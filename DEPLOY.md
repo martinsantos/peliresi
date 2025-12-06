@@ -1,142 +1,88 @@
-# INSTRUCCIONES DE DESPLIEGUE A PRODUCCIÓN
+# INSTRUCCIONES DE DESPLIEGUE A PRODUCCIÓN (AS-BUILT)
 
-## URL de Destino
-**www.ultimamilla.com.ar/demoambiente**
+## URL Principal
+**https://peliresi.vercel.app/login**
+
+(Redirección desde: `https://www.ultimamilla.com.ar/demoambiente`)
 
 ---
 
-## 1. Configuración del Servidor
+## 1. Arquitectura Híbrida
 
-### Requisitos
-- Node.js 18+
-- PostgreSQL 14+
-- Nginx (reverse proxy)
-- PM2 (process manager)
+- **Frontend (SPA)**: Vercel (Free Tier)
+- **Backend (API)**: Servidor VPS propio (23.105.176.45) en puerto `3010`
+- **Base de Datos**: PostgreSQL en Docker existente (Servidor VPS)
+- **Proxy Inverso**: Nginx en VPS (SSL Termination)
 
-### Variables de Entorno (Backend)
+---
 
-Copiar `.env.production` a `.env`:
+## 2. Configuración Backend (Servidor)
 
+### Ubicación
+- Ruta: `/home/demoambiente`
+- Servicio PM2: `demo-backend`
+- Puerto Interno: `3010`
+
+### Comandos de Mantenimiento
 ```bash
-cd backend
-cp .env.production .env
-# Editar con valores reales:
-# - DATABASE_URL
-# - JWT_SECRET y JWT_REFRESH_SECRET
-# - SUPER_ADMIN_EMAIL=santosma@gmail.com
-# - ENABLE_ANALYTICS=true
+# Reiniciar Backend
+pm2 restart demo-backend
+
+# Ver Logs
+pm2 logs demo-backend
+
+# Actualizar Código
+cd /home/demoambiente
+# (Subir nuevos archivos dist/)
+pm2 restart demo-backend
+```
+
+### Variables de Entorno (.env)
+```env
+NODE_ENV=production
+PORT=3010
+DATABASE_URL="postgresql://directus:umbot_directus_2025!@localhost:5432/trazabilidad_demo?schema=public"
+JWT_SECRET=demo-secret-dgfa-mendoza-2025
+JWT_REFRESH_SECRET=demo-refresh-dgfa-2025
+FRONTEND_URL=https://peliresi.vercel.app
+SUPER_ADMIN_EMAIL=santosma@gmail.com
+ENABLE_ANALYTICS=true
+CORS_ORIGIN=https://peliresi.vercel.app
 ```
 
 ---
 
-## 2. Despliegue Backend
+## 3. Configuración Frontend (Vercel)
 
-```bash
-# Instalar dependencias
-cd backend
-npm install
+El frontend está desplegado en Vercel conectado al repositorio GitHub.
 
-# Regenerar cliente Prisma
-npx prisma generate
-
-# Migrar base de datos
-npx prisma migrate deploy
-
-# Seed de datos demo
-npm run db:seed
-npx ts-node prisma/seed-demo.ts
-
-# Build y start con PM2
-npm run build
-pm2 start dist/index.js --name "trazabilidad-api"
-```
-
----
-
-## 3. Despliegue Frontend
-
-```bash
-cd frontend
-
-# Instalar dependencias
-npm install
-
-# Build para producción
-npm run build
-
-# Copiar dist/ a nginx
-cp -r dist/* /var/www/demoambiente/
-```
+- **Repositorio**: `martinsantos/peliresi`
+- **Branch**: `main`
+- **Variables de Entorno (vercel.json)**:
+  - `VITE_API_URL`: `https://www.ultimamilla.com.ar/api`
 
 ---
 
 ## 4. Configuración Nginx
 
-```nginx
-# /etc/nginx/sites-available/demoambiente
+Ubicación: `/etc/nginx/sites-available/ultimamilla.com.ar`
 
-server {
-    listen 80;
-    server_name www.ultimamilla.com.ar;
-    
-    # IMPORTANTE: Evitar indexación
-    add_header X-Robots-Tag "noindex, nofollow" always;
-    
-    # Frontend
-    location /demoambiente {
-        alias /var/www/demoambiente;
-        try_files $uri $uri/ /demoambiente/index.html;
-    }
-    
-    # API Backend
-    location /demoambiente/api {
-        proxy_pass http://127.0.0.1:3002/api;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
+```nginx
+# Backend API
+location /api/ {
+    proxy_pass http://127.0.0.1:3010;
+    # ... headers standard ...
+}
+
+# Redirección acceso directo
+location /demoambiente {
+    return 301 https://peliresi.vercel.app/login;
 }
 ```
 
 ---
 
-## 5. Protección por Password (Opcional)
-
-Para agregar Basic Auth:
-
-```bash
-# Crear archivo de passwords
-htpasswd -c /etc/nginx/.htpasswd demouser
-
-# Agregar a location /demoambiente:
-auth_basic "Demo Ambiente";
-auth_basic_user_file /etc/nginx/.htpasswd;
-```
-
----
-
-## 6. Acceso a Estadísticas (Superadmin)
-
-### Configuración
-```env
-SUPER_ADMIN_EMAIL=santosma@gmail.com
-ENABLE_ANALYTICS=true
-```
-
-### Endpoints Disponibles
-
-| Endpoint | Descripción |
-|----------|-------------|
-| GET `/api/analytics/summary` | Resumen de estadísticas |
-| GET `/api/analytics/logs` | Logs detallados |
-| GET `/api/analytics/user/:email` | Actividad por usuario |
-
-### Acceso
-Solo accesible para el usuario logueado con email `santosma@gmail.com`.
-
----
-
-## 7. Credenciales Demo
+## 5. Credenciales Demo
 
 | Rol | Email | Password |
 |-----|-------|----------|
@@ -147,17 +93,12 @@ Solo accesible para el usuario logueado con email `santosma@gmail.com`.
 
 ---
 
-## 8. Verificar Despliegue
+## 6. Verificación
 
-```bash
-# Probar API
-curl https://www.ultimamilla.com.ar/demoambiente/api/health
-
-# Respuesta esperada:
-# {"status":"ok","message":"API is running"}
-```
+1. Backend Health: `https://www.ultimamilla.com.ar/api/health`
+2. Frontend Login: `https://peliresi.vercel.app/login`
+3. Redirección: `https://www.ultimamilla.com.ar/demoambiente` -> Vercel Login
 
 ---
 
-**Repositorio**: https://github.com/martinsantos/peliresi  
-**Fecha**: 2025-12-06
+*Fecha de Despliegue: 2025-12-06*
