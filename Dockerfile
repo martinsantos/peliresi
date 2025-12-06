@@ -1,18 +1,17 @@
-# Dockerfile para Railway
-FROM node:18-alpine
+# Multi-stage build para optimizar tamaño y velocidad
+FROM node:18-alpine AS builder
 
 # Instalar OpenSSL para Prisma
 RUN apk add --no-cache openssl
 
-WORKDIR /app
-
-# Copiar package.json de backend
-COPY backend/package*.json ./backend/
-COPY backend/prisma ./backend/prisma/
-
-# Instalar dependencias
 WORKDIR /app/backend
-RUN npm ci --only=production
+
+# Copiar solo archivos de dependencias primero (para cache)
+COPY backend/package*.json ./
+COPY backend/prisma ./prisma/
+
+# Instalar SOLO dependencias de producción
+RUN npm ci --only=production --ignore-scripts
 
 # Generar Prisma Client
 RUN npx prisma generate
@@ -21,11 +20,31 @@ RUN npx prisma generate
 COPY backend/src ./src
 COPY backend/tsconfig.json ./
 
-# Build TypeScript
+# Instalar TypeScript solo para build
+RUN npm install --save-dev typescript @types/node
+
+# Build
 RUN npm run build
+
+# Etapa final - imagen mínima
+FROM node:18-alpine
+
+RUN apk add --no-cache openssl
+
+WORKDIR /app
+
+# Copiar solo lo necesario desde builder
+COPY --from=builder /app/backend/node_modules ./node_modules
+COPY --from=builder /app/backend/dist ./dist
+COPY --from=builder /app/backend/prisma ./prisma
+COPY backend/package*.json ./
 
 # Exponer puerto
 EXPOSE 3000
+
+# Variables de entorno por defecto
+ENV NODE_ENV=production
+ENV PORT=3000
 
 # Comando de inicio
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
