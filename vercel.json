@@ -4,7 +4,7 @@
     "installCommand": null,
     "framework": null,
     "env": {
-        "VITE_API_URL": "https://peliresi-backend.up.railway.app/api"
+        "VITE_API_URL": "https://www.ultimamilla.com.ar/api"
     },
     "rewrites": [
         {

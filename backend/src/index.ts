@@ -29,6 +29,11 @@ if (process.env.ENABLE_ANALYTICS === 'true') {
 }
 
 // Rutas
+// Ruta de prueba (Health Check) - Mover al inicio para evitar conflictos de middleware
+app.get('/api/health', (req: Request, res: Response) => {
+  res.json({ status: 'ok', message: 'API is running' });
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/manifiestos', manifiestoRoutes);
 app.use('/api/catalogos', catalogoRoutes);
@@ -37,11 +42,6 @@ app.use('/api/reportes', reporteRoutes);
 app.use('/api/actores', actorRoutes);
 app.use('/api', notificationRoutes);
 app.use('/api/analytics', analyticsRoutes);
-
-// Ruta de prueba
-app.get('/api/health', (req: Request, res: Response) => {
-  res.json({ status: 'ok', message: 'API is running' });
-});
 
 // Manejador de rutas no encontradas
 app.use(notFoundHandler);
