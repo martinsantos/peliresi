@@ -191,7 +191,6 @@ class IndexedDBManager {
         return new Promise((resolve, reject) => {
             const transaction = this.db!.transaction([STORES.SYNC_QUEUE], 'readonly');
             const store = transaction.objectStore(STORES.SYNC_QUEUE);
-            const index = store.index('type');
             const request = store.getAll();
 
             request.onsuccess = () => {

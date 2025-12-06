@@ -14,8 +14,7 @@ import {
     Wifi,
     WifiOff,
     RefreshCw,
-    Download,
-    Database
+    Download
 } from 'lucide-react';
 import './TransportistaApp.css';
 
@@ -26,7 +25,6 @@ const TransportistaApp: React.FC = () => {
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [lastSync, setLastSync] = useState<Date | null>(null);
     const [syncing, setSyncing] = useState(false);
-    const [offlineMode, setOfflineMode] = useState(false);
 
     // Mock data para demo visual inmediata
     const mockManifiestos = [
@@ -55,12 +53,10 @@ const TransportistaApp: React.FC = () => {
         // Listener para cambios de conectividad
         const handleOnline = () => {
             setIsOnline(true);
-            setOfflineMode(false);
             syncData(); // Auto-sync al reconectar
         };
         const handleOffline = () => {
             setIsOnline(false);
-            setOfflineMode(true);
         };
 
         // Listener para mensajes del Service Worker
