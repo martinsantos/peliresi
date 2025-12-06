@@ -3,6 +3,9 @@
     "outputDirectory": "frontend/dist",
     "installCommand": null,
     "framework": null,
+    "env": {
+        "VITE_API_URL": "https://peliresi-backend.up.railway.app/api"
+    },
     "rewrites": [
         {
             "source": "/(.*)",
