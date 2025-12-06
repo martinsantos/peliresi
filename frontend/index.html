@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json" />
+
+  <!-- Mobile Meta Tags -->
+  <meta name="theme-color" content="#f59e0b" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Trazabilidad RRPP" />
+
+  <!-- SEO - Block indexing for demo -->
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="googlebot" content="noindex, nofollow" />
+  <meta name="description" content="Sistema de Trazabilidad de Residuos Peligrosos - Gobierno de Mendoza" />
+
+  <title>Trazabilidad RRPP - Gobierno de Mendoza</title>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+
+  <!-- Service Worker Registration (CU-T09: Offline-First) -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then((registration) => {
+            console.log('✅ Service Worker registrado:', registration.scope);
+
+            // Listener para mensajes del SW
+            navigator.serviceWorker.addEventListener('message', (event) => {
+              if (event.data.type === 'SYNC_COMPLETE') {
+                console.log('🔄 Sincronización completada:', event.data.timestamp);
+                // Disparar evento personalizado para que React lo escuche
+                window.dispatchEvent(new CustomEvent('sw-sync-complete', {
+                  detail: event.data
+                }));
+              }
+            });
+          })
+          .catch((error) => {
+            console.error('❌ Error al registrar Service Worker:', error);
+          });
+      });
+    }
+  </script>
+</body>
+
+</html>

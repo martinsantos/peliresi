@@ -1,0 +1,108 @@
+.operador-app .mobile-header {
+    background: linear-gradient(135deg, #059669, #047857);
+}
+
+.operador-app .header-avatar.operador {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.operador-app .stat-card.info {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.operador-app .stat-card.success {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.operador-app .stat-card.primary {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.operador-app .tab-btn.active {
+    background: #059669;
+    box-shadow: 0 4px 10px -3px rgba(5, 150, 105, 0.5);
+}
+
+.operador-card {
+    border-left: 4px solid #10b981;
+}
+
+.eta-badge {
+    background: #dbeafe;
+    color: #1e40af;
+    font-size: 0.75rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 12px;
+    font-weight: 700;
+}
+
+.weight-comparison {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 12px;
+    margin: 0.75rem 0;
+    border: 1px solid #e2e8f0;
+}
+
+.weight-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.weight-label {
+    font-size: 0.7rem;
+    color: #64748b;
+    margin-bottom: 0.25rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.weight-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.weight-value.highlight {
+    color: #059669;
+}
+
+.weight-arrow {
+    font-size: 1.5rem;
+    color: #94a3b8;
+    font-weight: 300;
+}
+
+.difference-alert {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background: #fef3c7;
+    border-radius: 8px;
+    color: #92400e;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border: 1px solid #fcd34d;
+}
+
+.btn-mobile.info {
+    background: #10b981;
+    color: white;
+    box-shadow: 0 4px 12px -3px rgba(16, 185, 129, 0.4);
+}
+
+.btn-mobile.danger {
+    background: #fef2f2;
+    color: #b91c1c;
+    border: 2px solid #fecaca;
+}
+
+.btn-mobile.danger:hover {
+    background: #fee2e2;
+}

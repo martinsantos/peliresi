@@ -1,0 +1,507 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id              String      @id @default(cuid())
+  email           String      @unique
+  password        String
+  rol             Rol
+  cuit            String?     @unique
+  nombre          String
+  apellido        String?
+  empresa         String?
+  telefono        String?
+  activo          Boolean     @default(true)
+  dosFaSecret     String?
+  dosFaVerificado Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relaciones
+  generador       Generador?
+  transportista   Transportista?
+  operador        Operador?
+  refreshTokens   RefreshToken[]
+  manifiestosCreados Manifiesto[]    @relation("UsuarioManifiestos")
+  eventos         EventoManifiesto[]
+  auditorias      Auditoria[]         @relation("UsuarioAuditorias")
+  notificaciones  Notificacion[]
+  reglasCreadas   ReglaAlerta[]       @relation("ReglasCreadas")
+
+  @@map("usuarios")
+}
+
+model Generador {
+  id                String      @id @default(cuid())
+  usuarioId         String      @unique
+  razonSocial       String
+  cuit              String      @unique
+  domicilio         String
+  telefono          String
+  email             String
+  numeroInscripcion String
+  categoria         String
+  activo            Boolean     @default(true)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relaciones
+  usuario     Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  manifiestos Manifiesto[]
+
+  @@map("generadores")
+}
+
+model Transportista {
+  id                  String    @id @default(cuid())
+  usuarioId           String    @unique
+  razonSocial         String
+  cuit                String    @unique
+  domicilio           String
+  telefono            String
+  email               String
+  numeroHabilitacion  String
+  activo              Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  // Relaciones
+  usuario       Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  vehiculos     Vehiculo[]
+  choferes      Chofer[]
+  manifiestos   Manifiesto[]
+
+  @@map("transportistas")
+}
+
+model Operador {
+  id                  String    @id @default(cuid())
+  usuarioId           String    @unique
+  razonSocial         String
+  cuit                String    @unique
+  domicilio           String
+  telefono            String
+  email               String
+  numeroHabilitacion  String
+  categoria           String
+  activo              Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  // Relaciones
+  usuario       Usuario              @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  tratamientos  TratamientoAutorizado[]
+  manifiestos   Manifiesto[]
+
+  @@map("operadores")
+}
+
+model Vehiculo {
+  id              String      @id @default(cuid())
+  transportistaId String
+  patente         String
+  marca           String
+  modelo          String
+  anio            Int
+  capacidad       Float
+  numeroHabilitacion String
+  vencimiento     DateTime
+  activo          Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relaciones
+  transportista Transportista @relation(fields: [transportistaId], references: [id], onDelete: Cascade)
+
+  @@map("vehiculos")
+}
+
+model Chofer {
+  id              String      @id @default(cuid())
+  transportistaId String
+  nombre          String
+  apellido        String
+  dni             String
+  licencia        String
+  vencimiento     DateTime
+  telefono        String
+  activo          Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relaciones
+  transportista Transportista @relation(fields: [transportistaId], references: [id], onDelete: Cascade)
+
+  @@map("choferes")
+}
+
+model TipoResiduo {
+  id              String      @id @default(cuid())
+  codigo          String      @unique
+  nombre          String
+  descripcion     String?
+  categoria       String
+  caracteristicas String?
+  peligrosidad    String
+  activo          Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relaciones
+  manifiestos     ManifiestoResiduo[]
+  tratamientos    TratamientoAutorizado[]
+
+  @@map("tipos_residuos")
+}
+
+model Manifiesto {
+  id              String      @id @default(cuid())
+  numero          String      @unique
+  generadorId     String
+  transportistaId String
+  operadorId      String
+  estado          EstadoManifiesto @default(BORRADOR)
+  observaciones   String?
+  fechaCreacion   DateTime    @default(now())
+  fechaFirma      DateTime?
+  fechaRetiro     DateTime?
+  fechaEntrega    DateTime?
+  fechaRecepcion  DateTime?
+  fechaCierre     DateTime?
+  qrCode          String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relaciones
+  generador       Generador           @relation(fields: [generadorId], references: [id])
+  transportista   Transportista       @relation(fields: [transportistaId], references: [id])
+  operador        Operador            @relation(fields: [operadorId], references: [id])
+  creadoPor       Usuario             @relation("UsuarioManifiestos", fields: [creadoPorId], references: [id])
+  creadoPorId     String
+  residuos        ManifiestoResiduo[]
+  eventos         EventoManifiesto[]
+  tracking        TrackingGPS[]
+  auditorias      Auditoria[]
+  notificaciones  Notificacion[]
+  alertas         AlertaGenerada[]
+  anomalias       AnomaliaTransporte[]
+
+  @@map("manifiestos")
+}
+
+model ManifiestoResiduo {
+  id              String      @id @default(cuid())
+  manifiestoId    String
+  tipoResiduoId   String
+  cantidad        Float
+  unidad          String
+  cantidadRecibida Float?
+  tipoDiferencia  TipoDiferencia?
+  observaciones   String?
+  descripcion     String?
+  estado          String
+  createdAt       DateTime    @default(now())
+
+  // Relaciones
+  manifiesto    Manifiesto    @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
+  tipoResiduo   TipoResiduo   @relation(fields: [tipoResiduoId], references: [id])
+
+  @@map("manifiestos_residuos")
+}
+
+enum TipoDiferencia {
+  FALTANTE
+  EXCEDENTE
+  NINGUNA
+}
+
+model EventoManifiesto {
+  id              String      @id @default(cuid())
+  manifiestoId    String
+  tipo            String
+  descripcion     String
+  ubicacion       String?
+  latitud         Float?
+  longitud        Float?
+  usuarioId       String
+  createdAt       DateTime    @default(now())
+
+  // Relaciones
+  manifiesto    Manifiesto    @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
+  usuario       Usuario       @relation(fields: [usuarioId], references: [id])
+
+  @@map("eventos_manifiesto")
+}
+
+model TrackingGPS {
+  id              String      @id @default(cuid())
+  manifiestoId    String
+  latitud         Float
+  longitud        Float
+  velocidad       Float?
+  direccion       Float?
+  precision       Float?
+  timestamp       DateTime    @default(now())
+
+  // Relaciones
+  manifiesto    Manifiesto    @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
+
+  @@map("tracking_gps")
+}
+
+model TratamientoAutorizado {
+  id              String      @id @default(cuid())
+  operadorId      String
+  tipoResiduoId   String
+  metodo          String
+  descripcion     String?
+  capacidad       Float
+  activo          Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relaciones
+  operador      Operador      @relation(fields: [operadorId], references: [id], onDelete: Cascade)
+  tipoResiduo   TipoResiduo   @relation(fields: [tipoResiduoId], references: [id])
+
+  @@unique([operadorId, tipoResiduoId, metodo])
+  @@map("tratamientos_autorizados")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  usuarioId String
+  revocado  Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model Auditoria {
+  id              String      @id @default(cuid())
+  accion          String
+  modulo          String
+  datosAntes      String?
+  datosDespues    String?
+  ip              String?
+  userAgent       String?
+  usuarioId       String
+  manifiestoId    String?
+  createdAt       DateTime    @default(now())
+
+  // Relaciones
+  usuario     Usuario     @relation("UsuarioAuditorias", fields: [usuarioId], references: [id])
+  manifiesto  Manifiesto? @relation(fields: [manifiestoId], references: [id])
+
+  @@map("auditorias")
+}
+
+// Enumeraciones
+enum Rol {
+  ADMIN
+  GENERADOR
+  TRANSPORTISTA
+  OPERADOR
+}
+
+enum EstadoManifiesto {
+  BORRADOR
+  PENDIENTE_APROBACION
+  APROBADO
+  EN_TRANSITO
+  ENTREGADO
+  RECIBIDO
+  EN_TRATAMIENTO
+  TRATADO
+  RECHAZADO
+  CANCELADO
+}
+
+// ========== SISTEMA DE NOTIFICACIONES IN-APP ==========
+
+model Notificacion {
+  id              String              @id @default(cuid())
+  usuarioId       String
+  tipo            TipoNotificacion
+  titulo          String
+  mensaje         String
+  datos           String?             // JSON con datos adicionales
+  manifiestoId    String?
+  leida           Boolean             @default(false)
+  fechaLeida      DateTime?
+  prioridad       PrioridadNotificacion @default(NORMAL)
+  createdAt       DateTime            @default(now())
+
+  // Relaciones
+  usuario         Usuario             @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  manifiesto      Manifiesto?         @relation(fields: [manifiestoId], references: [id])
+
+  @@index([usuarioId, leida])
+  @@map("notificaciones")
+}
+
+model ReglaAlerta {
+  id              String              @id @default(cuid())
+  nombre          String
+  descripcion     String?
+  evento          EventoAlerta
+  condicion       String              // JSON con condiciones
+  destinatarios   String              // JSON con roles/usuarios
+  activa          Boolean             @default(true)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  creadoPorId     String
+
+  // Relaciones
+  creadoPor       Usuario             @relation("ReglasCreadas", fields: [creadoPorId], references: [id])
+  alertasGeneradas AlertaGenerada[]
+
+  @@map("reglas_alertas")
+}
+
+model AlertaGenerada {
+  id              String              @id @default(cuid())
+  reglaId         String
+  manifiestoId    String?
+  datos           String              // JSON con datos del evento
+  estado          EstadoAlerta        @default(PENDIENTE)
+  resueltaPor     String?
+  fechaResolucion DateTime?
+  notas           String?
+  createdAt       DateTime            @default(now())
+
+  // Relaciones
+  regla           ReglaAlerta         @relation(fields: [reglaId], references: [id])
+  manifiesto      Manifiesto?         @relation(fields: [manifiestoId], references: [id])
+
+  @@map("alertas_generadas")
+}
+
+model AnomaliaTransporte {
+  id              String              @id @default(cuid())
+  manifiestoId    String
+  tipo            TipoAnomalia
+  descripcion     String
+  latitud         Float
+  longitud        Float
+  valorDetectado  Float?
+  valorEsperado   Float?
+  severidad       SeveridadAnomalia   @default(MEDIA)
+  resuelta        Boolean             @default(false)
+  resueltaPor     String?
+  fechaResolucion DateTime?
+  notas           String?
+  createdAt       DateTime            @default(now())
+
+  // Relaciones
+  manifiesto      Manifiesto          @relation(fields: [manifiestoId], references: [id])
+
+  @@map("anomalias_transporte")
+}
+
+// Enumeraciones adicionales
+enum TipoNotificacion {
+  MANIFIESTO_FIRMADO
+  MANIFIESTO_EN_TRANSITO
+  MANIFIESTO_ENTREGADO
+  MANIFIESTO_RECIBIDO
+  MANIFIESTO_TRATADO
+  MANIFIESTO_RECHAZADO
+  INCIDENTE_REPORTADO
+  ANOMALIA_DETECTADA
+  VENCIMIENTO_PROXIMO
+  ALERTA_SISTEMA
+  INFO_GENERAL
+}
+
+enum PrioridadNotificacion {
+  BAJA
+  NORMAL
+  ALTA
+  URGENTE
+}
+
+enum EventoAlerta {
+  CAMBIO_ESTADO
+  INCIDENTE
+  DESVIO_RUTA
+  TIEMPO_EXCESIVO
+  DIFERENCIA_PESO
+  RECHAZO_CARGA
+  VENCIMIENTO
+  ANOMALIA_GPS
+}
+
+enum EstadoAlerta {
+  PENDIENTE
+  EN_REVISION
+  RESUELTA
+  DESCARTADA
+}
+
+enum TipoAnomalia {
+  DESVIO_RUTA
+  TIEMPO_EXCESIVO
+  VELOCIDAD_ANORMAL
+  PARADA_PROLONGADA
+  GPS_PERDIDO
+  RUTA_NO_AUTORIZADA
+}
+
+enum SeveridadAnomalia {
+  BAJA
+  MEDIA
+  ALTA
+  CRITICA
+}
+
+// ========== ANALYTICS & LOGGING ==========
+
+model AnalyticsLog {
+  id              String      @id @default(cuid())
+  timestamp       DateTime    @default(now())
+  method          String
+  path            String
+  userAgent       String?
+  ipAddress       String?
+  userId          String?
+  userEmail       String?
+  statusCode      Int
+  responseTimeMs  Int
+  queryParams     String?
+  requestBody     String?
+  
+  @@index([timestamp])
+  @@index([userId])
+  @@index([path])
+  @@map("analytics_logs")
+}
+
+// ========== DEMO ACCESS CONTROL ==========
+
+model DemoAccess {
+  id              String      @id @default(cuid())
+  sessionId       String      @unique
+  ipAddress       String?
+  userAgent       String?
+  accessGranted   DateTime    @default(now())
+  lastActivity    DateTime    @default(now())
+  
+  @@index([sessionId])
+  @@map("demo_access")
+}

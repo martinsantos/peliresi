@@ -1,0 +1,338 @@
+.carga-masiva-page {
+    padding: 1.5rem;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.carga-masiva-page .page-header {
+    margin-bottom: 1.5rem;
+}
+
+.carga-masiva-page .page-header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 0.25rem;
+}
+
+.carga-masiva-page .page-header p {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* Message */
+.message {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    border-radius: 10px;
+    margin-bottom: 1.5rem;
+    font-weight: 500;
+}
+
+.message.success {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.message.error {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.message-close {
+    margin-left: auto;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: inherit;
+    opacity: 0.5;
+}
+
+.message-close:hover {
+    opacity: 1;
+}
+
+/* Container */
+.carga-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+/* Step Card */
+.step-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 1.5rem;
+}
+
+.step-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.step-number {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    border-radius: 50%;
+    color: white;
+    font-weight: 700;
+    font-size: 0.875rem;
+}
+
+.step-header h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: white;
+    margin: 0;
+}
+
+.step-description {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-bottom: 1rem;
+}
+
+/* Tipo Selector */
+.tipo-selector {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.tipo-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1.25rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.tipo-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.tipo-btn.selected {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: #10b981;
+    color: #34d399;
+}
+
+.tipo-btn span {
+    font-weight: 500;
+}
+
+/* Upload Area */
+.upload-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2.5rem;
+    border: 2px dashed rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.02);
+    cursor: pointer;
+    transition: all 0.3s;
+    margin-bottom: 1rem;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.upload-area:hover {
+    border-color: rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.upload-area.has-file {
+    border-color: #10b981;
+    background: rgba(16, 185, 129, 0.08);
+    color: #34d399;
+}
+
+.upload-area p {
+    margin: 0.75rem 0 0.25rem;
+    font-size: 0.875rem;
+}
+
+.upload-area span {
+    font-size: 0.75rem;
+}
+
+.file-name {
+    font-weight: 600;
+    color: white;
+}
+
+.file-size {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.btn-large {
+    width: 100%;
+    padding: 1rem;
+    font-size: 1rem;
+}
+
+/* Resultado Card */
+.resultado-card .step-number {
+    background: transparent;
+}
+
+.resultado-stats {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.resultado-stats .stat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.resultado-stats .stat.success {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.resultado-stats .stat.error {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.resultado-stats .stat.total {
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: white;
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-top: 0.25rem;
+}
+
+/* Errores Lista */
+.errores-lista {
+    background: rgba(239, 68, 68, 0.05);
+    border: 1px solid rgba(239, 68, 68, 0.15);
+    border-radius: 12px;
+    padding: 1rem;
+}
+
+.errores-lista h4 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #f87171;
+    margin: 0 0 0.75rem;
+}
+
+.errores-scroll {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.error-item {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 0.8rem;
+}
+
+.error-item:last-child {
+    border-bottom: none;
+}
+
+.error-item .linea {
+    flex-shrink: 0;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.error-item .error-msg {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* Instrucciones */
+.instrucciones-card {
+    margin-top: 1.5rem;
+    background: rgba(59, 130, 246, 0.08);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 16px;
+    padding: 1.5rem;
+}
+
+.instrucciones-card h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #60a5fa;
+    margin: 0 0 1rem;
+}
+
+.instrucciones-card ul {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+.instrucciones-card li {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 0.5rem;
+}
+
+/* Spin */
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+    .tipo-selector {
+        flex-direction: column;
+    }
+
+    .resultado-stats {
+        flex-direction: column;
+    }
+}
