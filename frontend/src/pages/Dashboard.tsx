@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { manifiestoService } from '../services/manifiesto.service';
 import type { DashboardStats } from '../types';
+import OnboardingTour from '../components/OnboardingTour';
 import {
     FileText,
     TrendingUp,
@@ -13,7 +14,8 @@ import {
     ArrowRight,
     MapPin,
     Activity,
-    Smartphone
+    Smartphone,
+    HelpCircle
 } from 'lucide-react';
 import './Dashboard.css';
 
@@ -22,9 +24,15 @@ const Dashboard: React.FC = () => {
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [showTour, setShowTour] = useState(false);
 
     useEffect(() => {
         loadDashboard();
+        // Mostrar tour si es la primera vez
+        const tourCompleted = localStorage.getItem('tourCompleted');
+        if (!tourCompleted) {
+            setTimeout(() => setShowTour(true), 500);
+        }
     }, []);
 
     const loadDashboard = async () => {
@@ -95,18 +103,38 @@ const Dashboard: React.FC = () => {
 
     return (
         <div className="dashboard animate-fadeIn">
+            {/* Onboarding Tour */}
+            <OnboardingTour
+                userRole={user?.rol as 'ADMIN' | 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR'}
+                isOpen={showTour}
+                onComplete={() => setShowTour(false)}
+            />
+
             {/* Welcome Section */}
             <div className="dashboard-welcome">
                 <div>
                     <h2>Bienvenido, {user?.nombre}!</h2>
                     <p>Aquí tienes un resumen de la actividad del sistema.</p>
                 </div>
-                {user?.rol === 'GENERADOR' && (
-                    <Link to="/manifiestos/nuevo" className="btn btn-primary">
-                        <FileText size={18} />
-                        Nuevo Manifiesto
-                    </Link>
-                )}
+                <div className="dashboard-welcome-actions">
+                    <button
+                        className="btn btn-ghost btn-help"
+                        onClick={() => {
+                            localStorage.removeItem('tourCompleted');
+                            setShowTour(true);
+                        }}
+                        title="Ver guía del sistema"
+                    >
+                        <HelpCircle size={18} />
+                        Ayuda
+                    </button>
+                    {user?.rol === 'GENERADOR' && (
+                        <Link to="/manifiestos/nuevo" className="btn btn-primary btn-nuevo-manifiesto">
+                            <FileText size={18} />
+                            Nuevo Manifiesto
+                        </Link>
+                    )}
+                </div>
             </div>
 
             {/* Mobile App Promo */}
