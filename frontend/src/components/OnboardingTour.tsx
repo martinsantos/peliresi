@@ -606,7 +606,7 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ userRole, onComplete, i
                     <rect
                         width="100%"
                         height="100%"
-                        fill="rgba(0, 0, 0, 0.8)"
+                        fill="rgba(0, 0, 0, 0.92)"
                         mask="url(#spotlight-mask)"
                     />
                 </svg>

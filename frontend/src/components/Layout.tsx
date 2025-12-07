@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -19,10 +19,12 @@ import {
     Users,
     Bell,
     Upload,
-    QrCode
+    QrCode,
+    HelpCircle
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import QRScanner from './QRScanner';
+import OnboardingTour from './OnboardingTour';
 import './Layout.css';
 
 interface LayoutProps {
@@ -36,6 +38,22 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [userMenuOpen, setUserMenuOpen] = useState(false);
     const [qrScannerOpen, setQrScannerOpen] = useState(false);
+    const [showTour, setShowTour] = useState(false);
+
+    // Mostrar tour automáticamente si es primera vez
+    useEffect(() => {
+        const tourCompleted = localStorage.getItem('tourCompleted');
+        if (!tourCompleted && location.pathname === '/dashboard') {
+            const timer = setTimeout(() => setShowTour(true), 800);
+            return () => clearTimeout(timer);
+        }
+    }, [location.pathname]);
+
+    const handleStartTour = () => {
+        localStorage.removeItem('tourCompleted');
+        navigate('/dashboard');
+        setTimeout(() => setShowTour(true), 300);
+    };
 
     const handleLogout = async () => {
         await logout();
@@ -152,6 +170,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     </div>
 
                     <div className="header-actions">
+                        {/* Help/Tour Button */}
+                        <button
+                            className="header-icon-btn help-btn"
+                            onClick={handleStartTour}
+                            title="Ver guía del sistema"
+                        >
+                            <HelpCircle size={20} />
+                        </button>
+
                         {/* QR Scanner Button */}
                         <button
                             className="header-icon-btn"
@@ -209,6 +236,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             {qrScannerOpen && (
                 <QRScanner onClose={() => setQrScannerOpen(false)} />
             )}
+
+            {/* Onboarding Tour */}
+            <OnboardingTour
+                userRole={user?.rol as 'ADMIN' | 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR'}
+                isOpen={showTour}
+                onComplete={() => setShowTour(false)}
+            />
         </div>
     );
 };
