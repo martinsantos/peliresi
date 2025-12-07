@@ -2,6 +2,7 @@ import axios from 'axios';
 import type { AxiosResponse, InternalAxiosRequestConfig, AxiosError } from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002/api';
+const BASE_URL = import.meta.env.BASE_URL || '/demoambiente/';
 
 const api = axios.create({
     baseURL: API_URL,
@@ -32,10 +33,12 @@ api.interceptors.response.use(
             localStorage.removeItem('accessToken');
             localStorage.removeItem('refreshToken');
             localStorage.removeItem('user');
-            window.location.href = '/login';
+            // Usar BASE_URL para redirigir correctamente en subdirectorio
+            window.location.href = `${BASE_URL}login`.replace('//', '/');
         }
         return Promise.reject(error);
     }
 );
 
 export default api;
+

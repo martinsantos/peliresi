@@ -18,10 +18,13 @@ import DemoApp from './pages/DemoApp';
 import './index.css';
 import './pages/DemoApp.css';
 
+// Base path para deployment en subdirectorio
+const BASE_PATH = import.meta.env.BASE_URL || '/demoambiente/';
+
 const App: React.FC = () => {
   return (
     <AuthProvider>
-      <Router>
+      <Router basename={BASE_PATH.replace(/\/$/, '')}>
         <Routes>
           {/* Ruta pública */}
           <Route path="/login" element={<Login />} />
