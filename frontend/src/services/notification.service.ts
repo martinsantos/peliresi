@@ -90,7 +90,8 @@ export const alertaService = {
     // Obtener reglas de alerta
     async getReglas() {
         const response = await api.get('/alertas/reglas');
-        return response.data.data;
+        // Handle different response structures: { data: [...] } or [...]
+        return response.data?.data || response.data || [];
     },
 
     // Crear regla

@@ -68,10 +68,11 @@ const ConfigurarAlertas: React.FC = () => {
         setLoading(true);
         try {
             const data = await alertaService.getReglas();
-            setReglas(data);
+            setReglas(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error('Error:', error);
             setMensaje({ tipo: 'error', texto: 'Error al cargar reglas' });
+            setReglas([]);
         } finally {
             setLoading(false);
         }
