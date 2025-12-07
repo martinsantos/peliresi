@@ -1,167 +1,512 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ChevronRight, ChevronLeft, Sparkles, CheckCircle2, Target, Lightbulb } from 'lucide-react';
+import {
+    X, ChevronRight, ChevronLeft, Sparkles, CheckCircle2, Target, Lightbulb,
+    FileText, Truck, MapPin, Users, Bell, BarChart3, Settings, Shield,
+    QrCode, Scale, ClipboardCheck, AlertTriangle, Download, Upload
+} from 'lucide-react';
 import './OnboardingTour.css';
 
 interface TourStep {
     id: string;
     title: string;
     content: string;
-    target?: string; // CSS selector
+    target?: string;
     position: 'top' | 'bottom' | 'left' | 'right' | 'center';
     icon?: React.ReactNode;
     highlight?: string;
     action?: string;
+    category?: string;
 }
 
+// ==========================================
+// TOUR ADMINISTRADOR - FLUJO COMPLETO
+// ==========================================
 const tourStepsAdmin: TourStep[] = [
+    // BIENVENIDA
     {
         id: 'welcome',
-        title: 'Bienvenido al Sistema de Trazabilidad',
-        content: 'Este sistema permite gestionar el ciclo completo de residuos peligrosos: desde su generación hasta la disposición final. Te guiaremos por las funciones principales.',
+        title: '👋 Bienvenido al Sistema de Trazabilidad RRPP',
+        content: 'Sistema integral para la gestión del ciclo completo de residuos peligrosos. Este tour te guiará por todas las funciones según tu rol de Administrador DGFA.',
         position: 'center',
         icon: <Sparkles className="step-icon-sparkle" />,
+        category: 'Inicio',
     },
+    // CU-A02: Dashboard Ejecutivo
+    {
+        id: 'dashboard',
+        title: '📊 Dashboard Ejecutivo (CU-A02)',
+        content: 'Panel de control con KPIs en tiempo real: manifiestos activos, en tránsito, completados. Actualización automática cada 5 minutos.',
+        target: '.stats-grid',
+        position: 'bottom',
+        icon: <BarChart3 />,
+        highlight: 'Indicadores clave de gestión',
+        category: 'Supervisión',
+    },
+    // NAVEGACIÓN
     {
         id: 'sidebar',
-        title: 'Menú de Navegación',
-        content: 'Desde aquí accedes a todos los módulos del sistema: Manifiestos, Tracking GPS, Reportes, Alertas y más.',
+        title: '📋 Menú de Navegación',
+        content: 'Acceso a todos los módulos del sistema. El menú se adapta según tu rol y permisos asignados.',
         target: '.sidebar',
         position: 'right',
         icon: <Target />,
-        highlight: 'Menú lateral izquierdo',
-        action: 'Explora las opciones del menú',
+        highlight: 'Menú lateral',
+        action: 'Explora las opciones disponibles',
     },
-    {
-        id: 'stats',
-        title: 'Panel de Estadísticas',
-        content: 'Visualiza métricas en tiempo real: manifiestos totales, en borrador, en tránsito y completados.',
-        target: '.stats-grid',
-        position: 'bottom',
-        icon: <Lightbulb />,
-        highlight: 'Indicadores clave',
-    },
+    // CU-A09: Monitoreo Tiempo Real
     {
         id: 'tracking',
-        title: 'Tracking GPS en Tiempo Real',
-        content: 'Monitorea la ubicación exacta de todos los transportes activos en el mapa interactivo.',
+        title: '🗺️ Monitoreo en Tiempo Real (CU-A09)',
+        content: 'Visualiza en mapa interactivo la ubicación GPS de todos los transportes activos. Actualización cada 30 segundos con detección automática de desvíos.',
         target: '[href*="tracking"]',
         position: 'right',
-        icon: <Target />,
-        action: 'Click para ver el mapa',
+        icon: <MapPin />,
+        action: 'Click para ver mapa GPS',
+        category: 'Monitoreo',
     },
+    // MANIFIESTOS
+    {
+        id: 'manifiestos',
+        title: '📄 Gestión de Manifiestos',
+        content: 'Consulta, filtra y supervisa todos los manifiestos del sistema. Accede al ciclo de vida completo de cada documento.',
+        target: '[href*="manifiestos"]',
+        position: 'right',
+        icon: <FileText />,
+        action: 'Ver listado de manifiestos',
+    },
+    // CU-A03/A04: Gestión Usuarios
     {
         id: 'actores',
-        title: 'Gestión de Actores',
-        content: 'Administra Generadores, Transportistas y Operadores habilitados en el sistema.',
+        title: '👥 Gestión de Actores (CU-A03/A04)',
+        content: 'Administra Generadores, Transportistas y Operadores habilitados. Crea usuarios, asigna roles y permisos específicos.',
         target: '[href*="actores"]',
         position: 'right',
-        icon: <Target />,
+        icon: <Users />,
+        action: 'Gestionar usuarios del sistema',
+        category: 'Administración',
     },
+    // CU-A13: Configurar Alertas
+    {
+        id: 'alertas',
+        title: '🔔 Configurar Alertas (CU-A13)',
+        content: 'Define reglas para alertas automáticas: vencimientos, desvíos de ruta, tiempos excesivos. Configura destinatarios y canales (email, push).',
+        target: '[href*="alertas"]',
+        position: 'right',
+        icon: <Bell />,
+        action: 'Configurar reglas de alerta',
+        category: 'Configuración',
+    },
+    // CU-A15: Carga Masiva
+    {
+        id: 'carga-masiva',
+        title: '📤 Carga Masiva Inicial (CU-A15)',
+        content: 'Importa el padrón histórico de actores desde Excel/CSV. El sistema valida, detecta duplicados y reporta errores.',
+        target: '[href*="carga-masiva"]',
+        position: 'right',
+        icon: <Upload />,
+        action: 'Importar datos masivos',
+    },
+    // REPORTES
+    {
+        id: 'reportes',
+        title: '📈 Reportes Estadísticos (CU-A11)',
+        content: 'Genera informes personalizables por período, tipo de residuo, actor o zona. Exporta en PDF, CSV o XML.',
+        target: '[href*="reportes"]',
+        position: 'right',
+        icon: <BarChart3 />,
+        action: 'Generar reportes',
+        category: 'Reportes',
+    },
+    // CU-A10: Auditoría
+    {
+        id: 'configuracion',
+        title: '⚙️ Auditoría y Configuración (CU-A10)',
+        content: 'Consulta el log de auditoría con todas las operaciones: fecha, usuario, IP, datos antes/después. Registro inmutable para cumplimiento legal.',
+        target: '[href*="configuracion"]',
+        position: 'right',
+        icon: <Settings />,
+        action: 'Ver logs de auditoría',
+        category: 'Sistema',
+    },
+    // SEGURIDAD
+    {
+        id: 'seguridad',
+        title: '🔒 Seguridad del Sistema',
+        content: 'Autenticación JWT con refresh tokens, RBAC por rol, CORS configurado, API protegida. Cumplimiento normativo Ley 24.051.',
+        position: 'center',
+        icon: <Shield />,
+        category: 'Seguridad',
+    },
+    // FINAL
     {
         id: 'complete',
-        title: '¡Todo Listo!',
-        content: 'Ya conoces las funciones principales. Puedes volver a ver esta guía desde el botón "Ayuda" en cualquier momento.',
+        title: '✅ ¡Tour Completado!',
+        content: 'Ya conoces todas las funciones de administración. Recuerda: puedes volver a ver esta guía desde el botón "Ayuda" en cualquier momento.',
         position: 'center',
         icon: <CheckCircle2 className="step-icon-success" />,
     },
 ];
 
+// ==========================================
+// TOUR GENERADOR - FLUJO COMPLETO
+// ==========================================
 const tourStepsGenerador: TourStep[] = [
+    // BIENVENIDA
     {
         id: 'welcome',
-        title: 'Bienvenido, Generador',
-        content: 'Desde este panel puedes crear manifiestos electrónicos para declarar tus residuos peligrosos.',
+        title: '🏭 Bienvenido, Generador de Residuos',
+        content: 'Este sistema te permite declarar y gestionar tus residuos peligrosos mediante manifiestos electrónicos con firma digital.',
         position: 'center',
         icon: <Sparkles className="step-icon-sparkle" />,
+        category: 'Inicio',
     },
+    // CU-G02: Dashboard
     {
-        id: 'nuevo',
-        title: 'Crear Nuevo Manifiesto',
-        content: 'Haz click aquí para crear un nuevo manifiesto. Selecciona residuo, transportista y operador destino.',
-        target: '.btn-nuevo-manifiesto',
-        position: 'bottom',
-        icon: <Target />,
-        action: 'Click para comenzar',
-    },
-    {
-        id: 'stats',
-        title: 'Tus Estadísticas',
-        content: 'Ve el resumen de tus manifiestos: borradores, en tránsito y completados.',
+        id: 'dashboard-gen',
+        title: '📊 Tu Panel de Control (CU-G02)',
+        content: 'Resumen de tus manifiestos: borradores pendientes, en proceso de firma, en tránsito y completados. Accesos rápidos a funciones principales.',
         target: '.stats-grid',
         position: 'bottom',
-        icon: <Lightbulb />,
+        icon: <BarChart3 />,
+        highlight: 'Contadores de manifiestos',
+        category: 'Dashboard',
     },
+    // CU-G03: Crear Manifiesto
     {
-        id: 'manifiestos',
-        title: 'Historial de Manifiestos',
-        content: 'Consulta todos tus manifiestos, descarga PDFs y realiza seguimiento.',
-        target: '[href*="manifiestos"]',
-        position: 'right',
-        icon: <Target />,
+        id: 'nuevo-manifiesto',
+        title: '➕ Crear Nuevo Manifiesto (CU-G03)',
+        content: 'Inicia aquí la declaración de un nuevo envío. Tus datos como generador se precargan automáticamente.',
+        target: '.btn-nuevo-manifiesto',
+        position: 'bottom',
+        icon: <FileText />,
+        action: 'Click para crear manifiesto',
+        category: 'Creación',
     },
+    // CU-G04: Tipo de Residuo
     {
-        id: 'complete',
-        title: '¡Listo para Comenzar!',
-        content: 'Al firmar un manifiesto, el transportista será notificado automáticamente.',
+        id: 'tipo-residuo',
+        title: '🧪 Seleccionar Tipo de Residuo (CU-G04)',
+        content: 'Busca en el catálogo oficial (Ley 24.051). Categorías Y1-Y45 con códigos, nombres y características de peligrosidad.',
         position: 'center',
-        icon: <CheckCircle2 className="step-icon-success" />,
+        icon: <AlertTriangle />,
+        highlight: 'Catálogo de residuos peligrosos',
+        category: 'Creación',
     },
-];
-
-const tourStepsTransportista: TourStep[] = [
+    // CU-G05: Asignar Transportista
     {
-        id: 'welcome',
-        title: 'Bienvenido, Transportista',
-        content: 'Gestiona los retiros y entregas de residuos peligrosos asignados a tu empresa.',
+        id: 'asignar-transportista',
+        title: '🚛 Asignar Transportista (CU-G05)',
+        content: 'Selecciona de la lista de transportistas habilitados. El sistema filtra los compatibles con tu tipo de residuo.',
         position: 'center',
-        icon: <Sparkles className="step-icon-sparkle" />,
+        icon: <Truck />,
+        highlight: 'Lista de transportistas autorizados',
+        category: 'Asignación',
     },
+    // CU-G06: Asignar Operador
     {
-        id: 'manifiestos',
-        title: 'Manifiestos Asignados',
-        content: 'Ve los manifiestos pendientes de retiro que te han sido asignados.',
-        target: '[href*="manifiestos"]',
-        position: 'right',
+        id: 'asignar-operador',
+        title: '♻️ Asignar Operador Destino (CU-G06)',
+        content: 'Elige la planta de tratamiento. Visualiza métodos de tratamiento autorizados y capacidad disponible.',
+        position: 'center',
         icon: <Target />,
+        highlight: 'Plantas de tratamiento habilitadas',
+        category: 'Asignación',
     },
+    // CU-G07: Firma
     {
-        id: 'tracking',
-        title: 'Tracking GPS',
-        content: 'Tu ubicación se registra automáticamente durante el transporte para trazabilidad completa.',
+        id: 'firmar-manifiesto',
+        title: '✍️ Firmar Manifiesto (CU-G07)',
+        content: 'Aplica tu firma electrónica. El sistema genera automáticamente el código QR único. El transportista es notificado al instante.',
+        position: 'center',
+        icon: <ClipboardCheck />,
+        highlight: 'Firma digital con validez legal',
+        category: 'Firma',
+    },
+    // CU-G08: Consultar Estado
+    {
+        id: 'estado-manifiesto',
+        title: '📍 Seguimiento en Tiempo Real (CU-G08)',
+        content: 'Consulta el estado actual de tus manifiestos. Si está en tránsito, visualiza la ubicación GPS del transporte en el mapa.',
         target: '[href*="tracking"]',
         position: 'right',
-        icon: <Lightbulb />,
+        icon: <MapPin />,
+        action: 'Ver ubicación del transporte',
+        category: 'Seguimiento',
     },
+    // CU-G09: Historial
     {
-        id: 'complete',
-        title: '¡Listo para Operar!',
-        content: 'La app funciona offline. Los datos se sincronizan al recuperar conexión.',
+        id: 'historial-gen',
+        title: '📋 Historial de Manifiestos (CU-G09)',
+        content: 'Accede al listado completo de tus manifiestos. Filtra por período, estado o tipo de residuo. Timeline completo de cada documento.',
+        target: '[href*="manifiestos"]',
+        position: 'right',
+        icon: <FileText />,
+        action: 'Ver historial completo',
+        category: 'Consulta',
+    },
+    // CU-G10: Descargar PDF
+    {
+        id: 'descargar-pdf',
+        title: '📥 Descargar PDF con QR (CU-G10)',
+        content: 'Genera copia PDF del manifiesto firmado. Incluye todos los datos, firmas digitales, código QR y timeline de eventos.',
+        position: 'center',
+        icon: <Download />,
+        highlight: 'Documento oficial descargable',
+        category: 'Documentos',
+    },
+    // CU-G11: Notificaciones
+    {
+        id: 'notificaciones-gen',
+        title: '🔔 Notificaciones Automáticas (CU-G11)',
+        content: 'Recibe alertas de cambios de estado: retiro confirmado, llegada a destino, cierre de manifiesto. Por email y notificaciones push.',
+        position: 'center',
+        icon: <Bell />,
+        category: 'Notificaciones',
+    },
+    // FINAL
+    {
+        id: 'complete-gen',
+        title: '✅ ¡Listo para Operar!',
+        content: 'Ya conoces el flujo completo. Al firmar un manifiesto, el transportista será notificado y podrá iniciar el retiro.',
         position: 'center',
         icon: <CheckCircle2 className="step-icon-success" />,
     },
 ];
 
-const tourStepsOperador: TourStep[] = [
+// ==========================================
+// TOUR TRANSPORTISTA - FLUJO COMPLETO
+// ==========================================
+const tourStepsTransportista: TourStep[] = [
+    // BIENVENIDA
     {
         id: 'welcome',
-        title: 'Bienvenido, Operador',
-        content: 'Gestiona la recepción, pesaje y tratamiento de residuos peligrosos en tu planta.',
+        title: '🚛 Bienvenido, Transportista',
+        content: 'Gestiona los retiros y entregas de residuos peligrosos. La app funciona offline y sincroniza automáticamente.',
         position: 'center',
         icon: <Sparkles className="step-icon-sparkle" />,
+        category: 'Inicio',
     },
+    // CU-T01: Sincronización
     {
-        id: 'manifiestos',
-        title: 'Manifiestos Entrantes',
-        content: 'Ve los transportes en camino a tu planta con ETA estimado.',
+        id: 'sync',
+        title: '🔄 Sincronización Automática (CU-T01)',
+        content: 'Al iniciar sesión, el sistema descarga automáticamente: manifiestos asignados, catálogo de residuos y datos de operadores.',
+        position: 'center',
+        icon: <Target />,
+        highlight: 'Base de datos local cifrada',
+        category: 'Sincronización',
+    },
+    // CU-T02: Ver Asignados
+    {
+        id: 'asignados',
+        title: '📋 Manifiestos Asignados (CU-T02)',
+        content: 'Listado de manifiestos pendientes de retiro. Cada registro muestra: N° manifiesto, generador, tipo de residuo, dirección y fecha límite.',
         target: '[href*="manifiestos"]',
         position: 'right',
-        icon: <Target />,
+        icon: <FileText />,
+        action: 'Ver manifiestos pendientes',
+        category: 'Gestión',
     },
+    // CU-T03: Confirmar Retiro
     {
-        id: 'complete',
-        title: '¡Listo para Operar!',
-        content: 'Escanea QR para recepción rápida. Cada cierre genera certificado automático.',
+        id: 'confirmar-retiro',
+        title: '✅ Confirmar Retiro en Origen (CU-T03)',
+        content: 'Registra el retiro en la ubicación del generador. El sistema captura GPS, hora y permite firma en pantalla. Funciona 100% OFFLINE.',
+        position: 'center',
+        icon: <ClipboardCheck />,
+        highlight: 'Captura GPS + Firma digital',
+        category: 'Operación',
+    },
+    // CU-T04: Iniciar Transporte
+    {
+        id: 'iniciar-viaje',
+        title: '🚀 Iniciar Transporte (CU-T04)',
+        content: 'Activa el seguimiento GPS automático. El sistema calcula ruta y ETA, notifica a generador y operador destino.',
+        position: 'center',
+        icon: <Truck />,
+        highlight: 'Tracking GPS activado',
+        category: 'Transporte',
+    },
+    // CU-T05: Actualizar Estado
+    {
+        id: 'actualizar-estado',
+        title: '📝 Actualizar Estado en Tránsito (CU-T05)',
+        content: 'Registra eventos durante el viaje: paradas programadas, demoras, cambio de conductor. Cada evento con ubicación GPS.',
+        position: 'center',
+        icon: <MapPin />,
+        category: 'Transporte',
+    },
+    // CU-T06: Incidentes
+    {
+        id: 'registrar-incidente',
+        title: '🚨 Registrar Incidentes (CU-T06)',
+        content: 'Documenta anomalías: accidentes, derrames, robos. Incluye descripción, fotos y GPS. La DGFA es alertada inmediatamente.',
+        position: 'center',
+        icon: <AlertTriangle />,
+        highlight: 'Alerta inmediata a autoridades',
+        category: 'Incidentes',
+    },
+    // CU-T07: Confirmar Entrega
+    {
+        id: 'confirmar-entrega',
+        title: '📦 Confirmar Entrega en Destino (CU-T07)',
+        content: 'Registra llegada a la planta del operador. El sistema verifica GPS vs dirección destino y solicita confirmación del operador.',
+        position: 'center',
+        icon: <CheckCircle2 />,
+        highlight: 'Verificación de ubicación',
+        category: 'Entrega',
+    },
+    // CU-T08: Escanear QR
+    {
+        id: 'escanear-qr',
+        title: '📱 Escanear QR de Manifiesto (CU-T08)',
+        content: 'Lee el código QR para carga rápida de información y verificación de autenticidad. Si el QR es ilegible, permite ingreso manual.',
+        position: 'center',
+        icon: <QrCode />,
+        action: 'Escanear para verificar',
+        category: 'Verificación',
+    },
+    // CU-T09: Modo Offline
+    {
+        id: 'modo-offline',
+        title: '📡 Operación Sin Conexión (CU-T09)',
+        content: 'La app detecta pérdida de conectividad y activa modo offline transparente. Al recuperar señal, sincroniza automáticamente.',
+        position: 'center',
+        icon: <Target />,
+        highlight: 'Service Worker + IndexedDB',
+        category: 'Offline',
+    },
+    // FINAL
+    {
+        id: 'complete-trans',
+        title: '✅ ¡Listo para Operar!',
+        content: 'Ya conoces todas las funciones. Recuerda: la app funciona sin conexión y los datos se sincronizan al recuperar señal.',
+        position: 'center',
+        icon: <CheckCircle2 className="step-icon-success" />,
+    },
+];
+
+// ==========================================
+// TOUR OPERADOR - FLUJO COMPLETO
+// ==========================================
+const tourStepsOperador: TourStep[] = [
+    // BIENVENIDA
+    {
+        id: 'welcome',
+        title: '♻️ Bienvenido, Operador de Tratamiento',
+        content: 'Gestiona la recepción, pesaje, tratamiento y disposición final de residuos peligrosos en tu planta.',
+        position: 'center',
+        icon: <Sparkles className="step-icon-sparkle" />,
+        category: 'Inicio',
+    },
+    // CU-O02: Ver Entrantes
+    {
+        id: 'entrantes',
+        title: '🚚 Manifiestos Entrantes (CU-O02)',
+        content: 'Visualiza transportes en camino a tu planta. Cada registro muestra: generador, transportista, tipo de residuo y ETA estimado.',
+        target: '[href*="manifiestos"]',
+        position: 'right',
+        icon: <Truck />,
+        action: 'Ver entregas pendientes',
+        category: 'Recepción',
+    },
+    // CU-O03: Recepción QR
+    {
+        id: 'recepcion-qr',
+        title: '📱 Recepción con QR (CU-O03)',
+        content: 'Escanea el QR del manifiesto al llegar el transporte. El sistema valida integridad y estado. Funciona OFFLINE contra lista de "Esperados".',
+        position: 'center',
+        icon: <QrCode />,
+        highlight: 'Validación offline disponible',
+        category: 'Recepción',
+    },
+    // CU-O04: Pesaje
+    {
+        id: 'pesaje',
+        title: '⚖️ Registrar Pesaje (CU-O04)',
+        content: 'Ingresa el peso real medido en báscula. El sistema compara con lo declarado y calcula diferencia porcentual.',
+        position: 'center',
+        icon: <Scale />,
+        highlight: 'Comparación automática de pesos',
+        category: 'Verificación',
+    },
+    // CU-O05: Diferencias
+    {
+        id: 'diferencias',
+        title: '📊 Registrar Diferencias (CU-O05)',
+        content: 'Si hay discrepancia >5%, documenta el faltante/excedente con justificación y fotos. El sistema notifica a todas las partes.',
+        position: 'center',
+        icon: <AlertTriangle />,
+        highlight: 'Documentación de discrepancias',
+        category: 'Verificación',
+    },
+    // CU-O06: Rechazo
+    {
+        id: 'rechazo',
+        title: '❌ Rechazar Carga (CU-O06)',
+        content: 'Si corresponde, registra el rechazo total o parcial. Selecciona motivo, documenta con fotos. El transportista debe retornar la carga.',
+        position: 'center',
+        icon: <X />,
+        highlight: 'Documentación de rechazos',
+        category: 'Rechazo',
+    },
+    // CU-O07: Firmar Recepción
+    {
+        id: 'firmar-recepcion',
+        title: '✍️ Firmar Recepción Conforme (CU-O07)',
+        content: 'Aplica firma electrónica de conformidad. El sistema actualiza estado a "Recibido - Pendiente Tratamiento" y notifica al generador.',
+        position: 'center',
+        icon: <ClipboardCheck />,
+        highlight: 'Firma digital de recepción',
+        category: 'Firma',
+    },
+    // CU-O08: Tratamiento
+    {
+        id: 'tratamiento',
+        title: '⚗️ Registrar Tratamiento (CU-O08)',
+        content: 'Documenta el método aplicado: incineración, neutralización, encapsulamiento, etc. El sistema valida que esté autorizado para el residuo.',
+        position: 'center',
+        icon: <Settings />,
+        highlight: 'Métodos de tratamiento autorizados',
+        category: 'Tratamiento',
+    },
+    // CU-O09: Cerrar Manifiesto
+    {
+        id: 'cerrar-manifiesto',
+        title: '🔒 Cerrar Manifiesto (CU-O09)',
+        content: 'Finaliza el ciclo con firma electrónica de disposición final. El sistema genera certificado automático y notifica a todas las partes.',
+        position: 'center',
+        icon: <CheckCircle2 />,
+        highlight: 'TRAZABILIDAD COMPLETA',
+        category: 'Cierre',
+    },
+    // CU-O10: Certificado
+    {
+        id: 'certificado',
+        title: '📜 Certificado de Disposición (CU-O10)',
+        content: 'Se genera automáticamente al cerrar. Incluye todos los datos del residuo, tratamiento, fechas y firmas. Enviado al generador.',
+        position: 'center',
+        icon: <Download />,
+        highlight: 'Documento legal generado',
+        category: 'Documentos',
+    },
+    // CU-O11/O12: Historial y Reportes
+    {
+        id: 'historial-op',
+        title: '📋 Historial y Reportes (CU-O11/O12)',
+        content: 'Accede al registro histórico de todos los manifiestos procesados. Genera reportes por período, generador o tipo de residuo.',
+        target: '[href*="reportes"]',
+        position: 'right',
+        icon: <BarChart3 />,
+        action: 'Ver historial y reportes',
+        category: 'Consulta',
+    },
+    // FINAL
+    {
+        id: 'complete-op',
+        title: '✅ ¡Listo para Operar!',
+        content: 'Ya conoces el flujo completo de recepción y tratamiento. Cada cierre de manifiesto genera certificado automático para el generador.',
         position: 'center',
         icon: <CheckCircle2 className="step-icon-success" />,
     },
@@ -200,7 +545,6 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ userRole, onComplete, i
     const steps = getTourSteps();
     const step = steps[currentStep];
 
-    // Calcular posición del elemento target
     const updateTargetPosition = useCallback(() => {
         if (!step?.target) {
             setTargetRect(null);
@@ -220,10 +564,8 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ userRole, onComplete, i
         }
     }, [step]);
 
-    // Calcular posición del tooltip
     const updateTooltipPosition = useCallback(() => {
         if (!targetRect || !tooltipRef.current) {
-            // Centrado
             setTooltipStyle({
                 top: '50%',
                 left: '50%',
@@ -270,7 +612,6 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ userRole, onComplete, i
                 };
         }
 
-        // Bounds checking
         if (typeof style.left === 'number' && style.left < 20) style.left = 20;
         if (typeof style.top === 'number' && style.top < 20) style.top = 20;
 
@@ -325,7 +666,7 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ userRole, onComplete, i
 
     return createPortal(
         <div className="onboarding-overlay">
-            {/* SVG Mask para el spotlight */}
+            {/* SVG Mask */}
             <svg className="onboarding-mask" width="100%" height="100%">
                 <defs>
                     <mask id="spotlight-mask">
@@ -351,7 +692,7 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ userRole, onComplete, i
                 />
             </svg>
 
-            {/* Spotlight ring animado */}
+            {/* Spotlight ring */}
             {targetRect && (
                 <div
                     className="spotlight-ring"
@@ -370,36 +711,44 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ userRole, onComplete, i
                 className={`onboarding-tooltip ${isCenter ? 'tooltip-center' : ''} tooltip-${step?.position}`}
                 style={tooltipStyle}
             >
-                {/* Flecha */}
                 {!isCenter && <div className={`tooltip-arrow arrow-${step?.position}`} />}
 
-                {/* Header con icono */}
                 <div className="tooltip-header">
                     <div className="tooltip-icon-wrapper">
                         {step?.icon || <Lightbulb />}
                     </div>
-                    <div className="tooltip-step-indicator">
-                        Paso {currentStep + 1} de {steps.length}
+                    <div className="tooltip-meta">
+                        <div className="tooltip-step-indicator">
+                            Paso {currentStep + 1} de {steps.length}
+                        </div>
+                        {step?.category && (
+                            <div className="tooltip-category">{step.category}</div>
+                        )}
                     </div>
                     <button className="tooltip-close" onClick={handleComplete}>
                         <X size={18} />
                     </button>
                 </div>
 
-                {/* Contenido */}
                 <div className="tooltip-content">
                     <h3 className="tooltip-title">{step?.title}</h3>
                     <p className="tooltip-description">{step?.content}</p>
 
+                    {step?.highlight && (
+                        <div className="tooltip-highlight">
+                            <Target size={14} />
+                            <span>{step.highlight}</span>
+                        </div>
+                    )}
+
                     {step?.action && (
                         <div className="tooltip-action-hint">
-                            <Target size={14} />
+                            <ChevronRight size={14} />
                             <span>{step.action}</span>
                         </div>
                     )}
                 </div>
 
-                {/* Progress dots */}
                 <div className="tooltip-progress">
                     {steps.map((_, idx) => (
                         <button
@@ -410,7 +759,6 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ userRole, onComplete, i
                     ))}
                 </div>
 
-                {/* Footer con botones */}
                 <div className="tooltip-footer">
                     <button className="tooltip-skip" onClick={handleComplete}>
                         Omitir tour
