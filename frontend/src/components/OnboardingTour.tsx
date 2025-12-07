@@ -1,389 +1,302 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { createPortal } from 'react-dom';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
 import {
-    X, ChevronRight, ChevronLeft, Sparkles, CheckCircle2, Target, Lightbulb,
-    FileText, Truck, MapPin, Users, BarChart3, Scale, Play, RotateCcw, Eye, Zap
+    X, ChevronRight, ChevronLeft, Sparkles, CheckCircle2,
+    FileText, Truck, MapPin, Users, BarChart3, Scale,
+    Bell, Settings, QrCode, Shield, Factory, Building2,
+    ClipboardCheck, AlertTriangle, Download, Zap
 } from 'lucide-react';
 import './OnboardingTour.css';
 
-interface TourStep {
+interface TourSlide {
     id: string;
     title: string;
-    content: string;
-    target?: string;
-    position: 'top' | 'bottom' | 'left' | 'right' | 'center';
-    icon?: React.ReactNode;
-    highlight?: string;
-    action?: string;
-    category?: string;
-    navigateTo?: string; // Nueva prop para navegación
-    waitForElement?: string; // Elemento a esperar después de navegar
-    delay?: number; // Delay antes de mostrar el tooltip
+    subtitle: string;
+    description: string;
+    icon: React.ReactNode;
+    features: string[];
+    color: string;
 }
 
-// ==========================================
-// TOUR ADMINISTRADOR - CON NAVEGACIÓN
-// ==========================================
-const tourStepsAdmin: TourStep[] = [
+// Slides para cada rol
+const slidesAdmin: TourSlide[] = [
     {
         id: 'welcome',
-        title: '🎉 Bienvenido al Sistema DGFA',
-        content: 'Te guiaremos por todas las funciones del sistema con una experiencia interactiva. ¡Preparate para conocer el poder de la trazabilidad digital!',
-        position: 'center',
-        icon: <Sparkles className="step-icon-sparkle" />,
-        category: 'Inicio',
+        title: '¡Bienvenido al Sistema DGFA!',
+        subtitle: 'Trazabilidad de Residuos Peligrosos',
+        description: 'Sistema integral para gestionar el ciclo completo de residuos peligrosos según Ley 24.051.',
+        icon: <Shield />,
+        features: ['Gestión digital completa', 'Trazabilidad en tiempo real', 'Cumplimiento normativo'],
+        color: '#10b981',
     },
     {
-        id: 'dashboard-stats',
-        title: '📊 Panel de Control en Tiempo Real',
-        content: 'Métricas actualizadas automáticamente: manifiestos totales, borradores, en tránsito y completados. Un vistazo a toda la operación.',
-        target: '.stats-grid',
-        position: 'bottom',
+        id: 'dashboard',
+        title: 'Dashboard Ejecutivo',
+        subtitle: 'Vista general del sistema',
+        description: 'Panel de control con métricas actualizadas automáticamente cada 5 minutos.',
         icon: <BarChart3 />,
-        highlight: 'Indicadores clave (KPIs)',
-        category: 'Dashboard',
-        navigateTo: '/dashboard',
+        features: ['KPIs en tiempo real', 'Manifiestos por estado', 'Actividad reciente'],
+        color: '#3b82f6',
     },
     {
-        id: 'go-manifiestos',
-        title: '📄 Vamos a ver los Manifiestos',
-        content: 'El corazón del sistema. Aquí se gestionan todos los documentos de trazabilidad. ¡Te llevamos allí!',
-        position: 'center',
-        icon: <Zap className="step-icon-zap" />,
-        category: 'Navegación',
-        action: 'Navegando a Manifiestos...',
-    },
-    {
-        id: 'manifiestos-list',
-        title: '📋 Listado de Manifiestos',
-        content: 'Vista completa de todos los manifiestos del sistema. Filtra por estado, fecha, generador o transportista. Click en cualquiera para ver el detalle.',
-        target: '.manifiestos-table, .recent-list, .card',
-        position: 'bottom',
+        id: 'manifiestos',
+        title: 'Gestión de Manifiestos',
+        subtitle: 'Documentos de trazabilidad',
+        description: 'Consulta, filtra y supervisa todos los manifiestos. Timeline completo de cada documento.',
         icon: <FileText />,
-        highlight: 'Tabla de manifiestos con filtros',
-        category: 'Manifiestos',
-        navigateTo: '/manifiestos',
-        delay: 500,
+        features: ['Listado filtrable', 'Estados en tiempo real', 'Descarga PDF con QR'],
+        color: '#8b5cf6',
     },
     {
-        id: 'go-tracking',
-        title: '🗺️ Vamos al Mapa en Tiempo Real',
-        content: 'Visualiza la ubicación GPS de todos los transportes activos. ¡Es impresionante!',
-        position: 'center',
-        icon: <MapPin className="step-icon-map" />,
-        category: 'Navegación',
-        action: 'Navegando al Tracking GPS...',
-    },
-    {
-        id: 'tracking-map',
-        title: '📍 Monitoreo GPS en Vivo',
-        content: 'Mapa interactivo con la ubicación de cada transporte. Actualización cada 30 segundos. Detecta desvíos de ruta automáticamente.',
-        target: '.tracking-content, .map-container, .card',
-        position: 'right',
+        id: 'tracking',
+        title: 'Tracking GPS',
+        subtitle: 'Monitoreo en tiempo real',
+        description: 'Mapa interactivo con ubicación de transportes activos. Actualización cada 30 segundos.',
         icon: <MapPin />,
-        highlight: 'Transportes activos en tiempo real',
-        category: 'Tracking',
-        navigateTo: '/tracking',
-        delay: 500,
+        features: ['Mapa en vivo', 'ETA automático', 'Detección de desvíos'],
+        color: '#f59e0b',
     },
     {
-        id: 'go-actores',
-        title: '👥 Gestión de Actores del Sistema',
-        content: 'Administra Generadores, Transportistas y Operadores habilitados.',
-        position: 'center',
+        id: 'actores',
+        title: 'Gestión de Actores',
+        subtitle: 'Usuarios del sistema',
+        description: 'Administra Generadores, Transportistas y Operadores habilitados.',
         icon: <Users />,
-        category: 'Navegación',
+        features: ['CRUD completo', 'Roles y permisos', 'Estado de habilitación'],
+        color: '#ec4899',
     },
     {
-        id: 'actores-list',
-        title: '🏢 Actores Habilitados',
-        content: 'Crea usuarios, asigna roles y permisos. Ve el estado de habilitación de cada actor en la cadena de trazabilidad.',
-        target: '.actors-grid, .card, table',
-        position: 'bottom',
-        icon: <Users />,
-        highlight: 'Generadores, Transportistas, Operadores',
-        category: 'Actores',
-        navigateTo: '/actores',
-        delay: 500,
+        id: 'alertas',
+        title: 'Sistema de Alertas',
+        subtitle: 'Notificaciones automáticas',
+        description: 'Configura reglas para alertas: vencimientos, desvíos, tiempos excesivos.',
+        icon: <Bell />,
+        features: ['Reglas personalizables', 'Email y push', 'Historial de alertas'],
+        color: '#ef4444',
     },
     {
-        id: 'go-reportes',
-        title: '📈 Reportes y Estadísticas',
-        content: 'Genera informes personalizables para análisis y cumplimiento normativo.',
-        position: 'center',
+        id: 'reportes',
+        title: 'Reportes Estadísticos',
+        subtitle: 'Análisis y exportación',
+        description: 'Genera informes por período, tipo de residuo, actor o zona geográfica.',
         icon: <BarChart3 />,
-        category: 'Navegación',
+        features: ['Reportes personalizados', 'Exportación PDF/CSV/XML', 'Gráficos interactivos'],
+        color: '#14b8a6',
     },
     {
-        id: 'reportes-view',
-        title: '📊 Centro de Reportes',
-        content: 'Reportes por período, tipo de residuo, actor o zona geográfica. Exporta en PDF, CSV o XML.',
-        target: '.reports-container, .card, .stats',
-        position: 'bottom',
-        icon: <BarChart3 />,
-        highlight: 'Exportación multi-formato',
-        category: 'Reportes',
-        navigateTo: '/reportes',
-        delay: 500,
-    },
-    {
-        id: 'final-dashboard',
-        title: '🏠 Regresando al Dashboard',
-        content: 'Volvemos al panel principal para culminar el recorrido.',
-        position: 'center',
-        icon: <Target />,
-        category: 'Final',
-        navigateTo: '/dashboard',
-        delay: 300,
-    },
-    {
-        id: 'tour-complete',
-        title: '🎊 ¡Tour Completado!',
-        content: 'Ya conoces todas las funciones principales. El botón "Ayuda" está siempre disponible para repetir este tour. ¡Manos a la obra!',
-        position: 'center',
-        icon: <CheckCircle2 className="step-icon-success" />,
-        category: 'Completado',
+        id: 'complete',
+        title: '¡Tour Completado!',
+        subtitle: 'Listo para comenzar',
+        description: 'Ya conoces todas las funciones principales. Puedes volver a ver esta guía desde el botón "?" en cualquier momento.',
+        icon: <CheckCircle2 />,
+        features: ['Soporte disponible', 'Documentación completa', 'Actualizaciones continuas'],
+        color: '#10b981',
     },
 ];
 
-// ==========================================
-// TOUR GENERADOR - CON NAVEGACIÓN
-// ==========================================
-const tourStepsGenerador: TourStep[] = [
+const slidesGenerador: TourSlide[] = [
     {
         id: 'welcome',
-        title: '🏭 Bienvenido, Generador',
-        content: 'Este tour te mostrará cómo gestionar tus residuos peligrosos de manera digital y segura.',
-        position: 'center',
-        icon: <Sparkles className="step-icon-sparkle" />,
-        category: 'Inicio',
+        title: '¡Bienvenido, Generador!',
+        subtitle: 'Gestiona tus residuos peligrosos',
+        description: 'Declara y gestiona tus residuos mediante manifiestos electrónicos con firma digital.',
+        icon: <Factory />,
+        features: ['Manifiestos digitales', 'Firma electrónica', 'Seguimiento en tiempo real'],
+        color: '#10b981',
     },
     {
-        id: 'dashboard-gen',
-        title: '📊 Tu Panel de Control',
-        content: 'Aquí ves el resumen de todos tus manifiestos: cuántos están pendientes, en tránsito y completados.',
-        target: '.stats-grid',
-        position: 'bottom',
-        icon: <BarChart3 />,
-        highlight: 'Tus estadísticas personales',
-        category: 'Dashboard',
-        navigateTo: '/dashboard',
-    },
-    {
-        id: 'nuevo-btn',
-        title: '➕ Crear Nuevo Manifiesto',
-        content: 'Este es el botón más importante. Desde aquí inicias la declaración de un nuevo envío de residuos.',
-        target: '.btn-nuevo-manifiesto, [href*="nuevo"]',
-        position: 'bottom',
+        id: 'crear',
+        title: 'Crear Manifiesto',
+        subtitle: 'Declaración de residuos',
+        description: 'Selecciona tipo de residuo, cantidad, transportista y operador destino.',
         icon: <FileText />,
-        action: 'Click aquí para crear',
-        category: 'Creación',
+        features: ['Catálogo Ley 24.051', 'Datos precargados', 'QR automático'],
+        color: '#3b82f6',
     },
     {
-        id: 'go-form',
-        title: '📝 Vamos al Formulario',
-        content: 'Te mostramos cómo se ve el formulario de creación de manifiestos.',
-        position: 'center',
-        icon: <Zap className="step-icon-zap" />,
-        category: 'Navegación',
+        id: 'asignar',
+        title: 'Asignar Actores',
+        subtitle: 'Transportista y Operador',
+        description: 'Elige de la lista de actores habilitados compatibles con tu tipo de residuo.',
+        icon: <Users />,
+        features: ['Filtro por residuo', 'Verificación activa', 'Notificación automática'],
+        color: '#8b5cf6',
     },
     {
-        id: 'form-view',
-        title: '📋 Formulario de Manifiesto',
-        content: 'Aquí seleccionas: tipo de residuo, cantidad, transportista habilitado y operador destino. Tus datos ya están precargados.',
-        target: 'form, .form-container, .card',
-        position: 'right',
-        icon: <FileText />,
-        highlight: 'Campos del manifiesto',
-        category: 'Creación',
-        navigateTo: '/manifiestos/nuevo',
-        delay: 500,
+        id: 'firmar',
+        title: 'Firma Digital',
+        subtitle: 'Validez legal',
+        description: 'Al firmar, se genera código QR único y el transportista es notificado al instante.',
+        icon: <ClipboardCheck />,
+        features: ['Firma electrónica', 'Código QR único', 'Notificación push'],
+        color: '#f59e0b',
     },
     {
-        id: 'go-historial',
-        title: '📚 Tu Historial',
-        content: 'Veamos el listado completo de tus manifiestos.',
-        position: 'center',
-        icon: <Eye />,
-        category: 'Navegación',
-    },
-    {
-        id: 'historial-view',
-        title: '📋 Historial de Manifiestos',
-        content: 'Todos tus manifiestos con su estado actual. Puedes filtrar, buscar y descargar PDFs.',
-        target: '.manifiestos-table, table, .card',
-        position: 'bottom',
-        icon: <FileText />,
-        highlight: 'Filtros y descarga PDF',
-        category: 'Historial',
-        navigateTo: '/manifiestos',
-        delay: 500,
-    },
-    {
-        id: 'back-dashboard',
-        title: '🏠 Volviendo al Inicio',
-        content: 'Regresamos al Dashboard.',
-        position: 'center',
-        icon: <Target />,
-        navigateTo: '/dashboard',
-        delay: 300,
-    },
-    {
-        id: 'complete-gen',
-        title: '✅ ¡Listo para Operar!',
-        content: 'Ya sabes cómo crear y gestionar manifiestos. Al firmar, el transportista es notificado automáticamente. ¡Éxitos!',
-        position: 'center',
-        icon: <CheckCircle2 className="step-icon-success" />,
-    },
-];
-
-// ==========================================
-// TOUR TRANSPORTISTA - CON NAVEGACIÓN
-// ==========================================
-const tourStepsTransportista: TourStep[] = [
-    {
-        id: 'welcome',
-        title: '🚛 Bienvenido, Transportista',
-        content: 'Te mostramos cómo gestionar retiros y entregas con tracking GPS y modo offline.',
-        position: 'center',
-        icon: <Sparkles className="step-icon-sparkle" />,
-        category: 'Inicio',
-    },
-    {
-        id: 'dashboard-trans',
-        title: '📊 Tus Estadísticas',
-        content: 'Manifiestos asignados, en tránsito y completados. Todo en un vistazo.',
-        target: '.stats-grid',
-        position: 'bottom',
-        icon: <BarChart3 />,
-        category: 'Dashboard',
-        navigateTo: '/dashboard',
-    },
-    {
-        id: 'go-manifiestos',
-        title: '📋 Veamos tus Asignaciones',
-        content: 'Los manifiestos que tienes pendientes de retiro.',
-        position: 'center',
-        icon: <Truck />,
-        category: 'Navegación',
-    },
-    {
-        id: 'asignados-view',
-        title: '📦 Manifiestos Pendientes',
-        content: 'Lista de retiros asignados con dirección, tipo de residuo y fecha límite. Click para ver detalle.',
-        target: '.manifiestos-table, table, .card',
-        position: 'bottom',
-        icon: <FileText />,
-        highlight: 'Pendientes de retiro',
-        category: 'Asignados',
-        navigateTo: '/manifiestos',
-        delay: 500,
-    },
-    {
-        id: 'go-tracking',
-        title: '📍 Tu Ubicación en Tiempo Real',
-        content: 'Veamos el mapa de tracking GPS.',
-        position: 'center',
-        icon: <MapPin className="step-icon-map" />,
-        category: 'Navegación',
-    },
-    {
-        id: 'tracking-trans',
-        title: '🗺️ Tracking GPS',
-        content: 'Durante el transporte, tu ubicación se registra automáticamente. El generador y operador pueden seguirte en tiempo real.',
-        target: '.tracking-content, .map-container, .card',
-        position: 'right',
+        id: 'seguimiento',
+        title: 'Seguimiento GPS',
+        subtitle: 'Ubicación en tiempo real',
+        description: 'Visualiza en mapa la ubicación del transporte durante todo el viaje.',
         icon: <MapPin />,
-        highlight: 'Tu posición en el mapa',
-        category: 'GPS',
-        navigateTo: '/tracking',
-        delay: 500,
+        features: ['Mapa interactivo', 'ETA estimado', 'Historial de ruta'],
+        color: '#ec4899',
     },
     {
-        id: 'back-dashboard',
-        title: '🏠 Volviendo al Inicio',
-        content: 'Regresamos al Dashboard.',
-        position: 'center',
-        icon: <Target />,
-        navigateTo: '/dashboard',
-        delay: 300,
+        id: 'historial',
+        title: 'Historial y PDFs',
+        subtitle: 'Registro completo',
+        description: 'Accede al listado de manifiestos y descarga PDFs con todas las firmas.',
+        icon: <Download />,
+        features: ['Filtros avanzados', 'PDF descargable', 'Timeline de eventos'],
+        color: '#14b8a6',
     },
     {
-        id: 'complete-trans',
-        title: '✅ ¡Listo para la Ruta!',
-        content: 'La app funciona OFFLINE. Los datos se sincronizan al recuperar conexión. ¡Buen viaje!',
-        position: 'center',
-        icon: <CheckCircle2 className="step-icon-success" />,
+        id: 'complete',
+        title: '¡Listo para Operar!',
+        subtitle: 'Tu primer manifiesto',
+        description: 'Al firmar un manifiesto, el transportista será notificado automáticamente.',
+        icon: <CheckCircle2 />,
+        features: ['Soporte disponible', 'Notificaciones activas', 'Certificados automáticos'],
+        color: '#10b981',
     },
 ];
 
-// ==========================================
-// TOUR OPERADOR - CON NAVEGACIÓN
-// ==========================================
-const tourStepsOperador: TourStep[] = [
+const slidesTransportista: TourSlide[] = [
     {
         id: 'welcome',
-        title: '♻️ Bienvenido, Operador',
-        content: 'Te mostramos cómo gestionar recepción, pesaje y tratamiento de residuos.',
-        position: 'center',
-        icon: <Sparkles className="step-icon-sparkle" />,
-        category: 'Inicio',
-    },
-    {
-        id: 'dashboard-op',
-        title: '📊 Tu Panel de Operaciones',
-        content: 'Entregas en camino, pendientes de recepción y procesadas.',
-        target: '.stats-grid',
-        position: 'bottom',
-        icon: <BarChart3 />,
-        category: 'Dashboard',
-        navigateTo: '/dashboard',
-    },
-    {
-        id: 'go-manifiestos',
-        title: '🚚 Veamos las Entregas',
-        content: 'Manifiestos que vienen en camino a tu planta.',
-        position: 'center',
+        title: '¡Bienvenido, Transportista!',
+        subtitle: 'Gestiona retiros y entregas',
+        description: 'La app funciona OFFLINE y sincroniza automáticamente al recuperar conexión.',
         icon: <Truck />,
-        category: 'Navegación',
+        features: ['Modo offline', 'GPS automático', 'Sincronización'],
+        color: '#10b981',
     },
     {
-        id: 'entrantes-view',
-        title: '📦 Manifiestos Entrantes',
-        content: 'Lista de transportes en camino con ETA estimado. Prepara la recepción con anticipación.',
-        target: '.manifiestos-table, table, .card',
-        position: 'bottom',
+        id: 'asignados',
+        title: 'Manifiestos Asignados',
+        subtitle: 'Pendientes de retiro',
+        description: 'Lista de manifiestos asignados con dirección, tipo de residuo y fecha límite.',
         icon: <FileText />,
-        highlight: 'En camino a tu planta',
-        category: 'Recepción',
-        navigateTo: '/manifiestos',
-        delay: 500,
+        features: ['Lista ordenada', 'Direcciones claras', 'Fechas límite'],
+        color: '#3b82f6',
     },
     {
-        id: 'process-info',
-        title: '⚖️ Proceso de Recepción',
-        content: 'Al llegar el transporte: 1) Escanea QR, 2) Pesa en báscula, 3) Firma recepción, 4) Registra tratamiento, 5) Cierra manifiesto.',
-        position: 'center',
+        id: 'retiro',
+        title: 'Confirmar Retiro',
+        subtitle: 'En ubicación del generador',
+        description: 'Registra el retiro con GPS, hora y firma en pantalla. Funciona 100% OFFLINE.',
+        icon: <ClipboardCheck />,
+        features: ['Captura GPS', 'Firma digital', 'Funciona offline'],
+        color: '#8b5cf6',
+    },
+    {
+        id: 'transporte',
+        title: 'Durante el Transporte',
+        subtitle: 'Tracking automático',
+        description: 'Tu ubicación se registra automáticamente. Puedes registrar paradas o incidentes.',
+        icon: <MapPin />,
+        features: ['GPS continuo', 'Registro de paradas', 'Alertas de desvío'],
+        color: '#f59e0b',
+    },
+    {
+        id: 'incidentes',
+        title: 'Registrar Incidentes',
+        subtitle: 'Documentación de anomalías',
+        description: 'Documenta accidentes, derrames o robos con descripción, fotos y GPS.',
+        icon: <AlertTriangle />,
+        features: ['Fotos adjuntas', 'Ubicación exacta', 'Alerta inmediata'],
+        color: '#ef4444',
+    },
+    {
+        id: 'entrega',
+        title: 'Confirmar Entrega',
+        subtitle: 'En destino del operador',
+        description: 'Registra llegada, verifica GPS vs dirección destino, solicita confirmación.',
+        icon: <CheckCircle2 />,
+        features: ['Verificación GPS', 'Firma operador', 'Cierre parcial'],
+        color: '#14b8a6',
+    },
+    {
+        id: 'qr',
+        title: 'Escaneo QR',
+        subtitle: 'Verificación rápida',
+        description: 'Escanea el código QR del manifiesto para carga rápida y verificación.',
+        icon: <QrCode />,
+        features: ['Lectura instantánea', 'Verificación', 'Modo manual'],
+        color: '#ec4899',
+    },
+    {
+        id: 'complete',
+        title: '¡Listo para la Ruta!',
+        subtitle: 'Modo offline disponible',
+        description: 'La app funciona sin conexión. Los datos se sincronizan al recuperar señal.',
+        icon: <Zap />,
+        features: ['Sin internet', 'Sincronización', 'Datos seguros'],
+        color: '#10b981',
+    },
+];
+
+const slidesOperador: TourSlide[] = [
+    {
+        id: 'welcome',
+        title: '¡Bienvenido, Operador!',
+        subtitle: 'Recepción y tratamiento',
+        description: 'Gestiona la recepción, pesaje y tratamiento de residuos en tu planta.',
+        icon: <Building2 />,
+        features: ['Recepción digital', 'Pesaje registrado', 'Certificados'],
+        color: '#10b981',
+    },
+    {
+        id: 'entrantes',
+        title: 'Manifiestos Entrantes',
+        subtitle: 'En camino a tu planta',
+        description: 'Visualiza transportes en camino con generador, tipo de residuo y ETA.',
+        icon: <Truck />,
+        features: ['ETA estimado', 'Datos completos', 'Preparación anticipada'],
+        color: '#3b82f6',
+    },
+    {
+        id: 'recepcion',
+        title: 'Recepción con QR',
+        subtitle: 'Escaneo al llegar',
+        description: 'Escanea el QR del manifiesto. Funciona OFFLINE contra lista de "Esperados".',
+        icon: <QrCode />,
+        features: ['Escaneo rápido', 'Validación offline', 'Lista esperados'],
+        color: '#8b5cf6',
+    },
+    {
+        id: 'pesaje',
+        title: 'Registro de Pesaje',
+        subtitle: 'Peso en báscula',
+        description: 'Ingresa el peso real. El sistema compara con lo declarado automáticamente.',
         icon: <Scale />,
-        highlight: '5 pasos para cerrar el ciclo',
-        category: 'Proceso',
+        features: ['Comparación automática', 'Diferencia %', 'Justificación'],
+        color: '#f59e0b',
     },
     {
-        id: 'back-dashboard',
-        title: '🏠 Volviendo al Inicio',
-        content: 'Regresamos al Dashboard.',
-        position: 'center',
-        icon: <Target />,
-        navigateTo: '/dashboard',
-        delay: 300,
+        id: 'tratamiento',
+        title: 'Registrar Tratamiento',
+        subtitle: 'Método aplicado',
+        description: 'Documenta incineración, neutralización, encapsulamiento, etc.',
+        icon: <Settings />,
+        features: ['Métodos autorizados', 'Validación', 'Registro detallado'],
+        color: '#ec4899',
     },
     {
-        id: 'complete-op',
-        title: '✅ ¡Listo para Operar!',
-        content: 'Cada cierre genera certificado automático. El generador recibe notificación de disposición final. ¡Éxitos!',
-        position: 'center',
-        icon: <CheckCircle2 className="step-icon-success" />,
+        id: 'cierre',
+        title: 'Cerrar Manifiesto',
+        subtitle: 'Disposición final',
+        description: 'Firma electrónica de cierre. Se genera certificado automático.',
+        icon: <ClipboardCheck />,
+        features: ['Firma digital', 'Certificado PDF', 'Notificación generador'],
+        color: '#14b8a6',
+    },
+    {
+        id: 'complete',
+        title: '¡Listo para Operar!',
+        subtitle: 'Certificados automáticos',
+        description: 'Cada cierre genera certificado para el generador. Trazabilidad completa.',
+        icon: <CheckCircle2 />,
+        features: ['Certificados', 'Historial', 'Reportes'],
+        color: '#10b981',
     },
 ];
 
@@ -393,374 +306,165 @@ interface OnboardingTourProps {
     isOpen: boolean;
 }
 
-interface TargetRect {
-    top: number;
-    left: number;
-    width: number;
-    height: number;
-}
-
 const OnboardingTour: React.FC<OnboardingTourProps> = ({ userRole, onComplete, isOpen }) => {
-    const navigate = useNavigate();
-    const location = useLocation();
-    const [currentStep, setCurrentStep] = useState(0);
-    const [showTour, setShowTour] = useState(isOpen);
-    const [targetRect, setTargetRect] = useState<TargetRect | null>(null);
-    const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({});
-    const [isTransitioning, setIsTransitioning] = useState(false);
-    const tooltipRef = useRef<HTMLDivElement>(null);
+    const [currentSlide, setCurrentSlide] = useState(0);
+    const [isVisible, setIsVisible] = useState(false);
+    const [direction, setDirection] = useState<'next' | 'prev'>('next');
 
-    const getTourSteps = useCallback(() => {
+    const getSlides = () => {
         switch (userRole) {
-            case 'ADMIN': return tourStepsAdmin;
-            case 'GENERADOR': return tourStepsGenerador;
-            case 'TRANSPORTISTA': return tourStepsTransportista;
-            case 'OPERADOR': return tourStepsOperador;
-            default: return tourStepsAdmin;
+            case 'ADMIN': return slidesAdmin;
+            case 'GENERADOR': return slidesGenerador;
+            case 'TRANSPORTISTA': return slidesTransportista;
+            case 'OPERADOR': return slidesOperador;
+            default: return slidesAdmin;
         }
-    }, [userRole]);
+    };
 
-    const steps = getTourSteps();
-    const step = steps[currentStep];
-
-    // Buscar elemento con fallbacks
-    const findElement = useCallback((selector: string): Element | null => {
-        if (!selector) return null;
-        const selectors = selector.split(',').map(s => s.trim());
-        for (const sel of selectors) {
-            const el = document.querySelector(sel);
-            if (el) return el;
-        }
-        return null;
-    }, []);
-
-    const updateTargetPosition = useCallback(() => {
-        if (!step?.target || isTransitioning) {
-            setTargetRect(null);
-            return;
-        }
-
-        const element = findElement(step.target);
-        if (element) {
-            const rect = element.getBoundingClientRect();
-            const padding = 12;
-            setTargetRect({
-                top: rect.top - padding + window.scrollY,
-                left: rect.left - padding,
-                width: rect.width + padding * 2,
-                height: rect.height + padding * 2,
-            });
-
-            // Auto-scroll al elemento si no es visible
-            if (rect.top < 0 || rect.bottom > window.innerHeight) {
-                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-        } else {
-            setTargetRect(null);
-        }
-    }, [step, isTransitioning, findElement]);
-
-    const updateTooltipPosition = useCallback(() => {
-        if (!targetRect || !tooltipRef.current || step?.position === 'center') {
-            setTooltipStyle({
-                position: 'fixed',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-            });
-            return;
-        }
-
-        const tooltip = tooltipRef.current.getBoundingClientRect();
-        const gap = 20;
-        let style: React.CSSProperties = { position: 'fixed' };
-        const scrollY = window.scrollY;
-
-        switch (step?.position) {
-            case 'right':
-                style.top = Math.max(20, Math.min(
-                    targetRect.top - scrollY + targetRect.height / 2 - tooltip.height / 2,
-                    window.innerHeight - tooltip.height - 20
-                ));
-                style.left = Math.min(targetRect.left + targetRect.width + gap, window.innerWidth - tooltip.width - 20);
-                break;
-            case 'left':
-                style.top = targetRect.top - scrollY + targetRect.height / 2 - tooltip.height / 2;
-                style.left = Math.max(20, targetRect.left - tooltip.width - gap);
-                break;
-            case 'bottom':
-                style.top = Math.min(targetRect.top - scrollY + targetRect.height + gap, window.innerHeight - tooltip.height - 20);
-                style.left = Math.max(20, Math.min(
-                    targetRect.left + targetRect.width / 2 - tooltip.width / 2,
-                    window.innerWidth - tooltip.width - 20
-                ));
-                break;
-            case 'top':
-                style.top = Math.max(20, targetRect.top - scrollY - tooltip.height - gap);
-                style.left = targetRect.left + targetRect.width / 2 - tooltip.width / 2;
-                break;
-        }
-
-        setTooltipStyle(style);
-    }, [targetRect, step]);
-
-    // Navegar al paso
-    const navigateToStep = useCallback(async (stepIndex: number) => {
-        const targetStep = steps[stepIndex];
-        if (targetStep?.navigateTo && location.pathname !== targetStep.navigateTo) {
-            setIsTransitioning(true);
-            navigate(targetStep.navigateTo);
-
-            // Esperar más tiempo para que la página cargue completamente
-            await new Promise(resolve => setTimeout(resolve, targetStep.delay || 800));
-            setIsTransitioning(false);
-        }
-    }, [steps, navigate, location.pathname]);
+    const slides = getSlides();
+    const slide = slides[currentSlide];
+    const progress = ((currentSlide + 1) / slides.length) * 100;
 
     useEffect(() => {
-        setShowTour(isOpen);
         if (isOpen) {
-            setCurrentStep(0);
+            setCurrentSlide(0);
+            setIsVisible(true);
+            document.body.style.overflow = 'hidden';
+        } else {
+            setIsVisible(false);
+            document.body.style.overflow = '';
         }
+        return () => {
+            document.body.style.overflow = '';
+        };
     }, [isOpen]);
 
-    // Retry finding element after navigation
-    useEffect(() => {
-        if (showTour && !isTransitioning) {
-            // Primera búsqueda inmediata
-            const timer1 = setTimeout(() => {
-                updateTargetPosition();
-                setTimeout(updateTooltipPosition, 100);
-            }, 200);
-
-            // Segunda búsqueda después de que el DOM se estabilice
-            const timer2 = setTimeout(() => {
-                updateTargetPosition();
-                setTimeout(updateTooltipPosition, 100);
-            }, 600);
-
-            // Tercera búsqueda para páginas lentas
-            const timer3 = setTimeout(() => {
-                updateTargetPosition();
-                setTimeout(updateTooltipPosition, 100);
-            }, 1200);
-
-            return () => {
-                clearTimeout(timer1);
-                clearTimeout(timer2);
-                clearTimeout(timer3);
-            };
-        }
-    }, [showTour, currentStep, isTransitioning, updateTargetPosition, updateTooltipPosition, location.pathname]);
-
-    useEffect(() => {
-        const handleResize = () => {
-            updateTargetPosition();
-            updateTooltipPosition();
-        };
-        window.addEventListener('resize', handleResize);
-        window.addEventListener('scroll', handleResize);
-        return () => {
-            window.removeEventListener('resize', handleResize);
-            window.removeEventListener('scroll', handleResize);
-        };
-    }, [updateTargetPosition, updateTooltipPosition]);
-
-    const handleNext = async () => {
-        if (currentStep < steps.length - 1) {
-            const nextStep = currentStep + 1;
-            await navigateToStep(nextStep);
-            setCurrentStep(nextStep);
+    const handleNext = () => {
+        if (currentSlide < slides.length - 1) {
+            setDirection('next');
+            setCurrentSlide(currentSlide + 1);
         } else {
             handleComplete();
         }
     };
 
-    const handlePrev = async () => {
-        if (currentStep > 0) {
-            const prevStep = currentStep - 1;
-            await navigateToStep(prevStep);
-            setCurrentStep(prevStep);
+    const handlePrev = () => {
+        if (currentSlide > 0) {
+            setDirection('prev');
+            setCurrentSlide(currentSlide - 1);
         }
     };
 
     const handleComplete = () => {
-        setShowTour(false);
+        setIsVisible(false);
         localStorage.setItem('tourCompleted', 'true');
-        navigate('/dashboard');
-        onComplete();
+        setTimeout(onComplete, 300);
     };
 
-    const handleRestart = () => {
-        setCurrentStep(0);
-        navigate('/dashboard');
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'ArrowRight') handleNext();
+        if (e.key === 'ArrowLeft') handlePrev();
+        if (e.key === 'Escape') handleComplete();
     };
 
-    if (!showTour) return null;
+    useEffect(() => {
+        if (isVisible) {
+            window.addEventListener('keydown', handleKeyDown);
+            return () => window.removeEventListener('keydown', handleKeyDown);
+        }
+    }, [isVisible, currentSlide]);
 
-    const isCenter = !step?.target || step.position === 'center' || !findElement(step.target || '');
-    const progress = ((currentStep + 1) / steps.length) * 100;
+    if (!isOpen) return null;
 
-    return createPortal(
-        <div className={`onboarding - overlay ${isTransitioning ? 'transitioning' : ''} `}>
-            {/* SVG Mask para spotlight */}
-            {!isTransitioning && (
-                <svg className="onboarding-mask" width="100%" height="100%">
-                    <defs>
-                        <mask id="spotlight-mask">
-                            <rect width="100%" height="100%" fill="white" />
-                            {targetRect && (
-                                <rect
-                                    x={targetRect.left}
-                                    y={targetRect.top}
-                                    width={targetRect.width}
-                                    height={targetRect.height}
-                                    rx="16"
-                                    fill="black"
-                                    className="spotlight-cutout"
-                                />
-                            )}
-                        </mask>
-                    </defs>
-                    <rect
-                        width="100%"
-                        height="100%"
-                        fill="rgba(0, 0, 0, 0.97)"
-                        mask="url(#spotlight-mask)"
-                    />
-                </svg>
-            )}
-
-            {/* Pantalla de transición */}
-            {isTransitioning && (
-                <div className="transition-screen">
-                    <div className="transition-loader">
-                        <Zap className="transition-icon" />
-                    </div>
-                    <p className="transition-text">Navegando...</p>
-                </div>
-            )}
-
-            {/* Spotlight ring animado */}
-            {targetRect && !isTransitioning && (
-                <div
-                    className="spotlight-ring"
-                    style={{
-                        top: targetRect.top - 6,
-                        left: targetRect.left - 6,
-                        width: targetRect.width + 12,
-                        height: targetRect.height + 12,
-                    }}
-                />
-            )}
-
-            {/* Progress bar superior */}
-            <div className="tour-progress-bar">
-                <div className="tour-progress-fill" style={{ width: `${progress}% ` }} />
+    return (
+        <div className={`tour-modal ${isVisible ? 'visible' : ''}`}>
+            {/* Progress bar */}
+            <div className="tour-progress">
+                <div className="tour-progress-fill" style={{ width: `${progress}%` }} />
             </div>
 
-            {/* Tooltip */}
-            {!isTransitioning && (
-                <div
-                    ref={tooltipRef}
-                    className={`onboarding - tooltip ${isCenter ? 'tooltip-center' : ''} tooltip - ${step?.position} `}
-                    style={tooltipStyle}
-                >
-                    {!isCenter && <div className={`tooltip - arrow arrow - ${step?.position} `} />}
+            {/* Close button */}
+            <button className="tour-close" onClick={handleComplete}>
+                <X size={24} />
+            </button>
 
-                    {/* Header */}
-                    <div className="tooltip-header">
-                        <div className="tooltip-icon-wrapper">
-                            {step?.icon || <Lightbulb />}
-                        </div>
-                        <div className="tooltip-meta">
-                            <div className="tooltip-step-indicator">
-                                Paso {currentStep + 1} de {steps.length}
-                            </div>
-                            {step?.category && (
-                                <div className="tooltip-category">{step.category}</div>
-                            )}
-                        </div>
-                        <div className="tooltip-controls">
-                            <button
-                                className="tooltip-control-btn"
-                                onClick={handleRestart}
-                                title="Reiniciar tour"
-                            >
-                                <RotateCcw size={16} />
-                            </button>
-                            <button className="tooltip-close" onClick={handleComplete}>
-                                <X size={18} />
-                            </button>
-                        </div>
-                    </div>
+            {/* Step indicator */}
+            <div className="tour-step-indicator">
+                {currentSlide + 1} / {slides.length}
+            </div>
 
-                    {/* Content */}
-                    <div className="tooltip-content">
-                        <h3 className="tooltip-title">{step?.title}</h3>
-                        <p className="tooltip-description">{step?.content}</p>
-
-                        {step?.highlight && (
-                            <div className="tooltip-highlight">
-                                <Eye size={14} />
-                                <span>{step.highlight}</span>
-                            </div>
-                        )}
-
-                        {step?.action && (
-                            <div className="tooltip-action-hint">
-                                <Play size={14} />
-                                <span>{step.action}</span>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Mini progress dots */}
-                    <div className="tooltip-progress">
-                        {steps.map((_, idx) => (
-                            <div
-                                key={idx}
-                                className={`progress - dot ${idx === currentStep ? 'active' : ''} ${idx < currentStep ? 'completed' : ''} `}
-                            />
-                        ))}
-                    </div>
-
-                    {/* Footer */}
-                    <div className="tooltip-footer">
-                        <button className="tooltip-skip" onClick={handleComplete}>
-                            Salir del tour
-                        </button>
-                        <div className="tooltip-nav">
-                            {currentStep > 0 && (
-                                <button className="tooltip-btn tooltip-btn-secondary" onClick={handlePrev}>
-                                    <ChevronLeft size={18} />
-                                    Anterior
-                                </button>
-                            )}
-                            <button className="tooltip-btn tooltip-btn-primary" onClick={handleNext}>
-                                {currentStep === steps.length - 1 ? (
-                                    <>
-                                        ¡Comenzar!
-                                        <CheckCircle2 size={18} />
-                                    </>
-                                ) : step?.navigateTo ? (
-                                    <>
-                                        Ir allí
-                                        <Zap size={18} />
-                                    </>
-                                ) : (
-                                    <>
-                                        Siguiente
-                                        <ChevronRight size={18} />
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    </div>
+            {/* Main content */}
+            <div className={`tour-content ${direction}`} key={currentSlide}>
+                {/* Icon */}
+                <div className="tour-icon" style={{ background: `linear-gradient(135deg, ${slide.color}, ${slide.color}88)` }}>
+                    {slide.icon}
                 </div>
-            )}
-        </div>,
-        document.body
+
+                {/* Text */}
+                <h1 className="tour-title">{slide.title}</h1>
+                <h2 className="tour-subtitle">{slide.subtitle}</h2>
+                <p className="tour-description">{slide.description}</p>
+
+                {/* Features */}
+                <div className="tour-features">
+                    {slide.features.map((feature, idx) => (
+                        <div key={idx} className="tour-feature" style={{ borderColor: `${slide.color}66` }}>
+                            <CheckCircle2 size={16} style={{ color: slide.color }} />
+                            <span>{feature}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Dots */}
+            <div className="tour-dots">
+                {slides.map((_, idx) => (
+                    <button
+                        key={idx}
+                        className={`tour-dot ${idx === currentSlide ? 'active' : ''} ${idx < currentSlide ? 'completed' : ''}`}
+                        onClick={() => {
+                            setDirection(idx > currentSlide ? 'next' : 'prev');
+                            setCurrentSlide(idx);
+                        }}
+                        style={idx === currentSlide ? { background: slide.color } : {}}
+                    />
+                ))}
+            </div>
+
+            {/* Navigation */}
+            <div className="tour-nav">
+                <button
+                    className="tour-btn tour-btn-secondary"
+                    onClick={handlePrev}
+                    disabled={currentSlide === 0}
+                >
+                    <ChevronLeft size={20} />
+                    Anterior
+                </button>
+
+                <button className="tour-btn tour-btn-skip" onClick={handleComplete}>
+                    Saltar
+                </button>
+
+                <button
+                    className="tour-btn tour-btn-primary"
+                    onClick={handleNext}
+                    style={{ background: `linear-gradient(135deg, ${slide.color}, ${slide.color}cc)` }}
+                >
+                    {currentSlide === slides.length - 1 ? (
+                        <>
+                            ¡Comenzar!
+                            <Sparkles size={20} />
+                        </>
+                    ) : (
+                        <>
+                            Siguiente
+                            <ChevronRight size={20} />
+                        </>
+                    )}
+                </button>
+            </div>
+        </div>
     );
 };
 
