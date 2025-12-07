@@ -511,8 +511,8 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ userRole, onComplete, i
             setIsTransitioning(true);
             navigate(targetStep.navigateTo);
 
-            // Esperar a que la navegación complete
-            await new Promise(resolve => setTimeout(resolve, targetStep.delay || 400));
+            // Esperar más tiempo para que la página cargue completamente
+            await new Promise(resolve => setTimeout(resolve, targetStep.delay || 800));
             setIsTransitioning(false);
         }
     }, [steps, navigate, location.pathname]);
@@ -524,13 +524,32 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ userRole, onComplete, i
         }
     }, [isOpen]);
 
+    // Retry finding element after navigation
     useEffect(() => {
         if (showTour && !isTransitioning) {
-            const timer = setTimeout(() => {
+            // Primera búsqueda inmediata
+            const timer1 = setTimeout(() => {
                 updateTargetPosition();
                 setTimeout(updateTooltipPosition, 100);
-            }, 150);
-            return () => clearTimeout(timer);
+            }, 200);
+
+            // Segunda búsqueda después de que el DOM se estabilice
+            const timer2 = setTimeout(() => {
+                updateTargetPosition();
+                setTimeout(updateTooltipPosition, 100);
+            }, 600);
+
+            // Tercera búsqueda para páginas lentas
+            const timer3 = setTimeout(() => {
+                updateTargetPosition();
+                setTimeout(updateTooltipPosition, 100);
+            }, 1200);
+
+            return () => {
+                clearTimeout(timer1);
+                clearTimeout(timer2);
+                clearTimeout(timer3);
+            };
         }
     }, [showTour, currentStep, isTransitioning, updateTargetPosition, updateTooltipPosition, location.pathname]);
 
@@ -606,7 +625,7 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ userRole, onComplete, i
                     <rect
                         width="100%"
                         height="100%"
-                        fill="rgba(0, 0, 0, 0.92)"
+                        fill="rgba(0, 0, 0, 0.97)"
                         mask="url(#spotlight-mask)"
                     />
                 </svg>
