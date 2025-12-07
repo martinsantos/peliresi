@@ -108,6 +108,26 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     // Generar tokens
     const { accessToken, refreshToken } = generateTokens(user.id);
 
+    // Registrar login en auditoría
+    try {
+      await prisma.auditoria.create({
+        data: {
+          usuarioId: user.id,
+          accion: 'LOGIN',
+          modulo: 'AUTH',
+          ip: req.ip || req.headers['x-forwarded-for']?.toString() || 'unknown',
+          userAgent: req.headers['user-agent'] || 'unknown',
+          datosDespues: JSON.stringify({
+            email: user.email,
+            rol: user.rol,
+            timestamp: new Date().toISOString()
+          }),
+        },
+      });
+    } catch (auditError) {
+      console.error('Error registrando auditoría de login:', auditError);
+    }
+
     // Preparar datos de usuario para la respuesta (sin contraseña)
     const userData = {
       id: user.id,
