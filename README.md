@@ -1,247 +1,298 @@
-# Sistema de Trazabilidad de Residuos Peligrosos - Demo
+# 📚 README - Sistema de Trazabilidad de Residuos Peligrosos
 
-## Descripción
-Sistema completo para la gestión y trazabilidad de residuos peligrosos según la Ley 24.051, implementado con arquitectura moderna y escalable para la DGFA de Mendoza.
+## Demo DGFA Mendoza - Diciembre 2025
 
-## Arquitectura
+---
 
-### Backend
-- **Node.js + Express + TypeScript** - API RESTful
-- **PostgreSQL + Prisma ORM** - Base de datos relacional
-- **JWT** - Autenticación con tokens
-- **bcryptjs** - Encriptación de contraseñas
-- **QRCode** - Generación de códigos QR para manifiestos
+## 🌐 Acceso a la Demo
 
-### Frontend
-- **React 18 + TypeScript** - Interfaz de usuario
-- **Vite** - Build tool y dev server
-- **React Router v6** - Navegación SPA
-- **Leaflet + React-Leaflet** - Mapas interactivos para tracking GPS
-- **Lucide React** - Iconografía
-- **Axios** - Cliente HTTP
+**URL de Producción:** [https://www.ultimamilla.com.ar/demoambiente/](https://www.ultimamilla.com.ar/demoambiente/)
 
-## Requisitos
-
-- Node.js 18+ 
-- PostgreSQL 14+ (o Docker)
-- npm o yarn
-
-## Instalación
-
-### 1. Clonar e instalar dependencias
-
-```bash
-# Backend
-cd trazabilidad-rrpp-demo/backend
-npm install
-
-# Frontend
-cd ../frontend
-npm install
-```
-
-### 2. Configurar base de datos
-
-Opción A: PostgreSQL local
-```bash
-# Crear base de datos
-createdb trazabilidad_rrpp
-
-# Configurar .env en backend/
-DATABASE_URL="postgresql://tu_usuario:tu_password@localhost:5432/trazabilidad_rrpp?schema=public"
-```
-
-Opción B: Docker
-```bash
-docker run --name trazabilidad-db -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=trazabilidad_rrpp -p 5432:5432 -d postgres:14
-```
-
-### 3. Ejecutar migraciones y seed
-
-```bash
-cd backend
-
-# Generar cliente Prisma
-npx prisma generate
-
-# Ejecutar migraciones
-npx prisma migrate dev
-
-# Cargar datos de prueba
-npm run db:seed
-```
-
-### 4. Iniciar la aplicación
-
-Terminal 1 - Backend:
-```bash
-cd backend
-npm run dev
-```
-
-Terminal 2 - Frontend:
-```bash
-cd frontend
-npm run dev
-```
-
-La aplicación estará disponible en:
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:3001
-
-## Usuarios de prueba
+### Credenciales de Prueba
 
 | Rol | Email | Contraseña |
 |-----|-------|------------|
-| **Admin DGFA** | admin@dgfa.mendoza.gov.ar | admin123 |
-| **Generador** | quimica.mendoza@industria.com | gen123 |
-| **Transportista** | transportes.andes@logistica.com | trans123 |
-| **Operador** | tratamiento.residuos@planta.com | op123 |
+| 👨‍💼 Administrador DGFA | `admin@dgfa.mendoza.gov.ar` | `admin123` |
+| 🏭 Generador | `quimica.mendoza@industria.com` | `gen123` |
+| 🚛 Transportista | `transportes.andes@logistica.com` | `trans123` |
+| ♻️ Operador | `tratamiento.residuos@planta.com` | `op123` |
 
-## Funcionalidades de la Demo
+---
 
-### 1. Dashboard
-- Estadísticas de manifiestos por estado
-- Manifiestos recientes
-- Transportes activos en tiempo real
+## 📋 Descripción del Sistema
 
-### 2. Gestión de Manifiestos
-- Listado con filtros y paginación
-- Crear nuevo manifiesto (Generador)
-- Firmar electrónicamente
-- Flujo completo: Creación → Firma → Retiro → Transporte → Entrega → Recepción → Tratamiento
+Sistema integral de **trazabilidad de residuos peligrosos** para la Dirección de Gestión y Fiscalización Ambiental (DGFA) de la Provincia de Mendoza.
 
-### 3. Tracking GPS
-- Mapa interactivo con ubicación de transportes
-- Visualización de rutas
-- Detalles del transporte seleccionado
+### Características Principales
 
-### 4. Flujo de trabajo por rol
+| Característica | Descripción |
+|----------------|-------------|
+| **Manifiestos Electrónicos** | Creación, firma y seguimiento digital |
+| **Firma Electrónica** | Validación legal en cada etapa |
+| **Tracking GPS** | Ubicación en tiempo real de transportes |
+| **Modo Offline** | Funcionamiento sin conexión |
+| **Código QR** | Verificación instantánea |
+| **Auditoría Completa** | Registro inmutable de operaciones |
+| **Alertas Automáticas** | Detección proactiva de anomalías |
 
-**Generador:**
-- Crear manifiesto con residuos
-- Asignar transportista y operador
-- Firmar electrónicamente
+---
 
-**Transportista:**
-- Ver manifiestos asignados
-- Confirmar retiro de carga
-- Actualizar ubicación GPS
-- Confirmar entrega en destino
+## 🏗️ Arquitectura
 
-**Operador:**
-- Ver entregas pendientes
-- Confirmar recepción
-- Registrar tratamiento
-- Cerrar manifiesto
+### Stack Tecnológico
 
-**Administrador DGFA:**
-- Visualizar todo el sistema
-- Monitorear transportes en tiempo real
-- Acceso a reportes y estadísticas
-- Gestión de catálogos y usuarios (Configuración)
+| Componente | Tecnología |
+|------------|------------|
+| **Frontend** | React 18 + TypeScript + Vite |
+| **Backend** | Node.js + Express + TypeScript |
+| **Base de Datos** | PostgreSQL 15 |
+| **ORM** | Prisma |
+| **Autenticación** | JWT |
+| **Deployment** | PM2 + Nginx |
 
-### 5. Demo de App Móvil 📱
+### Infraestructura de Producción
 
-**Acceso**: Desde el Dashboard web, hacer clic en la tarjeta "Versión Móvil Disponible"
+```
+Servidor: 23.105.176.45
+│
+├── Nginx (443/80) - Proxy reverso + SSL
+│   ├── /demoambiente/ → Frontend estático
+│   └── /api/ → Backend Node.js
+│
+├── PM2
+│   ├── demo-backend (puerto 3010)
+│   ├── astro-ultimamilla (puerto 4321) [sitio principal]
+│   └── sgi (puerto 3456) [otro servicio]
+│
+└── Docker
+    └── PostgreSQL (directus-admin-database-1)
+        └── Base de datos: trazabilidad_demo
+```
 
-La demo incluye simuladores visuales de apps móviles para:
+---
 
-**App del Transportista:**
-- Dashboard con resumen de tareas (Retiros pendientes, En viaje)
-- Lista de manifiestos asignados con información detallada
-- Botones de acción contextuales (Iniciar Retiro, Reportar Incidente, Confirmar Llegada)
-- Navegación por tabs (Pendientes, En Curso, Historial)
-- Botón flotante de escaneo QR
-- Interfaz táctil optimizada para uso en ruta
-
-**App del Operador:**
-- Dashboard de recepción con manifiestos entrantes
-- Visualización de ETA (tiempo estimado de llegada)
-- Comparador visual de peso declarado vs real
-- Indicadores de diferencias con alertas
-- Botones de Aprobación/Rechazo de carga
-- Navegación por tabs (En Camino, Recibidos, Tratados)
-- Botón flotante para captura de evidencia fotográfica
-
-**Características del Simulador:**
-- Marco realista de teléfono (iPhone/Android)
-- Status bar funcional (hora, señal, batería)
-- Contenido scrolleable dentro de la app
-- Selector de roles para cambiar entre Transportista y Operador
-- Diseño Mobile-First completamente responsive
-
-Ver documentación completa en [MOBILE_DEMO.md](./MOBILE_DEMO.md)
-
-### 6. Códigos QR
-
-Los manifiestos firmados generan automáticamente un código QR único que contiene:
-- Número de manifiesto
-- ID del manifiesto
-- Timestamp de generación
-
-**Acceso**: En el detalle de cualquier manifiesto firmado, botón "Ver QR"
-
-## API Endpoints
-
-### Autenticación
-- `POST /api/auth/login` - Iniciar sesión
-- `POST /api/auth/register` - Registrar usuario
-- `GET /api/auth/profile` - Obtener perfil
-- `POST /api/auth/logout` - Cerrar sesión
-
-### Manifiestos
-- `GET /api/manifiestos/dashboard` - Estadísticas
-- `GET /api/manifiestos` - Listar manifiestos
-- `GET /api/manifiestos/:id` - Detalle de manifiesto
-- `POST /api/manifiestos` - Crear manifiesto
-- `POST /api/manifiestos/:id/firmar` - Firmar manifiesto
-- `POST /api/manifiestos/:id/confirmar-retiro` - Confirmar retiro
-- `POST /api/manifiestos/:id/ubicacion` - Actualizar GPS
-- `POST /api/manifiestos/:id/confirmar-entrega` - Confirmar entrega
-- `POST /api/manifiestos/:id/confirmar-recepcion` - Confirmar recepción
-- `POST /api/manifiestos/:id/cerrar` - Cerrar manifiesto
-
-### Catálogos
-- `GET /api/catalogos/tipos-residuos` - Tipos de residuos
-- `GET /api/catalogos/generadores` - Generadores
-- `GET /api/catalogos/transportistas` - Transportistas
-- `GET /api/catalogos/operadores` - Operadores
-
-## Estructura del Proyecto
+## 📁 Estructura del Proyecto
 
 ```
 trazabilidad-rrpp-demo/
-├── backend/
+├── frontend/                 # Aplicación React
+│   ├── src/
+│   │   ├── components/       # Componentes reutilizables
+│   │   │   ├── Layout.tsx
+│   │   │   ├── OnboardingTour.tsx  # Guía interactiva
+│   │   │   └── ...
+│   │   ├── pages/            # Páginas de la aplicación
+│   │   ├── services/         # API y servicios
+│   │   ├── context/          # Context providers
+│   │   └── types/            # TypeScript types
+│   └── dist/                 # Build de producción
+│
+├── backend/                  # API Express
+│   ├── src/
+│   │   ├── controllers/      # Controladores
+│   │   ├── routes/           # Rutas API
+│   │   ├── middlewares/      # Middlewares
+│   │   └── config/           # Configuración
 │   ├── prisma/
-│   │   ├── schema.prisma    # Modelo de datos
-│   │   ├── seed.ts          # Datos de prueba
-│   │   └── migrations/      # Migraciones
-│   └── src/
-│       ├── controllers/     # Controladores
-│       ├── routes/          # Rutas API
-│       ├── middlewares/     # Autenticación, errores
-│       ├── config/          # Configuración
-│       └── index.ts         # Entrada
-├── frontend/
-│   └── src/
-│       ├── components/      # Componentes reutilizables
-│       ├── pages/           # Páginas de la aplicación
-│       ├── context/         # Context API (Auth)
-│       ├── services/        # Servicios API
-│       ├── types/           # Tipos TypeScript
-│       └── App.tsx          # Componente principal
-└── README.md
+│   │   ├── schema.prisma     # Modelo de datos
+│   │   ├── seed.ts           # Seed inicial
+│   │   └── seed-demo.ts      # Datos de demo
+│   └── dist/                 # Build de producción
+│
+├── GUIA_DEMO.md              # Guía paso a paso para demo
+├── TUTORIAL_DEMO.md          # Tutorial técnico completo
+├── DEPLOY.md                 # Instrucciones de deployment
+└── README.md                 # Este archivo
 ```
 
-## Stack Tecnológico
+---
 
-- **Backend**: Node.js, Express, TypeScript, Prisma, PostgreSQL
-- **Frontend**: React, TypeScript, Vite, Leaflet
-- **Autenticación**: JWT
-- **Base de datos**: PostgreSQL
-- **Mapas**: OpenStreetMap + Leaflet
+## 🚀 Guía de Instalación Local
 
-## Licencia
+### Requisitos
 
-MIT - Desarrollado para la Dirección de Gestión y Fiscalización Ambiental (DGFA) de la Provincia de Mendoza.
+- Node.js 18+
+- PostgreSQL 15+
+- npm o yarn
+
+### Backend
+
+```bash
+cd backend
+npm install
+cp .env.example .env
+# Configurar DATABASE_URL en .env
+npx prisma migrate dev
+npx prisma db seed
+npm run dev
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+---
+
+## 🔧 Variables de Entorno
+
+### Backend (.env)
+
+```env
+NODE_ENV=production
+PORT=3010
+DATABASE_URL="postgresql://user:pass@localhost:5432/trazabilidad_demo"
+JWT_SECRET=your-jwt-secret
+JWT_REFRESH_SECRET=your-refresh-secret
+CORS_ORIGIN=https://your-domain.com
+ENABLE_ANALYTICS=true
+```
+
+### Frontend (.env.production)
+
+```env
+VITE_API_URL=https://your-domain.com/api
+```
+
+---
+
+## 📊 Modelo de Datos
+
+### Entidades Principales
+
+| Entidad | Descripción |
+|---------|-------------|
+| **Usuario** | Usuarios del sistema con rol asignado |
+| **Generador** | Empresas que generan residuos |
+| **Transportista** | Empresas de transporte habilitadas |
+| **Operador** | Plantas de tratamiento/disposición |
+| **Manifiesto** | Documento de trazabilidad |
+| **TipoResiduo** | Catálogo según Ley 24.051 |
+| **TrackingGPS** | Puntos de ubicación del transporte |
+| **Auditoria** | Log de operaciones del sistema |
+
+---
+
+## 🎯 Casos de Uso Implementados
+
+### Administrador (CU-A)
+- ✅ CU-A01: Iniciar sesión
+- ✅ CU-A02: Dashboard ejecutivo
+- ✅ CU-A03: Gestionar usuarios
+- ✅ CU-A09: Monitoreo en tiempo real
+- ✅ CU-A10: Consultar auditoría
+- ✅ CU-A13: Configurar alertas
+
+### Generador (CU-G)
+- ✅ CU-G01: Iniciar sesión
+- ✅ CU-G02: Dashboard del generador
+- ✅ CU-G03: Crear manifiesto
+- ✅ CU-G07: Firmar manifiesto
+- ✅ CU-G08: Consultar estado
+
+### Transportista (CU-T)
+- ✅ CU-T01: Iniciar sesión
+- ✅ CU-T02: Ver manifiestos asignados
+- ✅ CU-T03: Confirmar retiro
+- ✅ CU-T04: Iniciar transporte
+- ✅ CU-T07: Confirmar entrega
+
+### Operador (CU-O)
+- ✅ CU-O01: Iniciar sesión
+- ✅ CU-O02: Ver manifiestos entrantes
+- ✅ CU-O03: Recepción con QR
+- ✅ CU-O04: Registrar pesaje
+- ✅ CU-O07: Firmar recepción
+- ✅ CU-O08: Registrar tratamiento
+- ✅ CU-O09: Cerrar manifiesto
+
+---
+
+## 🔒 Seguridad
+
+| Aspecto | Implementación |
+|---------|----------------|
+| **Autenticación** | JWT con refresh tokens |
+| **Autorización** | RBAC por rol de usuario |
+| **CORS** | Orígenes permitidos configurables |
+| **No-indexación** | robots noindex + X-Robots-Tag |
+| **Auditoría** | Log completo de operaciones |
+| **API protegida** | Middleware de autenticación |
+
+---
+
+## 📱 Características Especiales
+
+### Tour de Onboarding
+
+Al primer login, el sistema muestra una guía interactiva personalizada según el rol del usuario:
+
+- Pasos destacados con zona a observar
+- Navegación Anterior/Siguiente
+- Botón "Ayuda" para re-ver el tour
+
+### Modo Offline
+
+La aplicación soporta operación sin conexión:
+
+- IndexedDB para almacenamiento local
+- Service Worker para sincronización
+- Resolución automática de conflictos
+
+---
+
+## 📄 Documentación Adicional
+
+| Archivo | Contenido |
+|---------|-----------|
+| `GUIA_DEMO.md` | Guía paso a paso para demostración |
+| `TUTORIAL_DEMO.md` | Tutorial técnico completo |
+| `DEPLOY.md` | Instrucciones de deployment |
+
+---
+
+## 🧪 Datos de Demo
+
+El sistema incluye datos precargados:
+
+- **8 usuarios** (Admin, Generadores, Transportistas, Operadores)
+- **3 generadores** de residuos
+- **2 transportistas** habilitados
+- **2 operadores** de tratamiento
+- **15 tipos de residuos** (Ley 24.051)
+- **70 manifiestos** históricos
+
+---
+
+## 📝 Auditoría y Logs
+
+El sistema registra automáticamente:
+
+- Logins de usuarios (IP, User Agent, Timestamp)
+- Operaciones CRUD en manifiestos
+- Cambios de estado
+- Firmas electrónicas
+
+Consultar en: Menú → Configuración → Auditoría
+
+---
+
+## 🔗 Enlaces
+
+- **Demo:** https://www.ultimamilla.com.ar/demoambiente/
+- **Repositorio:** https://github.com/martinsantos/peliresi
+- **API Health:** https://www.ultimamilla.com.ar/api/health
+
+---
+
+## 📅 Versión
+
+**Versión:** Demo Diciembre 2025  
+**Última actualización:** 2025-12-07
+
+---
+
+*Desarrollado para DGFA Mendoza - Licitación Sistema de Trazabilidad RRPP*
