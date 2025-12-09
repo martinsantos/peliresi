@@ -49,7 +49,8 @@ export const usePWAInstall = (): PWAInstallState => {
             if (isIOS) {
                 alert('Para instalar en iOS:\n\n1. Toca el botón "Compartir" (□↑)\n2. Selecciona "Agregar a pantalla de inicio"\n3. Confirma tocando "Agregar"');
             } else {
-                alert('La instalación no está disponible en este momento. Intenta refrescar la página.');
+                // Show Chrome manual install instructions
+                alert('Para instalar en Chrome:\n\n1. Abre el menú ⋮ (tres puntos verticales)\n2. Selecciona "Instalar aplicación" o "Agregar a pantalla de inicio"\n\nSi no ves esta opción:\n• Navega un poco por la app primero\n• Chrome requiere cierta interacción antes de ofrecer la instalación');
             }
             return;
         }
