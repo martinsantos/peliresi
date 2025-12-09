@@ -1,543 +1,442 @@
-# 📘 MANUAL TUTORIAL: Sistema de Trazabilidad de Residuos Peligrosos
+# MANUAL TUTORIAL - Sistema de Trazabilidad de Residuos Peligrosos
 
-## DGFA - Dirección General de Fiscalización Ambiental
-### Gobierno de Mendoza
-
----
-
-## Índice
-
-1. [Introducción](#1-introducción)
-2. [Acceso al Sistema](#2-acceso-al-sistema)
-3. [Rol ADMINISTRADOR](#3-rol-administrador)
-4. [Rol GENERADOR](#4-rol-generador)
-5. [Rol TRANSPORTISTA](#5-rol-transportista)
-6. [Rol OPERADOR](#6-rol-operador)
-7. [Aplicación Móvil (PWA)](#7-aplicación-móvil-pwa)
-8. [Casos de Uso por Rol](#8-casos-de-uso-por-rol)
-9. [Preguntas Frecuentes](#9-preguntas-frecuentes)
+## Dirección de Gestión y Fiscalización Ambiental - Gobierno de Mendoza
 
 ---
 
-## 1. Introducción
+## 1. INTRODUCCIÓN
 
-El **Sistema de Trazabilidad de Residuos Peligrosos** es una plataforma integral diseñada para gestionar el ciclo completo de los residuos peligrosos bajo la Ley 24.051. Permite:
+### 1.1 Visión General del Sistema
 
-- **Trazabilidad completa** desde la generación hasta la disposición final
-- **Manifiestos digitales** con firma electrónica
-- **Tracking GPS en tiempo real** de transportes
-- **Alertas automáticas** ante desvíos o anomalías
-- **Reportes ambientales** para fiscalización
+El Sistema de Trazabilidad de Residuos Peligrosos (RRPP) es una plataforma integral diseñada para la gestión completa del ciclo de vida de los manifiestos de residuos peligrosos en la Provincia de Mendoza, conforme a la Ley Nacional 24.051.
 
-### Roles del Sistema
+El sistema cuenta con **dos modalidades de acceso**:
 
-| Rol | Descripción |
-|-----|-------------|
-| **ADMINISTRADOR** | Gestión completa, supervisión, reportes y configuración |
-| **GENERADOR** | Empresas que generan residuos peligrosos |
-| **TRANSPORTISTA** | Empresas habilitadas para transporte |
-| **OPERADOR** | Plantas de tratamiento y disposición final |
+| Modalidad | Descripción | Acceso |
+|-----------|-------------|--------|
+| **Dashboard Web** | Interfaz de escritorio completa para gestión administrativa | `/dashboard` |
+| **Demo App (PWA)** | Aplicación móvil para operaciones en campo | `/demo-app` |
 
----
+### 1.2 Actores del Sistema
 
-## 2. Acceso al Sistema
+| Actor | Descripción | Casos de Uso |
+|-------|-------------|--------------|
+| **Administrador DGFA** | Supervisa y administra el sistema completo | CU-A01 a CU-A15 |
+| **Generador** | Empresa que produce residuos peligrosos | CU-G01 a CU-G12 |
+| **Transportista** | Empresa habilitada para transporte | CU-T01 a CU-T11 |
+| **Operador** | Planta de tratamiento/disposición final | CU-O01 a CU-O12 |
 
-### 2.1 Plataforma Web (Desktop)
+### 1.3 Acceso al Sistema
 
-Acceda al sistema desde cualquier navegador moderno:
+**Contraseña de Demo:** `mimi88`
 
-**URL:** `https://demoambiente.ultimamilla.com.ar`
-
-El sistema detectará automáticamente su rol basado en las credenciales.
-
-### 2.2 Aplicación Móvil (PWA)
-
-La aplicación móvil está disponible para dispositivos Android e iOS:
-
-1. Abra el navegador en su dispositivo móvil
-2. Navegue a la URL del sistema
-3. Toque **"Instalar App"** cuando aparezca el botón
-4. En iOS: Toque el ícono de compartir → **"Agregar a pantalla de inicio"**
+- El Dashboard Web requiere esta contraseña para acceder
+- La Demo App (selector de roles) tiene acceso libre
 
 ---
 
-## 3. Rol ADMINISTRADOR
+## 2. VERSIÓN DASHBOARD (Escritorio)
 
-El rol Administrador tiene acceso completo a todas las funcionalidades del sistema.
+### 2.1 Cambio de Perfil en el Menú
 
-### 3.1 Dashboard Principal
+> **IMPORTANTE**: El sistema permite cambiar de rol desde el menú lateral de navegación.
 
-El dashboard muestra indicadores clave de rendimiento (KPIs):
+El menú desplegable de navegación muestra todas las opciones disponibles según el rol actual. Para cambiar de perfil:
 
-![Dashboard Administrador](screenshots/desktop/desktop_dashboard_admin.png)
+1. Acceder al Dashboard con la contraseña `mimi88`
+2. En el menú lateral izquierdo, observar la sección de usuario
+3. Hacer clic en el selector de rol para cambiar entre perfiles
 
-**Elementos del Dashboard:**
-- **Manifiestos Activos:** Cantidad total de manifiestos en proceso
-- **En Tránsito:** Vehículos actualmente transportando residuos
-- **Alertas:** Notificaciones pendientes de atención
-- **Gráficos:** Tendencias y estadísticas de operación
-
-**Casos de Uso Relacionados:**
-- CU-A01: Visualizar Dashboard
-- CU-A13: Monitorear Indicadores
+Los roles disponibles son:
+- **Administrador** - Acceso completo al sistema
+- **Generador** - Creación y seguimiento de manifiestos
+- **Transportista** - Gestión de viajes y GPS
+- **Operador** - Recepción y tratamiento
 
 ---
 
-### 3.2 Gestión de Manifiestos
+### 2.2 Administrador DGFA
 
-Visualice, cree y administre todos los manifiestos del sistema:
+#### 2.2.1 Dashboard Ejecutivo (CU-A02)
 
-![Lista de Manifiestos](screenshots/desktop/desktop_manifiestos_lista.png)
+![Dashboard Administrador](screenshots/desktop/admin_dashboard.png)
 
-**Funcionalidades:**
-- Filtrar por estado (Pendiente, En Tránsito, Completado)
-- Buscar por número de manifiesto o empresa
-- Ver detalle completo de cada manifiesto
-- Exportar datos a Excel/PDF
+El dashboard presenta:
+- **Métricas en tiempo real**: Manifiestos activos, en tránsito, completados
+- **Mapa interactivo**: Ubicación GPS de transportes activos
+- **Alertas pendientes**: Notificaciones que requieren atención
+- **Gráficos de tendencias**: Estadísticas de los últimos 30 días
 
-**Casos de Uso Relacionados:**
-- CU-A02: Gestionar Manifiestos
-- CU-A03: Supervisar Estado de Manifiestos
-- CU-A12: Exportar Datos
+**Acciones disponibles:**
+- Filtrar por período, tipo de residuo o actor
+- Exportar datos en PDF/CSV
+- Acceder a cualquier manifiesto con un clic
 
----
+#### 2.2.2 Gestión de Manifiestos (CU-A09)
 
-### 3.3 Tracking GPS en Tiempo Real
+![Lista de Manifiestos](screenshots/desktop/admin_manifiestos.png)
 
-Monitoreo de todos los vehículos en ruta:
-
-![Tracking GPS](screenshots/desktop/desktop_tracking_gps.png)
-
-**Características:**
-- Mapa interactivo con posición en tiempo real
-- Rutas planificadas vs. rutas reales
-- Historial de recorridos
-- Alertas de geofencing ante desviaciones
-
-**Casos de Uso Relacionados:**
-- CU-A04: Monitorear Transporte en Tiempo Real
-- CU-S03: Detectar Desviaciones de Ruta
-- CU-S04: Enviar Alertas por Desviación
-
----
-
-### 3.4 Gestión de Actores
-
-Administre empresas, usuarios y permisos:
-
-![Gestión de Actores](screenshots/desktop/desktop_actores_gestion.png)
-
-**Opciones Disponibles:**
-- Alta/Baja/Modificación de empresas
-- Gestión de usuarios por empresa
-- Asignación de roles y permisos
-- Historial de actividad por usuario
-
-**Casos de Uso Relacionados:**
-- CU-A05: Gestionar Generadores
-- CU-A06: Gestionar Transportistas
-- CU-A07: Gestionar Operadores
-- CU-A08: Gestionar Vehículos
-- CU-A09: Gestionar Usuarios
-
----
-
-### 3.5 Reportes y Estadísticas
-
-Generación de informes para fiscalización:
-
-![Reportes Admin](screenshots/desktop/desktop_reportes_admin.png)
-
-**Tipos de Reportes:**
-- Reportes de trazabilidad por período
-- Estadísticas por tipo de residuo
-- Informes de cumplimiento normativo
-- Exportación a formatos oficiales
-
-**Casos de Uso Relacionados:**
-- CU-A10: Generar Reportes
-- CU-A11: Consultar Histórico
-- CU-A12: Exportar Datos
-
----
-
-## 4. Rol GENERADOR
-
-El Generador es la empresa que produce residuos peligrosos y debe declararlos.
-
-### 4.1 Dashboard del Generador
-
-Vista principal con acceso rápido a funciones:
-
-![Dashboard Generador Móvil](screenshots/mobile/mobile_generador_dashboard.png)
-
-**Acciones Rápidas:**
-- **Nuevo Manifiesto:** Crear declaración de residuos
-- **Historial:** Ver manifiestos anteriores
-- **Estado:** Monitorear manifiestos activos
-
----
-
-### 4.2 Crear Nuevo Manifiesto
-
-Proceso de declaración de residuos:
-
-![Nuevo Manifiesto](screenshots/mobile/mobile_generador_nuevo_manifiesto.png)
-
-**Pasos para crear un manifiesto:**
-
-1. **Seleccionar tipo de residuo** (código Y según Ley 24.051)
-2. **Indicar cantidad** en kg, litros o unidades
-3. **Describir características** del residuo
-4. **Seleccionar transportista** habilitado
-5. **Seleccionar planta destino** (operador)
-6. **Confirmar y firmar** digitalmente
-
-**Casos de Uso Relacionados:**
-- CU-G01: Solicitar Retiro de Residuos
-- CU-G03: Crear Manifiesto
-
----
-
-### 4.3 Historial y Seguimiento
-
-Consultar manifiestos generados:
-
-![Generador Historial](screenshots/mobile/mobile_generador.png)
-
-**Información Disponible:**
-- Lista de todos los manifiestos
-- Estado actual de cada manifiesto
-- Documentación adjunta
-- Certificados de tratamiento
-
-**Casos de Uso Relacionados:**
-- CU-G04: Verificar Estado
-- CU-G05: Descargar Certificado
-- CU-G02: Consultar Estado del Manifiesto
-
----
-
-## 5. Rol TRANSPORTISTA
-
-El Transportista es responsable del traslado de residuos peligrosos.
-
-### 5.1 Dashboard del Transportista
-
-Vista principal con viajes asignados:
-
-![Dashboard Transportista](screenshots/mobile/mobile_transportista_dashboard.png)
-
-**Elementos del Dashboard:**
-- Viajes pendientes de inicio
-- Viajes en curso
-- Historial de viajes completados
-
----
-
-### 5.2 Escanear QR del Manifiesto
-
-Validación del manifiesto al retirar residuos:
-
-![Escanear QR](screenshots/mobile/mobile_transportista_qr.png)
-
-**Proceso:**
-
-1. Abra la cámara con el botón **"Escanear QR"**
-2. Apunte al código QR del manifiesto
-3. Verifique que los datos coincidan
-4. Confirme el retiro con su firma
-
-**Casos de Uso Relacionados:**
-- CU-T01: Ver Manifiestos Asignados
-- CU-T02: Escanear QR del Manifiesto
-- CU-T03: Confirmar Retiro de Residuos
-
----
-
-### 5.3 Iniciar y Gestionar Viaje
-
-Control del transporte en tiempo real:
-
-![Iniciar Viaje](screenshots/mobile/mobile_transportista_viaje.png)
-
-**Funcionalidades:**
-- Iniciar viaje con GPS activado
-- Ver ruta optimizada al destino
-- Registrar paradas o incidentes
-- Finalizar viaje al llegar
-
-![Ruta del Viaje](screenshots/mobile/mobile_transportista_ruta.png)
-
-**Casos de Uso Relacionados:**
-- CU-T04: Iniciar Viaje
-- CU-T05: Registrar Incidentes
-- CU-T06: Finalizar Viaje
-- CU-T07: Actualizar Posición GPS
-
----
-
-### 5.4 Manifiestos Asignados
-
-Lista de manifiestos para transporte:
-
-![Manifiestos Transportista](screenshots/mobile/mobile_transportista_manifiestos.png)
+Funcionalidades:
+- Listado completo de todos los manifiestos del sistema
+- Filtros avanzados por estado, fecha, generador, transportista
+- Visualización del estado actual de cada manifiesto
+- Acceso al detalle con timeline completo de eventos
 
 **Estados de Manifiestos:**
-- 🟡 **Pendiente:** Esperando retiro
-- 🔵 **En Tránsito:** Viaje en curso
-- 🟢 **Entregado:** Recepcionado en planta
+| Estado | Color | Descripción |
+|--------|-------|-------------|
+| Borrador | Gris | En edición, no firmado |
+| Pendiente | Amarillo | Firmado, esperando retiro |
+| En Tránsito | Azul | En transporte con GPS |
+| Recibido | Verde | Llegó a destino |
+| Tratado | Verde oscuro | Proceso completado |
+
+#### 2.2.3 Monitoreo GPS en Tiempo Real (CU-A09)
+
+![Tracking GPS](screenshots/desktop/admin_tracking.png)
+
+El mapa de monitoreo muestra:
+- Posición en tiempo real de cada transporte
+- Ruta esperada vs ruta actual
+- ETA (tiempo estimado de llegada)
+- Alertas de desvío automáticas
+
+**Actualización automática cada 30 segundos**
+
+#### 2.2.4 Gestión de Actores (CU-A03 a CU-A08)
+
+![Gestión de Actores](screenshots/desktop/admin_actores.png)
+
+Permite administrar:
+- **Generadores** (CU-A06): Alta, baja y modificación de empresas generadoras
+- **Transportistas** (CU-A07): Registro de empresas, vehículos y choferes
+- **Operadores** (CU-A08): Plantas de tratamiento habilitadas
+
+Cada actor incluye:
+- Datos de la empresa (razón social, CUIT)
+- Número de habilitación
+- Estado activo/inactivo
+- Historial de manifiestos
+
+#### 2.2.5 Reportes y Estadísticas (CU-A10 a CU-A12)
+
+![Reportes](screenshots/desktop/admin_reportes.png)
+
+Tipos de reportes disponibles:
+- **Por período**: Manifiestos por día/semana/mes
+- **Por tipo de residuo**: Según categorías Y de Ley 24.051
+- **Por actor**: Generadores, transportistas, operadores
+- **Por zona geográfica**: Distribución territorial
+
+**Formatos de exportación:** PDF, CSV, XML
+
+#### 2.2.6 Configuración de Alertas (CU-A13)
+
+![Configuración de Alertas](screenshots/desktop/desktop_admin_alertas.png)
+
+Reglas configurables:
+- Vencimientos de manifiestos
+- Desvíos de ruta (GPS)
+- Tiempos excesivos de transporte
+- Diferencias de pesaje
+- Rechazos de carga
 
 ---
 
-## 6. Rol OPERADOR
+### 2.3 Generador de Residuos
 
-El Operador gestiona la planta de tratamiento o disposición final.
+#### 2.3.1 Dashboard del Generador (CU-G02)
 
-### 6.1 Dashboard del Operador
+El generador visualiza:
+- Manifiestos en borrador
+- Pendientes de retiro
+- En tránsito
+- Completados
 
-Pantalla principal con manifiestos entrantes y acciones disponibles:
+**Accesos directos:**
+- Crear nuevo manifiesto
+- Consultar historial
+- Ver alertas
 
-![Dashboard Operador](screenshots/mobile/mobile_operador_home.png)
+#### 2.3.2 Crear Manifiesto Electrónico (CU-G03 a CU-G07)
 
-**Funcionalidades:**
-- Ver manifiestos entrantes en tiempo real
-- Pestañas: Entrantes, Recibidos, Tratados
-- Escanear QR para búsqueda rápida
-- Control de estado de cada manifiesto
+Flujo de creación:
+
+1. **Seleccionar tipo de residuo** (CU-G04)
+   - Catálogo según Ley 24.051
+   - Categorías Y con características
+
+2. **Ingresar cantidad y unidad**
+   - Kilogramos o litros
+   - Descripción adicional
+
+3. **Asignar transportista** (CU-G05)
+   - Lista de transportistas habilitados
+   - Verificación de habilitación vigente
+
+4. **Seleccionar operador destino** (CU-G06)
+   - Operadores compatibles con el residuo
+   - Verificación de capacidad
+
+5. **Firmar manifiesto** (CU-G07)
+   - Firma electrónica con token
+   - Generación de QR único
+
+#### 2.3.3 Consulta de Estado (CU-G08)
+
+Para cada manifiesto se puede ver:
+- Estado actual
+- Ubicación GPS (si está en tránsito)
+- Timeline de eventos
+- Datos completos del manifiesto
+
+#### 2.3.4 Historial y PDF (CU-G09, CU-G10)
+
+- Listado paginado con filtros
+- Exportación a PDF con QR
+- Descarga de certificados
 
 ---
 
-### 6.2 Manifiestos Entrantes
+### 2.4 Transportista
 
-Lista de residuos próximos a llegar:
+#### 2.4.1 Dashboard de Viajes (CU-T02)
 
-![Manifiestos Entrantes](screenshots/mobile/mobile_operador_entrantes.png)
+Muestra:
+- Manifiestos asignados pendientes de retiro
+- Viajes activos en curso
+- Historial de viajes completados
 
-**Información mostrada:**
-- Número de manifiesto
-- Generador y transportista
-- Tipo de residuo con código Y
-- Cantidad declarada y ETA estimado
+#### 2.4.2 Gestión de Viajes
+
+Proceso de un viaje:
+
+1. **Confirmar retiro** (CU-T03)
+   - Escaneo de QR
+   - Captura GPS del punto
+   - Firma del generador
+
+2. **Iniciar transporte** (CU-T04)
+   - Activación de tracking GPS
+   - Notificación a partes
+
+3. **Actualizar estado** (CU-T05)
+   - Registrar paradas
+   - Reportar demoras
+
+4. **Confirmar entrega** (CU-T07)
+   - Verificación GPS en destino
+   - Firma de entrega
+
+#### 2.4.3 Modo Offline (CU-T09)
+
+El sistema soporta operación sin conexión:
+- Todas las operaciones se guardan localmente
+- Sincronización automática al recuperar señal
+- Base de datos local cifrada
 
 ---
 
-### 6.3 Recepción en Garita
+### 2.5 Operador
 
-Proceso de recepción de vehículos:
+#### 2.5.1 Manifiestos Entrantes (CU-O02)
 
-![Recepción Garita](screenshots/mobile/mobile_operador_recepcion.png)
+Lista de manifiestos con destino a la planta:
+- ETA estimado
+- Datos del generador y transportista
+- Tipo de residuo
 
-**Pasos:**
+#### 2.5.2 Recepción y Pesaje (CU-O03, CU-O04)
+
+Proceso de recepción:
 
 1. **Escanear QR** del manifiesto
-2. **Verificar documentación** del transportista
-3. **Confirmar ingreso** a la planta
-4. **Asignar báscula** para pesaje
+2. **Verificar datos** del residuo
+3. **Registrar peso** real en báscula
+4. **Comparar** con cantidad declarada
+5. **Firmar recepción** conforme
 
-**Casos de Uso Relacionados:**
-- CU-O01: Recibir Vehículo en Garita
-- CU-O02: Escanear QR del Manifiesto
-- CU-O03: Verificar Documentación
+#### 2.5.3 Tratamiento y Certificados (CU-O08 a CU-O10)
 
----
-
-### 6.4 Escaneo QR del Operador
-
-Búsqueda y validación de manifiestos por código QR:
-
-![Escaneo QR Operador](screenshots/mobile/mobile_operador_escaneo_qr.png)
-
-**Funcionalidades:**
-- Cámara integrada para escaneo
-- Validación automática del manifiesto
-- Información instantánea del residuo
+1. **Registrar tratamiento** aplicado
+2. **Seleccionar método** del catálogo
+3. **Cerrar manifiesto** con firma
+4. **Generar certificado** de disposición
 
 ---
 
-### 6.5 Control de Pesaje
+## 3. DEMO APP (PWA Móvil)
 
-Registro del peso de residuos:
+### 3.1 Selector de Roles
 
-![Control Pesaje](screenshots/mobile/mobile_operador_pesaje.png)
+![Selector de Roles](screenshots/mobile/mobile_demoapp_selector.png)
 
-**Proceso de Pesaje:**
+Al acceder a `/demo-app`, se presenta el selector de roles:
+- **Administrador** - Icono escudo azul
+- **Generador** - Icono fábrica púrpura
+- **Transportista** - Icono camión naranja
+- **Operador** - Icono edificio verde
 
-1. El vehículo ingresa a la báscula
-2. Registrar peso bruto
-3. El vehículo descarga los residuos
-4. Registrar peso tara
-5. El sistema calcula peso neto
-
-**Casos de Uso Relacionados:**
-- CU-O04: Registrar Pesaje
-- CU-O05: Confirmar Recepción Final
-- CU-O07: Registrar Diferencia de Peso
+El **onboarding** se muestra automáticamente con un tour de funcionalidades.
 
 ---
 
-### 6.4 Tratamiento y Disposición
+### 3.2 Administrador (Móvil)
 
-Registro del tratamiento aplicado:
-
-**Proceso:**
-
-1. Clasificar residuos recibidos
-2. Aplicar tratamiento según tipo
-3. Registrar método de disposición
-4. Generar certificado de tratamiento
-
-**Casos de Uso Relacionados:**
-- CU-O06: Registrar Tratamiento
-- CU-O08: Emitir Certificado de Tratamiento
-- CU-O09: Actualizar Estado del Manifiesto
+Funciones disponibles:
+- Dashboard con métricas
+- Lista de manifiestos
+- Mapa de tracking
+- Gestión de actores
 
 ---
 
-## 7. Aplicación Móvil (PWA)
+### 3.3 Generador (Móvil)
 
-### 7.1 Instalación
+#### Dashboard del Generador
 
-La aplicación móvil funciona como una Progressive Web App (PWA):
+![Generador Dashboard](screenshots/mobile/mobile_generador_dashboard.png)
 
-![Selector de Roles DemoApp](screenshots/mobile/mobile_demoapp_selector.png)
+Muestra:
+- Contadores de manifiestos por estado
+- Acceso rápido a crear nuevo
+- Últimos manifiestos
 
-**Ventajas de la PWA:**
-- ✅ No requiere descarga desde tienda
-- ✅ Funciona offline
-- ✅ Actualizaciones automáticas
-- ✅ Ocupa poco espacio
+#### Crear Manifiesto
 
----
+![Nuevo Manifiesto](screenshots/mobile/mobile_generador_crear_manifiesto.png)
 
-### 7.2 Funcionalidades Offline
+Formulario simplificado para móvil:
+- Selector de tipo de residuo
+- Ingreso de cantidad
+- Selección de transportista
+- Selección de operador
 
-El sistema permite trabajar sin conexión:
+#### Historial
 
-- Los datos se sincronizan automáticamente
-- Las acciones se encolan localmente
-- Indicador de estado de conexión visible
+![Historial](screenshots/mobile/mobile_generador_historial.png)
 
----
-
-### 7.3 Notificaciones Push
-
-Reciba alertas en tiempo real:
-
-- Nuevos manifiestos asignados
-- Alertas de desviación de ruta
-- Recordatorios de acciones pendientes
-- Confirmaciones de procesos
+Lista de manifiestos con búsqueda y filtros.
 
 ---
 
-## 8. Casos de Uso por Rol
+### 3.4 Transportista (Móvil)
 
-### 8.1 Administrador (CU-A)
+#### Dashboard de Ruta
 
-| ID | Caso de Uso | Descripción |
-|----|-------------|-------------|
-| CU-A01 | Visualizar Dashboard | Ver KPIs y estadísticas generales |
-| CU-A02 | Gestionar Manifiestos | CRUD completo de manifiestos |
-| CU-A03 | Supervisar Estado | Monitorear manifiestos activos |
-| CU-A04 | Monitorear Transporte | Tracking GPS en tiempo real |
-| CU-A05 | Gestionar Generadores | Alta/baja de empresas generadoras |
-| CU-A06 | Gestionar Transportistas | Alta/baja de transportistas |
-| CU-A07 | Gestionar Operadores | Alta/baja de plantas |
-| CU-A08 | Gestionar Vehículos | Registro de flota |
-| CU-A09 | Gestionar Usuarios | Control de accesos |
-| CU-A10 | Generar Reportes | Informes de fiscalización |
-| CU-A11 | Consultar Histórico | Búsqueda en archivo |
-| CU-A12 | Exportar Datos | Descarga en Excel/PDF |
-| CU-A13 | Monitorear Indicadores | KPIs ambientales |
-| CU-A14 | Configurar Sistema | Parámetros generales |
+![Transportista Home](screenshots/mobile/mobile_transportista_home.png)
 
----
+Panel principal con:
+- Manifiestos asignados
+- Viaje activo (si existe)
+- Acciones rápidas
 
-### 8.2 Generador (CU-G)
+#### Escaneo QR (CU-T08)
 
-| ID | Caso de Uso | Descripción |
-|----|-------------|-------------|
-| CU-G01 | Solicitar Retiro | Programar retiro de residuos |
-| CU-G02 | Consultar Estado | Ver estado de manifiestos |
-| CU-G03 | Crear Manifiesto | Declarar residuos |
-| CU-G04 | Verificar Estado | Seguimiento en tiempo real |
-| CU-G05 | Descargar Certificado | Obtener certificado de tratamiento |
-| CU-G06 | Firmar Manifiesto | Firma digital |
-| CU-G07 | Cancelar Manifiesto | Anular manifiesto pendiente |
-| CU-G08 | Ver Historial | Consultar manifiestos anteriores |
-| CU-G09 | Recibir Notificaciones | Alertas del sistema |
-| CU-G10 | Generar Reportes | Informes propios |
-| CU-G11 | Consultar Transportistas | Ver transportistas habilitados |
-| CU-G12 | Actualizar Perfil | Modificar datos de empresa |
+![Escaneo QR](screenshots/mobile/mobile_transportista_qr.png)
+
+Permite:
+- Escanear QR del manifiesto
+- Cargar datos automáticamente
+- Verificar información
+
+#### Viaje Activo
+
+![Viaje Activo](screenshots/mobile/mobile_transportista_viaje.png)
+
+Durante el viaje:
+- Temporizador de duración
+- Ubicación GPS actual
+- Botones de incidente y parada
+- Confirmar entrega
+
+#### Detalle de Manifiesto
+
+![Detalle Manifiesto](screenshots/mobile/mobile_transportista_manifiesto_detalle.png)
+
+Información completa del manifiesto con acciones disponibles.
 
 ---
 
-### 8.3 Transportista (CU-T)
+### 3.5 Operador (Móvil)
 
-| ID | Caso de Uso | Descripción |
-|----|-------------|-------------|
-| CU-T01 | Ver Manifiestos | Lista de manifiestos asignados |
-| CU-T02 | Escanear QR | Validar manifiesto |
-| CU-T03 | Confirmar Retiro | Registrar recogida |
-| CU-T04 | Iniciar Viaje | Comenzar transporte con GPS |
-| CU-T05 | Registrar Incidentes | Documentar problemas |
-| CU-T06 | Finalizar Viaje | Confirmar llegada |
-| CU-T07 | Actualizar GPS | Envío de posición |
-| CU-T08 | Ver Ruta | Navegación optimizada |
-| CU-T09 | Firmar Entrega | Firma digital en destino |
-| CU-T10 | Ver Historial | Viajes completados |
-| CU-T11 | Recibir Alertas | Notificaciones push |
-| CU-T12 | Actualizar Perfil | Datos de conductor |
+#### Dashboard Entrantes
 
----
+![Operador Home](screenshots/mobile/mobile_operador_home.png)
 
-### 8.4 Operador (CU-O)
+Vista de:
+- Cargas entrantes con ETA
+- Acciones de recepción
+- Pesaje pendiente
 
-| ID | Caso de Uso | Descripción |
-|----|-------------|-------------|
-| CU-O01 | Recibir Vehículo | Ingreso en garita |
-| CU-O02 | Escanear QR | Validar manifiesto |
-| CU-O03 | Verificar Documentación | Control de papeles |
-| CU-O04 | Registrar Pesaje | Báscula de ingreso |
-| CU-O05 | Confirmar Recepción | Aceptar carga |
-| CU-O06 | Registrar Tratamiento | Proceso aplicado |
-| CU-O07 | Registrar Diferencia | Variación de peso |
-| CU-O08 | Emitir Certificado | Certificado de tratamiento |
-| CU-O09 | Actualizar Estado | Cambio de estado del manifiesto |
-| CU-O10 | Rechazar Carga | Devolver carga no conforme |
-| CU-O11 | Ver Historial | Recepciones anteriores |
-| CU-O12 | Generar Reportes | Informes de planta |
+#### Escaneo QR
+
+![Operador QR](screenshots/mobile/mobile_operador_escaneo_qr.png)
+
+Para recepción:
+- Escanear QR del manifiesto entrante
+- Validar datos offline si es necesario
+- Iniciar proceso de recepción
+
+#### Recepción
+
+![Recepción](screenshots/mobile/mobile_operador_recepcion.png)
+
+Confirmar:
+- Datos del residuo
+- Peso registrado
+- Observaciones
 
 ---
 
-## 9. Preguntas Frecuentes
+## 4. CARACTERÍSTICAS TÉCNICAS
 
-### ¿Cómo recupero mi contraseña?
-Contacte al administrador del sistema para restablecer su contraseña.
+### 4.1 PWA - Instalable como App
 
-### ¿Qué hago si el GPS no funciona?
-Verifique que la aplicación tenga permisos de ubicación. En iOS, vaya a Configuración > Privacidad > Servicios de ubicación.
+La aplicación puede instalarse en dispositivos móviles:
+- **Android**: Menú ⋮ → "Instalar aplicación"
+- **iOS**: Compartir → "Agregar a pantalla de inicio"
 
-### ¿Puedo trabajar sin conexión a Internet?
-Sí, la aplicación almacena datos localmente y sincroniza cuando recupera conexión.
+### 4.2 Modo Offline (CU-T09)
 
-### ¿Cómo instalo la app en mi celular?
-Siga las instrucciones en la sección 7.1 de este manual.
+- Funcionamiento completo sin conexión
+- Sincronización automática
+- Base de datos local cifrada
 
-### ¿Qué navegadores son compatibles?
-Chrome, Firefox, Safari y Edge en sus versiones más recientes.
+### 4.3 Notificaciones Push (CU-G11)
+
+Alertas automáticas por:
+- Cambios de estado
+- Retiros y entregas
+- Anomalías detectadas
+
+### 4.4 Seguridad
+
+- Autenticación con token 2FA
+- Firma electrónica de documentos
+- Log de auditoría completo (CU-A10)
+- Cifrado de datos sensibles
 
 ---
 
-## Soporte Técnico
+## 5. ANEXOS
 
-**Email:** soporte@demoambiente.ultimamilla.com.ar  
-**Teléfono:** +54 261 XXX-XXXX  
-**Horario:** Lunes a Viernes, 8:00 a 18:00
+### 5.1 Referencia de Casos de Uso
+
+| Módulo | Casos de Uso |
+|--------|--------------|
+| Autenticación | CU-A01, CU-G01, CU-T01, CU-O01 |
+| Dashboard | CU-A02, CU-G02, CU-T02, CU-O02 |
+| Manifiestos | CU-A09, CU-G03-G10, CU-T02-T08, CU-O02-O09 |
+| Gestión Actores | CU-A03-A08, CU-G12, CU-T11 |
+| Reportes | CU-A10-A12, CU-G09, CU-T10, CU-O11-O12 |
+| Configuración | CU-A13-A15, CU-T09 |
+
+### 5.2 Contacto
+
+**Dirección de Gestión y Fiscalización Ambiental**  
+Gobierno de Mendoza
 
 ---
 
-*Documento generado automáticamente - Versión 1.0*  
-*Fecha: Diciembre 2024*  
-*Sistema de Trazabilidad de Residuos Peligrosos - DGFA Mendoza*
+*Documento generado automáticamente - Diciembre 2025*
