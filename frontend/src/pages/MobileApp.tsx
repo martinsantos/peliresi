@@ -27,6 +27,12 @@ if (typeof window !== 'undefined') {
 }
 
 const MobileApp: React.FC = () => {
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+        // Check localStorage for existing auth
+        return localStorage.getItem('demoAppAuth') === 'true';
+    });
+    const [password, setPassword] = useState('');
+    const [passwordError, setPasswordError] = useState(false);
     const [role, setRole] = useState<UserRole | null>(null);
     const [currentScreen, setCurrentScreen] = useState<Screen>('home');
     const [menuOpen, setMenuOpen] = useState(false);
@@ -39,6 +45,19 @@ const MobileApp: React.FC = () => {
 
     const { isOnline, syncPending } = useConnectivity();
     const { promptInstall, canInstall, isIOS } = usePWAInstall();
+
+    // Password validation
+    const handlePasswordSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (password === 'mimi88') {
+            setIsAuthenticated(true);
+            localStorage.setItem('demoAppAuth', 'true');
+            setPasswordError(false);
+        } else {
+            setPasswordError(true);
+            setTimeout(() => setPasswordError(false), 2000);
+        }
+    };
 
     // Timer for active trip
     useEffect(() => {
@@ -118,6 +137,87 @@ const MobileApp: React.FC = () => {
         showToastMessage('✅ Viaje finalizado correctamente');
         analyticsService.trackAction('finalizar_viaje', 'viaje', role || undefined, { duracion: tiempoViaje });
     };
+
+    // Password screen
+    if (!isAuthenticated) {
+        return (
+            <div className="app-container">
+                <div className="role-selection" style={{ justifyContent: 'center' }}>
+                    <div className="role-logo" style={{
+                        background: 'linear-gradient(135deg, #10b981, #059669)',
+                        boxShadow: '0 12px 40px rgba(16, 185, 129, 0.4)'
+                    }}>
+                        <Shield size={36} strokeWidth={2} />
+                    </div>
+                    <h1 style={{ color: '#ffffff' }}>DGFA Mendoza</h1>
+                    <p style={{ color: '#94a3b8', marginBottom: '24px' }}>Sistema de Trazabilidad</p>
+
+                    <form onSubmit={handlePasswordSubmit} style={{ width: '100%', maxWidth: '280px' }}>
+                        <div style={{
+                            background: 'rgba(30, 41, 59, 0.8)',
+                            borderRadius: '12px',
+                            padding: '20px',
+                            border: passwordError ? '2px solid #ef4444' : '1px solid rgba(255, 255, 255, 0.15)'
+                        }}>
+                            <label style={{
+                                display: 'block',
+                                color: '#94a3b8',
+                                fontSize: '12px',
+                                marginBottom: '8px',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px'
+                            }}>
+                                Contraseña de acceso
+                            </label>
+                            <input
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="••••••••"
+                                style={{
+                                    width: '100%',
+                                    padding: '14px 16px',
+                                    background: 'rgba(15, 23, 42, 0.8)',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    borderRadius: '8px',
+                                    color: '#f8fafc',
+                                    fontSize: '16px',
+                                    outline: 'none'
+                                }}
+                                autoFocus
+                            />
+                            {passwordError && (
+                                <p style={{ color: '#ef4444', fontSize: '12px', marginTop: '8px' }}>
+                                    Contraseña incorrecta
+                                </p>
+                            )}
+                        </div>
+                        <button
+                            type="submit"
+                            style={{
+                                width: '100%',
+                                marginTop: '16px',
+                                padding: '14px',
+                                background: 'linear-gradient(135deg, #10b981, #059669)',
+                                border: 'none',
+                                borderRadius: '12px',
+                                color: 'white',
+                                fontSize: '15px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px'
+                            }}
+                        >
+                            Ingresar
+                        </button>
+                    </form>
+                </div>
+            </div>
+        );
+    }
 
     // Role selection screen
     if (!role) {
