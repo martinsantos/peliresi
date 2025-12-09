@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import Layout from './components/Layout';
+import PasswordGate from './components/PasswordGate';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Manifiestos from './pages/Manifiestos';
@@ -48,20 +49,62 @@ const App: React.FC = () => {
           {/* RUTA PRIVADA - Solo accesible por URL directa (no mostrar en menús) */}
           <Route path="/analytics-admin" element={<AnalyticsAdmin />} />
 
-          {/* Rutas SIN protección para demo */}
-          <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
-          <Route path="/manifiestos" element={<Layout><Manifiestos /></Layout>} />
-          <Route path="/manifiestos/nuevo" element={<Layout><ManifiestoForm /></Layout>} />
-          <Route path="/manifiestos/:id" element={<Layout><ManifiestoDetalle /></Layout>} />
-          <Route path="/tracking" element={<Layout><Tracking /></Layout>} />
-          <Route path="/reportes" element={<Layout><Reportes /></Layout>} />
-          <Route path="/actores" element={<Layout><GestionActores /></Layout>} />
-          <Route path="/alertas" element={<Layout><ConfigurarAlertas /></Layout>} />
-          <Route path="/carga-masiva" element={<Layout><CargaMasiva /></Layout>} />
-          <Route path="/configuracion" element={<Layout><Configuracion /></Layout>} />
+          {/* Demo App - SIN password, acceso libre */}
           <Route path="/demo-app" element={<DemoApp />} />
 
-          {/* Redirección por defecto - directo al dashboard */}
+          {/* Rutas del Dashboard - PROTEGIDAS con password */}
+          <Route path="/dashboard" element={
+            <PasswordGate>
+              <Layout><Dashboard /></Layout>
+            </PasswordGate>
+          } />
+          <Route path="/manifiestos" element={
+            <PasswordGate>
+              <Layout><Manifiestos /></Layout>
+            </PasswordGate>
+          } />
+          <Route path="/manifiestos/nuevo" element={
+            <PasswordGate>
+              <Layout><ManifiestoForm /></Layout>
+            </PasswordGate>
+          } />
+          <Route path="/manifiestos/:id" element={
+            <PasswordGate>
+              <Layout><ManifiestoDetalle /></Layout>
+            </PasswordGate>
+          } />
+          <Route path="/tracking" element={
+            <PasswordGate>
+              <Layout><Tracking /></Layout>
+            </PasswordGate>
+          } />
+          <Route path="/reportes" element={
+            <PasswordGate>
+              <Layout><Reportes /></Layout>
+            </PasswordGate>
+          } />
+          <Route path="/actores" element={
+            <PasswordGate>
+              <Layout><GestionActores /></Layout>
+            </PasswordGate>
+          } />
+          <Route path="/alertas" element={
+            <PasswordGate>
+              <Layout><ConfigurarAlertas /></Layout>
+            </PasswordGate>
+          } />
+          <Route path="/carga-masiva" element={
+            <PasswordGate>
+              <Layout><CargaMasiva /></Layout>
+            </PasswordGate>
+          } />
+          <Route path="/configuracion" element={
+            <PasswordGate>
+              <Layout><Configuracion /></Layout>
+            </PasswordGate>
+          } />
+
+          {/* Redirección por defecto - al dashboard (con password) */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
@@ -71,3 +114,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+

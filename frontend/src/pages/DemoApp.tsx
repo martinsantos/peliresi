@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import MobileApp from './MobileApp';
 import {
     ArrowLeft, Smartphone, Zap, WifiOff, QrCode, MapPin, Bell, Users,
@@ -69,15 +69,8 @@ const roleScreens = {
 
 const DemoApp: React.FC = () => {
     const [expandedRole, setExpandedRole] = useState<string | null>('ADMIN');
-    const [showOnboarding, setShowOnboarding] = useState(false);
-
-    // Mostrar onboarding automáticamente la primera vez
-    useEffect(() => {
-        const completed = localStorage.getItem('demoAppOnboardingCompleted');
-        if (!completed) {
-            setShowOnboarding(true);
-        }
-    }, []);
+    // Onboarding SIEMPRE visible al iniciar (producción)
+    const [showOnboarding, setShowOnboarding] = useState(true);
 
     const handleOnboardingComplete = () => {
         setShowOnboarding(false);
