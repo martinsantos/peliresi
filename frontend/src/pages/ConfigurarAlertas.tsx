@@ -47,6 +47,40 @@ const ConfigurarAlertas: React.FC = () => {
     const [guardando, setGuardando] = useState(false);
     const [mensaje, setMensaje] = useState<{ tipo: 'success' | 'error'; texto: string } | null>(null);
 
+    // Demo reglas fallback
+    const demoReglas: ReglaAlerta[] = [
+        {
+            id: '1',
+            nombre: 'Alerta por Tiempo Excesivo',
+            descripcion: 'Notifica cuando un transporte tarda más de lo esperado',
+            evento: 'TIEMPO_EXCESIVO',
+            condicion: JSON.stringify({ umbral: '60', unidad: 'minutos' }),
+            destinatarios: JSON.stringify(['ADMIN', 'TRANSPORTISTA']),
+            activa: true,
+            _count: { alertasGeneradas: 12 }
+        } as ReglaAlerta,
+        {
+            id: '2',
+            nombre: 'Desvío de Ruta Detectado',
+            descripcion: 'Alerta cuando el vehículo se desvía de la ruta planificada',
+            evento: 'DESVIO_RUTA',
+            condicion: JSON.stringify({}),
+            destinatarios: JSON.stringify(['ADMIN', 'TRANSPORTISTA', 'GENERADOR']),
+            activa: true,
+            _count: { alertasGeneradas: 3 }
+        } as ReglaAlerta,
+        {
+            id: '3',
+            nombre: 'Diferencia de Peso',
+            descripcion: 'Notifica discrepancias en el peso reportado',
+            evento: 'DIFERENCIA_PESO',
+            condicion: JSON.stringify({ umbral: '5', unidad: 'porcentaje' }),
+            destinatarios: JSON.stringify(['ADMIN', 'OPERADOR']),
+            activa: false,
+            _count: { alertasGeneradas: 0 }
+        } as ReglaAlerta,
+    ];
+
     // Form state
     const [form, setForm] = useState({
         nombre: '',
@@ -70,9 +104,9 @@ const ConfigurarAlertas: React.FC = () => {
             const data = await alertaService.getReglas();
             setReglas(Array.isArray(data) ? data : []);
         } catch (error) {
-            console.error('Error:', error);
-            setMensaje({ tipo: 'error', texto: 'Error al cargar reglas' });
-            setReglas([]);
+            console.error('Error loading reglas, using demo data:', error);
+            // Usar datos demo en caso de error
+            setReglas(demoReglas);
         } finally {
             setLoading(false);
         }

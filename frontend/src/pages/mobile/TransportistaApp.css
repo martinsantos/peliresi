@@ -49,14 +49,17 @@
 .offline-indicator-bar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
+    justify-content: flex-start;
+    gap: 0.5rem;
     margin-top: 1rem;
-    padding: 0.6rem 0.85rem;
+    padding: 0.5rem 0.75rem;
     background: rgba(255, 255, 255, 0.15);
     border-radius: 12px;
     backdrop-filter: blur(10px);
     margin-bottom: 1rem;
+    max-width: 100%;
+    overflow: hidden;
+    flex-wrap: nowrap;
 }
 
 .connection-status {
@@ -80,8 +83,15 @@
 }
 
 @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.7;
+    }
 }
 
 .last-sync {
@@ -120,13 +130,20 @@
 }
 
 @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .mobile-stats {
     display: flex;
-    gap: 1rem;
+    gap: 0.5rem;
+    width: 100%;
+    max-width: 100%;
 }
 
 .stat-card {
@@ -187,8 +204,10 @@
 .mobile-content {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 1rem;
     background: white;
+    max-width: 100%;
 }
 
 .cards-list {
@@ -201,10 +220,16 @@
 .mobile-card {
     background: #fefefe;
     border-radius: 16px;
-    padding: 1.25rem;
+    padding: 1rem;
     box-shadow: 0 2px 12px -4px rgba(0, 0, 0, 0.1);
     border: 1px solid #e2e8f0;
     border-left: 4px solid #f59e0b;
+    overflow: hidden;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    display: flex !important;
+    flex-direction: column !important;
 }
 
 .card-header {
@@ -379,4 +404,54 @@
     padding: 3rem 2rem;
     color: #64748b;
     font-size: 0.95rem;
+}
+
+/* === CRITICAL: Force vertical layout and fix overflow === */
+.mobile-app .mobile-content,
+.mobile-app .cards-list {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+}
+
+.mobile-app .mobile-card {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.mobile-app .card-header,
+.mobile-app .card-body,
+.mobile-app .card-footer {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.mobile-app .btn-mobile {
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* Fix header overflow */
+.mobile-app .mobile-header {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+}
+
+.mobile-app .offline-indicator-bar {
+    width: auto !important;
+    max-width: 100% !important;
+}
+
+.mobile-app .mobile-stats {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
 }

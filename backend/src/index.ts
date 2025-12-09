@@ -18,8 +18,11 @@ const app = express();
 const prisma = new PrismaClient();
 
 // Middleware básico
+// Soportar múltiples orígenes CORS (separados por coma)
+const corsOrigins = config.CORS_ORIGIN.split(',').map(o => o.trim());
 app.use(cors({
-  origin: config.CORS_ORIGIN
+  origin: corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins,
+  credentials: true
 }));
 app.use(express.json());
 

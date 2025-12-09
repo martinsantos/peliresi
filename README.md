@@ -8,14 +8,20 @@
 
 **URL de Producción:** [https://www.ultimamilla.com.ar/demoambiente/](https://www.ultimamilla.com.ar/demoambiente/)
 
-### Credenciales de Prueba
+### Acceso Directo (Sin Login)
 
-| Rol | Email | Contraseña |
-|-----|-------|------------|
-| 👨‍💼 Administrador DGFA | `admin@dgfa.mendoza.gov.ar` | `admin123` |
-| 🏭 Generador | `quimica.mendoza@industria.com` | `gen123` |
-| 🚛 Transportista | `transportes.andes@logistica.com` | `trans123` |
-| ♻️ Operador | `tratamiento.residuos@planta.com` | `op123` |
+La demo está configurada para **acceso directo al Dashboard** sin necesidad de login.
+
+Para cambiar de rol, usar el **menú de usuario** (esquina superior derecha).
+
+### Roles Disponibles
+
+| Rol | Identificador | Color |
+|-----|---------------|-------|
+| 🛡️ Administrador DGFA | ADMIN | Verde |
+| 🏭 Generador | GENERADOR | Azul |
+| 🚛 Transportista | TRANSPORTISTA | Naranja |
+| 🏢 Operador | OPERADOR | Violeta |
 
 ---
 
@@ -248,9 +254,17 @@ La aplicación soporta operación sin conexión:
 
 | Archivo | Contenido |
 |---------|-----------|
+| `docs/MANUAL_TUTORIAL.md` | **📘 Manual Tutorial Completo** - Guía profesional con 34+ capturas de pantalla |
 | `GUIA_DEMO.md` | Guía paso a paso para demostración |
 | `TUTORIAL_DEMO.md` | Tutorial técnico completo |
 | `DEPLOY.md` | Instrucciones de deployment |
+
+### 📸 Capturas de Pantalla
+
+El manual incluye capturas reales del sistema organizadas por tipo:
+
+- `docs/screenshots/desktop/` - 15 capturas de vistas desktop
+- `docs/screenshots/mobile/` - 19 capturas de aplicación móvil
 
 ---
 
@@ -288,10 +302,21 @@ Consultar en: Menú → Configuración → Auditoría
 
 ---
 
+## 📊 Acceso a Analytics (Privado)
+
+**URL Privada:** `/demoambiente/analytics-admin`
+
+Esta ruta NO está visible en el menú. Solo accesible por URL directa.
+
+**Credencial de acceso:**
+- **Password:** `adminanalytics2024`
+
+---
+
 ## 📅 Versión
 
 **Versión:** Demo Diciembre 2025  
-**Última actualización:** 2025-12-07
+**Última actualización:** 2025-12-09
 
 ---
 

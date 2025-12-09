@@ -94,8 +94,10 @@
 .app-content {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     background: #f8fafc;
     position: relative;
+    max-width: 100%;
 }
 
 .app-home-indicator {

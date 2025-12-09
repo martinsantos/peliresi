@@ -1,23 +1,29 @@
 // Service Worker para modo Offline-First (CU-T09)
-const CACHE_NAME = 'trazabilidad-rrpp-v1';
-const RUNTIME_CACHE = 'runtime-cache-v1';
+const CACHE_NAME = 'trazabilidad-rrpp-v4';
+const RUNTIME_CACHE = 'runtime-cache-v4';
 
 // Recursos críticos para cachear en instalación
+// Paths relativos al scope del SW
 const PRECACHE_URLS = [
-    '/',
-    '/index.html',
-    '/manifest.json',
-    '/offline.html'
+    '/demoambiente/',
+    '/demoambiente/index.html'
 ];
 
 // Instalación del Service Worker
 self.addEventListener('install', (event) => {
-    console.log('[SW] Instalando Service Worker...');
+    console.log('[SW] Installing Service Worker...');
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then((cache) => {
-                console.log('[SW] Pre-cacheando recursos críticos');
-                return cache.addAll(PRECACHE_URLS);
+                console.log('[SW] Caching static assets...');
+                // Use addAll with catch for individual failures
+                return Promise.all(
+                    PRECACHE_URLS.map(url =>
+                        cache.add(url).catch(err => {
+                            console.warn('[SW] Failed to cache:', url, err);
+                        })
+                    )
+                );
             })
             .then(() => self.skipWaiting())
     );
@@ -110,8 +116,8 @@ self.addEventListener('push', (event) => {
     const title = data.title || 'Trazabilidad RRPP';
     const options = {
         body: data.body || 'Nueva notificación',
-        icon: '/icon-192.png',
-        badge: '/icon-192.png',
+        icon: '/demoambiente/icon-192.png',
+        badge: '/demoambiente/icon-192.png',
         data: data
     };
 

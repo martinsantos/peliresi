@@ -211,6 +211,14 @@ export interface DashboardStats {
     };
     recientes: Manifiesto[];
     enTransitoList: Manifiesto[];
+    // Also support flat structure from API
+    borradores?: number;
+    aprobados?: number;
+    enTransito?: number;
+    entregados?: number;
+    recibidos?: number;
+    tratados?: number;
+    total?: number;
 }
 
 export interface AuthTokens {

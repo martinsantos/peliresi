@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual Tutorial | Sistema de Trazabilidad RRPP - DGFA Mendoza</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        /* ============================================
+           VARIABLES Y RESET
+           ============================================ */
+        :root {
+            --primary: #10b981;
+            --primary-dark: #059669;
+            --secondary: #1e293b;
+            --accent: #3b82f6;
+            --text: #334155;
+            --text-muted: #64748b;
+            --bg: #f8fafc;
+            --bg-card: #ffffff;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+            --radius: 12px;
+            --sidebar-width: 280px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            scroll-padding-top: 80px;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            font-size: 16px;
+            line-height: 1.7;
+            color: var(--text);
+            background: var(--bg);
+        }
+
+        /* ============================================
+           LAYOUT
+           ============================================ */
+        .layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* ============================================
+           SIDEBAR / MENU STICKY
+           ============================================ */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: var(--secondary);
+            color: white;
+            overflow-y: auto;
+            z-index: 1000;
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar-header {
+            padding: 24px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .logo .u {
+            color: #ef4444;
+        }
+
+        .logo .rest {
+            color: #60a5fa;
+        }
+
+        .sidebar-subtitle {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .nav-section {
+            padding: 16px 0;
+        }
+
+        .nav-title {
+            padding: 8px 24px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 24px;
+            color: rgba(255, 255, 255, 0.7);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: white;
+        }
+
+        .nav-link.active {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--primary);
+            border-left-color: var(--primary);
+        }
+
+        .nav-link .icon {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .nav-sub {
+            padding-left: 56px;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .nav-sub:hover {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        /* ============================================
+           MAIN CONTENT
+           ============================================ */
+        .main {
+            margin-left: var(--sidebar-width);
+            flex: 1;
+            min-width: 0;
+        }
+
+        /* Top Header */
+        .top-header {
+            position: sticky;
+            top: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .breadcrumb a {
+            color: var(--text-muted);
+            text-decoration: none;
+        }
+
+        .breadcrumb a:hover {
+            color: var(--primary);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg);
+            border-color: var(--text-muted);
+        }
+
+        /* Content Area */
+        .content {
+            padding: 40px;
+            max-width: 900px;
+        }
+
+        /* ============================================
+           TYPOGRAPHY
+           ============================================ */
+        h1 {
+            font-size: 36px;
+            font-weight: 800;
+            color: var(--secondary);
+            margin-bottom: 16px;
+            line-height: 1.2;
+        }
+
+        h2 {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--secondary);
+            margin-top: 48px;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        h3 {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--secondary);
+            margin-top: 32px;
+            margin-bottom: 16px;
+        }
+
+        h4 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text);
+            margin-top: 24px;
+            margin-bottom: 12px;
+        }
+
+        p {
+            margin-bottom: 16px;
+        }
+
+        ul,
+        ol {
+            margin-bottom: 16px;
+            padding-left: 24px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        strong {
+            font-weight: 600;
+            color: var(--secondary);
+        }
+
+        a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        /* ============================================
+           CARDS & SECTIONS
+           ============================================ */
+        .card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow);
+        }
+
+        .intro-card {
+            background: linear-gradient(135deg, var(--secondary), #334155);
+            color: white;
+            padding: 32px;
+        }
+
+        .intro-card h1 {
+            color: white;
+        }
+
+        .intro-card p {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 18px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-top: 24px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+        }
+
+        .feature-item .icon {
+            width: 40px;
+            height: 40px;
+            background: var(--primary);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .feature-item span {
+            font-weight: 500;
+        }
+
+        /* ============================================
+           TABLES
+           ============================================ */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 14px;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+
+        thead {
+            background: var(--secondary);
+            color: white;
+        }
+
+        th {
+            padding: 14px 16px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            background: white;
+        }
+
+        tr:hover td {
+            background: var(--bg);
+        }
+
+        /* ============================================
+           SCREENSHOTS & ANIMATIONS
+           ============================================ */
+        .screenshot-container {
+            margin: 24px 0;
+            text-align: center;
+        }
+
+        .screenshot {
+            max-width: 100%;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-lg);
+            transition: transform 0.3s ease;
+        }
+
+        .screenshot:hover {
+            transform: scale(1.02);
+        }
+
+        .screenshot-caption {
+            margin-top: 12px;
+            font-size: 14px;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        /* Animation container for WebP videos */
+        .animation-container {
+            margin: 24px 0;
+            background: var(--secondary);
+            border-radius: var(--radius);
+            padding: 16px;
+            text-align: center;
+        }
+
+        .animation-container video,
+        .animation-container img {
+            max-width: 100%;
+            border-radius: 8px;
+        }
+
+        .animation-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 12px;
+            padding: 6px 12px;
+            background: var(--primary);
+            color: white;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        /* ============================================
+           ROLE BADGES
+           ============================================ */
+        .role-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .role-admin {
+            background: rgba(16, 185, 129, 0.15);
+            color: #059669;
+        }
+
+        .role-generador {
+            background: rgba(59, 130, 246, 0.15);
+            color: #2563eb;
+        }
+
+        .role-transportista {
+            background: rgba(245, 158, 11, 0.15);
+            color: #d97706;
+        }
+
+        .role-operador {
+            background: rgba(139, 92, 246, 0.15);
+            color: #7c3aed;
+        }
+
+        /* ============================================
+           STEPS / PROCESS
+           ============================================ */
+        .steps {
+            counter-reset: step;
+        }
+
+        .step {
+            position: relative;
+            padding-left: 48px;
+            margin-bottom: 24px;
+        }
+
+        .step::before {
+            counter-increment: step;
+            content: counter(step);
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 32px;
+            height: 32px;
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .step h4 {
+            margin-top: 0;
+        }
+
+        /* ============================================
+           CODE
+           ============================================ */
+        code {
+            background: #f1f5f9;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 14px;
+            color: #e11d48;
+        }
+
+        pre {
+            background: var(--secondary);
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: var(--radius);
+            overflow-x: auto;
+            font-size: 14px;
+            margin: 16px 0;
+        }
+
+        pre code {
+            background: none;
+            color: inherit;
+            padding: 0;
+        }
+
+        /* ============================================
+           CALLOUTS
+           ============================================ */
+        .callout {
+            padding: 20px 24px;
+            border-radius: var(--radius);
+            margin: 20px 0;
+            display: flex;
+            gap: 16px;
+        }
+
+        .callout-icon {
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .callout-info {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .callout-success {
+            background: #f0fdf4;
+            border-left: 4px solid #22c55e;
+        }
+
+        .callout-warning {
+            background: #fffbeb;
+            border-left: 4px solid #f59e0b;
+        }
+
+        /* ============================================
+           MOBILE MENU
+           ============================================ */
+        .mobile-toggle {
+            display: none;
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 56px;
+            height: 56px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: var(--shadow-lg);
+            z-index: 1001;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .main {
+                margin-left: 0;
+            }
+
+            .mobile-toggle {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .content {
+                padding: 24px;
+            }
+
+            h1 {
+                font-size: 28px;
+            }
+
+            h2 {
+                font-size: 22px;
+            }
+        }
+
+        /* ============================================
+           FOOTER
+           ============================================ */
+        .footer {
+            margin-top: 64px;
+            padding: 32px;
+            background: var(--secondary);
+            color: white;
+            text-align: center;
+            border-radius: var(--radius) var(--radius) 0 0;
+        }
+
+        .footer p {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 14px;
+        }
+
+        /* ============================================
+           PRINT STYLES
+           ============================================ */
+        @media print {
+
+            .sidebar,
+            .top-header,
+            .mobile-toggle {
+                display: none !important;
+            }
+
+            .main {
+                margin-left: 0;
+            }
+
+            .content {
+                max-width: none;
+                padding: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <span class="u">ú</span><span class="rest">ltimamilla</span>
+            </div>
+            <div class="sidebar-subtitle">Sistema Trazabilidad RRPP</div>
+        </div>
+
+        <div class="nav-section">
+            <div class="nav-title">Inicio</div>
+            <a href="#introduccion" class="nav-link active">
+                <span class="icon">📘</span>
+                Introducción
+            </a>
+            <a href="#acceso" class="nav-link">
+                <span class="icon">🔑</span>
+                Acceso al Sistema
+            </a>
+        </div>
+
+        <div class="nav-section">
+            <div class="nav-title">Roles</div>
+            <a href="#admin" class="nav-link">
+                <span class="icon">🛡️</span>
+                Administrador
+            </a>
+            <a href="#admin-dashboard" class="nav-link nav-sub">Dashboard</a>
+            <a href="#admin-manifiestos" class="nav-link nav-sub">Manifiestos</a>
+            <a href="#admin-tracking" class="nav-link nav-sub">Tracking GPS</a>
+
+            <a href="#generador" class="nav-link">
+                <span class="icon">🏭</span>
+                Generador
+            </a>
+            <a href="#generador-crear" class="nav-link nav-sub">Crear Manifiesto</a>
+
+            <a href="#transportista" class="nav-link">
+                <span class="icon">🚛</span>
+                Transportista
+            </a>
+            <a href="#transportista-viaje" class="nav-link nav-sub">Gestión de Viaje</a>
+
+            <a href="#operador" class="nav-link">
+                <span class="icon">🏢</span>
+                Operador
+            </a>
+            <a href="#operador-recepcion" class="nav-link nav-sub">Recepción</a>
+        </div>
+
+        <div class="nav-section">
+            <div class="nav-title">Aplicación</div>
+            <a href="#pwa" class="nav-link">
+                <span class="icon">📱</span>
+                App Móvil (PWA)
+            </a>
+            <a href="#casos-uso" class="nav-link">
+                <span class="icon">📋</span>
+                Casos de Uso
+            </a>
+            <a href="#faq" class="nav-link">
+                <span class="icon">❓</span>
+                Preguntas Frecuentes
+            </a>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Top Header -->
+        <header class="top-header">
+            <div class="breadcrumb">
+                <a href="#">Inicio</a>
+                <span>/</span>
+                <span>Manual Tutorial</span>
+            </div>
+            <div class="header-actions">
+                <a href="MANUAL_TUTORIAL_DGFA.pdf" class="btn btn-secondary" download>
+                    📄 Descargar PDF
+                </a>
+                <a href="https://www.ultimamilla.com.ar/demoambiente/" class="btn btn-primary" target="_blank">
+                    🚀 Ver Demo en Vivo
+                </a>
+            </div>
+        </header>
+
+        <!-- Content -->
+        <div class="content">
+            <!-- Intro Card -->
+            <section id="introduccion">
+                <div class="card intro-card">
+                    <h1>📘 Manual Tutorial</h1>
+                    <p>Sistema de Trazabilidad de Residuos Peligrosos<br>
+                        <strong>DGFA - Dirección General de Fiscalización Ambiental</strong><br>
+                        Gobierno de Mendoza
+                    </p>
+
+                    <div class="feature-grid">
+                        <div class="feature-item">
+                            <div class="icon">📄</div>
+                            <span>Manifiestos Digitales</span>
+                        </div>
+                        <div class="feature-item">
+                            <div class="icon">🛰️</div>
+                            <span>Tracking GPS</span>
+                        </div>
+                        <div class="feature-item">
+                            <div class="icon">🔔</div>
+                            <span>Alertas Automáticas</span>
+                        </div>
+                        <div class="feature-item">
+                            <div class="icon">📊</div>
+                            <span>Reportes Ambientales</span>
+                        </div>
+                    </div>
+                </div>
+
+                <h3>Roles del Sistema</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Rol</th>
+                            <th>Descripción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="role-badge role-admin">🛡️ ADMINISTRADOR</span></td>
+                            <td>Gestión completa, supervisión, reportes y configuración</td>
+                        </tr>
+                        <tr>
+                            <td><span class="role-badge role-generador">🏭 GENERADOR</span></td>
+                            <td>Empresas que generan residuos peligrosos</td>
+                        </tr>
+                        <tr>
+                            <td><span class="role-badge role-transportista">🚛 TRANSPORTISTA</span></td>
+                            <td>Empresas habilitadas para transporte</td>
+                        </tr>
+                        <tr>
+                            <td><span class="role-badge role-operador">🏢 OPERADOR</span></td>
+                            <td>Plantas de tratamiento y disposición final</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- Acceso -->
+            <section id="acceso">
+                <h2>🔑 Acceso al Sistema</h2>
+
+                <h3>Plataforma Web (Desktop)</h3>
+                <div class="card">
+                    <p>Acceda al sistema desde cualquier navegador moderno:</p>
+                    <p><strong>URL:</strong> <code>https://demoambiente.ultimamilla.com.ar</code></p>
+                    <p>El sistema detectará automáticamente su rol basado en las credenciales.</p>
+                </div>
+
+                <h3>Aplicación Móvil (PWA)</h3>
+                <div class="steps">
+                    <div class="step">
+                        <h4>Abrir navegador</h4>
+                        <p>Abra Chrome o Safari en su dispositivo móvil</p>
+                    </div>
+                    <div class="step">
+                        <h4>Navegar a la URL</h4>
+                        <p>Ingrese a la dirección del sistema</p>
+                    </div>
+                    <div class="step">
+                        <h4>Instalar App</h4>
+                        <p>Toque <strong>"Instalar App"</strong> o en iOS: Compartir → "Agregar a pantalla de inicio"
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Admin -->
+            <section id="admin">
+                <h2>🛡️ Rol ADMINISTRADOR</h2>
+                <p>El rol Administrador tiene acceso completo a todas las funcionalidades del sistema.</p>
+
+                <h3 id="admin-dashboard">Dashboard Principal</h3>
+                <p>El dashboard muestra indicadores clave de rendimiento (KPIs):</p>
+
+                <div class="screenshot-container">
+                    <img src="screenshots/desktop/desktop_dashboard_admin.png" alt="Dashboard Administrador"
+                        class="screenshot">
+                    <p class="screenshot-caption">Vista del Dashboard del Administrador con KPIs en tiempo real</p>
+                </div>
+
+                <div class="card">
+                    <h4>Elementos del Dashboard:</h4>
+                    <ul>
+                        <li><strong>Manifiestos Activos:</strong> Cantidad total de manifiestos en proceso</li>
+                        <li><strong>En Tránsito:</strong> Vehículos actualmente transportando residuos</li>
+                        <li><strong>Alertas:</strong> Notificaciones pendientes de atención</li>
+                        <li><strong>Gráficos:</strong> Tendencias y estadísticas de operación</li>
+                    </ul>
+                </div>
+
+                <h3 id="admin-manifiestos">Gestión de Manifiestos</h3>
+                <div class="screenshot-container">
+                    <img src="screenshots/desktop/desktop_manifiestos_lista.png" alt="Lista de Manifiestos"
+                        class="screenshot">
+                    <p class="screenshot-caption">Listado completo de manifiestos con filtros y acciones</p>
+                </div>
+
+                <h3 id="admin-tracking">Tracking GPS en Tiempo Real</h3>
+                <div class="screenshot-container">
+                    <img src="screenshots/desktop/desktop_tracking_gps.png" alt="Tracking GPS" class="screenshot">
+                    <p class="screenshot-caption">Mapa interactivo con seguimiento de vehículos en ruta</p>
+                </div>
+
+                <div class="callout callout-info">
+                    <span class="callout-icon">💡</span>
+                    <div>
+                        <strong>Geofencing Activo</strong><br>
+                        El sistema detecta automáticamente desviaciones de ruta y genera alertas en tiempo real.
+                    </div>
+                </div>
+            </section>
+
+            <!-- Generador -->
+            <section id="generador">
+                <h2>🏭 Rol GENERADOR</h2>
+                <p>El Generador es la empresa que produce residuos peligrosos y debe declararlos.</p>
+
+                <h3>Dashboard del Generador</h3>
+                <div class="screenshot-container">
+                    <img src="screenshots/mobile/mobile_generador_dashboard.png" alt="Dashboard Generador"
+                        class="screenshot" style="max-width: 300px;">
+                    <p class="screenshot-caption">Vista móvil del dashboard del Generador</p>
+                </div>
+
+                <h3 id="generador-crear">Crear Nuevo Manifiesto</h3>
+                <div class="screenshot-container">
+                    <img src="screenshots/mobile/mobile_generador_crear_manifiesto.png" alt="Crear Manifiesto"
+                        class="screenshot" style="max-width: 300px;">
+                    <p class="screenshot-caption">Formulario de creación de manifiesto</p>
+                </div>
+
+                <div class="steps">
+                    <div class="step">
+                        <h4>Seleccionar tipo de residuo</h4>
+                        <p>Código Y según Ley 24.051</p>
+                    </div>
+                    <div class="step">
+                        <h4>Indicar cantidad</h4>
+                        <p>En kg, litros o unidades</p>
+                    </div>
+                    <div class="step">
+                        <h4>Seleccionar transportista</h4>
+                        <p>De la lista de habilitados</p>
+                    </div>
+                    <div class="step">
+                        <h4>Confirmar y firmar</h4>
+                        <p>Firma digital del manifiesto</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Transportista -->
+            <section id="transportista">
+                <h2>🚛 Rol TRANSPORTISTA</h2>
+                <p>El Transportista es responsable del traslado de residuos peligrosos.</p>
+
+                <h3>Dashboard del Transportista</h3>
+                <div class="screenshot-container">
+                    <img src="screenshots/mobile/mobile_transportista_home.png" alt="Dashboard Transportista"
+                        class="screenshot" style="max-width: 300px;">
+                    <p class="screenshot-caption">Vista principal con viajes asignados</p>
+                </div>
+
+                <h3>Escanear QR del Manifiesto</h3>
+                <div class="screenshot-container">
+                    <img src="screenshots/mobile/mobile_transportista_qr.png" alt="Escanear QR" class="screenshot"
+                        style="max-width: 300px;">
+                    <p class="screenshot-caption">Validación del manifiesto mediante código QR</p>
+                </div>
+
+                <h3 id="transportista-viaje">Gestión de Viaje</h3>
+                <div class="screenshot-container">
+                    <img src="screenshots/mobile/mobile_transportista_viaje.png" alt="Viaje Activo" class="screenshot"
+                        style="max-width: 300px;">
+                    <p class="screenshot-caption">Control del viaje con GPS activo</p>
+                </div>
+            </section>
+
+            <!-- Operador -->
+            <section id="operador">
+                <h2>🏢 Rol OPERADOR</h2>
+                <p>El Operador gestiona la planta de tratamiento o disposición final.</p>
+
+                <h3>Dashboard del Operador</h3>
+                <div class="screenshot-container">
+                    <img src="screenshots/mobile/mobile_operador_home.png" alt="Dashboard Operador" class="screenshot"
+                        style="max-width: 300px;">
+                    <p class="screenshot-caption">Vista de manifiestos entrantes</p>
+                </div>
+
+                <h3 id="operador-recepcion">Recepción en Garita</h3>
+                <div class="screenshot-container">
+                    <img src="screenshots/mobile/mobile_operador_recepcion.png" alt="Recepción" class="screenshot"
+                        style="max-width: 300px;">
+                    <p class="screenshot-caption">Proceso de recepción de vehículos</p>
+                </div>
+
+                <h3>Escaneo QR</h3>
+                <div class="screenshot-container">
+                    <img src="screenshots/mobile/mobile_operador_escaneo_qr.png" alt="Escaneo QR Operador"
+                        class="screenshot" style="max-width: 300px;">
+                    <p class="screenshot-caption">Validación de manifiestos por QR</p>
+                </div>
+
+                <h3>Control de Pesaje</h3>
+                <div class="screenshot-container">
+                    <img src="screenshots/mobile/mobile_operador_pesaje.png" alt="Control Pesaje" class="screenshot"
+                        style="max-width: 300px;">
+                    <p class="screenshot-caption">Registro de peso bruto y tara</p>
+                </div>
+            </section>
+
+            <!-- PWA -->
+            <section id="pwa">
+                <h2>📱 Aplicación Móvil (PWA)</h2>
+
+                <div class="screenshot-container">
+                    <img src="screenshots/mobile/mobile_demoapp_selector.png" alt="Selector de Roles" class="screenshot"
+                        style="max-width: 300px;">
+                    <p class="screenshot-caption">Selector de roles en la aplicación móvil</p>
+                </div>
+
+                <div class="card">
+                    <h4>Ventajas de la PWA:</h4>
+                    <ul>
+                        <li>✅ No requiere descarga desde tienda</li>
+                        <li>✅ Funciona offline</li>
+                        <li>✅ Actualizaciones automáticas</li>
+                        <li>✅ Ocupa poco espacio</li>
+                        <li>✅ Notificaciones push</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Casos de Uso -->
+            <section id="casos-uso">
+                <h2>📋 Casos de Uso por Rol</h2>
+
+                <h3>Administrador (CU-A)</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Caso de Uso</th>
+                            <th>Descripción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>CU-A01</code></td>
+                            <td>Visualizar Dashboard</td>
+                            <td>Ver KPIs y estadísticas</td>
+                        </tr>
+                        <tr>
+                            <td><code>CU-A02</code></td>
+                            <td>Gestionar Manifiestos</td>
+                            <td>CRUD completo</td>
+                        </tr>
+                        <tr>
+                            <td><code>CU-A04</code></td>
+                            <td>Monitorear Transporte</td>
+                            <td>Tracking GPS en tiempo real</td>
+                        </tr>
+                        <tr>
+                            <td><code>CU-A10</code></td>
+                            <td>Generar Reportes</td>
+                            <td>Informes de fiscalización</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Generador (CU-G)</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Caso de Uso</th>
+                            <th>Descripción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>CU-G01</code></td>
+                            <td>Solicitar Retiro</td>
+                            <td>Programar retiro de residuos</td>
+                        </tr>
+                        <tr>
+                            <td><code>CU-G03</code></td>
+                            <td>Crear Manifiesto</td>
+                            <td>Declarar residuos</td>
+                        </tr>
+                        <tr>
+                            <td><code>CU-G05</code></td>
+                            <td>Descargar Certificado</td>
+                            <td>Obtener certificado de tratamiento</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Transportista (CU-T)</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Caso de Uso</th>
+                            <th>Descripción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>CU-T02</code></td>
+                            <td>Escanear QR</td>
+                            <td>Validar manifiesto</td>
+                        </tr>
+                        <tr>
+                            <td><code>CU-T04</code></td>
+                            <td>Iniciar Viaje</td>
+                            <td>Comenzar transporte con GPS</td>
+                        </tr>
+                        <tr>
+                            <td><code>CU-T07</code></td>
+                            <td>Actualizar GPS</td>
+                            <td>Envío de posición</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Operador (CU-O)</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Caso de Uso</th>
+                            <th>Descripción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>CU-O01</code></td>
+                            <td>Recibir Vehículo</td>
+                            <td>Ingreso en garita</td>
+                        </tr>
+                        <tr>
+                            <td><code>CU-O04</code></td>
+                            <td>Registrar Pesaje</td>
+                            <td>Báscula de ingreso</td>
+                        </tr>
+                        <tr>
+                            <td><code>CU-O08</code></td>
+                            <td>Emitir Certificado</td>
+                            <td>Certificado de tratamiento</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- FAQ -->
+            <section id="faq">
+                <h2>❓ Preguntas Frecuentes</h2>
+
+                <div class="card">
+                    <h4>¿Cómo recupero mi contraseña?</h4>
+                    <p>Contacte al administrador del sistema para restablecer su contraseña.</p>
+                </div>
+
+                <div class="card">
+                    <h4>¿Qué hago si el GPS no funciona?</h4>
+                    <p>Verifique que la aplicación tenga permisos de ubicación. En iOS, vaya a Configuración →
+                        Privacidad → Servicios de ubicación.</p>
+                </div>
+
+                <div class="card">
+                    <h4>¿Puedo trabajar sin conexión a Internet?</h4>
+                    <p>Sí, la aplicación almacena datos localmente y sincroniza cuando recupera conexión.</p>
+                </div>
+
+                <div class="card">
+                    <h4>¿Qué navegadores son compatibles?</h4>
+                    <p>Chrome, Firefox, Safari y Edge en sus versiones más recientes.</p>
+                </div>
+            </section>
+
+            <!-- Footer -->
+            <footer class="footer">
+                <div class="logo" style="justify-content: center; margin-bottom: 16px;">
+                    <span class="u">ú</span><span class="rest">ltimamilla</span>
+                </div>
+                <p>Sistema de Trazabilidad de Residuos Peligrosos</p>
+                <p>DGFA Mendoza • Diciembre 2025</p>
+            </footer>
+        </div>
+    </main>
+
+    <!-- Mobile Toggle -->
+    <button class="mobile-toggle" onclick="toggleSidebar()">☰</button>
+
+    <script>
+        // Toggle sidebar on mobile
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+
+        // Active link tracking
+        const sections = document.querySelectorAll('section[id]');
+        const navLinks = document.querySelectorAll('.nav-link');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (scrollY >= sectionTop - 100) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + current) {
+                    link.classList.add('active');
+                }
+            });
+        });
+
+        // Close sidebar when clicking a link on mobile
+        navLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                if (window.innerWidth <= 768) {
+                    document.getElementById('sidebar').classList.remove('open');
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>

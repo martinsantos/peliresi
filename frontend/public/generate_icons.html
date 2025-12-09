@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head><title>Icon Generator</title></head>
+<body>
+<canvas id="c192" width="192" height="192"></canvas>
+<canvas id="c512" width="512" height="512"></canvas>
+<script>
+function drawIcon(canvas, size) {
+    const ctx = canvas.getContext('2d');
+    // Background
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(0, 0, size, size);
+    // Rounded rect for logo area
+    const padding = size * 0.15;
+    const radius = size * 0.15;
+    ctx.fillStyle = '#10b981';
+    ctx.beginPath();
+    ctx.roundRect(padding, padding, size - padding * 2, size - padding * 2, radius);
+    ctx.fill();
+    // Letter T
+    ctx.fillStyle = 'white';
+    ctx.font = `bold ${size * 0.5}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('T', size / 2, size / 2);
+}
+drawIcon(document.getElementById('c192'), 192);
+drawIcon(document.getElementById('c512'), 512);
+// Convert to data URLs and show
+console.log('192:', document.getElementById('c192').toDataURL());
+console.log('512:', document.getElementById('c512').toDataURL());
+</script>
+</body>
+</html>

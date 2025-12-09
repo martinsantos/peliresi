@@ -39,9 +39,12 @@ export const authService = {
     async logout(): Promise<void> {
         try {
             await api.post('/auth/logout');
+        } catch {
+            // Ignorar errores de API en logout (modo demo)
         } finally {
             localStorage.removeItem('accessToken');
             localStorage.removeItem('refreshToken');
+            localStorage.removeItem('token'); // Token de demo
             localStorage.removeItem('user');
         }
     },
@@ -59,6 +62,7 @@ export const authService = {
     },
 
     isAuthenticated(): boolean {
-        return !!localStorage.getItem('accessToken');
+        // Soportar tanto token de demo como accessToken de backend real
+        return !!localStorage.getItem('accessToken') || !!localStorage.getItem('token');
     },
 };

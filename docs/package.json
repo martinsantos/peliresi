@@ -1,0 +1,15 @@
+{
+    "name": "manual-pdf-generator",
+    "version": "1.0.0",
+    "description": "Generador de PDF para Manual Tutorial DGFA",
+    "main": "generate-pdf.js",
+    "scripts": {
+        "generate": "node generate-pdf.js",
+        "pdf": "node generate-pdf.js"
+    },
+    "dependencies": {
+        "md-to-pdf": "^5.2.4"
+    },
+    "author": "DGFA Mendoza",
+    "license": "ISC"
+}

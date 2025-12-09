@@ -25,6 +25,7 @@ import {
 import NotificationBell from './NotificationBell';
 import QRScanner from './QRScanner';
 import OnboardingTour from './OnboardingTour';
+import ContextualHelp from './ContextualHelp';
 import './Layout.css';
 
 interface LayoutProps {
@@ -39,11 +40,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     const [userMenuOpen, setUserMenuOpen] = useState(false);
     const [qrScannerOpen, setQrScannerOpen] = useState(false);
     const [showTour, setShowTour] = useState(false);
+    const [showContextualHelp, setShowContextualHelp] = useState(false);
 
-    // Mostrar tour automáticamente si es primera vez
+    // Mostrar tour automáticamente si es primera vez o nueva versión
     useEffect(() => {
         const tourCompleted = localStorage.getItem('tourCompleted');
-        if (!tourCompleted && location.pathname === '/dashboard') {
+        const tourVersion = localStorage.getItem('tourVersion');
+        const currentVersion = '2.0';
+
+        // Show tour if never completed OR if version changed
+        if ((!tourCompleted || tourVersion !== currentVersion) && location.pathname === '/dashboard') {
             const timer = setTimeout(() => setShowTour(true), 800);
             return () => clearTimeout(timer);
         }
@@ -90,19 +96,53 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         }
     };
 
-    const navItems = [
-        { path: '/dashboard', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
-        { path: '/manifiestos', icon: <FileText size={20} />, label: 'Manifiestos' },
-        { path: '/tracking', icon: <MapPin size={20} />, label: 'Tracking GPS' },
-        { path: '/reportes', icon: <BarChart3 size={20} />, label: 'Reportes' },
-    ];
+    // Menú diferenciado por rol
+    const getNavItems = () => {
+        const baseItems = [
+            { path: '/dashboard', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
+        ];
 
-    if (user?.rol === 'ADMIN') {
-        navItems.push({ path: '/actores', icon: <Users size={20} />, label: 'Gestión Actores' });
-        navItems.push({ path: '/alertas', icon: <Bell size={20} />, label: 'Configurar Alertas' });
-        navItems.push({ path: '/carga-masiva', icon: <Upload size={20} />, label: 'Carga Masiva' });
-        navItems.push({ path: '/configuracion', icon: <Settings size={20} />, label: 'Configuración' });
-    }
+        switch (user?.rol) {
+            case 'ADMIN':
+                return [
+                    ...baseItems,
+                    { path: '/manifiestos', icon: <FileText size={20} />, label: 'Manifiestos' },
+                    { path: '/tracking', icon: <MapPin size={20} />, label: 'Tracking GPS' },
+                    { path: '/reportes', icon: <BarChart3 size={20} />, label: 'Reportes' },
+                    { path: '/actores', icon: <Users size={20} />, label: 'Gestión Actores' },
+                    { path: '/alertas', icon: <Bell size={20} />, label: 'Configurar Alertas' },
+                    { path: '/carga-masiva', icon: <Upload size={20} />, label: 'Carga Masiva' },
+                    { path: '/configuracion', icon: <Settings size={20} />, label: 'Configuración' },
+                ];
+            case 'GENERADOR':
+                return [
+                    ...baseItems,
+                    { path: '/manifiestos', icon: <FileText size={20} />, label: 'Mis Manifiestos' },
+                    { path: '/manifiestos/nuevo', icon: <FileText size={20} />, label: 'Nuevo Manifiesto' },
+                    { path: '/tracking', icon: <MapPin size={20} />, label: 'Seguimiento' },
+                    { path: '/reportes', icon: <BarChart3 size={20} />, label: 'Mis Reportes' },
+                ];
+            case 'TRANSPORTISTA':
+                return [
+                    ...baseItems,
+                    { path: '/manifiestos', icon: <FileText size={20} />, label: 'Viajes Asignados' },
+                    { path: '/tracking', icon: <MapPin size={20} />, label: 'Mi Ruta GPS' },
+                    { path: '/demo-app', icon: <Truck size={20} />, label: 'App Móvil' },
+                ];
+            case 'OPERADOR':
+                return [
+                    ...baseItems,
+                    { path: '/manifiestos', icon: <FileText size={20} />, label: 'Recepciones' },
+                    { path: '/tracking', icon: <MapPin size={20} />, label: 'Llegadas Hoy' },
+                    { path: '/reportes', icon: <BarChart3 size={20} />, label: 'Reportes Planta' },
+                ];
+            default:
+                return baseItems;
+        }
+    };
+
+    const navItems = getNavItems();
+
 
     return (
         <div className="layout">
@@ -170,13 +210,22 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     </div>
 
                     <div className="header-actions">
-                        {/* Help/Tour Button */}
+                        {/* Contextual Help Button */}
+                        <button
+                            className="header-icon-btn"
+                            onClick={() => setShowContextualHelp(true)}
+                            title="Ayuda contextual"
+                        >
+                            <HelpCircle size={20} />
+                        </button>
+
+                        {/* Tour Button */}
                         <button
                             className="header-icon-btn help-btn"
                             onClick={handleStartTour}
-                            title="Ver guía del sistema"
+                            title="Ver tour guiado"
                         >
-                            <HelpCircle size={20} />
+                            ??
                         </button>
 
                         {/* QR Scanner Button */}
@@ -211,6 +260,50 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                         <span>{user?.email}</span>
                                     </div>
                                     <div className="user-menu-divider" />
+                                    <div className="user-menu-section">
+                                        <span className="user-menu-section-title">Cambiar perfil:</span>
+                                        <button
+                                            className="user-menu-item"
+                                            onClick={() => {
+                                                localStorage.setItem('user', JSON.stringify({ id: '1', email: 'admin@example.com', nombre: 'Admin', apellido: 'Demo', rol: 'ADMIN' }));
+                                                window.location.reload();
+                                            }}
+                                        >
+                                            <Shield size={16} />
+                                            <span>Administrador DGFA</span>
+                                        </button>
+                                        <button
+                                            className="user-menu-item"
+                                            onClick={() => {
+                                                localStorage.setItem('user', JSON.stringify({ id: '2', email: 'generador@example.com', nombre: 'Generador', apellido: 'Demo', rol: 'GENERADOR' }));
+                                                window.location.reload();
+                                            }}
+                                        >
+                                            <Factory size={16} />
+                                            <span>Generador</span>
+                                        </button>
+                                        <button
+                                            className="user-menu-item"
+                                            onClick={() => {
+                                                localStorage.setItem('user', JSON.stringify({ id: '3', email: 'transportista@example.com', nombre: 'Transportista', apellido: 'Demo', rol: 'TRANSPORTISTA' }));
+                                                window.location.reload();
+                                            }}
+                                        >
+                                            <Truck size={16} />
+                                            <span>Transportista</span>
+                                        </button>
+                                        <button
+                                            className="user-menu-item"
+                                            onClick={() => {
+                                                localStorage.setItem('user', JSON.stringify({ id: '4', email: 'operador@example.com', nombre: 'Operador', apellido: 'Demo', rol: 'OPERADOR' }));
+                                                window.location.reload();
+                                            }}
+                                        >
+                                            <Building2 size={16} />
+                                            <span>Operador</span>
+                                        </button>
+                                    </div>
+                                    <div className="user-menu-divider" />
                                     <button className="user-menu-item" onClick={handleLogout}>
                                         <LogOut size={16} />
                                         <span>Cerrar sesión</span>
@@ -242,6 +335,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 userRole={user?.rol as 'ADMIN' | 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR'}
                 isOpen={showTour}
                 onComplete={() => setShowTour(false)}
+            />
+
+            {/* Contextual Help */}
+            <ContextualHelp
+                isActive={showContextualHelp}
+                onClose={() => setShowContextualHelp(false)}
             />
         </div>
     );

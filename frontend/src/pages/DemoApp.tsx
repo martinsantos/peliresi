@@ -1,84 +1,228 @@
-import React, { useState } from 'react';
-import MobileFrame from '../components/MobileFrame';
-import TransportistaApp from './mobile/TransportistaApp';
-import OperadorApp from './mobile/OperadorApp';
-import { ArrowLeft, Truck, Package } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import MobileApp from './MobileApp';
+import {
+    ArrowLeft, Smartphone, Zap, WifiOff, QrCode, MapPin, Bell, Users,
+    FileText, Truck, Factory, Building2, Plus, Eye, Navigation, UserCircle,
+    ListChecks, Settings, ChevronRight, ChevronDown, HelpCircle
+} from 'lucide-react';
+import { Link } from 'react-router-dom';
+import InstallPWAButton from '../components/InstallPWAButton';
+import ConnectivityIndicator from '../components/ConnectivityIndicator';
+import DemoAppOnboarding from '../components/DemoAppOnboarding';
 import './DemoApp.css';
 
-type AppRole = 'transportista' | 'operador' | null;
+// Pantallas por rol con casos de uso
+const roleScreens = {
+    ADMIN: {
+        icon: <Users size={20} />,
+        color: '#8b5cf6',
+        label: 'Administrador',
+        screens: [
+            { name: 'Dashboard', desc: 'Estadísticas generales del sistema', icon: <ListChecks size={16} /> },
+            { name: 'Manifiestos', desc: 'Lista de todos los manifiestos', icon: <FileText size={16} /> },
+            { name: 'Tracking GPS', desc: 'Mapa de transportes activos', icon: <MapPin size={16} /> },
+            { name: 'Gestión Actores', desc: 'Administrar generadores, transportistas, operadores', icon: <Users size={16} /> },
+            { name: 'Alertas', desc: 'Notificaciones y alertas del sistema', icon: <Bell size={16} /> },
+            { name: 'Perfil', desc: 'Configuración de cuenta', icon: <Settings size={16} /> },
+        ]
+    },
+    GENERADOR: {
+        icon: <Factory size={20} />,
+        color: '#10b981',
+        label: 'Generador',
+        screens: [
+            { name: 'Dashboard', desc: 'Resumen de manifiestos propios', icon: <ListChecks size={16} /> },
+            { name: 'Nuevo Manifiesto', desc: 'Crear nuevo manifiesto digital', icon: <Plus size={16} /> },
+            { name: 'Mis Manifiestos', desc: 'Historial de manifiestos generados', icon: <FileText size={16} /> },
+            { name: 'Escanear QR', desc: 'Verificar manifiesto escaneando código', icon: <QrCode size={16} /> },
+            { name: 'Alertas', desc: 'Notificaciones de mis manifiestos', icon: <Bell size={16} /> },
+            { name: 'Perfil', desc: 'Mis datos y configuración', icon: <UserCircle size={16} /> },
+        ]
+    },
+    TRANSPORTISTA: {
+        icon: <Truck size={20} />,
+        color: '#f59e0b',
+        label: 'Transportista',
+        screens: [
+            { name: 'Dashboard', desc: 'Viajes pendientes y activos', icon: <ListChecks size={16} /> },
+            { name: 'Escanear QR', desc: 'Escanear manifiesto para iniciar viaje', icon: <QrCode size={16} /> },
+            { name: 'Viaje Activo', desc: 'Seguimiento GPS del viaje actual', icon: <Navigation size={16} /> },
+            { name: 'Confirmar Retiro', desc: 'Registrar retiro de carga con GPS', icon: <MapPin size={16} /> },
+            { name: 'Confirmar Entrega', desc: 'Registrar entrega en destino', icon: <Building2 size={16} /> },
+            { name: 'Historial', desc: 'Viajes completados', icon: <Eye size={16} /> },
+        ]
+    },
+    OPERADOR: {
+        icon: <Building2 size={20} />,
+        color: '#3b82f6',
+        label: 'Operador',
+        screens: [
+            { name: 'Dashboard', desc: 'Cargas entrantes y recibidas', icon: <ListChecks size={16} /> },
+            { name: 'Escanear QR', desc: 'Escanear manifiesto al recibir carga', icon: <QrCode size={16} /> },
+            { name: 'Confirmar Recepción', desc: 'Registrar recepción con pesaje', icon: <Building2 size={16} /> },
+            { name: 'Tratamiento', desc: 'Registrar tratamiento realizado', icon: <Settings size={16} /> },
+            { name: 'Certificados', desc: 'Generar certificado de tratamiento', icon: <FileText size={16} /> },
+            { name: 'Historial', desc: 'Manifiestos procesados', icon: <Eye size={16} /> },
+        ]
+    }
+};
 
 const DemoApp: React.FC = () => {
-    const navigate = useNavigate();
-    const [selectedRole, setSelectedRole] = useState<AppRole>(null);
+    const [expandedRole, setExpandedRole] = useState<string | null>('ADMIN');
+    const [showOnboarding, setShowOnboarding] = useState(false);
 
-    if (!selectedRole) {
-        return (
-            <div className="demo-app-page">
-                <div className="demo-nav">
-                    <button className="btn btn-ghost" onClick={() => navigate('/dashboard')}>
-                        <ArrowLeft size={20} />
-                        Volver al Dashboard Web
-                    </button>
-                </div>
+    // Mostrar onboarding automáticamente la primera vez
+    useEffect(() => {
+        const completed = localStorage.getItem('demoAppOnboardingCompleted');
+        if (!completed) {
+            setShowOnboarding(true);
+        }
+    }, []);
 
-                <div className="role-selector">
-                    <div className="selector-header">
-                        <h1>Simulador de App Móvil</h1>
-                        <p>Selecciona el rol que deseas visualizar</p>
-                    </div>
+    const handleOnboardingComplete = () => {
+        setShowOnboarding(false);
+    };
 
-                    <div className="role-cards">
-                        <div className="role-card transportista" onClick={() => setSelectedRole('transportista')}>
-                            <div className="role-icon">
-                                <Truck size={48} />
-                            </div>
-                            <h3>Transportista</h3>
-                            <p>Gestión de retiros, entregas y tracking GPS en ruta</p>
-                            <ul className="role-features">
-                                <li>✓ Hoja de ruta diaria</li>
-                                <li>✓ Confirmación de retiros</li>
-                                <li>✓ Registro de eventos</li>
-                                <li>✓ Escaneo de QR</li>
-                            </ul>
-                            <button className="btn btn-primary">Ver Demo</button>
-                        </div>
-
-                        <div className="role-card operador" onClick={() => setSelectedRole('operador')}>
-                            <div className="role-icon">
-                                <Package size={48} />
-                            </div>
-                            <h3>Operador</h3>
-                            <p>Recepción, pesaje y tratamiento de residuos peligrosos</p>
-                            <ul className="role-features">
-                                <li>✓ Manifiestos entrantes</li>
-                                <li>✓ Pesaje y verificación</li>
-                                <li>✓ Aprobación/Rechazo</li>
-                                <li>✓ Registro de tratamiento</li>
-                            </ul>
-                            <button className="btn btn-success">Ver Demo</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    const handleShowOnboarding = () => {
+        setShowOnboarding(true);
+    };
 
     return (
-        <div className="demo-app-page">
-            <div className="demo-nav">
-                <button className="btn btn-ghost" onClick={() => setSelectedRole(null)}>
-                    <ArrowLeft size={20} />
-                    Cambiar Rol
-                </button>
-                <button className="btn btn-ghost" onClick={() => navigate('/dashboard')}>
-                    Volver al Dashboard
-                </button>
+        <div className="demo-page">
+            {/* Demo App Onboarding */}
+            <DemoAppOnboarding
+                isOpen={showOnboarding}
+                onComplete={handleOnboardingComplete}
+            />
+
+            {/* Top Bar */}
+            <div className="demo-topbar">
+                <Link to="/dashboard" className="back-link">
+                    <ArrowLeft size={18} />
+                    <span>Volver al Dashboard Web</span>
+                </Link>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <button
+                        onClick={handleShowOnboarding}
+                        className="help-tour-btn"
+                        title="Ver Tour de Funcionalidades"
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '8px 14px',
+                            background: 'rgba(16, 185, 129, 0.2)',
+                            border: '1px solid rgba(16, 185, 129, 0.3)',
+                            borderRadius: '8px',
+                            color: '#10b981',
+                            fontSize: '13px',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                        }}
+                    >
+                        <HelpCircle size={16} />
+                        Ver Tour
+                    </button>
+                    <ConnectivityIndicator size="small" showLabel={true} />
+                </div>
             </div>
 
-            <MobileFrame title={selectedRole === 'transportista' ? 'App Transportista' : 'App Operador'}>
-                {selectedRole === 'transportista' ? <TransportistaApp /> : <OperadorApp />}
-            </MobileFrame>
+            {/* Main Demo Area */}
+            <div className="demo-wrapper">
+                {/* Phone Mockup */}
+                <div className="phone-mockup">
+                    <div className="phone-notch">
+                        <div className="phone-camera"></div>
+                    </div>
+                    <div className="phone-screen">
+                        <MobileApp />
+                    </div>
+                    <div className="phone-home-indicator"></div>
+                </div>
+
+                {/* Info Panel - Enhanced with All Screens */}
+                <div className="info-panel">
+                    <div className="info-header">
+                        <div className="info-badge">
+                            <Zap size={16} />
+                            <span>PWA</span>
+                        </div>
+                        <h1>App Móvil PWA</h1>
+                        <p className="subtitle">Sistema de Trazabilidad de Residuos Peligrosos</p>
+                    </div>
+
+                    {/* Features Grid */}
+                    <div className="features-grid">
+                        <div className="feature-card">
+                            <WifiOff size={24} color="#3b82f6" />
+                            <span>Modo Offline</span>
+                        </div>
+                        <div className="feature-card">
+                            <QrCode size={24} color="#10b981" />
+                            <span>Escaneo QR</span>
+                        </div>
+                        <div className="feature-card">
+                            <MapPin size={24} color="#f59e0b" />
+                            <span>GPS Real</span>
+                        </div>
+                        <div className="feature-card">
+                            <Bell size={24} color="#ec4899" />
+                            <span>Push</span>
+                        </div>
+                    </div>
+
+                    {/* Screens by Role - Expandable */}
+                    <div className="roles-section">
+                        <h3 className="section-title">
+                            <Smartphone size={18} />
+                            Pantallas por Rol
+                        </h3>
+
+                        {Object.entries(roleScreens).map(([roleKey, role]) => (
+                            <div key={roleKey} className="role-accordion">
+                                <button
+                                    className={`role-header ${expandedRole === roleKey ? 'expanded' : ''}`}
+                                    onClick={() => setExpandedRole(expandedRole === roleKey ? null : roleKey)}
+                                    style={{ borderLeftColor: role.color }}
+                                >
+                                    <div className="role-info">
+                                        <span className="role-icon" style={{ background: `${role.color}20`, color: role.color }}>
+                                            {role.icon}
+                                        </span>
+                                        <span className="role-name">{role.label}</span>
+                                        <span className="screen-count">{role.screens.length} pantallas</span>
+                                    </div>
+                                    {expandedRole === roleKey ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                                </button>
+
+                                {expandedRole === roleKey && (
+                                    <div className="screens-list">
+                                        {role.screens.map((screen, idx) => (
+                                            <div key={idx} className="screen-item">
+                                                <span className="screen-icon" style={{ color: role.color }}>
+                                                    {screen.icon}
+                                                </span>
+                                                <div className="screen-info">
+                                                    <strong>{screen.name}</strong>
+                                                    <span>{screen.desc}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Install Button */}
+                    <InstallPWAButton variant="card" />
+
+                    <div className="demo-hint">
+                        <p>💡 Selecciona un rol en el teléfono para probar sus pantallas</p>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };

@@ -3,17 +3,19 @@
 
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <link rel="icon" type="image/png" href="/demoambiente/icon-192.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <!-- PWA Manifest -->
-  <link rel="manifest" href="/manifest.json" />
+  <link rel="manifest" href="/demoambiente/manifest.json" />
 
   <!-- Mobile Meta Tags -->
-  <meta name="theme-color" content="#f59e0b" />
+  <meta name="theme-color" content="#10b981" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Trazabilidad RRPP" />
+  <meta name="apple-mobile-web-app-title" content="DGFA RRPP" />
+  <link rel="apple-touch-icon" href="/demoambiente/icon-192.png" />
 
   <!-- SEO - Block indexing for demo -->
   <meta name="robots" content="noindex, nofollow" />
@@ -27,24 +29,13 @@
   <div id="root"></div>
   <script type="module" src="/src/main.tsx"></script>
 
-  <!-- Service Worker Registration (CU-T09: Offline-First) -->
+  <!-- Service Worker para PWA -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
+        navigator.serviceWorker.register('/demoambiente/sw.js', { scope: '/demoambiente/' })
           .then((registration) => {
             console.log('✅ Service Worker registrado:', registration.scope);
-
-            // Listener para mensajes del SW
-            navigator.serviceWorker.addEventListener('message', (event) => {
-              if (event.data.type === 'SYNC_COMPLETE') {
-                console.log('🔄 Sincronización completada:', event.data.timestamp);
-                // Disparar evento personalizado para que React lo escuche
-                window.dispatchEvent(new CustomEvent('sw-sync-complete', {
-                  detail: event.data
-                }));
-              }
-            });
           })
           .catch((error) => {
             console.error('❌ Error al registrar Service Worker:', error);

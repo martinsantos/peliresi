@@ -1,154 +1,104 @@
-import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
-import './Login.css';
+import React from 'react';
 
 const Login: React.FC = () => {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
+    const handleClick = (role: string, email: string) => {
+        alert('Clickeaste: ' + role);
 
-    const { login } = useAuth();
-    const navigate = useNavigate();
-    const location = useLocation();
+        const user = {
+            id: '1',
+            email: email,
+            nombre: role,
+            apellido: 'Demo',
+            rol: email === 'admin@example.com' ? 'ADMIN' : email.split('@')[0].toUpperCase()
+        };
 
-    const from = (location.state as any)?.from?.pathname || '/dashboard';
+        localStorage.setItem('token', 'demo-token-' + Date.now());
+        localStorage.setItem('user', JSON.stringify(user));
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError('');
-        setLoading(true);
-
-        try {
-            await login(email, password);
-            navigate(from, { replace: true });
-        } catch (err: any) {
-            setError(err.response?.data?.message || 'Error al iniciar sesión');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Usuarios de demo
-    const demoUsers = [
-        { email: 'admin@dgfa.mendoza.gov.ar', password: 'admin123', rol: 'Administrador DGFA' },
-        { email: 'quimica.mendoza@industria.com', password: 'gen123', rol: 'Generador' },
-        { email: 'transportes.andes@logistica.com', password: 'trans123', rol: 'Transportista' },
-        { email: 'tratamiento.residuos@planta.com', password: 'op123', rol: 'Operador' },
-    ];
-
-    const handleDemoLogin = (demoEmail: string, demoPassword: string) => {
-        setEmail(demoEmail);
-        setPassword(demoPassword);
+        window.location.href = '/demoambiente/dashboard';
     };
 
     return (
-        <div className="login-page">
-            <div className="login-background">
-                <div className="login-gradient" />
-                <div className="login-pattern" />
-            </div>
+        <div style={{
+            minHeight: '100vh',
+            background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            gap: '20px',
+            padding: '20px'
+        }}>
+            <h1 style={{ color: 'white', marginBottom: '20px' }}>
+                Sistema de Trazabilidad
+            </h1>
+            <p style={{ color: '#94a3b8', marginBottom: '30px' }}>
+                Seleccione su perfil para ingresar
+            </p>
 
-            <div className="login-container">
-                <div className="login-card">
-                    <div className="login-header">
-                        <div className="login-logo">
-                            <svg viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="30" cy="30" r="28" stroke="currentColor" strokeWidth="2" fill="none" />
-                                <path d="M18 30L26 38L42 20" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                                <path d="M10 30C10 18.954 18.954 10 30 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                <path d="M50 30C50 41.046 41.046 50 30 50" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                            </svg>
-                        </div>
-                        <h1>Sistema de Trazabilidad</h1>
-                        <p>Residuos Peligrosos - DGFA Mendoza</p>
-                    </div>
+            <button
+                onClick={() => handleClick('Administrador', 'admin@example.com')}
+                style={{
+                    padding: '20px 40px',
+                    fontSize: '18px',
+                    background: '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    width: '300px'
+                }}
+            >
+                🛡️ Administrador DGFA
+            </button>
 
-                    <form className="login-form" onSubmit={handleSubmit}>
-                        {error && (
-                            <div className="login-error">
-                                {error}
-                            </div>
-                        )}
+            <button
+                onClick={() => handleClick('Generador', 'generador@example.com')}
+                style={{
+                    padding: '20px 40px',
+                    fontSize: '18px',
+                    background: '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    width: '300px'
+                }}
+            >
+                🏭 Generador
+            </button>
 
-                        <div className="form-group">
-                            <label className="form-label" htmlFor="email">Correo electrónico</label>
-                            <input
-                                id="email"
-                                type="email"
-                                className="form-input"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                placeholder="usuario@ejemplo.com"
-                                required
-                                disabled={loading}
-                            />
-                        </div>
+            <button
+                onClick={() => handleClick('Transportista', 'transportista@example.com')}
+                style={{
+                    padding: '20px 40px',
+                    fontSize: '18px',
+                    background: '#f59e0b',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    width: '300px'
+                }}
+            >
+                🚛 Transportista
+            </button>
 
-                        <div className="form-group">
-                            <label className="form-label" htmlFor="password">Contraseña</label>
-                            <div className="password-input-wrapper">
-                                <input
-                                    id="password"
-                                    type={showPassword ? 'text' : 'password'}
-                                    className="form-input"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    placeholder="••••••••"
-                                    required
-                                    disabled={loading}
-                                />
-                                <button
-                                    type="button"
-                                    className="password-toggle"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    tabIndex={-1}
-                                >
-                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                </button>
-                            </div>
-                        </div>
-
-                        <button type="submit" className="btn btn-primary w-full" disabled={loading}>
-                            {loading ? (
-                                <>
-                                    <Loader2 size={18} className="animate-spin" />
-                                    Iniciando sesión...
-                                </>
-                            ) : (
-                                'Iniciar Sesión'
-                            )}
-                        </button>
-                    </form>
-
-                    <div className="login-divider">
-                        <span>Usuarios de demostración</span>
-                    </div>
-
-                    <div className="demo-users">
-                        {demoUsers.map((user) => (
-                            <button
-                                key={user.email}
-                                className="demo-user-btn"
-                                onClick={() => handleDemoLogin(user.email, user.password)}
-                                type="button"
-                            >
-                                <span className="demo-user-rol">{user.rol}</span>
-                                <span className="demo-user-email">{user.email}</span>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                <p className="login-footer">
-                    Sistema desarrollado para la Dirección de Gestión y Fiscalización Ambiental
-                    <br />
-                    © {new Date().getFullYear()} Gobierno de Mendoza
-                </p>
-            </div>
+            <button
+                onClick={() => handleClick('Operador', 'operador@example.com')}
+                style={{
+                    padding: '20px 40px',
+                    fontSize: '18px',
+                    background: '#8b5cf6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    width: '300px'
+                }}
+            >
+                🏢 Operador
+            </button>
         </div>
     );
 };

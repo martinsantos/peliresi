@@ -26,6 +26,11 @@
 
 .operador-card {
     border-left: 4px solid #10b981;
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
 }
 
 .eta-badge {
@@ -105,4 +110,36 @@
 
 .btn-mobile.danger:hover {
     background: #fee2e2;
+}
+
+/* === CRITICAL: Force vertical layout === */
+.operador-app .mobile-content,
+.operador-app .cards-list {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+}
+
+.operador-app .operador-card,
+.operador-app .mobile-card {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.operador-app .card-header,
+.operador-app .card-body,
+.operador-app .card-footer {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.operador-app .btn-mobile {
+    width: 100% !important;
+    box-sizing: border-box !important;
 }

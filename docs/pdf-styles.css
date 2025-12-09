@@ -1,0 +1,395 @@
+/* ============================================
+   ESTILOS PROFESIONALES PARA PDF
+   Sistema de Trazabilidad RRPP - DGFA Mendoza
+   ============================================ */
+
+/* Variables de colores */
+:root {
+    --primary-color: #10b981;
+    --primary-dark: #059669;
+    --secondary-color: #1e293b;
+    --text-color: #334155;
+    --heading-color: #0f172a;
+    --border-color: #e2e8f0;
+    --accent-color: #3b82f6;
+    --success-color: #22c55e;
+    --warning-color: #f59e0b;
+}
+
+/* ============================================
+   ESTILOS GENERALES
+   ============================================ */
+
+body {
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11pt;
+    line-height: 1.7;
+    color: var(--text-color);
+    background: white;
+}
+
+/* ============================================
+   ENCABEZADOS
+   ============================================ */
+
+h1 {
+    font-size: 26pt;
+    font-weight: 800;
+    color: var(--heading-color);
+    border-bottom: 4px solid var(--primary-color);
+    padding-bottom: 12px;
+    margin-top: 40px;
+    margin-bottom: 20px;
+    letter-spacing: -0.5px;
+}
+
+/* Título principal centrado */
+h1:first-of-type {
+    text-align: center;
+    font-size: 32pt;
+    margin-top: 80px;
+    margin-bottom: 10px;
+    border-bottom: none;
+    background: linear-gradient(135deg, var(--heading-color), var(--secondary-color));
+    -webkit-background-clip: text;
+    background-clip: text;
+    padding: 20px 0;
+}
+
+h2 {
+    font-size: 18pt;
+    font-weight: 700;
+    color: var(--heading-color);
+    border-bottom: 2px solid var(--border-color);
+    border-left: 4px solid var(--primary-color);
+    padding: 8px 0 8px 15px;
+    margin-top: 35px;
+    margin-bottom: 15px;
+    background: linear-gradient(90deg, rgba(16, 185, 129, 0.08), transparent);
+}
+
+h3 {
+    font-size: 14pt;
+    font-weight: 600;
+    color: var(--secondary-color);
+    margin-top: 25px;
+    margin-bottom: 12px;
+    padding-left: 10px;
+    border-left: 3px solid var(--accent-color);
+}
+
+h4 {
+    font-size: 12pt;
+    font-weight: 600;
+    color: var(--secondary-color);
+    margin-top: 18px;
+    margin-bottom: 10px;
+}
+
+/* ============================================
+   PÁRRAFOS Y TEXTO
+   ============================================ */
+
+p {
+    margin: 12px 0;
+    text-align: justify;
+    hyphens: auto;
+}
+
+strong {
+    color: var(--heading-color);
+    font-weight: 600;
+}
+
+em {
+    color: var(--secondary-color);
+}
+
+/* ============================================
+   LISTAS
+   ============================================ */
+
+ul,
+ol {
+    margin: 15px 0;
+    padding-left: 25px;
+}
+
+li {
+    margin: 8px 0;
+    line-height: 1.6;
+}
+
+li::marker {
+    color: var(--primary-color);
+    font-weight: bold;
+}
+
+/* Listas anidadas */
+ul ul,
+ol ol,
+ul ol,
+ol ul {
+    margin: 5px 0;
+}
+
+/* ============================================
+   TABLAS
+   ============================================ */
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-size: 10pt;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+thead {
+    background: linear-gradient(135deg, var(--secondary-color), #334155);
+}
+
+th {
+    color: white;
+    padding: 12px 15px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 10pt;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+td {
+    padding: 10px 15px;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: top;
+}
+
+tr:nth-child(even) {
+    background-color: #f8fafc;
+}
+
+tr:hover {
+    background-color: #f1f5f9;
+}
+
+/* Primera columna destacada */
+td:first-child {
+    font-weight: 500;
+    color: var(--heading-color);
+}
+
+/* ============================================
+   IMÁGENES (CAPTURAS DE PANTALLA)
+   ============================================ */
+
+img {
+    max-width: 85%;
+    height: auto;
+    display: block;
+    margin: 25px auto;
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow:
+        0 4px 6px rgba(0, 0, 0, 0.07),
+        0 10px 20px rgba(0, 0, 0, 0.04);
+}
+
+/* Figcaption para imágenes */
+img+em {
+    display: block;
+    text-align: center;
+    font-size: 9pt;
+    color: #64748b;
+    margin-top: -15px;
+    margin-bottom: 20px;
+}
+
+/* ============================================
+   CÓDIGO
+   ============================================ */
+
+code {
+    background-color: #f1f5f9;
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+    font-size: 9.5pt;
+    color: #e11d48;
+    border: 1px solid #e2e8f0;
+}
+
+pre {
+    background: linear-gradient(135deg, #1e293b, #0f172a);
+    color: #e2e8f0;
+    padding: 18px 20px;
+    border-radius: 10px;
+    overflow-x: auto;
+    font-size: 9pt;
+    line-height: 1.5;
+    border-left: 4px solid var(--primary-color);
+    margin: 20px 0;
+}
+
+pre code {
+    background: none;
+    padding: 0;
+    color: inherit;
+    border: none;
+    font-size: 9pt;
+}
+
+/* ============================================
+   BLOQUES DE CITA / NOTAS
+   ============================================ */
+
+blockquote {
+    border-left: 4px solid var(--primary-color);
+    margin: 20px 0;
+    padding: 15px 25px;
+    background: linear-gradient(90deg, #f0fdf4, #ecfdf5);
+    border-radius: 0 8px 8px 0;
+    font-style: italic;
+    color: var(--secondary-color);
+}
+
+blockquote p {
+    margin: 0;
+}
+
+/* ============================================
+   SEPARADORES
+   ============================================ */
+
+hr {
+    border: none;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--border-color), transparent);
+    margin: 35px 0;
+}
+
+/* ============================================
+   ENLACES
+   ============================================ */
+
+a {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 500;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s;
+}
+
+a:hover {
+    border-bottom-color: var(--primary-color);
+}
+
+/* URLs visibles en PDF */
+a[href^="http"]:not([href*="localhost"])::after {
+    content: " (" attr(href) ")";
+    font-size: 8pt;
+    color: #64748b;
+    font-weight: normal;
+}
+
+/* ============================================
+   BADGES / ETIQUETAS ESPECIALES
+   ============================================ */
+
+/* Emojis como badges */
+p:has(> strong:first-child) {
+    padding: 8px 0;
+}
+
+/* ============================================
+   ÍNDICE / TOC
+   ============================================ */
+
+/* Estilo para enlaces del índice */
+a[href^="#"] {
+    color: var(--accent-color);
+}
+
+/* ============================================
+   CASOS DE USO
+   ============================================ */
+
+/* Tablas de casos de uso */
+table td:first-child code,
+table td:first-child strong {
+    color: var(--primary-dark);
+    background: rgba(16, 185, 129, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+/* ============================================
+   PÁGINA DE IMPRESIÓN
+   ============================================ */
+
+@media print {
+    body {
+        font-size: 10pt;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4 {
+        page-break-after: avoid;
+    }
+
+    table,
+    img,
+    pre,
+    blockquote {
+        page-break-inside: avoid;
+    }
+
+    h2 {
+        page-break-before: auto;
+    }
+
+    /* Asegurar que las secciones principales empiecen en nueva página */
+    h2[id^="3-"],
+    h2[id^="4-"],
+    h2[id^="5-"],
+    h2[id^="6-"],
+    h2[id^="7-"],
+    h2[id^="8-"] {
+        page-break-before: always;
+    }
+}
+
+/* ============================================
+   ELEMENTOS ESPECIALES DEL MANUAL
+   ============================================ */
+
+/* Pasos numerados */
+ol li {
+    padding-left: 5px;
+}
+
+/* Checkmarks en listas */
+li:has(> strong:first-child:contains("✅")),
+li:has(> strong:first-child:contains("✓")) {
+    list-style-type: none;
+    margin-left: -20px;
+}
+
+/* FAQs */
+h3:contains("¿") {
+    color: var(--accent-color);
+    font-style: italic;
+}
+
+/* Información de contacto */
+p:has(strong:contains("Email")),
+p:has(strong:contains("Teléfono")) {
+    background: #f8fafc;
+    padding: 8px 15px;
+    border-radius: 6px;
+    border-left: 3px solid var(--primary-color);
+}
