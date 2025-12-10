@@ -21,7 +21,7 @@ El sistema cuenta con **dos modalidades de acceso**:
 
 | Actor | Descripción | Casos de Uso |
 |-------|-------------|--------------|
-| **Administrador DGFA** | Supervisa y administra el sistema completo | CU-A01 a CU-A15 |
+| **Administrador SITREP** | Supervisa y administra el sistema completo | CU-A01 a CU-A15 |
 | **Generador** | Empresa que produce residuos peligrosos | CU-G01 a CU-G12 |
 | **Transportista** | Empresa habilitada para transporte | CU-T01 a CU-T11 |
 | **Operador** | Planta de tratamiento/disposición final | CU-O01 a CU-O12 |
@@ -55,7 +55,7 @@ Los roles disponibles son:
 
 ---
 
-### 2.2 Administrador DGFA
+### 2.2 Administrador SITREP
 
 #### 2.2.1 Dashboard Ejecutivo (CU-A02)
 

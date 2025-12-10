@@ -192,7 +192,7 @@ const Dashboard: React.FC = () => {
                                 user?.rol === 'TRANSPORTISTA' ? '#f59e0b' :
                                     '#8b5cf6'
                     }}>
-                        {user?.rol === 'ADMIN' ? '🛡️ Administrador DGFA' :
+                        {user?.rol === 'ADMIN' ? '🛡️ Administrador SITREP' :
                             user?.rol === 'GENERADOR' ? '🏭 Generador de Residuos' :
                                 user?.rol === 'TRANSPORTISTA' ? '🚛 Transportista' :
                                     '🏢 Operador de Tratamiento'}

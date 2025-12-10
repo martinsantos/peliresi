@@ -138,7 +138,7 @@ const MobileApp: React.FC = () => {
                     }}>
                         <Shield size={36} strokeWidth={2} />
                     </div>
-                    <h1 style={{ color: '#ffffff' }}>DGFA Mendoza</h1>
+                    <h1 style={{ color: '#ffffff' }}>SITREP</h1>
                     <p style={{ color: '#94a3b8' }}>Sistema de Trazabilidad</p>
 
                     <div className="role-list">

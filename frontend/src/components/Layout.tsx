@@ -91,7 +91,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     const getRolLabel = () => {
         switch (user?.rol) {
             case 'ADMIN':
-                return 'Administrador DGFA';
+                return 'Administrador SITREP';
             case 'GENERADOR':
                 return 'Generador de Residuos';
             case 'TRANSPORTISTA':
@@ -166,8 +166,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                             </svg>
                         </div>
                         <div className="logo-text">
-                            <span className="logo-title">DGFA</span>
-                            <span className="logo-subtitle">Trazabilidad RRPP</span>
+                            <span className="logo-title">SITREP</span>
+                            <span className="logo-subtitle">Residuos Peligrosos</span>
                         </div>
                     </div>
                     <button className="sidebar-close" onClick={() => setSidebarOpen(false)}>
@@ -277,7 +277,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                             }}
                                         >
                                             <Shield size={16} />
-                                            <span>Administrador DGFA</span>
+                                            <span>Administrador SITREP</span>
                                         </button>
                                         <button
                                             className="user-menu-item"

@@ -34,28 +34,28 @@ const demoSlides: DemoSlide[] = [
     // ADMIN
     {
         id: 'admin-dashboard', role: 'ADMIN',
-        title: 'Dashboard Admin', subtitle: '🛡️ Administrador DGFA',
+        title: 'Dashboard Admin', subtitle: '🛡️ Administrador SITREP',
         description: 'Vista ejecutiva con KPIs en tiempo real. Estadísticas de manifiestos, transportes activos y alertas.',
         icon: <Shield />, features: ['KPIs', 'Estadísticas', 'Alertas'],
         color: '#10b981', animationType: 'dashboard'
     },
     {
         id: 'admin-monitoring', role: 'ADMIN',
-        title: 'Monitoreo GPS', subtitle: '🛡️ Administrador DGFA',
+        title: 'Monitoreo GPS', subtitle: '🛡️ Administrador SITREP',
         description: 'Mapa interactivo con ubicación de todos los transportes activos. Actualización cada 30 segundos.',
         icon: <MapPin />, features: ['Mapa vivo', 'Rutas', 'Alertas'],
         color: '#ef4444', animationType: 'map'
     },
     {
         id: 'admin-actors', role: 'ADMIN',
-        title: 'Gestión de Actores', subtitle: '🛡️ Administrador DGFA',
+        title: 'Gestión de Actores', subtitle: '🛡️ Administrador SITREP',
         description: 'Administra generadores, transportistas y operadores. Asigna roles y permisos.',
         icon: <Users />, features: ['CRUD', 'Roles', 'Permisos'],
         color: '#8b5cf6', animationType: 'list'
     },
     {
         id: 'admin-reports', role: 'ADMIN',
-        title: 'Reportes y Auditoría', subtitle: '🛡️ Administrador DGFA',
+        title: 'Reportes y Auditoría', subtitle: '🛡️ Administrador SITREP',
         description: 'Informes estadísticos y log de auditoría. Exporta en PDF, CSV o XML.',
         icon: <BarChart3 />, features: ['Reportes', 'Auditoría', 'Export'],
         color: '#3b82f6', animationType: 'dashboard'

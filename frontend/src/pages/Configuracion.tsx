@@ -26,7 +26,7 @@ const Configuracion: React.FC = () => {
         { id: '1', nombre: 'Roberto Gómez', email: 'quimica.mendoza@industria.com', rol: 'GENERADOR', estado: 'ACTIVO' },
         { id: '2', nombre: 'Pedro Martínez', email: 'transportes.andes@logistica.com', rol: 'TRANSPORTISTA', estado: 'ACTIVO' },
         { id: '3', nombre: 'Miguel Fernández', email: 'tratamiento.residuos@planta.com', rol: 'OPERADOR', estado: 'ACTIVO' },
-        { id: '4', nombre: 'Administrador DGFA', email: 'admin@dgfa.mendoza.gov.ar', rol: 'ADMIN', estado: 'ACTIVO' },
+        { id: '4', nombre: 'Administrador SITREP', email: 'admin@dgfa.mendoza.gov.ar', rol: 'ADMIN', estado: 'ACTIVO' },
     ]);
 
     useEffect(() => {

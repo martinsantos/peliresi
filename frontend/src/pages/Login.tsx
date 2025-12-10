@@ -49,7 +49,7 @@ const Login: React.FC = () => {
                     width: '300px'
                 }}
             >
-                🛡️ Administrador DGFA
+                🛡️ Administrador SITREP
             </button>
 
             <button

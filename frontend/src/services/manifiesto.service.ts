@@ -141,25 +141,54 @@ export const manifiestoService = {
     },
 };
 
+// Importar datos demo para fallback
+import {
+    tiposResiduosDemo,
+    transportistasDemo,
+    operadoresDemo,
+    generadoresDemo
+} from '../data/catalogos-demo';
+
 export const catalogoService = {
     async getTiposResiduos(): Promise<TipoResiduo[]> {
-        const response = await api.get<ApiResponse<{ tiposResiduos: TipoResiduo[] }>>('/catalogos/tipos-residuos');
-        return response.data.data.tiposResiduos;
+        try {
+            const response = await api.get<ApiResponse<{ tiposResiduos: TipoResiduo[] }>>('/catalogos/tipos-residuos');
+            return response.data.data.tiposResiduos;
+        } catch {
+            // Fallback a datos demo
+            console.log('[CatalogoService] Usando datos demo para tipos de residuos');
+            return tiposResiduosDemo;
+        }
     },
 
     async getGeneradores(): Promise<Generador[]> {
-        const response = await api.get<ApiResponse<{ generadores: Generador[] }>>('/catalogos/generadores');
-        return response.data.data.generadores;
+        try {
+            const response = await api.get<ApiResponse<{ generadores: Generador[] }>>('/catalogos/generadores');
+            return response.data.data.generadores;
+        } catch {
+            console.log('[CatalogoService] Usando datos demo para generadores');
+            return generadoresDemo;
+        }
     },
 
     async getTransportistas(): Promise<Transportista[]> {
-        const response = await api.get<ApiResponse<{ transportistas: Transportista[] }>>('/catalogos/transportistas');
-        return response.data.data.transportistas;
+        try {
+            const response = await api.get<ApiResponse<{ transportistas: Transportista[] }>>('/catalogos/transportistas');
+            return response.data.data.transportistas;
+        } catch {
+            console.log('[CatalogoService] Usando datos demo para transportistas');
+            return transportistasDemo;
+        }
     },
 
     async getOperadores(tipoResiduoId?: string): Promise<Operador[]> {
-        const params = tipoResiduoId ? { tipoResiduoId } : {};
-        const response = await api.get<ApiResponse<{ operadores: Operador[] }>>('/catalogos/operadores', { params });
-        return response.data.data.operadores;
+        try {
+            const params = tipoResiduoId ? { tipoResiduoId } : {};
+            const response = await api.get<ApiResponse<{ operadores: Operador[] }>>('/catalogos/operadores', { params });
+            return response.data.data.operadores;
+        } catch {
+            console.log('[CatalogoService] Usando datos demo para operadores');
+            return operadoresDemo;
+        }
     },
 };

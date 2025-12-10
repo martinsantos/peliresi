@@ -294,7 +294,7 @@ const SystemPreview: React.FC<{ type: string }> = ({ type }) => {
                         <div className="preview-logo">
                             <Shield size={36} />
                         </div>
-                        <div className="preview-welcome-title">Sistema DGFA</div>
+                        <div className="preview-welcome-title">SITREP</div>
                         <div className="preview-welcome-sub">Trazabilidad de Residuos Peligrosos</div>
                         <div className="preview-welcome-features">
                             <span>✓ Manifiestos digitales</span>
@@ -339,7 +339,7 @@ interface TourSlide {
 // ADMIN slides
 const slidesAdmin: TourSlide[] = [
     {
-        id: 'welcome', title: '¡Bienvenido al Sistema DGFA!', subtitle: 'Plataforma de Gestión Ambiental',
+        id: 'welcome', title: '¡Bienvenido al SITREP!', subtitle: 'Plataforma de Gestión Ambiental',
         description: 'Sistema integral para la trazabilidad de residuos peligrosos según Ley 24.051.',
         icon: <Shield />, features: ['Control total', 'Supervisión en tiempo real', 'Cumplimiento normativo'],
         color: '#10b981', previewType: 'welcome'
@@ -630,7 +630,7 @@ const slidesTransportista: TourSlide[] = [
     },
     {
         id: 'incidente', title: 'Registrar Incidentes', subtitle: 'Anomalías CU-T06',
-        description: 'Documenta accidentes, derrames con fotos y GPS. Alerta a DGFA.',
+        description: 'Documenta accidentes, derrames con fotos y GPS. Alerta a SITREP.',
         icon: <AlertTriangle />, features: ['Fotos', 'GPS', 'Alerta'],
         color: '#ef4444', previewType: 'alertas', cuRef: 'CU-T06'
     },
@@ -695,7 +695,7 @@ const slidesOperador: TourSlide[] = [
     {
         id: 'rechazo', title: 'Rechazar Carga', subtitle: 'Documentar CU-O06',
         description: 'Si rechazas: motivo, descripción, foto. Notifica a todos.',
-        icon: <X />, features: ['Motivos', 'Evidencia', 'Alerta DGFA'],
+        icon: <X />, features: ['Motivos', 'Evidencia', 'Alerta SITREP'],
         color: '#dc2626', previewType: 'alertas', cuRef: 'CU-O06'
     },
     {

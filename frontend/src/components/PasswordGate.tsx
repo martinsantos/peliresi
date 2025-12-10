@@ -15,12 +15,28 @@ const PasswordGate: React.FC<PasswordGateProps> = ({ children }) => {
     const [password, setPassword] = useState('');
     const [error, setError] = useState(false);
 
+    // Función para notificar login exitoso
+    const notifyLogin = async () => {
+        try {
+            await fetch('/demoambiente/api/notify-login.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ page: 'dashboard' })
+            });
+        } catch {
+            // Silent fail - no bloquear el acceso si la notificación falla
+            console.log('[SITREP] Notificación enviada');
+        }
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (password === DEMO_PASSWORD) {
             setIsAuthenticated(true);
             localStorage.setItem(AUTH_KEY, 'true');
             setError(false);
+            // Notificar acceso exitoso
+            notifyLogin();
         } else {
             setError(true);
             setTimeout(() => setError(false), 2000);
@@ -66,7 +82,7 @@ const PasswordGate: React.FC<PasswordGateProps> = ({ children }) => {
                     fontWeight: 700,
                     marginBottom: '8px'
                 }}>
-                    DGFA Mendoza
+                    SITREP
                 </h1>
                 <p style={{
                     color: '#94a3b8',

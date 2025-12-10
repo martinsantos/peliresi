@@ -132,7 +132,7 @@ const InstallPWAModal: React.FC<InstallPWAModalProps> = ({
                                         </div>
                                         <div className="step-text">
                                             <h4>Selecciona "Instalar app"</h4>
-                                            <p>También puede aparecer como "Agregar a pantalla de inicio" o "Instalar DGFA RRPP"</p>
+                                            <p>También puede aparecer como "Agregar a pantalla de inicio" o "Instalar SITREP"</p>
                                         </div>
                                     </div>
                                 </div>

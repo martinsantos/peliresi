@@ -436,7 +436,7 @@
                 </svg>
             </div>
             <div>
-                <h1>DGFA Mendoza</h1>
+                <h1>SITREP</h1>
                 <span>Manual Tutorial</span>
             </div>
         </div>
@@ -525,7 +525,7 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td><strong>Administrador DGFA</strong></td>
+                        <td><strong>Administrador SITREP</strong></td>
                         <td>Supervisa y administra el sistema completo</td>
                         <td>CU-A01 a CU-A15</td>
                     </tr>
@@ -594,7 +594,7 @@
                         </a>
                         <p style="margin-top: 12px; font-size: 16px;">👆 Haz clic en tu nombre (esquina superior
                             derecha) para cambiar entre:<br>
-                            <strong>Administrador DGFA</strong> • <strong>Generador</strong> •
+                            <strong>Administrador SITREP</strong> • <strong>Generador</strong> •
                             <strong>Transportista</strong> • <strong>Operador</strong>
                         </p>
                     </div>
@@ -651,7 +651,7 @@
         </section>
 
         <section id="admin" class="section">
-            <h2>Administrador DGFA</h2>
+            <h2>Administrador SITREP</h2>
 
             <h3>Dashboard Ejecutivo (CU-A02)</h3>
             <img src="screenshots/desktop/admin_dashboard.png" alt="Dashboard Administrador" class="screenshot">
@@ -843,7 +843,7 @@
             <p>Basado en el documento oficial de especificación de casos de uso del Sistema de Trazabilidad de Residuos
                 Peligrosos.</p>
 
-            <h3>🛡️ Administrador DGFA (CU-A01 a CU-A15)</h3>
+            <h3>🛡️ Administrador SITREP (CU-A01 a CU-A15)</h3>
             <table>
                 <thead>
                     <tr>
@@ -1225,11 +1225,11 @@
                 <table>
                     <tr>
                         <th style="width:150px">Actor Principal</th>
-                        <td>Administrador DGFA</td>
+                        <td>Administrador SITREP</td>
                     </tr>
                     <tr>
                         <th>Descripción</th>
-                        <td>Permite al administrador de la DGFA acceder al sistema mediante autenticación segura con
+                        <td>Permite al administrador SITREP acceder al sistema mediante autenticación segura con
                             usuario, contraseña y token de seguridad (2FA).</td>
                     </tr>
                     <tr>
@@ -1269,7 +1269,7 @@
                 <table>
                     <tr>
                         <th style="width:150px">Actor Principal</th>
-                        <td>Administrador DGFA</td>
+                        <td>Administrador SITREP</td>
                     </tr>
                     <tr>
                         <th>Descripción</th>
@@ -1617,7 +1617,7 @@
                         <th>Flujo Principal</th>
                         <td>1. Sistema recibe actualización de posición GPS<br>2. Compara con ruta esperada<br>3.
                             Calcula tiempo transcurrido vs estimado<br>4. Si detecta anomalía, genera alerta<br>5.
-                            Notifica a DGFA y actores involucrados<br>6. Registra incidencia en el manifiesto</td>
+                            Notifica a SITREP y actores involucrados<br>6. Registra incidencia en el manifiesto</td>
                     </tr>
                     <tr>
                         <th>Flujo Alternativo</th>
@@ -1635,16 +1635,16 @@
             </div>
 
             
-        <!-- 🛡️ Administrador DGFA -->
+        <!-- 🛡️ Administrador SITREP -->
         <section id="cu-admin" class="section">
-            <h2>🛡️ Administrador DGFA</h2>
+            <h2>🛡️ Administrador SITREP</h2>
             <p>Total: 15 casos de uso</p>
 
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a01">
                 <h4 style="margin-top:0">CU-A01: Iniciar Sesión Administrador</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
-                    <tr><th>Descripción</th><td>Permite al administrador de la DGFA acceder al sistema mediante autenticación segura con usuario, contraseña y token de seguridad (2FA).</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
+                    <tr><th>Descripción</th><td>Permite al administrador SITREP acceder al sistema mediante autenticación segura con usuario, contraseña y token de seguridad (2FA).</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Usuario registrado en el sistema <br>• Usuario con rol de Administrador asignado <br>• Credenciales activas y no bloqueadas</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede a la URL del sistema <br>2. El sistema muestra formulario de login <br>3. El administrador ingresa usuario y contraseña <br>4. El sistema valida credenciales y solicita token 2FA <br>5. El administrador ingresa código de token <br>6. El sistema verifica token y crea sesión <br>7. El sistema redirige al dashboard de administración</td></tr>
                     <tr><th>Flujo Alternativo</th><td><br>• 3a. Credenciales inválidas: sistema muestra error y permite reintentar (máx 3 intentos) <br>• 3b. Usuario bloqueado: sistema notifica y sugiere contactar soporte <br>• 5a. Token inválido: sistema permite reingresar código</td></tr>
@@ -1656,7 +1656,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a02">
                 <h4 style="margin-top:0">CU-A02: Visualizar Dashboard Ejecutivo</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Presenta al administrador un panel de control con indicadores clave (KPIs) de la gestión de residuos peligrosos en tiempo real.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de visualización de dashboard</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El sistema carga el dashboard al iniciar sesión <br>2. Se muestran métricas: manifiestos activos, en tránsito, completados <br>3. Se visualiza mapa con ubicación de transportes activos <br>4. Se presentan alertas pendientes de atención <br>5. Se muestran gráficos de tendencias (últimos 30 días) <br>6. El administrador puede filtrar por período, tipo de residuo o actor</td></tr>
@@ -1669,7 +1669,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a03">
                 <h4 style="margin-top:0">CU-A03: Gestionar Usuarios del Sistema</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Permite crear, modificar, activar/desactivar y eliminar usuarios del sistema (generadores, transportistas, operadores y otros administradores).</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de gestión de usuarios</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de usuarios <br>2. El sistema muestra listado de usuarios con filtros <br>3. El administrador selecciona acción (crear/editar/eliminar) <br>4. Para crear: completa formulario con datos del usuario <br>5. El sistema valida datos únicos (CUIT, email) <br>6. El sistema envía credenciales por email al nuevo usuario <br>7. El sistema registra la operación en auditoría</td></tr>
@@ -1682,7 +1682,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a04">
                 <h4 style="margin-top:0">CU-A04: Asignar Roles y Permisos</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Define niveles de acceso y permisos específicos para cada usuario según su rol en la cadena de gestión de residuos.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Usuario destino existente en el sistema</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador selecciona usuario a configurar <br>2. El sistema muestra roles disponibles (Admin, Generador, Transportista, Operador) <br>3. El administrador asigna rol principal <br>4. El sistema muestra permisos asociados al rol <br>5. El administrador puede ajustar permisos específicos <br>6. El sistema guarda configuración</td></tr>
@@ -1695,7 +1695,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a05">
                 <h4 style="margin-top:0">CU-A05: Administrar Catálogo de Residuos</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Gestiona el catálogo oficial de tipos de residuos peligrosos según la normativa vigente (Ley 24.051), incluyendo categorías, códigos y características.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de configuración del sistema</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de configuración <br>2. Selecciona 'Catálogo de Residuos' <br>3. El sistema muestra listado con categorías según Ley <br>24.051 <br>4. El administrador puede agregar/editar/desactivar tipos <br>5. Para cada tipo define: código, nombre, categoría Y, características <br>6. El sistema valida código único <br>7. El sistema guarda cambios</td></tr>
@@ -1708,7 +1708,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a06">
                 <h4 style="margin-top:0">CU-A06: Gestionar Generadores Habilitados</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Administra el registro de generadores de residuos peligrosos habilitados, incluyendo datos de inscripción, categorización y estado.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de gestión de actores</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Generadores <br>2. El sistema muestra listado con filtros de búsqueda <br>3. Para alta: completa datos (razón social, CUIT, domicilio, N° inscripción) <br>4. El sistema valida datos contra registros existentes <br>5. El sistema asigna credenciales de acceso <br>6. El sistema envía notificación al generador <br>7. El sistema registra operación en auditoría</td></tr>
@@ -1721,7 +1721,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a07">
                 <h4 style="margin-top:0">CU-A07: Gestionar Transportistas Habilitados</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Administra el registro de transportistas de residuos peligrosos, incluyendo datos de la empresa, vehículos autorizados y choferes registrados.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de gestión de actores</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Transportistas <br>2. El sistema muestra listado de empresas transportistas <br>3. Para alta: completa datos empresa (razón social, CUIT, N° habilitación) <br>4. Registra vehículos (patente, tipo, capacidad, habilitación) <br>5. Registra choferes (nombre, DNI, licencia) <br>6. El sistema valida datos y asigna credenciales <br>7. El sistema notifica al transportista</td></tr>
@@ -1734,7 +1734,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a08">
                 <h4 style="margin-top:0">CU-A08: Gestionar Operadores Habilitados</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Administra el registro de operadores de tratamiento y disposición final de residuos peligrosos habilitados por la autoridad ambiental.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de gestión de actores</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Operadores <br>2. El sistema muestra listado de operadores registrados <br>3. Para alta: completa datos (razón social, CUIT, N° habilitación, categoría) <br>4. Registra tipos de residuos que puede recibir <br>5. Registra métodos de tratamiento/disposición autorizados <br>6. El sistema valida y asigna credenciales <br>7. El sistema notifica al operador</td></tr>
@@ -1747,7 +1747,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a09">
                 <h4 style="margin-top:0">CU-A09: Monitorear Manifiestos en Tiempo Real</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Visualiza en mapa interactivo la ubicación GPS de todos los transportes activos y el estado actualizado de los manifiestos en curso.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Manifiestos en estado 'en tránsito' existentes</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Monitoreo <br>2. El sistema muestra mapa con marcadores de transportes activos <br>3. Cada marcador indica: N° manifiesto, transportista, origen, destino <br>4. El administrador puede hacer click para ver detalle <br>5. El sistema actualiza posiciones cada 30 segundos <br>6. El administrador puede filtrar por zona, transportista o tipo de residuo</td></tr>
@@ -1760,7 +1760,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a10">
                 <h4 style="margin-top:0">CU-A10: Consultar Log de Auditoría</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Permite revisar el registro histórico de todas las operaciones realizadas en el sistema, con detalle de fecha, usuario, acción y datos afectados.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de auditoría</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Auditoría <br>2. El sistema muestra listado de eventos con filtros <br>3. El administrador puede filtrar por: fecha, usuario, tipo de operación, módulo <br>4. Al seleccionar evento, se muestra detalle completo <br>5. El detalle incluye: datos antes/después del cambio <br>6. El administrador puede exportar resultados</td></tr>
@@ -1773,7 +1773,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a11">
                 <h4 style="margin-top:0">CU-A11: Generar Reportes Estadísticos</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Crea informes estadísticos personalizables sobre la gestión de residuos peligrosos, con filtros por período, tipo de residuo, actor, zona geográfica, etc.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Datos históricos disponibles</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Reportes <br>2. Selecciona tipo de reporte (predefinido o personalizado) <br>3. Define parámetros: período, filtros, agrupaciones <br>4. El sistema genera vista previa del reporte <br>5. El administrador puede ajustar y regenerar <br>6. El administrador descarga en formato deseado (PDF/CSV/XML)</td></tr>
@@ -1786,7 +1786,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a12">
                 <h4 style="margin-top:0">CU-A12: Exportar Datos del Sistema</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Permite descargar información del sistema en formatos estándar (PDF, CSV, XML) para uso externo, reportes regulatorios o integración con otros sistemas.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de exportación</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede a la funcionalidad de exportación <br>2. Selecciona conjunto de datos a exportar <br>3. Define filtros y período <br>4. Selecciona formato de salida (PDF/CSV/XML) <br>5. El sistema genera archivo <br>6. El sistema ofrece descarga directa</td></tr>
@@ -1799,7 +1799,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a13">
                 <h4 style="margin-top:0">CU-A13: Configurar Alertas y Notificaciones</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Define reglas para generación automática de alertas ante eventos específicos como vencimientos, desvíos de ruta, tiempos excesivos, etc.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de configuración</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede a configuración de alertas <br>2. El sistema muestra reglas existentes <br>3. Para nueva regla: define evento disparador <br>4. Configura condiciones (umbrales, tiempos) <br>5. Define destinatarios y canales (email, push, SMS) <br>6. El sistema activa la regla <br>7. El sistema registra configuración</td></tr>
@@ -1812,7 +1812,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a14">
                 <h4 style="margin-top:0">CU-A14: Gestionar Parámetros del Sistema</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Configura valores globales del sistema como tiempos de vencimiento, formatos de documentos, umbrales de alerta y otros parámetros operativos.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de configuración avanzada</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede a Parámetros del Sistema <br>2. El sistema muestra categorías de configuración <br>3. Selecciona categoría a modificar <br>4. Visualiza valores actuales con descripción <br>5. Modifica valores según necesidad <br>6. El sistema valida rangos permitidos <br>7. El sistema guarda y aplica cambios</td></tr>
@@ -1825,9 +1825,9 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a15">
                 <h4 style="margin-top:0">CU-A15: Realizar Carga Masiva Inicial (Migración)</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Importación del padrón histórico de generadores, transportistas y operadores para la puesta en marcha.</td></tr>
-                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Archivo de datos en formato válido (Excel/CSV/SQL) <br>• Estructura de datos compatible <br>• Acceso a la base de datos MySQL o Excel provista por DGFA con los \~2000 registros históricos estimados.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Archivo de datos en formato válido (Excel/CSV/SQL) <br>• Estructura de datos compatible <br>• Acceso a la base de datos MySQL o Excel provista por SITREP con los \~2000 registros históricos estimados.</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Importación <br>2. Selecciona tipo de datos a importar <br>3. Carga archivo fuente <br>4. El sistema analiza y muestra vista previa <br>5. El sistema detecta y reporta errores/duplicados <br>6. El administrador confirma importación <br>7. El sistema procesa registros y reporta resultado</td></tr>
                     <tr><th>Flujo Alternativo</th><td><br>• 5a. Errores críticos: sistema bloquea importación hasta corrección <br>• 5b. Duplicados: sistema ofrece opciones (omitir/actualizar/crear nuevo) <br>• 7a. Proceso largo: sistema ejecuta en segundo plano</td></tr>
                     <tr><th>Postcondiciones</th><td><br>• Datos importados correctamente <br>• Reporte de importación generado <br>• Registros disponibles en el sistema</td></tr>
@@ -1846,7 +1846,7 @@
                 <table>
                     <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
                     <tr><th>Descripción</th><td>Permite al generador de residuos peligrosos acceder al portal web mediante autenticación con usuario, contraseña y token de seguridad.</td></tr>
-                    <tr><th>Precondiciones</th><td><br>• Usuario registrado como Generador <br>• Credenciales activas <br>• Empresa habilitada por DGFA</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Usuario registrado como Generador <br>• Credenciales activas <br>• Empresa habilitada por SITREP</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El generador accede a la URL del portal <br>2. El sistema muestra formulario de login <br>3. Ingresa usuario y contraseña <br>4. El sistema valida y solicita token de seguridad <br>5. Ingresa código de token <br>6. El sistema verifica y crea sesión <br>7. Redirige al dashboard del generador</td></tr>
                     <tr><th>Flujo Alternativo</th><td><br>• 3a. Credenciales inválidas: error y reintento (máx 3\) <br>• 5a. Token expirado: solicita regenerar código</td></tr>
                     <tr><th>Postcondiciones</th><td><br>• Sesión activa <br>• Acceso al portal de generador</td></tr>
@@ -2074,9 +2074,9 @@
                     <tr><th style="width:150px">Actor Principal</th><td>Transportista</td></tr>
                     <tr><th>Descripción</th><td>Documenta cualquier anomalía, accidente o desvío de ruta con descripción, fotografías y ubicación GPS.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Manifiesto en tránsito <br>• Incidente ocurrido</td></tr>
-                    <tr><th>Flujo Principal</th><td><br>1. Selecciona 'Registrar Incidente' <br>2. Selecciona tipo de incidente (accidente, derrame, robo, etc.) <br>3. Describe el incidente <br>4. Captura fotografías del evento <br>5. Sistema registra ubicación GPS <br>6. Sistema genera alerta inmediata a DGFA <br>7. Sistema marca manifiesto con incidente</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Selecciona 'Registrar Incidente' <br>2. Selecciona tipo de incidente (accidente, derrame, robo, etc.) <br>3. Describe el incidente <br>4. Captura fotografías del evento <br>5. Sistema registra ubicación GPS <br>6. Sistema genera alerta inmediata a SITREP <br>7. Sistema marca manifiesto con incidente</td></tr>
                     <tr><th>Flujo Alternativo</th><td><br>• 4a. Sin cámara: permite continuar con descripción detallada</td></tr>
-                    <tr><th>Postcondiciones</th><td><br>• Incidente documentado <br>• DGFA alertada inmediatamente <br>• Manifiesto marcado</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Incidente documentado <br>• SITREP alertada inmediatamente <br>• Manifiesto marcado</td></tr>
                     <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
                 </table>
             </div>
@@ -2139,7 +2139,7 @@
                     <tr><th style="width:150px">Actor Principal</th><td>Transportista</td></tr>
                     <tr><th>Descripción</th><td>Permite ver y actualizar información de los vehículos habilitados asignados a la empresa.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión activa <br>• Permisos de gestión de flota</td></tr>
-                    <tr><th>Flujo Principal</th><td><br>1. Accede a módulo de vehículos <br>2. Sistema muestra listado de vehículos <br>3. Puede ver estado de habilitación de cada uno <br>4. Puede solicitar actualización de datos <br>5. Sistema envía solicitud a DGFA para aprobación</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Accede a módulo de vehículos <br>2. Sistema muestra listado de vehículos <br>3. Puede ver estado de habilitación de cada uno <br>4. Puede solicitar actualización de datos <br>5. Sistema envía solicitud a SITREP para aprobación</td></tr>
                     <tr><th>Flujo Alternativo</th><td><br>• 3a. Habilitación vencida: sistema marca vehículo como no disponible</td></tr>
                     <tr><th>Postcondiciones</th><td><br>• Información de flota visualizada/actualizada</td></tr>
                     <tr><th>Prioridad</th><td><strong style="color:#22c55e">Baja</strong></td></tr>
@@ -2198,7 +2198,7 @@
                     <tr><th>Descripción</th><td>Ingresa el peso real de los residuos recibidos para comparación con lo declarado en el manifiesto.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Recepción iniciada <br>• Báscula disponible</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. Sistema muestra cantidad declarada <br>2. Operador ingresa peso real medido <br>3. Sistema calcula diferencia porcentual <br>4. Si diferencia supera umbral, solicita justificación <br>5. Registra peso final <br>6. Adjunta ticket de báscula si corresponde</td></tr>
-                    <tr><th>Flujo Alternativo</th><td><br>• 4a. Diferencia significativa: genera alerta a DGFA</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 4a. Diferencia significativa: genera alerta a SITREP</td></tr>
                     <tr><th>Postcondiciones</th><td><br>• Peso registrado <br>• Diferencias documentadas si existen</td></tr>
                     <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
                 </table>
@@ -2212,7 +2212,7 @@
                     <tr><th>Precondiciones</th><td><br>• Pesaje realizado <br>• Diferencia detectada</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. Sistema presenta diferencia detectada <br>2. Operador selecciona tipo de diferencia (faltante/excedente) <br>3. Ingresa descripción/justificación <br>4. Captura evidencia fotográfica si es necesario <br>5. Sistema registra y notifica a partes involucradas</td></tr>
                     <tr><th>Flujo Alternativo</th><td><br>• 3a. Diferencia menor a umbral: registro simplificado</td></tr>
-                    <tr><th>Postcondiciones</th><td><br>• Diferencia documentada <br>• Generador y DGFA notificados</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Diferencia documentada <br>• Generador y SITREP notificados</td></tr>
                     <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
                 </table>
             </div>
@@ -2225,7 +2225,7 @@
                     <tr><th>Precondiciones</th><td><br>• Recepción en proceso <br>• Motivo válido de rechazo</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. Selecciona opción 'Rechazar Carga' <br>2. Selecciona motivo (no coincide, contaminado, sin documentación, etc.) <br>3. Ingresa descripción detallada <br>4. Captura evidencia fotográfica <br>5. Sistema registra rechazo <br>6. Sistema notifica a todas las partes <br>7. Sistema requiere retorno de carga</td></tr>
                     <tr><th>Flujo Alternativo</th><td><br>• Rechazo parcial: permite indicar cantidad rechazada vs aceptada</td></tr>
-                    <tr><th>Postcondiciones</th><td><br>• Rechazo registrado <br>• Generador y transportista notificados <br>• DGFA alertada</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Rechazo registrado <br>• Generador y transportista notificados <br>• SITREP alertada</td></tr>
                     <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
                 </table>
             </div>
@@ -2411,7 +2411,7 @@
                     <tr><th style="width:150px">Actor Principal</th><td>Sistema</td></tr>
                     <tr><th>Descripción</th><td>Identifica automáticamente desvíos de ruta, tiempos excesivos y otros comportamientos anómalos.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Manifiesto en tránsito <br>• Tracking GPS activo</td></tr>
-                    <tr><th>Flujo Principal</th><td><br>1. Sistema recibe actualización de posición GPS <br>2. Compara con ruta esperada <br>3. Calcula tiempo transcurrido vs estimado <br>4. Si detecta anomalía, genera alerta <br>5. Notifica a DGFA y actores involucrados <br>6. Registra incidencia en el manifiesto</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Sistema recibe actualización de posición GPS <br>2. Compara con ruta esperada <br>3. Calcula tiempo transcurrido vs estimado <br>4. Si detecta anomalía, genera alerta <br>5. Notifica a SITREP y actores involucrados <br>6. Registra incidencia en el manifiesto</td></tr>
                     <tr><th>Flujo Alternativo</th><td><br>• Falsa alarma: administrador puede descartar con justificación</td></tr>
                     <tr><th>Postcondiciones</th><td><br>• Anomalías detectadas <br>• Alertas generadas si corresponde</td></tr>
                     <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
@@ -2459,16 +2459,16 @@
         </section>
 
         
-        <!-- 🛡️ Administrador DGFA -->
+        <!-- 🛡️ Administrador SITREP -->
         <section id="cu-admin" class="section">
-            <h2>🛡️ Administrador DGFA</h2>
+            <h2>🛡️ Administrador SITREP</h2>
             <p>Total: 15 casos de uso</p>
 
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a01">
                 <h4 style="margin-top:0">CU-A01: Iniciar Sesión Administrador</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
-                    <tr><th>Descripción</th><td>Permite al administrador de la DGFA acceder al sistema mediante autenticación segura con usuario, contraseña y token de seguridad (2FA).</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
+                    <tr><th>Descripción</th><td>Permite al administrador SITREP acceder al sistema mediante autenticación segura con usuario, contraseña y token de seguridad (2FA).</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Usuario registrado en el sistema <br>• Usuario con rol de Administrador asignado <br>• Credenciales activas y no bloqueadas</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede a la URL del sistema <br>2. El sistema muestra formulario de login <br>3. El administrador ingresa usuario y contraseña <br>4. El sistema valida credenciales y solicita token 2FA <br>5. El administrador ingresa código de token <br>6. El sistema verifica token y crea sesión <br>7. El sistema redirige al dashboard de administración</td></tr>
                     <tr><th>Flujo Alternativo</th><td><br>• 3a. Credenciales inválidas: sistema muestra error y permite reintentar (máx 3 intentos) <br>• 3b. Usuario bloqueado: sistema notifica y sugiere contactar soporte <br>• 5a. Token inválido: sistema permite reingresar código</td></tr>
@@ -2480,7 +2480,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a02">
                 <h4 style="margin-top:0">CU-A02: Visualizar Dashboard Ejecutivo</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Presenta al administrador un panel de control con indicadores clave (KPIs) de la gestión de residuos peligrosos en tiempo real.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de visualización de dashboard</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El sistema carga el dashboard al iniciar sesión <br>2. Se muestran métricas: manifiestos activos, en tránsito, completados <br>3. Se visualiza mapa con ubicación de transportes activos <br>4. Se presentan alertas pendientes de atención <br>5. Se muestran gráficos de tendencias (últimos 30 días) <br>6. El administrador puede filtrar por período, tipo de residuo o actor</td></tr>
@@ -2493,7 +2493,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a03">
                 <h4 style="margin-top:0">CU-A03: Gestionar Usuarios del Sistema</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Permite crear, modificar, activar/desactivar y eliminar usuarios del sistema (generadores, transportistas, operadores y otros administradores).</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de gestión de usuarios</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de usuarios <br>2. El sistema muestra listado de usuarios con filtros <br>3. El administrador selecciona acción (crear/editar/eliminar) <br>4. Para crear: completa formulario con datos del usuario <br>5. El sistema valida datos únicos (CUIT, email) <br>6. El sistema envía credenciales por email al nuevo usuario <br>7. El sistema registra la operación en auditoría</td></tr>
@@ -2506,7 +2506,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a04">
                 <h4 style="margin-top:0">CU-A04: Asignar Roles y Permisos</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Define niveles de acceso y permisos específicos para cada usuario según su rol en la cadena de gestión de residuos.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Usuario destino existente en el sistema</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador selecciona usuario a configurar <br>2. El sistema muestra roles disponibles (Admin, Generador, Transportista, Operador) <br>3. El administrador asigna rol principal <br>4. El sistema muestra permisos asociados al rol <br>5. El administrador puede ajustar permisos específicos <br>6. El sistema guarda configuración</td></tr>
@@ -2519,7 +2519,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a05">
                 <h4 style="margin-top:0">CU-A05: Administrar Catálogo de Residuos</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Gestiona el catálogo oficial de tipos de residuos peligrosos según la normativa vigente (Ley 24.051), incluyendo categorías, códigos y características.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de configuración del sistema</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de configuración <br>2. Selecciona 'Catálogo de Residuos' <br>3. El sistema muestra listado con categorías según Ley <br>24.051 <br>4. El administrador puede agregar/editar/desactivar tipos <br>5. Para cada tipo define: código, nombre, categoría Y, características <br>6. El sistema valida código único <br>7. El sistema guarda cambios</td></tr>
@@ -2532,7 +2532,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a06">
                 <h4 style="margin-top:0">CU-A06: Gestionar Generadores Habilitados</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Administra el registro de generadores de residuos peligrosos habilitados, incluyendo datos de inscripción, categorización y estado.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de gestión de actores</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Generadores <br>2. El sistema muestra listado con filtros de búsqueda <br>3. Para alta: completa datos (razón social, CUIT, domicilio, N° inscripción) <br>4. El sistema valida datos contra registros existentes <br>5. El sistema asigna credenciales de acceso <br>6. El sistema envía notificación al generador <br>7. El sistema registra operación en auditoría</td></tr>
@@ -2545,7 +2545,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a07">
                 <h4 style="margin-top:0">CU-A07: Gestionar Transportistas Habilitados</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Administra el registro de transportistas de residuos peligrosos, incluyendo datos de la empresa, vehículos autorizados y choferes registrados.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de gestión de actores</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Transportistas <br>2. El sistema muestra listado de empresas transportistas <br>3. Para alta: completa datos empresa (razón social, CUIT, N° habilitación) <br>4. Registra vehículos (patente, tipo, capacidad, habilitación) <br>5. Registra choferes (nombre, DNI, licencia) <br>6. El sistema valida datos y asigna credenciales <br>7. El sistema notifica al transportista</td></tr>
@@ -2558,7 +2558,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a08">
                 <h4 style="margin-top:0">CU-A08: Gestionar Operadores Habilitados</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Administra el registro de operadores de tratamiento y disposición final de residuos peligrosos habilitados por la autoridad ambiental.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de gestión de actores</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Operadores <br>2. El sistema muestra listado de operadores registrados <br>3. Para alta: completa datos (razón social, CUIT, N° habilitación, categoría) <br>4. Registra tipos de residuos que puede recibir <br>5. Registra métodos de tratamiento/disposición autorizados <br>6. El sistema valida y asigna credenciales <br>7. El sistema notifica al operador</td></tr>
@@ -2571,7 +2571,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a09">
                 <h4 style="margin-top:0">CU-A09: Monitorear Manifiestos en Tiempo Real</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Visualiza en mapa interactivo la ubicación GPS de todos los transportes activos y el estado actualizado de los manifiestos en curso.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Manifiestos en estado 'en tránsito' existentes</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Monitoreo <br>2. El sistema muestra mapa con marcadores de transportes activos <br>3. Cada marcador indica: N° manifiesto, transportista, origen, destino <br>4. El administrador puede hacer click para ver detalle <br>5. El sistema actualiza posiciones cada 30 segundos <br>6. El administrador puede filtrar por zona, transportista o tipo de residuo</td></tr>
@@ -2584,7 +2584,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a10">
                 <h4 style="margin-top:0">CU-A10: Consultar Log de Auditoría</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Permite revisar el registro histórico de todas las operaciones realizadas en el sistema, con detalle de fecha, usuario, acción y datos afectados.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de auditoría</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Auditoría <br>2. El sistema muestra listado de eventos con filtros <br>3. El administrador puede filtrar por: fecha, usuario, tipo de operación, módulo <br>4. Al seleccionar evento, se muestra detalle completo <br>5. El detalle incluye: datos antes/después del cambio <br>6. El administrador puede exportar resultados</td></tr>
@@ -2597,7 +2597,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a11">
                 <h4 style="margin-top:0">CU-A11: Generar Reportes Estadísticos</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Crea informes estadísticos personalizables sobre la gestión de residuos peligrosos, con filtros por período, tipo de residuo, actor, zona geográfica, etc.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Datos históricos disponibles</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Reportes <br>2. Selecciona tipo de reporte (predefinido o personalizado) <br>3. Define parámetros: período, filtros, agrupaciones <br>4. El sistema genera vista previa del reporte <br>5. El administrador puede ajustar y regenerar <br>6. El administrador descarga en formato deseado (PDF/CSV/XML)</td></tr>
@@ -2610,7 +2610,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a12">
                 <h4 style="margin-top:0">CU-A12: Exportar Datos del Sistema</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Permite descargar información del sistema en formatos estándar (PDF, CSV, XML) para uso externo, reportes regulatorios o integración con otros sistemas.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de exportación</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede a la funcionalidad de exportación <br>2. Selecciona conjunto de datos a exportar <br>3. Define filtros y período <br>4. Selecciona formato de salida (PDF/CSV/XML) <br>5. El sistema genera archivo <br>6. El sistema ofrece descarga directa</td></tr>
@@ -2623,7 +2623,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a13">
                 <h4 style="margin-top:0">CU-A13: Configurar Alertas y Notificaciones</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Define reglas para generación automática de alertas ante eventos específicos como vencimientos, desvíos de ruta, tiempos excesivos, etc.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de configuración</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede a configuración de alertas <br>2. El sistema muestra reglas existentes <br>3. Para nueva regla: define evento disparador <br>4. Configura condiciones (umbrales, tiempos) <br>5. Define destinatarios y canales (email, push, SMS) <br>6. El sistema activa la regla <br>7. El sistema registra configuración</td></tr>
@@ -2636,7 +2636,7 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a14">
                 <h4 style="margin-top:0">CU-A14: Gestionar Parámetros del Sistema</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Configura valores globales del sistema como tiempos de vencimiento, formatos de documentos, umbrales de alerta y otros parámetros operativos.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de configuración avanzada</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede a Parámetros del Sistema <br>2. El sistema muestra categorías de configuración <br>3. Selecciona categoría a modificar <br>4. Visualiza valores actuales con descripción <br>5. Modifica valores según necesidad <br>6. El sistema valida rangos permitidos <br>7. El sistema guarda y aplica cambios</td></tr>
@@ -2649,9 +2649,9 @@
             <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a15">
                 <h4 style="margin-top:0">CU-A15: Realizar Carga Masiva Inicial (Migración)</h4>
                 <table>
-                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador SITREP</td></tr>
                     <tr><th>Descripción</th><td>Importación del padrón histórico de generadores, transportistas y operadores para la puesta en marcha.</td></tr>
-                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Archivo de datos en formato válido (Excel/CSV/SQL) <br>• Estructura de datos compatible <br>• Acceso a la base de datos MySQL o Excel provista por DGFA con los \~2000 registros históricos estimados.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Archivo de datos en formato válido (Excel/CSV/SQL) <br>• Estructura de datos compatible <br>• Acceso a la base de datos MySQL o Excel provista por SITREP con los \~2000 registros históricos estimados.</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Importación <br>2. Selecciona tipo de datos a importar <br>3. Carga archivo fuente <br>4. El sistema analiza y muestra vista previa <br>5. El sistema detecta y reporta errores/duplicados <br>6. El administrador confirma importación <br>7. El sistema procesa registros y reporta resultado</td></tr>
                     <tr><th>Flujo Alternativo</th><td><br>• 5a. Errores críticos: sistema bloquea importación hasta corrección <br>• 5b. Duplicados: sistema ofrece opciones (omitir/actualizar/crear nuevo) <br>• 7a. Proceso largo: sistema ejecuta en segundo plano</td></tr>
                     <tr><th>Postcondiciones</th><td><br>• Datos importados correctamente <br>• Reporte de importación generado <br>• Registros disponibles en el sistema</td></tr>
@@ -2670,7 +2670,7 @@
                 <table>
                     <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
                     <tr><th>Descripción</th><td>Permite al generador de residuos peligrosos acceder al portal web mediante autenticación con usuario, contraseña y token de seguridad.</td></tr>
-                    <tr><th>Precondiciones</th><td><br>• Usuario registrado como Generador <br>• Credenciales activas <br>• Empresa habilitada por DGFA</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Usuario registrado como Generador <br>• Credenciales activas <br>• Empresa habilitada por SITREP</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. El generador accede a la URL del portal <br>2. El sistema muestra formulario de login <br>3. Ingresa usuario y contraseña <br>4. El sistema valida y solicita token de seguridad <br>5. Ingresa código de token <br>6. El sistema verifica y crea sesión <br>7. Redirige al dashboard del generador</td></tr>
                     <tr><th>Flujo Alternativo</th><td><br>• 3a. Credenciales inválidas: error y reintento (máx 3\) <br>• 5a. Token expirado: solicita regenerar código</td></tr>
                     <tr><th>Postcondiciones</th><td><br>• Sesión activa <br>• Acceso al portal de generador</td></tr>
@@ -2898,9 +2898,9 @@
                     <tr><th style="width:150px">Actor Principal</th><td>Transportista</td></tr>
                     <tr><th>Descripción</th><td>Documenta cualquier anomalía, accidente o desvío de ruta con descripción, fotografías y ubicación GPS.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Manifiesto en tránsito <br>• Incidente ocurrido</td></tr>
-                    <tr><th>Flujo Principal</th><td><br>1. Selecciona 'Registrar Incidente' <br>2. Selecciona tipo de incidente (accidente, derrame, robo, etc.) <br>3. Describe el incidente <br>4. Captura fotografías del evento <br>5. Sistema registra ubicación GPS <br>6. Sistema genera alerta inmediata a DGFA <br>7. Sistema marca manifiesto con incidente</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Selecciona 'Registrar Incidente' <br>2. Selecciona tipo de incidente (accidente, derrame, robo, etc.) <br>3. Describe el incidente <br>4. Captura fotografías del evento <br>5. Sistema registra ubicación GPS <br>6. Sistema genera alerta inmediata a SITREP <br>7. Sistema marca manifiesto con incidente</td></tr>
                     <tr><th>Flujo Alternativo</th><td><br>• 4a. Sin cámara: permite continuar con descripción detallada</td></tr>
-                    <tr><th>Postcondiciones</th><td><br>• Incidente documentado <br>• DGFA alertada inmediatamente <br>• Manifiesto marcado</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Incidente documentado <br>• SITREP alertada inmediatamente <br>• Manifiesto marcado</td></tr>
                     <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
                 </table>
             </div>
@@ -2963,7 +2963,7 @@
                     <tr><th style="width:150px">Actor Principal</th><td>Transportista</td></tr>
                     <tr><th>Descripción</th><td>Permite ver y actualizar información de los vehículos habilitados asignados a la empresa.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Sesión activa <br>• Permisos de gestión de flota</td></tr>
-                    <tr><th>Flujo Principal</th><td><br>1. Accede a módulo de vehículos <br>2. Sistema muestra listado de vehículos <br>3. Puede ver estado de habilitación de cada uno <br>4. Puede solicitar actualización de datos <br>5. Sistema envía solicitud a DGFA para aprobación</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Accede a módulo de vehículos <br>2. Sistema muestra listado de vehículos <br>3. Puede ver estado de habilitación de cada uno <br>4. Puede solicitar actualización de datos <br>5. Sistema envía solicitud a SITREP para aprobación</td></tr>
                     <tr><th>Flujo Alternativo</th><td><br>• 3a. Habilitación vencida: sistema marca vehículo como no disponible</td></tr>
                     <tr><th>Postcondiciones</th><td><br>• Información de flota visualizada/actualizada</td></tr>
                     <tr><th>Prioridad</th><td><strong style="color:#22c55e">Baja</strong></td></tr>
@@ -3022,7 +3022,7 @@
                     <tr><th>Descripción</th><td>Ingresa el peso real de los residuos recibidos para comparación con lo declarado en el manifiesto.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Recepción iniciada <br>• Báscula disponible</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. Sistema muestra cantidad declarada <br>2. Operador ingresa peso real medido <br>3. Sistema calcula diferencia porcentual <br>4. Si diferencia supera umbral, solicita justificación <br>5. Registra peso final <br>6. Adjunta ticket de báscula si corresponde</td></tr>
-                    <tr><th>Flujo Alternativo</th><td><br>• 4a. Diferencia significativa: genera alerta a DGFA</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 4a. Diferencia significativa: genera alerta a SITREP</td></tr>
                     <tr><th>Postcondiciones</th><td><br>• Peso registrado <br>• Diferencias documentadas si existen</td></tr>
                     <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
                 </table>
@@ -3036,7 +3036,7 @@
                     <tr><th>Precondiciones</th><td><br>• Pesaje realizado <br>• Diferencia detectada</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. Sistema presenta diferencia detectada <br>2. Operador selecciona tipo de diferencia (faltante/excedente) <br>3. Ingresa descripción/justificación <br>4. Captura evidencia fotográfica si es necesario <br>5. Sistema registra y notifica a partes involucradas</td></tr>
                     <tr><th>Flujo Alternativo</th><td><br>• 3a. Diferencia menor a umbral: registro simplificado</td></tr>
-                    <tr><th>Postcondiciones</th><td><br>• Diferencia documentada <br>• Generador y DGFA notificados</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Diferencia documentada <br>• Generador y SITREP notificados</td></tr>
                     <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
                 </table>
             </div>
@@ -3049,7 +3049,7 @@
                     <tr><th>Precondiciones</th><td><br>• Recepción en proceso <br>• Motivo válido de rechazo</td></tr>
                     <tr><th>Flujo Principal</th><td><br>1. Selecciona opción 'Rechazar Carga' <br>2. Selecciona motivo (no coincide, contaminado, sin documentación, etc.) <br>3. Ingresa descripción detallada <br>4. Captura evidencia fotográfica <br>5. Sistema registra rechazo <br>6. Sistema notifica a todas las partes <br>7. Sistema requiere retorno de carga</td></tr>
                     <tr><th>Flujo Alternativo</th><td><br>• Rechazo parcial: permite indicar cantidad rechazada vs aceptada</td></tr>
-                    <tr><th>Postcondiciones</th><td><br>• Rechazo registrado <br>• Generador y transportista notificados <br>• DGFA alertada</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Rechazo registrado <br>• Generador y transportista notificados <br>• SITREP alertada</td></tr>
                     <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
                 </table>
             </div>
@@ -3235,7 +3235,7 @@
                     <tr><th style="width:150px">Actor Principal</th><td>Sistema</td></tr>
                     <tr><th>Descripción</th><td>Identifica automáticamente desvíos de ruta, tiempos excesivos y otros comportamientos anómalos.</td></tr>
                     <tr><th>Precondiciones</th><td><br>• Manifiesto en tránsito <br>• Tracking GPS activo</td></tr>
-                    <tr><th>Flujo Principal</th><td><br>1. Sistema recibe actualización de posición GPS <br>2. Compara con ruta esperada <br>3. Calcula tiempo transcurrido vs estimado <br>4. Si detecta anomalía, genera alerta <br>5. Notifica a DGFA y actores involucrados <br>6. Registra incidencia en el manifiesto</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Sistema recibe actualización de posición GPS <br>2. Compara con ruta esperada <br>3. Calcula tiempo transcurrido vs estimado <br>4. Si detecta anomalía, genera alerta <br>5. Notifica a SITREP y actores involucrados <br>6. Registra incidencia en el manifiesto</td></tr>
                     <tr><th>Flujo Alternativo</th><td><br>• Falsa alarma: administrador puede descartar con justificación</td></tr>
                     <tr><th>Postcondiciones</th><td><br>• Anomalías detectadas <br>• Alertas generadas si corresponde</td></tr>
                     <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
