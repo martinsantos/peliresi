@@ -42,15 +42,22 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     const [showTour, setShowTour] = useState(false);
     const [showContextualHelp, setShowContextualHelp] = useState(false);
 
-    // Mostrar tour automáticamente si es primera vez o nueva versión
+    // TOUR: Siempre se muestra al cargar el dashboard
     useEffect(() => {
-        const tourCompleted = localStorage.getItem('tourCompleted');
-        const tourVersion = localStorage.getItem('tourVersion');
-        const currentVersion = '2.0';
-
-        // Show tour if never completed OR if version changed
-        if ((!tourCompleted || tourVersion !== currentVersion) && location.pathname === '/dashboard') {
+        if (location.pathname === '/dashboard') {
             const timer = setTimeout(() => setShowTour(true), 800);
+            return () => clearTimeout(timer);
+        }
+    }, [location.pathname]);
+
+    // AYUDA CONTEXTUAL: Solo la primera vez
+    useEffect(() => {
+        const helpShown = localStorage.getItem('contextualHelpShown');
+        if (!helpShown && location.pathname === '/dashboard') {
+            const timer = setTimeout(() => {
+                setShowContextualHelp(true);
+                localStorage.setItem('contextualHelpShown', 'true');
+            }, 2000);
             return () => clearTimeout(timer);
         }
     }, [location.pathname]);

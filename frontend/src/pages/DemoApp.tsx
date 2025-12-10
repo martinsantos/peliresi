@@ -68,7 +68,7 @@ const roleScreens = {
 };
 
 const DemoApp: React.FC = () => {
-    const [expandedRole, setExpandedRole] = useState<string | null>('ADMIN');
+    const [expandedRole, setExpandedRole] = useState<string | null>(null);
     // Onboarding SIEMPRE visible al iniciar (producción)
     const [showOnboarding, setShowOnboarding] = useState(true);
 
