@@ -1201,8 +1201,432 @@
                         <td>Firma Digital Conjunta</td>
                         <td>Gestión de firmas secuenciales</td>
                     </tr>
-                </tbody>
             </table>
+        </section>
+
+        <!-- ANEXO B: Especificación Detallada de Casos de Uso -->
+        <section id="anexo-detalle" class="section">
+            <h2>📖 Anexo B: Especificación Detallada de Casos de Uso</h2>
+            <p>Documentación completa de los casos de uso críticos, incluyendo precondiciones, flujos y postcondiciones.
+            </p>
+
+            <!-- CU-A01 -->
+            <div class="card" style="margin: 24px 0; border-left: 4px solid #10b981;">
+                <h4>CU-A01: Iniciar Sesión Administrador</h4>
+                <table>
+                    <tr>
+                        <th style="width:150px">Actor Principal</th>
+                        <td>Administrador DGFA</td>
+                    </tr>
+                    <tr>
+                        <th>Descripción</th>
+                        <td>Permite al administrador de la DGFA acceder al sistema mediante autenticación segura con
+                            usuario, contraseña y token de seguridad (2FA).</td>
+                    </tr>
+                    <tr>
+                        <th>Precondiciones</th>
+                        <td>• Usuario registrado en el sistema<br>• Usuario con rol de Administrador asignado<br>•
+                            Credenciales activas y no bloqueadas</td>
+                    </tr>
+                    <tr>
+                        <th>Flujo Principal</th>
+                        <td>1. El administrador accede a la URL del sistema<br>2. El sistema muestra formulario de
+                            login<br>3. El administrador ingresa usuario y contraseña<br>4. El sistema valida
+                            credenciales y solicita token 2FA<br>5. El administrador ingresa código de token<br>6. El
+                            sistema verifica token y crea sesión<br>7. El sistema redirige al dashboard de
+                            administración</td>
+                    </tr>
+                    <tr>
+                        <th>Flujo Alternativo</th>
+                        <td>• 3a. Credenciales inválidas: sistema muestra error y permite reintentar (máx 3
+                            intentos)<br>• 3b. Usuario bloqueado: sistema notifica y sugiere contactar soporte<br>• 5a.
+                            Token inválido: sistema permite reingresar código</td>
+                    </tr>
+                    <tr>
+                        <th>Postcondiciones</th>
+                        <td>• Sesión iniciada correctamente<br>• Log de acceso registrado en auditoría<br>• Dashboard de
+                            administración visible</td>
+                    </tr>
+                    <tr>
+                        <th>Prioridad</th>
+                        <td><strong style="color:#ef4444">Alta - Crítico</strong></td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- CU-A02 -->
+            <div class="card" style="margin: 24px 0; border-left: 4px solid #10b981;">
+                <h4>CU-A02: Visualizar Dashboard Ejecutivo</h4>
+                <table>
+                    <tr>
+                        <th style="width:150px">Actor Principal</th>
+                        <td>Administrador DGFA</td>
+                    </tr>
+                    <tr>
+                        <th>Descripción</th>
+                        <td>Presenta al administrador un panel de control con indicadores clave (KPIs) de la gestión de
+                            residuos peligrosos en tiempo real.</td>
+                    </tr>
+                    <tr>
+                        <th>Precondiciones</th>
+                        <td>• Sesión de administrador activa<br>• Permisos de visualización de dashboard</td>
+                    </tr>
+                    <tr>
+                        <th>Flujo Principal</th>
+                        <td>1. El sistema carga el dashboard al iniciar sesión<br>2. Se muestran métricas: manifiestos
+                            activos, en tránsito, completados<br>3. Se visualiza mapa con ubicación de transportes
+                            activos<br>4. Se presentan alertas pendientes de atención<br>5. Se muestran gráficos de
+                            tendencias (últimos 30 días)<br>6. El administrador puede filtrar por período, tipo de
+                            residuo o actor</td>
+                    </tr>
+                    <tr>
+                        <th>Flujo Alternativo</th>
+                        <td>• 2a. Sin datos: sistema muestra mensaje indicando que no hay información disponible<br>•
+                            4a. Sin alertas: sección de alertas indica 'Sin alertas pendientes'</td>
+                    </tr>
+                    <tr>
+                        <th>Postcondiciones</th>
+                        <td>• Dashboard visualizado correctamente<br>• Datos actualizados en tiempo real</td>
+                    </tr>
+                    <tr>
+                        <th>Prioridad</th>
+                        <td><strong style="color:#ef4444">Alta - Crítico</strong></td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- CU-G03 -->
+            <div class="card" style="margin: 24px 0; border-left: 4px solid #22c55e;">
+                <h4>CU-G03: Crear Manifiesto Electrónico</h4>
+                <table>
+                    <tr>
+                        <th style="width:150px">Actor Principal</th>
+                        <td>Generador de Residuos</td>
+                    </tr>
+                    <tr>
+                        <th>Descripción</th>
+                        <td>Permite al generador crear un nuevo manifiesto electrónico de residuos peligrosos,
+                            declarando tipo, cantidad, origen, transportista y operador destino.</td>
+                    </tr>
+                    <tr>
+                        <th>Precondiciones</th>
+                        <td>• Sesión de generador activa<br>• Al menos un transportista y operador habilitados
+                            disponibles</td>
+                    </tr>
+                    <tr>
+                        <th>Flujo Principal</th>
+                        <td>1. El generador selecciona 'Nuevo Manifiesto'<br>2. El sistema muestra formulario con datos
+                            del generador precargados<br>3. Selecciona tipo de residuo del catálogo<br>4. Ingresa
+                            cantidad y unidad de medida<br>5. Selecciona transportista habilitado de la lista<br>6.
+                            Selecciona operador destino de la lista<br>7. Ingresa observaciones si corresponde<br>8. El
+                            sistema valida datos ingresados<br>9. El generador puede guardar como borrador o continuar a
+                            firma</td>
+                    </tr>
+                    <tr>
+                        <th>Flujo Alternativo</th>
+                        <td>• 3a. Tipo de residuo no encontrado: permite búsqueda<br>• 5a. Transportista no disponible
+                            para el residuo: sistema filtra compatibles<br>• 6a. Operador no recibe ese tipo de residuo:
+                            sistema advierte<br>• 8a. Datos incompletos: sistema indica campos faltantes</td>
+                    </tr>
+                    <tr>
+                        <th>Postcondiciones</th>
+                        <td>• Manifiesto creado en estado borrador o pendiente de firma<br>• Número de manifiesto
+                            asignado</td>
+                    </tr>
+                    <tr>
+                        <th>Prioridad</th>
+                        <td><strong style="color:#ef4444">Alta - Crítico</strong></td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- CU-G07 -->
+            <div class="card" style="margin: 24px 0; border-left: 4px solid #22c55e;">
+                <h4>CU-G07: Firmar Manifiesto (Electrónica/Remota)</h4>
+                <table>
+                    <tr>
+                        <th style="width:150px">Actor Principal</th>
+                        <td>Generador de Residuos</td>
+                    </tr>
+                    <tr>
+                        <th>Descripción</th>
+                        <td>Aplica firma al manifiesto. Soporta mecanismo interno (Usuario+Pass+Token) y orquestación
+                            para múltiples firmantes.</td>
+                    </tr>
+                    <tr>
+                        <th>Precondiciones</th>
+                        <td>• Sesión activa<br>• Manifiesto completo y validado<br>• Token de seguridad disponible</td>
+                    </tr>
+                    <tr>
+                        <th>Flujo Principal</th>
+                        <td>1. Generador revisa el borrador y acepta la DDJJ<br>2. Sistema solicita método de
+                            autenticación de firma<br>3. <strong>Opción A (Estándar):</strong> Ingresa contraseña y
+                            Token (OTP/Físico)<br>4. <strong>Opción B (Remota):</strong> Invoca servicio de Firma
+                            Digital Remota (Nube)<br>5. Sistema estampa la firma, bloquea el documento y genera el
+                            QR<br>6. Notifica al Transportista</td>
+                    </tr>
+                    <tr>
+                        <th>Flujo Alternativo</th>
+                        <td><strong>Firma Conjunta:</strong> Si el sistema detecta que se requieren múltiples firmas
+                            (ej. Responsable Técnico + Legal), el estado pasa a "Pendiente de 2da Firma" antes de
+                            liberarse.</td>
+                    </tr>
+                    <tr>
+                        <th>Postcondiciones</th>
+                        <td>• Manifiesto firmado digitalmente<br>• Estado actualizado<br>• Transportista notificado<br>•
+                            QR generado</td>
+                    </tr>
+                    <tr>
+                        <th>Prioridad</th>
+                        <td><strong style="color:#ef4444">Alta - Crítico</strong></td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- CU-T03 -->
+            <div class="card" style="margin: 24px 0; border-left: 4px solid #f59e0b;">
+                <h4>CU-T03: Confirmar Retiro en Origen (Modo Desconectado)</h4>
+                <table>
+                    <tr>
+                        <th style="width:150px">Actor Principal</th>
+                        <td>Transportista</td>
+                    </tr>
+                    <tr>
+                        <th>Descripción</th>
+                        <td>Registro de retiro en zona sin señal. La operación debe completarse localmente al 100%.</td>
+                    </tr>
+                    <tr>
+                        <th>Precondiciones</th>
+                        <td>• Sesión activa (preferentemente app móvil)<br>• Manifiesto asignado en estado 'Pendiente de
+                            retiro'<br>• GPS activo</td>
+                    </tr>
+                    <tr>
+                        <th>Flujo Principal</th>
+                        <td>1. Transportista selecciona manifiesto en App<br>2. Verifica bultos y cantidades<br>3.
+                            <strong>Georreferenciación:</strong> App captura coordenadas GPS del dispositivo
+                            (independiente de la red)<br>4. <strong>Firma en Pantalla:</strong> Generador firma sobre el
+                            dispositivo del transportista<br>5. <strong>Persistencia Local:</strong> Si no hay red, la
+                            transacción se guarda en LocalDB encriptada<br>6. Sistema encola la sincronización para
+                            cuando se recupere conectividad</td>
+                    </tr>
+                    <tr>
+                        <th>Flujo Alternativo</th>
+                        <td>• 3a. Cantidad diferente: registra observación obligatoria<br>• 4a. Sin GPS: permite
+                            ingresar dirección manualmente con advertencia<br>• 6a. Sin conexión: almacena localmente
+                            para sincronizar después</td>
+                    </tr>
+                    <tr>
+                        <th>Postcondiciones</th>
+                        <td>• Retiro registrado con evidencia<br>• Estado actualizado<br>• Partes notificadas</td>
+                    </tr>
+                    <tr>
+                        <th>Prioridad</th>
+                        <td><strong style="color:#ef4444">Alta - Crítico</strong></td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- CU-T09 -->
+            <div class="card" style="margin: 24px 0; border-left: 4px solid #f59e0b;">
+                <h4>CU-T09: Arquitectura Offline-First y Sincronización</h4>
+                <table>
+                    <tr>
+                        <th style="width:150px">Actor Principal</th>
+                        <td>Sistema (App)</td>
+                    </tr>
+                    <tr>
+                        <th>Descripción</th>
+                        <td>Capacidad del motor de la App para gestionar la intermitencia de red sin detener la
+                            operación.</td>
+                    </tr>
+                    <tr>
+                        <th>Precondiciones</th>
+                        <td>• App móvil instalada<br>• Datos previos sincronizados</td>
+                    </tr>
+                    <tr>
+                        <th>Flujo Principal</th>
+                        <td>1. App detecta pérdida de conectividad<br>2. Activa modo "Offline-First" transparente al
+                            usuario<br>3. Todas las validaciones (QR, Tipos de Residuo) se ejecutan contra la caché
+                            local<br>4. Al recuperar señal, el <strong>Service Worker</strong> dispara la sincronización
+                            en segundo plano<br>5. Resolución de conflictos automática (prioridad timestamp servidor)
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Flujo Alternativo</th>
+                        <td>• 5a. Conflicto de datos: sistema presenta opciones al usuario<br>• 5b. Sincronización
+                            fallida: reintenta automáticamente</td>
+                    </tr>
+                    <tr>
+                        <th>Postcondiciones</th>
+                        <td>• Operaciones registradas localmente<br>• Sincronización exitosa al reconectar</td>
+                    </tr>
+                    <tr>
+                        <th>Prioridad</th>
+                        <td><strong style="color:#ef4444">Alta</strong></td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- CU-O03 -->
+            <div class="card" style="margin: 24px 0; border-left: 4px solid #3b82f6;">
+                <h4>CU-O03: Recepción con Validación QR/Offline</h4>
+                <table>
+                    <tr>
+                        <th style="width:150px">Actor Principal</th>
+                        <td>Operador</td>
+                    </tr>
+                    <tr>
+                        <th>Descripción</th>
+                        <td>Ingreso a planta. Debe soportar lectura de QR incluso si la garita de acceso no tiene red
+                            estable.</td>
+                    </tr>
+                    <tr>
+                        <th>Precondiciones</th>
+                        <td>• Sesión activa<br>• Manifiesto en estado 'Entregado - Pendiente recepción'<br>• Transporte
+                            presente en planta</td>
+                    </tr>
+                    <tr>
+                        <th>Flujo Principal</th>
+                        <td>1. Transporte arriba a planta<br>2. Operador escanea QR del manifiesto<br>3.
+                            <strong>Validación:</strong> App verifica integridad del QR y estado "En Tránsito". Si no
+                            hay red, valida contra lista de "Esperados" descargada previamente<br>4. Registra ingreso y
+                            deriva a báscula</td>
+                    </tr>
+                    <tr>
+                        <th>Flujo Alternativo</th>
+                        <td>• 3a. QR ilegible: ingreso manual<br>• 4a. Datos no coinciden: registrar observación</td>
+                    </tr>
+                    <tr>
+                        <th>Postcondiciones</th>
+                        <td>• Recepción iniciada<br>• Proceso de verificación en curso</td>
+                    </tr>
+                    <tr>
+                        <th>Prioridad</th>
+                        <td><strong style="color:#ef4444">Alta - Crítico</strong></td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- CU-O09 -->
+            <div class="card" style="margin: 24px 0; border-left: 4px solid #3b82f6;">
+                <h4>CU-O09: Cerrar Manifiesto</h4>
+                <table>
+                    <tr>
+                        <th style="width:150px">Actor Principal</th>
+                        <td>Operador</td>
+                    </tr>
+                    <tr>
+                        <th>Descripción</th>
+                        <td>Finaliza el ciclo completo del manifiesto con firma de disposición final, completando la
+                            trazabilidad.</td>
+                    </tr>
+                    <tr>
+                        <th>Precondiciones</th>
+                        <td>• Tratamiento registrado<br>• Proceso completo</td>
+                    </tr>
+                    <tr>
+                        <th>Flujo Principal</th>
+                        <td>1. Selecciona manifiesto a cerrar<br>2. Sistema verifica que todos los pasos están
+                            completos<br>3. Operador confirma finalización<br>4. Sistema solicita firma
+                            electrónica<br>5. Aplica firma de cierre<br>6. Sistema cambia estado a 'Cerrado'<br>7.
+                            Sistema genera certificado de disposición<br>8. Sistema notifica a todas las partes</td>
+                    </tr>
+                    <tr>
+                        <th>Flujo Alternativo</th>
+                        <td>• 2a. Pasos incompletos: sistema indica qué falta</td>
+                    </tr>
+                    <tr>
+                        <th>Postcondiciones</th>
+                        <td>• Manifiesto cerrado definitivamente<br>• Certificado generado<br>• Ciclo de trazabilidad
+                            completado</td>
+                    </tr>
+                    <tr>
+                        <th>Prioridad</th>
+                        <td><strong style="color:#ef4444">Alta - Crítico</strong></td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- CU-S04 -->
+            <div class="card" style="margin: 24px 0; border-left: 4px solid #8b5cf6;">
+                <h4>CU-S04: Registrar Auditoría</h4>
+                <table>
+                    <tr>
+                        <th style="width:150px">Actor Principal</th>
+                        <td>Sistema</td>
+                    </tr>
+                    <tr>
+                        <th>Descripción</th>
+                        <td>Log automático de todas las operaciones realizadas con timestamp, usuario, IP y datos
+                            afectados.</td>
+                    </tr>
+                    <tr>
+                        <th>Precondiciones</th>
+                        <td>• Operación realizada en el sistema</td>
+                    </tr>
+                    <tr>
+                        <th>Flujo Principal</th>
+                        <td>1. Usuario realiza cualquier operación<br>2. Sistema captura: fecha/hora, usuario, IP,
+                            acción, módulo<br>3. Captura datos antes y después del cambio<br>4. Almacena en tabla de
+                            auditoría<br>5. Registro inmutable</td>
+                    </tr>
+                    <tr>
+                        <th>Flujo Alternativo</th>
+                        <td>• Error de registro: almacena en cola para retry</td>
+                    </tr>
+                    <tr>
+                        <th>Postcondiciones</th>
+                        <td>• Operación auditada<br>• Registro inmutable disponible</td>
+                    </tr>
+                    <tr>
+                        <th>Prioridad</th>
+                        <td><strong style="color:#ef4444">Alta - Crítico</strong></td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- CU-S08 -->
+            <div class="card" style="margin: 24px 0; border-left: 4px solid #8b5cf6;">
+                <h4>CU-S08: Detectar Anomalías en Transporte</h4>
+                <table>
+                    <tr>
+                        <th style="width:150px">Actor Principal</th>
+                        <td>Sistema</td>
+                    </tr>
+                    <tr>
+                        <th>Descripción</th>
+                        <td>Identifica automáticamente desvíos de ruta, tiempos excesivos y otros comportamientos
+                            anómalos.</td>
+                    </tr>
+                    <tr>
+                        <th>Precondiciones</th>
+                        <td>• Manifiesto en tránsito<br>• Tracking GPS activo</td>
+                    </tr>
+                    <tr>
+                        <th>Flujo Principal</th>
+                        <td>1. Sistema recibe actualización de posición GPS<br>2. Compara con ruta esperada<br>3.
+                            Calcula tiempo transcurrido vs estimado<br>4. Si detecta anomalía, genera alerta<br>5.
+                            Notifica a DGFA y actores involucrados<br>6. Registra incidencia en el manifiesto</td>
+                    </tr>
+                    <tr>
+                        <th>Flujo Alternativo</th>
+                        <td>• Falsa alarma: administrador puede descartar con justificación</td>
+                    </tr>
+                    <tr>
+                        <th>Postcondiciones</th>
+                        <td>• Anomalías detectadas<br>• Alertas generadas si corresponde</td>
+                    </tr>
+                    <tr>
+                        <th>Prioridad</th>
+                        <td><strong style="color:#ef4444">Alta</strong></td>
+                    </tr>
+                </table>
+            </div>
+
+            <p style="margin-top: 32px; padding: 16px; background: rgba(16, 185, 129, 0.1); border-radius: 8px;">
+                <strong>📋 Nota:</strong> Para la especificación completa de los 61 casos de uso, consulte el documento
+                técnico <code>casosdeusoambientenuevo.docx.md</code> disponible en la documentación del proyecto.
+            </p>
         </section>
 
         <footer
