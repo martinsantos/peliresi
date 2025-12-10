@@ -4,7 +4,7 @@ interface PWAInstallState {
     canInstall: boolean;
     isInstalled: boolean;
     isIOS: boolean;
-    promptInstall: () => Promise<void>;
+    promptInstall: () => Promise<boolean>;
 }
 
 export const usePWAInstall = (): PWAInstallState => {
@@ -26,12 +26,14 @@ export const usePWAInstall = (): PWAInstallState => {
             e.preventDefault();
             setDeferredPrompt(e);
             setCanInstall(true);
+            console.log('[PWA] Install prompt ready');
         };
 
         const handleAppInstalled = () => {
             setIsInstalled(true);
             setCanInstall(false);
             setDeferredPrompt(null);
+            console.log('[PWA] App installed successfully');
         };
 
         window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -43,16 +45,11 @@ export const usePWAInstall = (): PWAInstallState => {
         };
     }, []);
 
-    const promptInstall = async () => {
+    // Returns true if native prompt was used, false otherwise
+    const promptInstall = async (): Promise<boolean> => {
         if (!deferredPrompt) {
-            // For iOS, show instructions
-            if (isIOS) {
-                alert('Para instalar en iOS:\n\n1. Toca el botón "Compartir" (□↑)\n2. Selecciona "Agregar a pantalla de inicio"\n3. Confirma tocando "Agregar"');
-            } else {
-                // Show Chrome manual install instructions
-                alert('Para instalar en Chrome:\n\n1. Abre el menú ⋮ (tres puntos verticales)\n2. Selecciona "Instalar aplicación" o "Agregar a pantalla de inicio"\n\nSi no ves esta opción:\n• Navega un poco por la app primero\n• Chrome requiere cierta interacción antes de ofrecer la instalación');
-            }
-            return;
+            // No native prompt available
+            return false;
         }
 
         try {
@@ -63,8 +60,10 @@ export const usePWAInstall = (): PWAInstallState => {
                 setCanInstall(false);
             }
             setDeferredPrompt(null);
+            return true;
         } catch (error) {
             console.error('Error al instalar PWA:', error);
+            return false;
         }
     };
 
@@ -75,3 +74,4 @@ export const usePWAInstall = (): PWAInstallState => {
         promptInstall
     };
 };
+
