@@ -469,7 +469,16 @@
             <div class="nav-section-title">Técnico</div>
             <a href="#pwa" class="nav-link">PWA Instalable</a>
             <a href="#offline" class="nav-link">Modo Offline</a>
-            <a href="#casos-uso" class="nav-link">Casos de Uso</a>
+            <a href="#casos-uso" class="nav-link">Matriz de Casos</a>
+        </div>
+
+        <div class="nav-section">
+            <div class="nav-section-title">📋 Casos de Uso</div>
+            <a href="#cu-admin" class="nav-link">🛡️ Administrador (15)</a>
+            <a href="#cu-generador" class="nav-link">🏭 Generador (12)</a>
+            <a href="#cu-transportista" class="nav-link">🚛 Transportista (11)</a>
+            <a href="#cu-operador" class="nav-link">🏢 Operador (12)</a>
+            <a href="#cu-sistema" class="nav-link">⚙️ Sistema (11)</a>
         </div>
     </nav>
 
@@ -1407,7 +1416,8 @@
                             (independiente de la red)<br>4. <strong>Firma en Pantalla:</strong> Generador firma sobre el
                             dispositivo del transportista<br>5. <strong>Persistencia Local:</strong> Si no hay red, la
                             transacción se guarda en LocalDB encriptada<br>6. Sistema encola la sincronización para
-                            cuando se recupere conectividad</td>
+                            cuando se recupere conectividad
+                        </td>
                     </tr>
                     <tr>
                         <th>Flujo Alternativo</th>
@@ -1490,7 +1500,8 @@
                         <td>1. Transporte arriba a planta<br>2. Operador escanea QR del manifiesto<br>3.
                             <strong>Validación:</strong> App verifica integridad del QR y estado "En Tránsito". Si no
                             hay red, valida contra lista de "Esperados" descargada previamente<br>4. Registra ingreso y
-                            deriva a báscula</td>
+                            deriva a báscula
+                        </td>
                     </tr>
                     <tr>
                         <th>Flujo Alternativo</th>
@@ -1623,10 +1634,1654 @@
                 </table>
             </div>
 
-            <p style="margin-top: 32px; padding: 16px; background: rgba(16, 185, 129, 0.1); border-radius: 8px;">
-                <strong>📋 Nota:</strong> Para la especificación completa de los 61 casos de uso, consulte el documento
-                técnico <code>casosdeusoambientenuevo.docx.md</code> disponible en la documentación del proyecto.
-            </p>
+            
+        <!-- 🛡️ Administrador DGFA -->
+        <section id="cu-admin" class="section">
+            <h2>🛡️ Administrador DGFA</h2>
+            <p>Total: 15 casos de uso</p>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a01">
+                <h4 style="margin-top:0">CU-A01: Iniciar Sesión Administrador</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Permite al administrador de la DGFA acceder al sistema mediante autenticación segura con usuario, contraseña y token de seguridad (2FA).</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Usuario registrado en el sistema <br>• Usuario con rol de Administrador asignado <br>• Credenciales activas y no bloqueadas</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede a la URL del sistema <br>2. El sistema muestra formulario de login <br>3. El administrador ingresa usuario y contraseña <br>4. El sistema valida credenciales y solicita token 2FA <br>5. El administrador ingresa código de token <br>6. El sistema verifica token y crea sesión <br>7. El sistema redirige al dashboard de administración</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. Credenciales inválidas: sistema muestra error y permite reintentar (máx 3 intentos) <br>• 3b. Usuario bloqueado: sistema notifica y sugiere contactar soporte <br>• 5a. Token inválido: sistema permite reingresar código</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Sesión iniciada correctamente <br>• Log de acceso registrado en auditoría <br>• Dashboard de administración visible</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a02">
+                <h4 style="margin-top:0">CU-A02: Visualizar Dashboard Ejecutivo</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Presenta al administrador un panel de control con indicadores clave (KPIs) de la gestión de residuos peligrosos en tiempo real.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de visualización de dashboard</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El sistema carga el dashboard al iniciar sesión <br>2. Se muestran métricas: manifiestos activos, en tránsito, completados <br>3. Se visualiza mapa con ubicación de transportes activos <br>4. Se presentan alertas pendientes de atención <br>5. Se muestran gráficos de tendencias (últimos 30 días) <br>6. El administrador puede filtrar por período, tipo de residuo o actor</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 2a. Sin datos: sistema muestra mensaje indicando que no hay información disponible <br>• 4a. Sin alertas: sección de alertas indica 'Sin alertas pendientes'</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Dashboard visualizado correctamente <br>• Datos actualizados en tiempo real</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a03">
+                <h4 style="margin-top:0">CU-A03: Gestionar Usuarios del Sistema</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Permite crear, modificar, activar/desactivar y eliminar usuarios del sistema (generadores, transportistas, operadores y otros administradores).</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de gestión de usuarios</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de usuarios <br>2. El sistema muestra listado de usuarios con filtros <br>3. El administrador selecciona acción (crear/editar/eliminar) <br>4. Para crear: completa formulario con datos del usuario <br>5. El sistema valida datos únicos (CUIT, email) <br>6. El sistema envía credenciales por email al nuevo usuario <br>7. El sistema registra la operación en auditoría</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 5a. CUIT duplicado: sistema indica que el usuario ya existe <br>• 5b. Email inválido: sistema solicita corrección <br>• Eliminar: sistema solicita confirmación y motivo</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Usuario creado/modificado/eliminado correctamente <br>• Notificación enviada al usuario afectado <br>• Operación registrada en auditoría</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a04">
+                <h4 style="margin-top:0">CU-A04: Asignar Roles y Permisos</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Define niveles de acceso y permisos específicos para cada usuario según su rol en la cadena de gestión de residuos.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Usuario destino existente en el sistema</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador selecciona usuario a configurar <br>2. El sistema muestra roles disponibles (Admin, Generador, Transportista, Operador) <br>3. El administrador asigna rol principal <br>4. El sistema muestra permisos asociados al rol <br>5. El administrador puede ajustar permisos específicos <br>6. El sistema guarda configuración</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. Cambio de rol crítico: sistema solicita doble confirmación <br>• 5a. Permisos incompatibles: sistema advierte y bloquea combinación</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Rol y permisos asignados <br>• Usuario notificado del cambio <br>• Nuevos permisos efectivos inmediatamente</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a05">
+                <h4 style="margin-top:0">CU-A05: Administrar Catálogo de Residuos</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Gestiona el catálogo oficial de tipos de residuos peligrosos según la normativa vigente (Ley 24.051), incluyendo categorías, códigos y características.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de configuración del sistema</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de configuración <br>2. Selecciona 'Catálogo de Residuos' <br>3. El sistema muestra listado con categorías según Ley <br>24.051 <br>4. El administrador puede agregar/editar/desactivar tipos <br>5. Para cada tipo define: código, nombre, categoría Y, características <br>6. El sistema valida código único <br>7. El sistema guarda cambios</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 4a. Desactivar tipo en uso: sistema advierte y solicita confirmación <br>• 6a. Código duplicado: sistema rechaza y solicita corrección</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Catálogo actualizado <br>• Cambios reflejados en formularios de manifiestos <br>• Historial de cambios registrado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a06">
+                <h4 style="margin-top:0">CU-A06: Gestionar Generadores Habilitados</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Administra el registro de generadores de residuos peligrosos habilitados, incluyendo datos de inscripción, categorización y estado.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de gestión de actores</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Generadores <br>2. El sistema muestra listado con filtros de búsqueda <br>3. Para alta: completa datos (razón social, CUIT, domicilio, N° inscripción) <br>4. El sistema valida datos contra registros existentes <br>5. El sistema asigna credenciales de acceso <br>6. El sistema envía notificación al generador <br>7. El sistema registra operación en auditoría</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 4a. CUIT existente: sistema muestra registro actual <br>• 5a. Para baja: sistema verifica manifiestos pendientes antes de desactivar</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Generador registrado/actualizado en el sistema <br>• Credenciales enviadas (si corresponde) <br>• Generador habilitado para crear manifiestos</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a07">
+                <h4 style="margin-top:0">CU-A07: Gestionar Transportistas Habilitados</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Administra el registro de transportistas de residuos peligrosos, incluyendo datos de la empresa, vehículos autorizados y choferes registrados.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de gestión de actores</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Transportistas <br>2. El sistema muestra listado de empresas transportistas <br>3. Para alta: completa datos empresa (razón social, CUIT, N° habilitación) <br>4. Registra vehículos (patente, tipo, capacidad, habilitación) <br>5. Registra choferes (nombre, DNI, licencia) <br>6. El sistema valida datos y asigna credenciales <br>7. El sistema notifica al transportista</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 4a. Vehículo sin habilitación vigente: sistema advierte <br>• 5a. Chofer sin licencia válida: sistema bloquea registro</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Transportista registrado con flota y personal <br>• Credenciales enviadas <br>• Transportista disponible para asignación en manifiestos</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a08">
+                <h4 style="margin-top:0">CU-A08: Gestionar Operadores Habilitados</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Administra el registro de operadores de tratamiento y disposición final de residuos peligrosos habilitados por la autoridad ambiental.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de gestión de actores</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Operadores <br>2. El sistema muestra listado de operadores registrados <br>3. Para alta: completa datos (razón social, CUIT, N° habilitación, categoría) <br>4. Registra tipos de residuos que puede recibir <br>5. Registra métodos de tratamiento/disposición autorizados <br>6. El sistema valida y asigna credenciales <br>7. El sistema notifica al operador</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 4a. Categoría no coincide con habilitación: sistema advierte <br>• 5a. Método no autorizado: sistema bloquea registro</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Operador registrado con capacidades definidas <br>• Credenciales enviadas <br>• Operador disponible como destino en manifiestos</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a09">
+                <h4 style="margin-top:0">CU-A09: Monitorear Manifiestos en Tiempo Real</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Visualiza en mapa interactivo la ubicación GPS de todos los transportes activos y el estado actualizado de los manifiestos en curso.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Manifiestos en estado 'en tránsito' existentes</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Monitoreo <br>2. El sistema muestra mapa con marcadores de transportes activos <br>3. Cada marcador indica: N° manifiesto, transportista, origen, destino <br>4. El administrador puede hacer click para ver detalle <br>5. El sistema actualiza posiciones cada 30 segundos <br>6. El administrador puede filtrar por zona, transportista o tipo de residuo</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 2a. Sin transportes activos: mapa muestra mensaje informativo <br>• 5a. Transporte sin señal GPS: marcador indica 'última posición conocida'</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Visualización en tiempo real de transportes <br>• Alertas generadas ante desvíos de ruta</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a10">
+                <h4 style="margin-top:0">CU-A10: Consultar Log de Auditoría</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Permite revisar el registro histórico de todas las operaciones realizadas en el sistema, con detalle de fecha, usuario, acción y datos afectados.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de auditoría</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Auditoría <br>2. El sistema muestra listado de eventos con filtros <br>3. El administrador puede filtrar por: fecha, usuario, tipo de operación, módulo <br>4. Al seleccionar evento, se muestra detalle completo <br>5. El detalle incluye: datos antes/después del cambio <br>6. El administrador puede exportar resultados</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. Sin resultados para filtros: sistema sugiere ampliar criterios <br>• 6a. Exportación grande: sistema genera archivo en segundo plano</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Información de auditoría consultada <br>• Exportación generada si se solicitó</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a11">
+                <h4 style="margin-top:0">CU-A11: Generar Reportes Estadísticos</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Crea informes estadísticos personalizables sobre la gestión de residuos peligrosos, con filtros por período, tipo de residuo, actor, zona geográfica, etc.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Datos históricos disponibles</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Reportes <br>2. Selecciona tipo de reporte (predefinido o personalizado) <br>3. Define parámetros: período, filtros, agrupaciones <br>4. El sistema genera vista previa del reporte <br>5. El administrador puede ajustar y regenerar <br>6. El administrador descarga en formato deseado (PDF/CSV/XML)</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 4a. Período sin datos: sistema informa y sugiere otro rango <br>• 6a. Reporte muy grande: sistema genera en segundo plano y notifica</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Reporte generado correctamente <br>• Archivo descargado en formato solicitado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a12">
+                <h4 style="margin-top:0">CU-A12: Exportar Datos del Sistema</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Permite descargar información del sistema en formatos estándar (PDF, CSV, XML) para uso externo, reportes regulatorios o integración con otros sistemas.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de exportación</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede a la funcionalidad de exportación <br>2. Selecciona conjunto de datos a exportar <br>3. Define filtros y período <br>4. Selecciona formato de salida (PDF/CSV/XML) <br>5. El sistema genera archivo <br>6. El sistema ofrece descarga directa</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 5a. Datos sensibles: sistema solicita confirmación adicional <br>• 5b. Archivo grande: sistema comprime y notifica por email</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Datos exportados correctamente <br>• Log de exportación registrado en auditoría</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a13">
+                <h4 style="margin-top:0">CU-A13: Configurar Alertas y Notificaciones</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Define reglas para generación automática de alertas ante eventos específicos como vencimientos, desvíos de ruta, tiempos excesivos, etc.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de configuración</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede a configuración de alertas <br>2. El sistema muestra reglas existentes <br>3. Para nueva regla: define evento disparador <br>4. Configura condiciones (umbrales, tiempos) <br>5. Define destinatarios y canales (email, push, SMS) <br>6. El sistema activa la regla <br>7. El sistema registra configuración</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 4a. Condiciones inválidas: sistema advierte y sugiere corrección <br>• 5a. Destinatario inválido: sistema solicita verificación</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Regla de alerta configurada y activa <br>• Sistema monitoreando condiciones definidas</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a14">
+                <h4 style="margin-top:0">CU-A14: Gestionar Parámetros del Sistema</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Configura valores globales del sistema como tiempos de vencimiento, formatos de documentos, umbrales de alerta y otros parámetros operativos.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de configuración avanzada</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede a Parámetros del Sistema <br>2. El sistema muestra categorías de configuración <br>3. Selecciona categoría a modificar <br>4. Visualiza valores actuales con descripción <br>5. Modifica valores según necesidad <br>6. El sistema valida rangos permitidos <br>7. El sistema guarda y aplica cambios</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 6a. Valor fuera de rango: sistema rechaza y muestra límites <br>• 7a. Cambio crítico: sistema solicita doble confirmación</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Parámetros actualizados <br>• Cambios efectivos inmediatamente <br>• Registro en auditoría</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Baja</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a15">
+                <h4 style="margin-top:0">CU-A15: Realizar Carga Masiva Inicial (Migración)</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Importación del padrón histórico de generadores, transportistas y operadores para la puesta en marcha.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Archivo de datos en formato válido (Excel/CSV/SQL) <br>• Estructura de datos compatible <br>• Acceso a la base de datos MySQL o Excel provista por DGFA con los \~2000 registros históricos estimados.</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Importación <br>2. Selecciona tipo de datos a importar <br>3. Carga archivo fuente <br>4. El sistema analiza y muestra vista previa <br>5. El sistema detecta y reporta errores/duplicados <br>6. El administrador confirma importación <br>7. El sistema procesa registros y reporta resultado</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 5a. Errores críticos: sistema bloquea importación hasta corrección <br>• 5b. Duplicados: sistema ofrece opciones (omitir/actualizar/crear nuevo) <br>• 7a. Proceso largo: sistema ejecuta en segundo plano</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Datos importados correctamente <br>• Reporte de importación generado <br>• Registros disponibles en el sistema</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta (inicial)</strong></td></tr>
+                </table>
+            </div>
+        </section>
+
+        <!-- 🏭 Generador de Residuos -->
+        <section id="cu-generador" class="section">
+            <h2>🏭 Generador de Residuos</h2>
+            <p>Total: 12 casos de uso</p>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #22c55e;" id="cu-g01">
+                <h4 style="margin-top:0">CU-G01: Iniciar Sesión Generador</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
+                    <tr><th>Descripción</th><td>Permite al generador de residuos peligrosos acceder al portal web mediante autenticación con usuario, contraseña y token de seguridad.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Usuario registrado como Generador <br>• Credenciales activas <br>• Empresa habilitada por DGFA</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El generador accede a la URL del portal <br>2. El sistema muestra formulario de login <br>3. Ingresa usuario y contraseña <br>4. El sistema valida y solicita token de seguridad <br>5. Ingresa código de token <br>6. El sistema verifica y crea sesión <br>7. Redirige al dashboard del generador</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. Credenciales inválidas: error y reintento (máx 3\) <br>• 5a. Token expirado: solicita regenerar código</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Sesión activa <br>• Acceso al portal de generador</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #22c55e;" id="cu-g02">
+                <h4 style="margin-top:0">CU-G02: Visualizar Dashboard del Generador</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
+                    <tr><th>Descripción</th><td>Presenta al generador un resumen de sus manifiestos: pendientes de envío, en tránsito, completados, y accesos rápidos a funciones principales.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de generador activa</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El sistema carga dashboard al iniciar sesión <br>2. Muestra contadores: borradores, pendientes, en tránsito, completados <br>3. Visualiza últimos manifiestos con estado <br>4. Muestra alertas y notificaciones pendientes <br>5. Ofrece accesos directos a crear manifiesto y consultar historial</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 2a. Sin manifiestos: muestra mensaje de bienvenida y guía inicial</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Dashboard visualizado con información actualizada</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #22c55e;" id="cu-g03">
+                <h4 style="margin-top:0">CU-G03: Crear Manifiesto Electrónico</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
+                    <tr><th>Descripción</th><td>Permite al generador crear un nuevo manifiesto electrónico de residuos peligrosos, declarando tipo, cantidad, origen, transportista y operador destino.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de generador activa <br>• Al menos un transportista y operador habilitados disponibles</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El generador selecciona 'Nuevo Manifiesto' <br>2. El sistema muestra formulario con datos del generador precargados <br>3. Selecciona tipo de residuo del catálogo <br>4. Ingresa cantidad y unidad de medida <br>5. Selecciona transportista habilitado de la lista <br>6. Selecciona operador destino de la lista <br>7. Ingresa observaciones si corresponde <br>8. El sistema valida datos ingresados <br>9. El generador puede guardar como borrador o continuar a firma</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. Tipo de residuo no encontrado: permite búsqueda <br>• 5a. Transportista no disponible para el residuo: sistema filtra compatibles <br>• 6a. Operador no recibe ese tipo de residuo: sistema advierte <br>• 8a. Datos incompletos: sistema indica campos faltantes</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Manifiesto creado en estado borrador o pendiente de firma <br>• Número de manifiesto asignado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #22c55e;" id="cu-g04">
+                <h4 style="margin-top:0">CU-G04: Seleccionar Tipo de Residuo</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
+                    <tr><th>Descripción</th><td>Permite buscar y seleccionar del catálogo oficial el tipo de residuo peligroso a declarar en el manifiesto.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa <br>• Manifiesto en edición <br>• Catálogo de residuos configurado</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El generador accede al selector de residuos <br>2. El sistema muestra categorías principales (Categorías Y) <br>3. Puede buscar por código, nombre o característica <br>4. Selecciona el tipo específico <br>5. El sistema muestra descripción y características <br>6. Confirma selección</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. Sin resultados: sugiere búsqueda alternativa <br>• 4a. Residuo deshabilitado: indica no disponible</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Tipo de residuo asignado al manifiesto</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #22c55e;" id="cu-g05">
+                <h4 style="margin-top:0">CU-G05: Asignar Transportista al Manifiesto</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
+                    <tr><th>Descripción</th><td>Selecciona de la lista de transportistas habilitados el que realizará el transporte del residuo peligroso.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa <br>• Manifiesto en edición <br>• Tipo de residuo seleccionado</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El generador accede al selector de transportistas <br>2. El sistema muestra lista filtrada por tipo de residuo <br>3. Puede buscar por nombre o CUIT <br>4. Visualiza datos del transportista (habilitación, vehículos) <br>5. Selecciona transportista deseado <br>6. El sistema registra la asignación</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 2a. Sin transportistas compatibles: sistema notifica <br>• 4a. Habilitación próxima a vencer: sistema advierte</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Transportista asignado al manifiesto <br>• Transportista notificado de asignación pendiente</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #22c55e;" id="cu-g06">
+                <h4 style="margin-top:0">CU-G06: Asignar Operador Destino</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
+                    <tr><th>Descripción</th><td>Selecciona de la lista de operadores habilitados el que recibirá y tratará/dispondrá el residuo peligroso.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa <br>• Manifiesto en edición <br>• Tipo de residuo seleccionado</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El generador accede al selector de operadores <br>2. El sistema muestra lista filtrada por tipo de residuo <br>3. Puede buscar por nombre, CUIT o ubicación <br>4. Visualiza datos del operador (métodos de tratamiento, capacidad) <br>5. Selecciona operador deseado <br>6. El sistema registra la asignación</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 2a. Sin operadores compatibles: sistema notifica <br>• 4a. Operador con capacidad limitada: sistema advierte</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Operador destino asignado al manifiesto</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #22c55e;" id="cu-g07">
+                <h4 style="margin-top:0">CU-G07: Firmar Manifiesto (Electrónica/Remota)</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
+                    <tr><th>Descripción</th><td>Aplica firma al manifiesto. Soporta mecanismo interno (Usuario+Pass+Token) y orquestación para múltiples firmantes.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa <br>• Manifiesto completo y validado <br>• Token de seguridad disponible</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Generador revisa el borrador y acepta la DDJJ. <br>2. Sistema solicita método de autenticación de firma. <br>3. **Opción A (Estándar):** Ingresa contraseña y Token (OTP/Físico). <br>4. **Opción B (Remota):** Invoca servicio de Firma Digital Remota (Nube) si corresponde. <br>5. Sistema estampa la firma, bloquea el documento y genera el QR. <br>6. Notifica al Transportista.</td></tr>
+                    <tr><th>Flujo Alternativo</th><td>**Firma Conjunta:** Si el sistema detecta que se requieren múltiples firmas (ej. Responsable Técnico \+ Legal), el estado pasa a "Pendiente de 2da Firma" antes de liberarse.</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Manifiesto firmado digitalmente <br>• Estado actualizado <br>• Transportista notificado <br>• QR generado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #22c55e;" id="cu-g08">
+                <h4 style="margin-top:0">CU-G08: Consultar Estado de Manifiesto</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
+                    <tr><th>Descripción</th><td>Permite ver el estado actual de un manifiesto específico, incluyendo ubicación del transporte si está en tránsito.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa <br>• Manifiesto existente del generador</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El generador selecciona manifiesto a consultar <br>2. El sistema muestra estado actual (pendiente/en tránsito/recibido/cerrado) <br>3. Si está en tránsito: muestra mapa con ubicación GPS <br>4. Muestra timeline de eventos del manifiesto <br>5. Muestra datos completos del manifiesto</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. Sin señal GPS: muestra última ubicación conocida</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Información del manifiesto visualizada</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #22c55e;" id="cu-g09">
+                <h4 style="margin-top:0">CU-G09: Consultar Historial de Manifiestos</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
+                    <tr><th>Descripción</th><td>Accede al listado completo de manifiestos emitidos con filtros de búsqueda por período, estado, tipo de residuo, etc.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El generador accede al módulo de Historial <br>2. El sistema muestra listado paginado de manifiestos <br>3. Puede aplicar filtros: fecha, estado, tipo residuo, transportista <br>4. Puede ordenar por diferentes columnas <br>5. Selecciona manifiesto para ver detalle <br>6. Puede exportar listado filtrado</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. Sin resultados: sugiere modificar filtros</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Historial consultado <br>• Exportación generada si se solicitó</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #22c55e;" id="cu-g10">
+                <h4 style="margin-top:0">CU-G10: Descargar Manifiesto en PDF</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
+                    <tr><th>Descripción</th><td>Genera y descarga copia del manifiesto en formato PDF con todos los datos, firmas y código QR.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa <br>• Manifiesto existente</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El generador selecciona manifiesto <br>2. Selecciona opción 'Descargar PDF' <br>3. El sistema genera documento PDF <br>4. El sistema ofrece descarga del archivo <br>5. El archivo incluye: datos completos, firmas, QR, timeline</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. Error de generación: sistema reintenta o notifica</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Archivo PDF descargado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #22c55e;" id="cu-g11">
+                <h4 style="margin-top:0">CU-G11: Recibir Notificaciones</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
+                    <tr><th>Descripción</th><td>Recibe alertas automáticas sobre cambios de estado de sus manifiestos: retiro, llegada a destino, cierre, anomalías.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Usuario con notificaciones habilitadas <br>• Manifiesto con actividad</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Ocurre evento en manifiesto del generador <br>2. El sistema genera notificación según configuración <br>3. Envía por canales configurados (email, push) <br>4. El generador visualiza notificación <br>5. Puede acceder directamente al manifiesto desde la notificación</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 2a. Canal no disponible: sistema usa alternativo</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Notificación enviada y registrada</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #22c55e;" id="cu-g12">
+                <h4 style="margin-top:0">CU-G12: Actualizar Perfil del Generador</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
+                    <tr><th>Descripción</th><td>Permite modificar datos de contacto, configuración de notificaciones y preferencias del usuario generador.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El generador accede a 'Mi Perfil' <br>2. El sistema muestra datos actuales <br>3. Modifica campos permitidos (contacto, notificaciones) <br>4. El sistema valida cambios <br>5. Guarda actualización</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 4a. Email duplicado: sistema advierte</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Perfil actualizado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Baja</strong></td></tr>
+                </table>
+            </div>
+        </section>
+
+        <!-- 🚛 Transportista -->
+        <section id="cu-transportista" class="section">
+            <h2>🚛 Transportista</h2>
+            <p>Total: 11 casos de uso</p>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #f59e0b;" id="cu-t01">
+                <h4 style="margin-top:0">CU-T01: Iniciar Sesión y Sincronización Inicial</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Transportista</td></tr>
+                    <tr><th>Descripción</th><td>Acceso vía App Nativa (Android/iOS). Incluye la descarga de tablas maestras para futura operación offline.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Usuario registrado como Transportista <br>• Empresa habilitada</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Abre App y se autentica. <br>2. Sistema valida credenciales. <br>3. **Sync Silenciosa:** Sistema descarga automáticamente en segundo plano: Manifiestos asignados, Catálogo de residuos y Datos de operadores destino. <br>4. Habilita base de datos local cifrada.</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 2a. Credenciales inválidas: reintento <br>• 4a. Token inválido: solicita nuevo código</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Sesión activa en web o app</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #f59e0b;" id="cu-t02">
+                <h4 style="margin-top:0">CU-T02: Visualizar Manifiestos Asignados</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Transportista</td></tr>
+                    <tr><th>Descripción</th><td>Muestra listado de manifiestos pendientes de retiro asignados al transportista.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa <br>• Manifiestos asignados existentes</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Accede a módulo de manifiestos asignados <br>2. Sistema muestra listado con filtros <br>3. Cada registro muestra: N°, generador, tipo residuo, dirección, fecha límite <br>4. Puede ordenar por urgencia o fecha <br>5. Selecciona para ver detalle y navegar a origen</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Sin manifiestos: muestra mensaje informativo</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Listado de trabajo visualizado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #f59e0b;" id="cu-t03">
+                <h4 style="margin-top:0">CU-T03: Confirmar Retiro en Origen (Modo Desconectado)</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Transportista</td></tr>
+                    <tr><th>Descripción</th><td>Registro de retiro en zona sin señal. La operación debe completarse localmente al 100%.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa (preferentemente app móvil) <br>• Manifiesto asignado en estado 'Pendiente de retiro' <br>• GPS activo</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Transportista selecciona manifiesto en App. <br>2. Verifica bultos y cantidades. <br>3. **Georreferenciación:** App captura coordenadas GPS del dispositivo (independiente de la red). <br>4. **Firma en Pantalla:** Generador firma sobre el dispositivo del transportista. <br>5. **Persistencia Local:** Si no hay red, la transacción se guarda en LocalDB encriptada. <br>6. Sistema encola la sincronización para cuando se recupere conectividad.</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. Cantidad diferente: registra observación obligatoria <br>• 4a. Sin GPS: permite ingresar dirección manualmente con advertencia <br>• 6a. Sin conexión: almacena localmente para sincronizar después</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Retiro registrado con evidencia <br>• Estado actualizado <br>• Partes notificadas</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #f59e0b;" id="cu-t04">
+                <h4 style="margin-top:0">CU-T04: Iniciar Transporte</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Transportista</td></tr>
+                    <tr><th>Descripción</th><td>Marca el inicio del trayecto hacia el operador destino, activando el seguimiento GPS automático.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Carga recibida confirmada <br>• GPS activo</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Selecciona opción 'Iniciar Viaje' <br>2. Sistema solicita confirmación <br>3. Sistema activa tracking GPS periódico <br>4. Sistema cambia estado a 'En tránsito' <br>5. Sistema notifica a generador y operador destino <br>6. Sistema comienza a calcular ruta y ETA</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. GPS desactivado: sistema advierte y solicita activación</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Transporte iniciado <br>• Tracking GPS activo <br>• Ruta registrándose</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #f59e0b;" id="cu-t05">
+                <h4 style="margin-top:0">CU-T05: Actualizar Estado en Tránsito</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Transportista</td></tr>
+                    <tr><th>Descripción</th><td>Permite registrar eventos durante el transporte como paradas programadas, demoras, cambios de conductor, etc.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Manifiesto en estado 'En tránsito'</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Selecciona manifiesto activo <br>2. Selecciona tipo de evento (parada, demora, cambio chofer) <br>3. Ingresa descripción del evento <br>4. Sistema captura ubicación GPS <br>5. Sistema registra evento en timeline <br>6. Sistema notifica si el evento es relevante</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 2a. Evento crítico (accidente): activa flujo especial con alertas</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Evento registrado en historial del manifiesto</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #f59e0b;" id="cu-t06">
+                <h4 style="margin-top:0">CU-T06: Registrar Incidente de Transporte</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Transportista</td></tr>
+                    <tr><th>Descripción</th><td>Documenta cualquier anomalía, accidente o desvío de ruta con descripción, fotografías y ubicación GPS.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Manifiesto en tránsito <br>• Incidente ocurrido</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Selecciona 'Registrar Incidente' <br>2. Selecciona tipo de incidente (accidente, derrame, robo, etc.) <br>3. Describe el incidente <br>4. Captura fotografías del evento <br>5. Sistema registra ubicación GPS <br>6. Sistema genera alerta inmediata a DGFA <br>7. Sistema marca manifiesto con incidente</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 4a. Sin cámara: permite continuar con descripción detallada</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Incidente documentado <br>• DGFA alertada inmediatamente <br>• Manifiesto marcado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #f59e0b;" id="cu-t07">
+                <h4 style="margin-top:0">CU-T07: Confirmar Entrega en Destino</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Transportista</td></tr>
+                    <tr><th>Descripción</th><td>Registra la llegada y entrega de la carga en el operador destino con firma y ubicación GPS.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Manifiesto en tránsito <br>• Arribo a destino</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Selecciona 'Confirmar Entrega' <br>2. Sistema verifica ubicación GPS vs dirección del operador <br>3. Registra hora de llegada <br>4. Sistema solicita confirmación del operador (QR o código) <br>5. Aplica firma de entrega <br>6. Sistema actualiza estado a 'Entregado - Pendiente recepción' <br>7. Sistema notifica a operador y generador</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 2a. Ubicación no coincide: sistema advierte y requiere justificación <br>• 4a. Operador no disponible: permite registrar entrega parcial</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Entrega registrada <br>• Operador notificado para recepción <br>• Tracking GPS desactivado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #f59e0b;" id="cu-t08">
+                <h4 style="margin-top:0">CU-T08: Escanear QR de Manifiesto</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Transportista</td></tr>
+                    <tr><th>Descripción</th><td>Lee código QR del manifiesto para carga rápida de información y verificación.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• App móvil con cámara <br>• Manifiesto con QR generado</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Selecciona 'Escanear QR' <br>2. Activa cámara y enfoca código <br>3. Sistema decodifica QR <br>4. Carga automáticamente datos del manifiesto <br>5. Permite continuar con operación (recepción/entrega)</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. QR ilegible: permite ingreso manual del número</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Manifiesto cargado para operación</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #f59e0b;" id="cu-t09">
+                <h4 style="margin-top:0">CU-T09: Arquitectura Offline-First y Sincronización</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Sistema (App)</td></tr>
+                    <tr><th>Descripción</th><td>Capacidad del motor de la App para gestionar la intermitencia de red sin detener la operación.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• App móvil instalada <br>• Datos previos sincronizados</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. App detecta pérdida de conectividad. <br>2. Activa modo "Offline-First" transparente al usuario. <br>3. Todas las validaciones (QR, Tipos de Residuo) se ejecutan contra la caché local. <br>4. Al recuperar señal, el **Service Worker** dispara la sincronización en segundo plano. <br>5. Resolución de conflictos automática (prioridad timestamp servidor).</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 5a. Conflicto de datos: sistema presenta opciones al usuario <br>• 5b. Sincronización fallida: reintenta automáticamente</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Operaciones registradas localmente <br>• Sincronización exitosa al reconectar</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #f59e0b;" id="cu-t10">
+                <h4 style="margin-top:0">CU-T10: Consultar Historial de Viajes</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Transportista</td></tr>
+                    <tr><th>Descripción</th><td>Accede al registro histórico de todos los transportes realizados.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Accede a módulo de historial <br>2. Sistema muestra listado paginado <br>3. Puede filtrar por fecha, estado, tipo de residuo <br>4. Selecciona viaje para ver detalle <br>5. Detalle incluye: ruta, tiempos, eventos</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Sin resultados: sugiere ampliar filtros</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Historial consultado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Baja</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #f59e0b;" id="cu-t11">
+                <h4 style="margin-top:0">CU-T11: Gestionar Flota de Vehículos</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Transportista</td></tr>
+                    <tr><th>Descripción</th><td>Permite ver y actualizar información de los vehículos habilitados asignados a la empresa.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa <br>• Permisos de gestión de flota</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Accede a módulo de vehículos <br>2. Sistema muestra listado de vehículos <br>3. Puede ver estado de habilitación de cada uno <br>4. Puede solicitar actualización de datos <br>5. Sistema envía solicitud a DGFA para aprobación</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. Habilitación vencida: sistema marca vehículo como no disponible</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Información de flota visualizada/actualizada</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Baja</strong></td></tr>
+                </table>
+            </div>
+        </section>
+
+        <!-- 🏢 Operador de Tratamiento -->
+        <section id="cu-operador" class="section">
+            <h2>🏢 Operador de Tratamiento</h2>
+            <p>Total: 12 casos de uso</p>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-o01">
+                <h4 style="margin-top:0">CU-O01: Iniciar Sesión Operador</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Operador</td></tr>
+                    <tr><th>Descripción</th><td>Permite al operador de tratamiento/disposición acceder al sistema con autenticación segura.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Usuario registrado como Operador <br>• Planta habilitada</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Accede a URL del portal <br>2. Ingresa credenciales <br>3. Sistema valida y solicita token <br>4. Ingresa código <br>5. Sistema crea sesión <br>6. Redirige a dashboard de operador</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Credenciales inválidas: reintento <br>• Token inválido: regenerar</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Sesión activa</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-o02">
+                <h4 style="margin-top:0">CU-O02: Visualizar Manifiestos Entrantes</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Operador</td></tr>
+                    <tr><th>Descripción</th><td>Muestra listado de manifiestos en tránsito con destino a la planta del operador.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa <br>• Manifiestos en tránsito hacia el operador</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Accede a módulo de entregas pendientes <br>2. Sistema muestra listado de manifiestos en camino <br>3. Cada registro muestra: N°, generador, transportista, tipo residuo, ETA <br>4. Puede ver ubicación actual en mapa <br>5. Puede preparar recepción anticipadamente</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Sin entregas pendientes: muestra mensaje informativo</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Información de entregas pendientes visualizada</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-o03">
+                <h4 style="margin-top:0">CU-O03: Recepción con Validación QR/Offline</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Operador</td></tr>
+                    <tr><th>Descripción</th><td>Ingreso a planta. Debe soportar lectura de QR incluso si la garita de acceso no tiene red estable.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa <br>• Manifiesto en estado 'Entregado - Pendiente recepción' <br>• Transporte presente en planta</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Transporte arriba a planta. <br>2. Operador escanea QR del manifiesto. <br>3. **Validación:** App verifica integridad del QR y estado "En Tránsito". Si no hay red, valida contra lista de "Esperados" descargada previamente. <br>4. Registra ingreso y deriva a báscula.</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. QR ilegible: ingreso manual <br>• 4a. Datos no coinciden: registrar observación</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Recepción iniciada <br>• Proceso de verificación en curso</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-o04">
+                <h4 style="margin-top:0">CU-O04: Registrar Pesaje de Residuos</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Operador</td></tr>
+                    <tr><th>Descripción</th><td>Ingresa el peso real de los residuos recibidos para comparación con lo declarado en el manifiesto.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Recepción iniciada <br>• Báscula disponible</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Sistema muestra cantidad declarada <br>2. Operador ingresa peso real medido <br>3. Sistema calcula diferencia porcentual <br>4. Si diferencia supera umbral, solicita justificación <br>5. Registra peso final <br>6. Adjunta ticket de báscula si corresponde</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 4a. Diferencia significativa: genera alerta a DGFA</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Peso registrado <br>• Diferencias documentadas si existen</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-o05">
+                <h4 style="margin-top:0">CU-O05: Registrar Diferencias de Carga</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Operador</td></tr>
+                    <tr><th>Descripción</th><td>Documenta discrepancias entre la cantidad declarada en el manifiesto y la efectivamente recibida.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Pesaje realizado <br>• Diferencia detectada</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Sistema presenta diferencia detectada <br>2. Operador selecciona tipo de diferencia (faltante/excedente) <br>3. Ingresa descripción/justificación <br>4. Captura evidencia fotográfica si es necesario <br>5. Sistema registra y notifica a partes involucradas</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. Diferencia menor a umbral: registro simplificado</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Diferencia documentada <br>• Generador y DGFA notificados</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-o06">
+                <h4 style="margin-top:0">CU-O06: Rechazar Carga de Residuos</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Operador</td></tr>
+                    <tr><th>Descripción</th><td>Registra el rechazo total o parcial de residuos con documentación del motivo y evidencia.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Recepción en proceso <br>• Motivo válido de rechazo</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Selecciona opción 'Rechazar Carga' <br>2. Selecciona motivo (no coincide, contaminado, sin documentación, etc.) <br>3. Ingresa descripción detallada <br>4. Captura evidencia fotográfica <br>5. Sistema registra rechazo <br>6. Sistema notifica a todas las partes <br>7. Sistema requiere retorno de carga</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Rechazo parcial: permite indicar cantidad rechazada vs aceptada</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Rechazo registrado <br>• Generador y transportista notificados <br>• DGFA alertada</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-o07">
+                <h4 style="margin-top:0">CU-O07: Firmar Recepción Conforme</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Operador</td></tr>
+                    <tr><th>Descripción</th><td>Aplica firma electrónica de conformidad de recepción, confirmando la aceptación de la carga.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Verificación y pesaje completados <br>• Carga aceptada</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Sistema presenta resumen de recepción <br>2. Operador verifica datos <br>3. Acepta términos de recepción <br>4. Sistema solicita token de seguridad <br>5. Aplica firma electrónica <br>6. Sistema actualiza estado a 'Recibido - Pendiente tratamiento' <br>7. Sistema notifica a generador</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Token inválido: permite reingresar</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Recepción firmada <br>• Manifiesto avanza a tratamiento <br>• Generador notificado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-o08">
+                <h4 style="margin-top:0">CU-O08: Registrar Tratamiento Aplicado</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Operador</td></tr>
+                    <tr><th>Descripción</th><td>Documenta el tipo de tratamiento o método de disposición final aplicado a los residuos recibidos.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Residuos recibidos <br>• Tratamiento realizado</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Selecciona manifiesto a procesar <br>2. Selecciona método de tratamiento del catálogo <br>3. Ingresa datos específicos del proceso <br>4. Registra fecha de tratamiento <br>5. Sistema valida que método está autorizado para el tipo de residuo <br>6. Guarda registro de tratamiento</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 5a. Método no autorizado: sistema bloquea y advierte</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Tratamiento registrado <br>• Manifiesto actualizado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-o09">
+                <h4 style="margin-top:0">CU-O09: Cerrar Manifiesto</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Operador</td></tr>
+                    <tr><th>Descripción</th><td>Finaliza el ciclo completo del manifiesto con firma de disposición final, completando la trazabilidad.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Tratamiento registrado <br>• Proceso completo</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Selecciona manifiesto a cerrar <br>2. Sistema verifica que todos los pasos están completos <br>3. Operador confirma finalización <br>4. Sistema solicita firma electrónica <br>5. Aplica firma de cierre <br>6. Sistema cambia estado a 'Cerrado' <br>7. Sistema genera certificado de disposición <br>8. Sistema notifica a todas las partes</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 2a. Pasos incompletos: sistema indica qué falta</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Manifiesto cerrado definitivamente <br>• Certificado generado <br>• Ciclo de trazabilidad completado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-o10">
+                <h4 style="margin-top:0">CU-O10: Generar Certificado de Disposición</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Operador</td></tr>
+                    <tr><th>Descripción</th><td>Emite certificado oficial de tratamiento/disposición realizado para entrega al generador.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Manifiesto cerrado</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Selecciona manifiesto cerrado <br>2. Selecciona 'Generar Certificado' <br>3. Sistema genera documento con datos completos <br>4. Incluye: datos del residuo, tratamiento, fechas, firmas <br>5. Permite descarga en PDF <br>6. Sistema envía copia al generador automáticamente</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Regenerar certificado: mantiene datos originales</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Certificado generado y disponible <br>• Copia enviada al generador</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-o11">
+                <h4 style="margin-top:0">CU-O11: Consultar Historial de Recepciones</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Operador</td></tr>
+                    <tr><th>Descripción</th><td>Accede al registro histórico de todos los manifiestos procesados por la planta.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Accede a módulo de historial <br>2. Sistema muestra listado paginado <br>3. Puede filtrar por fecha, generador, tipo de residuo, estado <br>4. Selecciona registro para ver detalle completo <br>5. Puede exportar listado</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Sin resultados: sugiere ampliar filtros</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Historial consultado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Baja</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-o12">
+                <h4 style="margin-top:0">CU-O12: Generar Reportes del Operador</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Operador</td></tr>
+                    <tr><th>Descripción</th><td>Crea informes de residuos recibidos y tratados por período, tipo, generador, etc.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa <br>• Datos históricos disponibles</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Accede a módulo de reportes <br>2. Selecciona tipo de reporte <br>3. Define filtros y período <br>4. Sistema genera reporte <br>5. Visualiza y puede exportar</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Sin datos: informa y sugiere otro período</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Reporte generado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+        </section>
+
+        <!-- ⚙️ Sistema Automatizado -->
+        <section id="cu-sistema" class="section">
+            <h2>⚙️ Sistema Automatizado</h2>
+            <p>Total: 11 casos de uso</p>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #8b5cf6;" id="cu-s01">
+                <h4 style="margin-top:0">CU-S01: Generar Número de Manifiesto</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Sistema</td></tr>
+                    <tr><th>Descripción</th><td>Asigna automáticamente un número único correlativo al crear un nuevo manifiesto.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Manifiesto en proceso de creación</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Usuario inicia creación de manifiesto <br>2. Sistema consulta último número asignado <br>3. Genera siguiente número correlativo con formato: AAAA-NNNNNN <br>4. Asigna número al manifiesto <br>5. Registra asignación en log</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Error de secuencia: sistema recupera y corrige</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Número único asignado <br>• Secuencia actualizada</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #8b5cf6;" id="cu-s02">
+                <h4 style="margin-top:0">CU-S02: Validar Datos de Manifiesto</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Sistema</td></tr>
+                    <tr><th>Descripción</th><td>Verifica automáticamente campos obligatorios, formato de datos y consistencia antes de permitir avanzar.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Manifiesto en edición <br>• Usuario intenta guardar o firmar</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Usuario solicita guardar/firmar <br>2. Sistema valida campos obligatorios <br>3. Valida formato de datos (CUIT, cantidades, fechas) <br>4. Verifica consistencia (transportista habilitado, operador compatible) <br>5. Si todo OK, permite continuar <br>6. Si hay errores, muestra lista detallada</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Errores encontrados: detalla cada uno para corrección</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Datos validados <br>• Usuario informado de errores si existen</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #8b5cf6;" id="cu-s03">
+                <h4 style="margin-top:0">CU-S03: Enviar Notificaciones Automáticas</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Sistema</td></tr>
+                    <tr><th>Descripción</th><td>Despacha alertas automáticas por email y push según eventos configurados en el sistema.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Evento que dispara notificación <br>• Destinatarios configurados</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Ocurre evento disparador <br>2. Sistema identifica regla de notificación <br>3. Genera contenido del mensaje <br>4. Determina destinatarios según configuración <br>5. Envía por canales habilitados (email, push) <br>6. Registra envío en log</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Canal no disponible: usa alternativo <br>• Envío fallido: reintenta 3 veces</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Notificaciones enviadas <br>• Envíos registrados</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #8b5cf6;" id="cu-s04">
+                <h4 style="margin-top:0">CU-S04: Registrar Auditoría</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Sistema</td></tr>
+                    <tr><th>Descripción</th><td>Log automático de todas las operaciones realizadas con timestamp, usuario, IP y datos afectados.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Operación realizada en el sistema</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Usuario realiza cualquier operación <br>2. Sistema captura: fecha/hora, usuario, IP, acción, módulo <br>3. Captura datos antes y después del cambio <br>4. Almacena en tabla de auditoría <br>5. Registro inmutable</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Error de registro: almacena en cola para retry</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Operación auditada <br>• Registro inmutable disponible</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #8b5cf6;" id="cu-s05">
+                <h4 style="margin-top:0">CU-S05: Sincronizar Datos Offline</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Sistema</td></tr>
+                    <tr><th>Descripción</th><td>Proceso de sincronización bidireccional de datos capturados sin conexión desde apps móviles.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• App reconecta después de operar offline <br>• Datos locales pendientes de sync</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. App detecta conexión disponible <br>2. Identifica registros pendientes de sincronización <br>3. Envía datos al servidor en orden cronológico <br>4. Servidor valida y procesa cada registro <br>5. Resuelve conflictos si existen <br>6. Actualiza app con datos del servidor <br>7. Confirma sincronización exitosa</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Conflicto de datos: aplica regla de resolución configurada <br>• Error de sync: reintenta automáticamente</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Datos sincronizados <br>• App y servidor en consistencia</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #8b5cf6;" id="cu-s06">
+                <h4 style="margin-top:0">CU-S06: Generar Código QR de Manifiesto</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Sistema</td></tr>
+                    <tr><th>Descripción</th><td>Crea automáticamente código QR único para cada manifiesto al momento de la firma.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Manifiesto firmado por generador</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Generador firma el manifiesto <br>2. Sistema genera string único con datos clave <br>3. Crea imagen QR codificando la información <br>4. Asocia QR al manifiesto <br>5. QR queda disponible para impresión y escaneo</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Error de generación: reintenta con algoritmo alternativo</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• QR generado y asociado <br>• QR incluido en PDF del manifiesto</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #8b5cf6;" id="cu-s07">
+                <h4 style="margin-top:0">CU-S07: Calcular Estadísticas del Dashboard</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Sistema</td></tr>
+                    <tr><th>Descripción</th><td>Actualiza periódicamente indicadores y métricas mostrados en los dashboards de cada rol.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Datos de manifiestos disponibles <br>• Proceso programado activo</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Proceso se ejecuta según programación (cada 5 min) <br>2. Consulta datos de manifiestos por estado <br>3. Calcula contadores y porcentajes <br>4. Actualiza caché de estadísticas <br>5. Dashboards consumen datos actualizados</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Error de cálculo: usa última versión válida</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Estadísticas actualizadas <br>• Dashboards reflejan datos recientes</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #8b5cf6;" id="cu-s08">
+                <h4 style="margin-top:0">CU-S08: Detectar Anomalías en Transporte</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Sistema</td></tr>
+                    <tr><th>Descripción</th><td>Identifica automáticamente desvíos de ruta, tiempos excesivos y otros comportamientos anómalos.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Manifiesto en tránsito <br>• Tracking GPS activo</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Sistema recibe actualización de posición GPS <br>2. Compara con ruta esperada <br>3. Calcula tiempo transcurrido vs estimado <br>4. Si detecta anomalía, genera alerta <br>5. Notifica a DGFA y actores involucrados <br>6. Registra incidencia en el manifiesto</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Falsa alarma: administrador puede descartar con justificación</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Anomalías detectadas <br>• Alertas generadas si corresponde</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #8b5cf6;" id="cu-s09">
+                <h4 style="margin-top:0">CU-S09: Realizar Backup Automático</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Sistema</td></tr>
+                    <tr><th>Descripción</th><td>Ejecuta respaldo periódico de base de datos y archivos adjuntos del sistema.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Proceso programado configurado <br>• Almacenamiento de backup disponible</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Proceso se ejecuta según programación (diario) <br>2. Genera dump de base de datos <br>3. Copia archivos adjuntos nuevos/modificados <br>4. Comprime y cifra backup <br>5. Transfiere a almacenamiento secundario <br>6. Registra backup exitoso <br>7. Limpia backups antiguos según política de retención</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Error de backup: notifica a administradores <br>• Espacio insuficiente: alerta crítica</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Backup completado <br>• Datos protegidos ante pérdida</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #8b5cf6;" id="cu-s10">
+                <h4 style="margin-top:0">CU-S10: Orquestación mediante Motor BPMN</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Sistema</td></tr>
+                    <tr><th>Descripción</th><td>Uso de un motor de procesos basado en el estándar BPMN para gobernar el ciclo de vida del manifiesto.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Proceso programado configurado <br>• Almacenamiento de backup disponible</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Sistema recibe solicitud de transición de estado (ej. "Firmar"). <br>2. Motor BPMN evalúa reglas de negocio vigentes. <br>3. Si la normativa cambia, se actualiza el diagrama BPMN sin modificar código fuente. <br>4. Motor avanza el token del proceso y dispara acciones.</td></tr>
+                    <tr><th>Flujo Alternativo</th><td>-</td></tr>
+                    <tr><th>Postcondiciones</th><td>-</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">BAJA</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #8b5cf6;" id="cu-s11">
+                <h4 style="margin-top:0">CU-S11: Gestión de Firma Digital Conjunta/Secuencial</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Sistema</td></tr>
+                    <tr><th>Descripción</th><td>Capacidad de gestionar múltiples firmas sobre un mismo documento PDF garantizando integridad (hash).</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Proceso programado configurado <br>• Almacenamiento de backup disponible</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Usuario A firma el documento. <br>2. Sistema aplica firma y recalcula hash, pero mantiene el documento "abierto" para siguientes firmas. <br>3. Sistema notifica a Usuario B (segundo firmante requerido por flujo BPMN). <br>4. Usuario B firma sobre el documento ya firmado por A. <br>5. Sistema valida cadena de confianza completa. <br>6. Cierre definitivo del PDF (Long Term Validation).</td></tr>
+                    <tr><th>Flujo Alternativo</th><td>-</td></tr>
+                    <tr><th>Postcondiciones</th><td>-</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">BAJA</strong></td></tr>
+                </table>
+            </div>
+        </section>
+
+        
+        <!-- 🛡️ Administrador DGFA -->
+        <section id="cu-admin" class="section">
+            <h2>🛡️ Administrador DGFA</h2>
+            <p>Total: 15 casos de uso</p>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a01">
+                <h4 style="margin-top:0">CU-A01: Iniciar Sesión Administrador</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Permite al administrador de la DGFA acceder al sistema mediante autenticación segura con usuario, contraseña y token de seguridad (2FA).</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Usuario registrado en el sistema <br>• Usuario con rol de Administrador asignado <br>• Credenciales activas y no bloqueadas</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede a la URL del sistema <br>2. El sistema muestra formulario de login <br>3. El administrador ingresa usuario y contraseña <br>4. El sistema valida credenciales y solicita token 2FA <br>5. El administrador ingresa código de token <br>6. El sistema verifica token y crea sesión <br>7. El sistema redirige al dashboard de administración</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. Credenciales inválidas: sistema muestra error y permite reintentar (máx 3 intentos) <br>• 3b. Usuario bloqueado: sistema notifica y sugiere contactar soporte <br>• 5a. Token inválido: sistema permite reingresar código</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Sesión iniciada correctamente <br>• Log de acceso registrado en auditoría <br>• Dashboard de administración visible</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a02">
+                <h4 style="margin-top:0">CU-A02: Visualizar Dashboard Ejecutivo</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Presenta al administrador un panel de control con indicadores clave (KPIs) de la gestión de residuos peligrosos en tiempo real.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de visualización de dashboard</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El sistema carga el dashboard al iniciar sesión <br>2. Se muestran métricas: manifiestos activos, en tránsito, completados <br>3. Se visualiza mapa con ubicación de transportes activos <br>4. Se presentan alertas pendientes de atención <br>5. Se muestran gráficos de tendencias (últimos 30 días) <br>6. El administrador puede filtrar por período, tipo de residuo o actor</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 2a. Sin datos: sistema muestra mensaje indicando que no hay información disponible <br>• 4a. Sin alertas: sección de alertas indica 'Sin alertas pendientes'</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Dashboard visualizado correctamente <br>• Datos actualizados en tiempo real</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a03">
+                <h4 style="margin-top:0">CU-A03: Gestionar Usuarios del Sistema</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Permite crear, modificar, activar/desactivar y eliminar usuarios del sistema (generadores, transportistas, operadores y otros administradores).</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de gestión de usuarios</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de usuarios <br>2. El sistema muestra listado de usuarios con filtros <br>3. El administrador selecciona acción (crear/editar/eliminar) <br>4. Para crear: completa formulario con datos del usuario <br>5. El sistema valida datos únicos (CUIT, email) <br>6. El sistema envía credenciales por email al nuevo usuario <br>7. El sistema registra la operación en auditoría</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 5a. CUIT duplicado: sistema indica que el usuario ya existe <br>• 5b. Email inválido: sistema solicita corrección <br>• Eliminar: sistema solicita confirmación y motivo</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Usuario creado/modificado/eliminado correctamente <br>• Notificación enviada al usuario afectado <br>• Operación registrada en auditoría</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a04">
+                <h4 style="margin-top:0">CU-A04: Asignar Roles y Permisos</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Define niveles de acceso y permisos específicos para cada usuario según su rol en la cadena de gestión de residuos.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Usuario destino existente en el sistema</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador selecciona usuario a configurar <br>2. El sistema muestra roles disponibles (Admin, Generador, Transportista, Operador) <br>3. El administrador asigna rol principal <br>4. El sistema muestra permisos asociados al rol <br>5. El administrador puede ajustar permisos específicos <br>6. El sistema guarda configuración</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. Cambio de rol crítico: sistema solicita doble confirmación <br>• 5a. Permisos incompatibles: sistema advierte y bloquea combinación</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Rol y permisos asignados <br>• Usuario notificado del cambio <br>• Nuevos permisos efectivos inmediatamente</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a05">
+                <h4 style="margin-top:0">CU-A05: Administrar Catálogo de Residuos</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Gestiona el catálogo oficial de tipos de residuos peligrosos según la normativa vigente (Ley 24.051), incluyendo categorías, códigos y características.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de configuración del sistema</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de configuración <br>2. Selecciona 'Catálogo de Residuos' <br>3. El sistema muestra listado con categorías según Ley <br>24.051 <br>4. El administrador puede agregar/editar/desactivar tipos <br>5. Para cada tipo define: código, nombre, categoría Y, características <br>6. El sistema valida código único <br>7. El sistema guarda cambios</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 4a. Desactivar tipo en uso: sistema advierte y solicita confirmación <br>• 6a. Código duplicado: sistema rechaza y solicita corrección</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Catálogo actualizado <br>• Cambios reflejados en formularios de manifiestos <br>• Historial de cambios registrado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a06">
+                <h4 style="margin-top:0">CU-A06: Gestionar Generadores Habilitados</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Administra el registro de generadores de residuos peligrosos habilitados, incluyendo datos de inscripción, categorización y estado.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de gestión de actores</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Generadores <br>2. El sistema muestra listado con filtros de búsqueda <br>3. Para alta: completa datos (razón social, CUIT, domicilio, N° inscripción) <br>4. El sistema valida datos contra registros existentes <br>5. El sistema asigna credenciales de acceso <br>6. El sistema envía notificación al generador <br>7. El sistema registra operación en auditoría</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 4a. CUIT existente: sistema muestra registro actual <br>• 5a. Para baja: sistema verifica manifiestos pendientes antes de desactivar</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Generador registrado/actualizado en el sistema <br>• Credenciales enviadas (si corresponde) <br>• Generador habilitado para crear manifiestos</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a07">
+                <h4 style="margin-top:0">CU-A07: Gestionar Transportistas Habilitados</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Administra el registro de transportistas de residuos peligrosos, incluyendo datos de la empresa, vehículos autorizados y choferes registrados.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de gestión de actores</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Transportistas <br>2. El sistema muestra listado de empresas transportistas <br>3. Para alta: completa datos empresa (razón social, CUIT, N° habilitación) <br>4. Registra vehículos (patente, tipo, capacidad, habilitación) <br>5. Registra choferes (nombre, DNI, licencia) <br>6. El sistema valida datos y asigna credenciales <br>7. El sistema notifica al transportista</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 4a. Vehículo sin habilitación vigente: sistema advierte <br>• 5a. Chofer sin licencia válida: sistema bloquea registro</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Transportista registrado con flota y personal <br>• Credenciales enviadas <br>• Transportista disponible para asignación en manifiestos</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a08">
+                <h4 style="margin-top:0">CU-A08: Gestionar Operadores Habilitados</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Administra el registro de operadores de tratamiento y disposición final de residuos peligrosos habilitados por la autoridad ambiental.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de gestión de actores</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Operadores <br>2. El sistema muestra listado de operadores registrados <br>3. Para alta: completa datos (razón social, CUIT, N° habilitación, categoría) <br>4. Registra tipos de residuos que puede recibir <br>5. Registra métodos de tratamiento/disposición autorizados <br>6. El sistema valida y asigna credenciales <br>7. El sistema notifica al operador</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 4a. Categoría no coincide con habilitación: sistema advierte <br>• 5a. Método no autorizado: sistema bloquea registro</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Operador registrado con capacidades definidas <br>• Credenciales enviadas <br>• Operador disponible como destino en manifiestos</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a09">
+                <h4 style="margin-top:0">CU-A09: Monitorear Manifiestos en Tiempo Real</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Visualiza en mapa interactivo la ubicación GPS de todos los transportes activos y el estado actualizado de los manifiestos en curso.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Manifiestos en estado 'en tránsito' existentes</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Monitoreo <br>2. El sistema muestra mapa con marcadores de transportes activos <br>3. Cada marcador indica: N° manifiesto, transportista, origen, destino <br>4. El administrador puede hacer click para ver detalle <br>5. El sistema actualiza posiciones cada 30 segundos <br>6. El administrador puede filtrar por zona, transportista o tipo de residuo</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 2a. Sin transportes activos: mapa muestra mensaje informativo <br>• 5a. Transporte sin señal GPS: marcador indica 'última posición conocida'</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Visualización en tiempo real de transportes <br>• Alertas generadas ante desvíos de ruta</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a10">
+                <h4 style="margin-top:0">CU-A10: Consultar Log de Auditoría</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Permite revisar el registro histórico de todas las operaciones realizadas en el sistema, con detalle de fecha, usuario, acción y datos afectados.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de auditoría</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Auditoría <br>2. El sistema muestra listado de eventos con filtros <br>3. El administrador puede filtrar por: fecha, usuario, tipo de operación, módulo <br>4. Al seleccionar evento, se muestra detalle completo <br>5. El detalle incluye: datos antes/después del cambio <br>6. El administrador puede exportar resultados</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. Sin resultados para filtros: sistema sugiere ampliar criterios <br>• 6a. Exportación grande: sistema genera archivo en segundo plano</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Información de auditoría consultada <br>• Exportación generada si se solicitó</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a11">
+                <h4 style="margin-top:0">CU-A11: Generar Reportes Estadísticos</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Crea informes estadísticos personalizables sobre la gestión de residuos peligrosos, con filtros por período, tipo de residuo, actor, zona geográfica, etc.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Datos históricos disponibles</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Reportes <br>2. Selecciona tipo de reporte (predefinido o personalizado) <br>3. Define parámetros: período, filtros, agrupaciones <br>4. El sistema genera vista previa del reporte <br>5. El administrador puede ajustar y regenerar <br>6. El administrador descarga en formato deseado (PDF/CSV/XML)</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 4a. Período sin datos: sistema informa y sugiere otro rango <br>• 6a. Reporte muy grande: sistema genera en segundo plano y notifica</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Reporte generado correctamente <br>• Archivo descargado en formato solicitado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a12">
+                <h4 style="margin-top:0">CU-A12: Exportar Datos del Sistema</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Permite descargar información del sistema en formatos estándar (PDF, CSV, XML) para uso externo, reportes regulatorios o integración con otros sistemas.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de exportación</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede a la funcionalidad de exportación <br>2. Selecciona conjunto de datos a exportar <br>3. Define filtros y período <br>4. Selecciona formato de salida (PDF/CSV/XML) <br>5. El sistema genera archivo <br>6. El sistema ofrece descarga directa</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 5a. Datos sensibles: sistema solicita confirmación adicional <br>• 5b. Archivo grande: sistema comprime y notifica por email</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Datos exportados correctamente <br>• Log de exportación registrado en auditoría</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a13">
+                <h4 style="margin-top:0">CU-A13: Configurar Alertas y Notificaciones</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Define reglas para generación automática de alertas ante eventos específicos como vencimientos, desvíos de ruta, tiempos excesivos, etc.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de configuración</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede a configuración de alertas <br>2. El sistema muestra reglas existentes <br>3. Para nueva regla: define evento disparador <br>4. Configura condiciones (umbrales, tiempos) <br>5. Define destinatarios y canales (email, push, SMS) <br>6. El sistema activa la regla <br>7. El sistema registra configuración</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 4a. Condiciones inválidas: sistema advierte y sugiere corrección <br>• 5a. Destinatario inválido: sistema solicita verificación</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Regla de alerta configurada y activa <br>• Sistema monitoreando condiciones definidas</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a14">
+                <h4 style="margin-top:0">CU-A14: Gestionar Parámetros del Sistema</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Configura valores globales del sistema como tiempos de vencimiento, formatos de documentos, umbrales de alerta y otros parámetros operativos.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Permisos de configuración avanzada</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede a Parámetros del Sistema <br>2. El sistema muestra categorías de configuración <br>3. Selecciona categoría a modificar <br>4. Visualiza valores actuales con descripción <br>5. Modifica valores según necesidad <br>6. El sistema valida rangos permitidos <br>7. El sistema guarda y aplica cambios</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 6a. Valor fuera de rango: sistema rechaza y muestra límites <br>• 7a. Cambio crítico: sistema solicita doble confirmación</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Parámetros actualizados <br>• Cambios efectivos inmediatamente <br>• Registro en auditoría</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Baja</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-a15">
+                <h4 style="margin-top:0">CU-A15: Realizar Carga Masiva Inicial (Migración)</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Administrador DGFA</td></tr>
+                    <tr><th>Descripción</th><td>Importación del padrón histórico de generadores, transportistas y operadores para la puesta en marcha.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de administrador activa <br>• Archivo de datos en formato válido (Excel/CSV/SQL) <br>• Estructura de datos compatible <br>• Acceso a la base de datos MySQL o Excel provista por DGFA con los \~2000 registros históricos estimados.</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El administrador accede al módulo de Importación <br>2. Selecciona tipo de datos a importar <br>3. Carga archivo fuente <br>4. El sistema analiza y muestra vista previa <br>5. El sistema detecta y reporta errores/duplicados <br>6. El administrador confirma importación <br>7. El sistema procesa registros y reporta resultado</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 5a. Errores críticos: sistema bloquea importación hasta corrección <br>• 5b. Duplicados: sistema ofrece opciones (omitir/actualizar/crear nuevo) <br>• 7a. Proceso largo: sistema ejecuta en segundo plano</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Datos importados correctamente <br>• Reporte de importación generado <br>• Registros disponibles en el sistema</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta (inicial)</strong></td></tr>
+                </table>
+            </div>
+        </section>
+
+        <!-- 🏭 Generador de Residuos -->
+        <section id="cu-generador" class="section">
+            <h2>🏭 Generador de Residuos</h2>
+            <p>Total: 12 casos de uso</p>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #22c55e;" id="cu-g01">
+                <h4 style="margin-top:0">CU-G01: Iniciar Sesión Generador</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
+                    <tr><th>Descripción</th><td>Permite al generador de residuos peligrosos acceder al portal web mediante autenticación con usuario, contraseña y token de seguridad.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Usuario registrado como Generador <br>• Credenciales activas <br>• Empresa habilitada por DGFA</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El generador accede a la URL del portal <br>2. El sistema muestra formulario de login <br>3. Ingresa usuario y contraseña <br>4. El sistema valida y solicita token de seguridad <br>5. Ingresa código de token <br>6. El sistema verifica y crea sesión <br>7. Redirige al dashboard del generador</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. Credenciales inválidas: error y reintento (máx 3\) <br>• 5a. Token expirado: solicita regenerar código</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Sesión activa <br>• Acceso al portal de generador</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #22c55e;" id="cu-g02">
+                <h4 style="margin-top:0">CU-G02: Visualizar Dashboard del Generador</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
+                    <tr><th>Descripción</th><td>Presenta al generador un resumen de sus manifiestos: pendientes de envío, en tránsito, completados, y accesos rápidos a funciones principales.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de generador activa</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El sistema carga dashboard al iniciar sesión <br>2. Muestra contadores: borradores, pendientes, en tránsito, completados <br>3. Visualiza últimos manifiestos con estado <br>4. Muestra alertas y notificaciones pendientes <br>5. Ofrece accesos directos a crear manifiesto y consultar historial</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 2a. Sin manifiestos: muestra mensaje de bienvenida y guía inicial</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Dashboard visualizado con información actualizada</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #22c55e;" id="cu-g03">
+                <h4 style="margin-top:0">CU-G03: Crear Manifiesto Electrónico</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
+                    <tr><th>Descripción</th><td>Permite al generador crear un nuevo manifiesto electrónico de residuos peligrosos, declarando tipo, cantidad, origen, transportista y operador destino.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión de generador activa <br>• Al menos un transportista y operador habilitados disponibles</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El generador selecciona 'Nuevo Manifiesto' <br>2. El sistema muestra formulario con datos del generador precargados <br>3. Selecciona tipo de residuo del catálogo <br>4. Ingresa cantidad y unidad de medida <br>5. Selecciona transportista habilitado de la lista <br>6. Selecciona operador destino de la lista <br>7. Ingresa observaciones si corresponde <br>8. El sistema valida datos ingresados <br>9. El generador puede guardar como borrador o continuar a firma</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. Tipo de residuo no encontrado: permite búsqueda <br>• 5a. Transportista no disponible para el residuo: sistema filtra compatibles <br>• 6a. Operador no recibe ese tipo de residuo: sistema advierte <br>• 8a. Datos incompletos: sistema indica campos faltantes</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Manifiesto creado en estado borrador o pendiente de firma <br>• Número de manifiesto asignado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #22c55e;" id="cu-g04">
+                <h4 style="margin-top:0">CU-G04: Seleccionar Tipo de Residuo</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
+                    <tr><th>Descripción</th><td>Permite buscar y seleccionar del catálogo oficial el tipo de residuo peligroso a declarar en el manifiesto.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa <br>• Manifiesto en edición <br>• Catálogo de residuos configurado</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El generador accede al selector de residuos <br>2. El sistema muestra categorías principales (Categorías Y) <br>3. Puede buscar por código, nombre o característica <br>4. Selecciona el tipo específico <br>5. El sistema muestra descripción y características <br>6. Confirma selección</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. Sin resultados: sugiere búsqueda alternativa <br>• 4a. Residuo deshabilitado: indica no disponible</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Tipo de residuo asignado al manifiesto</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #22c55e;" id="cu-g05">
+                <h4 style="margin-top:0">CU-G05: Asignar Transportista al Manifiesto</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
+                    <tr><th>Descripción</th><td>Selecciona de la lista de transportistas habilitados el que realizará el transporte del residuo peligroso.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa <br>• Manifiesto en edición <br>• Tipo de residuo seleccionado</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El generador accede al selector de transportistas <br>2. El sistema muestra lista filtrada por tipo de residuo <br>3. Puede buscar por nombre o CUIT <br>4. Visualiza datos del transportista (habilitación, vehículos) <br>5. Selecciona transportista deseado <br>6. El sistema registra la asignación</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 2a. Sin transportistas compatibles: sistema notifica <br>• 4a. Habilitación próxima a vencer: sistema advierte</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Transportista asignado al manifiesto <br>• Transportista notificado de asignación pendiente</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #22c55e;" id="cu-g06">
+                <h4 style="margin-top:0">CU-G06: Asignar Operador Destino</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
+                    <tr><th>Descripción</th><td>Selecciona de la lista de operadores habilitados el que recibirá y tratará/dispondrá el residuo peligroso.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa <br>• Manifiesto en edición <br>• Tipo de residuo seleccionado</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El generador accede al selector de operadores <br>2. El sistema muestra lista filtrada por tipo de residuo <br>3. Puede buscar por nombre, CUIT o ubicación <br>4. Visualiza datos del operador (métodos de tratamiento, capacidad) <br>5. Selecciona operador deseado <br>6. El sistema registra la asignación</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 2a. Sin operadores compatibles: sistema notifica <br>• 4a. Operador con capacidad limitada: sistema advierte</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Operador destino asignado al manifiesto</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #22c55e;" id="cu-g07">
+                <h4 style="margin-top:0">CU-G07: Firmar Manifiesto (Electrónica/Remota)</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
+                    <tr><th>Descripción</th><td>Aplica firma al manifiesto. Soporta mecanismo interno (Usuario+Pass+Token) y orquestación para múltiples firmantes.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa <br>• Manifiesto completo y validado <br>• Token de seguridad disponible</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Generador revisa el borrador y acepta la DDJJ. <br>2. Sistema solicita método de autenticación de firma. <br>3. **Opción A (Estándar):** Ingresa contraseña y Token (OTP/Físico). <br>4. **Opción B (Remota):** Invoca servicio de Firma Digital Remota (Nube) si corresponde. <br>5. Sistema estampa la firma, bloquea el documento y genera el QR. <br>6. Notifica al Transportista.</td></tr>
+                    <tr><th>Flujo Alternativo</th><td>**Firma Conjunta:** Si el sistema detecta que se requieren múltiples firmas (ej. Responsable Técnico \+ Legal), el estado pasa a "Pendiente de 2da Firma" antes de liberarse.</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Manifiesto firmado digitalmente <br>• Estado actualizado <br>• Transportista notificado <br>• QR generado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #22c55e;" id="cu-g08">
+                <h4 style="margin-top:0">CU-G08: Consultar Estado de Manifiesto</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
+                    <tr><th>Descripción</th><td>Permite ver el estado actual de un manifiesto específico, incluyendo ubicación del transporte si está en tránsito.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa <br>• Manifiesto existente del generador</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El generador selecciona manifiesto a consultar <br>2. El sistema muestra estado actual (pendiente/en tránsito/recibido/cerrado) <br>3. Si está en tránsito: muestra mapa con ubicación GPS <br>4. Muestra timeline de eventos del manifiesto <br>5. Muestra datos completos del manifiesto</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. Sin señal GPS: muestra última ubicación conocida</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Información del manifiesto visualizada</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #22c55e;" id="cu-g09">
+                <h4 style="margin-top:0">CU-G09: Consultar Historial de Manifiestos</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
+                    <tr><th>Descripción</th><td>Accede al listado completo de manifiestos emitidos con filtros de búsqueda por período, estado, tipo de residuo, etc.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El generador accede al módulo de Historial <br>2. El sistema muestra listado paginado de manifiestos <br>3. Puede aplicar filtros: fecha, estado, tipo residuo, transportista <br>4. Puede ordenar por diferentes columnas <br>5. Selecciona manifiesto para ver detalle <br>6. Puede exportar listado filtrado</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. Sin resultados: sugiere modificar filtros</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Historial consultado <br>• Exportación generada si se solicitó</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #22c55e;" id="cu-g10">
+                <h4 style="margin-top:0">CU-G10: Descargar Manifiesto en PDF</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
+                    <tr><th>Descripción</th><td>Genera y descarga copia del manifiesto en formato PDF con todos los datos, firmas y código QR.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa <br>• Manifiesto existente</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El generador selecciona manifiesto <br>2. Selecciona opción 'Descargar PDF' <br>3. El sistema genera documento PDF <br>4. El sistema ofrece descarga del archivo <br>5. El archivo incluye: datos completos, firmas, QR, timeline</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. Error de generación: sistema reintenta o notifica</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Archivo PDF descargado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #22c55e;" id="cu-g11">
+                <h4 style="margin-top:0">CU-G11: Recibir Notificaciones</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
+                    <tr><th>Descripción</th><td>Recibe alertas automáticas sobre cambios de estado de sus manifiestos: retiro, llegada a destino, cierre, anomalías.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Usuario con notificaciones habilitadas <br>• Manifiesto con actividad</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Ocurre evento en manifiesto del generador <br>2. El sistema genera notificación según configuración <br>3. Envía por canales configurados (email, push) <br>4. El generador visualiza notificación <br>5. Puede acceder directamente al manifiesto desde la notificación</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 2a. Canal no disponible: sistema usa alternativo</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Notificación enviada y registrada</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #22c55e;" id="cu-g12">
+                <h4 style="margin-top:0">CU-G12: Actualizar Perfil del Generador</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Generador de Residuos</td></tr>
+                    <tr><th>Descripción</th><td>Permite modificar datos de contacto, configuración de notificaciones y preferencias del usuario generador.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. El generador accede a 'Mi Perfil' <br>2. El sistema muestra datos actuales <br>3. Modifica campos permitidos (contacto, notificaciones) <br>4. El sistema valida cambios <br>5. Guarda actualización</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 4a. Email duplicado: sistema advierte</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Perfil actualizado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Baja</strong></td></tr>
+                </table>
+            </div>
+        </section>
+
+        <!-- 🚛 Transportista -->
+        <section id="cu-transportista" class="section">
+            <h2>🚛 Transportista</h2>
+            <p>Total: 11 casos de uso</p>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #f59e0b;" id="cu-t01">
+                <h4 style="margin-top:0">CU-T01: Iniciar Sesión y Sincronización Inicial</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Transportista</td></tr>
+                    <tr><th>Descripción</th><td>Acceso vía App Nativa (Android/iOS). Incluye la descarga de tablas maestras para futura operación offline.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Usuario registrado como Transportista <br>• Empresa habilitada</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Abre App y se autentica. <br>2. Sistema valida credenciales. <br>3. **Sync Silenciosa:** Sistema descarga automáticamente en segundo plano: Manifiestos asignados, Catálogo de residuos y Datos de operadores destino. <br>4. Habilita base de datos local cifrada.</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 2a. Credenciales inválidas: reintento <br>• 4a. Token inválido: solicita nuevo código</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Sesión activa en web o app</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #f59e0b;" id="cu-t02">
+                <h4 style="margin-top:0">CU-T02: Visualizar Manifiestos Asignados</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Transportista</td></tr>
+                    <tr><th>Descripción</th><td>Muestra listado de manifiestos pendientes de retiro asignados al transportista.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa <br>• Manifiestos asignados existentes</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Accede a módulo de manifiestos asignados <br>2. Sistema muestra listado con filtros <br>3. Cada registro muestra: N°, generador, tipo residuo, dirección, fecha límite <br>4. Puede ordenar por urgencia o fecha <br>5. Selecciona para ver detalle y navegar a origen</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Sin manifiestos: muestra mensaje informativo</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Listado de trabajo visualizado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #f59e0b;" id="cu-t03">
+                <h4 style="margin-top:0">CU-T03: Confirmar Retiro en Origen (Modo Desconectado)</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Transportista</td></tr>
+                    <tr><th>Descripción</th><td>Registro de retiro en zona sin señal. La operación debe completarse localmente al 100%.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa (preferentemente app móvil) <br>• Manifiesto asignado en estado 'Pendiente de retiro' <br>• GPS activo</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Transportista selecciona manifiesto en App. <br>2. Verifica bultos y cantidades. <br>3. **Georreferenciación:** App captura coordenadas GPS del dispositivo (independiente de la red). <br>4. **Firma en Pantalla:** Generador firma sobre el dispositivo del transportista. <br>5. **Persistencia Local:** Si no hay red, la transacción se guarda en LocalDB encriptada. <br>6. Sistema encola la sincronización para cuando se recupere conectividad.</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. Cantidad diferente: registra observación obligatoria <br>• 4a. Sin GPS: permite ingresar dirección manualmente con advertencia <br>• 6a. Sin conexión: almacena localmente para sincronizar después</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Retiro registrado con evidencia <br>• Estado actualizado <br>• Partes notificadas</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #f59e0b;" id="cu-t04">
+                <h4 style="margin-top:0">CU-T04: Iniciar Transporte</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Transportista</td></tr>
+                    <tr><th>Descripción</th><td>Marca el inicio del trayecto hacia el operador destino, activando el seguimiento GPS automático.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Carga recibida confirmada <br>• GPS activo</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Selecciona opción 'Iniciar Viaje' <br>2. Sistema solicita confirmación <br>3. Sistema activa tracking GPS periódico <br>4. Sistema cambia estado a 'En tránsito' <br>5. Sistema notifica a generador y operador destino <br>6. Sistema comienza a calcular ruta y ETA</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. GPS desactivado: sistema advierte y solicita activación</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Transporte iniciado <br>• Tracking GPS activo <br>• Ruta registrándose</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #f59e0b;" id="cu-t05">
+                <h4 style="margin-top:0">CU-T05: Actualizar Estado en Tránsito</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Transportista</td></tr>
+                    <tr><th>Descripción</th><td>Permite registrar eventos durante el transporte como paradas programadas, demoras, cambios de conductor, etc.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Manifiesto en estado 'En tránsito'</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Selecciona manifiesto activo <br>2. Selecciona tipo de evento (parada, demora, cambio chofer) <br>3. Ingresa descripción del evento <br>4. Sistema captura ubicación GPS <br>5. Sistema registra evento en timeline <br>6. Sistema notifica si el evento es relevante</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 2a. Evento crítico (accidente): activa flujo especial con alertas</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Evento registrado en historial del manifiesto</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #f59e0b;" id="cu-t06">
+                <h4 style="margin-top:0">CU-T06: Registrar Incidente de Transporte</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Transportista</td></tr>
+                    <tr><th>Descripción</th><td>Documenta cualquier anomalía, accidente o desvío de ruta con descripción, fotografías y ubicación GPS.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Manifiesto en tránsito <br>• Incidente ocurrido</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Selecciona 'Registrar Incidente' <br>2. Selecciona tipo de incidente (accidente, derrame, robo, etc.) <br>3. Describe el incidente <br>4. Captura fotografías del evento <br>5. Sistema registra ubicación GPS <br>6. Sistema genera alerta inmediata a DGFA <br>7. Sistema marca manifiesto con incidente</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 4a. Sin cámara: permite continuar con descripción detallada</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Incidente documentado <br>• DGFA alertada inmediatamente <br>• Manifiesto marcado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #f59e0b;" id="cu-t07">
+                <h4 style="margin-top:0">CU-T07: Confirmar Entrega en Destino</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Transportista</td></tr>
+                    <tr><th>Descripción</th><td>Registra la llegada y entrega de la carga en el operador destino con firma y ubicación GPS.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Manifiesto en tránsito <br>• Arribo a destino</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Selecciona 'Confirmar Entrega' <br>2. Sistema verifica ubicación GPS vs dirección del operador <br>3. Registra hora de llegada <br>4. Sistema solicita confirmación del operador (QR o código) <br>5. Aplica firma de entrega <br>6. Sistema actualiza estado a 'Entregado - Pendiente recepción' <br>7. Sistema notifica a operador y generador</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 2a. Ubicación no coincide: sistema advierte y requiere justificación <br>• 4a. Operador no disponible: permite registrar entrega parcial</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Entrega registrada <br>• Operador notificado para recepción <br>• Tracking GPS desactivado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #f59e0b;" id="cu-t08">
+                <h4 style="margin-top:0">CU-T08: Escanear QR de Manifiesto</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Transportista</td></tr>
+                    <tr><th>Descripción</th><td>Lee código QR del manifiesto para carga rápida de información y verificación.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• App móvil con cámara <br>• Manifiesto con QR generado</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Selecciona 'Escanear QR' <br>2. Activa cámara y enfoca código <br>3. Sistema decodifica QR <br>4. Carga automáticamente datos del manifiesto <br>5. Permite continuar con operación (recepción/entrega)</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. QR ilegible: permite ingreso manual del número</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Manifiesto cargado para operación</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #f59e0b;" id="cu-t09">
+                <h4 style="margin-top:0">CU-T09: Arquitectura Offline-First y Sincronización</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Sistema (App)</td></tr>
+                    <tr><th>Descripción</th><td>Capacidad del motor de la App para gestionar la intermitencia de red sin detener la operación.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• App móvil instalada <br>• Datos previos sincronizados</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. App detecta pérdida de conectividad. <br>2. Activa modo "Offline-First" transparente al usuario. <br>3. Todas las validaciones (QR, Tipos de Residuo) se ejecutan contra la caché local. <br>4. Al recuperar señal, el **Service Worker** dispara la sincronización en segundo plano. <br>5. Resolución de conflictos automática (prioridad timestamp servidor).</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 5a. Conflicto de datos: sistema presenta opciones al usuario <br>• 5b. Sincronización fallida: reintenta automáticamente</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Operaciones registradas localmente <br>• Sincronización exitosa al reconectar</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #f59e0b;" id="cu-t10">
+                <h4 style="margin-top:0">CU-T10: Consultar Historial de Viajes</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Transportista</td></tr>
+                    <tr><th>Descripción</th><td>Accede al registro histórico de todos los transportes realizados.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Accede a módulo de historial <br>2. Sistema muestra listado paginado <br>3. Puede filtrar por fecha, estado, tipo de residuo <br>4. Selecciona viaje para ver detalle <br>5. Detalle incluye: ruta, tiempos, eventos</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Sin resultados: sugiere ampliar filtros</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Historial consultado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Baja</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #f59e0b;" id="cu-t11">
+                <h4 style="margin-top:0">CU-T11: Gestionar Flota de Vehículos</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Transportista</td></tr>
+                    <tr><th>Descripción</th><td>Permite ver y actualizar información de los vehículos habilitados asignados a la empresa.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa <br>• Permisos de gestión de flota</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Accede a módulo de vehículos <br>2. Sistema muestra listado de vehículos <br>3. Puede ver estado de habilitación de cada uno <br>4. Puede solicitar actualización de datos <br>5. Sistema envía solicitud a DGFA para aprobación</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. Habilitación vencida: sistema marca vehículo como no disponible</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Información de flota visualizada/actualizada</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Baja</strong></td></tr>
+                </table>
+            </div>
+        </section>
+
+        <!-- 🏢 Operador de Tratamiento -->
+        <section id="cu-operador" class="section">
+            <h2>🏢 Operador de Tratamiento</h2>
+            <p>Total: 12 casos de uso</p>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-o01">
+                <h4 style="margin-top:0">CU-O01: Iniciar Sesión Operador</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Operador</td></tr>
+                    <tr><th>Descripción</th><td>Permite al operador de tratamiento/disposición acceder al sistema con autenticación segura.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Usuario registrado como Operador <br>• Planta habilitada</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Accede a URL del portal <br>2. Ingresa credenciales <br>3. Sistema valida y solicita token <br>4. Ingresa código <br>5. Sistema crea sesión <br>6. Redirige a dashboard de operador</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Credenciales inválidas: reintento <br>• Token inválido: regenerar</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Sesión activa</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-o02">
+                <h4 style="margin-top:0">CU-O02: Visualizar Manifiestos Entrantes</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Operador</td></tr>
+                    <tr><th>Descripción</th><td>Muestra listado de manifiestos en tránsito con destino a la planta del operador.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa <br>• Manifiestos en tránsito hacia el operador</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Accede a módulo de entregas pendientes <br>2. Sistema muestra listado de manifiestos en camino <br>3. Cada registro muestra: N°, generador, transportista, tipo residuo, ETA <br>4. Puede ver ubicación actual en mapa <br>5. Puede preparar recepción anticipadamente</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Sin entregas pendientes: muestra mensaje informativo</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Información de entregas pendientes visualizada</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-o03">
+                <h4 style="margin-top:0">CU-O03: Recepción con Validación QR/Offline</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Operador</td></tr>
+                    <tr><th>Descripción</th><td>Ingreso a planta. Debe soportar lectura de QR incluso si la garita de acceso no tiene red estable.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa <br>• Manifiesto en estado 'Entregado - Pendiente recepción' <br>• Transporte presente en planta</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Transporte arriba a planta. <br>2. Operador escanea QR del manifiesto. <br>3. **Validación:** App verifica integridad del QR y estado "En Tránsito". Si no hay red, valida contra lista de "Esperados" descargada previamente. <br>4. Registra ingreso y deriva a báscula.</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. QR ilegible: ingreso manual <br>• 4a. Datos no coinciden: registrar observación</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Recepción iniciada <br>• Proceso de verificación en curso</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-o04">
+                <h4 style="margin-top:0">CU-O04: Registrar Pesaje de Residuos</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Operador</td></tr>
+                    <tr><th>Descripción</th><td>Ingresa el peso real de los residuos recibidos para comparación con lo declarado en el manifiesto.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Recepción iniciada <br>• Báscula disponible</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Sistema muestra cantidad declarada <br>2. Operador ingresa peso real medido <br>3. Sistema calcula diferencia porcentual <br>4. Si diferencia supera umbral, solicita justificación <br>5. Registra peso final <br>6. Adjunta ticket de báscula si corresponde</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 4a. Diferencia significativa: genera alerta a DGFA</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Peso registrado <br>• Diferencias documentadas si existen</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-o05">
+                <h4 style="margin-top:0">CU-O05: Registrar Diferencias de Carga</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Operador</td></tr>
+                    <tr><th>Descripción</th><td>Documenta discrepancias entre la cantidad declarada en el manifiesto y la efectivamente recibida.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Pesaje realizado <br>• Diferencia detectada</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Sistema presenta diferencia detectada <br>2. Operador selecciona tipo de diferencia (faltante/excedente) <br>3. Ingresa descripción/justificación <br>4. Captura evidencia fotográfica si es necesario <br>5. Sistema registra y notifica a partes involucradas</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 3a. Diferencia menor a umbral: registro simplificado</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Diferencia documentada <br>• Generador y DGFA notificados</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-o06">
+                <h4 style="margin-top:0">CU-O06: Rechazar Carga de Residuos</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Operador</td></tr>
+                    <tr><th>Descripción</th><td>Registra el rechazo total o parcial de residuos con documentación del motivo y evidencia.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Recepción en proceso <br>• Motivo válido de rechazo</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Selecciona opción 'Rechazar Carga' <br>2. Selecciona motivo (no coincide, contaminado, sin documentación, etc.) <br>3. Ingresa descripción detallada <br>4. Captura evidencia fotográfica <br>5. Sistema registra rechazo <br>6. Sistema notifica a todas las partes <br>7. Sistema requiere retorno de carga</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Rechazo parcial: permite indicar cantidad rechazada vs aceptada</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Rechazo registrado <br>• Generador y transportista notificados <br>• DGFA alertada</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-o07">
+                <h4 style="margin-top:0">CU-O07: Firmar Recepción Conforme</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Operador</td></tr>
+                    <tr><th>Descripción</th><td>Aplica firma electrónica de conformidad de recepción, confirmando la aceptación de la carga.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Verificación y pesaje completados <br>• Carga aceptada</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Sistema presenta resumen de recepción <br>2. Operador verifica datos <br>3. Acepta términos de recepción <br>4. Sistema solicita token de seguridad <br>5. Aplica firma electrónica <br>6. Sistema actualiza estado a 'Recibido - Pendiente tratamiento' <br>7. Sistema notifica a generador</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Token inválido: permite reingresar</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Recepción firmada <br>• Manifiesto avanza a tratamiento <br>• Generador notificado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-o08">
+                <h4 style="margin-top:0">CU-O08: Registrar Tratamiento Aplicado</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Operador</td></tr>
+                    <tr><th>Descripción</th><td>Documenta el tipo de tratamiento o método de disposición final aplicado a los residuos recibidos.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Residuos recibidos <br>• Tratamiento realizado</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Selecciona manifiesto a procesar <br>2. Selecciona método de tratamiento del catálogo <br>3. Ingresa datos específicos del proceso <br>4. Registra fecha de tratamiento <br>5. Sistema valida que método está autorizado para el tipo de residuo <br>6. Guarda registro de tratamiento</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 5a. Método no autorizado: sistema bloquea y advierte</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Tratamiento registrado <br>• Manifiesto actualizado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-o09">
+                <h4 style="margin-top:0">CU-O09: Cerrar Manifiesto</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Operador</td></tr>
+                    <tr><th>Descripción</th><td>Finaliza el ciclo completo del manifiesto con firma de disposición final, completando la trazabilidad.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Tratamiento registrado <br>• Proceso completo</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Selecciona manifiesto a cerrar <br>2. Sistema verifica que todos los pasos están completos <br>3. Operador confirma finalización <br>4. Sistema solicita firma electrónica <br>5. Aplica firma de cierre <br>6. Sistema cambia estado a 'Cerrado' <br>7. Sistema genera certificado de disposición <br>8. Sistema notifica a todas las partes</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• 2a. Pasos incompletos: sistema indica qué falta</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Manifiesto cerrado definitivamente <br>• Certificado generado <br>• Ciclo de trazabilidad completado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-o10">
+                <h4 style="margin-top:0">CU-O10: Generar Certificado de Disposición</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Operador</td></tr>
+                    <tr><th>Descripción</th><td>Emite certificado oficial de tratamiento/disposición realizado para entrega al generador.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Manifiesto cerrado</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Selecciona manifiesto cerrado <br>2. Selecciona 'Generar Certificado' <br>3. Sistema genera documento con datos completos <br>4. Incluye: datos del residuo, tratamiento, fechas, firmas <br>5. Permite descarga en PDF <br>6. Sistema envía copia al generador automáticamente</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Regenerar certificado: mantiene datos originales</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Certificado generado y disponible <br>• Copia enviada al generador</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-o11">
+                <h4 style="margin-top:0">CU-O11: Consultar Historial de Recepciones</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Operador</td></tr>
+                    <tr><th>Descripción</th><td>Accede al registro histórico de todos los manifiestos procesados por la planta.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Accede a módulo de historial <br>2. Sistema muestra listado paginado <br>3. Puede filtrar por fecha, generador, tipo de residuo, estado <br>4. Selecciona registro para ver detalle completo <br>5. Puede exportar listado</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Sin resultados: sugiere ampliar filtros</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Historial consultado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Baja</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-o12">
+                <h4 style="margin-top:0">CU-O12: Generar Reportes del Operador</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Operador</td></tr>
+                    <tr><th>Descripción</th><td>Crea informes de residuos recibidos y tratados por período, tipo, generador, etc.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Sesión activa <br>• Datos históricos disponibles</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Accede a módulo de reportes <br>2. Selecciona tipo de reporte <br>3. Define filtros y período <br>4. Sistema genera reporte <br>5. Visualiza y puede exportar</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Sin datos: informa y sugiere otro período</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Reporte generado</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+        </section>
+
+        <!-- ⚙️ Sistema Automatizado -->
+        <section id="cu-sistema" class="section">
+            <h2>⚙️ Sistema Automatizado</h2>
+            <p>Total: 11 casos de uso</p>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #8b5cf6;" id="cu-s01">
+                <h4 style="margin-top:0">CU-S01: Generar Número de Manifiesto</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Sistema</td></tr>
+                    <tr><th>Descripción</th><td>Asigna automáticamente un número único correlativo al crear un nuevo manifiesto.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Manifiesto en proceso de creación</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Usuario inicia creación de manifiesto <br>2. Sistema consulta último número asignado <br>3. Genera siguiente número correlativo con formato: AAAA-NNNNNN <br>4. Asigna número al manifiesto <br>5. Registra asignación en log</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Error de secuencia: sistema recupera y corrige</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Número único asignado <br>• Secuencia actualizada</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #8b5cf6;" id="cu-s02">
+                <h4 style="margin-top:0">CU-S02: Validar Datos de Manifiesto</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Sistema</td></tr>
+                    <tr><th>Descripción</th><td>Verifica automáticamente campos obligatorios, formato de datos y consistencia antes de permitir avanzar.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Manifiesto en edición <br>• Usuario intenta guardar o firmar</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Usuario solicita guardar/firmar <br>2. Sistema valida campos obligatorios <br>3. Valida formato de datos (CUIT, cantidades, fechas) <br>4. Verifica consistencia (transportista habilitado, operador compatible) <br>5. Si todo OK, permite continuar <br>6. Si hay errores, muestra lista detallada</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Errores encontrados: detalla cada uno para corrección</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Datos validados <br>• Usuario informado de errores si existen</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #8b5cf6;" id="cu-s03">
+                <h4 style="margin-top:0">CU-S03: Enviar Notificaciones Automáticas</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Sistema</td></tr>
+                    <tr><th>Descripción</th><td>Despacha alertas automáticas por email y push según eventos configurados en el sistema.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Evento que dispara notificación <br>• Destinatarios configurados</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Ocurre evento disparador <br>2. Sistema identifica regla de notificación <br>3. Genera contenido del mensaje <br>4. Determina destinatarios según configuración <br>5. Envía por canales habilitados (email, push) <br>6. Registra envío en log</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Canal no disponible: usa alternativo <br>• Envío fallido: reintenta 3 veces</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Notificaciones enviadas <br>• Envíos registrados</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #8b5cf6;" id="cu-s04">
+                <h4 style="margin-top:0">CU-S04: Registrar Auditoría</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Sistema</td></tr>
+                    <tr><th>Descripción</th><td>Log automático de todas las operaciones realizadas con timestamp, usuario, IP y datos afectados.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Operación realizada en el sistema</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Usuario realiza cualquier operación <br>2. Sistema captura: fecha/hora, usuario, IP, acción, módulo <br>3. Captura datos antes y después del cambio <br>4. Almacena en tabla de auditoría <br>5. Registro inmutable</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Error de registro: almacena en cola para retry</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Operación auditada <br>• Registro inmutable disponible</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #8b5cf6;" id="cu-s05">
+                <h4 style="margin-top:0">CU-S05: Sincronizar Datos Offline</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Sistema</td></tr>
+                    <tr><th>Descripción</th><td>Proceso de sincronización bidireccional de datos capturados sin conexión desde apps móviles.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• App reconecta después de operar offline <br>• Datos locales pendientes de sync</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. App detecta conexión disponible <br>2. Identifica registros pendientes de sincronización <br>3. Envía datos al servidor en orden cronológico <br>4. Servidor valida y procesa cada registro <br>5. Resuelve conflictos si existen <br>6. Actualiza app con datos del servidor <br>7. Confirma sincronización exitosa</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Conflicto de datos: aplica regla de resolución configurada <br>• Error de sync: reintenta automáticamente</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Datos sincronizados <br>• App y servidor en consistencia</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #8b5cf6;" id="cu-s06">
+                <h4 style="margin-top:0">CU-S06: Generar Código QR de Manifiesto</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Sistema</td></tr>
+                    <tr><th>Descripción</th><td>Crea automáticamente código QR único para cada manifiesto al momento de la firma.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Manifiesto firmado por generador</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Generador firma el manifiesto <br>2. Sistema genera string único con datos clave <br>3. Crea imagen QR codificando la información <br>4. Asocia QR al manifiesto <br>5. QR queda disponible para impresión y escaneo</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Error de generación: reintenta con algoritmo alternativo</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• QR generado y asociado <br>• QR incluido en PDF del manifiesto</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #8b5cf6;" id="cu-s07">
+                <h4 style="margin-top:0">CU-S07: Calcular Estadísticas del Dashboard</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Sistema</td></tr>
+                    <tr><th>Descripción</th><td>Actualiza periódicamente indicadores y métricas mostrados en los dashboards de cada rol.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Datos de manifiestos disponibles <br>• Proceso programado activo</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Proceso se ejecuta según programación (cada 5 min) <br>2. Consulta datos de manifiestos por estado <br>3. Calcula contadores y porcentajes <br>4. Actualiza caché de estadísticas <br>5. Dashboards consumen datos actualizados</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Error de cálculo: usa última versión válida</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Estadísticas actualizadas <br>• Dashboards reflejan datos recientes</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">Media</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #8b5cf6;" id="cu-s08">
+                <h4 style="margin-top:0">CU-S08: Detectar Anomalías en Transporte</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Sistema</td></tr>
+                    <tr><th>Descripción</th><td>Identifica automáticamente desvíos de ruta, tiempos excesivos y otros comportamientos anómalos.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Manifiesto en tránsito <br>• Tracking GPS activo</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Sistema recibe actualización de posición GPS <br>2. Compara con ruta esperada <br>3. Calcula tiempo transcurrido vs estimado <br>4. Si detecta anomalía, genera alerta <br>5. Notifica a DGFA y actores involucrados <br>6. Registra incidencia en el manifiesto</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Falsa alarma: administrador puede descartar con justificación</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Anomalías detectadas <br>• Alertas generadas si corresponde</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #8b5cf6;" id="cu-s09">
+                <h4 style="margin-top:0">CU-S09: Realizar Backup Automático</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Sistema</td></tr>
+                    <tr><th>Descripción</th><td>Ejecuta respaldo periódico de base de datos y archivos adjuntos del sistema.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Proceso programado configurado <br>• Almacenamiento de backup disponible</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Proceso se ejecuta según programación (diario) <br>2. Genera dump de base de datos <br>3. Copia archivos adjuntos nuevos/modificados <br>4. Comprime y cifra backup <br>5. Transfiere a almacenamiento secundario <br>6. Registra backup exitoso <br>7. Limpia backups antiguos según política de retención</td></tr>
+                    <tr><th>Flujo Alternativo</th><td><br>• Error de backup: notifica a administradores <br>• Espacio insuficiente: alerta crítica</td></tr>
+                    <tr><th>Postcondiciones</th><td><br>• Backup completado <br>• Datos protegidos ante pérdida</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #8b5cf6;" id="cu-s10">
+                <h4 style="margin-top:0">CU-S10: Orquestación mediante Motor BPMN</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Sistema</td></tr>
+                    <tr><th>Descripción</th><td>Uso de un motor de procesos basado en el estándar BPMN para gobernar el ciclo de vida del manifiesto.</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Proceso programado configurado <br>• Almacenamiento de backup disponible</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Sistema recibe solicitud de transición de estado (ej. "Firmar"). <br>2. Motor BPMN evalúa reglas de negocio vigentes. <br>3. Si la normativa cambia, se actualiza el diagrama BPMN sin modificar código fuente. <br>4. Motor avanza el token del proceso y dispara acciones.</td></tr>
+                    <tr><th>Flujo Alternativo</th><td>-</td></tr>
+                    <tr><th>Postcondiciones</th><td>-</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">BAJA</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #8b5cf6;" id="cu-s11">
+                <h4 style="margin-top:0">CU-S11: Gestión de Firma Digital Conjunta/Secuencial</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Sistema</td></tr>
+                    <tr><th>Descripción</th><td>Capacidad de gestionar múltiples firmas sobre un mismo documento PDF garantizando integridad (hash).</td></tr>
+                    <tr><th>Precondiciones</th><td><br>• Proceso programado configurado <br>• Almacenamiento de backup disponible</td></tr>
+                    <tr><th>Flujo Principal</th><td><br>1. Usuario A firma el documento. <br>2. Sistema aplica firma y recalcula hash, pero mantiene el documento "abierto" para siguientes firmas. <br>3. Sistema notifica a Usuario B (segundo firmante requerido por flujo BPMN). <br>4. Usuario B firma sobre el documento ya firmado por A. <br>5. Sistema valida cadena de confianza completa. <br>6. Cierre definitivo del PDF (Long Term Validation).</td></tr>
+                    <tr><th>Flujo Alternativo</th><td>-</td></tr>
+                    <tr><th>Postcondiciones</th><td>-</td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#22c55e">BAJA</strong></td></tr>
+                </table>
+            </div>
+        </section>
+
         </section>
 
         <footer
