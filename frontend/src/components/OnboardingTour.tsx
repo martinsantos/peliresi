@@ -345,6 +345,12 @@ const slidesAdmin: TourSlide[] = [
         color: '#10b981', previewType: 'welcome'
     },
     {
+        id: 'cambio-perfil', title: '⭐ CAMBIO DE PERFIL', subtitle: 'Función Importante',
+        description: 'Haz clic en tu nombre en la esquina superior derecha para cambiar entre roles: Administrador, Generador, Transportista u Operador.',
+        icon: <Users />, features: ['Menú superior derecha', '4 perfiles disponibles', 'Cambio instantáneo'],
+        color: '#f59e0b', previewType: 'dashboard'
+    },
+    {
         id: 'dashboard', title: 'Dashboard Ejecutivo', subtitle: 'Panel de Control CU-A02',
         description: 'KPIs actualizados: manifiestos activos, en tránsito, completados. Gráficos y alertas.',
         icon: <BarChart3 />, features: ['Métricas en tiempo real', 'Gráficos de tendencias', 'Alertas pendientes'],

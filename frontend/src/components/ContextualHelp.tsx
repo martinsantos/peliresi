@@ -25,12 +25,22 @@ interface ContextualHelpProps {
 const defaultHelpItems: Record<string, HelpItem[]> = {
     dashboard: [
         {
+            id: 'cambio-perfil', selector: '.user-menu, .user-dropdown, [class*="user"], .header-user, .dropdown-trigger',
+            title: '⭐ CAMBIO DE PERFIL',
+            description: 'Haz clic aquí para cambiar entre roles: Administrador, Generador, Transportista u Operador. Es la función más importante del sistema.',
+            position: 'bottom'
+        },
+        {
             id: 'welcome', selector: '.dashboard-welcome', title: 'Panel de Bienvenida',
             description: 'Resumen de tu actividad con accesos rápidos a las funciones principales.', position: 'bottom'
         },
         {
             id: 'stats', selector: '.stats-grid', title: 'Estadísticas en Tiempo Real',
             description: 'Contadores actualizados: manifiestos por estado, alertas pendientes.', position: 'bottom'
+        },
+        {
+            id: 'menu-lateral', selector: '.sidebar, nav', title: 'Menú de Navegación',
+            description: 'Accede a Manifiestos, Tracking GPS, Gestión de Actores, Reportes y más.', position: 'right'
         },
         {
             id: 'recent', selector: '.dashboard-section', title: 'Actividad Reciente',
