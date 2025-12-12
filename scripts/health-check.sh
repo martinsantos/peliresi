@@ -1,12 +1,14 @@
 #!/bin/bash
 # ============================================
-# SITREP Health Check Script
+# SITREP Health Check Script - v2.0
 # Sistema de Trazabilidad de Residuos Peligrosos
+# Monitoreo automático con alertas por email
 # ============================================
 
 BASE_URL="https://www.ultimamilla.com.ar/demoambiente"
+ALERT_ENDPOINT="https://viveroloscocos.com.ar/sitrep-alert.php"
 LOG_FILE="/var/log/sitrep-health.log"
-ADMIN_EMAIL="santosma@gmail.com"
+STATUS_FILE="/tmp/sitrep-last-status"
 
 # Rutas críticas a verificar
 ROUTES=(
@@ -17,57 +19,46 @@ ROUTES=(
     "manual/MANUAL_TUTORIAL.html"
 )
 
-# Colores
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
-
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 ALL_OK=true
 FAILED_ROUTES=""
 
-echo "============================================"
-echo "SITREP Health Check - $TIMESTAMP"
-echo "============================================"
-
+# Verificar cada ruta
 for route in "${ROUTES[@]}"; do
     URL="$BASE_URL/$route"
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$URL")
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$URL" 2>/dev/null)
     
     if [ "$HTTP_CODE" == "200" ]; then
-        echo -e "${GREEN}✓${NC} /$route - HTTP $HTTP_CODE"
+        echo "$TIMESTAMP - OK - /$route" >> "$LOG_FILE"
     else
-        echo -e "${RED}✗${NC} /$route - HTTP $HTTP_CODE (FAILED)"
         ALL_OK=false
-        FAILED_ROUTES="$FAILED_ROUTES /$route"
+        FAILED_ROUTES="$FAILED_ROUTES /$route($HTTP_CODE)"
+        echo "$TIMESTAMP - FAIL - /$route - HTTP $HTTP_CODE" >> "$LOG_FILE"
     fi
 done
 
-# Verificar assets recientes
-ASSETS_OK=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$BASE_URL/assets/" 2>/dev/null || echo "000")
-if [ "$ASSETS_OK" != "000" ]; then
-    echo -e "${GREEN}✓${NC} /assets - Accesible"
-else
-    echo -e "${YELLOW}⚠${NC} /assets - No verificable directamente"
-fi
-
-echo "============================================"
-
+# Procesar resultado
 if [ "$ALL_OK" = true ]; then
-    echo -e "${GREEN}Estado: TODOS LOS SERVICIOS OPERATIVOS${NC}"
-    echo "$TIMESTAMP - OK - All routes healthy" >> "$LOG_FILE"
+    # Todo OK - guardar estado
+    echo "OK" > "$STATUS_FILE"
+    echo "$TIMESTAMP - All services operational" >> "$LOG_FILE"
 else
-    echo -e "${RED}Estado: FALLAS DETECTADAS${NC}"
-    echo "Rutas con problemas:$FAILED_ROUTES"
-    echo "$TIMESTAMP - FAIL - Routes:$FAILED_ROUTES" >> "$LOG_FILE"
+    # Hay fallas - verificar si ya enviamos alerta recientemente
+    LAST_STATUS=$(cat "$STATUS_FILE" 2>/dev/null || echo "OK")
     
-    # Enviar alerta por email
-    if command -v mail &> /dev/null; then
-        echo "Alerta SITREP: Rutas caídas:$FAILED_ROUTES - $TIMESTAMP" | \
-            mail -s "[SITREP ALERTA] Servicio caído detectado" "$ADMIN_EMAIL"
-        echo "Alerta enviada a $ADMIN_EMAIL"
+    if [ "$LAST_STATUS" != "FAIL" ]; then
+        # Primer fallo detectado - enviar alerta
+        echo "FAIL" > "$STATUS_FILE"
+        echo "$TIMESTAMP - ALERT SENT - Routes:$FAILED_ROUTES" >> "$LOG_FILE"
+        
+        # Enviar alerta via PHP endpoint
+        ENCODED_ROUTES=$(echo "$FAILED_ROUTES" | sed 's/ /%20/g')
+        curl -s "$ALERT_ENDPOINT?routes=$ENCODED_ROUTES&message=Caida_detectada" > /dev/null 2>&1
+    else
+        # Ya estaba en fallo - no enviar alerta duplicada
+        echo "$TIMESTAMP - STILL FAILING - Routes:$FAILED_ROUTES (no duplicate alert)" >> "$LOG_FILE"
     fi
 fi
 
-echo "============================================"
+# Mantener log pequeño (últimas 1000 líneas)
+tail -1000 "$LOG_FILE" > "$LOG_FILE.tmp" 2>/dev/null && mv "$LOG_FILE.tmp" "$LOG_FILE" 2>/dev/null

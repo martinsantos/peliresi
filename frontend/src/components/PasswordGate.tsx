@@ -15,17 +15,18 @@ const PasswordGate: React.FC<PasswordGateProps> = ({ children }) => {
     const [password, setPassword] = useState('');
     const [error, setError] = useState(false);
 
-    // Función para notificar login exitoso
+    // Función para notificar login exitoso via PHP endpoint
     const notifyLogin = async () => {
         try {
-            await fetch('/demoambiente/api/notify-login.php', {
+            await fetch('https://viveroloscocos.com.ar/sitrep-notify.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ page: 'dashboard' })
+                body: JSON.stringify({})
             });
+            console.log('[SITREP] Notificación de acceso enviada');
         } catch {
             // Silent fail - no bloquear el acceso si la notificación falla
-            console.log('[SITREP] Notificación enviada');
+            console.log('[SITREP] Notificación fallida (silenciosa)');
         }
     };
 
