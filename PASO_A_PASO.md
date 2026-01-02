@@ -60,6 +60,15 @@ Servidor: 23.105.176.45
 - [x] Desplegar en `/var/www/sitrep-prod/`
 - [ ] Verificar funcionamiento ⭐ PENDIENTE DNS
 
+### Datos Seed Cargados ✅
+```
+usuarios:        8
+generadores:     3
+transportistas:  2
+operadores:      2
+tipos_residuos: 15
+```
+
 ### Fase 4: Testing - PENDIENTE
 - [ ] Configurar subdominio en proveedor DNS
 - [ ] Generar certificado SSL con certbot
