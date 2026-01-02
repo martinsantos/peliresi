@@ -73,3 +73,89 @@ export const hasRole = (...roles: string[]) => {
     next();
   };
 };
+
+// Alias para compatibilidad
+export const authMiddleware = isAuthenticated;
+
+// ============================================
+// Sistema de Permisos Granulares (CU-A04)
+// ============================================
+
+// Definición de permisos por rol
+const PERMISSIONS_BY_ROLE: Record<string, string[]> = {
+  ADMIN: [
+    'manifiestos:read', 'manifiestos:write', 'manifiestos:delete',
+    'usuarios:read', 'usuarios:write', 'usuarios:delete',
+    'generadores:read', 'generadores:write', 'generadores:delete',
+    'transportistas:read', 'transportistas:write', 'transportistas:delete',
+    'operadores:read', 'operadores:write', 'operadores:delete',
+    'reportes:read', 'reportes:export',
+    'auditoria:read',
+    'alertas:read', 'alertas:write',
+    'configuracion:read', 'configuracion:write'
+  ],
+  GENERADOR: [
+    'manifiestos:read', 'manifiestos:write',
+    'perfil:read', 'perfil:write',
+    'reportes:read'
+  ],
+  TRANSPORTISTA: [
+    'manifiestos:read', 'manifiestos:update-status',
+    'tracking:write',
+    'perfil:read', 'perfil:write'
+  ],
+  OPERADOR: [
+    'manifiestos:read', 'manifiestos:update-status', 'manifiestos:close',
+    'recepcion:write',
+    'tratamiento:write',
+    'certificados:write',
+    'perfil:read', 'perfil:write'
+  ]
+};
+
+/**
+ * Middleware para verificar permisos específicos
+ * @param requiredPermission - Permiso requerido en formato "recurso:accion"
+ */
+export const hasPermission = (requiredPermission: string) => {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return next(new AppError('No autorizado', 401));
+    }
+
+    const userRole = req.user.rol as string;
+    const userPermissions = PERMISSIONS_BY_ROLE[userRole] || [];
+
+    if (!userPermissions.includes(requiredPermission)) {
+      return next(
+        new AppError(`Permiso denegado: ${requiredPermission}`, 403)
+      );
+    }
+
+    next();
+  };
+};
+
+/**
+ * Middleware para verificar múltiples permisos (cualquiera de ellos)
+ */
+export const hasAnyPermission = (...permissions: string[]) => {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return next(new AppError('No autorizado', 401));
+    }
+
+    const userRole = req.user.rol as string;
+    const userPermissions = PERMISSIONS_BY_ROLE[userRole] || [];
+
+    const hasAny = permissions.some(p => userPermissions.includes(p));
+    if (!hasAny) {
+      return next(
+        new AppError(`Permisos insuficientes`, 403)
+      );
+    }
+
+    next();
+  };
+};
+

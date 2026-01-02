@@ -11,6 +11,7 @@ import reporteRoutes from './routes/reporte.routes';
 import actorRoutes from './routes/actor.routes';
 import notificationRoutes from './routes/notification.routes';
 import analyticsRoutes from './routes/analytics.routes';
+import syncRoutes from './routes/sync.routes';
 import { analyticsMiddleware, flushAnalytics } from './middlewares/analytics.middleware';
 
 // Inicializar la aplicación Express
@@ -45,6 +46,7 @@ app.use('/api/reportes', reporteRoutes);
 app.use('/api/actores', actorRoutes);
 app.use('/api', notificationRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/sync', syncRoutes);
 
 // Manejador de rutas no encontradas
 app.use(notFoundHandler);
