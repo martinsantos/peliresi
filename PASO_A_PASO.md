@@ -37,28 +37,32 @@ Servidor: 23.105.176.45
 
 ## Fases de Implementación
 
-### Fase 1: Infraestructura (Esta sesión)
+### Fase 1: Infraestructura (Esta sesión) ✅
 - [x] Crear rama `production/v1.0`
 - [x] Commit documentación de tareas
-- [ ] Configurar subdominio `sitrep.ultimamilla.com.ar`
-- [ ] Crear base de datos `sitrep_prod`
-- [ ] Configurar Nginx para nuevo dominio
-- [ ] Crear directorio `/var/www/sitrep-prod/`
-- [ ] Configurar PM2 para `sitrep-prod`
+- [x] Crear base de datos `sitrep_prod`
+- [x] Crear directorio `/var/www/sitrep-prod/`
+- [x] Crear directorio `/home/sitrep-prod/`
+- [x] Configurar Nginx para nuevo dominio
+- [x] Configurar PM2 para `sitrep-prod` (puerto 3011)
+- [ ] Configurar DNS para `sitrep.ultimamilla.com.ar` ⭐ PENDIENTE MANUAL
 
-### Fase 2: Backend (Rama production/v1.0)
-- [ ] Migrar esquema Prisma a nueva BD
-- [ ] Configurar `.env.production` con nuevas credenciales
-- [ ] Desplegar backend en puerto 3011
-- [ ] Verificar health check
+### Fase 2: Backend (Rama production/v1.0) ✅
+- [x] Crear `.env.sitrep-prod` con credenciales de producción
+- [x] Subir backend compilado a `/home/sitrep-prod/`
+- [x] Ejecutar `npm ci --production`
+- [x] Ejecutar `prisma migrate deploy` - 2 migraciones aplicadas
+- [x] Iniciar PM2 `sitrep-prod` - Verificado health check OK
 
-### Fase 3: Frontend (Rama production/v1.0)
-- [ ] Actualizar `VITE_API_URL` para nuevo dominio
-- [ ] Build de producción optimizado
-- [ ] Desplegar en `/var/www/sitrep-prod/`
-- [ ] Verificar funcionamiento
+### Fase 3: Frontend (Rama production/v1.0) ✅
+- [x] Actualizar `VITE_API_URL=https://sitrep.ultimamilla.com.ar/api`
+- [x] Build de producción (670KB JS, 146KB CSS)
+- [x] Desplegar en `/var/www/sitrep-prod/`
+- [ ] Verificar funcionamiento ⭐ PENDIENTE DNS
 
-### Fase 4: Testing
+### Fase 4: Testing - PENDIENTE
+- [ ] Configurar subdominio en proveedor DNS
+- [ ] Generar certificado SSL con certbot
 - [ ] Verificar casos de uso críticos
 - [ ] Tests E2E en nuevo dominio
 - [ ] Validar independencia de demo
