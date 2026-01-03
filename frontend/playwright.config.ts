@@ -24,8 +24,8 @@ export default defineConfig({
   
   /* Shared settings for all the projects below */
   use: {
-    /* Base URL for navegación */
-    baseURL: process.env.TEST_URL || 'https://www.ultimamilla.com.ar/demoambiente',
+    /* Base URL for navegación - Use SITREP production */
+    baseURL: process.env.TEST_URL || 'https://sitrep.ultimamilla.com.ar',
     
     /* Collect trace when retrying the failed test */
     trace: 'on-first-retry',

@@ -1,10 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
 import QRCode from 'qrcode';
+import prisma from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
-
-const prisma = new PrismaClient();
+import { config } from '../config/config';
 
 // Generar número de manifiesto único
 const generarNumeroManifiesto = async (): Promise<string> => {
@@ -151,12 +150,25 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
     const { transportistaId, operadorId, residuos, observaciones } = req.body;
     const userId = req.user.id;
 
-    // Verificar que el usuario es un generador
-    if (req.user.rol !== 'GENERADOR' || !req.user.generador) {
-      throw new AppError('Solo los generadores pueden crear manifiestos', 403);
+    // Determinar generadorId
+    let generadorId: string;
+    if (req.user.rol === 'ADMIN') {
+      generadorId = req.body.generadorId || (req.user.generador ? req.user.generador.id : null);
+      
+      // Fallback para ADMIN si no hay generadorId: tomar el primero que exista
+      if (!generadorId) {
+        const fallbackGenerador = await prisma.generador.findFirst({ select: { id: true } });
+        if (!fallbackGenerador) {
+          throw new AppError('No existen generadores registrados en el sistema', 400);
+        }
+        generadorId = fallbackGenerador.id;
+        console.log(`[ADMIN] Asignando generadorId fallback: ${generadorId}`);
+      }
+    } else if (req.user.rol === 'GENERADOR' && req.user.generador) {
+      generadorId = req.user.generador.id;
+    } else {
+      throw new AppError('Solo los generadores o administradores pueden crear manifiestos', 403);
     }
-
-    const generadorId = req.user.generador.id;
 
     // Generar número de manifiesto
     const numero = await generarNumeroManifiesto();
@@ -219,7 +231,11 @@ export const firmarManifiesto = async (req: AuthRequest, res: Response, next: Ne
     const userId = req.user.id;
 
     const manifiesto = await prisma.manifiesto.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        generador: true,
+        residuos: { include: { tipoResiduo: true } }
+      }
     });
 
     if (!manifiesto) {
@@ -230,21 +246,55 @@ export const firmarManifiesto = async (req: AuthRequest, res: Response, next: Ne
       throw new AppError('Solo se pueden firmar manifiestos en estado borrador', 400);
     }
 
-    // Generar código QR
-    const qrData = JSON.stringify({
-      numero: manifiesto.numero,
-      id: manifiesto.id,
-      timestamp: new Date().toISOString()
-    });
-    const qrCode = await QRCode.toDataURL(qrData);
+    // Obtener usuario firmante
+    const usuario = await prisma.usuario.findUnique({ where: { id: userId } });
+    if (!usuario) {
+      throw new AppError('Usuario no encontrado', 404);
+    }
 
-    // Actualizar manifiesto
+    // Generar contenido a firmar (resumen del manifiesto)
+    const contenidoFirma = JSON.stringify({
+      numero: manifiesto.numero,
+      generador: manifiesto.generador.razonSocial,
+      fecha: new Date().toISOString(),
+      residuos: manifiesto.residuos.map(r => ({
+        tipo: r.tipoResiduo.nombre,
+        cantidad: r.cantidad
+      }))
+    });
+
+    // Generar firma digital PKI simulada
+    const { signatureService } = await import('../services/signature.service');
+    const firmaDigital = signatureService.firmar(contenidoFirma, {
+      nombre: `${usuario.nombre} ${usuario.apellido || ''}`.trim(),
+      email: usuario.email,
+      cuit: usuario.cuit || undefined
+    });
+
+    // Generar código QR con URL de verificación única
+    const baseUrl = config.CORS_ORIGIN.split(',')[0].trim();
+    const verificationUrl = `${baseUrl}/manifiestos/${manifiesto.id}`;
+    
+    // El contenido del QR será la URL directa
+    const qrData = verificationUrl;
+    
+    let qrCode = '';
+    try {
+      qrCode = await QRCode.toDataURL(qrData);
+    } catch (qrErr) {
+      console.error('Error generating QR code:', qrErr);
+      // Fallback simple si falla la generación de imagen
+      qrCode = `data:text/plain;base64,${Buffer.from(qrData).toString('base64')}`;
+    }
+
+    // Actualizar manifiesto con firma digital
     const manifiestoActualizado = await prisma.manifiesto.update({
       where: { id },
       data: {
         estado: 'APROBADO',
         fechaFirma: new Date(),
-        qrCode
+        qrCode,
+        firmaDigital: firmaDigital as any  // JSON field
       },
       include: {
         generador: true,
@@ -263,14 +313,17 @@ export const firmarManifiesto = async (req: AuthRequest, res: Response, next: Ne
       data: {
         manifiestoId: id,
         tipo: 'FIRMA',
-        descripcion: 'Manifiesto firmado digitalmente por el generador',
+        descripcion: `Manifiesto firmado digitalmente. Certificado: ${firmaDigital.certificadoSerial}`,
         usuarioId: userId
       }
     });
 
     res.json({
       success: true,
-      data: { manifiesto: manifiestoActualizado }
+      data: { 
+        manifiesto: manifiestoActualizado,
+        firma: signatureService.formatearParaMostrar(firmaDigital)
+      }
     });
   } catch (error) {
     next(error);
@@ -284,8 +337,8 @@ export const confirmarRetiro = async (req: AuthRequest, res: Response, next: Nex
     const { latitud, longitud, observaciones } = req.body;
     const userId = req.user.id;
 
-    if (req.user.rol !== 'TRANSPORTISTA') {
-      throw new AppError('Solo los transportistas pueden confirmar retiros', 403);
+    if (req.user.rol !== 'TRANSPORTISTA' && req.user.rol !== 'ADMIN') {
+      throw new AppError('Solo los transportistas o administradores pueden confirmar retiros', 403);
     }
 
     const manifiesto = await prisma.manifiesto.findUnique({
@@ -391,8 +444,8 @@ export const confirmarEntrega = async (req: AuthRequest, res: Response, next: Ne
     const { latitud, longitud, observaciones } = req.body;
     const userId = req.user.id;
 
-    if (req.user.rol !== 'TRANSPORTISTA') {
-      throw new AppError('Solo los transportistas pueden confirmar entregas', 403);
+    if (req.user.rol !== 'TRANSPORTISTA' && req.user.rol !== 'ADMIN') {
+      throw new AppError('Solo los transportistas o administradores pueden confirmar entregas', 403);
     }
 
     const manifiesto = await prisma.manifiesto.findUnique({
@@ -449,8 +502,8 @@ export const confirmarRecepcion = async (req: AuthRequest, res: Response, next: 
     const { observaciones, pesoReal } = req.body;
     const userId = req.user.id;
 
-    if (req.user.rol !== 'OPERADOR') {
-      throw new AppError('Solo los operadores pueden confirmar recepciones', 403);
+    if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') {
+      throw new AppError('Solo los operadores o administradores pueden confirmar recepciones', 403);
     }
 
     const manifiesto = await prisma.manifiesto.findUnique({
@@ -505,8 +558,8 @@ export const cerrarManifiesto = async (req: AuthRequest, res: Response, next: Ne
     const { metodoTratamiento, observaciones } = req.body;
     const userId = req.user.id;
 
-    if (req.user.rol !== 'OPERADOR') {
-      throw new AppError('Solo los operadores pueden cerrar manifiestos', 403);
+    if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') {
+      throw new AppError('Solo los operadores o administradores pueden cerrar manifiestos', 403);
     }
 
     const manifiesto = await prisma.manifiesto.findUnique({
@@ -566,8 +619,8 @@ export const rechazarCarga = async (req: AuthRequest, res: Response, next: NextF
     const { motivo, descripcion, cantidadRechazada } = req.body;
     const userId = req.user.id;
 
-    if (req.user.rol !== 'OPERADOR') {
-      throw new AppError('Solo los operadores pueden rechazar cargas', 403);
+    if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') {
+      throw new AppError('Solo los operadores o administradores pueden rechazar cargas', 403);
     }
 
     const manifiesto = await prisma.manifiesto.findUnique({
@@ -622,8 +675,8 @@ export const registrarIncidente = async (req: AuthRequest, res: Response, next: 
     const { tipoIncidente, descripcion, latitud, longitud } = req.body;
     const userId = req.user.id;
 
-    if (req.user.rol !== 'TRANSPORTISTA') {
-      throw new AppError('Solo los transportistas pueden registrar incidentes', 403);
+    if (req.user.rol !== 'TRANSPORTISTA' && req.user.rol !== 'ADMIN') {
+      throw new AppError('Solo los transportistas o administradores pueden registrar incidentes', 403);
     }
 
     const manifiesto = await prisma.manifiesto.findUnique({
@@ -674,8 +727,8 @@ export const registrarTratamiento = async (req: AuthRequest, res: Response, next
     const { metodoTratamiento, fechaTratamiento, observaciones } = req.body;
     const userId = req.user.id;
 
-    if (req.user.rol !== 'OPERADOR') {
-      throw new AppError('Solo los operadores pueden registrar tratamientos', 403);
+    if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') {
+      throw new AppError('Solo los operadores o administradores pueden registrar tratamientos', 403);
     }
 
     const manifiesto = await prisma.manifiesto.findUnique({
@@ -729,8 +782,8 @@ export const registrarPesaje = async (req: AuthRequest, res: Response, next: Nex
     const { residuosPesados, observaciones } = req.body; // Array de { id: string, pesoReal: number }
     const userId = req.user.id;
 
-    if (req.user.rol !== 'OPERADOR') {
-      throw new AppError('Solo los operadores pueden registrar pesajes', 403);
+    if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') {
+      throw new AppError('Solo los operadores o administradores pueden registrar pesajes', 403);
     }
 
     const manifiesto = await prisma.manifiesto.findUnique({
@@ -897,9 +950,9 @@ export const getDashboardStats = async (req: AuthRequest, res: Response, next: N
 // Descarga tablas maestras para operación offline
 export const getSyncInicial = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    // Verificar que sea transportista u operador
-    if (req.user.rol !== 'TRANSPORTISTA' && req.user.rol !== 'OPERADOR') {
-      throw new AppError('Endpoint disponible solo para transportistas y operadores', 403);
+    // Verificar que sea transportista u operador o admin
+    if (req.user.rol !== 'TRANSPORTISTA' && req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') {
+      throw new AppError('Endpoint disponible solo para transportistas, operadores y administradores', 403);
     }
 
     // Obtener catálogo de residuos activos
@@ -1021,8 +1074,8 @@ export const getSyncInicial = async (req: AuthRequest, res: Response, next: Next
 // Validación QR offline contra lista pre-descargada
 export const getManifiestosEsperados = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (req.user.rol !== 'OPERADOR' || !req.user.operador) {
-      throw new AppError('Solo los operadores pueden acceder a esta función', 403);
+    if ((req.user.rol !== 'OPERADOR' || !req.user.operador) && req.user.rol !== 'ADMIN') {
+      throw new AppError('Solo los operadores o administradores pueden acceder a esta función', 403);
     }
 
     // Obtener manifiestos que están en camino o ya llegaron (pendientes de recepción)
@@ -1098,10 +1151,11 @@ export const getManifiestosEsperados = async (req: AuthRequest, res: Response, n
 // Validar QR de manifiesto (para validación offline/online) - CU-T08
 export const validarQR = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { qrData } = req.body;
+    // Aceptar tanto qrData como qrCode para compatibilidad
+    const qrData = req.body.qrData || req.body.qrCode;
 
     if (!qrData) {
-      throw new AppError('Datos de QR requeridos', 400);
+      throw new AppError('Datos de QR requeridos (qrData o qrCode)', 400);
     }
 
     // Intentar parsear el QR

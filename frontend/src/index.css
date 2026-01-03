@@ -628,3 +628,360 @@ tr:last-child td {
   display: flex;
   flex-direction: column;
 }
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* MOBILE RESPONSIVE - COMPREHENSIVE PWA OPTIMIZATION                          */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Mobile-first breakpoints:
+   - 480px: Small phones (iPhone SE)
+   - 640px: Large phones
+   - 768px: Tablets
+   - 1024px: Small laptops
+*/
+
+/* ========== MOBILE LARGE (max-width: 768px) ========== */
+@media (max-width: 768px) {
+  html {
+    font-size: 15px;
+  }
+
+  h1 { font-size: 1.75rem; }
+  h2 { font-size: 1.5rem; }
+  h3 { font-size: 1.25rem; }
+  h4 { font-size: 1.1rem; }
+
+  .card {
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+  }
+
+  /* Touch-friendly buttons */
+  .btn {
+    min-height: 44px;
+    padding: var(--space-3) var(--space-4);
+    font-size: 0.9375rem;
+  }
+
+  .btn-icon {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Tables scroll horizontally */
+  .table-container {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  th, td {
+    padding: var(--space-3);
+    font-size: 0.875rem;
+  }
+
+  /* Forms more spacious */
+  .form-input {
+    padding: var(--space-4);
+    font-size: 1rem;
+    min-height: 48px;
+  }
+
+  .form-select {
+    min-height: 48px;
+  }
+}
+
+/* ========== MOBILE SMALL (max-width: 480px) ========== */
+@media (max-width: 480px) {
+  html {
+    font-size: 14px;
+  }
+
+  h1 { font-size: 1.5rem; }
+  h2 { font-size: 1.35rem; }
+  h3 { font-size: 1.2rem; }
+
+  body {
+    line-height: 1.5;
+  }
+
+  .card {
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    margin-left: -0.25rem;
+    margin-right: -0.25rem;
+  }
+
+  .btn {
+    width: 100%;
+    justify-content: center;
+    font-size: 0.875rem;
+  }
+
+  .btn-icon {
+    width: auto;
+    min-width: 48px;
+  }
+
+  /* Badge smaller */
+  .badge {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+  }
+
+  /* Table cells compact */
+  th, td {
+    padding: var(--space-2);
+    font-size: 0.75rem;
+    white-space: nowrap;
+  }
+
+  /* Hide less important columns on mobile */
+  .hide-mobile {
+    display: none !important;
+  }
+
+  /* Stack header actions */
+  .flex.items-center.justify-between {
+    flex-direction: column;
+    gap: var(--space-3);
+    align-items: stretch;
+  }
+}
+
+/* ========== PWA SAFE AREA SUPPORT ========== */
+@supports (padding: env(safe-area-inset-bottom)) {
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* ========== TOUCH DEVICE OPTIMIZATIONS ========== */
+@media (hover: none) and (pointer: coarse) {
+  /* No hover effects on touch */
+  .btn:hover {
+    transform: none;
+  }
+
+  /* Larger touch targets */
+  .btn, button, a, input, select, textarea {
+    -webkit-tap-highlight-color: rgba(16, 185, 129, 0.2);
+  }
+
+  /* Prevent text selection on interactive elements */
+  .btn, button {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* ========== LANDSCAPE PHONE ========== */
+@media (max-height: 500px) and (orientation: landscape) {
+  .card {
+    padding: var(--space-2);
+  }
+
+  h1 { font-size: 1.25rem; }
+  h2 { font-size: 1.1rem; }
+}
+
+/* ========== MODAL MOBILE OPTIMIZATION ========== */
+@media (max-width: 640px) {
+  .modal-overlay, [class*="modal"] {
+    padding: var(--space-2);
+  }
+
+  .modal-content, [class*="modal-content"] {
+    max-height: 90vh;
+    max-width: 100%;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    margin: auto 0 0 0;
+  }
+}
+
+/* ========== IMPROVED SCROLLING ========== */
+html {
+  scroll-padding-top: 80px;
+}
+
+.scroll-smooth {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ========== LOADING STATES MOBILE ========== */
+.skeleton-loading {
+  background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--bg-secondary) 50%, var(--bg-tertiary) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ========== SIDEBAR MOBILE ========== */
+@media (max-width: 768px) {
+  .sidebar, [class*="sidebar"] {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 1000;
+    transform: translateX(-100%);
+    transition: transform var(--transition-normal);
+    width: 280px;
+    max-width: 85vw;
+  }
+
+  .sidebar.open, [class*="sidebar"].open {
+    transform: translateX(0);
+  }
+
+  .sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--transition-normal);
+  }
+
+  .sidebar-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+  }
+}
+
+/* ========== UTILITY MOBILE CLASSES ========== */
+.mobile-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+@media (min-width: 641px) {
+  .mobile-stack {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+.mobile-full {
+  width: 100%;
+}
+
+@media (min-width: 641px) {
+  .mobile-full {
+    width: auto;
+  }
+}
+
+/* ========== RESPONSIVE TABLES ========== */
+/* Tables convert to card layout on mobile */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-responsive table {
+  min-width: 100%;
+}
+
+@media (max-width: 768px) {
+  /* Card layout for tables on mobile */
+  .table-mobile-cards thead {
+    display: none;
+  }
+
+  .table-mobile-cards tbody {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .table-mobile-cards tr {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .table-mobile-cards td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-2) 0;
+    border: none;
+    border-bottom: 1px solid var(--border-color-light);
+  }
+
+  .table-mobile-cards td:last-child {
+    border-bottom: none;
+  }
+
+  .table-mobile-cards td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    flex-shrink: 0;
+    margin-right: var(--space-3);
+  }
+
+  .table-mobile-cards td .btn {
+    padding: var(--space-2) var(--space-3);
+    font-size: 0.75rem;
+  }
+
+  /* Scroll hint for regular tables */
+  .table-responsive::after {
+    content: '← Desliza →';
+    display: block;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    padding: var(--space-2);
+  }
+
+  .table-mobile-cards.table-responsive::after {
+    display: none;
+  }
+
+  /* Better touch targets */
+  .table-mobile-cards .btn,
+  .table-mobile-cards button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Status badges in mobile */
+  .table-mobile-cards .status-badge,
+  .table-mobile-cards .badge {
+    font-size: 0.7rem;
+    padding: 4px 8px;
+  }
+}
+
+/* ========== PRINT STYLES ========== */
+@media print {
+  body::before {
+    display: none;
+  }
+
+  .card {
+    border: 1px solid #ccc;
+    box-shadow: none;
+  }
+
+  .btn, .sidebar, .no-print {
+    display: none !important;
+  }
+}

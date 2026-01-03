@@ -12,7 +12,7 @@ export const pdfService = {
     },
 
     async descargarManifiestoPDF(id: string): Promise<void> {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('accessToken');
         const response = await fetch(`${api.defaults.baseURL}/pdf/manifiesto/${id}`, {
             headers: { Authorization: `Bearer ${token}` }
         });
@@ -28,7 +28,7 @@ export const pdfService = {
     },
 
     async descargarCertificadoPDF(id: string): Promise<void> {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('accessToken');
         const response = await fetch(`${api.defaults.baseURL}/pdf/certificado/${id}`, {
             headers: { Authorization: `Bearer ${token}` }
         });
@@ -88,7 +88,7 @@ export const reporteService = {
         fechaInicio?: string;
         fechaFin?: string;
     }): Promise<void> {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('accessToken');
         const queryString = params ? new URLSearchParams(params as Record<string, string>).toString() : '';
         const response = await fetch(`${api.defaults.baseURL}/reportes/exportar/${tipo}?${queryString}`, {
             headers: { Authorization: `Bearer ${token}` }

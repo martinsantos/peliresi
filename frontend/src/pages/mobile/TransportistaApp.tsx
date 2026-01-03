@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 import { manifiestoService } from '../../services/manifiesto.service';
 import { db } from '../../services/indexeddb';
 import api from '../../services/api';
@@ -14,7 +16,9 @@ import {
     Wifi,
     WifiOff,
     RefreshCw,
-    Download
+    Download,
+    X,
+    CheckCircle2
 } from 'lucide-react';
 import './TransportistaApp.css';
 
@@ -25,6 +29,10 @@ const TransportistaApp: React.FC = () => {
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [lastSync, setLastSync] = useState<Date | null>(null);
     const [syncing, setSyncing] = useState(false);
+    const [scannerActive, setScannerActive] = useState(false);
+    const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+    
+    const scannerRef = useRef<Html5QrcodeScanner | null>(null);
 
     // Mock data para demo visual inmediata
     const mockManifiestos = [
@@ -161,6 +169,83 @@ const TransportistaApp: React.FC = () => {
         }
     };
 
+    // Limpieza del scanner al desmontar
+    useEffect(() => {
+        return () => {
+            if (scannerRef.current) {
+                scannerRef.current.clear().catch(console.error);
+            }
+        };
+    }, []);
+
+    const startScanner = () => {
+        setScannerActive(true);
+        setTimeout(() => {
+            const scanner = new Html5QrcodeScanner(
+                "reader",
+                { fps: 10, qrbox: { width: 250, height: 250 } },
+                /* verbose= */ false
+            );
+            
+            scanner.render(onScanSuccess, onScanFailure);
+            scannerRef.current = scanner;
+        }, 100);
+    };
+
+    const stopScanner = () => {
+        if (scannerRef.current) {
+            scannerRef.current.clear().then(() => {
+                setScannerActive(false);
+                scannerRef.current = null;
+            }).catch(console.error);
+        } else {
+            setScannerActive(false);
+        }
+    };
+
+    const onScanSuccess = async (decodedText: string) => {
+        console.log(`Code matched = ${decodedText}`);
+        stopScanner();
+        
+        try {
+            const data = JSON.parse(decodedText);
+            if (data.id) {
+                handleAction(data.id, 'RETIRAR');
+            }
+        } catch (e) {
+            showActionMessage('error', 'Código QR no reconocido como manifiesto válido');
+        }
+    };
+
+    const onScanFailure = () => {
+        // Ignorar fallos de lectura continuos
+    };
+
+    const showActionMessage = (type: 'success' | 'error', text: string) => {
+        setActionMessage({ type, text });
+        setTimeout(() => setActionMessage(null), 4000);
+    };
+
+    const handleAction = async (id: string, action: 'RETIRAR' | 'ENTREGAR') => {
+        try {
+            setLoading(true);
+            const data = {}; // Podríamos agregar ubicación real aquí
+            if (action === 'RETIRAR') {
+                await manifiestoService.confirmarRetiro(id, data);
+                showActionMessage('success', 'Retiro iniciado correctamente');
+            } else {
+                await manifiestoService.confirmarEntrega(id, data);
+                showActionMessage('success', 'Entrega confirmada correctamente');
+            }
+            await loadData();
+        } catch (err) {
+            console.error('Error en acción:', err);
+            showActionMessage('error', 'Error al procesar la solicitud');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const filteredManifiestos = manifiestos.filter(m => {
         if (activeTab === 'pendientes') return m.estado === 'APROBADO';
         if (activeTab === 'en-curso') return m.estado === 'EN_TRANSITO';
@@ -170,7 +255,7 @@ const TransportistaApp: React.FC = () => {
     return (
         <div className="mobile-app animate-fadeIn">
             {/* App Header */}
-            <div className="mobile-header">
+            <header className="mobile-header">
                 <div className="header-top">
                     <div className="user-welcome">
                         <span>Hola,</span>
@@ -199,7 +284,7 @@ const TransportistaApp: React.FC = () => {
 
                     {lastSync && (
                         <div className="last-sync">
-                            Última sync: {lastSync.toLocaleTimeString()}
+                            {lastSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </div>
                     )}
 
@@ -219,118 +304,196 @@ const TransportistaApp: React.FC = () => {
 
                 {/* Stats Cards */}
                 <div className="mobile-stats">
-                    <div className="stat-card warning">
+                    <motion.div 
+                        className="stat-card warning"
+                        whileTap={{ scale: 0.95 }}
+                    >
                         <span className="stat-value">{manifiestos.filter(m => m.estado === 'APROBADO').length}</span>
                         <span className="stat-label">Retiros</span>
-                    </div>
-                    <div className="stat-card primary">
+                    </motion.div>
+                    <motion.div 
+                        className="stat-card primary"
+                        whileTap={{ scale: 0.95 }}
+                    >
                         <span className="stat-value">{manifiestos.filter(m => m.estado === 'EN_TRANSITO').length}</span>
                         <span className="stat-label">En Viaje</span>
-                    </div>
+                    </motion.div>
                 </div>
-            </div>
+            </header>
+
+            {/* Success/Error Message Overlay */}
+            <AnimatePresence>
+                {actionMessage && (
+                    <motion.div 
+                        className={`action-message ${actionMessage.type}`}
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                    >
+                        {actionMessage.type === 'success' ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
+                        <span>{actionMessage.text}</span>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* QR Scanner Overlay */}
+            <AnimatePresence>
+                {scannerActive && (
+                    <motion.div 
+                        className="scanner-overlay"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                    >
+                        <div className="scanner-container">
+                            <div className="scanner-header">
+                                <h3>Escaneando Manifiesto</h3>
+                                <button onClick={stopScanner} className="close-scanner">
+                                    <X size={24} />
+                                </button>
+                            </div>
+                            <div id="reader"></div>
+                            <p className="scanner-hint">Apunta con la cámara al código QR del manifiesto</p>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Tabs */}
             <div className="mobile-tabs">
-                <button
-                    className={`tab-btn ${activeTab === 'pendientes' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('pendientes')}
-                >
-                    Pendientes
-                </button>
-                <button
-                    className={`tab-btn ${activeTab === 'en-curso' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('en-curso')}
-                >
-                    En Curso
-                </button>
-                <button
-                    className={`tab-btn ${activeTab === 'historial' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('historial')}
-                >
-                    Historial
-                </button>
+                {(['pendientes', 'en-curso', 'historial'] as const).map((tab) => (
+                    <button
+                        key={tab}
+                        className={`tab-btn ${activeTab === tab ? 'active' : ''}`}
+                        onClick={() => setActiveTab(tab)}
+                    >
+                        {tab.charAt(0).toUpperCase() + tab.slice(1).replace('-', ' ')}
+                        {activeTab === tab && (
+                            <motion.div 
+                                className="tab-indicator" 
+                                layoutId="tab-indicator"
+                            />
+                        )}
+                    </button>
+                ))}
             </div>
 
             {/* Content List */}
-            <div className="mobile-content">
-                {loading ? (
-                    <div className="mobile-loading">Cargando...</div>
+            <main className="mobile-content">
+                {loading && manifiestos.length === 0 ? (
+                    <div className="mobile-loading">
+                        <RefreshCw className="spinning" size={32} />
+                        <p>Cargando datos...</p>
+                    </div>
                 ) : (
                     <div className="cards-list">
-                        {filteredManifiestos.map((m) => (
-                            <div key={m.id} className="mobile-card">
-                                <div className="card-header">
-                                    <span className="card-id">#{m.numero.split('-')[1]}</span>
-                                    <span className={`status-badge ${m.estado.toLowerCase()}`}>
-                                        {m.estado.replace('_', ' ')}
-                                    </span>
-                                </div>
-
-                                <div className="card-body">
-                                    <div className="info-row">
-                                        <MapPin size={16} className="icon-muted" />
-                                        <div className="info-text">
-                                            <span className="label">Origen</span>
-                                            <p>{m.generador?.domicilio}</p>
-                                        </div>
+                        <AnimatePresence mode="popLayout">
+                            {filteredManifiestos.map((m) => (
+                                <motion.div 
+                                    key={m.id} 
+                                    className={`mobile-card ${m.estado.toLowerCase()}`}
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: 20 }}
+                                    layout
+                                >
+                                    <div className="card-header">
+                                        <span className="card-id">#{m.numero.split('-')?.[1] || m.numero}</span>
+                                        <span className={`status-badge ${m.estado.toLowerCase()}`}>
+                                            {m.estado.replace('_', ' ')}
+                                        </span>
                                     </div>
 
-                                    {m.estado === 'EN_TRANSITO' && (
+                                    <div className="card-body">
                                         <div className="info-row">
-                                            <Navigation size={16} className="icon-muted" />
+                                            <MapPin size={16} className="icon-muted" />
                                             <div className="info-text">
-                                                <span className="label">Destino</span>
-                                                <p>{m.operador?.domicilio}</p>
+                                                <span className="label">Origen</span>
+                                                <p>{m.generador?.razonSocial}</p>
+                                                <span className="address">{m.generador?.domicilio}</span>
                                             </div>
                                         </div>
-                                    )}
 
-                                    <div className="info-row">
-                                        <Package size={16} className="icon-muted" />
-                                        <div className="info-text">
-                                            <span className="label">Carga</span>
-                                            <p>{m.residuos?.[0]?.tipoResiduo?.nombre} ({m.residuos?.[0]?.cantidad} {m.residuos?.[0]?.unidad})</p>
+                                        {m.estado === 'EN_TRANSITO' && (
+                                            <div className="info-row">
+                                                <Navigation size={16} className="icon-muted" />
+                                                <div className="info-text">
+                                                    <span className="label">Destino</span>
+                                                    <p>{m.operador?.razonSocial}</p>
+                                                    <span className="address">{m.operador?.domicilio}</span>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="info-row">
+                                            <Package size={16} className="icon-muted" />
+                                            <div className="info-text">
+                                                <span className="label">Residuos</span>
+                                                <p>{m.residuos?.[0]?.tipoResiduo?.nombre || 'Ver detalle'}</p>
+                                                <span className="quantity">{m.residuos?.[0]?.cantidad} {m.residuos?.[0]?.unidad}</span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
 
-                                <div className="card-footer">
-                                    {m.estado === 'APROBADO' && (
-                                        <button className="btn-mobile primary">
-                                            Iniciar Retiro
-                                            <ChevronRight size={18} />
-                                        </button>
-                                    )}
-                                    {m.estado === 'EN_TRANSITO' && (
-                                        <div className="action-buttons-row">
-                                            <button className="btn-mobile warning small">
-                                                <AlertTriangle size={18} />
-                                                Incidente
-                                            </button>
-                                            <button className="btn-mobile success small">
-                                                <Navigation size={18} />
-                                                Llegada
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
+                                    <div className="card-footer">
+                                        {m.estado === 'APROBADO' && (
+                                            <motion.button 
+                                                className="btn-mobile primary"
+                                                whileTap={{ scale: 0.98 }}
+                                                onClick={() => handleAction(m.id, 'RETIRAR')}
+                                            >
+                                                Iniciar Retiro
+                                                <ChevronRight size={18} />
+                                            </motion.button>
+                                        )}
+                                        {m.estado === 'EN_TRANSITO' && (
+                                            <div className="action-buttons-row">
+                                                <motion.button 
+                                                    className="btn-mobile warning small"
+                                                    whileTap={{ scale: 0.95 }}
+                                                >
+                                                    <AlertTriangle size={18} />
+                                                    Incidente
+                                                </motion.button>
+                                                <motion.button 
+                                                    className="btn-mobile success small"
+                                                    whileTap={{ scale: 0.95 }}
+                                                    onClick={() => handleAction(m.id, 'ENTREGAR')}
+                                                >
+                                                    <CheckCircle2 size={18} />
+                                                    Entregar
+                                                </motion.button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </AnimatePresence>
 
                         {filteredManifiestos.length === 0 && (
-                            <div className="empty-state">
+                            <motion.div 
+                                className="empty-state"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                            >
+                                <Package size={48} className="icon-muted" />
                                 <p>No hay manifiestos en esta sección</p>
-                            </div>
+                            </motion.div>
                         )}
                     </div>
                 )}
-            </div>
+            </main>
 
             {/* Floating Action Button (FAB) - CU-T08 */}
-            <button className="fab-scan" title="Escanear QR (CU-T08)">
+            <motion.button 
+                className="fab-scan" 
+                title="Escanear QR (CU-T08)"
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={startScanner}
+            >
                 <QrCode size={24} />
-            </button>
+            </motion.button>
         </div>
     );
 };

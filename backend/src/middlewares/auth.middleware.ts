@@ -64,7 +64,15 @@ export const hasRole = (...roles: string[]) => {
       return next(new AppError('No autorizado', 401));
     }
 
+    // El Super Administrador (ADMIN) siempre tiene acceso
+    if (req.user.rol === 'ADMIN') {
+      console.log(`[AUTH] Bypass ADMIN para usuario: ${req.user.email}`);
+      return next();
+    }
+
+    console.log(`[AUTH] Verificando rol. Usuario: ${req.user.email}, Rol actual: "${req.user.rol}", Roles requeridos: ${JSON.stringify(roles)}`);
     if (!roles.includes(req.user.rol)) {
+      console.log(`[AUTH] 403 Forbidden para ${req.user.email}. El rol "${req.user.rol}" no está en ${JSON.stringify(roles)}`);
       return next(
         new AppError('No tiene permisos para realizar esta acción', 403)
       );

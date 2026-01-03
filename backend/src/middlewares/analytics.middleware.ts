@@ -1,8 +1,6 @@
 // Analytics Middleware - Tracks all API requests for superadmin stats
 import { Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '../lib/prisma';
 
 interface AnalyticsData {
     timestamp: Date;

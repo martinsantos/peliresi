@@ -29,63 +29,7 @@ const Manifiestos: React.FC = () => {
         pages: 1
     });
 
-    // Demo manifiestos fallback
-    const demoManifiestos: Manifiesto[] = [
-        {
-            id: '1',
-            numero: 'MAN-2025-000005',
-            estado: 'APROBADO',
-            generador: { razonSocial: 'Química Industrial Mendoza', cuit: '30-71234567-8' },
-            transportista: { razonSocial: 'Transportes Los Andes S.A.', cuit: '30-71234568-9' },
-            operador: { razonSocial: 'Centro de Tratamiento Cuyo', cuit: '30-71234569-0' },
-            createdAt: new Date('2025-12-05').toISOString()
-        } as Manifiesto,
-        {
-            id: '2',
-            numero: 'MAN-2025-000006',
-            estado: 'EN_TRANSITO',
-            generador: { razonSocial: 'Hospital Central Mendoza', cuit: '30-71234570-1' },
-            transportista: { razonSocial: 'Logística Cuyo S.R.L.', cuit: '30-71234571-2' },
-            operador: { razonSocial: 'Planta Este Residuos', cuit: '30-71234572-3' },
-            createdAt: new Date('2025-12-06').toISOString()
-        } as Manifiesto,
-        {
-            id: '3',
-            numero: 'MAN-2025-000007',
-            estado: 'RECIBIDO',
-            generador: { razonSocial: 'Petroandina S.A.', cuit: '30-71234573-4' },
-            transportista: { razonSocial: 'Transportes Los Andes S.A.', cuit: '30-71234568-9' },
-            operador: { razonSocial: 'Centro de Tratamiento Cuyo', cuit: '30-71234569-0' },
-            createdAt: new Date('2025-12-04').toISOString()
-        } as Manifiesto,
-        {
-            id: '4',
-            numero: 'MAN-2025-000008',
-            estado: 'TRATADO',
-            generador: { razonSocial: 'Farmacéutica Los Andes', cuit: '30-71234574-5' },
-            transportista: { razonSocial: 'Logística Cuyo S.R.L.', cuit: '30-71234571-2' },
-            operador: { razonSocial: 'Planta Este Residuos', cuit: '30-71234572-3' },
-            createdAt: new Date('2025-12-01').toISOString()
-        } as Manifiesto,
-        {
-            id: '5',
-            numero: 'MAN-2025-000009',
-            estado: 'APROBADO',
-            generador: { razonSocial: 'Metalúrgica del Oeste', cuit: '30-71234575-6' },
-            transportista: { razonSocial: 'Transportes Los Andes S.A.', cuit: '30-71234568-9' },
-            operador: { razonSocial: 'Centro de Tratamiento Cuyo', cuit: '30-71234569-0' },
-            createdAt: new Date('2025-12-07').toISOString()
-        } as Manifiesto,
-        {
-            id: '6',
-            numero: 'MAN-2025-000010',
-            estado: 'EN_TRANSITO',
-            generador: { razonSocial: 'Laboratorio Análisis S.A.', cuit: '30-71234576-7' },
-            transportista: { razonSocial: 'Logística Cuyo S.R.L.', cuit: '30-71234571-2' },
-            operador: { razonSocial: 'Planta Este Residuos', cuit: '30-71234572-3' },
-            createdAt: new Date('2025-12-07').toISOString()
-        } as Manifiesto,
-    ];
+
 
     useEffect(() => {
         loadManifiestos();
@@ -105,15 +49,8 @@ const Manifiestos: React.FC = () => {
                 ...data.pagination
             }));
         } catch (err: any) {
-            console.error('Error loading manifiestos, using demo data:', err);
-            // Usar datos demo en caso de error
-            setManifiestos(demoManifiestos);
-            setPagination(prev => ({
-                ...prev,
-                total: demoManifiestos.length,
-                pages: Math.ceil(demoManifiestos.length / prev.limit)
-            }));
-            setError('');  // No mostrar error, solo usar datos demo
+            console.error('Error loading manifiestos:', err);
+            setError('Error al cargar la lista de manifiestos. Por favor intente más tarde.');
         } finally {
             setLoading(false);
         }

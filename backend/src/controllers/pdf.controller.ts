@@ -1,12 +1,63 @@
 import { Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
 import PDFDocument from 'pdfkit';
+import prisma from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 
-const prisma = new PrismaClient();
+// Colores del tema
+const COLORS = {
+    primary: '#10B981',
+    primaryDark: '#059669',
+    secondary: '#1E293B',
+    accent: '#3B82F6',
+    gray: '#64748B',
+    lightGray: '#F1F5F9',
+    text: '#1E293B',
+    textLight: '#64748B',
+    border: '#E2E8F0',
+    white: '#FFFFFF',
+    success: '#22C55E',
+    warning: '#F59E0B',
+};
 
-// Generar PDF del Manifiesto (CU-G10)
+// Helper para dibujar rectángulo
+function drawRect(doc: any, x: number, y: number, w: number, h: number, color: string, radius = 0) {
+    doc.save();
+    doc.fillColor(color);
+    if (radius > 0) {
+        doc.roundedRect(x, y, w, h, radius).fill();
+    } else {
+        doc.rect(x, y, w, h).fill();
+    }
+    doc.restore();
+}
+
+// Helper para sección con título compacto
+function drawSectionHeader(doc: any, title: string, x: number, y: number, width: number): number {
+    drawRect(doc, x, y, width, 20, COLORS.secondary, 3);
+    doc.save();
+    doc.fillColor(COLORS.white).fontSize(9).font('Helvetica-Bold');
+    doc.text(title, x + 8, y + 5);
+    doc.restore();
+    return y + 22;
+}
+
+// Helper para campo compacto - FIXED SPACING
+function drawFieldCompact(doc: any, label: string, value: string, x: number, y: number): number {
+    doc.save();
+    // Label en posición fija
+    doc.fontSize(9).font('Helvetica-Bold').fillColor(COLORS.textLight);
+    doc.text(label, x, y, { width: 95, lineBreak: false });
+    // Valor en posición separada
+    doc.font('Helvetica').fillColor(COLORS.text);
+    const displayValue = value || 'N/A';
+    doc.text(displayValue, x + 100, y, { width: 380, lineBreak: false });
+    doc.restore();
+    return y + 16; // Aumentado de 12 a 16 para mejor espaciado
+}
+
+
+// Generar PDF del Manifiesto - DISEÑO COMPACTO UNA PÁGINA
 export const generarPDFManifiesto = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const { id } = req.params;
@@ -16,20 +67,11 @@ export const generarPDFManifiesto = async (req: AuthRequest, res: Response, next
             include: {
                 generador: true,
                 transportista: {
-                    include: {
-                        vehiculos: true,
-                        choferes: true
-                    }
+                    include: { vehiculos: true, choferes: true }
                 },
                 operador: true,
-                residuos: {
-                    include: {
-                        tipoResiduo: true
-                    }
-                },
-                eventos: {
-                    orderBy: { createdAt: 'asc' }
-                }
+                residuos: { include: { tipoResiduo: true } },
+                eventos: { orderBy: { createdAt: 'asc' } }
             }
         });
 
@@ -37,173 +79,169 @@ export const generarPDFManifiesto = async (req: AuthRequest, res: Response, next
             throw new AppError('Manifiesto no encontrado', 404);
         }
 
-        // Crear documento PDF
-        const doc = new PDFDocument({
-            margin: 50,
-            size: 'A4'
-        });
-
-        // Configurar respuesta HTTP
+        const doc = new PDFDocument({ margin: 30, size: 'A4' });
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=manifiesto_${manifiesto.numero}.pdf`);
         doc.pipe(res);
 
-        // --- ENCABEZADO ---
-        doc.fontSize(18).font('Helvetica-Bold')
-            .text('MANIFIESTO DE TRANSPORTE DE RESIDUOS PELIGROSOS', { align: 'center' });
+        const pageWidth = doc.page.width;
+        const contentWidth = pageWidth - 60;
+        let y = 25;
 
-        doc.moveDown(0.5);
-        doc.fontSize(12).font('Helvetica')
-            .text('Ley Nacional 24.051 - Decreto Reglamentario 831/93', { align: 'center' });
+        // ═══ ENCABEZADO COMPACTO ═══
+        drawRect(doc, 0, 0, pageWidth, 6, COLORS.primary);
+        
+        // Header con número y estado
+        drawRect(doc, 30, 15, contentWidth, 55, COLORS.lightGray, 6);
+        
+        doc.save();
+        doc.fontSize(14).font('Helvetica-Bold').fillColor(COLORS.secondary);
+        doc.text('MANIFIESTO DE TRANSPORTE', 40, 22);
+        doc.fontSize(10).fillColor(COLORS.gray);
+        doc.text('RESIDUOS PELIGROSOS - Ley 24.051', 40, 40);
+        doc.restore();
 
-        doc.moveDown(0.3);
-        doc.fontSize(10)
-            .text('Dirección de Gestión y Fiscalización Ambiental - Provincia de Mendoza', { align: 'center' });
+        // Badge número
+        drawRect(doc, pageWidth - 145, 20, 110, 22, COLORS.primary, 4);
+        doc.save();
+        doc.fillColor(COLORS.white).fontSize(10).font('Helvetica-Bold');
+        doc.text(manifiesto.numero, pageWidth - 140, 26, { width: 100, align: 'center' });
+        doc.restore();
 
-        doc.moveDown();
+        // Badge estado
+        const estadoColor = manifiesto.estado === 'TRATADO' ? COLORS.success : 
+                           manifiesto.estado === 'EN_TRANSITO' ? COLORS.warning : COLORS.accent;
+        drawRect(doc, pageWidth - 145, 45, 110, 18, estadoColor, 4);
+        doc.save();
+        doc.fillColor(COLORS.white).fontSize(8).font('Helvetica-Bold');
+        doc.text(manifiesto.estado.replace('_', ' '), pageWidth - 140, 49, { width: 100, align: 'center' });
+        doc.restore();
 
-        // Número y estado
-        doc.fontSize(14).font('Helvetica-Bold')
-            .text(`Manifiesto N°: ${manifiesto.numero}`, { align: 'center' });
-        doc.fontSize(11).font('Helvetica')
-            .text(`Estado: ${manifiesto.estado}`, { align: 'center' });
+        y = 78;
 
-        doc.moveDown(1.5);
+        // ═══ SECCIÓN 1: GENERADOR ═══
+        y = drawSectionHeader(doc, '1. GENERADOR', 30, y, contentWidth);
+        y = drawFieldCompact(doc, 'Razón Social:', manifiesto.generador?.razonSocial || 'N/A', 35, y);
+        y = drawFieldCompact(doc, 'CUIT:', manifiesto.generador?.cuit || 'N/A', 35, y);
+        y = drawFieldCompact(doc, 'Domicilio:', manifiesto.generador?.domicilio || 'N/A', 35, y);
+        y = drawFieldCompact(doc, 'N° Inscripción:', manifiesto.generador?.numeroInscripcion || 'N/A', 35, y);
+        y += 5;
 
-        // --- DATOS DEL GENERADOR ---
-        doc.fontSize(12).font('Helvetica-Bold')
-            .text('1. DATOS DEL GENERADOR', { underline: true });
-        doc.moveDown(0.5);
-        doc.fontSize(10).font('Helvetica');
-        doc.text(`Razón Social: ${manifiesto.generador.razonSocial}`);
-        doc.text(`CUIT: ${manifiesto.generador.cuit}`);
-        doc.text(`Domicilio: ${manifiesto.generador.domicilio}`);
-        doc.text(`N° Inscripción: ${manifiesto.generador.numeroInscripcion || 'N/A'}`);
-        doc.text(`Categoría: ${manifiesto.generador.categoria || 'N/A'}`);
+        // ═══ SECCIÓN 2: TRANSPORTISTA ═══
+        y = drawSectionHeader(doc, '2. TRANSPORTISTA', 30, y, contentWidth);
+        y = drawFieldCompact(doc, 'Razón Social:', manifiesto.transportista?.razonSocial || 'N/A', 35, y);
+        y = drawFieldCompact(doc, 'CUIT:', manifiesto.transportista?.cuit || 'N/A', 35, y);
+        if (manifiesto.transportista?.vehiculos?.[0]) {
+            const v = manifiesto.transportista.vehiculos[0];
+            y = drawFieldCompact(doc, 'Vehículo:', `${v.marca} ${v.modelo} - ${v.patente}`, 35, y);
+        }
+        if (manifiesto.transportista?.choferes?.[0]) {
+            const c = manifiesto.transportista.choferes[0];
+            y = drawFieldCompact(doc, 'Chofer:', `${c.nombre} - DNI: ${c.dni}`, 35, y);
+        }
+        y += 5;
 
-        doc.moveDown();
+        // ═══ SECCIÓN 3: OPERADOR ═══
+        y = drawSectionHeader(doc, '3. OPERADOR', 30, y, contentWidth);
+        y = drawFieldCompact(doc, 'Razón Social:', manifiesto.operador?.razonSocial || 'N/A', 35, y);
+        y = drawFieldCompact(doc, 'CUIT:', manifiesto.operador?.cuit || 'N/A', 35, y);
+        y = drawFieldCompact(doc, 'N° Habilitación:', manifiesto.operador?.numeroHabilitacion || 'N/A', 35, y);
+        y += 5;
 
-        // --- DATOS DEL TRANSPORTISTA ---
-        doc.fontSize(12).font('Helvetica-Bold')
-            .text('2. DATOS DEL TRANSPORTISTA', { underline: true });
-        doc.moveDown(0.5);
-        doc.fontSize(10).font('Helvetica');
-        doc.text(`Razón Social: ${manifiesto.transportista.razonSocial}`);
-        doc.text(`CUIT: ${manifiesto.transportista.cuit}`);
-        doc.text(`N° Habilitación: ${manifiesto.transportista.numeroHabilitacion || 'N/A'}`);
+        // ═══ SECCIÓN 4: RESIDUOS (TABLA COMPACTA) ═══
+        y = drawSectionHeader(doc, '4. RESIDUOS PELIGROSOS', 30, y, contentWidth);
+        
+        // Encabezado tabla
+        const cols = [30, 100, 360, 430, 490];
+        drawRect(doc, 30, y, contentWidth, 16, COLORS.secondary);
+        doc.save();
+        doc.fillColor(COLORS.white).fontSize(7).font('Helvetica-Bold');
+        doc.text('CÓDIGO', cols[0] + 5, y + 4);
+        doc.text('DESCRIPCIÓN', cols[1] + 5, y + 4);
+        doc.text('CANTIDAD', cols[2] + 5, y + 4);
+        doc.text('UND', cols[3] + 5, y + 4);
+        doc.text('PELIGRO', cols[4] + 5, y + 4);
+        doc.restore();
+        y += 16;
 
-        if (manifiesto.transportista.vehiculos && manifiesto.transportista.vehiculos.length > 0) {
-            const vehiculo = manifiesto.transportista.vehiculos[0];
-            doc.text(`Vehículo: ${vehiculo.marca} ${vehiculo.modelo} - Patente: ${vehiculo.patente}`);
+        // Filas compactas
+        for (let i = 0; i < Math.min(manifiesto.residuos.length, 5); i++) {
+            const residuo = manifiesto.residuos[i];
+            if (!residuo.tipoResiduo) continue;
+            const bg = i % 2 === 0 ? COLORS.white : COLORS.lightGray;
+            drawRect(doc, 30, y, contentWidth, 14, bg);
+            doc.save();
+            doc.fontSize(7).fillColor(COLORS.text);
+            doc.text(residuo.tipoResiduo.codigo || 'N/A', cols[0] + 5, y + 4, { width: 65 });
+            doc.text(residuo.tipoResiduo.nombre?.substring(0, 40) || '-', cols[1] + 5, y + 4, { width: 255 });
+            doc.text(String(residuo.cantidad || 0), cols[2] + 5, y + 4, { width: 65 });
+            doc.text(residuo.unidad || 'u', cols[3] + 5, y + 4, { width: 55 });
+            doc.text(residuo.tipoResiduo.peligrosidad || '-', cols[4] + 5, y + 4, { width: 60 });
+            doc.restore();
+            y += 14;
+        }
+        y += 8;
+
+        // ═══ SECCIÓN 5: FECHAS Y QR (LADO A LADO) ═══
+        y = drawSectionHeader(doc, '5. TRAZABILIDAD Y VERIFICACIÓN', 30, y, contentWidth);
+        
+        const fechaFormat = (d: Date | null | undefined) => d ? new Date(d).toLocaleDateString('es-AR') : '---';
+        
+        // Columna izquierda: fechas
+        const fechaY = y;
+        doc.save();
+        doc.fontSize(8).font('Helvetica').fillColor(COLORS.text);
+        doc.text(`Creación: ${fechaFormat(manifiesto.createdAt)}`, 35, fechaY);
+        doc.text(`Firma: ${fechaFormat(manifiesto.fechaFirma)}`, 35, fechaY + 12);
+        doc.text(`Retiro: ${fechaFormat(manifiesto.fechaRetiro)}`, 35, fechaY + 24);
+        doc.text(`Entrega: ${fechaFormat(manifiesto.fechaEntrega)}`, 180, fechaY);
+        doc.text(`Recepción: ${fechaFormat(manifiesto.fechaRecepcion)}`, 180, fechaY + 12);
+        doc.text(`Cierre: ${fechaFormat(manifiesto.fechaCierre)}`, 180, fechaY + 24);
+        doc.restore();
+
+        // Columna derecha: QR
+        if (manifiesto.qrCode && manifiesto.qrCode.includes(',')) {
+            try {
+                const qrParts = manifiesto.qrCode.split(',');
+                if (qrParts.length > 1) {
+                    const qrImage = Buffer.from(qrParts[1], 'base64');
+                    doc.image(qrImage, pageWidth - 130, fechaY - 5, { width: 70, height: 70 });
+                    doc.save();
+                    doc.fontSize(6).fillColor(COLORS.textLight);
+                    doc.text('Escanear para verificar', pageWidth - 130, fechaY + 68, { width: 70, align: 'center' });
+                    doc.restore();
+                }
+            } catch (e) {
+                console.error('Error QR:', e);
+            }
         }
 
-        if (manifiesto.transportista.choferes && manifiesto.transportista.choferes.length > 0) {
-            const chofer = manifiesto.transportista.choferes[0];
-            doc.text(`Chofer: ${chofer.nombre} - DNI: ${chofer.dni}`);
+        // Firma digital si existe
+        const firmaDigital = manifiesto.firmaDigital as any;
+        if (firmaDigital) {
+            doc.save();
+            doc.fontSize(7).fillColor(COLORS.textLight);
+            doc.text(`Firma PKI: ${firmaDigital.certificadoSerial || 'N/A'}`, 320, fechaY);
+            doc.text(`Firmante: ${firmaDigital.titular?.substring(0, 30) || 'N/A'}`, 320, fechaY + 10);
+            doc.restore();
+            
+            // Badge validez
+            drawRect(doc, 320, fechaY + 22, 50, 14, COLORS.success, 3);
+            doc.save();
+            doc.fillColor(COLORS.white).fontSize(7).font('Helvetica-Bold');
+            doc.text('VÁLIDO', 325, fechaY + 26);
+            doc.restore();
         }
 
-        doc.moveDown();
+        y = fechaY + 85;
 
-        // --- DATOS DEL OPERADOR ---
-        doc.fontSize(12).font('Helvetica-Bold')
-            .text('3. DATOS DEL OPERADOR DE TRATAMIENTO', { underline: true });
-        doc.moveDown(0.5);
-        doc.fontSize(10).font('Helvetica');
-        doc.text(`Razón Social: ${manifiesto.operador.razonSocial}`);
-        doc.text(`CUIT: ${manifiesto.operador.cuit}`);
-        doc.text(`Domicilio: ${manifiesto.operador.domicilio}`);
-        doc.text(`N° Habilitación: ${manifiesto.operador.numeroHabilitacion || 'N/A'}`);
+        // ═══ PIE DE PÁGINA ═══
+        doc.save();
+        doc.moveTo(30, y).lineTo(pageWidth - 30, y).strokeColor(COLORS.border).lineWidth(0.5).stroke();
+        doc.fontSize(7).fillColor(COLORS.textLight);
+        doc.text('Sistema de Trazabilidad SITREP - Ley 24.051 | Generado: ' + new Date().toLocaleString('es-AR'), 30, y + 5, { align: 'center', width: contentWidth });
+        doc.restore();
 
-        doc.moveDown();
-
-        // --- RESIDUOS ---
-        doc.fontSize(12).font('Helvetica-Bold')
-            .text('4. DESCRIPCIÓN DE RESIDUOS PELIGROSOS', { underline: true });
-        doc.moveDown(0.5);
-
-        // Tabla de residuos
-        const tableTop = doc.y;
-        const col1 = 50;
-        const col2 = 150;
-        const col3 = 350;
-        const col4 = 450;
-
-        doc.fontSize(9).font('Helvetica-Bold');
-        doc.text('Código', col1, tableTop);
-        doc.text('Descripción', col2, tableTop);
-        doc.text('Cantidad', col3, tableTop);
-        doc.text('Unidad', col4, tableTop);
-
-        doc.moveTo(col1, tableTop + 15).lineTo(550, tableTop + 15).stroke();
-
-        let yPos = tableTop + 20;
-        doc.font('Helvetica').fontSize(9);
-
-        for (const residuo of manifiesto.residuos) {
-            doc.text(residuo.tipoResiduo.codigo, col1, yPos, { width: 90 });
-            doc.text(residuo.tipoResiduo.nombre, col2, yPos, { width: 190 });
-            doc.text(residuo.cantidad.toString(), col3, yPos, { width: 90 });
-            doc.text(residuo.unidad, col4, yPos, { width: 90 });
-            yPos += 20;
-        }
-
-        doc.y = yPos + 10;
-        doc.moveDown();
-
-        // --- OBSERVACIONES ---
-        if (manifiesto.observaciones) {
-            doc.fontSize(12).font('Helvetica-Bold')
-                .text('5. OBSERVACIONES', { underline: true });
-            doc.moveDown(0.5);
-            doc.fontSize(10).font('Helvetica')
-                .text(manifiesto.observaciones);
-            doc.moveDown();
-        }
-
-        // --- FECHAS ---
-        doc.fontSize(12).font('Helvetica-Bold')
-            .text('6. FECHAS Y FIRMAS', { underline: true });
-        doc.moveDown(0.5);
-        doc.fontSize(10).font('Helvetica');
-
-        doc.text(`Fecha de Creación: ${new Date(manifiesto.createdAt).toLocaleDateString('es-AR')}`);
-
-        if (manifiesto.fechaFirma) {
-            doc.text(`Fecha de Firma: ${new Date(manifiesto.fechaFirma).toLocaleDateString('es-AR')}`);
-        }
-        if (manifiesto.fechaRetiro) {
-            doc.text(`Fecha de Retiro: ${new Date(manifiesto.fechaRetiro).toLocaleDateString('es-AR')}`);
-        }
-        if (manifiesto.fechaEntrega) {
-            doc.text(`Fecha de Entrega: ${new Date(manifiesto.fechaEntrega).toLocaleDateString('es-AR')}`);
-        }
-        if (manifiesto.fechaRecepcion) {
-            doc.text(`Fecha de Recepción: ${new Date(manifiesto.fechaRecepcion).toLocaleDateString('es-AR')}`);
-        }
-        if (manifiesto.fechaCierre) {
-            doc.text(`Fecha de Cierre: ${new Date(manifiesto.fechaCierre).toLocaleDateString('es-AR')}`);
-        }
-
-        doc.moveDown();
-
-        // --- CÓDIGO QR ---
-        if (manifiesto.qrCode) {
-            doc.fontSize(12).font('Helvetica-Bold')
-                .text('CÓDIGO QR DE VERIFICACIÓN', { underline: true });
-            doc.moveDown(0.5);
-
-            // Convertir base64 a imagen
-            const qrImage = Buffer.from(manifiesto.qrCode.split(',')[1], 'base64');
-            doc.image(qrImage, { width: 100, height: 100 });
-        }
-
-        // --- PIE DE PÁGINA ---
-        doc.moveDown(2);
-        doc.fontSize(8).font('Helvetica')
-            .text('Este documento ha sido generado electrónicamente por el Sistema de Trazabilidad de RRPP.', { align: 'center' });
-        doc.text(`Generado el: ${new Date().toLocaleString('es-AR')}`, { align: 'center' });
-
-        // Finalizar documento
         doc.end();
 
     } catch (error) {
@@ -211,7 +249,7 @@ export const generarPDFManifiesto = async (req: AuthRequest, res: Response, next
     }
 };
 
-// Generar Certificado de Disposición (CU-O10)
+// Generar Certificado de Disposición - DISEÑO COMPACTO
 export const generarCertificado = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const { id } = req.params;
@@ -222,14 +260,7 @@ export const generarCertificado = async (req: AuthRequest, res: Response, next: 
                 generador: true,
                 transportista: true,
                 operador: true,
-                residuos: {
-                    include: {
-                        tipoResiduo: true
-                    }
-                },
-                eventos: {
-                    orderBy: { createdAt: 'desc' }
-                }
+                residuos: { include: { tipoResiduo: true } }
             }
         });
 
@@ -238,101 +269,98 @@ export const generarCertificado = async (req: AuthRequest, res: Response, next: 
         }
 
         if (manifiesto.estado !== 'TRATADO') {
-            throw new AppError('Solo se pueden generar certificados de manifiestos tratados', 400);
+            throw new AppError('Solo se pueden generar certificados para manifiestos tratados', 400);
         }
 
-        // Crear documento PDF
-        const doc = new PDFDocument({
-            margin: 50,
-            size: 'A4'
-        });
-
+        const doc = new PDFDocument({ margin: 40, size: 'A4' });
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=certificado_${manifiesto.numero}.pdf`);
         doc.pipe(res);
 
-        // --- ENCABEZADO ---
-        doc.fontSize(18).font('Helvetica-Bold')
-            .text('CERTIFICADO DE TRATAMIENTO Y DISPOSICIÓN FINAL', { align: 'center' });
+        const pageWidth = doc.page.width;
+        const contentWidth = pageWidth - 80;
+        let y = 40;
 
-        doc.moveDown(0.5);
-        doc.fontSize(12).font('Helvetica')
-            .text('DE RESIDUOS PELIGROSOS', { align: 'center' });
+        // Borde decorativo
+        doc.save();
+        doc.strokeColor(COLORS.primary).lineWidth(2);
+        doc.rect(25, 25, pageWidth - 50, doc.page.height - 50).stroke();
+        doc.restore();
 
-        doc.moveDown(0.3);
-        doc.fontSize(10)
-            .text('Ley Nacional 24.051 - Provincia de Mendoza', { align: 'center' });
+        // Encabezado
+        doc.save();
+        doc.fontSize(20).font('Helvetica-Bold').fillColor(COLORS.secondary);
+        doc.text('CERTIFICADO DE DISPOSICIÓN FINAL', 40, y, { align: 'center', width: contentWidth });
+        y += 28;
+        doc.fontSize(11).fillColor(COLORS.gray);
+        doc.text('DE RESIDUOS PELIGROSOS', 40, y, { align: 'center', width: contentWidth });
+        y += 20;
+        
+        drawRect(doc, pageWidth/2 - 60, y, 120, 25, COLORS.primary, 5);
+        doc.fillColor(COLORS.white).fontSize(12).font('Helvetica-Bold');
+        doc.text(`N° ${manifiesto.numero}`, pageWidth/2 - 55, y + 7, { width: 110, align: 'center' });
+        doc.restore();
+        
+        y += 45;
 
-        doc.moveDown(2);
+        // Cuerpo
+        drawRect(doc, 40, y, contentWidth, 180, COLORS.lightGray, 6);
+        doc.save();
+        doc.fontSize(10).font('Helvetica').fillColor(COLORS.text);
+        doc.text('Por medio del presente se certifica que:', 55, y + 15, { width: contentWidth - 30 });
+        doc.text(
+            `La empresa ${manifiesto.operador?.razonSocial || 'N/A'}, CUIT ${manifiesto.operador?.cuit || 'N/A'}, ` +
+            `habilitada bajo N° ${manifiesto.operador?.numeroHabilitacion || 'N/A'}, ha recibido y tratado ` +
+            `los residuos peligrosos del manifiesto de referencia, provenientes del generador ` +
+            `${manifiesto.generador?.razonSocial || 'N/A'}, transportados por ${manifiesto.transportista?.razonSocial || 'N/A'}.`,
+            55, y + 35, { width: contentWidth - 30, align: 'justify' }
+        );
 
-        // --- NÚMERO DE CERTIFICADO ---
-        doc.fontSize(14).font('Helvetica-Bold')
-            .text(`Certificado N°: CERT-${manifiesto.numero}`, { align: 'center' });
+        doc.font('Helvetica-Bold').text('Residuos tratados:', 55, y + 95);
+        doc.font('Helvetica');
+        let residuoY = y + 110;
+        for (const residuo of manifiesto.residuos.slice(0, 4)) {
+            if (!residuo.tipoResiduo) continue;
+            doc.text(`• ${residuo.tipoResiduo.nombre} - ${residuo.cantidad} ${residuo.unidad}`, 70, residuoY);
+            residuoY += 14;
+        }
+        doc.restore();
+        
+        y += 195;
 
-        doc.moveDown(2);
+        // Fechas y QR
+        doc.save();
+        doc.fontSize(9).fillColor(COLORS.text);
+        doc.text(`Fecha recepción: ${manifiesto.fechaRecepcion ? new Date(manifiesto.fechaRecepcion).toLocaleDateString('es-AR') : 'N/A'}`, 55, y);
+        doc.text(`Fecha tratamiento: ${manifiesto.fechaCierre ? new Date(manifiesto.fechaCierre).toLocaleDateString('es-AR') : 'N/A'}`, 55, y + 14);
+        doc.restore();
 
-        // --- CUERPO ---
-        doc.fontSize(11).font('Helvetica');
-        doc.text(`Por medio del presente se certifica que la empresa `, { continued: true });
-        doc.font('Helvetica-Bold').text(`${manifiesto.operador.razonSocial}`, { continued: true });
-        doc.font('Helvetica').text(`, identificada con CUIT ${manifiesto.operador.cuit}, habilitada como Operador de Tratamiento de Residuos Peligrosos, ha recibido y tratado los residuos detallados a continuación:`);
-
-        doc.moveDown(1.5);
-
-        // --- DATOS DEL GENERADOR ---
-        doc.fontSize(12).font('Helvetica-Bold').text('GENERADOR:');
-        doc.fontSize(10).font('Helvetica');
-        doc.text(`Razón Social: ${manifiesto.generador.razonSocial}`);
-        doc.text(`CUIT: ${manifiesto.generador.cuit}`);
-
-        doc.moveDown();
-
-        // --- RESIDUOS TRATADOS ---
-        doc.fontSize(12).font('Helvetica-Bold').text('RESIDUOS TRATADOS:');
-        doc.moveDown(0.5);
-
-        for (const residuo of manifiesto.residuos) {
-            doc.fontSize(10).font('Helvetica');
-            doc.text(`• ${residuo.tipoResiduo.codigo} - ${residuo.tipoResiduo.nombre}: ${residuo.cantidad} ${residuo.unidad}`);
+        // QR
+        if (manifiesto.qrCode && manifiesto.qrCode.includes(',')) {
+            try {
+                const qrParts = manifiesto.qrCode.split(',');
+                if (qrParts.length > 1) {
+                    const qrImage = Buffer.from(qrParts[1], 'base64');
+                    doc.image(qrImage, pageWidth - 130, y - 10, { width: 70, height: 70 });
+                }
+            } catch (e) { }
         }
 
-        doc.moveDown();
+        y += 55;
 
-        // --- MÉTODO DE TRATAMIENTO ---
-        const eventoTratamiento = manifiesto.eventos.find(e => e.tipo === 'TRATAMIENTO' || e.tipo === 'CIERRE');
-        const metodoTratamiento = eventoTratamiento?.descripcion || 'Tratamiento según normas vigentes';
+        // Firma
+        doc.save();
+        doc.strokeColor(COLORS.secondary).lineWidth(1);
+        doc.moveTo(pageWidth/2 - 80, y).lineTo(pageWidth/2 + 80, y).stroke();
+        doc.fontSize(8).fillColor(COLORS.text);
+        doc.text('Firma y Sello del Operador', pageWidth/2 - 80, y + 8, { width: 160, align: 'center' });
+        doc.restore();
 
-        doc.fontSize(12).font('Helvetica-Bold').text('MÉTODO DE TRATAMIENTO:');
-        doc.fontSize(10).font('Helvetica').text(metodoTratamiento);
-
-        doc.moveDown();
-
-        // --- FECHAS ---
-        doc.fontSize(12).font('Helvetica-Bold').text('FECHAS:');
-        doc.fontSize(10).font('Helvetica');
-        doc.text(`Fecha de Recepción: ${manifiesto.fechaRecepcion ? new Date(manifiesto.fechaRecepcion).toLocaleDateString('es-AR') : 'N/A'}`);
-        doc.text(`Fecha de Tratamiento: ${manifiesto.fechaCierre ? new Date(manifiesto.fechaCierre).toLocaleDateString('es-AR') : new Date().toLocaleDateString('es-AR')}`);
-
-        doc.moveDown(2);
-
-        // --- DECLARACIÓN ---
-        doc.fontSize(10).font('Helvetica');
-        doc.text('Se deja constancia que los residuos mencionados han sido tratados y/o dispuestos de acuerdo con la normativa ambiental vigente, cumpliendo con los requisitos establecidos por la Ley 24.051 y el Decreto 831/93.', { align: 'justify' });
-
-        doc.moveDown(3);
-
-        // --- FIRMA ---
-        doc.fontSize(10).text('_______________________________', { align: 'center' });
-        doc.text('Firma y Sello del Operador', { align: 'center' });
-        doc.text(manifiesto.operador.razonSocial, { align: 'center' });
-
-        doc.moveDown(2);
-
-        // --- PIE ---
-        doc.fontSize(8).font('Helvetica')
-            .text(`Manifiesto de origen: ${manifiesto.numero}`, { align: 'center' });
-        doc.text(`Certificado generado el: ${new Date().toLocaleString('es-AR')}`, { align: 'center' });
-        doc.text('Este documento ha sido generado electrónicamente por el Sistema de Trazabilidad de RRPP.', { align: 'center' });
+        // Pie
+        doc.save();
+        doc.fontSize(7).fillColor(COLORS.textLight);
+        doc.text('Sistema SITREP - Ley 24.051 | Generado: ' + new Date().toLocaleString('es-AR'), 40, doc.page.height - 50, { align: 'center', width: contentWidth });
+        doc.restore();
 
         doc.end();
 

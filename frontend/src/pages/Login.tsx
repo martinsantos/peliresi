@@ -1,21 +1,20 @@
-import React from 'react';
+import { authService } from '../services/auth.service';
 
 const Login: React.FC = () => {
-    const handleClick = (role: string, email: string) => {
-        alert('Clickeaste: ' + role);
+    const handleClick = async (role: string, email: string) => {
+        try {
+            // Determinar password según el seed
+            let password = 'admin123';
+            if (role === 'Generador') password = 'gen123';
+            if (role === 'Transportista') password = 'trans123';
+            if (role === 'Operador') password = 'op123';
 
-        const user = {
-            id: '1',
-            email: email,
-            nombre: role,
-            apellido: 'Demo',
-            rol: email === 'admin@example.com' ? 'ADMIN' : email.split('@')[0].toUpperCase()
-        };
-
-        localStorage.setItem('token', 'demo-token-' + Date.now());
-        localStorage.setItem('user', JSON.stringify(user));
-
-        window.location.href = '/demoambiente/dashboard';
+            await authService.login(email, password);
+            window.location.href = `${import.meta.env.BASE_URL}dashboard`.replace('//', '/');
+        } catch (error) {
+            console.error('Error en login:', error);
+            alert('Error al ingresar: Verifique que el servidor esté respondiendo.');
+        }
     };
 
     return (
@@ -37,7 +36,7 @@ const Login: React.FC = () => {
             </p>
 
             <button
-                onClick={() => handleClick('Administrador', 'admin@example.com')}
+                onClick={() => handleClick('Administrador', 'admin@dgfa.mendoza.gov.ar')}
                 style={{
                     padding: '20px 40px',
                     fontSize: '18px',
@@ -53,7 +52,7 @@ const Login: React.FC = () => {
             </button>
 
             <button
-                onClick={() => handleClick('Generador', 'generador@example.com')}
+                onClick={() => handleClick('Generador', 'quimica.mendoza@industria.com')}
                 style={{
                     padding: '20px 40px',
                     fontSize: '18px',
@@ -69,7 +68,7 @@ const Login: React.FC = () => {
             </button>
 
             <button
-                onClick={() => handleClick('Transportista', 'transportista@example.com')}
+                onClick={() => handleClick('Transportista', 'transportes.andes@logistica.com')}
                 style={{
                     padding: '20px 40px',
                     fontSize: '18px',
@@ -85,7 +84,7 @@ const Login: React.FC = () => {
             </button>
 
             <button
-                onClick={() => handleClick('Operador', 'operador@example.com')}
+                onClick={() => handleClick('Operador', 'tratamiento.residuos@planta.com')}
                 style={{
                     padding: '20px 40px',
                     fontSize: '18px',

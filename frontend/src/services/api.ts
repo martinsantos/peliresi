@@ -2,7 +2,7 @@ import axios from 'axios';
 import type { AxiosResponse, InternalAxiosRequestConfig, AxiosError } from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002/api';
-const BASE_URL = import.meta.env.BASE_URL || '/demoambiente/';
+const BASE_URL = import.meta.env.BASE_URL;
 
 const api = axios.create({
     baseURL: API_URL,

@@ -13,7 +13,7 @@ import { analyticsService } from '../services/analytics.service';
 import './MobileApp.css';
 
 type UserRole = 'ADMIN' | 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR';
-type Screen = 'home' | 'manifiestos' | 'tracking' | 'alertas' | 'perfil' | 'detalle' | 'nuevo' | 'escanear' | 'actores' | 'viaje';
+type Screen = 'home' | 'manifiestos' | 'tracking' | 'alertas' | 'perfil' | 'detalle' | 'nuevo' | 'escanear' | 'actores' | 'viaje' | 'historial';
 
 interface MenuItem {
     id: Screen;
@@ -27,22 +27,109 @@ if (typeof window !== 'undefined') {
 }
 
 const MobileApp: React.FC = () => {
-    const [role, setRole] = useState<UserRole | null>(null);
+    // Cargar rol guardado de localStorage
+    const getSavedRole = (): UserRole | null => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('sitrep_mobile_role');
+            if (saved && ['ADMIN', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(saved)) {
+                return saved as UserRole;
+            }
+        }
+        return null;
+    };
+
+    const [role, setRole] = useState<UserRole | null>(getSavedRole);
     const [currentScreen, setCurrentScreen] = useState<Screen>('home');
     const [menuOpen, setMenuOpen] = useState(false);
     const [selectedManifiesto, setSelectedManifiesto] = useState<any>(null);
     const [viajeActivo, setViajeActivo] = useState(false);
+    const [viajePausado, setViajePausado] = useState(false);
     const [tiempoViaje, setTiempoViaje] = useState(0);
+    const [viajeInicio, setViajeInicio] = useState<Date | null>(null);
+    const [viajeEventos, setViajeEventos] = useState<Array<{
+        tipo: 'INCIDENTE' | 'PARADA' | 'INICIO' | 'FIN' | 'REANUDACION';
+        descripcion: string;
+        timestamp: string;
+        gps: {lat: number, lng: number} | null;
+    }>>([]);
+    // Route tracking - records GPS position every 5 seconds during trip
+    const [viajeRuta, setViajeRuta] = useState<Array<{
+        lat: number;
+        lng: number;
+        timestamp: string;
+    }>>([]);
     const [showToast, setShowToast] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
     const intervalRef = useRef<number | null>(null);
+    const routeTrackingRef = useRef<number | null>(null);
+    
+    // Camera and GPS state
+    const [cameraActive, setCameraActive] = useState(false);
+    const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+    const [gpsPosition, setGpsPosition] = useState<{lat: number, lng: number} | null>(null);
+    const [gpsWatchId, setGpsWatchId] = useState<number | null>(null);
+    const [gpsAvailable, setGpsAvailable] = useState(false);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    
+    // Incident and Stop modals
+    const [showIncidentModal, setShowIncidentModal] = useState(false);
+    const [showParadaModal, setShowParadaModal] = useState(false);
+    const [incidentText, setIncidentText] = useState('');
+    const [paradaText, setParadaText] = useState('');
+    
+    // Saved trips history - includes route for map visualization
+    const [savedTrips, setSavedTrips] = useState<Array<{
+        id: string;
+        inicio: string;
+        fin: string;
+        duracion: number;
+        eventos: Array<{tipo: string; descripcion: string; timestamp: string; gps: any}>;
+        ruta?: Array<{lat: number; lng: number; timestamp: string}>;
+        role: string;
+    }>>([]);
 
     const { isOnline, syncPending } = useConnectivity();
     const { promptInstall, canInstall, isIOS } = usePWAInstall();
 
-    // Timer for active trip
+    // Guardar rol en localStorage cuando cambia
     useEffect(() => {
-        if (viajeActivo) {
+        if (role) {
+            localStorage.setItem('sitrep_mobile_role', role);
+        }
+    }, [role]);
+
+    // Auto-detect GPS on component mount
+    useEffect(() => {
+        if ('geolocation' in navigator) {
+            setGpsAvailable(true);
+            // Get initial position
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    setGpsPosition({
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    });
+                    console.log('📍 GPS detectado automáticamente');
+                },
+                (error) => {
+                    console.warn('GPS no accesible:', error.message);
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        }
+        
+        // Load saved trips from localStorage
+        const loadSavedTrips = () => {
+            const trips = JSON.parse(localStorage.getItem('sitrep_trips') || '[]');
+            setSavedTrips(trips);
+            console.log(`📋 ${trips.length} viajes cargados del historial`);
+        };
+        loadSavedTrips();
+    }, []);
+
+    // Timer for active trip (pauses when viajePausado)
+    useEffect(() => {
+        if (viajeActivo && !viajePausado) {
             intervalRef.current = window.setInterval(() => {
                 setTiempoViaje(prev => prev + 1);
             }, 1000);
@@ -50,7 +137,47 @@ const MobileApp: React.FC = () => {
         return () => {
             if (intervalRef.current) clearInterval(intervalRef.current);
         };
-    }, [viajeActivo]);
+    }, [viajeActivo, viajePausado]);
+
+    // GPS Route Tracking - record position every 5 seconds during active trip
+    useEffect(() => {
+        if (viajeActivo && !viajePausado && gpsAvailable) {
+            // Record position immediately when starting
+            if (gpsPosition) {
+                setViajeRuta(prev => [...prev, {
+                    lat: gpsPosition.lat,
+                    lng: gpsPosition.lng,
+                    timestamp: new Date().toISOString()
+                }]);
+            }
+            
+            // Then record every 5 seconds
+            routeTrackingRef.current = window.setInterval(() => {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const newPoint = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude,
+                            timestamp: new Date().toISOString()
+                        };
+                        setGpsPosition({ lat: newPoint.lat, lng: newPoint.lng });
+                        setViajeRuta(prev => [...prev, newPoint]);
+                        console.log('📍 Ruta actualizada:', newPoint);
+                    },
+                    (error) => console.warn('GPS tracking error:', error.message),
+                    { enableHighAccuracy: true, timeout: 4000 }
+                );
+            }, 5000);
+        }
+        
+        return () => {
+            if (routeTrackingRef.current) {
+                clearInterval(routeTrackingRef.current);
+                routeTrackingRef.current = null;
+            }
+        };
+    }, [viajeActivo, viajePausado, gpsAvailable]);
+
 
     // Format time
     const formatTime = (seconds: number) => {
@@ -97,6 +224,18 @@ const MobileApp: React.FC = () => {
     ];
 
     const handleChangeRole = () => {
+        localStorage.removeItem('sitrep_mobile_role');
+        // Stop camera and GPS when changing role
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+            setCameraStream(null);
+        }
+        setCameraActive(false);
+        if (gpsWatchId !== null) {
+            navigator.geolocation.clearWatch(gpsWatchId);
+            setGpsWatchId(null);
+        }
+        setGpsPosition(null);
         setRole(null);
         setCurrentScreen('home');
         setMenuOpen(false);
@@ -104,19 +243,198 @@ const MobileApp: React.FC = () => {
         setTiempoViaje(0);
     };
 
+    // ===== CAMERA FUNCTIONS =====
+    const startCamera = async () => {
+        console.log('🎥 startCamera called');
+        try {
+            console.log('🎥 Requesting camera...');
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' }
+            });
+            console.log('🎥 Camera stream obtained:', stream);
+            setCameraStream(stream);
+            setCameraActive(true);
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+                console.log('🎥 Video element connected');
+            }
+            showToastMessage('📷 Cámara activada');
+        } catch (err: any) {
+            console.error('❌ Camera error:', err);
+            showToastMessage('❌ No se pudo acceder a la cámara: ' + (err.message || 'Permiso denegado'));
+        }
+    };
+
+    const stopCamera = () => {
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+            setCameraStream(null);
+        }
+        setCameraActive(false);
+    };
+
+    // ===== GPS FUNCTIONS =====
+    const startGPS = () => {
+        if ('geolocation' in navigator) {
+            const watchId = navigator.geolocation.watchPosition(
+                (position) => {
+                    setGpsPosition({
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    });
+                },
+                (error) => {
+                    console.error('GPS error:', error);
+                    showToastMessage('⚠️ Error GPS: ' + error.message);
+                },
+                { 
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 5000
+                }
+            );
+            setGpsWatchId(watchId);
+        } else {
+            showToastMessage('❌ GPS no disponible');
+        }
+    };
+
+    const stopGPS = () => {
+        if (gpsWatchId !== null) {
+            navigator.geolocation.clearWatch(gpsWatchId);
+            setGpsWatchId(null);
+        }
+        setGpsPosition(null);
+    };
+
     const handleIniciarViaje = () => {
+        const inicio = new Date();
+        const inicioEvento = {
+            tipo: 'INICIO' as const,
+            descripcion: 'Viaje iniciado',
+            timestamp: inicio.toISOString(),
+            gps: gpsPosition
+        };
+        
         setViajeActivo(true);
+        setViajePausado(false);
+        setViajeInicio(inicio);
+        setViajeEventos([inicioEvento]);
+        setViajeRuta([]); // Reset route for new trip
+        setTiempoViaje(0);
         setCurrentScreen('viaje');
-        showToastMessage('🚛 Viaje iniciado - GPS activado');
-        analyticsService.trackAction('iniciar_viaje', 'viaje', role || undefined);
+        startGPS();
+        
+        showToastMessage('🚛 Viaje iniciado - GPS ' + (gpsPosition ? 'activo' : 'detectando...'));
+        analyticsService.trackAction('iniciar_viaje', 'viaje', role || undefined, { gps: gpsPosition });
     };
 
     const handleFinalizarViaje = () => {
+        const finEvento = {
+            tipo: 'FIN' as const,
+            descripcion: 'Viaje finalizado',
+            timestamp: new Date().toISOString(),
+            gps: gpsPosition
+        };
+        
+        const eventosFinales = [...viajeEventos, finEvento];
+        
+        // Save trip to localStorage with route for map visualization
+        const tripData = {
+            id: Date.now().toString(),
+            inicio: viajeInicio?.toISOString(),
+            fin: finEvento.timestamp,
+            duracion: tiempoViaje,
+            eventos: eventosFinales,
+            ruta: viajeRuta, // Include GPS route for map
+            role: role
+        };
+        
+        const existingTrips = JSON.parse(localStorage.getItem('sitrep_trips') || '[]');
+        existingTrips.push(tripData);
+        localStorage.setItem('sitrep_trips', JSON.stringify(existingTrips));
+        console.log('💾 Viaje guardado con ruta:', tripData);
+        
+        // Update state to reflect new saved trip
+        setSavedTrips(existingTrips);
+        
         setViajeActivo(false);
+        setViajePausado(false);
         setTiempoViaje(0);
+        setViajeEventos([]);
+        setViajeRuta([]);
+        setViajeInicio(null);
+        stopGPS();
         setCurrentScreen('home');
-        showToastMessage('✅ Viaje finalizado correctamente');
-        analyticsService.trackAction('finalizar_viaje', 'viaje', role || undefined, { duracion: tiempoViaje });
+        
+        showToastMessage(`✅ Viaje guardado - ${eventosFinales.length} eventos, ${viajeRuta.length} puntos GPS`);
+        analyticsService.trackAction('finalizar_viaje', 'viaje', role || undefined, tripData);
+    };
+
+    // ===== INCIDENT & PARADA HANDLERS =====
+    const handleOpenIncidentModal = () => {
+        setIncidentText('');
+        setShowIncidentModal(true);
+    };
+
+    const handleConfirmIncident = () => {
+        if (!incidentText.trim()) {
+            showToastMessage('⚠️ Describa el incidente');
+            return;
+        }
+        
+        const incidentEvento = {
+            tipo: 'INCIDENTE' as const,
+            descripcion: incidentText,
+            timestamp: new Date().toISOString(),
+            gps: gpsPosition
+        };
+        
+        setViajeEventos(prev => [...prev, incidentEvento]);
+        
+        console.log('📝 Incidente registrado:', incidentEvento);
+        showToastMessage('⚠️ INCIDENTE REGISTRADO - ' + incidentText.substring(0, 30));
+        analyticsService.trackAction('registrar_incidente', 'viaje', role || undefined, incidentEvento);
+        setShowIncidentModal(false);
+        setIncidentText('');
+    };
+
+    const handleOpenParadaModal = () => {
+        setParadaText('');
+        setShowParadaModal(true);
+    };
+
+    const handleConfirmParada = () => {
+        const paradaEvento = {
+            tipo: 'PARADA' as const,
+            descripcion: paradaText || 'Parada programada',
+            timestamp: new Date().toISOString(),
+            gps: gpsPosition
+        };
+        
+        setViajeEventos(prev => [...prev, paradaEvento]);
+        setViajePausado(true);
+        
+        console.log('📝 Parada registrada:', paradaEvento);
+        showToastMessage('⏸️ VIAJE EN PAUSA - ' + (paradaText || 'Parada registrada'));
+        analyticsService.trackAction('registrar_parada', 'viaje', role || undefined, paradaEvento);
+        setShowParadaModal(false);
+        setParadaText('');
+    };
+
+    const handleReanudarViaje = () => {
+        const reanudacionEvento = {
+            tipo: 'REANUDACION' as const,
+            descripcion: 'Viaje reanudado',
+            timestamp: new Date().toISOString(),
+            gps: gpsPosition
+        };
+        
+        setViajeEventos(prev => [...prev, reanudacionEvento]);
+        setViajePausado(false);
+        
+        showToastMessage('▶️ VIAJE REANUDADO');
+        analyticsService.trackAction('reanudar_viaje', 'viaje', role || undefined, reanudacionEvento);
     };
 
     // Role selection screen
@@ -358,6 +676,33 @@ const MobileApp: React.FC = () => {
                                             {viajeActivo ? <Pause size={24} /> : <Play size={24} />}
                                             <span>{viajeActivo ? 'Ver Viaje' : 'Iniciar Viaje'}</span>
                                         </button>
+                                        <button 
+                                            className="action-card"
+                                            onClick={() => {
+                                                const trips = JSON.parse(localStorage.getItem('sitrep_trips') || '[]');
+                                                setSavedTrips(trips);
+                                                setCurrentScreen('historial');
+                                            }}
+                                        >
+                                            <FileText size={24} />
+                                            <span>Historial</span>
+                                            {savedTrips.length > 0 && (
+                                                <span style={{
+                                                    position: 'absolute',
+                                                    top: '8px',
+                                                    right: '8px',
+                                                    background: '#ef4444',
+                                                    color: 'white',
+                                                    borderRadius: '50%',
+                                                    width: '20px',
+                                                    height: '20px',
+                                                    fontSize: '11px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center'
+                                                }}>{savedTrips.length}</span>
+                                            )}
+                                        </button>
                                     </>
                                 )}
                                 {role === 'OPERADOR' && (
@@ -443,11 +788,79 @@ const MobileApp: React.FC = () => {
 
                         {viajeActivo && (
                             <>
+                                {/* Pause indicator */}
+                                {viajePausado && (
+                                    <div style={{
+                                        background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                                        padding: '12px 16px',
+                                        borderRadius: '12px',
+                                        marginBottom: '16px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between'
+                                    }}>
+                                        <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            ⏸️ VIAJE EN PAUSA
+                                        </span>
+                                        <button 
+                                            className="btn-primary" 
+                                            onClick={handleReanudarViaje}
+                                            style={{ padding: '8px 16px', fontSize: '14px' }}
+                                        >
+                                            <Play size={16} />
+                                            Reanudar
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* GPS Status */}
                                 <div className="viaje-map-placeholder">
                                     <MapPinned size={40} />
-                                    <span>GPS Activo</span>
-                                    <small>Lat: -32.8895, Lng: -68.8458</small>
+                                    <span>
+                                        {gpsPosition ? '📍 GPS Activo' : 
+                                         gpsAvailable ? '⏳ Obteniendo GPS...' : '❌ GPS No Disponible'}
+                                    </span>
+                                    <small>
+                                        {gpsPosition 
+                                            ? `Lat: ${gpsPosition.lat.toFixed(6)}, Lng: ${gpsPosition.lng.toFixed(6)}`
+                                            : 'Esperando señal GPS...'}
+                                    </small>
                                 </div>
+
+                                {/* Events counter */}
+                                {viajeEventos.length > 1 && (
+                                    <div style={{
+                                        background: 'rgba(59, 130, 246, 0.2)',
+                                        border: '1px solid rgba(59, 130, 246, 0.4)',
+                                        padding: '12px 16px',
+                                        borderRadius: '12px',
+                                        marginTop: '12px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between'
+                                    }}>
+                                        <span style={{ color: '#93c5fd', fontSize: '14px' }}>
+                                            📋 Eventos registrados: {viajeEventos.length}
+                                        </span>
+                                        <span style={{ 
+                                            fontSize: '12px', 
+                                            color: '#64748b',
+                                            display: 'flex',
+                                            gap: '8px'
+                                        }}>
+                                            {viajeEventos.filter(e => e.tipo === 'INCIDENTE').length > 0 && (
+                                                <span style={{ color: '#f87171' }}>
+                                                    ⚠️ {viajeEventos.filter(e => e.tipo === 'INCIDENTE').length}
+                                                </span>
+                                            )}
+                                            {viajeEventos.filter(e => e.tipo === 'PARADA').length > 0 && (
+                                                <span style={{ color: '#fbbf24' }}>
+                                                    ⏸️ {viajeEventos.filter(e => e.tipo === 'PARADA').length}
+                                                </span>
+                                            )}
+                                        </span>
+                                    </div>
+                                )}
 
                                 <div className="viaje-info-cards">
                                     <div className="info-card">
@@ -467,14 +880,21 @@ const MobileApp: React.FC = () => {
                                 </div>
 
                                 <div className="viaje-actions">
-                                    <button className="btn-warning full">
+                                    <button className="btn-warning full" onClick={handleOpenIncidentModal}>
                                         <AlertTriangle size={18} />
                                         Registrar Incidente
                                     </button>
-                                    <button className="btn-secondary full">
-                                        <Clock size={18} />
-                                        Registrar Parada
-                                    </button>
+                                    {!viajePausado ? (
+                                        <button className="btn-secondary full" onClick={handleOpenParadaModal}>
+                                            <Clock size={18} />
+                                            Registrar Parada
+                                        </button>
+                                    ) : (
+                                        <button className="btn-primary full" onClick={handleReanudarViaje}>
+                                            <Play size={18} />
+                                            Reanudar Viaje
+                                        </button>
+                                    )}
                                     <button className="btn-primary full" onClick={handleFinalizarViaje}>
                                         <CheckCircle size={18} />
                                         Confirmar Entrega
@@ -484,10 +904,25 @@ const MobileApp: React.FC = () => {
                         )}
 
                         {!viajeActivo && (
-                            <button className="btn-primary full" onClick={handleIniciarViaje}>
-                                <Play size={18} />
-                                Iniciar Nuevo Viaje
-                            </button>
+                            <>
+                                <button className="btn-primary full" onClick={handleIniciarViaje}>
+                                    <Play size={18} />
+                                    Iniciar Nuevo Viaje
+                                </button>
+                                <button 
+                                    className="btn-secondary full" 
+                                    style={{ marginTop: '12px' }}
+                                    onClick={() => {
+                                        // Refresh saved trips before showing
+                                        const trips = JSON.parse(localStorage.getItem('sitrep_trips') || '[]');
+                                        setSavedTrips(trips);
+                                        setCurrentScreen('historial');
+                                    }}
+                                >
+                                    <FileText size={18} />
+                                    Ver Historial ({savedTrips.length} viajes)
+                                </button>
+                            </>
                         )}
                     </div>
                 );
@@ -526,6 +961,250 @@ const MobileApp: React.FC = () => {
                             ))}
                         </div>
                     </>
+                );
+
+            case 'historial':
+                return (
+                    <div className="scroll-content">
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '16px'
+                        }}>
+                            <h2 style={{ margin: 0, fontSize: '18px' }}>Historial de Viajes</h2>
+                            <span style={{ 
+                                background: 'rgba(59, 130, 246, 0.2)', 
+                                padding: '6px 12px', 
+                                borderRadius: '20px',
+                                fontSize: '12px',
+                                color: '#93c5fd'
+                            }}>
+                                {savedTrips.length} viajes
+                            </span>
+                        </div>
+
+                        {savedTrips.length === 0 ? (
+                            <div style={{
+                                textAlign: 'center',
+                                padding: '40px 20px',
+                                color: '#94a3b8'
+                            }}>
+                                <FileText size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
+                                <p>No hay viajes registrados</p>
+                                <small>Los viajes completados aparecerán aquí</small>
+                            </div>
+                        ) : (
+                            <div className="list">
+                                {savedTrips.slice().reverse().map((trip, index) => (
+                                    <div key={trip.id} className="list-item" style={{ 
+                                        padding: '16px',
+                                        marginBottom: '12px'
+                                    }}>
+                                        <div style={{ 
+                                            display: 'flex', 
+                                            justifyContent: 'space-between',
+                                            marginBottom: '12px'
+                                        }}>
+                                            <div>
+                                                <span style={{ 
+                                                    fontSize: '12px', 
+                                                    color: '#94a3b8',
+                                                    display: 'block'
+                                                }}>
+                                                    {new Date(trip.inicio).toLocaleDateString('es-AR', {
+                                                        day: '2-digit',
+                                                        month: 'short',
+                                                        year: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
+                                                    })}
+                                                </span>
+                                                <span style={{ fontWeight: 600 }}>
+                                                    Viaje #{savedTrips.length - index}
+                                                </span>
+                                            </div>
+                                            <div style={{ textAlign: 'right' }}>
+                                                <span style={{ 
+                                                    fontSize: '18px', 
+                                                    fontWeight: 600,
+                                                    color: '#10b981'
+                                                }}>
+                                                    {Math.floor(trip.duracion / 60)}:{(trip.duracion % 60).toString().padStart(2, '0')}
+                                                </span>
+                                                <span style={{ 
+                                                    fontSize: '12px', 
+                                                    color: '#94a3b8',
+                                                    display: 'block'
+                                                }}>
+                                                    min
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Events summary */}
+                                        <div style={{
+                                            display: 'flex',
+                                            gap: '8px',
+                                            flexWrap: 'wrap',
+                                            marginBottom: '12px'
+                                        }}>
+                                            {trip.eventos.filter(e => e.tipo === 'INCIDENTE').length > 0 && (
+                                                <span style={{
+                                                    background: 'rgba(239, 68, 68, 0.2)',
+                                                    color: '#f87171',
+                                                    padding: '4px 10px',
+                                                    borderRadius: '12px',
+                                                    fontSize: '12px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '4px'
+                                                }}>
+                                                    ⚠️ {trip.eventos.filter(e => e.tipo === 'INCIDENTE').length} Incidentes
+                                                </span>
+                                            )}
+                                            {trip.eventos.filter(e => e.tipo === 'PARADA').length > 0 && (
+                                                <span style={{
+                                                    background: 'rgba(245, 158, 11, 0.2)',
+                                                    color: '#fbbf24',
+                                                    padding: '4px 10px',
+                                                    borderRadius: '12px',
+                                                    fontSize: '12px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '4px'
+                                                }}>
+                                                    ⏸️ {trip.eventos.filter(e => e.tipo === 'PARADA').length} Paradas
+                                                </span>
+                                            )}
+                                            <span style={{
+                                                background: 'rgba(16, 185, 129, 0.2)',
+                                                color: '#34d399',
+                                                padding: '4px 10px',
+                                                borderRadius: '12px',
+                                                fontSize: '12px'
+                                            }}>
+                                                ✅ Completado
+                                            </span>
+                                        </div>
+
+                                        {/* Events detail */}
+                                        <details style={{ marginTop: '8px' }}>
+                                            <summary style={{ 
+                                                cursor: 'pointer', 
+                                                color: '#64748b',
+                                                fontSize: '12px'
+                                            }}>
+                                                Ver {trip.eventos.length} eventos
+                                            </summary>
+                                            <div style={{ 
+                                                marginTop: '12px',
+                                                borderLeft: '2px solid #334155',
+                                                paddingLeft: '12px'
+                                            }}>
+                                                {trip.eventos.map((evento, eIdx) => (
+                                                    <div key={eIdx} style={{
+                                                        padding: '8px 0',
+                                                        borderBottom: eIdx < trip.eventos.length - 1 ? '1px solid #1e293b' : 'none'
+                                                    }}>
+                                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                            <span style={{
+                                                                fontSize: '14px'
+                                                            }}>
+                                                                {evento.tipo === 'INICIO' ? '🚀' :
+                                                                 evento.tipo === 'FIN' ? '🏁' :
+                                                                 evento.tipo === 'INCIDENTE' ? '⚠️' :
+                                                                 evento.tipo === 'PARADA' ? '⏸️' :
+                                                                 evento.tipo === 'REANUDACION' ? '▶️' : '📍'}
+                                                            </span>
+                                                            <span style={{ fontSize: '13px' }}>
+                                                                {evento.descripcion}
+                                                            </span>
+                                                        </div>
+                                                        <div style={{ 
+                                                            fontSize: '11px', 
+                                                            color: '#64748b',
+                                                            marginTop: '4px',
+                                                            marginLeft: '22px'
+                                                        }}>
+                                                            {new Date(evento.timestamp).toLocaleTimeString('es-AR')}
+                                                            {evento.gps && ` | 📍 ${evento.gps.lat.toFixed(4)}, ${evento.gps.lng.toFixed(4)}`}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </details>
+
+                                        {/* Route Map Visualization */}
+                                        {trip.ruta && trip.ruta.length > 0 && (
+                                            <details style={{ marginTop: '12px' }}>
+                                                <summary style={{ 
+                                                    cursor: 'pointer', 
+                                                    color: '#3b82f6',
+                                                    fontSize: '12px',
+                                                    fontWeight: 500
+                                                }}>
+                                                    🗺️ Ver mapa del recorrido ({trip.ruta.length} puntos GPS)
+                                                </summary>
+                                                <div style={{ 
+                                                    marginTop: '12px',
+                                                    borderRadius: '12px',
+                                                    overflow: 'hidden',
+                                                    border: '1px solid #334155'
+                                                }}>
+                                                    {/* Static map showing route */}
+                                                    <div style={{
+                                                        height: '200px',
+                                                        background: '#1e293b',
+                                                        position: 'relative'
+                                                    }}>
+                                                        <iframe
+                                                            title={`Mapa Viaje ${savedTrips.length - index}`}
+                                                            style={{ width: '100%', height: '100%', border: 0 }}
+                                                            src={`https://www.openstreetmap.org/export/embed.html?bbox=${
+                                                                Math.min(...trip.ruta.map(p => p.lng)) - 0.01
+                                                            }%2C${
+                                                                Math.min(...trip.ruta.map(p => p.lat)) - 0.01
+                                                            }%2C${
+                                                                Math.max(...trip.ruta.map(p => p.lng)) + 0.01
+                                                            }%2C${
+                                                                Math.max(...trip.ruta.map(p => p.lat)) + 0.01
+                                                            }&layer=mapnik&marker=${
+                                                                trip.ruta[0].lat
+                                                            }%2C${
+                                                                trip.ruta[0].lng
+                                                            }`}
+                                                        />
+                                                    </div>
+                                                    {/* Route points legend */}
+                                                    <div style={{
+                                                        padding: '10px',
+                                                        background: 'rgba(30, 41, 59, 0.9)',
+                                                        display: 'flex',
+                                                        flexWrap: 'wrap',
+                                                        gap: '12px',
+                                                        fontSize: '11px'
+                                                    }}>
+                                                        <span style={{ color: '#22c55e' }}>
+                                                            🟢 Inicio: {trip.ruta[0].lat.toFixed(4)}, {trip.ruta[0].lng.toFixed(4)}
+                                                        </span>
+                                                        <span style={{ color: '#ef4444' }}>
+                                                            🔴 Fin: {trip.ruta[trip.ruta.length - 1].lat.toFixed(4)}, {trip.ruta[trip.ruta.length - 1].lng.toFixed(4)}
+                                                        </span>
+                                                        {trip.eventos.filter(e => e.tipo === 'INCIDENTE' && e.gps).map((e, i) => (
+                                                            <span key={i} style={{ color: '#fbbf24' }}>
+                                                                ⚠️ Incidente: {e.gps.lat.toFixed(4)}, {e.gps.lng.toFixed(4)}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </details>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 );
 
             case 'manifiestos':
@@ -567,14 +1246,31 @@ const MobileApp: React.FC = () => {
                                 <span className="qr-corner bottom-right"></span>
                             </div>
                             <div className="qr-scan-area">
-                                <QrCode size={70} strokeWidth={1.5} color="#64748b" />
+                                {cameraActive ? (
+                                    <video 
+                                        ref={videoRef} 
+                                        autoPlay 
+                                        playsInline 
+                                        muted
+                                        style={{
+                                            width: '100%',
+                                            height: '100%',
+                                            objectFit: 'cover',
+                                            borderRadius: '12px'
+                                        }}
+                                    />
+                                ) : (
+                                    <QrCode size={70} strokeWidth={1.5} color="#64748b" />
+                                )}
                             </div>
-                            <div className="qr-laser"></div>
+                            {!cameraActive && <div className="qr-laser"></div>}
                         </div>
-                        <p className="hint-text">Escanea el código QR del manifiesto</p>
-                        <button className="btn-primary">
+                        <p className="hint-text">
+                            {cameraActive ? 'Apunta al código QR del manifiesto' : 'Escanea el código QR del manifiesto'}
+                        </p>
+                        <button className="btn-primary" onClick={cameraActive ? stopCamera : startCamera}>
                             <Camera size={18} />
-                            Activar Cámara
+                            {cameraActive ? 'Detener Cámara' : 'Activar Cámara'}
                         </button>
                         <button className="btn-secondary">
                             Ingresar Manual
@@ -780,6 +1476,112 @@ const MobileApp: React.FC = () => {
             {showToast && (
                 <div className="toast-notification">
                     {toastMessage}
+                </div>
+            )}
+
+            {/* Incident Modal */}
+            {showIncidentModal && (
+                <div className="menu-overlay" onClick={() => setShowIncidentModal(false)}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+                        position: 'fixed',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        background: 'linear-gradient(180deg, #1e293b, #0f172a)',
+                        padding: '24px',
+                        borderRadius: '16px',
+                        width: '90%',
+                        maxWidth: '400px',
+                        zIndex: 10001,
+                        boxShadow: '0 25px 50px rgba(0,0,0,0.5)'
+                    }}>
+                        <h3 style={{ color: '#f87171', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <AlertTriangle size={24} />
+                            Registrar Incidente
+                        </h3>
+                        <textarea
+                            value={incidentText}
+                            onChange={(e) => setIncidentText(e.target.value)}
+                            placeholder="Describa el incidente..."
+                            style={{
+                                width: '100%',
+                                minHeight: '100px',
+                                padding: '12px',
+                                borderRadius: '8px',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                background: 'rgba(0,0,0,0.3)',
+                                color: '#fff',
+                                fontSize: '14px',
+                                resize: 'vertical'
+                            }}
+                        />
+                        {gpsPosition && (
+                            <p style={{ color: '#94a3b8', fontSize: '12px', marginTop: '8px' }}>
+                                📍 {gpsPosition.lat.toFixed(6)}, {gpsPosition.lng.toFixed(6)}
+                            </p>
+                        )}
+                        <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+                            <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowIncidentModal(false)}>
+                                Cancelar
+                            </button>
+                            <button className="btn-warning" style={{ flex: 1 }} onClick={handleConfirmIncident}>
+                                Confirmar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Parada Modal */}
+            {showParadaModal && (
+                <div className="menu-overlay" onClick={() => setShowParadaModal(false)}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+                        position: 'fixed',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        background: 'linear-gradient(180deg, #1e293b, #0f172a)',
+                        padding: '24px',
+                        borderRadius: '16px',
+                        width: '90%',
+                        maxWidth: '400px',
+                        zIndex: 10001,
+                        boxShadow: '0 25px 50px rgba(0,0,0,0.5)'
+                    }}>
+                        <h3 style={{ color: '#94a3b8', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Clock size={24} />
+                            Registrar Parada
+                        </h3>
+                        <textarea
+                            value={paradaText}
+                            onChange={(e) => setParadaText(e.target.value)}
+                            placeholder="Motivo de la parada (opcional)..."
+                            style={{
+                                width: '100%',
+                                minHeight: '80px',
+                                padding: '12px',
+                                borderRadius: '8px',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                background: 'rgba(0,0,0,0.3)',
+                                color: '#fff',
+                                fontSize: '14px',
+                                resize: 'vertical'
+                            }}
+                        />
+                        {gpsPosition && (
+                            <p style={{ color: '#94a3b8', fontSize: '12px', marginTop: '8px' }}>
+                                📍 {gpsPosition.lat.toFixed(6)}, {gpsPosition.lng.toFixed(6)}
+                            </p>
+                        )}
+                        <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+                            <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowParadaModal(false)}>
+                                Cancelar
+                            </button>
+                            <button className="btn-primary" style={{ flex: 1 }} onClick={handleConfirmParada}>
+                                Confirmar
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 

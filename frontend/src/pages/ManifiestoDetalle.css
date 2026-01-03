@@ -347,3 +347,122 @@
     margin: 0;
     font-size: 0.9rem;
 }
+/* ========== RESPONSIVE MÓVIL ========== */
+@media (max-width: 768px) {
+    .detalle-page {
+        padding: 1rem;
+    }
+
+    .detalle-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .detalle-title h2 {
+        font-size: 1.4rem;
+    }
+
+    .detalle-actions {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .detalle-actions .btn {
+        flex: 1;
+        min-width: 120px;
+        justify-content: center;
+    }
+
+    /* Progress Steps Mobile */
+    .progress-steps {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        padding: 0;
+    }
+
+    .progress-step {
+        flex: 0 0 auto;
+        min-width: 60px;
+    }
+
+    .step-icon {
+        width: 32px;
+        height: 32px;
+    }
+
+    .step-line {
+        display: none;
+    }
+
+    /* Grid Mobile: Stack vertically */
+    .detalle-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .detalle-section {
+        padding: 1rem;
+    }
+
+    /* Actor Cards Mobile */
+    .actor-card {
+        padding: 0.75rem;
+    }
+
+    .actor-icon {
+        width: 32px;
+        height: 32px;
+    }
+
+    /* Tables Mobile */
+    .data-table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .data-table th,
+    .data-table td {
+        white-space: nowrap;
+        padding: 0.5rem;
+        font-size: 0.8rem;
+    }
+
+    /* Modal Mobile */
+    .modal-content {
+        margin: 1rem;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .qr-container img {
+        width: 200px;
+        height: 200px;
+    }
+}
+
+@media (max-width: 480px) {
+    .detalle-page {
+        padding: 0.75rem;
+    }
+
+    .detalle-title h2 {
+        font-size: 1.1rem;
+    }
+
+    .step-icon {
+        width: 28px;
+        height: 28px;
+    }
+
+    .actor-card {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .qr-container img {
+        width: 160px;
+        height: 160px;
+    }
+}

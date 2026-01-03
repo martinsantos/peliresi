@@ -15,6 +15,9 @@ router.use(isAuthenticated);
 // Reportes disponibles para todos los roles autenticados
 router.get('/manifiestos', reporteManifiestosPorPeriodo);
 
+// Alias para estadísticas generales (CU-A11, CU-O12)
+router.get('/estadisticas', reporteManifiestosPorPeriodo);
+
 // Reportes de operador
 router.get('/tratados', reporteResiduosTratados);
 

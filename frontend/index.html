@@ -3,11 +3,11 @@
 
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" type="image/png" href="/demoambiente/icon-192.png" />
+  <link rel="icon" type="image/png" href="/icon-192.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <!-- PWA Manifest -->
-  <link rel="manifest" href="/demoambiente/manifest.json" />
+  <link rel="manifest" href="/manifest.webmanifest" />
 
   <!-- Mobile Meta Tags -->
   <meta name="theme-color" content="#10b981" />
@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="DGFA RRPP" />
-  <link rel="apple-touch-icon" href="/demoambiente/icon-192.png" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
 
   <!-- SEO - Block indexing for demo -->
   <meta name="robots" content="noindex, nofollow" />
@@ -29,17 +29,18 @@
   <div id="root"></div>
   <script type="module" src="/src/main.tsx"></script>
 
-  <!-- Service Worker para PWA -->
+  <!-- Script para limpiar Service Workers obsoletos de la demo anterior -->
   <script>
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/demoambiente/sw.js', { scope: '/demoambiente/' })
-          .then((registration) => {
-            console.log('✅ Service Worker registrado:', registration.scope);
-          })
-          .catch((error) => {
-            console.error('❌ Error al registrar Service Worker:', error);
-          });
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for(let registration of registrations) {
+          if (registration.scope.includes('demoambiente')) {
+            console.log('🧹 Limpiando SW obsoleto');
+            registration.unregister().then(() => {
+              window.location.reload();
+            });
+          }
+        }
       });
     }
   </script>

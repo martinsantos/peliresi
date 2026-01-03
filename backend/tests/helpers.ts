@@ -1,7 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 
+// Tipo extendido para incluir user (como AuthRequest del middleware)
+interface MockRequest extends Partial<Request> {
+  user?: { id: string; rol: string; [key: string]: any };
+}
+
 // Mocks básicos
-export const mockRequest = (options: Partial<Request> = {}): Partial<Request> => ({
+export const mockRequest = (options: MockRequest = {}): MockRequest => ({
   body: {},
   params: {},
   query: {},

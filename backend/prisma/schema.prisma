@@ -23,6 +23,15 @@ model Usuario {
   activo          Boolean     @default(true)
   dosFaSecret     String?
   dosFaVerificado Boolean     @default(false)
+  
+  // Campos de aprobación de usuarios
+  aprobado        Boolean     @default(true)  // true para usuarios existentes
+  fechaSolicitud  DateTime?
+  motivoSolicitud String?
+  aprobadoPorId   String?
+  fechaAprobacion DateTime?
+  motivoRechazo   String?
+  
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -36,6 +45,8 @@ model Usuario {
   auditorias      Auditoria[]         @relation("UsuarioAuditorias")
   notificaciones  Notificacion[]
   reglasCreadas   ReglaAlerta[]       @relation("ReglasCreadas")
+  pushSubscriptions PushSubscription[]
+  logsActividad   LogActividad[]
 
   @@map("usuarios")
 }
@@ -178,6 +189,7 @@ model Manifiesto {
   fechaRecepcion  DateTime?
   fechaCierre     DateTime?
   qrCode          String?
+  firmaDigital    Json?       // Datos de firma PKI simulada
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -504,4 +516,42 @@ model DemoAccess {
   
   @@index([sessionId])
   @@map("demo_access")
+}
+
+// ========== PUSH NOTIFICATIONS ==========
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  usuarioId String
+  endpoint  String   @unique
+  p256dh    String   // Keys
+  auth      String   // Keys
+  createdAt DateTime @default(now())
+  
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  
+  @@index([usuarioId])
+  @@map("push_subscriptions")
+}
+
+// ========== LOG DE ACTIVIDAD (AUDITORÍA COMPLETA) ==========
+
+model LogActividad {
+  id         String   @id @default(cuid())
+  usuarioId  String
+  accion     String   // LOGIN, LOGOUT, CREAR_MANIFIESTO, FIRMAR, etc.
+  modulo     String   // MANIFIESTOS, USUARIOS, SISTEMA, AUTH
+  entidadId  String?  // ID del manifiesto, usuario, etc.
+  detalles   Json?    // Datos adicionales
+  ip         String?
+  userAgent  String?
+  timestamp  DateTime @default(now())
+  
+  usuario    Usuario  @relation(fields: [usuarioId], references: [id])
+  
+  @@index([usuarioId])
+  @@index([accion])
+  @@index([modulo])
+  @@index([timestamp])
+  @@map("log_actividad")
 }

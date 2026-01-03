@@ -205,3 +205,52 @@ export const logout = async (req: Request, res: Response, next: NextFunction) =>
     next(error);
   }
 };
+
+// Obtener lista de usuarios (CU-A03 - Gestionar Usuarios)
+export const getUsers = async (req: Request & { user?: any }, res: Response, next: NextFunction) => {
+  try {
+    const { page = 1, limit = 20, rol, activo } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const where: any = {};
+    if (rol) where.rol = rol;
+    if (activo !== undefined) where.activo = activo === 'true';
+
+    const [users, total] = await Promise.all([
+      prisma.usuario.findMany({
+        where,
+        skip,
+        take: Number(limit),
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          email: true,
+          rol: true,
+          nombre: true,
+          apellido: true,
+          empresa: true,
+          telefono: true,
+          activo: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.usuario.count({ where }),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        users,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total,
+          pages: Math.ceil(total / Number(limit)),
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};

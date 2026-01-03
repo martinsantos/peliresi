@@ -399,59 +399,177 @@
     transform: scale(0.95);
 }
 
-.empty-state {
-    text-align: center;
-    padding: 3rem 2rem;
+/* Action Messages (Toasts) */
+.action-message {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    right: 20px;
+    padding: 1rem;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: white;
+    font-weight: 600;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+    z-index: 2000;
+}
+
+.action-message.success {
+    background: #10b981;
+}
+
+.action-message.error {
+    background: #ef4444;
+}
+
+/* Scanner Overlay */
+.scanner-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 3000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+}
+
+.scanner-container {
+    width: 100%;
+    max-width: 400px;
+    background: white;
+    border-radius: 24px;
+    overflow: hidden;
+    padding: 1.5rem;
+}
+
+.scanner-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.scanner-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: #1e293b;
+}
+
+.close-scanner {
+    background: #f1f5f9;
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     color: #64748b;
-    font-size: 0.95rem;
 }
 
-/* === CRITICAL: Force vertical layout and fix overflow === */
-.mobile-app .mobile-content,
-.mobile-app .cards-list {
-    display: flex !important;
-    flex-direction: column !important;
+#reader {
     width: 100% !important;
-    max-width: 100% !important;
-    overflow-x: hidden !important;
+    border: none !important;
+    border-radius: 16px;
+    overflow: hidden;
 }
 
-.mobile-app .mobile-card {
-    display: flex !important;
-    flex-direction: column !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
+#reader video {
+    border-radius: 16px;
 }
 
-.mobile-app .card-header,
-.mobile-app .card-body,
-.mobile-app .card-footer {
-    width: 100% !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
+.scanner-hint {
+    text-align: center;
+    color: #64748b;
+    font-size: 0.9rem;
+    margin-top: 1.5rem;
 }
 
-.mobile-app .btn-mobile {
-    width: 100% !important;
-    box-sizing: border-box !important;
+/* Card Improvements */
+.address {
+    font-size: 0.8rem;
+    color: #64748b;
+    margin-top: 2px;
 }
 
-/* Fix header overflow */
-.mobile-app .mobile-header {
-    width: 100% !important;
-    max-width: 100% !important;
-    overflow: hidden !important;
-    box-sizing: border-box !important;
+.quantity {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #f59e0b;
+    background: #fef3c7;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-top: 4px;
+    display: inline-block;
+    width: fit-content;
 }
 
-.mobile-app .offline-indicator-bar {
-    width: auto !important;
-    max-width: 100% !important;
+.tab-indicator {
+    position: absolute;
+    bottom: -10px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: #f59e0b;
+    border-radius: 3px;
 }
 
-.mobile-app .mobile-stats {
-    width: 100% !important;
-    max-width: 100% !important;
-    overflow: hidden !important;
+.tab-btn {
+    position: relative;
+}
+
+.spinning {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.mobile-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    color: #64748b;
+    gap: 1rem;
+}
+
+.mobile-loading p {
+    font-weight: 500;
+}
+
+/* Empty State adjustment */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+/* Status variants */
+.mobile-card.aprobado { border-left-color: #f59e0b; }
+.mobile-card.en_transito { border-left-color: #3b82f6; }
+.mobile-card.entregado { border-left-color: #10b981; }
+
+/* FAB with glass effect */
+.fab-scan {
+    backdrop-filter: blur(4px);
+    background: rgba(30, 41, 59, 0.9);
+}
+
+/* Responsive adjustment for small screens */
+@media (max-width: 360px) {
+    .mobile-header { padding: 1rem; }
+    .mobile-stats { gap: 0.4rem; }
+    .stat-card { padding: 0.5rem; }
+    .stat-value { font-size: 1.25rem; }
 }

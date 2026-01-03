@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import { PrismaClient, TipoNotificacion, PrioridadNotificacion, EventoAlerta, EstadoAlerta, TipoAnomalia, SeveridadAnomalia } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { TipoNotificacion, PrioridadNotificacion, EventoAlerta, EstadoAlerta, TipoAnomalia, SeveridadAnomalia } from '@prisma/client';
+import prisma from '../lib/prisma';
+import { emailService } from '../services/email.service';
 
 // ============ SERVICIO DE NOTIFICACIONES ============
 
@@ -128,6 +128,21 @@ class NotificationService {
                 manifiestoId,
                 prioridad: nuevoEstado === 'RECHAZADO' ? 'ALTA' : 'NORMAL'
             });
+
+            // Enviar email si es el generador, transportista u operador
+            const usuario = await prisma.usuario.findUnique({
+                where: { id: usuarioId },
+                select: { email: true, rol: true }
+            });
+
+            if (usuario && usuario.email) {
+                await emailService.sendManifestNotification(
+                    usuario.email,
+                    manifiesto.numero,
+                    nuevoEstado,
+                    info.mensaje
+                );
+            }
         }
     }
 }
