@@ -58,10 +58,12 @@ const MobileApp: React.FC = () => {
         lng: number;
         timestamp: string;
     }>>([]);
+    // Ref for route storage - avoids React closure issues in setInterval
+    const viajeRutaRef = useRef<Array<{lat: number; lng: number; timestamp: string}>>([]);
+    
     const [showToast, setShowToast] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
     const intervalRef = useRef<number | null>(null);
-    const routeTrackingRef = useRef<number | null>(null);
     
     // Camera and GPS state
     const [cameraActive, setCameraActive] = useState(false);
@@ -139,44 +141,72 @@ const MobileApp: React.FC = () => {
         };
     }, [viajeActivo, viajePausado]);
 
-    // GPS Route Tracking - record position every 5 seconds during active trip
+
+    // GPS Route Tracking - use setInterval for reliable periodic tracking
+    const gpsRouteIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const lastRoutePointTime = useRef<number>(0);
+    
     useEffect(() => {
-        if (viajeActivo && !viajePausado && gpsAvailable) {
-            // Record position immediately when starting
-            if (gpsPosition) {
-                setViajeRuta(prev => [...prev, {
-                    lat: gpsPosition.lat,
-                    lng: gpsPosition.lng,
-                    timestamp: new Date().toISOString()
-                }]);
-            }
+        // DEBUG: Log when useEffect fires
+        console.log('🔄 GPS useEffect fired - viajeActivo:', viajeActivo, 'viajePausado:', viajePausado);
+        
+        // Start GPS tracking when trip is active and not paused
+        if (viajeActivo && !viajePausado && 'geolocation' in navigator) {
+            console.log('🛰️ Iniciando tracking GPS para ruta...');
             
-            // Then record every 5 seconds
-            routeTrackingRef.current = window.setInterval(() => {
+            // Get initial position immediately
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    const point = {
+                        lat: pos.coords.latitude,
+                        lng: pos.coords.longitude,
+                        timestamp: new Date().toISOString()
+                    };
+                    setGpsPosition({ lat: point.lat, lng: point.lng });
+                    // Store initial point in ref AND state
+                    viajeRutaRef.current = [point];
+                    setViajeRuta([point]);
+                    lastRoutePointTime.current = Date.now();
+                    console.log('📍 Punto inicial ruta guardado:', point, 'Ref length:', viajeRutaRef.current.length);
+                },
+                (err) => console.warn('GPS inicial error:', err.message),
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+            
+            // Use setInterval for reliable periodic tracking every 5 seconds
+            gpsRouteIntervalRef.current = setInterval(() => {
                 navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const newPoint = {
-                            lat: position.coords.latitude,
-                            lng: position.coords.longitude,
+                    (pos) => {
+                        const point = {
+                            lat: pos.coords.latitude,
+                            lng: pos.coords.longitude,
                             timestamp: new Date().toISOString()
                         };
-                        setGpsPosition({ lat: newPoint.lat, lng: newPoint.lng });
-                        setViajeRuta(prev => [...prev, newPoint]);
-                        console.log('📍 Ruta actualizada:', newPoint);
+                        setGpsPosition({ lat: point.lat, lng: point.lng });
+                        
+                        // Store point in ref (reliable) AND update state for UI
+                        viajeRutaRef.current = [...viajeRutaRef.current, point];
+                        setViajeRuta([...viajeRutaRef.current]); // Sync state with ref
+                        lastRoutePointTime.current = Date.now();
+                        console.log('📍 Ruta actualizada:', point, 'Total puntos:', viajeRutaRef.current.length);
                     },
-                    (error) => console.warn('GPS tracking error:', error.message),
-                    { enableHighAccuracy: true, timeout: 4000 }
+                    (err) => console.warn('GPS tracking error:', err.message),
+                    { enableHighAccuracy: true, timeout: 4000, maximumAge: 2000 }
                 );
-            }, 5000);
+            }, 5000); // Every 5 seconds
         }
         
+        // Cleanup: stop tracking when trip ends or pauses
         return () => {
-            if (routeTrackingRef.current) {
-                clearInterval(routeTrackingRef.current);
-                routeTrackingRef.current = null;
+            if (gpsRouteIntervalRef.current !== null) {
+                console.log('🛑 Deteniendo tracking GPS');
+                clearInterval(gpsRouteIntervalRef.current);
+                gpsRouteIntervalRef.current = null;
             }
         };
-    }, [viajeActivo, viajePausado, gpsAvailable]);
+    }, [viajeActivo, viajePausado]);
+
+
 
 
     // Format time
@@ -274,30 +304,8 @@ const MobileApp: React.FC = () => {
     };
 
     // ===== GPS FUNCTIONS =====
-    const startGPS = () => {
-        if ('geolocation' in navigator) {
-            const watchId = navigator.geolocation.watchPosition(
-                (position) => {
-                    setGpsPosition({
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude
-                    });
-                },
-                (error) => {
-                    console.error('GPS error:', error);
-                    showToastMessage('⚠️ Error GPS: ' + error.message);
-                },
-                { 
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 5000
-                }
-            );
-            setGpsWatchId(watchId);
-        } else {
-            showToastMessage('❌ GPS no disponible');
-        }
-    };
+    // GPS tracking is now handled by useEffect with watchPosition when trip is active
+
 
     const stopGPS = () => {
         if (gpsWatchId !== null) {
@@ -309,24 +317,48 @@ const MobileApp: React.FC = () => {
 
     const handleIniciarViaje = () => {
         const inicio = new Date();
-        const inicioEvento = {
-            tipo: 'INICIO' as const,
-            descripcion: 'Viaje iniciado',
-            timestamp: inicio.toISOString(),
-            gps: gpsPosition
-        };
         
+        // Start trip state immediately (optimistic UI)
         setViajeActivo(true);
         setViajePausado(false);
         setViajeInicio(inicio);
-        setViajeEventos([inicioEvento]);
+        viajeRutaRef.current = []; // Reset ref for new trip
         setViajeRuta([]); // Reset route for new trip
         setTiempoViaje(0);
         setCurrentScreen('viaje');
-        startGPS();
         
-        showToastMessage('🚛 Viaje iniciado - GPS ' + (gpsPosition ? 'activo' : 'detectando...'));
-        analyticsService.trackAction('iniciar_viaje', 'viaje', role || undefined, { gps: gpsPosition });
+        // Get fresh GPS for INICIO event
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const gps = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                setGpsPosition(gps);
+                
+                const inicioEvento = {
+                    tipo: 'INICIO' as const,
+                    descripcion: 'Viaje iniciado',
+                    timestamp: inicio.toISOString(),
+                    gps: gps
+                };
+                setViajeEventos([inicioEvento]);
+                console.log('🚀 Viaje iniciado con GPS:', gps);
+                showToastMessage('🚛 Viaje iniciado - GPS activo');
+            },
+            (error) => {
+                // If GPS fails, still record the event without location
+                console.warn('GPS al iniciar:', error.message);
+                const inicioEvento = {
+                    tipo: 'INICIO' as const,
+                    descripcion: 'Viaje iniciado (sin GPS)',
+                    timestamp: inicio.toISOString(),
+                    gps: null
+                };
+                setViajeEventos([inicioEvento]);
+                showToastMessage('🚛 Viaje iniciado - GPS no disponible');
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+        
+        analyticsService.trackAction('iniciar_viaje', 'viaje', role || undefined);
     };
 
     const handleFinalizarViaje = () => {
@@ -340,13 +372,15 @@ const MobileApp: React.FC = () => {
         const eventosFinales = [...viajeEventos, finEvento];
         
         // Save trip to localStorage with route for map visualization
+        // Use ref.current for ruta as it's more reliable than state in async contexts
+        const rutaFinal = viajeRutaRef.current.length > 0 ? viajeRutaRef.current : viajeRuta;
         const tripData = {
             id: Date.now().toString(),
             inicio: viajeInicio?.toISOString(),
             fin: finEvento.timestamp,
             duracion: tiempoViaje,
             eventos: eventosFinales,
-            ruta: viajeRuta, // Include GPS route for map
+            ruta: rutaFinal, // Include GPS route for map (from ref)
             role: role
         };
         
@@ -362,6 +396,7 @@ const MobileApp: React.FC = () => {
         setViajePausado(false);
         setTiempoViaje(0);
         setViajeEventos([]);
+        viajeRutaRef.current = []; // Clear ref
         setViajeRuta([]);
         setViajeInicio(null);
         stopGPS();
