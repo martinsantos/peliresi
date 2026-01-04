@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import jsQR from 'jsqr';
 import {
     QrCode,
     Camera,
@@ -102,12 +103,16 @@ const QRScanner: React.FC<QRScannerProps> = ({ onClose, onScanSuccess }) => {
         }
     };
 
-    // Simula la detección de QR - en producción usar jsQR
-    const checkForQRPattern = (_imageData: ImageData): string | null => {
-        // Esta es una simulación. En producción:
-        // import jsQR from 'jsqr';
-        // const code = jsQR(imageData.data, imageData.width, imageData.height);
-        // return code?.data || null;
+    // Real QR detection using jsQR library
+    const checkForQRPattern = (imageData: ImageData): string | null => {
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: 'dontInvert',
+        });
+        
+        if (code && code.data) {
+            console.log('✅ QR Code detected:', code.data);
+            return code.data;
+        }
         return null;
     };
 
