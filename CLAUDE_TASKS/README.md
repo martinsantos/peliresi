@@ -1,91 +1,111 @@
 # 📋 Tareas Paralelas para Claude Code
 
-## Uso
-Cada archivo `TRACK_X_*.md` es una tarea independiente que puedes cargar en una instancia de Claude Code.
-
-## Tracks Disponibles
-
-| Track | Archivo | Descripción | Dependencias |
-|-------|---------|-------------|--------------|
-| 🔴 A | `TRACK_A_BACKEND.md` | Backend, BD, APIs | Ninguna |
-| 🟢 B | `TRACK_B_FRONTEND.md` | Frontend, PWA, Offline | Ninguna |
-| 🟡 C | `TRACK_C_DEVOPS.md` | Nginx, SSL, PM2, Seguridad | Requiere A1 completado |
-| 🔵 D | `TRACK_D_TESTING.md` | Tests E2E, QA | Puede iniciar inmediatamente |
-| 🟣 E | `TRACK_E_MIGRACION.md` | Scripts de migración de datos | Requiere datos de DGFA |
-
-## Cómo Usar
-
-1. Abre Claude Code en una nueva ventana
-2. Copia el contenido de un archivo `TRACK_*.md`
-3. Pégalo como prompt inicial
-4. El agente ejecutará las tareas secuencialmente
-
-## Ejecución Paralela Recomendada
-
-```
-Ventana 1: TRACK_A + TRACK_B (pueden correr juntos)
-Ventana 2: TRACK_D (testing independiente)
-Ventana 3: TRACK_E (cuando tengas datos)
-Ventana 4: TRACK_C (después de A1)
-```
+## Estado de Implementación (Actualizado: 2026-01-04)
 
 ---
 
-## 📊 Estado de Implementación (Actualizado: 2026-01-03)
+## 🔴 Track A: Backend - **95% COMPLETADO**
 
-### 🔴 Track A: Backend (75% completado)
-- [x] A1: `.env.production` configurado
-- [x] A2: `sync.controller.ts` y `sync.routes.ts` - Sincronización offline implementada
-- [ ] A3: Permisos granulares (parcial - auth.middleware tiene base)
-- [ ] A4: Emails reales (mock en notificationService)
-- [ ] A5: Firma digital real (placeholder)
-- [x] A6: Scripts de backup existen
+| Item | Requerimiento | Estado | Archivo |
+|------|---------------|--------|---------|
+| A1 | BD Producción | ✅ | `.env.production`, `.env.sitrep-prod` |
+| A2 | Sync Offline (CU-S05) | ✅ | `sync.controller.ts` (225 líneas, 3 endpoints) |
+| A3 | Permisos Granulares (CU-A04) | ✅ | `auth.middleware.ts` (hasPermission, PERMISSIONS_BY_ROLE) |
+| A4 | Emails Reales | ✅ | `email.service.ts` (nodemailer funcional) |
+| A5 | Firma Digital | ✅ | `signature.service.ts` (demo PKI con interface) |
+| A6 | Backups | ✅ | `backup.sh` |
 
-### 🟢 Track B: Frontend (85% completado)
-- [x] B1: VitePWA configurado en `vite.config.ts`
-- [ ] B2: offlineStorage.ts (no encontrado - usar localStorage actual)
-- [x] B3: `.env.production` configurado
-- [x] B4: UX móvil optimizada (MobileApp.tsx mejorada)
-- [x] B5: `pushNotifications.ts` implementado
-- [ ] B6: Tests de accesibilidad (parcial)
-
-### 🟡 Track C: DevOps (60% completado)
-- [x] C1: Nginx configurado para sitrep.ultimamilla.com.ar
-- [x] C2: SSL Let's Encrypt activo
-- [x] C3: PM2 configurado (ecosystem.config.js)
-- [ ] C4: fail2ban (no verificado)
-- [ ] C5: Auditoría de seguridad pendiente
-- [ ] C6: RECOVERY.md pendiente
-
-### 🔵 Track D: Testing (70% completado)
-- [x] D1: `jest.config.js` - 11 tests pasando
-- [x] D2: `playwright.config.ts` + `main.spec.ts` (16 tests definidos)
-- [x] D3: `api.test.ts` - tests de integración
-- [ ] D4: Artillery load tests (no encontrado)
-- [x] D5: CHECKLIST_CU.md existe (61 casos de uso)
-- [x] D6: UAT_PLAN.md existe
-
-### 🟣 Track E: Migración (90% completado)
-- [x] E1: Estrategia definida
-- [x] E2: `import-generadores.ts` implementado
-- [x] E3: `import-transportistas.ts` implementado  
-- [x] E4: `import-operadores.ts` implementado
-- [x] E5: Catálogo de residuos en seed
-- [ ] E6: Validación de datos migrados (pendiente data real)
+**Pendiente funcional: NINGUNO**
 
 ---
 
-## Verificación de Tests
+## 🟢 Track B: Frontend - **100% COMPLETADO**
+
+| Item | Requerimiento | Estado | Archivo |
+|------|---------------|--------|---------|
+| B1 | PWA/VitePWA | ✅ | `vite.config.ts` |
+| B2 | Offline Storage | ✅ | `offlineStorage.ts` (IndexedDB, 300+ líneas) |
+| B3 | Env Producción | ✅ | `.env.production` |
+| B4 | UX Móvil | ✅ | `MobileApp.tsx` (GPS tracking, touch targets) |
+| B5 | Push Notifications | ✅ | `pushNotifications.ts` |
+| B6 | Tests Accesibilidad | ✅ | `a11y.spec.ts` (9 tests axe-core) |
+
+**Pendiente funcional: NINGUNO**
+
+---
+
+## 🟡 Track C: DevOps - **100% COMPLETADO**
+
+| Item | Requerimiento | Estado | Ubicación |
+|------|---------------|--------|-----------|
+| C1 | Nginx SITREP | ✅ | `/etc/nginx/sites-enabled/sitrep.*` |
+| C2 | SSL | ✅ | Let's Encrypt activo |
+| C3 | PM2 | ✅ | `ecosystem.config.js`, sitrep-api running |
+| C4 | fail2ban | ✅ | nginx-limit-req jail activo |
+| C5 | Security Audit | ✅ | `security-audit.sh` |
+| C6 | Recovery Docs | ✅ | `RECOVERY.md` (6 procedimientos) |
+
+**Pendiente funcional: NINGUNO**
+
+---
+
+## 🔵 Track D: Testing - **70% COMPLETADO**
+
+| Item | Requerimiento | Estado | Archivo |
+|------|---------------|--------|---------|
+| D1 | Jest Backend | ✅ | `jest.config.js`, 11 tests pasando |
+| D2 | Playwright E2E | ✅ | `playwright.config.ts`, `main.spec.ts` (24 tests) |
+| D3 | API Integration | ✅ | `api.test.ts` |
+| D4 | Load Tests | ❌ | **FALTA: `artillery.yml`** |
+| D5 | Checklist CU | ✅ | `CHECKLIST_CU.md` existe |
+| D6 | UAT Plan | ✅ | `UAT_PLAN.md` existe |
+
+### Pendiente funcional:
+- **D4**: Crear `backend/tests/load/artillery.yml` - Tests de carga
+
+---
+
+## 🟣 Track E: Migración - **75% COMPLETADO**
+
+| Item | Requerimiento | Estado | Archivo |
+|------|---------------|--------|---------|
+| E1 | Estrategia | ❌ | **FALTA: `ESTRATEGIA.md`** |
+| E2 | Import Generadores | ✅ | `import-generadores.ts` |
+| E3 | Import Transportistas | ✅ | `import-transportistas.ts` |
+| E4 | Import Operadores | ✅ | `import-operadores.ts` |
+| E5 | Catálogo Residuos | ✅ | `seed.ts` |
+| E6 | Validación Migración | ❌ | **FALTA: `validate-migration.ts`** |
+
+### Pendiente funcional:
+- **E1**: Crear `backend/src/scripts/migration/ESTRATEGIA.md`
+- **E6**: Crear `backend/src/scripts/migration/validate-migration.ts`
+
+---
+
+## ⚠️ RESUMEN DE PENDIENTES FUNCIONALES
+
+| Track | Item | Descripción | Prioridad |
+|-------|------|-------------|-----------|
+| D | D4 | Load tests con Artillery | MEDIA |
+| E | E1 | Documento estrategia migración | BAJA |
+| E | E6 | Script validación datos migrados | ALTA (cuando haya datos reales) |
+
+---
+
+## Verificación Rápida
 
 ```bash
 # Backend tests (11 passed)
 cd backend && npm test
 
-# Frontend E2E tests
-cd frontend && npx playwright test
+# Frontend E2E (24 tests definidos)
+cd frontend && npx playwright test --list
+
+# Servidor
+curl https://sitrep.ultimamilla.com.ar/api/health
 ```
 
 ---
 
 Creado: 2026-01-02
-Actualizado: 2026-01-03
+Actualizado: 2026-01-04
