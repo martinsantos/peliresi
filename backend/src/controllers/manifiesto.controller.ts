@@ -271,9 +271,9 @@ export const firmarManifiesto = async (req: AuthRequest, res: Response, next: Ne
       cuit: usuario.cuit || undefined
     });
 
-    // Generar código QR con URL de verificación única
+    // Generar código QR con URL de verificación PÚBLICA (sin login)
     const baseUrl = config.CORS_ORIGIN.split(',')[0].trim();
-    const verificationUrl = `${baseUrl}/manifiestos/${manifiesto.id}`;
+    const verificationUrl = `${baseUrl}/verify/${manifiesto.id}`;
     
     // El contenido del QR será la URL directa
     const qrData = verificationUrl;
