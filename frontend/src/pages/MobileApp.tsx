@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import jsQR from 'jsqr';
 import {
     Home, FileText, MapPin, Bell, Settings, User, Menu,
     Truck, Package, Factory, Building2, QrCode, Camera,
@@ -72,6 +73,9 @@ const MobileApp: React.FC = () => {
     const [gpsWatchId, setGpsWatchId] = useState<number | null>(null);
     const [gpsAvailable, setGpsAvailable] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const [scannedQR, setScannedQR] = useState<string | null>(null);
+    const scanningRef = useRef<boolean>(false);
     
     // Incident and Stop modals
     const [showIncidentModal, setShowIncidentModal] = useState(false);
@@ -193,7 +197,7 @@ const MobileApp: React.FC = () => {
                     (err) => console.warn('GPS tracking error:', err.message),
                     { enableHighAccuracy: true, timeout: 4000, maximumAge: 2000 }
                 );
-            }, 5000); // Every 5 seconds
+            }, 30000); // Every 30 seconds
         }
         
         // Cleanup: stop tracking when trip ends or pauses
@@ -274,21 +278,70 @@ const MobileApp: React.FC = () => {
     };
 
     // ===== CAMERA FUNCTIONS =====
+    const scanQRFromVideo = () => {
+        if (!scanningRef.current || !videoRef.current || !canvasRef.current) return;
+        
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        
+        if (ctx && video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            try {
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: 'dontInvert',
+                });
+                
+                if (code && code.data) {
+                    console.log('✅ QR Code detected:', code.data);
+                    scanningRef.current = false;
+                    setScannedQR(code.data);
+                    stopCamera();
+                    
+                    // Open the QR URL (should be public verification URL)
+                    if (code.data.startsWith('http')) {
+                        window.open(code.data, '_blank');
+                        showToastMessage('✅ QR escaneado - Abriendo verificación');
+                    } else {
+                        showToastMessage(`✅ QR: ${code.data}`);
+                    }
+                    return;
+                }
+            } catch (err) {
+                console.error('Error scanning QR:', err);
+            }
+        }
+        
+        if (scanningRef.current) {
+            requestAnimationFrame(scanQRFromVideo);
+        }
+    };
+
     const startCamera = async () => {
         console.log('🎥 startCamera called');
+        setScannedQR(null);
         try {
             console.log('🎥 Requesting camera...');
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'environment' }
+                video: { facingMode: 'environment', width: 640, height: 480 }
             });
             console.log('🎥 Camera stream obtained:', stream);
             setCameraStream(stream);
             setCameraActive(true);
+            
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
-                console.log('🎥 Video element connected');
+                videoRef.current.onloadedmetadata = () => {
+                    scanningRef.current = true;
+                    requestAnimationFrame(scanQRFromVideo);
+                };
+                console.log('🎥 Video element connected, QR scanning started');
             }
-            showToastMessage('📷 Cámara activada');
+            showToastMessage('📷 Cámara activada - Escaneando QR...');
         } catch (err: any) {
             console.error('❌ Camera error:', err);
             showToastMessage('❌ No se pudo acceder a la cámara: ' + (err.message || 'Permiso denegado'));
@@ -296,6 +349,7 @@ const MobileApp: React.FC = () => {
     };
 
     const stopCamera = () => {
+        scanningRef.current = false;
         if (cameraStream) {
             cameraStream.getTracks().forEach(track => track.stop());
             setCameraStream(null);
@@ -1282,23 +1336,32 @@ const MobileApp: React.FC = () => {
                             </div>
                             <div className="qr-scan-area">
                                 {cameraActive ? (
-                                    <video 
-                                        ref={videoRef} 
-                                        autoPlay 
-                                        playsInline 
-                                        muted
-                                        style={{
-                                            width: '100%',
-                                            height: '100%',
-                                            objectFit: 'cover',
-                                            borderRadius: '12px'
-                                        }}
-                                    />
+                                    <>
+                                        <video 
+                                            ref={videoRef} 
+                                            autoPlay 
+                                            playsInline 
+                                            muted
+                                            style={{
+                                                width: '100%',
+                                                height: '100%',
+                                                objectFit: 'cover',
+                                                borderRadius: '12px'
+                                            }}
+                                        />
+                                        <canvas ref={canvasRef} style={{ display: 'none' }} />
+                                    </>
+                                ) : scannedQR ? (
+                                    <div style={{ textAlign: 'center', padding: '20px' }}>
+                                        <CheckCircle size={48} color="#22c55e" />
+                                        <p style={{ marginTop: '10px', fontWeight: 'bold' }}>QR Escaneado</p>
+                                        <p style={{ fontSize: '12px', wordBreak: 'break-all' }}>{scannedQR}</p>
+                                    </div>
                                 ) : (
                                     <QrCode size={70} strokeWidth={1.5} color="#64748b" />
                                 )}
                             </div>
-                            {!cameraActive && <div className="qr-laser"></div>}
+                            {!cameraActive && !scannedQR && <div className="qr-laser"></div>}
                         </div>
                         <p className="hint-text">
                             {cameraActive ? 'Apunta al código QR del manifiesto' : 'Escanea el código QR del manifiesto'}

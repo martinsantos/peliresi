@@ -86,6 +86,86 @@ app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', message: 'API is running' });
 });
 
+// ========== RUTA PÚBLICA DE VERIFICACIÓN (Sin autenticación - para auditoría QR) ==========
+app.get('/api/public/verify/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    
+    const manifiesto = await prisma.manifiesto.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        numero: true,
+        estado: true,
+        fechaCreacion: true,
+        fechaFirma: true,
+        fechaRetiro: true,
+        fechaEntrega: true,
+        fechaRecepcion: true,
+        fechaCierre: true,
+        qrCode: true,
+        firmaDigital: true,
+        generador: { select: { razonSocial: true, cuit: true } },
+        transportista: { select: { razonSocial: true, cuit: true } },
+        operador: { select: { razonSocial: true, cuit: true } },
+        residuos: {
+          select: {
+            cantidad: true,
+            unidad: true,
+            tipoResiduo: { select: { nombre: true, codigo: true } }
+          }
+        },
+        eventos: {
+          select: { tipo: true, descripcion: true, createdAt: true },
+          orderBy: { createdAt: 'desc' },
+          take: 10
+        }
+      }
+    });
+
+    if (!manifiesto) {
+      return res.status(404).json({
+        success: false,
+        error: 'Manifiesto no encontrado'
+      });
+    }
+
+    res.json({
+      success: true,
+      verificacion: {
+        manifiestoId: manifiesto.id,
+        numero: manifiesto.numero,
+        estado: manifiesto.estado,
+        cadenaResponsabilidad: {
+          generador: manifiesto.generador.razonSocial,
+          transportista: manifiesto.transportista.razonSocial,
+          operador: manifiesto.operador.razonSocial
+        },
+        timeline: {
+          creacion: manifiesto.fechaCreacion,
+          firma: manifiesto.fechaFirma,
+          retiro: manifiesto.fechaRetiro,
+          entrega: manifiesto.fechaEntrega,
+          recepcion: manifiesto.fechaRecepcion,
+          cierre: manifiesto.fechaCierre
+        },
+        residuos: manifiesto.residuos.map(r => ({
+          tipo: r.tipoResiduo.nombre,
+          codigo: r.tipoResiduo.codigo,
+          cantidad: r.cantidad,
+          unidad: r.unidad
+        })),
+        firmaDigital: manifiesto.firmaDigital ? 'FIRMADO DIGITALMENTE' : 'SIN FIRMA',
+        eventos: manifiesto.eventos,
+        verificadoEn: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Error en verificación pública:', error);
+    res.status(500).json({ success: false, error: 'Error al verificar manifiesto' });
+  }
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/manifiestos', manifiestoRoutes);
 app.use('/api/catalogos', catalogoRoutes);
