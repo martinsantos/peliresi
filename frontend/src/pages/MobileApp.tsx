@@ -210,6 +210,21 @@ const MobileApp: React.FC = () => {
         };
     }, [viajeActivo, viajePausado]);
 
+    // ===== CAMERA STREAM BINDING =====
+    // This useEffect runs AFTER React renders the video element when cameraActive becomes true
+    useEffect(() => {
+        if (cameraActive && cameraStream && videoRef.current) {
+            console.log('🎥 useEffect: Binding stream to video element');
+            videoRef.current.srcObject = cameraStream;
+            videoRef.current.play().catch(err => console.warn('Video play error:', err));
+            videoRef.current.onloadedmetadata = () => {
+                console.log('🎥 Video metadata loaded, starting QR scan');
+                scanningRef.current = true;
+                requestAnimationFrame(scanQRFromVideo);
+            };
+        }
+    }, [cameraActive, cameraStream]);
+
 
 
 
@@ -332,15 +347,7 @@ const MobileApp: React.FC = () => {
             console.log('🎥 Camera stream obtained:', stream);
             setCameraStream(stream);
             setCameraActive(true);
-            
-            if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-                videoRef.current.onloadedmetadata = () => {
-                    scanningRef.current = true;
-                    requestAnimationFrame(scanQRFromVideo);
-                };
-                console.log('🎥 Video element connected, QR scanning started');
-            }
+            // Note: stream binding to video element is handled by useEffect above
             showToastMessage('📷 Cámara activada - Escaneando QR...');
         } catch (err: any) {
             console.error('❌ Camera error:', err);

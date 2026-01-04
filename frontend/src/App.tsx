@@ -20,6 +20,7 @@ import AnalyticsAdmin from './pages/AnalyticsAdmin';
 import Registro from './pages/Registro';
 import AprobacionUsuarios from './pages/AprobacionUsuarios';
 import LogAuditoria from './pages/LogAuditoria';
+import ManifestoVerify from './pages/ManifestoVerify';
 import './index.css';
 import './pages/DemoApp.css';
 
@@ -45,6 +46,9 @@ const App: React.FC = () => {
 
           {/* Demo App - Vista con mockup para demostración en desktop */}
           <Route path="/demo-app" element={<DemoApp />} />
+
+          {/* Verificación Pública de Manifiesto - Sin autenticación, responsive */}
+          <Route path="/verify/:id" element={<ManifestoVerify />} />
 
           {/* Rutas del Dashboard - PROTEGIDAS con password */}
           <Route path="/dashboard" element={
