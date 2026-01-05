@@ -1,6 +1,6 @@
 # Estado de Implementación - Casos de Uso
 
-## 🎯 Resumen Ejecutivo - ACTUALIZADO
+## 🎯 Resumen Ejecutivo - ACTUALIZADO 2026-01-04
 
 | Módulo | Total CU | Completos | Parciales | Pendientes |
 |--------|----------|-----------|-----------|------------|
@@ -8,8 +8,8 @@
 | **Generador** | 12 | 12 (100%) | 0 | 0 |
 | **Transportista** | 11 | 11 (100%) | 0 | 0 |
 | **Operador** | 12 | 12 (100%) | 0 | 0 |
-| **Sistema** | 11 | 8 (73%) | 0 | 3 (27%) |
-| **TOTAL** | **61** | **57 (93%)** | **1 (2%)** | **3 (5%)** |
+| **Sistema** | 11 | 9 (82%) | 0 | 2 (18%) |
+| **TOTAL** | **61** | **58 (95%)** | **1 (2%)** | **2 (3%)** |
 
 ---
 
@@ -170,7 +170,7 @@
 | CU-S02 | Validar Datos Manifiesto | ✅ **Completo** | Validaciones backend |
 | CU-S03 | Enviar Notificaciones | ✅ **Completo** | In-app (email pospuesto) |
 | CU-S04 | Registrar Auditoría | ✅ **Completo** | EventoManifiesto + Log |
-| CU-S05 | Sincronizar Datos Offline | ❌ **Pendiente** | Requiere IndexedDB + Service Worker |
+| CU-S05 | Sincronizar Datos Offline | ✅ **Completo** | `indexeddb.ts` + `useOfflineStorage.ts` + `TransportistaApp.tsx` |
 | CU-S06 | Generar Código QR | ✅ **Completo** | Al firmar manifiesto |
 | CU-S07 | Calcular Estadísticas | ✅ **Completo** | Dashboard + reportes |
 | CU-S08 | Detectar Anomalías | ✅ **Completo** | Algoritmo GPS |
@@ -240,24 +240,29 @@ POST   /api/manifiestos/validar-qr      # CU-T08 - Validar código QR de manifie
 
 ## 📈 Métricas de Progreso
 
-| Métrica | Anterior | Ahora | Cambio |
-|---------|----------|-------|--------|
-| Total Casos de Uso | 59 | 61 | +2 (nuevos CU-S10, CU-S11) |
-| Casos Completos | 57 (97%) | 57 (93%) | % ajustado por nuevos CUs |
+| Métrica | 2025-12-06 | 2026-01-04 | Cambio |
+|---------|------------|------------|--------|
+| Total Casos de Uso | 61 | 61 | Sin cambio |
+| Casos Completos | 57 (93%) | 58 (95%) | +1 (CU-S05 verificado) |
 | Casos Parciales | 1 (2%) | 1 (2%) | Sin cambio |
-| Casos Pendientes | 1 (2%) | 3 (5%) | +2 nuevos CUs BAJA prioridad |
-| Endpoints API | ~50 | ~50 | Sin cambio |
+| Casos Pendientes | 3 (5%) | 2 (3%) | -1 (CU-S05 → Completo) |
+| Endpoints API | ~50 | ~55 | +5 (sync, verify, analytics) |
 | Páginas Frontend | 12 | 12 | Sin cambio |
 
 ---
 
 ## ⏳ Pendientes y Post-MVP
 
-### Alta Prioridad (Demo)
-1. **CU-S05**: Sincronización Offline con IndexedDB + Service Worker
-   - Almacenamiento local de manifiestos
-   - Cola de operaciones pendientes
-   - Sincronización bidireccional al reconectar
+### ✅ CU-S05 COMPLETADO (2026-01-04)
+Verificado en auditoría - La sincronización offline ya está implementada:
+- `frontend/src/services/indexeddb.ts` - IndexedDBManager completo
+- `frontend/src/hooks/useOfflineStorage.ts` - Hook React
+- `frontend/src/pages/mobile/TransportistaApp.tsx` - Integración activa
+
+### Parcial Pendiente
+1. **CU-A04**: UI para edición de permisos granulares
+   - El middleware de autorización funciona
+   - Falta página `/usuarios/:id/permisos` para editar roles por usuario
 
 ### Post-MVP (Prioridad BAJA según spec)
 2. **CU-S10**: Motor BPMN para orquestación de flujos
@@ -273,4 +278,4 @@ POST   /api/manifiestos/validar-qr      # CU-T08 - Validar código QR de manifie
 
 ---
 
-*Última actualización: 2025-12-06 16:00*
+*Última actualización: 2026-01-04 09:50 (Auditoría GAP)*

@@ -1,0 +1,155 @@
+/**
+ * useQRScanner - Hook for QR code scanning with camera
+ * Extracted from MobileApp.tsx (lines 69-78, 295-365)
+ * Handles camera stream, QR detection, and cleanup
+ */
+
+import { useState, useRef, useEffect, useCallback } from 'react';
+import jsQR from 'jsqr';
+
+interface UseQRScannerOptions {
+    onScan?: (data: string) => void;
+    onToast?: (message: string) => void;
+}
+
+interface UseQRScannerReturn {
+    // State
+    cameraActive: boolean;
+    scannedQR: string | null;
+    
+    // Refs for video/canvas elements
+    videoRef: React.RefObject<HTMLVideoElement | null>;
+    canvasRef: React.RefObject<HTMLCanvasElement | null>;
+    
+    // Actions
+    startCamera: () => Promise<void>;
+    stopCamera: () => void;
+    clearScannedQR: () => void;
+}
+
+export function useQRScanner({ onScan, onToast }: UseQRScannerOptions = {}): UseQRScannerReturn {
+    const [cameraActive, setCameraActive] = useState(false);
+    const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+    const [scannedQR, setScannedQR] = useState<string | null>(null);
+    
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const scanningRef = useRef<boolean>(false);
+
+    const showToast = useCallback((msg: string) => {
+        onToast?.(msg);
+    }, [onToast]);
+
+    // Scan QR from video frame
+    const scanQRFromVideo = useCallback(() => {
+        if (!scanningRef.current || !videoRef.current || !canvasRef.current) return;
+        
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        
+        if (ctx && video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            try {
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: 'dontInvert',
+                });
+                
+                if (code && code.data) {
+                    console.log('✅ QR Code detected:', code.data);
+                    scanningRef.current = false;
+                    setScannedQR(code.data);
+                    
+                    // Stop camera after successful scan
+                    if (cameraStream) {
+                        cameraStream.getTracks().forEach(track => track.stop());
+                        setCameraStream(null);
+                    }
+                    setCameraActive(false);
+                    
+                    // Callback with scanned data
+                    onScan?.(code.data);
+                    
+                    // Open URL if it's a URL
+                    if (code.data.startsWith('http')) {
+                        window.open(code.data, '_blank');
+                        showToast('✅ QR escaneado - Abriendo verificación');
+                    } else {
+                        showToast(`✅ QR: ${code.data}`);
+                    }
+                    return;
+                }
+            } catch (err) {
+                console.error('Error scanning QR:', err);
+            }
+        }
+        
+        if (scanningRef.current) {
+            requestAnimationFrame(scanQRFromVideo);
+        }
+    }, [cameraStream, onScan, showToast]);
+
+    // Bind stream to video when camera becomes active
+    useEffect(() => {
+        if (cameraActive && cameraStream && videoRef.current) {
+            videoRef.current.srcObject = cameraStream;
+            videoRef.current.play().catch(err => console.warn('Video play error:', err));
+            videoRef.current.onloadedmetadata = () => {
+                scanningRef.current = true;
+                requestAnimationFrame(scanQRFromVideo);
+            };
+        }
+    }, [cameraActive, cameraStream, scanQRFromVideo]);
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            scanningRef.current = false;
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+            }
+        };
+    }, [cameraStream]);
+
+    const startCamera = useCallback(async () => {
+        setScannedQR(null);
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment', width: 640, height: 480 }
+            });
+            setCameraStream(stream);
+            setCameraActive(true);
+            showToast('📷 Cámara activada - Escaneando QR...');
+        } catch (err: any) {
+            console.error('❌ Camera error:', err);
+            showToast('❌ No se pudo acceder a la cámara: ' + (err.message || 'Permiso denegado'));
+        }
+    }, [showToast]);
+
+    const stopCamera = useCallback(() => {
+        scanningRef.current = false;
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+            setCameraStream(null);
+        }
+        setCameraActive(false);
+    }, [cameraStream]);
+
+    const clearScannedQR = useCallback(() => {
+        setScannedQR(null);
+    }, []);
+
+    return {
+        cameraActive,
+        scannedQR,
+        videoRef,
+        canvasRef,
+        startCamera,
+        stopCamera,
+        clearScannedQR,
+    };
+}

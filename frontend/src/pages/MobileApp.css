@@ -1406,6 +1406,424 @@
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+/* === TRIP TRACKER SCREEN === */
+.viaje-screen .viaje-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0 20px;
+    text-align: left;
+}
+
+.viaje-screen .viaje-header h2 {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0;
+    color: #f8fafc;
+}
+
+.viaje-screen .back-btn {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 12px;
+    color: white;
+    cursor: pointer;
+}
+
+.viaje-status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.viaje-status-indicator.active {
+    background: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+}
+
+.viaje-status-indicator.paused {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+}
+
+/* Timer Container */
+.viaje-timer-container {
+    text-align: center;
+    padding: 24px;
+    background: rgba(30, 41, 59, 0.6);
+    border-radius: 16px;
+    margin-bottom: 20px;
+}
+
+.viaje-timer-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: #f8fafc;
+}
+
+.viaje-timer-display svg {
+    color: #64748b;
+}
+
+.viaje-time {
+    font-size: 36px;
+    font-weight: 800;
+    font-family: 'SF Mono', monospace;
+    letter-spacing: 2px;
+}
+
+/* GPS Status */
+.viaje-gps-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    background: rgba(30, 41, 59, 0.6);
+    border-radius: 12px;
+    font-size: 14px;
+    color: #94a3b8;
+    margin-bottom: 20px;
+}
+
+.viaje-gps-status svg {
+    color: #10b981;
+}
+
+.viaje-gps-status .gps-unavailable {
+    color: #ef4444;
+}
+
+.viaje-gps-status .route-count {
+    color: #64748b;
+    font-size: 12px;
+}
+
+/* Control Buttons */
+.viaje-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 24px;
+}
+
+.control-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px;
+    border: none;
+    border-radius: 14px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.control-btn span {
+    display: none;
+}
+
+@media (min-width: 400px) {
+    .control-btn span {
+        display: inline;
+    }
+}
+
+.control-btn.pause {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.1));
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.control-btn.pause:active {
+    background: rgba(245, 158, 11, 0.3);
+}
+
+.control-btn.resume {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(34, 197, 94, 0.1));
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.control-btn.resume:active {
+    background: rgba(34, 197, 94, 0.3);
+}
+
+.control-btn.incident {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.1));
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.control-btn.incident:active {
+    background: rgba(239, 68, 68, 0.3);
+}
+
+.control-btn.finish {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    border: none;
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
+}
+
+.control-btn.finish:active {
+    transform: scale(0.98);
+}
+
+/* Events Timeline */
+.viaje-events {
+    background: rgba(30, 41, 59, 0.6);
+    border-radius: 16px;
+    padding: 20px;
+}
+
+.viaje-events h3 {
+    font-size: 14px;
+    font-weight: 700;
+    color: #94a3b8;
+    margin: 0 0 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.events-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.no-events {
+    text-align: center;
+    padding: 24px;
+    color: #64748b;
+    font-size: 14px;
+}
+
+.event-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    border-left: 3px solid #64748b;
+}
+
+.event-item.inicio {
+    border-color: #22c55e;
+}
+
+.event-item.fin {
+    border-color: #3b82f6;
+}
+
+.event-item.incidente {
+    border-color: #ef4444;
+}
+
+.event-item.parada {
+    border-color: #f59e0b;
+}
+
+.event-item.reanudacion {
+    border-color: #22c55e;
+}
+
+.event-item .event-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    color: #94a3b8;
+    flex-shrink: 0;
+}
+
+.event-item .event-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.event-tipo {
+    font-size: 12px;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.event-desc {
+    font-size: 14px;
+    color: #f8fafc;
+}
+
+.event-time {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #64748b;
+}
+
+.event-gps {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: #10b981;
+}
+
+/* === MODALES === */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(8px);
+    z-index: 9999;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 60px 16px 16px;
+    animation: fadeIn 0.2s ease;
+}
+
+.modal-content {
+    width: 100%;
+    max-width: 400px;
+    background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+    border-radius: 20px;
+    padding: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    animation: slideInUp 0.3s ease;
+}
+
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.modal-header svg {
+    color: #f59e0b;
+}
+
+.modal-header h3 {
+    flex: 1;
+    font-size: 18px;
+    font-weight: 700;
+    color: #f8fafc;
+    margin: 0;
+}
+
+.modal-close {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 10px;
+    color: #94a3b8;
+    cursor: pointer;
+}
+
+.modal-body {
+    margin-bottom: 24px;
+}
+
+.modal-body textarea,
+.modal-body input,
+.modal-body select {
+    width: 100%;
+    padding: 14px 16px;
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    color: #f8fafc;
+    font-size: 15px;
+    resize: none;
+    outline: none;
+}
+
+.modal-body textarea {
+    min-height: 100px;
+}
+
+.modal-body textarea::placeholder,
+.modal-body input::placeholder {
+    color: #64748b;
+}
+
+.modal-body textarea:focus,
+.modal-body input:focus {
+    border-color: #10b981;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.modal-actions button {
+    flex: 1;
+    padding: 14px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.modal-actions .btn-cancel {
+    background: rgba(255, 255, 255, 0.1);
+    color: #94a3b8;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-actions .btn-confirm {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
+}
+
+.modal-actions .btn-danger {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+    box-shadow: 0 4px 16px rgba(239, 68, 68, 0.3);
+}
+
 @keyframes slideInDown {
     from {
         opacity: 0;

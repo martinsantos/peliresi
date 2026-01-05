@@ -5,12 +5,12 @@ import { test, expect, Page } from '@playwright/test';
  * Usa credenciales demo: *@demo.com / demo123
  */
 
-// Credenciales demo
+// Credenciales demo - Coinciden con seed.ts
 const DEMO_USERS = {
-  admin: { email: 'admin@demo.com', password: 'demo123' },
-  generador: { email: 'generador@demo.com', password: 'demo123' },
-  transportista: { email: 'transportista@demo.com', password: 'demo123' },
-  operador: { email: 'operador@demo.com', password: 'demo123' },
+  admin: { email: 'admin@dgfa.mendoza.gov.ar', password: 'password' },
+  generador: { email: 'quimica.mendoza@industria.com', password: 'password' },
+  transportista: { email: 'transportes.andes@logistica.com', password: 'password' },
+  operador: { email: 'tratamiento.residuos@planta.com', password: 'password' },
 };
 
 // Helper para hacer login

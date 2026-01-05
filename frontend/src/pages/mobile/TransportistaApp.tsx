@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { manifiestoService } from '../../services/manifiesto.service';
-import { db } from '../../services/indexeddb';
+import { offlineStorage } from '../../services/offlineStorage';
 import api from '../../services/api';
 import type { Manifiesto } from '../../types';
 import {
@@ -93,26 +93,26 @@ const TransportistaApp: React.FC = () => {
                 const data = await manifiestoService.getManifiestos({ limit: 10 });
                 if (data.manifiestos && data.manifiestos.length > 0) {
                     setManifiestos(data.manifiestos);
-                    // Guardar en IndexedDB para uso offline
-                    data.manifiestos.forEach(m => db.saveManifiesto(m).catch(console.error));
+                    // Guardar en offlineStorage para uso offline
+                    data.manifiestos.forEach(m => offlineStorage.saveManifiesto(m).catch(console.error));
                 } else {
                     setManifiestos(mockManifiestos as any);
                 }
             } else {
-                // Modo offline: cargar desde IndexedDB
-                const cachedManifiestos = await db.getAllManifiestos();
+                // Modo offline: cargar desde offlineStorage
+                const cachedManifiestos = await offlineStorage.getAllManifiestos();
                 if (cachedManifiestos.length > 0) {
                     setManifiestos(cachedManifiestos);
-                    console.log('📦 Cargados', cachedManifiestos.length, 'manifiestos desde IndexedDB');
+                    console.log('📦 Cargados', cachedManifiestos.length, 'manifiestos desde offlineStorage');
                 } else {
                     setManifiestos(mockManifiestos as any);
                 }
             }
         } catch (err) {
             console.error('Error cargando datos:', err);
-            // Fallback a IndexedDB
+            // Fallback a offlineStorage
             try {
-                const cachedManifiestos = await db.getAllManifiestos();
+                const cachedManifiestos = await offlineStorage.getAllManifiestos();
                 if (cachedManifiestos.length > 0) {
                     setManifiestos(cachedManifiestos);
                 } else {
@@ -136,20 +136,20 @@ const TransportistaApp: React.FC = () => {
             const response = await api.get('/manifiestos/sync-inicial');
             const { catalogoResiduos, operadores, manifiestos: syncedManifiestos } = response.data.data;
 
-            // Guardar en IndexedDB
+            // Guardar en offlineStorage
             if (catalogoResiduos) {
-                await db.saveTiposResiduos(catalogoResiduos);
+                await offlineStorage.saveTiposResiduos(catalogoResiduos);
                 console.log('✅ Catálogo de residuos sincronizado:', catalogoResiduos.length);
             }
 
             if (operadores) {
-                await db.saveOperadores(operadores);
+                await offlineStorage.saveOperadores(operadores);
                 console.log('✅ Operadores sincronizados:', operadores.length);
             }
 
             if (syncedManifiestos) {
                 for (const m of syncedManifiestos) {
-                    await db.saveManifiesto(m);
+                    await offlineStorage.saveManifiesto(m);
                 }
                 console.log('✅ Manifiestos sincronizados:', syncedManifiestos.length);
             }
