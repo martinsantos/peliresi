@@ -115,8 +115,38 @@ export const cerrarManifiesto = async (req: AuthRequest, res: Response, next: Ne
 };
 
 export const getDashboardStats = async (req: AuthRequest, res: Response, next: NextFunction) => {
-    // ... logic for dashboard stats (Simplified for now to permit build)
-    res.json({ success: true, data: { stats: {} } }); 
+    try {
+      const userId = req.user.id;
+      const rol = req.user.rol as string;
+
+      const whereBase: any = {};
+      if (rol === 'GENERADOR') whereBase.generadorId = userId;
+      else if (rol === 'TRANSPORTISTA') whereBase.transportistaId = userId;
+      else if (rol === 'OPERADOR') whereBase.operadorId = userId;
+
+      const [total, borradores, pendientes, enTransito, entregados, recibidos, enTratamiento, tratados, rechazados] = await Promise.all([
+        prisma.manifiesto.count({ where: whereBase }),
+        prisma.manifiesto.count({ where: { ...whereBase, estado: 'BORRADOR' } }),
+        prisma.manifiesto.count({ where: { ...whereBase, estado: 'PENDIENTE' } }),
+        prisma.manifiesto.count({ where: { ...whereBase, estado: 'EN_TRANSITO' } }),
+        prisma.manifiesto.count({ where: { ...whereBase, estado: 'ENTREGADO' } }),
+        prisma.manifiesto.count({ where: { ...whereBase, estado: 'RECIBIDO' } }),
+        prisma.manifiesto.count({ where: { ...whereBase, estado: 'EN_TRATAMIENTO' } }),
+        prisma.manifiesto.count({ where: { ...whereBase, estado: 'TRATADO' } }),
+        prisma.manifiesto.count({ where: { ...whereBase, estado: 'RECHAZADO' } })
+      ]);
+
+      res.json({
+        success: true,
+        data: {
+          stats: {
+            total, borradores, pendientes, enTransito, entregados, recibidos, enTratamiento, tratados, rechazados
+          }
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
 };
 
 export const getSyncInicial = async (req: AuthRequest, res: Response, next: NextFunction) => {

@@ -172,7 +172,7 @@ class OfflineStorageService {
           method: op.method,
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+            'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`
           },
           body: op.method !== 'DELETE' ? JSON.stringify(op.datos) : undefined
         });
