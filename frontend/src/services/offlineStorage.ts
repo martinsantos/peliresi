@@ -165,8 +165,27 @@ class OfflineStorageService {
 
     const operations = await this.db!.getAllFromIndex('operacionesPendientes', 'by-timestamp');
     const result: SyncResult = { success: true, synced: 0, failed: 0, errors: [] };
+    const MAX_RETRIES = 5;
 
     for (const op of operations) {
+      // Skip if we should wait (exponential backoff)
+      if (op.retries > 0) {
+        const backoffMs = Math.min(1000 * Math.pow(2, op.retries - 1), 30000); // 1s, 2s, 4s, 8s, 16s, max 30s
+        const nextRetryAt = op.timestamp + backoffMs * op.retries;
+        if (Date.now() < nextRetryAt) {
+          console.log(`[OfflineSync] Skipping op ${op.id}, waiting for backoff (retry ${op.retries})`);
+          continue;
+        }
+      }
+
+      // Check max retries
+      if (op.retries >= MAX_RETRIES) {
+        console.warn(`[OfflineSync] Max retries reached for op ${op.id}, marking as failed`);
+        result.failed++;
+        result.errors.push({ id: op.id!, error: `Max retries (${MAX_RETRIES}) exceeded` });
+        continue;
+      }
+
       try {
         const response = await fetch(op.endpoint, {
           method: op.method,
@@ -180,16 +199,41 @@ class OfflineStorageService {
         if (response.ok) {
           await this.db!.delete('operacionesPendientes', op.id!);
           result.synced++;
+          console.log(`[OfflineSync] Synced operation ${op.id}`);
+        } else if (response.status >= 500) {
+          // Server error - retry with backoff
+          op.retries++;
+          await this.db!.put('operacionesPendientes', op);
+          result.failed++;
+          result.errors.push({ id: op.id!, error: `HTTP ${response.status} - will retry` });
+          console.warn(`[OfflineSync] Server error for op ${op.id}, retry ${op.retries}`);
         } else {
+          // Client error (4xx) - don't retry
           result.failed++;
           result.errors.push({ id: op.id!, error: `HTTP ${response.status}` });
+          console.error(`[OfflineSync] Client error for op ${op.id}: ${response.status}`);
         }
       } catch (error) {
+        // Network error - retry with backoff
+        op.retries++;
+        await this.db!.put('operacionesPendientes', op);
         result.errors.push({ id: op.id!, error: (error as Error).message });
+        console.warn(`[OfflineSync] Network error for op ${op.id}, retry ${op.retries}`);
       }
     }
 
     await this.db!.put('syncMeta', { key: 'lastSync', lastSync: Date.now(), version: DB_VERSION });
+    
+    // Register background sync if supported
+    if ('serviceWorker' in navigator && 'sync' in (window as any).SyncManager) {
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        await (reg as any).sync.register('sitrep-sync');
+      } catch (e) {
+        console.warn('[OfflineSync] Background sync registration failed:', e);
+      }
+    }
+    
     return result;
   }
 

@@ -35,6 +35,8 @@ export function useQRScanner({ onScan, onToast }: UseQRScannerOptions = {}): Use
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const scanningRef = useRef<boolean>(false);
+    const scanStartTimeRef = useRef<number>(0);
+    const SCAN_TIMEOUT_MS = 15000; // 15 seconds timeout
 
     const showToast = useCallback((msg: string) => {
         onToast?.(msg);
@@ -62,6 +64,28 @@ export function useQRScanner({ onScan, onToast }: UseQRScannerOptions = {}): Use
                 if (code && code.data) {
                     console.log('✅ QR Code detected:', code.data);
                     scanningRef.current = false;
+                    
+                    // Haptic feedback (vibration)
+                    if ('vibrate' in navigator) {
+                        navigator.vibrate([100, 50, 100]);
+                    }
+                    
+                    // Audio feedback (short beep)
+                    try {
+                        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                        const oscillator = audioCtx.createOscillator();
+                        const gainNode = audioCtx.createGain();
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioCtx.destination);
+                        oscillator.frequency.value = 880; // A5 note
+                        oscillator.type = 'sine';
+                        gainNode.gain.value = 0.3;
+                        oscillator.start();
+                        setTimeout(() => oscillator.stop(), 150);
+                    } catch (e) {
+                        console.log('Audio feedback not available');
+                    }
+                    
                     setScannedQR(code.data);
                     
                     // Stop camera after successful scan
@@ -88,7 +112,15 @@ export function useQRScanner({ onScan, onToast }: UseQRScannerOptions = {}): Use
             }
         }
         
+        // Check for timeout
         if (scanningRef.current) {
+            const elapsed = Date.now() - scanStartTimeRef.current;
+            if (elapsed > SCAN_TIMEOUT_MS) {
+                console.log('⏰ QR scan timeout after 15s');
+                scanningRef.current = false;
+                showToast('⏰ Tiempo agotado. Intente de nuevo o ingrese el código manualmente.');
+                return;
+            }
             requestAnimationFrame(scanQRFromVideo);
         }
     }, [cameraStream, onScan, showToast]);
@@ -123,6 +155,7 @@ export function useQRScanner({ onScan, onToast }: UseQRScannerOptions = {}): Use
             });
             setCameraStream(stream);
             setCameraActive(true);
+            scanStartTimeRef.current = Date.now();
             showToast('📷 Cámara activada - Escaneando QR...');
         } catch (err: any) {
             console.error('❌ Camera error:', err);

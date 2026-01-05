@@ -159,7 +159,93 @@ export const getManifiestosEsperados = async (req: AuthRequest, res: Response, n
 };
 
 export const validarQR = async (req: AuthRequest, res: Response, next: NextFunction) => {
-    res.json({ success: true, valid: true });
+    try {
+      const { codigoQR } = req.body;
+      if (!codigoQR) {
+        return res.status(400).json({ success: false, error: 'codigoQR requerido' });
+      }
+
+      // Extraer ID del manifiesto del QR (formatos: URL con /manifiesto/ID o ID directo)
+      const urlMatch = codigoQR.match(/manifiesto[\/=]([a-zA-Z0-9-]+)/i);
+      const manifiestoId = urlMatch ? urlMatch[1] : codigoQR.trim();
+
+      // Buscar manifiesto en BD
+      const manifiesto = await prisma.manifiesto.findUnique({
+        where: { id: manifiestoId },
+        select: {
+          id: true,
+          numero: true,
+          estado: true,
+          generadorId: true,
+          transportistaId: true,
+          operadorId: true,
+          generador: { select: { razonSocial: true } },
+          transportista: { select: { razonSocial: true } },
+          operador: { select: { razonSocial: true } }
+        }
+      });
+
+      if (!manifiesto) {
+        return res.json({ success: true, valid: false, error: 'Manifiesto no encontrado' });
+      }
+
+      // Verificar permisos según rol del usuario
+      const userId = req.user.id;
+      const rol = req.user.rol;
+      let autorizado = false;
+      let razon = '';
+
+      if (rol === 'ADMIN') {
+        autorizado = true;
+        razon = 'Acceso de administrador';
+      } else if (rol === 'TRANSPORTISTA' && manifiesto.transportistaId === userId) {
+        autorizado = true;
+        razon = 'Transportista asignado';
+      } else if (rol === 'OPERADOR' && manifiesto.operadorId === userId) {
+        autorizado = true;
+        razon = 'Operador asignado';
+      } else if (rol === 'GENERADOR' && manifiesto.generadorId === userId) {
+        autorizado = true;
+        razon = 'Generador del manifiesto';
+      }
+
+      if (!autorizado) {
+        return res.json({
+          success: true,
+          valid: false,
+          error: 'No autorizado para este manifiesto',
+          data: { numero: manifiesto.numero, estado: manifiesto.estado }
+        });
+      }
+
+      // Determinar acciones disponibles según estado y rol
+      const acciones: string[] = [];
+      if (rol === 'TRANSPORTISTA') {
+        if (manifiesto.estado === 'APROBADO') acciones.push('INICIAR_TRANSPORTE');
+        if (manifiesto.estado === 'EN_TRANSITO') acciones.push('CONFIRMAR_ENTREGA');
+      } else if (rol === 'OPERADOR') {
+        if (manifiesto.estado === 'ENTREGADO') acciones.push('CONFIRMAR_RECEPCION');
+        if (['RECIBIDO', 'EN_TRATAMIENTO'].includes(manifiesto.estado)) acciones.push('REGISTRAR_TRATAMIENTO');
+      }
+
+      res.json({
+        success: true,
+        valid: true,
+        data: {
+          id: manifiesto.id,
+          numero: manifiesto.numero,
+          estado: manifiesto.estado,
+          generador: manifiesto.generador.razonSocial,
+          transportista: manifiesto.transportista.razonSocial,
+          operador: manifiesto.operador.razonSocial,
+          autorizado: true,
+          razonAutorizacion: razon,
+          accionesDisponibles: acciones
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
 };
 
 export const rechazarCarga = async (req: AuthRequest, res: Response, next: NextFunction) => {
