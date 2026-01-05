@@ -1,0 +1,9 @@
+# SITREP - Allow all crawlers for production
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+Disallow: /*.json
+
+# Sitemap
+Sitemap: https://sitrep.ultimamilla.com.ar/sitemap.xml
