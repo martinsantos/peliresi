@@ -20,13 +20,4 @@ router.post('/upload', syncController.uploadOfflineOperations);
 // GET /api/sync/changes?since=ISO_DATE - Obtener cambios desde fecha
 router.get('/changes', syncController.getChangesSince);
 
-// GET /api/sync/status - Estado de sincronización del usuario
-router.get('/status', syncController.getSyncStatus);
-
-// POST /api/sync/resolve-conflicts - Resolver conflictos de sincronización
-router.post('/resolve-conflicts', syncController.resolveConflicts);
-
-// POST /api/sync/batch - Sincronización en lote bidireccional
-router.post('/batch', syncController.batchSync);
-
 export default router;
