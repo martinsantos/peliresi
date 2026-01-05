@@ -1,6 +1,7 @@
 import { TipoNotificacion, PrioridadNotificacion } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { emailService } from './email.service';
+import { pushService } from './push.service';
 
 export class NotificationService {
   /**
@@ -144,6 +145,33 @@ export class NotificationService {
           info.mensaje
         );
       }
+
+      // ============================================================================
+      // PUSH NOTIFICATIONS - Fire-and-forget pattern (non-blocking)
+      // Si el push falla, no afecta el flujo principal de notificaciones
+      // ============================================================================
+      this.sendPushNotificationAsync(usuarioId, manifiesto.numero, nuevoEstado).catch(
+        err => console.error(`[PUSH] Error enviando push a ${usuarioId}:`, err.message)
+      );
+    }
+  }
+
+  /**
+   * Enviar push notification de forma asincrónica sin bloquear
+   * @internal
+   */
+  private async sendPushNotificationAsync(usuarioId: string, manifiestoNumero: string, nuevoEstado: string): Promise<void> {
+    try {
+      // Usar el método específico del push service para cambios de estado
+      await pushService.notificarCambioEstado(manifiestoNumero, nuevoEstado, usuarioId);
+    } catch (error) {
+      // Log del error pero no se propaga - el usuario ya recibió notificación por email
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.warn(
+        `[PUSH] Fallo enviar push para manifiesto ${manifiestoNumero} a usuario ${usuarioId}:`,
+        errorMessage
+      );
+      // No relanzar el error - permitir que el flujo principal continúe
     }
   }
 }
