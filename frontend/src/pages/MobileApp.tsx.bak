@@ -389,14 +389,7 @@ const MobileApp: React.FC = () => {
                 );
 
             default:
-                return (
-                    <div className="screen-not-found">
-                        <div className="screen-not-found-icon">🔍</div>
-                        <h2>Pantalla no disponible</h2>
-                        <p>La función solicitada está en desarrollo</p>
-                        <button className="btn btn-primary" onClick={() => setCurrentScreen('home')}>Volver al inicio</button>
-                    </div>
-                );
+                return <div className="section"><p>Pantalla: {currentScreen}</p></div>;
         }
     };
 

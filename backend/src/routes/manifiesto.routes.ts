@@ -17,7 +17,9 @@ import {
 } from '../controllers/manifiesto.controller';
 import {
     actualizarUbicacion,
-    registrarIncidente
+    registrarIncidente,
+    confirmarRetiro,
+    confirmarEntrega
 } from '../controllers/logistics.controller';
 
 const router = Router();
@@ -25,6 +27,7 @@ const router = Router();
 router.use(isAuthenticated);
 
 // Dashboard y Utilidades
+router.get('/dashboard/stats', getDashboardStats);
 router.get('/dashboard', getDashboardStats);
 router.get('/sync-inicial', getSyncInicial);
 router.get('/esperados', hasRole('OPERADOR'), getManifiestosEsperados);
@@ -36,11 +39,17 @@ router.get('/:id', getManifiestoById);
 router.post('/', hasRole('GENERADOR'), createManifiesto);
 router.post('/:id/firmar', hasRole('GENERADOR'), firmarManifiesto);
 
-// Logística y Transporte
+// ============================================================
+// TRANSPORTISTA: Retiro, Transporte y Entrega
+// ============================================================
+router.post('/:id/confirmar-retiro', hasRole('TRANSPORTISTA'), confirmarRetiro);
+router.post('/:id/confirmar-entrega', hasRole('TRANSPORTISTA'), confirmarEntrega);
 router.post('/:id/ubicacion', hasRole('TRANSPORTISTA'), actualizarUbicacion);
 router.post('/:id/incidente', hasRole('TRANSPORTISTA'), registrarIncidente);
 
-// Flujo de Recepción y Cierre
+// ============================================================
+// OPERADOR: Recepción, Pesaje, Tratamiento y Cierre
+// ============================================================
 router.post('/:id/confirmar-recepcion', hasRole('OPERADOR'), confirmarRecepcion);
 router.post('/:id/pesaje', hasRole('OPERADOR'), registrarPesaje);
 router.post('/:id/rechazar', hasRole('OPERADOR'), rechazarCarga);

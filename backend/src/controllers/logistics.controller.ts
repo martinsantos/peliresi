@@ -72,3 +72,106 @@ export const detectarAnomalias = async (req: AuthRequest, res: Response, next: N
     next(error);
   }
 };
+
+// ============================================================
+// TRANSPORTISTA: Confirmar Retiro y Entrega
+// ============================================================
+
+export const confirmarRetiro = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { latitud, longitud, observaciones } = req.body;
+    const userId = req.user.id;
+
+    // Verificar que es transportista asignado
+    const manifiesto = await prisma.manifiesto.findUnique({ 
+      where: { id },
+      include: { transportista: { select: { usuarioId: true } } }
+    });
+
+    if (!manifiesto) {
+      throw new AppError('Manifiesto no encontrado', 404);
+    }
+
+    if (manifiesto.transportista.usuarioId !== userId && req.user.rol !== 'ADMIN') {
+      throw new AppError('No eres el transportista asignado', 403);
+    }
+
+    if (manifiesto.estado !== 'APROBADO') {
+      throw new AppError('El manifiesto debe estar APROBADO para confirmar retiro', 400);
+    }
+
+    const resultado = await logisticsService.confirmarRetiro(id, userId, { latitud, longitud, observaciones });
+    
+    await notificationService.notificarCambioEstado(id, 'EN_TRANSITO', userId);
+
+    res.json({ success: true, data: { manifiesto: resultado } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const confirmarEntrega = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { latitud, longitud, observaciones, firmaDigital } = req.body;
+    const userId = req.user.id;
+
+    const manifiesto = await prisma.manifiesto.findUnique({ 
+      where: { id },
+      include: { transportista: { select: { usuarioId: true } } }
+    });
+
+    if (!manifiesto) {
+      throw new AppError('Manifiesto no encontrado', 404);
+    }
+
+    if (manifiesto.transportista.usuarioId !== userId && req.user.rol !== 'ADMIN') {
+      throw new AppError('No eres el transportista asignado', 403);
+    }
+
+    if (manifiesto.estado !== 'EN_TRANSITO') {
+      throw new AppError('El manifiesto debe estar EN_TRANSITO para confirmar entrega', 400);
+    }
+
+    // Actualizar estado a ENTREGADO
+    const manifiestoActualizado = await prisma.manifiesto.update({
+      where: { id },
+      data: {
+        estado: 'ENTREGADO',
+        fechaEntrega: new Date()
+      },
+      include: {
+        generador: true,
+        transportista: true,
+        operador: true,
+        residuos: { include: { tipoResiduo: true } }
+      }
+    });
+
+    // Registrar evento de entrega
+    await prisma.eventoManifiesto.create({
+      data: {
+        manifiestoId: id,
+        tipo: 'ENTREGA',
+        descripcion: observaciones || 'Carga entregada en destino',
+        latitud,
+        longitud,
+        usuarioId: userId
+      }
+    });
+
+    // Registrar ubicación GPS final
+    if (latitud && longitud) {
+      await prisma.trackingGPS.create({
+        data: { manifiestoId: id, latitud, longitud }
+      });
+    }
+
+    await notificationService.notificarCambioEstado(id, 'ENTREGADO', userId);
+
+    res.json({ success: true, data: { manifiesto: manifiestoActualizado } });
+  } catch (error) {
+    next(error);
+  }
+};
