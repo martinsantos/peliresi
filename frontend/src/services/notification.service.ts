@@ -121,7 +121,9 @@ export const alertaService = {
     // Obtener alertas generadas
     async getAlertas(params?: { estado?: string; limit?: number; offset?: number }) {
         const response = await api.get('/alertas', { params });
-        return response.data.data;
+        // La respuesta tiene estructura { alertas: [], total, pagina, totalPaginas }
+        const data = response.data.data;
+        return data.alertas || [];
     },
 
     // Resolver alerta
@@ -160,7 +162,7 @@ export const anomaliaService = {
 export const cargaMasivaService = {
     // Descargar plantilla
     async descargarPlantilla(tipo: 'generadores' | 'transportistas' | 'operadores') {
-        const response = await api.get(`/carga-masiva/plantilla/${tipo}`, {
+        const response = await api.get(`/actores/carga-masiva/plantilla/${tipo}`, {
             responseType: 'blob'
         });
 
@@ -178,7 +180,7 @@ export const cargaMasivaService = {
         const formData = new FormData();
         formData.append('archivo', archivo);
 
-        const response = await api.post(`/carga-masiva/${tipo}`, formData, {
+        const response = await api.post(`/actores/carga-masiva/${tipo}`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
         return response.data.data;

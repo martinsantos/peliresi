@@ -116,18 +116,24 @@ export const cerrarManifiesto = async (req: AuthRequest, res: Response, next: Ne
 
 export const getDashboardStats = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const userId = req.user.id;
       const rol = req.user.rol as string;
 
+      // Build filter based on role - use actor IDs, not user ID
       const whereBase: any = {};
-      if (rol === 'GENERADOR') whereBase.generadorId = userId;
-      else if (rol === 'TRANSPORTISTA') whereBase.transportistaId = userId;
-      else if (rol === 'OPERADOR') whereBase.operadorId = userId;
+      if (rol === 'GENERADOR' && req.user.generador) {
+        whereBase.generadorId = req.user.generador.id;
+      } else if (rol === 'TRANSPORTISTA' && req.user.transportista) {
+        whereBase.transportistaId = req.user.transportista.id;
+      } else if (rol === 'OPERADOR' && req.user.operador) {
+        whereBase.operadorId = req.user.operador.id;
+      }
+      // ADMIN sees all - no filter
 
-      const [total, borradores, pendientes, enTransito, entregados, recibidos, enTratamiento, tratados, rechazados] = await Promise.all([
+      const [total, borradores, pendientesAprobacion, aprobados, enTransito, entregados, recibidos, enTratamiento, tratados, rechazados] = await Promise.all([
         prisma.manifiesto.count({ where: whereBase }),
         prisma.manifiesto.count({ where: { ...whereBase, estado: 'BORRADOR' } }),
-        prisma.manifiesto.count({ where: { ...whereBase, estado: 'PENDIENTE' } }),
+        prisma.manifiesto.count({ where: { ...whereBase, estado: 'PENDIENTE_APROBACION' } }),
+        prisma.manifiesto.count({ where: { ...whereBase, estado: 'APROBADO' } }),
         prisma.manifiesto.count({ where: { ...whereBase, estado: 'EN_TRANSITO' } }),
         prisma.manifiesto.count({ where: { ...whereBase, estado: 'ENTREGADO' } }),
         prisma.manifiesto.count({ where: { ...whereBase, estado: 'RECIBIDO' } }),
@@ -140,7 +146,16 @@ export const getDashboardStats = async (req: AuthRequest, res: Response, next: N
         success: true,
         data: {
           stats: {
-            total, borradores, pendientes, enTransito, entregados, recibidos, enTratamiento, tratados, rechazados
+            total,
+            borradores,
+            pendientesAprobacion,
+            aprobados,
+            enTransito,
+            entregados,
+            recibidos,
+            enTratamiento,
+            tratados,
+            rechazados
           }
         }
       });
@@ -150,8 +165,74 @@ export const getDashboardStats = async (req: AuthRequest, res: Response, next: N
 };
 
 export const getSyncInicial = async (req: AuthRequest, res: Response, next: NextFunction) => {
-    // ... logic for sync
-    res.json({ success: true, data: {} });
+    try {
+        const userId = req.user?.id;
+        const userRol = req.user?.rol;
+
+        // Obtener catálogo de residuos
+        const catalogoResiduos = await prisma.tipoResiduo.findMany({
+            where: { activo: true },
+            select: { id: true, codigo: true, nombre: true, descripcion: true, peligrosidad: true }
+        });
+
+        // Obtener operadores activos
+        const operadores = await prisma.operador.findMany({
+            where: { activo: true },
+            select: {
+                id: true,
+                razonSocial: true,
+                cuit: true,
+                domicilio: true,
+                categoria: true,
+                tratamientos: { include: { tipoResiduo: { select: { codigo: true, nombre: true } } } }
+            }
+        });
+
+        // Obtener manifiestos según el rol del usuario
+        let manifiestoWhere: any = {};
+        if (userRol === 'TRANSPORTISTA') {
+            const transportista = await prisma.transportista.findFirst({ where: { usuarioId: userId } });
+            if (transportista) {
+                manifiestoWhere.transportistaId = transportista.id;
+                manifiestoWhere.estado = { in: ['FIRMADO', 'EN_TRANSITO', 'ENTREGADO'] };
+            }
+        } else if (userRol === 'OPERADOR') {
+            const operador = await prisma.operador.findFirst({ where: { usuarioId: userId } });
+            if (operador) {
+                manifiestoWhere.operadorId = operador.id;
+                manifiestoWhere.estado = { in: ['EN_TRANSITO', 'ENTREGADO', 'EN_TRATAMIENTO'] };
+            }
+        } else if (userRol === 'GENERADOR') {
+            const generador = await prisma.generador.findFirst({ where: { usuarioId: userId } });
+            if (generador) {
+                manifiestoWhere.generadorId = generador.id;
+            }
+        }
+
+        const manifiestos = await prisma.manifiesto.findMany({
+            where: manifiestoWhere,
+            take: 50,
+            orderBy: { updatedAt: 'desc' },
+            include: {
+                generador: { select: { razonSocial: true, cuit: true, domicilio: true } },
+                transportista: { select: { razonSocial: true, cuit: true } },
+                operador: { select: { razonSocial: true, domicilio: true } },
+                residuos: { include: { tipoResiduo: { select: { codigo: true, nombre: true } } } }
+            }
+        });
+
+        res.json({
+            success: true,
+            data: {
+                catalogoResiduos,
+                operadores,
+                manifiestos,
+                syncTimestamp: new Date().toISOString()
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
 };
 
 export const getManifiestosEsperados = async (req: AuthRequest, res: Response, next: NextFunction) => {

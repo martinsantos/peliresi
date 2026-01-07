@@ -500,3 +500,42 @@ export const cargaMasivaOperadores = async (req: AuthRequest, res: Response, nex
         next(error);
     }
 };
+
+// ============== DESCARGAR PLANTILLAS CSV ==============
+
+const PLANTILLAS: Record<string, { headers: string[]; ejemplo: string[] }> = {
+    generadores: {
+        headers: ['razonSocial', 'cuit', 'domicilio', 'telefono', 'email', 'numeroInscripcion', 'categoria'],
+        ejemplo: ['Empresa Demo SA', '30-12345678-9', 'Av. Principal 123', '261-4001234', 'contacto@empresa.com', 'GEN-001', 'GRANDE']
+    },
+    transportistas: {
+        headers: ['razonSocial', 'cuit', 'domicilio', 'numeroHabilitacion', 'telefono', 'email'],
+        ejemplo: ['Transporte Demo SRL', '30-98765432-1', 'Ruta 40 Km 5', 'HAB-T-001', '261-4005678', 'transporte@demo.com']
+    },
+    operadores: {
+        headers: ['razonSocial', 'cuit', 'numeroHabilitacion', 'domicilio', 'telefono', 'email', 'categoria'],
+        ejemplo: ['Operador Ambiental SA', '30-11223344-5', 'HAB-O-001', 'Zona Industrial Lote 10', '261-4009999', 'operador@ambiental.com', 'TRATAMIENTO']
+    }
+};
+
+export const descargarPlantilla = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { tipo } = req.params;
+
+        if (!['generadores', 'transportistas', 'operadores'].includes(tipo)) {
+            throw new AppError('Tipo de plantilla inválido. Use: generadores, transportistas u operadores', 400);
+        }
+
+        const plantilla = PLANTILLAS[tipo];
+        const csvContent = [
+            plantilla.headers.join(','),
+            plantilla.ejemplo.join(',')
+        ].join('\n');
+
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename=plantilla_${tipo}.csv`);
+        res.send(csvContent);
+    } catch (error) {
+        next(error);
+    }
+};

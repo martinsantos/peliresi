@@ -46,7 +46,7 @@ import { IncidentModal, ParadaModal } from '../components/mobile/TripModals';
 
 // Types and Data
 import type { UserRole, Screen, MenuItem } from '../types/mobile.types';
-import { ROLE_COLORS, ROLE_NAMES, ESTADO_CONFIG } from '../types/mobile.types';
+import { ROLE_NAMES, ESTADO_CONFIG } from '../types/mobile.types';
 import { DEMO_MANIFIESTOS, DEMO_ALERTAS } from '../data/demoMobile';
 
 import './MobileApp.css';
@@ -184,7 +184,6 @@ const MobileApp: React.FC = () => {
         }
     };
 
-    const getRoleColor = (): string => role ? ROLE_COLORS[role] : '#64748b';
     const getRoleName = (): string => role ? ROLE_NAMES[role] : 'Usuario';
     
     const getEstadoBadge = (estado: string) => {
@@ -304,11 +303,11 @@ const MobileApp: React.FC = () => {
                                 {DEMO_MANIFIESTOS.slice(0, 4).map(m => (
                                     <div key={m.id} className="list-item" onClick={() => handleSelectManifiesto(m)}>
                                         <div className="list-icon"><FileText size={18} /></div>
-                                        <div className="list-content">
+                                        <div className="list-body">
                                             <div className="list-title">#{m.numero}</div>
                                             <div className="list-sub">{m.generador}</div>
                                         </div>
-                                        {getEstadoBadge(m.estado)}
+                                        <div className="list-badge">{getEstadoBadge(m.estado)}</div>
                                     </div>
                                 ))}
                             </div>
@@ -327,11 +326,11 @@ const MobileApp: React.FC = () => {
                             {DEMO_MANIFIESTOS.map(m => (
                                 <div key={m.id} className="list-item" onClick={() => handleSelectManifiesto(m)}>
                                     <div className="list-icon"><FileText size={18} /></div>
-                                    <div className="list-content">
+                                    <div className="list-body">
                                         <div className="list-title">#{m.numero}</div>
                                         <div className="list-sub">{m.generador} → {m.operador}</div>
                                     </div>
-                                    {getEstadoBadge(m.estado)}
+                                    <div className="list-badge">{getEstadoBadge(m.estado)}</div>
                                 </div>
                             ))}
                         </div>
@@ -345,7 +344,7 @@ const MobileApp: React.FC = () => {
                         <div className="list">
                             {DEMO_ALERTAS.map(a => (
                                 <div key={a.id} className={`list-item alert-${a.tipo}`}>
-                                    <div className="list-content">
+                                    <div className="list-body">
                                         <div className="list-title">{a.mensaje}</div>
                                         <div className="list-sub">Hace {a.tiempo}</div>
                                     </div>
@@ -388,6 +387,179 @@ const MobileApp: React.FC = () => {
                     </div>
                 );
 
+            case 'tracking':
+                return (
+                    <div className="section">
+                        <h3>Monitoreo GPS</h3>
+                        <div className="tracking-status-card">
+                            <div className="tracking-indicator">
+                                <div className={`gps-pulse ${trip.gpsPosition ? 'active' : ''}`}></div>
+                                <Navigation size={28} />
+                            </div>
+                            <div className="tracking-info">
+                                <span className="tracking-label">Estado GPS</span>
+                                <span className="tracking-value">{trip.gpsPosition ? 'Activo' : 'Sin señal'}</span>
+                            </div>
+                        </div>
+                        {trip.gpsPosition && (
+                            <div className="detail-card">
+                                <div className="detail-row">
+                                    <label>Latitud:</label>
+                                    <span>{trip.gpsPosition.lat.toFixed(6)}</span>
+                                </div>
+                                <div className="detail-row">
+                                    <label>Longitud:</label>
+                                    <span>{trip.gpsPosition.lng.toFixed(6)}</span>
+                                </div>
+                                <div className="detail-row">
+                                    <label>Precisión:</label>
+                                    <span>±{(trip.gpsPosition as any).accuracy?.toFixed(0) || 'N/A'}m</span>
+                                </div>
+                            </div>
+                        )}
+                        <div className="list">
+                            <h4 style={{ margin: '16px 0 8px', color: 'var(--ind-yellow)' }}>Viajes Activos</h4>
+                            {DEMO_MANIFIESTOS.filter(m => m.estado === 'EN_TRANSITO').length > 0 ? (
+                                DEMO_MANIFIESTOS.filter(m => m.estado === 'EN_TRANSITO').map(m => (
+                                    <div key={m.id} className="list-item" onClick={() => handleSelectManifiesto(m)}>
+                                        <div className="list-icon"><Navigation size={18} /></div>
+                                        <div className="list-body">
+                                            <div className="list-title">#{m.numero}</div>
+                                            <div className="list-sub">{m.generador} → {m.operador}</div>
+                                        </div>
+                                        <div className="list-badge">{getEstadoBadge(m.estado)}</div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="empty-state">
+                                    <MapPin size={32} />
+                                    <p>No hay viajes en tránsito</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+
+            case 'nuevo':
+                return (
+                    <div className="section">
+                        <h3>Nuevo Manifiesto</h3>
+                        <div className="form-card">
+                            <div className="form-group">
+                                <label>Tipo de Residuo</label>
+                                <select className="form-select">
+                                    <option value="">Seleccione...</option>
+                                    <option value="Y1">Y1 - Desechos clínicos</option>
+                                    <option value="Y2">Y2 - Desechos farmacéuticos</option>
+                                    <option value="Y3">Y3 - Desechos medicamentos</option>
+                                    <option value="Y8">Y8 - Aceites usados</option>
+                                    <option value="Y9">Y9 - Mezclas de aceite/agua</option>
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label>Cantidad (kg)</label>
+                                <input type="number" className="form-input" placeholder="0.00" />
+                            </div>
+                            <div className="form-group">
+                                <label>Transportista</label>
+                                <select className="form-select">
+                                    <option value="">Seleccione...</option>
+                                    <option value="t1">Transporte Ecológico S.A.</option>
+                                    <option value="t2">LogiResiduos Ltda.</option>
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label>Operador de Destino</label>
+                                <select className="form-select">
+                                    <option value="">Seleccione...</option>
+                                    <option value="o1">Planta Tratamiento Norte</option>
+                                    <option value="o2">Centro Disposición Final</option>
+                                </select>
+                            </div>
+                            <div className="form-actions">
+                                <button className="btn btn-secondary" onClick={() => setCurrentScreen('home')}>
+                                    Cancelar
+                                </button>
+                                <button className="btn btn-primary" onClick={() => {
+                                    showToastMessage('Manifiesto creado exitosamente');
+                                    setCurrentScreen('manifiestos');
+                                }}>
+                                    Crear Manifiesto
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+
+            case 'actores':
+                return (
+                    <div className="section">
+                        <h3>Gestión de Actores</h3>
+                        <div className="search-bar">
+                            <Search size={18} />
+                            <input type="text" placeholder="Buscar actores..." />
+                        </div>
+                        <div className="actor-tabs">
+                            <button className="actor-tab active">Generadores</button>
+                            <button className="actor-tab">Transportistas</button>
+                            <button className="actor-tab">Operadores</button>
+                        </div>
+                        <div className="list">
+                            {[
+                                { id: 1, nombre: 'Industria Química S.A.', tipo: 'GENERADOR', estado: 'ACTIVO' },
+                                { id: 2, nombre: 'Laboratorios Médicos', tipo: 'GENERADOR', estado: 'ACTIVO' },
+                                { id: 3, nombre: 'Metalúrgica del Norte', tipo: 'GENERADOR', estado: 'PENDIENTE' },
+                            ].map(actor => (
+                                <div key={actor.id} className="list-item">
+                                    <div className="list-icon"><Users size={18} /></div>
+                                    <div className="list-body">
+                                        <div className="list-title">{actor.nombre}</div>
+                                        <div className="list-sub">{actor.tipo}</div>
+                                    </div>
+                                    <div className="list-badge">
+                                        <span className={`badge ${actor.estado === 'ACTIVO' ? 'active' : 'pending'}`}>
+                                            {actor.estado}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+
+            case 'historial':
+                return (
+                    <div className="section">
+                        <h3>Historial de Viajes</h3>
+                        <div className="filter-bar">
+                            <select className="form-select compact">
+                                <option value="7">Últimos 7 días</option>
+                                <option value="30">Últimos 30 días</option>
+                                <option value="90">Últimos 90 días</option>
+                            </select>
+                        </div>
+                        <div className="list">
+                            {DEMO_MANIFIESTOS.filter(m => m.estado === 'TRATADO' || m.estado === 'RECIBIDO').length > 0 ? (
+                                DEMO_MANIFIESTOS.filter(m => m.estado === 'TRATADO' || m.estado === 'RECIBIDO').map(m => (
+                                    <div key={m.id} className="list-item" onClick={() => handleSelectManifiesto(m)}>
+                                        <div className="list-icon"><FileText size={18} /></div>
+                                        <div className="list-body">
+                                            <div className="list-title">#{m.numero}</div>
+                                            <div className="list-sub">{m.generador}</div>
+                                        </div>
+                                        <div className="list-badge">{getEstadoBadge(m.estado)}</div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="empty-state">
+                                    <FileText size={32} />
+                                    <p>No hay viajes completados</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+
             default:
                 return (
                     <div className="screen-not-found">
@@ -423,7 +595,7 @@ const MobileApp: React.FC = () => {
             />
 
             {/* Header */}
-            <header className="app-header" style={{ background: getRoleColor() }}>
+            <header className="app-header">
                 <button className="header-btn" onClick={() => 
                     ['detalle', 'viaje', 'actores'].includes(currentScreen) 
                         ? setCurrentScreen('home') 
@@ -450,7 +622,7 @@ const MobileApp: React.FC = () => {
             {menuOpen && (
                 <div className="menu-overlay" onClick={() => setMenuOpen(false)}>
                     <div className="side-menu" onClick={e => e.stopPropagation()}>
-                        <div className="menu-user" style={{ background: getRoleColor() }}>
+                        <div className="menu-user">
                             <div className="menu-avatar"><User size={24} /></div>
                             <span className="menu-name">Usuario Demo</span>
                             <span className="menu-role">{getRoleName()}</span>
@@ -496,7 +668,6 @@ const MobileApp: React.FC = () => {
                             analyticsService.trackNavigation(item.id, previousScreen, role || undefined);
                             analyticsService.trackPageView(item.id, role || undefined);
                         }}
-                        style={currentScreen === item.id ? { color: getRoleColor() } : {}}
                     >
                         {item.icon}
                         <span>{item.label}</span>

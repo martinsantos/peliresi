@@ -33,7 +33,7 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-    const { user, logout } = useAuth();
+    const { user, logout, loading } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -150,6 +150,20 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
     const navItems = getNavItems();
 
+    // Loading state while auth is initializing
+    if (loading) {
+        return (
+            <div className="loading-screen">
+                <div className="logo-icon" style={{ width: 64, height: 64, color: '#10b981' }}>
+                    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="20" cy="20" r="18" stroke="currentColor" strokeWidth="2" fill="none" />
+                        <path d="M12 20L18 26L28 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                </div>
+                <span>Cargando SITREP...</span>
+            </div>
+        );
+    }
 
     return (
         <div className="layout">

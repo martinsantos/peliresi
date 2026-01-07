@@ -7,12 +7,14 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { GPSPosition, RoutePoint, TripEvent, SavedTrip } from '../types/mobile.types';
 import { analyticsService } from '../services/analytics.service';
+import { manifiestoService } from '../services/manifiesto.service';
 
 const TRIPS_STORAGE_KEY = 'sitrep_trips';
 const GPS_INTERVAL_MS = 30000; // 30 seconds
 
 interface UseTripTrackingOptions {
     role?: string;
+    manifiestoId?: string;
     onToast?: (message: string) => void;
 }
 
@@ -44,7 +46,7 @@ interface UseTripTrackingReturn {
     formatTime: (seconds: number) => string;
 }
 
-export function useTripTracking({ role, onToast }: UseTripTrackingOptions = {}): UseTripTrackingReturn {
+export function useTripTracking({ role, manifiestoId, onToast }: UseTripTrackingOptions = {}): UseTripTrackingReturn {
     // Trip state
     const [viajeActivo, setViajeActivo] = useState(false);
     const [viajePausado, setViajePausado] = useState(false);
@@ -139,7 +141,7 @@ export function useTripTracking({ role, onToast }: UseTripTrackingOptions = {}):
             // Periodic GPS tracking
             gpsRouteIntervalRef.current = setInterval(() => {
                 navigator.geolocation.getCurrentPosition(
-                    (pos) => {
+                    async (pos) => {
                         const point: RoutePoint = {
                             lat: pos.coords.latitude,
                             lng: pos.coords.longitude,
@@ -148,6 +150,18 @@ export function useTripTracking({ role, onToast }: UseTripTrackingOptions = {}):
                         setGpsPosition({ lat: point.lat, lng: point.lng });
                         viajeRutaRef.current = [...viajeRutaRef.current, point];
                         setViajeRuta([...viajeRutaRef.current]);
+
+                        // Enviar ubicación al backend si hay manifiestoId
+                        if (manifiestoId && navigator.onLine) {
+                            try {
+                                await manifiestoService.actualizarUbicacion(manifiestoId, {
+                                    latitud: point.lat,
+                                    longitud: point.lng
+                                });
+                            } catch (err) {
+                                console.warn('Error enviando ubicación al backend:', err);
+                            }
+                        }
                     },
                     (err) => console.warn('GPS tracking error:', err.message),
                     { enableHighAccuracy: true, timeout: 4000, maximumAge: 2000 }
@@ -161,7 +175,7 @@ export function useTripTracking({ role, onToast }: UseTripTrackingOptions = {}):
                 gpsRouteIntervalRef.current = null;
             }
         };
-    }, [viajeActivo, viajePausado]);
+    }, [viajeActivo, viajePausado, manifiestoId]);
 
     // Actions
     const iniciarViaje = useCallback(() => {

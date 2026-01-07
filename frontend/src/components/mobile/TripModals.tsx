@@ -75,21 +75,24 @@ const modalStyles = {
         fontFamily: 'inherit',
     },
     actions: {
-        display: 'flex',
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
         gap: '12px',
     },
     btnBase: {
-        flex: 1,
-        padding: '14px',
+        padding: '14px 12px',
         borderRadius: '12px',
-        fontSize: '15px',
+        fontSize: '14px',
         fontWeight: 600,
         cursor: 'pointer',
         border: 'none',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '8px',
+        gap: '6px',
+        whiteSpace: 'nowrap' as const,
+        overflow: 'hidden',
+        minHeight: '48px',
     },
     btnCancel: {
         background: 'rgba(255, 255, 255, 0.1)',
@@ -153,12 +156,12 @@ export const IncidentModal: React.FC<IncidentModalProps> = ({
                     >
                         Cancelar
                     </button>
-                    <button 
-                        style={{ ...modalStyles.btnBase, ...modalStyles.btnConfirmIncident }} 
+                    <button
+                        style={{ ...modalStyles.btnBase, ...modalStyles.btnConfirmIncident }}
                         onClick={onConfirm}
                     >
                         <AlertTriangle size={16} />
-                        Registrar Incidente
+                        Registrar
                     </button>
                 </div>
             </div>
@@ -211,12 +214,12 @@ export const ParadaModal: React.FC<ParadaModalProps> = ({
                     >
                         Cancelar
                     </button>
-                    <button 
-                        style={{ ...modalStyles.btnBase, ...modalStyles.btnConfirmParada }} 
+                    <button
+                        style={{ ...modalStyles.btnBase, ...modalStyles.btnConfirmParada }}
                         onClick={onConfirm}
                     >
                         <Pause size={16} />
-                        Confirmar Parada
+                        Confirmar
                     </button>
                 </div>
             </div>

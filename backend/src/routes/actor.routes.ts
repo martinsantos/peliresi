@@ -17,7 +17,8 @@ import {
     deleteOperador,
     cargaMasivaGeneradores,
     cargaMasivaTransportistas,
-    cargaMasivaOperadores
+    cargaMasivaOperadores,
+    descargarPlantilla
 } from '../controllers/actor.controller';
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -46,6 +47,7 @@ router.put('/operadores/:id', hasRole('ADMIN'), updateOperador);
 router.delete('/operadores/:id', hasRole('ADMIN'), deleteOperador);
 
 // ===== CARGA MASIVA (Solo Admin) =====
+router.get('/carga-masiva/plantilla/:tipo', hasRole('ADMIN'), descargarPlantilla);
 router.post('/carga-masiva/generadores', hasRole('ADMIN'), upload.single('archivo'), cargaMasivaGeneradores);
 router.post('/carga-masiva/transportistas', hasRole('ADMIN'), upload.single('archivo'), cargaMasivaTransportistas);
 router.post('/carga-masiva/operadores', hasRole('ADMIN'), upload.single('archivo'), cargaMasivaOperadores);

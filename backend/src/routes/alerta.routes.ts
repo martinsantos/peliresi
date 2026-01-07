@@ -3,6 +3,8 @@ import { isAuthenticated, hasRole } from '../middlewares/auth.middleware';
 import {
     getReglasAlerta,
     crearReglaAlerta,
+    actualizarReglaAlerta,
+    eliminarReglaAlerta,
     getAlertasGeneradas,
     resolverAlerta
 } from '../controllers/alerta.controller';
@@ -16,6 +18,8 @@ router.use(hasRole('ADMIN'));
 // ============ REGLAS DE ALERTA ============
 router.get('/reglas', getReglasAlerta);
 router.post('/reglas', crearReglaAlerta);
+router.put('/reglas/:id', actualizarReglaAlerta);
+router.delete('/reglas/:id', eliminarReglaAlerta);
 
 // ============ ALERTAS GENERADAS ============
 router.get('/', getAlertasGeneradas);

@@ -11,7 +11,48 @@ export const getReglasAlerta = async (req: Request, res: Response, next: NextFun
                 _count: { select: { alertasGeneradas: true } }
             }
         });
-        res.json({ success: true, data: reglas });
+
+        // Parsear y validar campos JSON (pueden estar double-stringified)
+        const reglasFormateadas = reglas.map(regla => {
+            let condicion = '{}';
+            let destinatarios = '[]';
+
+            // Parsear condición
+            try {
+                let parsed = JSON.parse(regla.condicion || '{}');
+                // Si es string, parsear nuevamente
+                if (typeof parsed === 'string') {
+                    parsed = JSON.parse(parsed);
+                }
+                condicion = JSON.stringify(parsed);
+            } catch {
+                condicion = '{}';
+            }
+
+            // Parsear destinatarios
+            try {
+                let parsed = JSON.parse(regla.destinatarios || '[]');
+                // Si es string, parsear nuevamente
+                if (typeof parsed === 'string') {
+                    parsed = JSON.parse(parsed);
+                }
+                // Asegurar que sea array
+                if (!Array.isArray(parsed)) {
+                    parsed = [];
+                }
+                destinatarios = JSON.stringify(parsed);
+            } catch {
+                destinatarios = '[]';
+            }
+
+            return {
+                ...regla,
+                condicion,
+                destinatarios
+            };
+        });
+
+        res.json({ success: true, data: reglasFormateadas });
     } catch (error) {
         next(error);
     }
@@ -90,6 +131,69 @@ export const resolverAlerta = async (req: Request, res: Response, next: NextFunc
         });
 
         res.json({ success: true, data: alerta });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const actualizarReglaAlerta = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { id } = req.params;
+        const { nombre, descripcion, evento, condicion, destinatarios, activa } = req.body;
+
+        const updateData: any = {};
+        if (nombre !== undefined) updateData.nombre = nombre;
+        if (descripcion !== undefined) updateData.descripcion = descripcion;
+        if (evento !== undefined) updateData.evento = evento as EventoAlerta;
+        if (condicion !== undefined) updateData.condicion = JSON.stringify(condicion);
+        if (destinatarios !== undefined) updateData.destinatarios = JSON.stringify(destinatarios);
+        if (activa !== undefined) updateData.activa = activa;
+
+        const regla = await prisma.reglaAlerta.update({
+            where: { id },
+            data: updateData,
+            include: {
+                creadoPor: { select: { nombre: true, apellido: true } },
+                _count: { select: { alertasGeneradas: true } }
+            }
+        });
+
+        // Parsear campos JSON (pueden estar double-stringified)
+        let condicionParsed = '{}';
+        let destinatariosParsed = '[]';
+        try {
+            let parsed = JSON.parse(regla.condicion || '{}');
+            if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+            condicionParsed = JSON.stringify(parsed);
+        } catch {
+            condicionParsed = '{}';
+        }
+        try {
+            let parsed = JSON.parse(regla.destinatarios || '[]');
+            if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+            if (!Array.isArray(parsed)) parsed = [];
+            destinatariosParsed = JSON.stringify(parsed);
+        } catch {
+            destinatariosParsed = '[]';
+        }
+
+        res.json({ success: true, data: { ...regla, condicion: condicionParsed, destinatarios: destinatariosParsed } });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const eliminarReglaAlerta = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { id } = req.params;
+
+        // Eliminar alertas generadas asociadas primero
+        await prisma.alertaGenerada.deleteMany({ where: { reglaId: id } });
+
+        // Eliminar la regla
+        await prisma.reglaAlerta.delete({ where: { id } });
+
+        res.json({ success: true, message: 'Regla de alerta eliminada' });
     } catch (error) {
         next(error);
     }

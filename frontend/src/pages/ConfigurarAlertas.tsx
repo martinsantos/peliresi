@@ -115,8 +115,20 @@ const ConfigurarAlertas: React.FC = () => {
     const abrirModal = (regla?: ReglaAlerta) => {
         if (regla) {
             setEditando(regla);
-            const condicion = JSON.parse(regla.condicion || '{}');
-            const destinatarios = JSON.parse(regla.destinatarios || '[]');
+            let condicion: any = {};
+            let destinatarios: string[] = [];
+            try {
+                const parsedCondicion = JSON.parse(regla.condicion || '{}');
+                condicion = parsedCondicion || {};
+            } catch (e) {
+                condicion = {};
+            }
+            try {
+                const parsedDest = JSON.parse(regla.destinatarios || '[]');
+                destinatarios = Array.isArray(parsedDest) ? parsedDest : [];
+            } catch (e) {
+                destinatarios = [];
+            }
             setForm({
                 nombre: regla.nombre,
                 descripcion: regla.descripcion || '',
@@ -124,8 +136,8 @@ const ConfigurarAlertas: React.FC = () => {
                 destinatarios,
                 activa: regla.activa,
                 condiciones: {
-                    umbral: condicion.umbral || '',
-                    unidad: condicion.unidad || 'minutos'
+                    umbral: condicion?.umbral || '',
+                    unidad: condicion?.unidad || 'minutos'
                 }
             });
         } else {
@@ -255,7 +267,13 @@ const ConfigurarAlertas: React.FC = () => {
                 <div className="reglas-grid">
                     {reglas.map(regla => {
                         const eventoInfo = eventosDisponibles.find(e => e.value === regla.evento);
-                        const destinatarios = JSON.parse(regla.destinatarios || '[]');
+                        let destinatarios = [];
+                        try {
+                            const parsed = JSON.parse(regla.destinatarios || '[]');
+                            destinatarios = Array.isArray(parsed) ? parsed : [];
+                        } catch (e) {
+                            destinatarios = [];
+                        }
 
                         return (
                             <div key={regla.id} className={`regla-card ${!regla.activa ? 'inactiva' : ''}`}>
