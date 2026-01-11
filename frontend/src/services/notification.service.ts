@@ -67,13 +67,13 @@ export const notificationService = {
 
     // Marcar como leída
     async marcarLeida(id: string) {
-        const response = await api.put(`/notificaciones/${id}/leida`);
+        const response = await api.put(`/notificaciones/${id}/leer`);
         return response.data.data;
     },
 
     // Marcar todas como leídas
     async marcarTodasLeidas() {
-        const response = await api.put('/notificaciones/todas-leidas');
+        const response = await api.put('/notificaciones/leer-todas');
         return response.data;
     },
 
