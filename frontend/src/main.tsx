@@ -1,6 +1,9 @@
 import { StrictMode, Component } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
+// Design System
+import './styles/variables.css'
+import './styles/layers.css'
 import './index.css'
 import App from './App.tsx'
 // import App from './AppDebug.tsx'

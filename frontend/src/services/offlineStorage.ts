@@ -20,6 +20,17 @@ interface SyncResult {
   errors: Array<{ id: number; error: string }>;
 }
 
+interface GPSPoint {
+  id?: number;
+  manifiestoId: string;
+  latitud: number;
+  longitud: number;
+  velocidad?: number;
+  precision?: number;
+  timestamp: string;
+  sincronizado: boolean;
+}
+
 // Database Schema
 interface OfflineDB extends DBSchema {
   manifiestos: {
@@ -53,11 +64,19 @@ interface OfflineDB extends DBSchema {
       version: number;
     };
   };
+  gpsPoints: {
+    key: number;
+    value: GPSPoint;
+    indexes: {
+      'by-manifiesto': string;
+      'by-sync': number;
+    };
+  };
 }
 
 // Constants
-const DB_NAME = 'sitrep-db-v2';
-const DB_VERSION = 2;
+const DB_NAME = 'sitrep-db-v3';
+const DB_VERSION = 3;
 
 class OfflineStorageService {
   private db: IDBPDatabase<OfflineDB> | null = null;
@@ -99,6 +118,17 @@ class OfflineStorageService {
           }
           if (!db.objectStoreNames.contains('operadores')) {
             db.createObjectStore('operadores', { keyPath: 'id' });
+          }
+        }
+
+        if (oldVersion < 3) {
+          if (!db.objectStoreNames.contains('gpsPoints')) {
+            const gpsStore = db.createObjectStore('gpsPoints', {
+              keyPath: 'id',
+              autoIncrement: true
+            });
+            gpsStore.createIndex('by-manifiesto', 'manifiestoId');
+            gpsStore.createIndex('by-sync', 'sincronizado');
           }
         }
       }
@@ -150,6 +180,75 @@ class OfflineStorageService {
   async getOperadores(): Promise<any[]> {
     await this.init();
     return this.db!.getAll('operadores');
+  }
+
+  // --- GPS Points (Offline-First Tracking) ---
+  async saveGPSPoint(data: {
+    manifiestoId: string;
+    latitud: number;
+    longitud: number;
+    velocidad?: number;
+    precision?: number;
+  }): Promise<number> {
+    await this.init();
+    const point: GPSPoint = {
+      ...data,
+      timestamp: new Date().toISOString(),
+      sincronizado: false
+    };
+    return (await this.db!.add('gpsPoints', point)) as number;
+  }
+
+  async getUnsyncedGPSPoints(): Promise<GPSPoint[]> {
+    await this.init();
+    // Get all points where sincronizado = false (using index value 0 for false)
+    const allPoints = await this.db!.getAll('gpsPoints');
+    return allPoints.filter(p => !p.sincronizado);
+  }
+
+  async getGPSPointsByManifiesto(manifiestoId: string): Promise<GPSPoint[]> {
+    await this.init();
+    return this.db!.getAllFromIndex('gpsPoints', 'by-manifiesto', manifiestoId);
+  }
+
+  async markGPSSynced(ids: number[]): Promise<void> {
+    await this.init();
+    const tx = this.db!.transaction('gpsPoints', 'readwrite');
+
+    for (const id of ids) {
+      const point = await tx.store.get(id);
+      if (point) {
+        point.sincronizado = true;
+        await tx.store.put(point);
+      }
+    }
+
+    await tx.done;
+  }
+
+  async deleteGPSPoints(ids: number[]): Promise<void> {
+    await this.init();
+    const tx = this.db!.transaction('gpsPoints', 'readwrite');
+    for (const id of ids) {
+      await tx.store.delete(id);
+    }
+    await tx.done;
+  }
+
+  async clearSyncedGPSPoints(): Promise<number> {
+    await this.init();
+    const allPoints = await this.db!.getAll('gpsPoints');
+    const syncedPoints = allPoints.filter(p => p.sincronizado);
+
+    const tx = this.db!.transaction('gpsPoints', 'readwrite');
+    for (const point of syncedPoints) {
+      if (point.id) {
+        await tx.store.delete(point.id);
+      }
+    }
+    await tx.done;
+
+    return syncedPoints.length;
   }
 
   // --- Cola de Sync ---
@@ -238,7 +337,59 @@ class OfflineStorageService {
   }
 
   get online(): boolean { return this.isOnline; }
+
+  // --- Utility methods for useConnectivity ---
+
+  /**
+   * Get all pending (unsynced) GPS points
+   * Alias for getUnsyncedGPSPoints for consistent naming
+   */
+  async getPendingGPSPoints(): Promise<GPSPoint[]> {
+    return this.getUnsyncedGPSPoints();
+  }
+
+  /**
+   * Mark a single GPS point as synced
+   */
+  async markGPSPointSynced(id: number): Promise<void> {
+    await this.init();
+    const point = await this.db!.get('gpsPoints', id);
+    if (point) {
+      point.sincronizado = true;
+      await this.db!.put('gpsPoints', point);
+    }
+  }
+
+  /**
+   * Check if there's any pending data to sync
+   */
+  async hasPendingData(): Promise<boolean> {
+    await this.init();
+
+    // Check for pending operations
+    const pendingOps = await this.db!.count('operacionesPendientes');
+    if (pendingOps > 0) return true;
+
+    // Check for unsynced GPS points
+    const allPoints = await this.db!.getAll('gpsPoints');
+    const unsyncedPoints = allPoints.filter(p => !p.sincronizado);
+
+    return unsyncedPoints.length > 0;
+  }
+
+  /**
+   * Get count of pending items for UI display
+   */
+  async getPendingCounts(): Promise<{ operations: number; gpsPoints: number }> {
+    await this.init();
+
+    const operations = await this.db!.count('operacionesPendientes');
+    const allPoints = await this.db!.getAll('gpsPoints');
+    const gpsPoints = allPoints.filter(p => !p.sincronizado).length;
+
+    return { operations, gpsPoints };
+  }
 }
 
 export const offlineStorage = new OfflineStorageService();
-export type { Manifiesto, PendingOperation, SyncResult };
+export type { Manifiesto, PendingOperation, SyncResult, GPSPoint };

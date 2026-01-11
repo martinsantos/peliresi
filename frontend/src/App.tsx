@@ -59,6 +59,7 @@ const App: React.FC = () => {
 
             {/* Apps Especializadas */}
             <Route path="/app" element={<AppMobile />} />
+            <Route path="/mobile" element={<AppMobile />} />
             <Route path="/demo-app" element={<DemoApp />} />
             <Route path="/analytics-admin" element={<AnalyticsAdmin />} />
 

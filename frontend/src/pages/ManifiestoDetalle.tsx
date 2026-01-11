@@ -20,8 +20,10 @@ import {
     ArrowRight,
     X,
     Award,
-    Loader2
+    Loader2,
+    Map
 } from 'lucide-react';
+import ManifiestoMap from '../components/mobile/ManifiestoMap';
 import './ManifiestoDetalle.css';
 
 const ManifiestoDetalle: React.FC = () => {
@@ -417,7 +419,51 @@ const ManifiestoDetalle: React.FC = () => {
                 </div>
             </div>
 
-            {/* Residuos */}
+            {/* Mapa Origen/Destino */}
+            <div className="card detalle-section map-section">
+                <h3><Map size={20} /> Ubicación Geográfica</h3>
+                <div className="map-description">
+                    <span className="map-route-label">
+                        <span className="origen-dot"></span>
+                        {manifiesto.generador?.razonSocial || 'Generador'}
+                    </span>
+                    <ArrowRight size={16} />
+                    <span className="map-route-label">
+                        <span className="destino-dot"></span>
+                        {manifiesto.operador?.razonSocial || 'Operador'}
+                    </span>
+                </div>
+                <ManifiestoMap
+                    origen={{
+                        nombre: manifiesto.generador?.razonSocial || 'Generador',
+                        direccion: manifiesto.generador?.domicilio,
+                        coords: manifiesto.generador?.latitud && manifiesto.generador?.longitud
+                            ? { lat: manifiesto.generador.latitud, lng: manifiesto.generador.longitud }
+                            : undefined
+                    }}
+                    destino={{
+                        nombre: manifiesto.operador?.razonSocial || 'Operador',
+                        direccion: manifiesto.operador?.domicilio,
+                        coords: manifiesto.operador?.latitud && manifiesto.operador?.longitud
+                            ? { lat: manifiesto.operador.latitud, lng: manifiesto.operador.longitud }
+                            : undefined
+                    }}
+                    altura="280px"
+                    showRoute={true}
+                />
+            </div>
+
+            {/* CORRECCIÓN 3: Observaciones del Manifiesto */}
+            {manifiesto.observaciones && (
+                <div className="card detalle-section observaciones-section">
+                    <h3>Observaciones Generales</h3>
+                    <div className="observaciones-content">
+                        <p>{manifiesto.observaciones}</p>
+                    </div>
+                </div>
+            )}
+
+            {/* Residuos - CORRECCIÓN 3: Agregar columnas descripción y observaciones */}
             <div className="card detalle-section">
                 <h3>Residuos Declarados</h3>
                 <div className="residuos-table">
@@ -431,6 +477,8 @@ const ManifiestoDetalle: React.FC = () => {
                                     <th>Peligrosidad</th>
                                     <th>Cantidad</th>
                                     <th>Unidad</th>
+                                    <th>Descripción</th>
+                                    <th>Observaciones</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -444,6 +492,8 @@ const ManifiestoDetalle: React.FC = () => {
                                         </td>
                                         <td><strong>{residuo.cantidad}</strong></td>
                                         <td>{residuo.unidad}</td>
+                                        <td className="descripcion-cell">{residuo.descripcion || '-'}</td>
+                                        <td className="observaciones-cell">{residuo.observaciones || '-'}</td>
                                     </tr>
                                 ))}
                             </tbody>

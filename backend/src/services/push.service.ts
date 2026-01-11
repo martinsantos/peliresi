@@ -158,20 +158,64 @@ export const pushService = {
    * Enviar notificación de cambio de estado
    */
   async notificarCambioEstado(manifiestoNumero: string, nuevoEstado: string, destinatarioId: string): Promise<void> {
-    const estadoTexto: Record<string, string> = {
-      EN_TRANSITO: '🚛 En Tránsito',
-      ENTREGADO: '📍 Entregado',
-      RECIBIDO: '✅ Recibido',
-      EN_TRATAMIENTO: '⚙️ En Tratamiento',
-      TRATADO: '🎉 Tratamiento Completado',
+    const estadoConfig: Record<string, { emoji: string; texto: string; body: string }> = {
+      APROBADO: {
+        emoji: '✍️',
+        texto: 'Manifiesto Firmado',
+        body: `El manifiesto ${manifiestoNumero} está listo para retiro`
+      },
+      EN_TRANSITO: {
+        emoji: '🚛',
+        texto: 'En Tránsito',
+        body: `El manifiesto ${manifiestoNumero} está en camino`
+      },
+      ENTREGADO: {
+        emoji: '📍',
+        texto: 'Entregado',
+        body: `El manifiesto ${manifiestoNumero} llegó a destino`
+      },
+      RECIBIDO: {
+        emoji: '✅',
+        texto: 'Recibido',
+        body: `El operador confirmó recepción de ${manifiestoNumero}`
+      },
+      EN_TRATAMIENTO: {
+        emoji: '⚙️',
+        texto: 'En Tratamiento',
+        body: `Se inició el tratamiento de ${manifiestoNumero}`
+      },
+      TRATADO: {
+        emoji: '🎉',
+        texto: 'Ciclo Completado',
+        body: `El manifiesto ${manifiestoNumero} finalizó exitosamente`
+      },
+      RECHAZADO: {
+        emoji: '⚠️',
+        texto: 'Carga Rechazada',
+        body: `La carga de ${manifiestoNumero} fue rechazada`
+      },
+    };
+
+    const config = estadoConfig[nuevoEstado] || {
+      emoji: '📋',
+      texto: nuevoEstado,
+      body: `Manifiesto ${manifiestoNumero}: ${nuevoEstado}`
     };
 
     await this.sendToUser(destinatarioId, {
-      title: estadoTexto[nuevoEstado] || `Estado: ${nuevoEstado}`,
-      body: `Manifiesto ${manifiestoNumero}`,
-      icon: '/icons/icon-192x192.png',
-      tag: `estado-${manifiestoNumero}`,
-      data: { url: `/manifiestos` },
+      title: `${config.emoji} ${config.texto}`,
+      body: config.body,
+      icon: '/pwa-192x192.png',
+      badge: '/pwa-192x192.png',
+      tag: `manifiesto-${manifiestoNumero}`,
+      data: {
+        url: `/manifiestos`,
+        manifiestoNumero,
+        estado: nuevoEstado
+      },
+      actions: nuevoEstado === 'APROBADO' ? [
+        { action: 'ver', title: 'Ver Manifiesto' }
+      ] : undefined
     });
   },
 };

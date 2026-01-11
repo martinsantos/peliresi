@@ -141,18 +141,19 @@
     border: 1px solid var(--border-color);
 }
 
+/* FASE 6 (P8): Mejora de contraste en titulos h3 */
 .detalle-section h3 {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     margin: 0 0 1rem;
-    font-size: 0.9rem;
-    color: var(--text-primary);
-    font-weight: 600;
+    font-size: 1.1rem;
+    color: var(--primary-200, #93c5fd);
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 2px solid var(--primary-400, #60a5fa);
 }
 
 /* Actor Cards - Vertical on Mobile */
@@ -546,5 +547,166 @@ table th {
     .qr-container img {
         width: 250px;
         height: 250px;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* CORRECCIÓN 3: OBSERVACIONES Y CAMPOS ADICIONALES EN TABLA                   */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Sección de Observaciones Generales */
+.observaciones-section {
+    background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+    border-left: 4px solid var(--primary-color);
+}
+
+.observaciones-content {
+    padding: 1rem;
+    background: var(--bg-primary);
+    border-radius: 8px;
+}
+
+.observaciones-content p {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+/* Celdas de descripción y observaciones en tabla de residuos */
+.descripcion-cell,
+.observaciones-cell {
+    max-width: 200px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    white-space: normal;
+    word-wrap: break-word;
+}
+
+.descripcion-cell {
+    color: var(--text-primary);
+}
+
+.observaciones-cell {
+    font-style: italic;
+    color: var(--text-muted);
+}
+
+/* Ajustar tabla con más columnas */
+.residuos-table table {
+    min-width: 800px;
+}
+
+/* Mobile: ocultar algunas columnas si es muy estrecho */
+@media (max-width: 768px) {
+    .descripcion-cell,
+    .observaciones-cell {
+        max-width: 120px;
+        font-size: 0.7rem;
+    }
+
+    .residuos-table table {
+        min-width: 700px;
+    }
+}
+
+/* Desktop: más espacio para descripciones */
+@media (min-width: 1024px) {
+    .descripcion-cell,
+    .observaciones-cell {
+        max-width: 250px;
+        font-size: 0.8rem;
+    }
+
+    .residuos-table table {
+        min-width: 900px;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* MAPA ORIGEN/DESTINO - Sección de ubicación geográfica                       */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+.map-section {
+    margin-bottom: 1rem;
+}
+
+.map-section h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.map-description {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-primary);
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.map-route-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.origen-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #8b5cf6;
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+}
+
+.destino-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+.map-description svg {
+    color: var(--text-muted);
+}
+
+/* Contenedor del mapa - asegurar visibilidad */
+.map-section .manifiesto-map-container {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+}
+
+/* Placeholder cuando no hay coordenadas */
+.map-section .map-placeholder {
+    background: var(--bg-primary);
+    border: 2px dashed var(--border-color);
+    color: var(--text-muted);
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+    .map-description {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .map-description svg {
+        transform: rotate(90deg);
+    }
+}
+
+@media (min-width: 768px) {
+    .map-route-label {
+        font-size: 0.95rem;
     }
 }

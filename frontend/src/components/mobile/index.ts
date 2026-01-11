@@ -8,6 +8,8 @@ export { default as RoleSelector } from './RoleSelector';
 export { default as TripTracker } from './TripTracker';
 export { default as QRScannerView } from './QRScannerView';
 export { IncidentModal, ParadaModal } from './TripModals';
+export { default as ManifiestoCard } from './ManifiestoCard';
+export type { ManifiestoCardData, EstadoManifiesto } from './ManifiestoCard';
 
 // Re-export hooks for convenience
 export { useTripTracking } from '../../hooks/useTripTracking';

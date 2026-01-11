@@ -1,0 +1,115 @@
+/**
+ * SITREP Design System - Z-Index Layers
+ * Sistema de capas estandarizado para evitar conflictos de z-index
+ *
+ * Jerarquía de capas (de menor a mayor):
+ * - Base: Contenido normal
+ * - Sticky: Headers sticky, elementos fijos dentro del contenido
+ * - Navigation: Bottom nav, tabs
+ * - Header: Top header de la app
+ * - Sidebar: Menú lateral
+ * - Overlay: Fondos oscuros de modales
+ * - Modal: Contenido de modales
+ * - Toast: Notificaciones
+ * - Tooltip: Tooltips y dropdowns
+ * - Max: Elementos críticos (debugging)
+ */
+
+:root {
+  /* ═══════════════════════════════════════════════════════════════════════════ */
+  /* SISTEMA DE CAPAS Z-INDEX                                                     */
+  /* ═══════════════════════════════════════════════════════════════════════════ */
+
+  /* Capas base */
+  --z-base: 0;
+  --z-content: 1;
+  --z-sticky: 10;
+
+  /* Navegación */
+  --z-bottom-nav: 100;
+  --z-tabs: 150;
+  --z-header: 200;
+  --z-sidebar: 300;
+
+  /* Overlays y modales */
+  --z-overlay: 400;
+  --z-modal: 500;
+  --z-modal-header: 510;
+  --z-modal-footer: 510;
+
+  /* Elementos flotantes */
+  --z-toast: 600;
+  --z-dropdown: 700;
+  --z-tooltip: 800;
+
+  /* Críticos */
+  --z-loading: 900;
+  --z-max: 9999;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* CLASES UTILITARIAS PARA Z-INDEX                                              */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+.z-base { z-index: var(--z-base); }
+.z-content { z-index: var(--z-content); }
+.z-sticky { z-index: var(--z-sticky); }
+.z-nav { z-index: var(--z-bottom-nav); }
+.z-header { z-index: var(--z-header); }
+.z-sidebar { z-index: var(--z-sidebar); }
+.z-overlay { z-index: var(--z-overlay); }
+.z-modal { z-index: var(--z-modal); }
+.z-toast { z-index: var(--z-toast); }
+.z-dropdown { z-index: var(--z-dropdown); }
+.z-tooltip { z-index: var(--z-tooltip); }
+.z-max { z-index: var(--z-max); }
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* COMPONENTES CON Z-INDEX DEFINIDO                                             */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Header principal de la app */
+.app-header {
+  z-index: var(--z-header);
+}
+
+/* Navegación inferior */
+.app-nav,
+.bottom-navigation {
+  z-index: var(--z-bottom-nav);
+}
+
+/* Menú lateral slide-in */
+.side-menu,
+.menu-overlay {
+  z-index: var(--z-sidebar);
+}
+
+/* Overlays de modales */
+.modal-overlay,
+.viaje-modal-overlay,
+.qr-confirm-modal {
+  z-index: var(--z-overlay);
+}
+
+/* Contenido de modales */
+.modal-content,
+.viaje-modal-content {
+  z-index: var(--z-modal);
+}
+
+/* Pantallas fullscreen (como HistorialViajes) */
+.fullscreen-overlay {
+  z-index: var(--z-modal);
+}
+
+/* Toast notifications */
+.toast,
+.toast-container {
+  z-index: var(--z-toast);
+}
+
+/* Loading spinner global */
+.loading-overlay {
+  z-index: var(--z-loading);
+}

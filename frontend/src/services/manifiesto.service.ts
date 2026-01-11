@@ -17,10 +17,14 @@ export const manifiestoService = {
     },
 
     // Manifiestos
+    // FASE 1: Agregado filtro por transportistaId
     async getManifiestos(params?: {
         estado?: string;
         page?: number;
         limit?: number;
+        transportistaId?: string;  // P1: Filtrar por transportista asignado
+        generadorId?: string;
+        operadorId?: string;
     }): Promise<{ manifiestos: Manifiesto[]; pagination: any }> {
         const response = await api.get<ApiResponse<{ manifiestos: Manifiesto[]; pagination: any }>>('/manifiestos', { params });
         return response.data.data;

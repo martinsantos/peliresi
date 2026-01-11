@@ -101,6 +101,19 @@ export const confirmarRetiro = async (req: AuthRequest, res: Response, next: Nex
       throw new AppError('El manifiesto debe estar APROBADO para confirmar retiro', 400);
     }
 
+    // CORRECCIÓN 1: Validar que el transportista no tenga otro viaje activo
+    const viajesActivos = await prisma.manifiesto.count({
+      where: {
+        transportistaId: manifiesto.transportistaId,
+        estado: 'EN_TRANSITO',
+        id: { not: id } // Excluir el actual por si acaso
+      }
+    });
+
+    if (viajesActivos > 0) {
+      throw new AppError('Ya tienes un viaje en tránsito. Debes finalizar el viaje actual antes de iniciar otro.', 409);
+    }
+
     const resultado = await logisticsService.confirmarRetiro(id, userId, { latitud, longitud, observaciones });
     
     await notificationService.notificarCambioEstado(id, 'EN_TRANSITO', userId);
@@ -171,6 +184,91 @@ export const confirmarEntrega = async (req: AuthRequest, res: Response, next: Ne
     await notificationService.notificarCambioEstado(id, 'ENTREGADO', userId);
 
     res.json({ success: true, data: { manifiesto: manifiestoActualizado } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================
+// RUTA GPS: Obtener ruta completa de un manifiesto
+// ============================================================
+
+export const getRutaManifiesto = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+
+    // Verificar que el manifiesto existe
+    const manifiesto = await prisma.manifiesto.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        numero: true,
+        estado: true,
+        generador: { select: { razonSocial: true, domicilio: true } },
+        operador: { select: { razonSocial: true, domicilio: true } }
+      }
+    });
+
+    if (!manifiesto) {
+      throw new AppError('Manifiesto no encontrado', 404);
+    }
+
+    // Obtener puntos de tracking GPS ordenados por timestamp
+    const tracking = await prisma.trackingGPS.findMany({
+      where: { manifiestoId: id },
+      orderBy: { timestamp: 'asc' },
+      select: {
+        latitud: true,
+        longitud: true,
+        velocidad: true,
+        timestamp: true
+      }
+    });
+
+    // También intentar obtener ruta del modelo Viaje si existe
+    const viaje = await prisma.viaje.findFirst({
+      where: { manifiestoId: id },
+      orderBy: { inicio: 'desc' },
+      select: {
+        ruta: true,
+        inicio: true,
+        fin: true,
+        duracion: true,
+        distancia: true,
+        estado: true
+      }
+    });
+
+    // Formatear respuesta
+    const ruta = tracking.map(t => ({
+      lat: t.latitud,
+      lng: t.longitud,
+      velocidad: t.velocidad,
+      timestamp: t.timestamp.toISOString()
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        manifiesto: {
+          id: manifiesto.id,
+          numero: manifiesto.numero,
+          estado: manifiesto.estado,
+          origen: manifiesto.generador,
+          destino: manifiesto.operador
+        },
+        ruta,
+        totalPuntos: ruta.length,
+        viaje: viaje ? {
+          inicio: viaje.inicio,
+          fin: viaje.fin,
+          duracion: viaje.duracion,
+          distancia: viaje.distancia,
+          estado: viaje.estado,
+          rutaViaje: viaje.ruta
+        } : null
+      }
+    });
   } catch (error) {
     next(error);
   }

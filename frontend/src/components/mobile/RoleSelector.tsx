@@ -5,9 +5,11 @@
  */
 
 import React from 'react';
-import { Shield, Factory, Truck, Building2, Download, ChevronRight, Wifi, WifiOff } from 'lucide-react';
+import { Shield, Factory, Truck, Building2, Download, ChevronRight, Wifi, WifiOff, Bell, BellOff, Loader2 } from 'lucide-react';
 import type { UserRole } from '../../types/mobile.types';
 import { analyticsService } from '../../services/analytics.service';
+import { usePushNotifications } from '../../hooks/usePushNotifications';
+import './RoleSelector.css';
 
 interface RoleSelectorProps {
     onSelectRole: (role: UserRole) => void;
@@ -58,10 +60,23 @@ const RoleSelector: React.FC<RoleSelectorProps> = ({
     isIOS,
     onInstall,
 }) => {
+    const push = usePushNotifications();
+
     const handleRoleClick = (role: UserRole) => {
         analyticsService.trackRoleSelection(role);
         analyticsService.trackPageView('home', role);
         onSelectRole(role);
+    };
+
+    const handlePushToggle = async () => {
+        if (push.isSubscribed) {
+            await push.unsubscribe();
+        } else {
+            const success = await push.subscribe();
+            if (success) {
+                analyticsService.trackAction('push_enabled', 'notifications', 'system');
+            }
+        }
     };
 
     return (
@@ -112,9 +127,9 @@ const RoleSelector: React.FC<RoleSelectorProps> = ({
                     ))}
                 </div>
 
-                <button 
-                    className="install-hint" 
-                    onClick={onInstall} 
+                <button
+                    className="install-hint"
+                    onClick={onInstall}
                     style={{
                         background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.1))',
                         border: '1px solid rgba(16, 185, 129, 0.4)',
@@ -126,6 +141,42 @@ const RoleSelector: React.FC<RoleSelectorProps> = ({
                         {canInstall ? 'Instalar App' : isIOS ? 'Agregar a Inicio' : 'Instalar App'}
                     </span>
                 </button>
+
+                {/* Push Notifications Button */}
+                {push.isSupported && (
+                    <button
+                        className={`install-hint ${push.isSubscribed ? 'push-subscribed' : 'push-unsubscribed'}`}
+                        onClick={handlePushToggle}
+                        disabled={push.loading}
+                        style={{
+                            marginTop: '8px',
+                            opacity: push.loading ? 0.6 : 1,
+                            cursor: push.loading ? 'wait' : 'pointer'
+                        }}
+                    >
+                        {push.loading ? (
+                            <Loader2 size={18} className="animate-spin" />
+                        ) : push.isSubscribed ? (
+                            <Bell size={18} />
+                        ) : (
+                            <BellOff size={18} />
+                        )}
+                        <span>
+                            {push.loading
+                                ? 'Procesando...'
+                                : push.isSubscribed
+                                    ? 'Notificaciones Activas'
+                                    : 'Activar Notificaciones'
+                            }
+                        </span>
+                    </button>
+                )}
+
+                {push.error && (
+                    <p className="push-error">
+                        {push.error}
+                    </p>
+                )}
             </div>
         </div>
     );

@@ -130,11 +130,23 @@ router.get('/admin/usuarios/pendientes', isAuthenticated, hasRole('ADMIN'), asyn
 /**
  * POST /api/admin/usuarios/:id/aprobar
  * Aprobar usuario (solo admin)
+ * También crea la entidad asociada (Generador/Transportista/Operador) si no existe
  */
 router.post('/admin/usuarios/:id/aprobar', isAuthenticated, hasRole('ADMIN'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
 
+    // Primero obtener el usuario para ver su rol
+    const usuarioExistente = await prisma.usuario.findUnique({
+      where: { id },
+      include: { generador: true, transportista: true, operador: true }
+    });
+
+    if (!usuarioExistente) {
+      return res.status(404).json({ success: false, error: 'Usuario no encontrado' });
+    }
+
+    // Actualizar usuario como aprobado
     const usuario = await prisma.usuario.update({
       where: { id },
       data: {
@@ -145,13 +157,67 @@ router.post('/admin/usuarios/:id/aprobar', isAuthenticated, hasRole('ADMIN'), as
       },
     });
 
+    // Crear entidad asociada según el rol (si no existe)
+    let entidadCreada = null;
+    const nombreCompleto = `${usuario.nombre} ${usuario.apellido || ''}`.trim();
+
+    if (usuario.rol === 'GENERADOR' && !usuarioExistente.generador) {
+      entidadCreada = await prisma.generador.create({
+        data: {
+          usuarioId: id,
+          razonSocial: usuario.empresa || nombreCompleto,
+          cuit: usuario.cuit || `00-00000000-0`,
+          domicilio: 'Pendiente de completar',
+          telefono: usuario.telefono || '',
+          email: usuario.email,
+          numeroInscripcion: `RG-AUTO-${Date.now()}`,
+          categoria: 'Pendiente',
+          activo: true,
+        }
+      });
+      console.log(`[REGISTRO] Generador creado automáticamente para usuario ${usuario.email}`);
+    } else if (usuario.rol === 'TRANSPORTISTA' && !usuarioExistente.transportista) {
+      entidadCreada = await prisma.transportista.create({
+        data: {
+          usuarioId: id,
+          razonSocial: usuario.empresa || nombreCompleto,
+          cuit: usuario.cuit || `00-00000000-0`,
+          domicilio: 'Pendiente de completar',
+          telefono: usuario.telefono || '',
+          email: usuario.email,
+          numeroHabilitacion: `HT-AUTO-${Date.now()}`,
+          activo: true,
+        }
+      });
+      console.log(`[REGISTRO] Transportista creado automáticamente para usuario ${usuario.email}`);
+    } else if (usuario.rol === 'OPERADOR' && !usuarioExistente.operador) {
+      entidadCreada = await prisma.operador.create({
+        data: {
+          usuarioId: id,
+          razonSocial: usuario.empresa || nombreCompleto,
+          cuit: usuario.cuit || `00-00000000-0`,
+          domicilio: 'Pendiente de completar',
+          telefono: usuario.telefono || '',
+          email: usuario.email,
+          numeroHabilitacion: `HO-AUTO-${Date.now()}`,
+          categoria: 'Pendiente',
+          activo: true,
+        }
+      });
+      console.log(`[REGISTRO] Operador creado automáticamente para usuario ${usuario.email}`);
+    }
+
     // Registrar en log de actividad
     await loggerService.registrar({
       usuarioId: req.user!.id,
       accion: 'APROBAR_USUARIO',
       modulo: 'USUARIOS',
       entidadId: id,
-      detalles: { email: usuario.email, rol: usuario.rol },
+      detalles: {
+        email: usuario.email,
+        rol: usuario.rol,
+        entidadCreada: entidadCreada ? true : false
+      },
       req,
     });
 
@@ -164,8 +230,13 @@ router.post('/admin/usuarios/:id/aprobar', isAuthenticated, hasRole('ADMIN'), as
 
     res.json({
       success: true,
-      message: 'Usuario aprobado correctamente',
-      data: { usuario: { id: usuario.id, email: usuario.email } },
+      message: entidadCreada
+        ? `Usuario aprobado y ${usuario.rol.toLowerCase()} creado automáticamente`
+        : 'Usuario aprobado correctamente',
+      data: {
+        usuario: { id: usuario.id, email: usuario.email },
+        entidadCreada: entidadCreada ? { tipo: usuario.rol, id: entidadCreada.id } : null
+      },
     });
   } catch (error) {
     next(error);

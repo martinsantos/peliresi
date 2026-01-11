@@ -1,6 +1,26 @@
 import api from './api';
 import type { LoginResponse, Usuario, ApiResponse } from '../types';
 
+// Notify Service Worker about token changes
+const notifyServiceWorker = (type: 'SET_TOKEN' | 'CLEAR_TOKEN', token?: string) => {
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+            type,
+            token
+        });
+    }
+};
+
+// Setup listener for GET_TOKEN requests from Service Worker
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data?.type === 'GET_TOKEN' && event.ports?.[0]) {
+            const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+            event.ports[0].postMessage({ token });
+        }
+    });
+}
+
 export const authService = {
     async login(email: string, password: string): Promise<LoginResponse> {
         const response = await api.post<ApiResponse<LoginResponse>>('/auth/login', {
@@ -14,6 +34,9 @@ export const authService = {
         localStorage.setItem('accessToken', tokens.accessToken);
         localStorage.setItem('refreshToken', tokens.refreshToken);
         localStorage.setItem('user', JSON.stringify(user));
+
+        // Notify Service Worker about the new token
+        notifyServiceWorker('SET_TOKEN', tokens.accessToken);
 
         return response.data.data;
     },
@@ -46,6 +69,9 @@ export const authService = {
             localStorage.removeItem('refreshToken');
             localStorage.removeItem('token'); // Token de demo
             localStorage.removeItem('user');
+
+            // Notify Service Worker to clear cached token
+            notifyServiceWorker('CLEAR_TOKEN');
         }
     },
 

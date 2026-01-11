@@ -33,6 +33,49 @@
     font-size: 0.875rem;
 }
 
+.tracking-subtitle {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.last-update {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    padding: var(--space-1) var(--space-2);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+}
+
+.tracking-controls {
+    display: flex;
+    gap: var(--space-2);
+}
+
+.btn-icon {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+}
+
+.btn-success {
+    background: var(--status-success);
+    color: white;
+    border: none;
+}
+
+.btn-success:hover {
+    background: var(--primary-600);
+}
+
 .tracking-error {
     display: flex;
     align-items: center;
@@ -281,6 +324,16 @@
         gap: var(--space-3);
     }
 
+    .tracking-subtitle {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .tracking-controls {
+        width: 100%;
+        justify-content: space-between;
+    }
+
     .tracking-map {
         min-height: 300px;
     }
@@ -288,4 +341,106 @@
     .details-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* Extra small screens */
+@media (max-width: 399px) {
+    .tracking-header h2 {
+        font-size: 1.25rem;
+    }
+
+    .last-update {
+        font-size: 0.65rem;
+        padding: var(--space-1);
+    }
+
+    .btn-icon {
+        width: 36px;
+        height: 36px;
+    }
+
+    .tracking-map {
+        min-height: 250px;
+        margin: 0 -4px;
+        border-radius: var(--radius-md);
+    }
+
+    .tracking-sidebar {
+        padding: var(--space-2);
+    }
+
+    .transport-item {
+        padding: var(--space-2);
+    }
+
+    .details-grid {
+        gap: var(--space-2);
+    }
+}
+
+/* Real GPS Route Info */
+.tracking-details-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-4);
+}
+
+.tracking-details-header h3 {
+    margin-bottom: 0;
+}
+
+.loading-ruta,
+.ruta-info {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: 0.75rem;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-md);
+}
+
+.loading-ruta {
+    color: var(--text-muted);
+    background: var(--bg-tertiary);
+}
+
+.ruta-info {
+    color: var(--primary-400);
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.spinning {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.detail-highlight {
+    color: var(--primary-400) !important;
+    font-size: 1rem !important;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--space-1) var(--space-2);
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: var(--radius-md);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.badge-warning {
+    background: rgba(245, 158, 11, 0.2);
+    color: var(--status-warning);
+}
+
+.badge-success {
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--status-success);
 }

@@ -1,0 +1,230 @@
+/**
+ * TripMap Styles - Real-time map visualization for mobile trips
+ */
+
+.trip-map-container {
+    position: relative;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    background: #1e293b;
+}
+
+.trip-map-container .leaflet-container {
+    background: #1e293b;
+    font-family: inherit;
+}
+
+/* Attribution styling */
+.trip-map-container .leaflet-control-attribution {
+    background: rgba(30, 41, 59, 0.9) !important;
+    color: #64748b !important;
+    font-size: 10px;
+    padding: 2px 6px;
+}
+
+.trip-map-container .leaflet-control-attribution a {
+    color: #94a3b8 !important;
+}
+
+/* ===== Current Position Marker - Pulsing Effect ===== */
+.current-position-marker {
+    background: transparent !important;
+    border: none !important;
+}
+
+.pulse-marker {
+    position: relative;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pulse-core {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    background: linear-gradient(135deg, #f97316, #ea580c);
+    border-radius: 50%;
+    border: 3px solid white;
+    box-shadow: 0 2px 8px rgba(249, 115, 22, 0.5);
+    z-index: 2;
+}
+
+.pulse-ring {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(249, 115, 22, 0.3);
+    animation: pulse-animation 2s ease-out infinite;
+    z-index: 1;
+}
+
+@keyframes pulse-animation {
+    0% {
+        transform: scale(0.8);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.5);
+        opacity: 0.5;
+    }
+    100% {
+        transform: scale(2);
+        opacity: 0;
+    }
+}
+
+/* ===== Start Position Marker ===== */
+.start-position-marker {
+    background: transparent !important;
+    border: none !important;
+}
+
+.start-marker {
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+/* ===== Map Overlay Info ===== */
+.map-overlay-info {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+.map-stats {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(15, 23, 42, 0.9);
+    backdrop-filter: blur(8px);
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.stat-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #64748b;
+}
+
+.stat-dot.active {
+    background: #10b981;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+}
+
+.stat-item.coords {
+    font-family: 'SF Mono', 'Monaco', monospace;
+    font-size: 11px;
+    color: #64748b;
+}
+
+/* ===== Custom Zoom Controls ===== */
+.map-zoom-controls {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.zoom-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.9);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #f8fafc;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.zoom-btn:hover {
+    background: rgba(30, 41, 59, 0.95);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.zoom-btn:active {
+    transform: scale(0.95);
+}
+
+/* ===== Hide default Leaflet controls ===== */
+.trip-map-container .leaflet-control-zoom {
+    display: none;
+}
+
+/* ===== Loading State ===== */
+.trip-map-container.loading::after {
+    content: 'Cargando mapa...';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #94a3b8;
+    font-size: 14px;
+    z-index: 1001;
+}
+
+/* ===== Route Line Styles ===== */
+.leaflet-interactive.route-line {
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* ===== Responsive adjustments ===== */
+@media (max-width: 400px) {
+    .map-stats {
+        flex-direction: column;
+        gap: 4px;
+        align-items: flex-start;
+    }
+
+    .map-zoom-controls {
+        top: 8px;
+        right: 8px;
+    }
+
+    .zoom-btn {
+        width: 28px;
+        height: 28px;
+        font-size: 16px;
+    }
+}
+
+/* ===== Dark map tiles overlay for better contrast ===== */
+.trip-map-container .leaflet-tile-pane {
+    filter: brightness(0.9) contrast(1.05);
+}
+
+/* ===== Trip completed state ===== */
+.trip-map-container.completed .pulse-ring {
+    animation: none;
+    background: rgba(16, 185, 129, 0.3);
+}
+
+.trip-map-container.completed .pulse-core {
+    background: linear-gradient(135deg, #10b981, #059669);
+}

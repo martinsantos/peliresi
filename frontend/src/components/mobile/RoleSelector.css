@@ -1,0 +1,124 @@
+/**
+ * RoleSelector - Theme-aware styles
+ * Supports both Dark and Light themes
+ */
+
+/* ========== DARK THEME (DEFAULT) ========== */
+.role-selection h1 {
+    color: var(--color-text-max, #ffffff);
+    margin: 0;
+    font-size: var(--text-3xl, 1.875rem);
+    font-weight: var(--font-extrabold, 800);
+    letter-spacing: 0.05em;
+}
+
+.role-selection p {
+    color: var(--color-text-secondary, #cbd5e1);
+    margin: var(--space-2, 8px) 0 0 0;
+    font-size: var(--text-sm, 0.875rem);
+}
+
+.role-btn .role-name {
+    color: var(--color-text-bright, #ffffff) !important;
+    font-weight: 600;
+}
+
+.role-btn .lucide {
+    color: var(--color-text-muted, #94a3b8);
+}
+
+/* Install hint button */
+.install-hint {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.1)) !important;
+    border: 1px solid rgba(16, 185, 129, 0.4) !important;
+    color: var(--color-success, #10b981) !important;
+}
+
+/* Push notifications button */
+.install-hint.push-subscribed {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(34, 197, 94, 0.1)) !important;
+    border: 1px solid rgba(34, 197, 94, 0.4) !important;
+    color: var(--color-success-bright, #22c55e) !important;
+}
+
+.install-hint.push-unsubscribed {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.1)) !important;
+    border: 1px solid rgba(245, 158, 11, 0.4) !important;
+    color: var(--color-warning, #f59e0b) !important;
+}
+
+.push-error {
+    color: var(--color-danger, #ef4444) !important;
+    font-size: 12px;
+    margin-top: 8px;
+    text-align: center;
+}
+
+/* ========== LIGHT THEME ========== */
+[data-theme="light"] .role-selection h1,
+.theme-light .role-selection h1 {
+    color: var(--color-text-max, #020617);
+    text-shadow: none;
+}
+
+[data-theme="light"] .role-selection p,
+.theme-light .role-selection p {
+    color: var(--color-text-secondary, #475569);
+}
+
+[data-theme="light"] .role-btn .role-name,
+.theme-light .role-btn .role-name {
+    color: var(--color-text-primary, #1e293b) !important;
+}
+
+[data-theme="light"] .role-btn .lucide,
+.theme-light .role-btn .lucide {
+    color: var(--color-text-muted, #64748b);
+}
+
+/* Logo en tema claro con mejor contraste */
+[data-theme="light"] .role-logo,
+.theme-light .role-logo {
+    background: linear-gradient(135deg, #0891b2, #0e7490) !important;
+    box-shadow: 0 12px 40px rgba(8, 145, 178, 0.3) !important;
+}
+
+/* Botones de rol en tema claro */
+[data-theme="light"] .role-btn,
+.theme-light .role-btn {
+    background: var(--color-bg-elevated, #ffffff);
+    border-color: var(--color-border-default, #e2e8f0);
+}
+
+[data-theme="light"] .role-btn:hover,
+.theme-light .role-btn:hover {
+    background: var(--color-bg-hover, #f1f5f9);
+    border-color: var(--color-border-strong, #cbd5e1);
+}
+
+/* Install hint en tema claro */
+[data-theme="light"] .install-hint,
+.theme-light .install-hint {
+    background: linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(6, 182, 212, 0.05)) !important;
+    border: 1px solid rgba(6, 182, 212, 0.3) !important;
+    color: var(--color-primary-darker, #155e75) !important;
+}
+
+[data-theme="light"] .install-hint.push-subscribed,
+.theme-light .install-hint.push-subscribed {
+    background: linear-gradient(135deg, rgba(5, 150, 105, 0.15), rgba(5, 150, 105, 0.05)) !important;
+    border: 1px solid rgba(5, 150, 105, 0.3) !important;
+    color: var(--color-success-dim, #047857) !important;
+}
+
+[data-theme="light"] .install-hint.push-unsubscribed,
+.theme-light .install-hint.push-unsubscribed {
+    background: linear-gradient(135deg, rgba(217, 119, 6, 0.15), rgba(217, 119, 6, 0.05)) !important;
+    border: 1px solid rgba(217, 119, 6, 0.3) !important;
+    color: var(--color-warning-dim, #d97706) !important;
+}
+
+[data-theme="light"] .push-error,
+.theme-light .push-error {
+    color: var(--color-danger-dim, #b91c1c) !important;
+}

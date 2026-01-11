@@ -23,10 +23,31 @@
     color: #ef4444;
     padding: 1rem;
     border-radius: 8px;
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
     display: flex;
     align-items: center;
     gap: 0.75rem;
+}
+
+.form-warning {
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid #f59e0b;
+    color: #f59e0b;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.form-warning svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.form-warning strong {
+    color: #d97706;
 }
 
 .manifiesto-form {
@@ -159,5 +180,83 @@
 
     .form-group.span-2 {
         grid-column: span 1;
+    }
+}
+
+/* ========== VALIDATION ERROR STYLES ========== */
+.form-group.has-error select,
+.form-group.has-error input,
+.form-group.has-error textarea,
+.input-error {
+    border-color: #ef4444 !important;
+    background: rgba(239, 68, 68, 0.05);
+}
+
+.form-group.has-error select:focus,
+.form-group.has-error input:focus,
+.form-group.has-error textarea:focus,
+.input-error:focus {
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15) !important;
+}
+
+.form-group.has-error label {
+    color: #ef4444;
+}
+
+.field-error {
+    display: block;
+    font-size: 0.75rem;
+    color: #ef4444;
+    margin-top: 0.25rem;
+    padding-left: 0.25rem;
+}
+
+/* Required field indicator */
+.form-group label::after {
+    content: '';
+}
+
+/* Warning state for compatibility issues */
+.form-group.has-warning select,
+.form-group.has-warning input {
+    border-color: #f59e0b !important;
+    background: rgba(245, 158, 11, 0.05);
+}
+
+.field-warning {
+    display: block;
+    font-size: 0.75rem;
+    color: #f59e0b;
+    margin-top: 0.25rem;
+    padding-left: 0.25rem;
+}
+
+/* Success state after validation passes */
+.form-group.is-valid select,
+.form-group.is-valid input {
+    border-color: #22c55e !important;
+}
+
+.form-group.is-valid label {
+    color: var(--text-secondary);
+}
+
+/* Mobile adjustments for errors */
+@media (max-width: 480px) {
+    .field-error,
+    .field-warning {
+        font-size: 0.7rem;
+    }
+
+    .form-error {
+        font-size: 0.875rem;
+        padding: 0.75rem;
+        gap: 0.5rem;
+    }
+
+    .form-error svg {
+        width: 18px;
+        height: 18px;
+        flex-shrink: 0;
     }
 }

@@ -206,6 +206,7 @@ model Manifiesto {
   notificaciones  Notificacion[]
   alertas         AlertaGenerada[]
   anomalias       AnomaliaTransporte[]
+  viajes          Viaje[]
 
   @@map("manifiestos")
 }
@@ -546,12 +547,57 @@ model LogActividad {
   ip         String?
   userAgent  String?
   timestamp  DateTime @default(now())
-  
+
   usuario    Usuario  @relation(fields: [usuarioId], references: [id])
-  
+
   @@index([usuarioId])
   @@index([accion])
   @@index([modulo])
   @@index([timestamp])
   @@map("log_actividad")
+}
+
+// ========== VIAJES (TRACKING MÓVIL) ==========
+
+model Viaje {
+  id              String        @id @default(cuid())
+  manifiestoId    String
+  transportistaId String
+  usuarioId       String
+
+  inicio          DateTime
+  fin             DateTime?
+  duracion        Int?          // segundos totales
+  distancia       Float?        // km calculados
+
+  estado          EstadoViaje   @default(EN_CURSO)
+
+  // Ruta completa como JSON: [{lat, lng, timestamp, velocidad}]
+  ruta            Json?
+  // Eventos del viaje como JSON: [{tipo, timestamp, descripcion, lat, lng}]
+  eventos         Json?
+
+  // Metadatos del dispositivo
+  dispositivoId   String?
+  appVersion      String?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relaciones
+  manifiesto      Manifiesto    @relation(fields: [manifiestoId], references: [id])
+
+  @@index([manifiestoId])
+  @@index([transportistaId])
+  @@index([usuarioId])
+  @@index([estado])
+  @@index([inicio])
+  @@map("viajes")
+}
+
+enum EstadoViaje {
+  EN_CURSO
+  COMPLETADO
+  CANCELADO
+  INCIDENTE
 }

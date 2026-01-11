@@ -1,14 +1,18 @@
 /**
  * TripTracker - Active trip tracking component for Transportista
  * WITH INLINE STYLES to bypass PWA cache issues
+ * v2.0 - Added real-time map visualization with Leaflet
  */
 
-import React from 'react';
-import { 
-    Navigation, MapPin, AlertTriangle, Clock, Pause, Play, 
-    CheckCircle, ChevronLeft 
+import React, { useState, lazy, Suspense } from 'react';
+import {
+    Navigation, MapPin, AlertTriangle, Clock, Pause, Play,
+    CheckCircle, ChevronLeft, Map, List
 } from 'lucide-react';
-import type { GPSPosition, TripEvent } from '../../types/mobile.types';
+import type { GPSPosition, TripEvent, RoutePoint } from '../../types/mobile.types';
+
+// Lazy load the map component for better performance
+const TripMap = lazy(() => import('./TripMap'));
 
 // Inline styles - guaranteed to apply regardless of cache
 const styles = {
@@ -190,6 +194,48 @@ const styles = {
         fontSize: '12px',
         color: '#64748b',
     },
+    // View mode tabs
+    viewTabs: {
+        display: 'flex',
+        gap: '8px',
+        padding: '4px',
+        background: 'rgba(30, 41, 59, 0.6)',
+        borderRadius: '12px',
+    },
+    viewTab: {
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '6px',
+        padding: '10px 16px',
+        background: 'transparent',
+        border: 'none',
+        borderRadius: '8px',
+        fontSize: '13px',
+        fontWeight: 600,
+        color: '#94a3b8',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+    },
+    viewTabActive: {
+        background: 'rgba(16, 185, 129, 0.2)',
+        color: '#10b981',
+    },
+    mapContainer: {
+        borderRadius: '16px',
+        overflow: 'hidden',
+    },
+    mapLoading: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '300px',
+        background: 'rgba(30, 41, 59, 0.6)',
+        borderRadius: '16px',
+        color: '#94a3b8',
+        fontSize: '14px',
+    },
 };
 
 interface TripTrackerProps {
@@ -197,6 +243,7 @@ interface TripTrackerProps {
     tiempoViaje: number;
     gpsPosition: GPSPosition | null;
     viajeEventos: TripEvent[];
+    viajeRuta: RoutePoint[];
     viajeRutaCount: number;
     onFinalizar: () => void;
     onOpenIncidentModal: () => void;
@@ -211,6 +258,7 @@ const TripTracker: React.FC<TripTrackerProps> = ({
     tiempoViaje,
     gpsPosition,
     viajeEventos,
+    viajeRuta,
     viajeRutaCount,
     onFinalizar,
     onOpenIncidentModal,
@@ -219,6 +267,9 @@ const TripTracker: React.FC<TripTrackerProps> = ({
     onBack,
     formatTime,
 }) => {
+    // View mode: 'info' for events list, 'mapa' for map view
+    const [viewMode, setViewMode] = useState<'info' | 'mapa'>('info');
+
     return (
         <div style={styles.screen}>
             {/* Header */}
@@ -298,39 +349,83 @@ const TripTracker: React.FC<TripTrackerProps> = ({
                 </button>
             </div>
 
-            {/* Events */}
-            <div style={styles.events}>
-                <h3 style={styles.eventsTitle}>Eventos del Viaje ({viajeEventos.length})</h3>
-                <div style={styles.eventsList}>
-                    {viajeEventos.length === 0 ? (
-                        <div style={styles.noEvents}>Sin eventos registrados</div>
-                    ) : (
-                        viajeEventos.map((evento, idx) => (
-                            <div key={idx} style={styles.eventItem}>
-                                <div style={styles.eventIcon}>
-                                    {evento.tipo === 'INICIO' && <Play size={14} />}
-                                    {evento.tipo === 'FIN' && <CheckCircle size={14} />}
-                                    {evento.tipo === 'INCIDENTE' && <AlertTriangle size={14} />}
-                                    {evento.tipo === 'PARADA' && <Pause size={14} />}
-                                    {evento.tipo === 'REANUDACION' && <Play size={14} />}
-                                </div>
-                                <div style={styles.eventContent}>
-                                    <div style={styles.eventTipo}>{evento.tipo}</div>
-                                    <div style={styles.eventDesc}>{evento.descripcion}</div>
-                                    <div style={styles.eventTime}>
-                                        {new Date(evento.timestamp).toLocaleTimeString()}
-                                        {evento.gps && (
-                                            <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                <MapPin size={10} /> GPS registrado
-                                            </span>
-                                        )}
+            {/* View Mode Tabs */}
+            <div style={styles.viewTabs}>
+                <button
+                    style={{
+                        ...styles.viewTab,
+                        ...(viewMode === 'info' ? styles.viewTabActive : {})
+                    }}
+                    onClick={() => setViewMode('info')}
+                >
+                    <List size={16} />
+                    Eventos
+                </button>
+                <button
+                    style={{
+                        ...styles.viewTab,
+                        ...(viewMode === 'mapa' ? styles.viewTabActive : {})
+                    }}
+                    onClick={() => setViewMode('mapa')}
+                >
+                    <Map size={16} />
+                    Mapa
+                </button>
+            </div>
+
+            {/* Content based on view mode */}
+            {viewMode === 'mapa' ? (
+                /* Real-time Map View */
+                <div style={styles.mapContainer}>
+                    <Suspense fallback={
+                        <div style={styles.mapLoading}>
+                            <span>Cargando mapa...</span>
+                        </div>
+                    }>
+                        <TripMap
+                            ruta={viajeRuta}
+                            posicionActual={gpsPosition}
+                            altura="350px"
+                            showStartMarker={true}
+                            autoCenter={true}
+                        />
+                    </Suspense>
+                </div>
+            ) : (
+                /* Events List */
+                <div style={styles.events}>
+                    <h3 style={styles.eventsTitle}>Eventos del Viaje ({viajeEventos.length})</h3>
+                    <div style={styles.eventsList}>
+                        {viajeEventos.length === 0 ? (
+                            <div style={styles.noEvents}>Sin eventos registrados</div>
+                        ) : (
+                            viajeEventos.map((evento, idx) => (
+                                <div key={idx} style={styles.eventItem}>
+                                    <div style={styles.eventIcon}>
+                                        {evento.tipo === 'INICIO' && <Play size={14} />}
+                                        {evento.tipo === 'FIN' && <CheckCircle size={14} />}
+                                        {evento.tipo === 'INCIDENTE' && <AlertTriangle size={14} />}
+                                        {evento.tipo === 'PARADA' && <Pause size={14} />}
+                                        {evento.tipo === 'REANUDACION' && <Play size={14} />}
+                                    </div>
+                                    <div style={styles.eventContent}>
+                                        <div style={styles.eventTipo}>{evento.tipo}</div>
+                                        <div style={styles.eventDesc}>{evento.descripcion}</div>
+                                        <div style={styles.eventTime}>
+                                            {new Date(evento.timestamp).toLocaleTimeString()}
+                                            {evento.gps && (
+                                                <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                    <MapPin size={10} /> GPS registrado
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))
-                    )}
+                            ))
+                        )}
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 };

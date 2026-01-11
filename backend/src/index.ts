@@ -22,6 +22,8 @@ import auditoriaRoutes from './routes/auditoria.routes';
 import alertaRoutes from './routes/alerta.routes';
 import logisticsRoutes from './routes/logistics.routes';
 import publicRoutes from './routes/public.routes';
+import viajesRoutes from './routes/viajes.routes';
+import notificacionRoutes from './routes/notificacion.routes';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -54,7 +56,9 @@ app.use('/api/registro', registroRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/manifiestos', manifiestoRoutes);
 app.use('/api/logistics', logisticsRoutes);
+app.use('/api/viajes', viajesRoutes);
 app.use('/api/catalogos', catalogoRoutes);
+app.use('/api/notificaciones', notificacionRoutes);
 app.use('/api/pdf', pdfRoutes);
 app.use('/api/reportes', reporteRoutes);
 app.use('/api/actores', actorRoutes);

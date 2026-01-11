@@ -28,6 +28,8 @@ export interface Generador {
     numeroInscripcion: string;
     categoria: string;
     activo: boolean;
+    latitud?: number;
+    longitud?: number;
 }
 
 export interface Transportista {
@@ -55,6 +57,8 @@ export interface Operador {
     numeroHabilitacion: string;
     categoria: string;
     activo: boolean;
+    latitud?: number;
+    longitud?: number;
     tratamientos?: TratamientoAutorizado[];
 }
 
@@ -150,6 +154,7 @@ export interface ManifiestoResiduo {
     cantidad: number;
     unidad: string;
     descripcion?: string;
+    observaciones?: string; // CORRECCIÓN 3: Campo para observaciones del residuo
     estado: string;
     tipoResiduo?: TipoResiduo;
 }

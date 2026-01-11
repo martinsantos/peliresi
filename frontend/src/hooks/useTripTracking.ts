@@ -8,9 +8,38 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import type { GPSPosition, RoutePoint, TripEvent, SavedTrip } from '../types/mobile.types';
 import { analyticsService } from '../services/analytics.service';
 import { manifiestoService } from '../services/manifiesto.service';
+import { offlineStorage } from '../services/offlineStorage';
+import { viajesService } from '../services/viajes.service';
 
 const TRIPS_STORAGE_KEY = 'sitrep_trips';
 const GPS_INTERVAL_MS = 30000; // 30 seconds
+
+// Helper: Calcular distancia total de la ruta en km (fórmula Haversine)
+function calcularDistanciaTotal(ruta: RoutePoint[]): number {
+    if (ruta.length < 2) return 0;
+
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    let total = 0;
+
+    for (let i = 1; i < ruta.length; i++) {
+        const lat1 = ruta[i - 1].lat;
+        const lon1 = ruta[i - 1].lng;
+        const lat2 = ruta[i].lat;
+        const lon2 = ruta[i].lng;
+
+        const R = 6371; // Radio de la Tierra en km
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        total += R * c;
+    }
+
+    return Math.round(total * 100) / 100; // Redondear a 2 decimales
+}
 
 interface UseTripTrackingOptions {
     role?: string;
@@ -44,6 +73,19 @@ interface UseTripTrackingReturn {
     
     // Utilities
     formatTime: (seconds: number) => string;
+}
+
+// Helper: Register background sync for GPS data
+async function registerBackgroundSync() {
+    if ('serviceWorker' in navigator && 'SyncManager' in window) {
+        try {
+            const reg = await navigator.serviceWorker.ready;
+            await (reg as any).sync.register('sitrep-gps-sync');
+            console.log('[GPS] Background sync registered');
+        } catch (e) {
+            console.warn('[GPS] Background sync registration failed:', e);
+        }
+    }
 }
 
 export function useTripTracking({ role, manifiestoId, onToast }: UseTripTrackingOptions = {}): UseTripTrackingReturn {
@@ -138,7 +180,7 @@ export function useTripTracking({ role, manifiestoId, onToast }: UseTripTracking
                 { enableHighAccuracy: true, timeout: 10000 }
             );
             
-            // Periodic GPS tracking
+            // Periodic GPS tracking (Offline-First)
             gpsRouteIntervalRef.current = setInterval(() => {
                 navigator.geolocation.getCurrentPosition(
                     async (pos) => {
@@ -151,15 +193,37 @@ export function useTripTracking({ role, manifiestoId, onToast }: UseTripTracking
                         viajeRutaRef.current = [...viajeRutaRef.current, point];
                         setViajeRuta([...viajeRutaRef.current]);
 
-                        // Enviar ubicación al backend si hay manifiestoId
-                        if (manifiestoId && navigator.onLine) {
+                        // OFFLINE-FIRST: Siempre guardar en IndexedDB primero
+                        if (manifiestoId) {
                             try {
-                                await manifiestoService.actualizarUbicacion(manifiestoId, {
+                                await offlineStorage.saveGPSPoint({
+                                    manifiestoId,
                                     latitud: point.lat,
-                                    longitud: point.lng
+                                    longitud: point.lng,
+                                    velocidad: pos.coords.speed || undefined,
+                                    precision: pos.coords.accuracy || undefined
                                 });
+                                console.log('[GPS] Punto guardado en IndexedDB');
+
+                                // Si estamos online, intentar enviar al backend
+                                if (navigator.onLine) {
+                                    try {
+                                        await manifiestoService.actualizarUbicacion(manifiestoId, {
+                                            latitud: point.lat,
+                                            longitud: point.lng
+                                        });
+                                        console.log('[GPS] Punto enviado al backend');
+                                    } catch (err) {
+                                        console.warn('[GPS] Error enviando al backend, se sincronizará después:', err);
+                                        // El Service Worker sincronizará cuando haya conexión
+                                        registerBackgroundSync();
+                                    }
+                                } else {
+                                    console.log('[GPS] Offline - se sincronizará cuando haya conexión');
+                                    registerBackgroundSync();
+                                }
                             } catch (err) {
-                                console.warn('Error enviando ubicación al backend:', err);
+                                console.error('[GPS] Error guardando en IndexedDB:', err);
                             }
                         }
                     },
@@ -214,17 +278,18 @@ export function useTripTracking({ role, manifiestoId, onToast }: UseTripTracking
         analyticsService.trackAction('iniciar_viaje', 'viaje', role);
     }, [role, showToast]);
 
-    const finalizarViaje = useCallback(() => {
+    const finalizarViaje = useCallback(async () => {
         const finEvento: TripEvent = {
             tipo: 'FIN',
             descripcion: 'Viaje finalizado',
             timestamp: new Date().toISOString(),
             gps: gpsPosition
         };
-        
+
         const eventosFinales = [...viajeEventos, finEvento];
         const rutaFinal = viajeRutaRef.current.length > 0 ? viajeRutaRef.current : viajeRuta;
-        
+        const distanciaKm = calcularDistanciaTotal(rutaFinal);
+
         const tripData: SavedTrip = {
             id: Date.now().toString(),
             inicio: viajeInicio?.toISOString() || '',
@@ -234,12 +299,69 @@ export function useTripTracking({ role, manifiestoId, onToast }: UseTripTracking
             ruta: rutaFinal,
             role: role || ''
         };
-        
+
+        // Guardar localmente primero (offline-first)
         const existingTrips = JSON.parse(localStorage.getItem(TRIPS_STORAGE_KEY) || '[]');
         existingTrips.push(tripData);
         localStorage.setItem(TRIPS_STORAGE_KEY, JSON.stringify(existingTrips));
         setSavedTrips(existingTrips);
-        
+
+        // ===== SINCRONIZAR CON BACKEND =====
+        if (manifiestoId) {
+            const syncData = {
+                manifiestoId,
+                inicio: viajeInicio?.toISOString() || new Date().toISOString(),
+                fin: finEvento.timestamp,
+                duracion: tiempoViaje,
+                distancia: distanciaKm,
+                ruta: rutaFinal.map(p => ({
+                    lat: p.lat,
+                    lng: p.lng,
+                    timestamp: p.timestamp
+                })),
+                eventos: eventosFinales.map(e => ({
+                    tipo: e.tipo,
+                    descripcion: e.descripcion,
+                    timestamp: e.timestamp,
+                    lat: e.gps?.lat,
+                    lng: e.gps?.lng
+                })),
+                appVersion: '2.0.0'
+            };
+
+            if (navigator.onLine) {
+                try {
+                    await viajesService.syncViaje(syncData);
+                    console.log('[Viaje] Sincronizado con backend');
+                    showToast(`✅ Viaje sincronizado - ${distanciaKm} km, ${rutaFinal.length} puntos GPS`);
+                } catch (err) {
+                    console.warn('[Viaje] Error al sincronizar, guardando para después:', err);
+                    // Encolar para sync posterior
+                    await offlineStorage.queueOperation({
+                        tipo: 'CREATE',
+                        method: 'POST',
+                        endpoint: '/api/viajes/sync',
+                        datos: syncData
+                    });
+                    showToast(`✅ Viaje guardado offline - se sincronizará cuando haya conexión`);
+                    registerBackgroundSync();
+                }
+            } else {
+                // Offline: encolar para sync
+                await offlineStorage.queueOperation({
+                    tipo: 'CREATE',
+                    method: 'POST',
+                    endpoint: '/api/viajes/sync',
+                    datos: syncData
+                });
+                console.log('[Viaje] Guardado offline para sincronización posterior');
+                showToast(`✅ Viaje guardado offline - ${distanciaKm} km`);
+                registerBackgroundSync();
+            }
+        } else {
+            showToast(`✅ Viaje guardado - ${eventosFinales.length} eventos, ${rutaFinal.length} puntos GPS`);
+        }
+
         // Reset state
         setViajeActivo(false);
         setViajePausado(false);
@@ -248,10 +370,9 @@ export function useTripTracking({ role, manifiestoId, onToast }: UseTripTracking
         viajeRutaRef.current = [];
         setViajeRuta([]);
         setViajeInicio(null);
-        
-        showToast(`✅ Viaje guardado - ${eventosFinales.length} eventos, ${rutaFinal.length} puntos GPS`);
+
         analyticsService.trackAction('finalizar_viaje', 'viaje', role, tripData);
-    }, [gpsPosition, viajeEventos, viajeInicio, tiempoViaje, viajeRuta, role, showToast]);
+    }, [gpsPosition, viajeEventos, viajeInicio, tiempoViaje, viajeRuta, role, manifiestoId, showToast]);
 
     const registrarIncidente = useCallback((descripcion: string) => {
         const incidentEvento: TripEvent = {
