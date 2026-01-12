@@ -43,6 +43,7 @@ const ActividadGlobal = lazy(() => import('./pages/ActividadGlobal'));
 const CentroControl = lazy(() => import('./pages/CentroControl'));
 const LogAuditoria = lazy(() => import('./pages/LogAuditoria'));
 const ManifestoVerify = lazy(() => import('./pages/ManifestoVerify'));
+const Notificaciones = lazy(() => import('./pages/Notificaciones'));
 import './index.css';
 import './pages/DemoApp.css';
 
@@ -77,6 +78,7 @@ const App: React.FC = () => {
             <Route path="/alertas" element={<PasswordGate><Layout><ConfigurarAlertas /></Layout></PasswordGate>} />
             <Route path="/carga-masiva" element={<PasswordGate><Layout><CargaMasiva /></Layout></PasswordGate>} />
             <Route path="/configuracion" element={<PasswordGate><Layout><Configuracion /></Layout></PasswordGate>} />
+            <Route path="/notificaciones" element={<PasswordGate><Layout><Notificaciones /></Layout></PasswordGate>} />
 
             {/* Administración */}
             <Route path="/admin/centro-control" element={<PasswordGate><Layout><CentroControl /></Layout></PasswordGate>} />

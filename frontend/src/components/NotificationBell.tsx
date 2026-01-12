@@ -249,7 +249,7 @@ const NotificationBell: React.FC = () => {
 
                     {notificaciones.length > 0 && (
                         <div className="dropdown-footer">
-                            <button onClick={() => { setOpen(false); navigate('/admin/actividad'); }}>
+                            <button onClick={() => { setOpen(false); navigate('/notificaciones'); }}>
                                 Ver todas las notificaciones
                             </button>
                         </div>
