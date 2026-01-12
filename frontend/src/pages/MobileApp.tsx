@@ -26,7 +26,7 @@ import {
     Navigation, Wifi, WifiOff,
     Users, Search,
     ChevronLeft, Plus, LogOut,
-    Play, RefreshCw
+    Play, RefreshCw, Command
 } from 'lucide-react';
 
 // Hooks
@@ -55,7 +55,7 @@ import TripBanner from '../components/layout/TripBanner';
 import ManifiestoMap from '../components/mobile/ManifiestoMap';
 
 // FASE 4 & 5: Pantallas extraídas
-import { AlertasScreen, PerfilScreen, ManifiestosScreen, AdminDashboard } from '../screens';
+import { AlertasScreen, PerfilScreen, ManifiestosScreen, AdminDashboard, AdminUsuariosScreen, CentroControlScreen } from '../screens';
 
 // Types and Data
 import type { UserRole, Screen, MenuItem, SavedTrip } from '../types/mobile.types';
@@ -438,10 +438,10 @@ const MobileApp: React.FC = () => {
         switch (role) {
             case 'ADMIN':
                 return [
-                    { id: 'home', label: 'Dashboard', icon: <Home size={20} /> },
+                    { id: 'home', label: 'Inicio', icon: <Home size={20} /> },
+                    { id: 'control', label: 'Control', icon: <Command size={20} /> },
                     { id: 'manifiestos', label: 'Manifiestos', icon: <FileText size={20} /> },
-                    { id: 'tracking', label: 'Monitoreo', icon: <MapPin size={20} /> },
-                    { id: 'alertas', label: 'Alertas', icon: <Bell size={20} /> },
+                    { id: 'usuarios', label: 'Usuarios', icon: <Users size={20} /> },
                     { id: 'perfil', label: 'Sistema', icon: <Settings size={20} /> },
                 ];
             case 'GENERADOR':
@@ -780,6 +780,20 @@ const MobileApp: React.FC = () => {
                         onMarcarLeida={handleMarcarLeida}
                         onEliminar={handleEliminarNotificacion}
                         onMarcarTodasLeidas={handleMarcarTodasLeidas}
+                    />
+                );
+
+            case 'usuarios':
+                // FASE 6: Gestión de usuarios para ADMIN
+                return (
+                    <AdminUsuariosScreen />
+                );
+
+            case 'control':
+                // FASE 7: Centro de Control para ADMIN
+                return (
+                    <CentroControlScreen
+                        onNavigate={(screen) => setCurrentScreen(screen as Screen)}
                     />
                 );
 

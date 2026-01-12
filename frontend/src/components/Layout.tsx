@@ -18,9 +18,10 @@ import {
     BarChart3,
     Users,
     Bell,
-    Upload,
     QrCode,
-    HelpCircle
+    HelpCircle,
+    Activity,
+    Command
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import QRScanner from './QRScanner';
@@ -113,13 +114,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             case 'ADMIN':
                 return [
                     ...baseItems,
+                    { path: '/admin/centro-control', icon: <Command size={20} />, label: 'Centro de Control' },
                     { path: '/manifiestos', icon: <FileText size={20} />, label: 'Manifiestos' },
                     { path: '/tracking', icon: <MapPin size={20} />, label: 'Tracking GPS' },
+                    { path: '/admin/usuarios-panel', icon: <User size={20} />, label: 'Usuarios' },
+                    { path: '/admin/actividad', icon: <Activity size={20} />, label: 'Timeline' },
+                    { path: '/alertas', icon: <Bell size={20} />, label: 'Alertas' },
+                    { path: '/actores', icon: <Users size={20} />, label: 'Actores' },
                     { path: '/reportes', icon: <BarChart3 size={20} />, label: 'Reportes' },
-                    { path: '/actores', icon: <Users size={20} />, label: 'Gestión Actores' },
-                    { path: '/alertas', icon: <Bell size={20} />, label: 'Configurar Alertas' },
-                    { path: '/carga-masiva', icon: <Upload size={20} />, label: 'Carga Masiva' },
-                    { path: '/configuracion', icon: <Settings size={20} />, label: 'Configuración' },
+                    { path: '/configuracion', icon: <Settings size={20} />, label: 'Config' },
                 ];
             case 'GENERADOR':
                 return [

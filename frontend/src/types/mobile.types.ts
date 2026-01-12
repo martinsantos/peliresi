@@ -2,7 +2,7 @@
 // This enables proper separation of concerns between components
 
 export type UserRole = 'ADMIN' | 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR';
-export type Screen = 'home' | 'manifiestos' | 'tracking' | 'alertas' | 'perfil' | 'detalle' | 'nuevo' | 'escanear' | 'actores' | 'viaje' | 'historial' | 'historial-viajes';
+export type Screen = 'home' | 'manifiestos' | 'tracking' | 'alertas' | 'perfil' | 'detalle' | 'nuevo' | 'escanear' | 'actores' | 'viaje' | 'historial' | 'historial-viajes' | 'usuarios' | 'control';
 
 export interface MenuItem {
     id: Screen;

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { EventoAlerta, EstadoAlerta } from '@prisma/client';
 import prisma from '../lib/prisma';
+import { alertaService } from '../services/alerta.service';
 
 export const getReglasAlerta = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -194,6 +195,116 @@ export const eliminarReglaAlerta = async (req: Request, res: Response, next: Nex
         await prisma.reglaAlerta.delete({ where: { id } });
 
         res.json({ success: true, message: 'Regla de alerta eliminada' });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Evalúa un manifiesto contra todas las reglas de alerta activas
+ * GET /api/alertas/evaluar/:manifiestoId
+ */
+export const evaluarManifiesto = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { manifiestoId } = req.params;
+        const resultados = await alertaService.evaluarManifiesto(manifiestoId);
+
+        res.json({
+            success: true,
+            data: {
+                manifiestoId,
+                advertencias: resultados,
+                hayAlertas: resultados.length > 0,
+                alertasCriticas: resultados.filter(r => r.severidad === 'CRITICAL').length,
+                alertasWarning: resultados.filter(r => r.severidad === 'WARNING').length
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Obtiene advertencias activas para mostrar en UI
+ * GET /api/alertas/advertencias
+ */
+export const getAdvertenciasActivas = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { manifiestoId, evento, severidad } = req.query;
+
+        const advertencias = await alertaService.obtenerAdvertenciasActivas({
+            manifiestoId: manifiestoId as string,
+            evento: evento as EventoAlerta,
+            severidad: severidad as string
+        });
+
+        res.json({
+            success: true,
+            data: advertencias,
+            total: advertencias.length
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Evalúa tiempos excesivos en manifiestos activos
+ * GET /api/alertas/evaluar-tiempos
+ */
+export const evaluarTiemposExcesivos = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const resultados = await alertaService.evaluarTiempoExcesivo();
+
+        res.json({
+            success: true,
+            data: resultados,
+            total: resultados.length
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Evalúa vencimientos próximos
+ * GET /api/alertas/evaluar-vencimientos
+ */
+export const evaluarVencimientos = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const resultados = await alertaService.evaluarVencimientos();
+
+        res.json({
+            success: true,
+            data: resultados,
+            total: resultados.length
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Notifica cambio de estado y genera alertas correspondientes
+ * POST /api/alertas/notificar-cambio-estado
+ */
+export const notificarCambioEstado = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { manifiestoId, estadoAnterior, estadoNuevo } = req.body;
+        const usuarioId = (req as any).user.id;
+
+        const resultados = await alertaService.evaluarCambioEstado(
+            manifiestoId,
+            estadoAnterior,
+            estadoNuevo,
+            usuarioId
+        );
+
+        res.json({
+            success: true,
+            data: resultados,
+            alertasGeneradas: resultados.length
+        });
     } catch (error) {
         next(error);
     }

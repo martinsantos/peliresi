@@ -38,6 +38,9 @@ const AppMobile = lazy(() => import('./pages/AppMobile'));
 const AnalyticsAdmin = lazy(() => import('./pages/AnalyticsAdmin'));
 const Registro = lazy(() => import('./pages/Registro'));
 const AprobacionUsuarios = lazy(() => import('./pages/AprobacionUsuarios'));
+const UsuariosPanel = lazy(() => import('./pages/UsuariosPanel'));
+const ActividadGlobal = lazy(() => import('./pages/ActividadGlobal'));
+const CentroControl = lazy(() => import('./pages/CentroControl'));
 const LogAuditoria = lazy(() => import('./pages/LogAuditoria'));
 const ManifestoVerify = lazy(() => import('./pages/ManifestoVerify'));
 import './index.css';
@@ -76,7 +79,10 @@ const App: React.FC = () => {
             <Route path="/configuracion" element={<PasswordGate><Layout><Configuracion /></Layout></PasswordGate>} />
 
             {/* Administración */}
+            <Route path="/admin/centro-control" element={<PasswordGate><Layout><CentroControl /></Layout></PasswordGate>} />
             <Route path="/admin/usuarios" element={<PasswordGate><Layout><AprobacionUsuarios /></Layout></PasswordGate>} />
+            <Route path="/admin/usuarios-panel" element={<PasswordGate><Layout><UsuariosPanel /></Layout></PasswordGate>} />
+            <Route path="/admin/actividad" element={<PasswordGate><Layout><ActividadGlobal /></Layout></PasswordGate>} />
             <Route path="/admin/auditoria" element={<PasswordGate><Layout><LogAuditoria /></Layout></PasswordGate>} />
 
             {/* Redirecciones */}

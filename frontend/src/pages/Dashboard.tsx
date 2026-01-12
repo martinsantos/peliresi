@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { manifiestoService } from '../services/manifiesto.service';
+import { usuarioService } from '../services/admin.service';
 import { demoStats } from '../data/demoDashboard';
 import type { DashboardStats } from '../types';
 import {
@@ -14,21 +15,52 @@ import {
     ArrowRight,
     MapPin,
     Activity,
-    Smartphone
+    Smartphone,
+    Users,
+    UserCheck,
+    Shield,
+    Factory,
+    Building2
 } from 'lucide-react';
 import './Dashboard.css';
 
 // Demo data fallback - ahora importado de ../data/demoDashboard
 
+interface AdminStats {
+    usuarios: {
+        total: number;
+        activos: number;
+        pendientes: number;
+        porRol: Record<string, number>;
+    };
+    manifiestos: {
+        total: number;
+        porEstado: Record<string, number>;
+    };
+}
+
 const Dashboard: React.FC = () => {
     const { user } = useAuth();
-    const [stats, setStats] = useState<DashboardStats>(demoStats); // Inicializado con datos demo
+    const [stats, setStats] = useState<DashboardStats>(demoStats);
+    const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
     const [loading, setLoading] = useState(true);
     const [error] = useState('');
 
     useEffect(() => {
         loadDashboard();
-    }, []);
+        if (user?.rol === 'ADMIN') {
+            loadAdminStats();
+        }
+    }, [user?.rol]);
+
+    const loadAdminStats = async () => {
+        try {
+            const data = await usuarioService.getEstadisticas();
+            setAdminStats(data);
+        } catch (err) {
+            console.error('Error loading admin stats:', err);
+        }
+    };
 
     const loadDashboard = async () => {
         try {
@@ -492,6 +524,159 @@ const Dashboard: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Admin Panel - Solo visible para ADMIN */}
+            {user?.rol === 'ADMIN' && adminStats && (
+                <div className="admin-panel" style={{ marginTop: '24px' }}>
+                    <div className="section-header" style={{ marginBottom: '16px' }}>
+                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: '#f8fafc' }}>
+                            <Users size={20} />
+                            Panel de Administración
+                        </h3>
+                        <Link to="/admin/usuarios-panel" className="btn btn-ghost">
+                            Gestionar Usuarios <ArrowRight size={16} />
+                        </Link>
+                    </div>
+
+                    <div className="admin-stats-grid" style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                        gap: '16px',
+                        marginBottom: '24px'
+                    }}>
+                        {/* Total Usuarios */}
+                        <div style={{
+                            display: 'flex', alignItems: 'center', gap: '16px', padding: '20px',
+                            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05))',
+                            border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '16px'
+                        }}>
+                            <div style={{
+                                width: '48px', height: '48px', borderRadius: '12px',
+                                background: 'rgba(16, 185, 129, 0.2)', display: 'flex',
+                                alignItems: 'center', justifyContent: 'center', color: '#10b981'
+                            }}>
+                                <Users size={24} />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <div style={{ fontSize: '28px', fontWeight: 800, color: '#f8fafc' }}>
+                                    {adminStats.usuarios.total}
+                                </div>
+                                <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase' }}>
+                                    Total Usuarios
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Usuarios Activos */}
+                        <div style={{
+                            display: 'flex', alignItems: 'center', gap: '16px', padding: '20px',
+                            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.05))',
+                            border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '16px'
+                        }}>
+                            <div style={{
+                                width: '48px', height: '48px', borderRadius: '12px',
+                                background: 'rgba(59, 130, 246, 0.2)', display: 'flex',
+                                alignItems: 'center', justifyContent: 'center', color: '#3b82f6'
+                            }}>
+                                <UserCheck size={24} />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <div style={{ fontSize: '28px', fontWeight: 800, color: '#f8fafc' }}>
+                                    {adminStats.usuarios.activos}
+                                </div>
+                                <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase' }}>
+                                    Activos
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Pendientes */}
+                        <div style={{
+                            display: 'flex', alignItems: 'center', gap: '16px', padding: '20px',
+                            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(245, 158, 11, 0.05))',
+                            border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '16px'
+                        }}>
+                            <div style={{
+                                width: '48px', height: '48px', borderRadius: '12px',
+                                background: 'rgba(245, 158, 11, 0.2)', display: 'flex',
+                                alignItems: 'center', justifyContent: 'center', color: '#f59e0b'
+                            }}>
+                                <Clock size={24} />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <div style={{ fontSize: '28px', fontWeight: 800, color: '#f8fafc' }}>
+                                    {adminStats.usuarios.pendientes}
+                                </div>
+                                <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase' }}>
+                                    Pendientes
+                                </div>
+                            </div>
+                            {adminStats.usuarios.pendientes > 0 && (
+                                <Link to="/admin/usuarios" style={{
+                                    marginLeft: 'auto', padding: '6px 12px', background: '#f59e0b',
+                                    color: '#000', borderRadius: '8px', fontSize: '12px', fontWeight: 600
+                                }}>
+                                    Aprobar
+                                </Link>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Distribución por Rol */}
+                    <div style={{
+                        background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
+                        borderRadius: '16px', padding: '20px'
+                    }}>
+                        <h4 style={{ margin: '0 0 16px', color: '#f8fafc', fontSize: '14px' }}>
+                            Usuarios por Rol
+                        </h4>
+                        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Shield size={16} style={{ color: '#10b981' }} />
+                                <span style={{ color: '#94a3b8', fontSize: '13px' }}>Admin:</span>
+                                <span style={{ color: '#f8fafc', fontWeight: 600 }}>
+                                    {adminStats.usuarios.porRol['ADMIN'] || 0}
+                                </span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Factory size={16} style={{ color: '#3b82f6' }} />
+                                <span style={{ color: '#94a3b8', fontSize: '13px' }}>Generadores:</span>
+                                <span style={{ color: '#f8fafc', fontWeight: 600 }}>
+                                    {adminStats.usuarios.porRol['GENERADOR'] || 0}
+                                </span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Truck size={16} style={{ color: '#f59e0b' }} />
+                                <span style={{ color: '#94a3b8', fontSize: '13px' }}>Transportistas:</span>
+                                <span style={{ color: '#f8fafc', fontWeight: 600 }}>
+                                    {adminStats.usuarios.porRol['TRANSPORTISTA'] || 0}
+                                </span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Building2 size={16} style={{ color: '#8b5cf6' }} />
+                                <span style={{ color: '#94a3b8', fontSize: '13px' }}>Operadores:</span>
+                                <span style={{ color: '#f8fafc', fontWeight: 600 }}>
+                                    {adminStats.usuarios.porRol['OPERADOR'] || 0}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Link a Actividad Global */}
+                    <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end' }}>
+                        <Link to="/admin/actividad" style={{
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            padding: '10px 20px', background: 'var(--bg-secondary)',
+                            border: '1px solid var(--border-color)', borderRadius: '10px',
+                            color: '#10b981', textDecoration: 'none', fontSize: '14px', fontWeight: 500
+                        }}>
+                            <Activity size={18} />
+                            Ver Actividad Global
+                            <ArrowRight size={16} />
+                        </Link>
+                    </div>
+                </div>
+            )}
         </div >
     );
 };

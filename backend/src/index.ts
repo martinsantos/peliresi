@@ -24,6 +24,7 @@ import logisticsRoutes from './routes/logistics.routes';
 import publicRoutes from './routes/public.routes';
 import viajesRoutes from './routes/viajes.routes';
 import notificacionRoutes from './routes/notificacion.routes';
+import adminRoutes from './routes/admin.routes';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -68,6 +69,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/admin/auditoria', auditoriaRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

@@ -10,3 +10,5 @@ export { default as AlertasScreen } from './AlertasScreen';
 export { default as PerfilScreen } from './PerfilScreen';
 export { default as ManifiestosScreen } from './ManifiestosScreen';
 export { default as AdminDashboard } from './AdminDashboard';
+export { default as AdminUsuariosScreen } from './AdminUsuariosScreen';
+export { default as CentroControlScreen } from './CentroControlScreen';

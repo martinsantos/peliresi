@@ -201,3 +201,143 @@ export const actorService = {
         await api.delete(`/actores/operadores/${id}`);
     }
 };
+
+// ===== GESTIÓN DE USUARIOS =====
+export interface Usuario {
+    id: string;
+    email: string;
+    rol: string;
+    nombre: string;
+    apellido: string;
+    empresa?: string;
+    telefono?: string;
+    activo: boolean;
+    createdAt: string;
+    updatedAt?: string;
+    generador?: { id: string; razonSocial: string };
+    transportista?: { id: string; razonSocial: string };
+    operador?: { id: string; razonSocial: string };
+}
+
+export interface UsuariosResponse {
+    usuarios: Usuario[];
+    stats: {
+        total: number;
+        activos: number;
+        inactivos: number;
+        porRol: Record<string, number>;
+    };
+    pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        pages: number;
+    };
+}
+
+export interface Actividad {
+    id: string;
+    tipo: 'MANIFIESTO' | 'SISTEMA';
+    accion: string;
+    descripcion: string;
+    fecha: string;
+    usuario: { nombre: string; apellido: string; rol: string } | null;
+    manifiesto: { numero: string; estado: string } | null;
+    metadata?: any;
+}
+
+export interface ActividadResponse {
+    actividades: Actividad[];
+    stats: {
+        eventosHoy: number;
+        manifestosActivos: number;
+        usuariosActivos: number;
+    };
+    pagination: {
+        page: number;
+        limit: number;
+    };
+}
+
+export const usuarioService = {
+    /**
+     * Obtener todos los usuarios con estadísticas
+     */
+    async getUsuarios(params?: {
+        page?: number;
+        limit?: number;
+        rol?: string;
+        activo?: boolean | string;
+        busqueda?: string;
+    }): Promise<UsuariosResponse> {
+        const response = await api.get<ApiResponse<UsuariosResponse>>('/admin/usuarios', { params });
+        return response.data.data;
+    },
+
+    /**
+     * Obtener usuarios pendientes de aprobación
+     */
+    async getUsuariosPendientes(): Promise<{ usuarios: Usuario[]; total: number }> {
+        const response = await api.get<ApiResponse<{ usuarios: Usuario[]; total: number }>>('/admin/usuarios/pendientes');
+        return response.data.data;
+    },
+
+    /**
+     * Obtener detalle de un usuario
+     */
+    async getUsuario(id: string): Promise<{ usuario: Usuario; actividadReciente: any[] }> {
+        const response = await api.get<ApiResponse<{ usuario: Usuario; actividadReciente: any[] }>>(`/admin/usuarios/${id}`);
+        return response.data.data;
+    },
+
+    /**
+     * Actualizar usuario
+     */
+    async updateUsuario(id: string, data: Partial<Usuario>): Promise<Usuario> {
+        const response = await api.put<ApiResponse<{ usuario: Usuario }>>(`/admin/usuarios/${id}`, data);
+        return response.data.data.usuario;
+    },
+
+    /**
+     * Aprobar usuario pendiente
+     */
+    async aprobarUsuario(id: string): Promise<Usuario> {
+        const response = await api.post<ApiResponse<{ usuario: Usuario }>>(`/admin/usuarios/${id}/aprobar`);
+        return response.data.data.usuario;
+    },
+
+    /**
+     * Rechazar usuario pendiente
+     */
+    async rechazarUsuario(id: string, motivo?: string): Promise<void> {
+        await api.post(`/admin/usuarios/${id}/rechazar`, { motivo });
+    },
+
+    /**
+     * Obtener actividad global del sistema
+     */
+    async getActividad(params?: {
+        page?: number;
+        limit?: number;
+        tipo?: string;
+        desde?: string;
+        hasta?: string;
+    }): Promise<ActividadResponse> {
+        const response = await api.get<ApiResponse<ActividadResponse>>('/admin/actividad', { params });
+        return response.data.data;
+    },
+
+    /**
+     * Obtener estadísticas generales
+     */
+    async getEstadisticas(): Promise<{
+        usuarios: { total: number; activos: number; pendientes: number; porRol: Record<string, number> };
+        manifiestos: { total: number; porEstado: Record<string, number> };
+    }> {
+        const response = await api.get<ApiResponse<{
+            usuarios: { total: number; activos: number; pendientes: number; porRol: Record<string, number> };
+            manifiestos: { total: number; porEstado: Record<string, number> };
+        }>>('/admin/estadisticas');
+        return response.data.data;
+    }
+};

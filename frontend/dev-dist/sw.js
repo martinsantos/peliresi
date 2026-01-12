@@ -1,110 +1,108 @@
 /**
- * Service Worker para SITREP con soporte Push Notifications
- * Este archivo se incluye en el build por vite-plugin-pwa
+ * Copyright 2018 Google Inc. All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
-// Manejar eventos de push
-self.addEventListener('push', function(event) {
-  if (!event.data) return;
+// If the loader is already loaded, just stop.
+if (!self.define) {
+  let registry = {};
 
-  try {
-    const payload = event.data.json();
-    
-    const options = {
-      body: payload.body || 'Nueva notificación',
-      icon: payload.icon || '/icons/icon-192x192.png',
-      badge: payload.badge || '/icons/badge-72x72.png',
-      tag: payload.tag || 'sitrep-notification',
-      data: payload.data || {},
-      vibrate: [100, 50, 100],
-      actions: payload.actions || [],
-      requireInteraction: payload.requireInteraction || false,
-    };
+  // Used for `eval` and `importScripts` where we can't get script URL by other means.
+  // In both cases, it's safe to use a global var because those functions are synchronous.
+  let nextDefineUri;
 
-    event.waitUntil(
-      self.registration.showNotification(payload.title || 'SITREP', options)
+  const singleRequire = (uri, parentUri) => {
+    uri = new URL(uri + ".js", parentUri).href;
+    return registry[uri] || (
+      
+        new Promise(resolve => {
+          if ("document" in self) {
+            const script = document.createElement("script");
+            script.src = uri;
+            script.onload = resolve;
+            document.head.appendChild(script);
+          } else {
+            nextDefineUri = uri;
+            importScripts(uri);
+            resolve();
+          }
+        })
+      
+      .then(() => {
+        let promise = registry[uri];
+        if (!promise) {
+          throw new Error(`Module ${uri} didn’t register its module`);
+        }
+        return promise;
+      })
     );
-  } catch (error) {
-    console.error('[SW] Error procesando push:', error);
-  }
-});
+  };
 
-// Manejar click en notificación
-self.addEventListener('notificationclick', function(event) {
-  event.notification.close();
+  self.define = (depsNames, factory) => {
+    const uri = nextDefineUri || ("document" in self ? document.currentScript.src : "") || location.href;
+    if (registry[uri]) {
+      // Module is already loading or loaded.
+      return;
+    }
+    let exports = {};
+    const require = depUri => singleRequire(depUri, uri);
+    const specialDeps = {
+      module: { uri },
+      exports,
+      require
+    };
+    registry[uri] = Promise.all(depsNames.map(
+      depName => specialDeps[depName] || require(depName)
+    )).then(deps => {
+      factory(...deps);
+      return exports;
+    });
+  };
+}
+define(['./workbox-52f2a342'], (function (workbox) { 'use strict';
 
-  const urlToOpen = event.notification.data?.url || '/dashboard';
-
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
-      // Si hay una pestaña abierta, enfocarla
-      for (const client of clientList) {
-        if (client.url.includes(self.registration.scope) && 'focus' in client) {
-          client.navigate(urlToOpen);
-          return client.focus();
-        }
-      }
-      // Si no hay pestaña, abrir una nueva
-      if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
-      }
-    })
-  );
-});
-
-// Manejar cierre de notificación
-self.addEventListener('notificationclose', function(event) {
-  console.log('[SW] Notificación cerrada:', event.notification.tag);
-});
-
-// Cache para funcionamiento offline
-const CACHE_NAME = 'sitrep-v1';
-const urlsToCache = [
-  '/',
-  '/login',
-  '/dashboard',
-  '/manifest.webmanifest',
-  '/icons/icon-192x192.png',
-];
-
-// Instalar Service Worker
-self.addEventListener('install', function(event) {
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(function(cache) {
-      return cache.addAll(urlsToCache);
-    })
-  );
-});
+  workbox.clientsClaim();
 
-// Activar Service Worker
-self.addEventListener('activate', function(event) {
-  event.waitUntil(clients.claim());
-});
+  /**
+   * The precacheAndRoute() method efficiently caches and responds to
+   * requests for URLs in the manifest.
+   * See https://goo.gl/S9QRab
+   */
+  workbox.precacheAndRoute([{
+    "url": "registerSW.js",
+    "revision": "f8a891f4d73a9795262680ece31851d1"
+  }, {
+    "url": "index.html",
+    "revision": "0.c32d5okgilo"
+  }], {});
+  workbox.cleanupOutdatedCaches();
+  workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("index.html"), {
+    allowlist: [/^\/$/]
+  }));
+  workbox.registerRoute(/^https:\/\/sitrep\.ultimamilla\.com\.ar\/api\/.*/i, new workbox.NetworkFirst({
+    "cacheName": "api-cache",
+    "networkTimeoutSeconds": 10,
+    plugins: [new workbox.ExpirationPlugin({
+      maxEntries: 100,
+      maxAgeSeconds: 86400
+    })]
+  }), 'GET');
+  workbox.registerRoute(/^https:\/\/.*\.tile\.openstreetmap\.org\/.*/i, new workbox.CacheFirst({
+    "cacheName": "osm-tiles",
+    plugins: [new workbox.ExpirationPlugin({
+      maxEntries: 500,
+      maxAgeSeconds: 2592000
+    })]
+  }), 'GET');
 
-// Fetch con estrategia Network First
-self.addEventListener('fetch', function(event) {
-  // Ignorar peticiones que no sean GET
-  if (event.request.method !== 'GET') return;
-  
-  // Ignorar peticiones a la API (siempre network)
-  if (event.request.url.includes('/api/')) return;
-
-  event.respondWith(
-    fetch(event.request)
-      .then(function(response) {
-        // Cachear respuesta exitosa
-        if (response.status === 200) {
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then(function(cache) {
-            cache.put(event.request, responseClone);
-          });
-        }
-        return response;
-      })
-      .catch(function() {
-        // Si falla, intentar desde cache
-        return caches.match(event.request);
-      })
-  );
-});
+}));
+//# sourceMappingURL=sw.js.map
