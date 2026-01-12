@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Bell,
@@ -8,12 +8,17 @@ import {
     Truck,
     AlertTriangle,
     Info,
-    X
+    X,
+    Package,
+    UserCheck,
+    MapPin
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { notificationService, type Notificacion } from '../services/notification.service';
 import './NotificationBell.css';
 
 const NotificationBell: React.FC = () => {
+    const { user } = useAuth();
     const [open, setOpen] = useState(false);
     const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
     const [noLeidas, setNoLeidas] = useState(0);
@@ -21,12 +26,47 @@ const NotificationBell: React.FC = () => {
     const menuRef = useRef<HTMLDivElement>(null);
     const navigate = useNavigate();
 
+    // Obtener el actorId según el rol del usuario
+    const getActorId = useCallback(() => {
+        if (!user) return undefined;
+        switch (user.rol) {
+            case 'GENERADOR':
+                return (user as any).generadorId;
+            case 'TRANSPORTISTA':
+                return (user as any).transportistaId;
+            case 'OPERADOR':
+                return (user as any).operadorId;
+            default:
+                return undefined;
+        }
+    }, [user]);
+
+    const cargarNotificaciones = useCallback(async () => {
+        if (!user) return;
+
+        try {
+            // Usar getMisAlertas para obtener notificaciones filtradas por relevancia
+            const data = await notificationService.getMisAlertas({
+                rol: user.rol,
+                actorId: getActorId(),
+                limit: 10
+            });
+            setNotificaciones(data.notificaciones || []);
+            setNoLeidas(data.noLeidas || 0);
+        } catch (error) {
+            console.error('Error al cargar notificaciones:', error);
+            // Fallback silencioso
+            setNotificaciones([]);
+            setNoLeidas(0);
+        }
+    }, [user, getActorId]);
+
     useEffect(() => {
         cargarNotificaciones();
         // Polling cada 30 segundos
         const interval = setInterval(cargarNotificaciones, 30000);
         return () => clearInterval(interval);
-    }, []);
+    }, [cargarNotificaciones]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -38,16 +78,6 @@ const NotificationBell: React.FC = () => {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
-
-    const cargarNotificaciones = async () => {
-        try {
-            const data = await notificationService.getNotificaciones({ limit: 10 });
-            setNotificaciones(data.notificaciones);
-            setNoLeidas(data.noLeidas);
-        } catch (error) {
-            console.error('Error al cargar notificaciones:', error);
-        }
-    };
 
     const marcarLeida = async (id: string) => {
         try {
@@ -96,14 +126,27 @@ const NotificationBell: React.FC = () => {
         switch (tipo) {
             case 'MANIFIESTO_FIRMADO':
             case 'MANIFIESTO_TRATADO':
+            case 'RECEPCION':
                 return <FileText size={16} className="icon-success" />;
             case 'MANIFIESTO_EN_TRANSITO':
             case 'MANIFIESTO_ENTREGADO':
+            case 'EN_TRANSITO':
+            case 'ENTREGADO':
                 return <Truck size={16} className="icon-info" />;
             case 'MANIFIESTO_RECHAZADO':
             case 'INCIDENTE_REPORTADO':
             case 'ANOMALIA_DETECTADA':
+            case 'RECHAZO':
                 return <AlertTriangle size={16} className="icon-warning" />;
+            case 'ASIGNACION':
+            case 'VIAJE_ASIGNADO':
+                return <UserCheck size={16} className="icon-primary" />;
+            case 'EN_CAMINO':
+            case 'LLEGADA_INMINENTE':
+                return <MapPin size={16} className="icon-accent" />;
+            case 'ESTADO':
+            case 'CAMBIO_ESTADO':
+                return <Package size={16} className="icon-info" />;
             default:
                 return <Info size={16} className="icon-default" />;
         }

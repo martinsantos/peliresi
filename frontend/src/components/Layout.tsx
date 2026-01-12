@@ -289,7 +289,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                         <button
                                             className="user-menu-item"
                                             onClick={() => {
-                                                localStorage.setItem('user', JSON.stringify({ id: '1', email: 'admin@example.com', nombre: 'Admin', apellido: 'Demo', rol: 'ADMIN' }));
+                                                localStorage.setItem('user', JSON.stringify({
+                                                    id: '1',
+                                                    email: 'admin@dgfa.mendoza.gov.ar',
+                                                    nombre: 'Admin',
+                                                    apellido: 'DGFA',
+                                                    rol: 'ADMIN'
+                                                }));
+                                                localStorage.setItem('token', 'demo-token-admin');
+                                                localStorage.setItem('accessToken', 'demo-token-admin');
                                                 window.location.reload();
                                             }}
                                         >
@@ -299,32 +307,62 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                         <button
                                             className="user-menu-item"
                                             onClick={() => {
-                                                localStorage.setItem('user', JSON.stringify({ id: '2', email: 'generador@example.com', nombre: 'Generador', apellido: 'Demo', rol: 'GENERADOR' }));
+                                                localStorage.setItem('user', JSON.stringify({
+                                                    id: '2',
+                                                    email: 'generador@demo.com',
+                                                    nombre: 'Juan',
+                                                    apellido: 'Pérez',
+                                                    rol: 'GENERADOR',
+                                                    generadorId: 'g1',
+                                                    generador: { id: 'g1', razonSocial: 'Industrias del Norte SA' }
+                                                }));
+                                                localStorage.setItem('token', 'demo-token-generador');
+                                                localStorage.setItem('accessToken', 'demo-token-generador');
                                                 window.location.reload();
                                             }}
                                         >
                                             <Factory size={16} />
-                                            <span>Generador</span>
+                                            <span>Generador (Juan Pérez)</span>
                                         </button>
                                         <button
                                             className="user-menu-item"
                                             onClick={() => {
-                                                localStorage.setItem('user', JSON.stringify({ id: '3', email: 'transportista@example.com', nombre: 'Transportista', apellido: 'Demo', rol: 'TRANSPORTISTA' }));
+                                                localStorage.setItem('user', JSON.stringify({
+                                                    id: '4',
+                                                    email: 'transportista@demo.com',
+                                                    nombre: 'Carlos',
+                                                    apellido: 'López',
+                                                    rol: 'TRANSPORTISTA',
+                                                    transportistaId: 't1',
+                                                    transportista: { id: 't1', razonSocial: 'Transportes López' }
+                                                }));
+                                                localStorage.setItem('token', 'demo-token-transportista');
+                                                localStorage.setItem('accessToken', 'demo-token-transportista');
                                                 window.location.reload();
                                             }}
                                         >
                                             <Truck size={16} />
-                                            <span>Transportista</span>
+                                            <span>Transportista (Carlos López)</span>
                                         </button>
                                         <button
                                             className="user-menu-item"
                                             onClick={() => {
-                                                localStorage.setItem('user', JSON.stringify({ id: '4', email: 'operador@example.com', nombre: 'Operador', apellido: 'Demo', rol: 'OPERADOR' }));
+                                                localStorage.setItem('user', JSON.stringify({
+                                                    id: '6',
+                                                    email: 'operador@demo.com',
+                                                    nombre: 'Roberto',
+                                                    apellido: 'Silva',
+                                                    rol: 'OPERADOR',
+                                                    operadorId: 'o1',
+                                                    operador: { id: 'o1', razonSocial: 'Planta Tratamiento Mendoza' }
+                                                }));
+                                                localStorage.setItem('token', 'demo-token-operador');
+                                                localStorage.setItem('accessToken', 'demo-token-operador');
                                                 window.location.reload();
                                             }}
                                         >
                                             <Building2 size={16} />
-                                            <span>Operador</span>
+                                            <span>Operador (Roberto Silva)</span>
                                         </button>
                                     </div>
                                     <div className="user-menu-divider" />

@@ -84,10 +84,16 @@ const ManifiestoDetalle: React.FC = () => {
                 case 'confirmar-recepcion':
                     updated = await manifiestoService.confirmarRecepcion(manifiesto.id, {});
                     break;
-                case 'cerrar':
-                    updated = await manifiestoService.cerrarManifiesto(manifiesto.id, {
+                case 'tratamiento':
+                    updated = await manifiestoService.registrarTratamiento(manifiesto.id, {
                         metodoTratamiento: 'Incineración controlada'
                     });
+                    break;
+                case 'cerrar':
+                    const resultado = await manifiestoService.cerrarManifiesto(manifiesto.id, {
+                        observaciones: 'Ciclo completo'
+                    });
+                    updated = resultado.manifiesto;
                     break;
                 default:
                     return;
@@ -103,11 +109,13 @@ const ManifiestoDetalle: React.FC = () => {
     const getEstadoInfo = (estado: string) => {
         const estados: Record<string, { class: string; label: string; icon: React.ReactNode }> = {
             BORRADOR: { class: 'badge-info', label: 'Borrador', icon: <Edit3 size={16} /> },
+            PENDIENTE_APROBACION: { class: 'badge-warning', label: 'Pendiente Aprobación', icon: <Clock size={16} /> },
             APROBADO: { class: 'badge-success', label: 'Aprobado', icon: <CheckCircle size={16} /> },
             EN_TRANSITO: { class: 'badge-warning', label: 'En Tránsito', icon: <Truck size={16} /> },
             ENTREGADO: { class: 'badge-primary', label: 'Entregado', icon: <MapPin size={16} /> },
             RECIBIDO: { class: 'badge-info', label: 'Recibido', icon: <Building2 size={16} /> },
             TRATADO: { class: 'badge-success', label: 'Tratado', icon: <CheckCircle size={16} /> },
+            CERRADO: { class: 'badge-success', label: 'Cerrado', icon: <Award size={16} /> },
         };
         return estados[estado] || { class: 'badge-info', label: estado, icon: <FileText size={16} /> };
     };

@@ -65,6 +65,28 @@ export const notificationService = {
         return response.data.data;
     },
 
+    // Obtener MIS alertas filtradas por rol y actor (relevancia directa)
+    async getMisAlertas(params: {
+        rol: string;
+        actorId?: string;
+        limit?: number;
+    }): Promise<{ notificaciones: Notificacion[]; noLeidas: number }> {
+        try {
+            const response = await api.get('/notificaciones/mis-alertas', { params });
+            // Handle both wrapped and unwrapped responses
+            const data = response.data?.data || response.data;
+            return {
+                notificaciones: data.notificaciones || [],
+                noLeidas: data.noLeidas || 0
+            };
+        } catch (error) {
+            console.warn('getMisAlertas fallback to getNotificaciones:', error);
+            // Fallback to regular notifications if endpoint not available
+            const data = await this.getNotificaciones({ limit: params.limit });
+            return data;
+        }
+    },
+
     // Marcar como leída
     async marcarLeida(id: string) {
         const response = await api.put(`/notificaciones/${id}/leer`);

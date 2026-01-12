@@ -90,14 +90,6 @@ export const manifiestoService = {
         return response.data.data.manifiesto;
     },
 
-    async cerrarManifiesto(id: string, data: {
-        metodoTratamiento: string;
-        observaciones?: string;
-    }): Promise<Manifiesto> {
-        const response = await api.post<ApiResponse<{ manifiesto: Manifiesto }>>(`/manifiestos/${id}/cerrar`, data);
-        return response.data.data.manifiesto;
-    },
-
     // Nuevos endpoints para casos de uso completos
     async rechazarCarga(id: string, data: {
         motivo: string;
@@ -142,6 +134,90 @@ export const manifiestoService = {
             porcentajeDif: number;
         }>>(`/manifiestos/${id}/pesaje`, data);
         return response.data.data;
+    },
+
+    // ===== NUEVOS ENDPOINTS v3.1 =====
+
+    // CU-O09: Cerrar manifiesto (estado final)
+    async cerrarManifiesto(id: string, data?: {
+        observaciones?: string;
+    }): Promise<{ manifiesto: Manifiesto; certificado: string }> {
+        const response = await api.post<ApiResponse<{ manifiesto: Manifiesto; certificado: string }>>(`/manifiestos/${id}/cerrar`, data);
+        return response.data.data;
+    },
+
+    // CU-G10: Obtener datos para generar PDF con QR
+    async getPDFData(id: string): Promise<{
+        numero: string;
+        estado: string;
+        fechaEmision: string;
+        generador: { razonSocial: string; cuit: string; inscripcion: string };
+        transportista: { razonSocial: string; cuit: string; habilitacion: string; vehiculo: string; chofer: string };
+        operador: { razonSocial: string; cuit: string; habilitacion: string };
+        residuos: { tipo: string; peso: number; pesoRecibido: number | null; unidad: string };
+        recorrido: { origen: string; destino: string; inicioTransporte: string | null; finTransporte: string | null };
+        tratamiento: { tipo: string; fecha: string | null } | null;
+        certificado: string | null;
+        qrCode: string;
+        qrVerificationUrl: string;
+        firmas: {
+            generador: { firmado: boolean; fecha: string };
+            transportista: { firmado: boolean; fecha: string | null };
+            operador: { firmado: boolean; fecha: string | null };
+        };
+    }> {
+        const response = await api.get<ApiResponse<any>>(`/manifiestos/${id}/pdf`);
+        return response.data.data;
+    },
+
+    // CU-O10: Obtener certificado de disposición final
+    async getCertificado(id: string): Promise<{
+        numero: string;
+        manifiesto: string;
+        fechaEmision: string;
+        operador: { razonSocial: string; cuit: string; habilitacion: string; categoria: string };
+        generador: { razonSocial: string; cuit: string };
+        residuo: { tipo: string; pesoRecibido: number; unidad: string };
+        tratamiento: { tipo: string; fecha: string; resultado: string };
+        declaracion: string;
+        firmaOperador: { nombre: string; fecha: string; sello: string };
+        qrVerification: string;
+    }> {
+        const response = await api.get<ApiResponse<any>>(`/manifiestos/${id}/certificado`);
+        return response.data.data;
+    },
+
+    // CU-G07: Firmar con método alternativo (Token/PIN/SMS)
+    async firmarConToken(id: string, data: {
+        metodoFirma: 'USUARIO_PASSWORD' | 'TOKEN_PIN' | 'CODIGO_SMS' | 'CERTIFICADO_DIGITAL';
+        tokenPin?: string;
+        codigoSMS?: string;
+    }): Promise<{ manifiesto: Manifiesto; firma: { metodo: string; fecha: string; firmante: string; hashFirma: string } }> {
+        const response = await api.post<ApiResponse<any>>(`/manifiestos/${id}/firmar-con-token`, data);
+        return response.data.data;
+    },
+
+    // Obtener métodos de firma disponibles
+    async getMetodosFirma(): Promise<{
+        metodos: Array<{
+            id: string;
+            nombre: string;
+            descripcion: string;
+            requiere2FA: boolean;
+            disponible: boolean;
+            pinsDePrueba?: string[];
+            codigosDePrueba?: string[];
+            nota?: string;
+        }>;
+    }> {
+        const response = await api.get<ApiResponse<any>>('/firma/metodos-disponibles');
+        return response.data.data;
+    },
+
+    // Solicitar código SMS para firma
+    async solicitarCodigoSMS(telefono: string): Promise<{ success: boolean; message: string; hint?: string; expiraEn?: number }> {
+        const response = await api.post<{ success: boolean; message: string; hint?: string; expiraEn?: number }>('/auth/enviar-codigo-sms', { telefono });
+        return response.data;
     },
 };
 

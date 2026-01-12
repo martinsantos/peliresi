@@ -1,8 +1,3 @@
-/**
- * Servicio de Alertas - Frontend
- * Conecta con el backend para evaluar y mostrar alertas del sistema
- */
-
 import api from './api';
 
 export interface ResultadoEvaluacion {
@@ -47,10 +42,11 @@ export interface EvaluacionManifiesto {
     alertasWarning: number;
 }
 
+function extractArrayResponse<T>(response: { data: T[] | { data: T[] } }): T[] {
+    return Array.isArray(response.data) ? response.data : (response.data.data || []);
+}
+
 class AlertaService {
-    /**
-     * Evalúa un manifiesto contra todas las reglas activas
-     */
     async evaluarManifiesto(manifiestoId: string): Promise<EvaluacionManifiesto> {
         try {
             const response = await api.get(`/alertas/evaluar/${manifiestoId}`);
@@ -67,9 +63,6 @@ class AlertaService {
         }
     }
 
-    /**
-     * Obtiene advertencias activas del sistema
-     */
     async getAdvertenciasActivas(filtros?: {
         manifiestoId?: string;
         evento?: string;
@@ -82,16 +75,13 @@ class AlertaService {
             if (filtros?.severidad) params.append('severidad', filtros.severidad);
 
             const response = await api.get(`/alertas/advertencias?${params.toString()}`);
-            return response.data.data;
+            return extractArrayResponse(response);
         } catch (error) {
             console.error('Error obteniendo advertencias:', error);
             return [];
         }
     }
 
-    /**
-     * Obtiene todas las reglas de alerta (solo ADMIN)
-     */
     async getReglas(): Promise<ReglaAlerta[]> {
         try {
             const response = await api.get('/alertas/reglas');
@@ -102,9 +92,6 @@ class AlertaService {
         }
     }
 
-    /**
-     * Crea una nueva regla de alerta (solo ADMIN)
-     */
     async crearRegla(regla: Omit<ReglaAlerta, 'id' | 'createdAt'>): Promise<ReglaAlerta | null> {
         try {
             const response = await api.post('/alertas/reglas', regla);
@@ -115,9 +102,6 @@ class AlertaService {
         }
     }
 
-    /**
-     * Actualiza una regla de alerta (solo ADMIN)
-     */
     async actualizarRegla(id: string, datos: Partial<ReglaAlerta>): Promise<ReglaAlerta | null> {
         try {
             const response = await api.put(`/alertas/reglas/${id}`, datos);
@@ -128,9 +112,6 @@ class AlertaService {
         }
     }
 
-    /**
-     * Elimina una regla de alerta (solo ADMIN)
-     */
     async eliminarRegla(id: string): Promise<boolean> {
         try {
             await api.delete(`/alertas/reglas/${id}`);
@@ -141,9 +122,6 @@ class AlertaService {
         }
     }
 
-    /**
-     * Obtiene alertas generadas
-     */
     async getAlertasGeneradas(filtros?: {
         estado?: string;
         limit?: number;
@@ -163,9 +141,6 @@ class AlertaService {
         }
     }
 
-    /**
-     * Resuelve una alerta
-     */
     async resolverAlerta(id: string, estado: string, notas?: string): Promise<boolean> {
         try {
             await api.put(`/alertas/${id}/resolver`, { estado, notas });
@@ -176,9 +151,6 @@ class AlertaService {
         }
     }
 
-    /**
-     * Notifica un cambio de estado para generar alertas
-     */
     async notificarCambioEstado(
         manifiestoId: string,
         estadoAnterior: string,
@@ -197,71 +169,49 @@ class AlertaService {
         }
     }
 
-    /**
-     * Evalúa tiempos excesivos en manifiestos (solo ADMIN)
-     */
     async evaluarTiemposExcesivos(): Promise<ResultadoEvaluacion[]> {
         try {
             const response = await api.get('/alertas/evaluar-tiempos');
-            return response.data.data;
+            return extractArrayResponse(response);
         } catch (error) {
             console.error('Error evaluando tiempos:', error);
             return [];
         }
     }
 
-    /**
-     * Evalúa vencimientos próximos (solo ADMIN)
-     */
     async evaluarVencimientos(): Promise<ResultadoEvaluacion[]> {
         try {
             const response = await api.get('/alertas/evaluar-vencimientos');
-            return response.data.data;
+            return extractArrayResponse(response);
         } catch (error) {
             console.error('Error evaluando vencimientos:', error);
             return [];
         }
     }
 
-    /**
-     * Obtiene el color según la severidad
-     */
     getSeveridadColor(severidad: string): { bg: string; color: string; border: string } {
         switch (severidad) {
             case 'CRITICAL':
                 return { bg: '#fef2f2', color: '#dc2626', border: '#fecaca' };
             case 'WARNING':
                 return { bg: '#fffbeb', color: '#d97706', border: '#fde68a' };
-            case 'INFO':
             default:
                 return { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' };
         }
     }
 
-    /**
-     * Obtiene el icono según el tipo de evento
-     */
     getEventoIcono(evento: string): string {
-        switch (evento) {
-            case 'CAMBIO_ESTADO':
-                return '🔄';
-            case 'INCIDENTE':
-                return '⚠️';
-            case 'DESVIO_RUTA':
-                return '🚧';
-            case 'TIEMPO_EXCESIVO':
-                return '⏰';
-            case 'DIFERENCIA_PESO':
-                return '⚖️';
-            case 'RECHAZO_CARGA':
-                return '❌';
-            case 'VENCIMIENTO':
-                return '📅';
-            case 'ANOMALIA_GPS':
-                return '📍';
-            default:
-                return '📋';
-        }
+        const iconos: Record<string, string> = {
+            CAMBIO_ESTADO: '🔄',
+            INCIDENTE: '⚠️',
+            DESVIO_RUTA: '🚧',
+            TIEMPO_EXCESIVO: '⏰',
+            DIFERENCIA_PESO: '⚖️',
+            RECHAZO_CARGA: '❌',
+            VENCIMIENTO: '📅',
+            ANOMALIA_GPS: '📍'
+        };
+        return iconos[evento] || '📋';
     }
 }
 

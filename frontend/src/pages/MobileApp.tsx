@@ -174,25 +174,48 @@ const MobileApp: React.FC = () => {
         }
     }, [qr.parsedQR, loadManifiestoFromQR]);
 
-    // Función para iniciar viaje desde QR escaneado
-    const handleIniciarViajeDesdeQR = useCallback(() => {
+    // Función para iniciar viaje desde QR escaneado - CORREGIDO: llama directamente al backend
+    const handleIniciarViajeDesdeQR = useCallback(async () => {
         if (!scannedManifiesto) return;
 
-        // Seleccionar el manifiesto
-        setSelectedManifiesto(scannedManifiesto);
-        setActiveManifiestoId(scannedManifiesto.id);
-
-        // Iniciar viaje
-        trip.iniciarViaje();
-
-        // Cerrar modal y navegar a viaje
+        // Cerrar modal antes de iniciar
         setShowQRConfirmModal(false);
-        setScannedManifiesto(null);
         qr.clearScannedQR();
-        setCurrentScreen('viaje');
 
-        showToastMessage('🚛 Viaje iniciado desde QR');
-    }, [scannedManifiesto, trip, qr, showToastMessage]);
+        setActiveManifiestoId(scannedManifiesto.id);
+        setSelectedManifiesto(scannedManifiesto);
+
+        // Si el manifiesto está APROBADO, llamar al backend para cambiar a EN_TRANSITO
+        if (scannedManifiesto.estado === 'APROBADO' && isOnline) {
+            try {
+                // Obtener posición GPS actual
+                const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000 });
+                }).catch(() => null);
+
+                await manifiestoService.confirmarRetiro(scannedManifiesto.id, {
+                    latitud: position?.coords.latitude,
+                    longitud: position?.coords.longitude,
+                    observaciones: 'Retiro confirmado desde QR'
+                });
+
+                showToastMessage(`✅ Retiro confirmado - Manifiesto #${scannedManifiesto.numero}`);
+                console.log('[QR] Backend actualizado: manifiesto', scannedManifiesto.id, 'ahora EN_TRANSITO');
+            } catch (err: any) {
+                console.error('[QR] Error confirmando retiro:', err);
+                showToastMessage(`⚠️ Error al confirmar retiro: ${err.message || 'Error de conexión'}`);
+                // NO iniciar viaje local si el backend falla
+                setScannedManifiesto(null);
+                return;
+            }
+        }
+
+        // Iniciar tracking local
+        trip.iniciarViaje();
+        setCurrentScreen('viaje');
+        setScannedManifiesto(null);
+        showToastMessage(`🚛 Viaje iniciado desde QR - #${scannedManifiesto.numero}`);
+    }, [scannedManifiesto, qr, isOnline, trip, showToastMessage]);
 
     // Save role to localStorage
     useEffect(() => {
@@ -360,14 +383,7 @@ const MobileApp: React.FC = () => {
         setParadaText('');
     }, [paradaText, trip]);
 
-    const handleIniciarViaje = useCallback((manifiestoId?: string) => {
-        if (manifiestoId) {
-            setActiveManifiestoId(manifiestoId);
-        }
-        trip.iniciarViaje();
-        setCurrentScreen('viaje');
-    }, [trip]);
-
+    // Handler para iniciar viaje CON manifiesto - LLAMA AL BACKEND
     const handleIniciarViajeConManifiesto = useCallback(async (manifiesto: any) => {
         // Use original backend object if available (from formatManifiestoForDisplay)
         const originalManifiesto = manifiesto._original || manifiesto;
@@ -390,11 +406,14 @@ const MobileApp: React.FC = () => {
                 });
 
                 showToastMessage(`✅ Retiro confirmado - Manifiesto #${manifiesto.numero}`);
+                console.log('[MobileApp] Backend actualizado: manifiesto', originalManifiesto.id, 'ahora EN_TRANSITO');
                 // Actualizar lista de manifiestos
                 loadManifiestosFromBackend();
             } catch (err: any) {
-                console.error('Error confirmando retiro:', err);
+                console.error('[MobileApp] Error confirmando retiro:', err);
                 showToastMessage(`⚠️ Error al confirmar retiro: ${err.message || 'Error de conexión'}`);
+                // NO iniciar viaje local si el backend falla
+                return;
             }
         }
 
@@ -432,6 +451,28 @@ const MobileApp: React.FC = () => {
         setSelectedManifiesto(null);
         setCurrentScreen('home');
     }, [activeManifiestoId, isOnline, trip, showToastMessage, loadManifiestosFromBackend]);
+
+    // CORRECCIÓN CRÍTICA: Función para el botón "Iniciar Viaje" de acciones rápidas
+    // Si hay 1 manifiesto pendiente: lo inicia automáticamente
+    // Si hay varios: muestra la lista para seleccionar
+    const handleIniciarViajeAutomatico = useCallback(async () => {
+        const manifiestosPendientes = backendManifiestos.filter(m => m.estado === 'APROBADO');
+
+        if (manifiestosPendientes.length === 0) {
+            showToastMessage('⚠️ No hay manifiestos pendientes asignados');
+            return;
+        }
+
+        if (manifiestosPendientes.length === 1) {
+            // Si solo hay uno, iniciar automáticamente con ese
+            const manifiesto = manifiestosPendientes[0];
+            await handleIniciarViajeConManifiesto(formatManifiestoForDisplay(manifiesto));
+        } else {
+            // Si hay varios, mostrar la pestaña de pendientes para que elija
+            setActiveTab('pendientes');
+            showToastMessage('📋 Selecciona un manifiesto de la lista para iniciar el viaje');
+        }
+    }, [backendManifiestos, showToastMessage, handleIniciarViajeConManifiesto]);
 
     // ========== MENU CONFIGURATION ==========
     const getMenuItems = (): MenuItem[] => {
@@ -672,7 +713,7 @@ const MobileApp: React.FC = () => {
                                             onClick={trip.viajeActivo
                                                 ? () => setCurrentScreen('viaje')
                                                 : puedeIniciarViaje
-                                                    ? () => handleIniciarViaje()
+                                                    ? handleIniciarViajeAutomatico
                                                     : undefined}
                                             disabled={!trip.viajeActivo && !puedeIniciarViaje}
                                         >

@@ -44,6 +44,7 @@ const CentroControlScreen: React.FC<CentroControlScreenProps> = ({ onNavigate })
     const [actividades, setActividades] = useState<Actividad[]>([]);
     const [loading, setLoading] = useState(true);
     const [expandedSection, setExpandedSection] = useState<string | null>('timeline');
+    const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
     const loadData = useCallback(async () => {
         try {
@@ -66,6 +67,7 @@ const CentroControlScreen: React.FC<CentroControlScreenProps> = ({ onNavigate })
 
             setStats(combinedStats);
             setActividades(actividadData.actividades);
+            setLastUpdate(new Date());
         } catch (err) {
             console.error('Error loading centro control:', err);
         } finally {
@@ -75,6 +77,13 @@ const CentroControlScreen: React.FC<CentroControlScreenProps> = ({ onNavigate })
 
     useEffect(() => {
         loadData();
+
+        // POLLING: Actualizar datos cada 30 segundos
+        const pollInterval = setInterval(() => {
+            loadData();
+        }, 30000);
+
+        return () => clearInterval(pollInterval);
     }, [loadData]);
 
     const formatRelativeTime = (dateStr: string) => {
@@ -100,9 +109,16 @@ const CentroControlScreen: React.FC<CentroControlScreenProps> = ({ onNavigate })
             <div className="cc-header">
                 <div className="cc-header-content">
                     <h2><Activity size={20} /> Centro de Control</h2>
-                    <button className="refresh-btn" onClick={loadData} disabled={loading}>
-                        <RefreshCw size={16} className={loading ? 'spinning' : ''} />
-                    </button>
+                    <div className="cc-header-right">
+                        {lastUpdate && (
+                            <span className="last-update">
+                                {lastUpdate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                        )}
+                        <button className="refresh-btn" onClick={loadData} disabled={loading}>
+                            <RefreshCw size={16} className={loading ? 'spinning' : ''} />
+                        </button>
+                    </div>
                 </div>
             </div>
 

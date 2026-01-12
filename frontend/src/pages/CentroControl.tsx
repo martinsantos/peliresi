@@ -1,14 +1,3 @@
-/**
- * Centro de Control - Hub Administrativo Unificado
- *
- * Integra en una sola vista:
- * - Timeline de actividad en tiempo real
- * - Estado de manifiestos por fase
- * - Gestión de usuarios y roles
- * - Alertas activas y su impacto
- * - Métricas y KPIs del sistema
- */
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -96,7 +85,6 @@ const CentroControl: React.FC = () => {
 
     const loadData = useCallback(async () => {
         try {
-            // Cargar datos en paralelo incluyendo alertas reales
             const [statsData, actividadData, manifestosData, advertenciasData, tiemposData, vencimientosData] = await Promise.all([
                 usuarioService.getEstadisticas(),
                 usuarioService.getActividad({ limit: 50 }),
@@ -106,10 +94,8 @@ const CentroControl: React.FC = () => {
                 alertaService.evaluarVencimientos()
             ]);
 
-            // Combinar todas las alertas
             const todasLasAlertas = [...advertenciasData, ...tiemposData, ...vencimientosData];
 
-            // Construir stats combinados
             const combinedStats: SystemStats = {
                 manifiestos: {
                     total: statsData.manifiestos.total,
@@ -129,7 +115,6 @@ const CentroControl: React.FC = () => {
             setActividades(actividadData.actividades);
             setManifiestos(manifestosData.manifiestos || []);
 
-            // Convertir alertas del backend al formato de la UI
             const alertasFormateadas: AlertaActiva[] = todasLasAlertas.slice(0, 10).map((alerta, index) => ({
                 id: `${alerta.reglaId}-${index}`,
                 tipo: alerta.evento,
@@ -140,19 +125,21 @@ const CentroControl: React.FC = () => {
                 severidad: alerta.severidad
             }));
 
-            // Si no hay alertas del backend, mantener algunas por defecto como referencia
-            if (alertasFormateadas.length === 0) {
-                setAlertas([
-                    { id: '1', tipo: 'TIEMPO_EXCESIVO', nombre: 'Tiempo Excesivo', descripcion: 'Transporte > 24h', activa: true, manifestosAfectados: 0, severidad: 'INFO' },
-                    { id: '2', tipo: 'DESVIO_RUTA', nombre: 'Desvio de Ruta', descripcion: 'Fuera de ruta planificada', activa: true, manifestosAfectados: 0, severidad: 'INFO' },
-                    { id: '3', tipo: 'DIFERENCIA_PESO', nombre: 'Diferencia de Peso', descripcion: 'Discrepancia > 5%', activa: true, manifestosAfectados: 0, severidad: 'INFO' }
-                ]);
-            } else {
-                setAlertas(alertasFormateadas);
-            }
+            const defaultAlertas: AlertaActiva[] = [
+                { id: '1', tipo: 'TIEMPO_EXCESIVO', nombre: 'Tiempo Excesivo', descripcion: 'Transporte > 24h', activa: true, manifestosAfectados: 0, severidad: 'INFO' },
+                { id: '2', tipo: 'DESVIO_RUTA', nombre: 'Desvio de Ruta', descripcion: 'Fuera de ruta planificada', activa: true, manifestosAfectados: 0, severidad: 'INFO' },
+                { id: '3', tipo: 'DIFERENCIA_PESO', nombre: 'Diferencia de Peso', descripcion: 'Discrepancia > 5%', activa: true, manifestosAfectados: 0, severidad: 'INFO' }
+            ];
 
+            setAlertas(alertasFormateadas.length > 0 ? alertasFormateadas : defaultAlertas);
         } catch (err) {
-            console.error('Error loading centro control data:', err);
+            console.error('Error loading control center data:', err);
+            try {
+                const actividadData = await usuarioService.getActividad({ limit: 50 });
+                setActividades(actividadData?.actividades || []);
+            } catch {
+                // Fallback failed silently
+            }
         } finally {
             setLoading(false);
         }
@@ -169,17 +156,15 @@ const CentroControl: React.FC = () => {
         return () => clearInterval(interval);
     }, [autoRefresh, loadData]);
 
-    const formatRelativeTime = (dateStr: string) => {
-        const date = new Date(dateStr);
-        const now = new Date();
-        const diffMs = now.getTime() - date.getTime();
-        const diffMins = Math.floor(diffMs / (1000 * 60));
-        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const formatRelativeTime = (dateStr: string): string => {
+        const diffMs = Date.now() - new Date(dateStr).getTime();
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
 
         if (diffMins < 1) return 'Ahora';
         if (diffMins < 60) return `${diffMins}m`;
         if (diffHours < 24) return `${diffHours}h`;
-        return date.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
+        return new Date(dateStr).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
     };
 
     const getEstadoBadge = (estado: string) => {
@@ -190,6 +175,27 @@ const CentroControl: React.FC = () => {
                 {config.label}
             </span>
         );
+    };
+
+    const renderSeveridadIndicator = (severidad?: 'INFO' | 'WARNING' | 'CRITICAL') => {
+        switch (severidad) {
+            case 'CRITICAL':
+                return <span className="status-indicator critical" title="Critica"><AlertCircle size={14} /></span>;
+            case 'WARNING':
+                return <span className="status-indicator warning" title="Advertencia"><AlertTriangle size={14} /></span>;
+            default:
+                return <span className="status-indicator active" title="Activa"><Eye size={14} /></span>;
+        }
+    };
+
+    const renderImpactBadge = (alerta: AlertaActiva) => {
+        if (alerta.severidad === 'CRITICAL') {
+            return <span className="impact-badge critical"><AlertCircle size={12} /> Critica</span>;
+        }
+        if (alerta.manifestosAfectados > 0) {
+            return <span className="impact-badge warning"><AlertTriangle size={12} /> {alerta.manifestosAfectados} afectados</span>;
+        }
+        return <span className="impact-badge success"><CheckCircle size={12} /> Sin incidencias</span>;
     };
 
     const filteredManifiestos = filterEstado === 'TODOS'
@@ -505,15 +511,11 @@ const CentroControl: React.FC = () => {
                                 </Link>
                             </div>
 
-                            {/* Banner de Advertencias Globales en tiempo real */}
                             <div style={{ marginBottom: '16px' }}>
                                 <AdvertenciasGlobales
                                     autoRefresh={autoRefresh}
                                     refreshInterval={30000}
                                     maxVisible={5}
-                                    onResolverClick={(alerta) => {
-                                        console.log('Resolver alerta:', alerta);
-                                    }}
                                 />
                             </div>
 
@@ -525,41 +527,14 @@ const CentroControl: React.FC = () => {
                                 {alertas.map(alerta => (
                                     <div key={alerta.id} className={`alerta-item ${alerta.activa ? 'active' : 'inactive'} ${alerta.severidad?.toLowerCase() || ''}`}>
                                         <div className="alerta-status">
-                                            {alerta.severidad === 'CRITICAL' ? (
-                                                <span className="status-indicator critical" title="Critica">
-                                                    <AlertCircle size={14} />
-                                                </span>
-                                            ) : alerta.severidad === 'WARNING' ? (
-                                                <span className="status-indicator warning" title="Advertencia">
-                                                    <AlertTriangle size={14} />
-                                                </span>
-                                            ) : (
-                                                <span className="status-indicator active" title="Activa">
-                                                    <Eye size={14} />
-                                                </span>
-                                            )}
+                                            {renderSeveridadIndicator(alerta.severidad)}
                                         </div>
                                         <div className="alerta-content">
                                             <strong>{alerta.nombre}</strong>
                                             <span>{alerta.descripcion}</span>
                                         </div>
                                         <div className="alerta-impact">
-                                            {alerta.severidad === 'CRITICAL' ? (
-                                                <span className="impact-badge critical">
-                                                    <AlertCircle size={12} />
-                                                    Critica
-                                                </span>
-                                            ) : alerta.manifestosAfectados > 0 ? (
-                                                <span className="impact-badge warning">
-                                                    <AlertTriangle size={12} />
-                                                    {alerta.manifestosAfectados} afectados
-                                                </span>
-                                            ) : (
-                                                <span className="impact-badge success">
-                                                    <CheckCircle size={12} />
-                                                    Sin incidencias
-                                                </span>
-                                            )}
+                                            {renderImpactBadge(alerta)}
                                         </div>
                                     </div>
                                 ))}
