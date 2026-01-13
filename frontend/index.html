@@ -29,20 +29,43 @@
   <div id="root"></div>
   <script type="module" src="/src/main.tsx"></script>
 
-  <!-- Script para limpiar Service Workers obsoletos de la demo anterior -->
+  <!-- CORRECCIÓN v5.2: Forzar limpieza de Service Workers y caché corruptos -->
   <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for(let registration of registrations) {
-          if (registration.scope.includes('demoambiente')) {
-            console.log('🧹 Limpiando SW obsoleto');
-            registration.unregister().then(() => {
-              window.location.reload();
+    (function() {
+      var VERSION = 'v7.2.0-20260113';
+      var lastVersion = localStorage.getItem('sitrep_app_version');
+
+      if (lastVersion !== VERSION) {
+        console.log('🔄 Nueva versión detectada:', VERSION, '(anterior:', lastVersion, ')');
+        localStorage.setItem('sitrep_app_version', VERSION);
+
+        // Limpiar TODOS los Service Workers
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            console.log('🧹 Limpiando', registrations.length, 'Service Workers...');
+            var promises = registrations.map(function(reg) {
+              return reg.unregister();
             });
-          }
+            Promise.all(promises).then(function() {
+              // Limpiar todos los caches
+              if ('caches' in window) {
+                caches.keys().then(function(keys) {
+                  console.log('🧹 Limpiando', keys.length, 'caches...');
+                  return Promise.all(keys.map(function(key) {
+                    return caches.delete(key);
+                  }));
+                }).then(function() {
+                  console.log('✅ Limpieza completa, recargando...');
+                  window.location.reload(true);
+                });
+              } else {
+                window.location.reload(true);
+              }
+            });
+          });
         }
-      });
-    }
+      }
+    })();
   </script>
 </body>
 

@@ -1,0 +1,560 @@
+/* TransportistaModal - Confirmación Retiro/Entrega */
+/* REDISEÑO v6.0 - Mobile-First Industrial Design */
+
+.transportista-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    align-items: flex-end; /* Mobile: slide from bottom */
+    justify-content: center;
+    z-index: 9999;
+    animation: fadeIn 0.2s ease;
+    padding: 0;
+}
+
+@media (min-width: 640px) {
+    .transportista-modal-overlay {
+        align-items: center;
+        padding: 20px;
+    }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.transportista-modal {
+    background: linear-gradient(180deg, #12121f 0%, #0a0a12 100%);
+    border-radius: 24px 24px 0 0;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: none;
+    width: 100%;
+    max-width: 100%;
+    max-height: 95vh;
+    max-height: 95dvh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: slideUp 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+    box-shadow:
+        0 -4px 32px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+}
+
+@media (min-width: 640px) {
+    .transportista-modal {
+        max-width: 440px;
+        max-height: 90vh;
+        border-radius: 24px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(100px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Header - REDISEÑO v6.0 */
+.transportista-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    flex-shrink: 0;
+    min-height: 72px;
+}
+
+.transportista-header.retiro {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(245, 158, 11, 0.05));
+}
+
+.transportista-header.entrega {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.05));
+}
+
+.header-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.transportista-header.retiro .header-icon {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+}
+
+.transportista-header.entrega .header-icon {
+    background: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+}
+
+.header-content {
+    flex: 1;
+    min-width: 0; /* Critical for text truncation */
+    overflow: hidden;
+}
+
+.header-content h2 {
+    margin: 0 0 2px;
+    font-size: 17px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.header-content p {
+    margin: 0;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.55);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.transportista-header .close-btn {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.transportista-header .close-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    transform: scale(1.05);
+}
+
+.transportista-header .close-btn:active {
+    transform: scale(0.95);
+}
+
+.transportista-header .close-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Scrollable content wrapper */
+.transportista-modal > .manifiesto-info,
+.transportista-modal > .ubicacion-actual,
+.transportista-modal > .evidencia-section,
+.transportista-modal > .observaciones-section,
+.transportista-modal > .firma-section {
+    flex-shrink: 0;
+}
+
+/* Create a scrollable area for the main content */
+.transportista-modal {
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Manifiesto Info - REDISEÑO v6.0 */
+.manifiesto-info {
+    padding: 14px 16px;
+    background: rgba(20, 20, 35, 0.6);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.info-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+}
+
+.info-row svg {
+    color: var(--ind-text-muted, rgba(255, 255, 255, 0.4));
+    flex-shrink: 0;
+}
+
+.info-row.main {
+    justify-content: space-between;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--ind-border, rgba(255, 255, 255, 0.1));
+}
+
+.info-row .numero {
+    font-size: 18px;
+    font-weight: 600;
+    font-family: monospace;
+    color: var(--ind-text-primary, #fff);
+}
+
+.info-row .estado {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    background: rgba(6, 182, 212, 0.2);
+    color: #06b6d4;
+}
+
+.info-row .label {
+    color: var(--ind-text-muted, rgba(255, 255, 255, 0.5));
+}
+
+.info-row .value {
+    color: var(--ind-text-primary, #fff);
+    flex: 1;
+    text-align: right;
+}
+
+.info-row .value.highlight {
+    font-weight: 600;
+    color: var(--ind-cyan, #06b6d4);
+}
+
+.info-row.direccion {
+    padding-left: 24px;
+    font-size: 13px;
+    color: var(--ind-text-muted, rgba(255, 255, 255, 0.5));
+}
+
+/* Ubicación Actual */
+.ubicacion-actual {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: rgba(34, 197, 94, 0.1);
+    font-size: 13px;
+}
+
+.ubicacion-actual svg {
+    color: #22c55e;
+}
+
+.ubicacion-actual span:first-of-type {
+    color: #22c55e;
+    flex: 1;
+}
+
+.ubicacion-actual .coords {
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--ind-text-muted, rgba(255, 255, 255, 0.5));
+}
+
+/* Evidencia Section */
+.evidencia-section {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--ind-border, rgba(255, 255, 255, 0.05));
+}
+
+.evidencia-section label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ind-text-primary, #fff);
+    margin-bottom: 10px;
+}
+
+.btn-captura {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 14px;
+    background: var(--ind-panel, rgba(26, 26, 46, 0.6));
+    border: 2px dashed var(--ind-border, rgba(255, 255, 255, 0.2));
+    border-radius: 12px;
+    color: var(--ind-text-muted, rgba(255, 255, 255, 0.6));
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-captura:hover {
+    border-color: var(--ind-cyan, #06b6d4);
+    color: var(--ind-cyan, #06b6d4);
+    background: rgba(6, 182, 212, 0.1);
+}
+
+.foto-preview {
+    position: relative;
+}
+
+.foto-preview img {
+    width: 100%;
+    height: auto;
+    border-radius: 10px;
+    background: #222;
+}
+
+.foto-preview button {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.7);
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    color: white;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.foto-preview button:hover {
+    background: rgba(0, 0, 0, 0.9);
+}
+
+/* Observaciones Section */
+.observaciones-section {
+    padding: 16px 20px;
+}
+
+.observaciones-section label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ind-text-primary, #fff);
+    margin-bottom: 8px;
+}
+
+.observaciones-section textarea {
+    width: 100%;
+    padding: 12px;
+    background: var(--ind-panel, rgba(26, 26, 46, 0.6));
+    border: 1px solid var(--ind-border, rgba(255, 255, 255, 0.1));
+    border-radius: 10px;
+    color: var(--ind-text-primary, #fff);
+    font-size: 14px;
+    resize: vertical;
+    min-height: 60px;
+    font-family: inherit;
+}
+
+.observaciones-section textarea:focus {
+    outline: none;
+    border-color: var(--ind-cyan, #06b6d4);
+}
+
+.observaciones-section textarea::placeholder {
+    color: var(--ind-text-muted, rgba(255, 255, 255, 0.4));
+}
+
+/* Firma Section */
+.firma-section {
+    padding: 0 20px 16px;
+}
+
+.firma-preview {
+    background: var(--ind-panel, rgba(26, 26, 46, 0.8));
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid var(--ind-border, rgba(255, 255, 255, 0.1));
+}
+
+.firma-preview .preview-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.firma-preview .preview-header svg {
+    color: var(--ind-green, #22c55e);
+}
+
+.firma-preview .preview-header span {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ind-green, #22c55e);
+}
+
+.firma-preview .preview-header button {
+    background: transparent;
+    border: 1px solid var(--ind-border, rgba(255, 255, 255, 0.2));
+    padding: 6px 12px;
+    border-radius: 6px;
+    color: var(--ind-text-muted, rgba(255, 255, 255, 0.6));
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.firma-preview .preview-header button:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--ind-text-primary, #fff);
+}
+
+.firma-preview img {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    background: #fff;
+}
+
+/* Error */
+.transportista-error {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: rgba(239, 68, 68, 0.1);
+    border-top: 1px solid rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    font-size: 14px;
+}
+
+/* Actions */
+.transportista-actions {
+    display: flex;
+    gap: 12px;
+    padding: 20px;
+    border-top: 1px solid var(--ind-border, rgba(255, 255, 255, 0.1));
+}
+
+.transportista-actions .btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+}
+
+.transportista-actions .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--ind-border, rgba(255, 255, 255, 0.2));
+    color: var(--ind-text-muted, rgba(255, 255, 255, 0.6));
+}
+
+.transportista-actions .btn-ghost:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--ind-text-primary, #fff);
+}
+
+.transportista-actions .btn-retiro {
+    flex: 1;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+}
+
+.transportista-actions .btn-retiro:hover:not(:disabled) {
+    background: linear-gradient(135deg, #d97706, #b45309);
+    transform: translateY(-1px);
+}
+
+.transportista-actions .btn-entrega {
+    flex: 1;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+}
+
+.transportista-actions .btn-entrega:hover:not(:disabled) {
+    background: linear-gradient(135deg, #059669, #047857);
+    transform: translateY(-1px);
+}
+
+.transportista-actions .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Spinner */
+.spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Timestamp Footer */
+.timestamp-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: var(--ind-panel, rgba(26, 26, 46, 0.3));
+    font-size: 12px;
+    color: var(--ind-text-muted, rgba(255, 255, 255, 0.4));
+    border-bottom-left-radius: 20px;
+    border-bottom-right-radius: 20px;
+}
+
+.timestamp-footer svg {
+    opacity: 0.6;
+}
+
+/* Responsive - REDISEÑO v6.0 */
+@media (max-width: 400px) {
+    .header-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+    }
+
+    .header-content h2 {
+        font-size: 15px;
+    }
+
+    .header-content p {
+        font-size: 11px;
+    }
+
+    .info-row .numero {
+        font-size: 16px;
+    }
+
+    .info-row {
+        font-size: 13px;
+    }
+}
+
+/* Safe area for iOS bottom notch */
+.transportista-actions {
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+}
+
+.timestamp-footer {
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+}

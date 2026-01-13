@@ -1,13 +1,23 @@
 /**
- * useConnectivity - Hook for real offline/online sync management
- * Handles automatic sync when coming back online
+ * useConnectivity - FASE 4 REFACTORIZADO
+ * Hook para gestión real de conectividad offline/online
+ *
+ * MEJORAS:
+ * - Heartbeat check para verificar conectividad real (no solo navigator.onLine)
+ * - Verificación periódica del estado de red
+ * - Mejor manejo de reconexión
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { offlineStorage } from '../services/offlineStorage';
 
+const HEARTBEAT_URL = '/api/health';
+const HEARTBEAT_INTERVAL_MS = 30000; // Check cada 30 segundos
+const HEARTBEAT_TIMEOUT_MS = 5000;
+
 interface ConnectivityState {
     isOnline: boolean;
+    isReallyOnline: boolean; // Verificado con heartbeat
     wasOffline: boolean;
     lastOnlineAt: Date | null;
     syncPending: boolean;
@@ -21,6 +31,7 @@ interface ConnectivityState {
         message: string;
         timestamp: Date;
     } | null;
+    lastHeartbeat: Date | null;
 }
 
 interface SyncResult {
@@ -32,15 +43,75 @@ interface SyncResult {
 export const useConnectivity = () => {
     const [state, setState] = useState<ConnectivityState>({
         isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+        isReallyOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
         wasOffline: false,
         lastOnlineAt: null,
         syncPending: false,
         syncProgress: { total: 0, completed: 0, failed: 0 },
-        lastSyncResult: null
+        lastSyncResult: null,
+        lastHeartbeat: null
     });
 
     const syncInProgressRef = useRef(false);
     const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    /**
+     * FASE 4: Heartbeat check para verificar conectividad real
+     * navigator.onLine solo detecta si hay interfaz de red, no si hay internet
+     */
+    const checkRealConnectivity = useCallback(async (): Promise<boolean> => {
+        if (!navigator.onLine) {
+            setState(prev => ({ ...prev, isReallyOnline: false }));
+            return false;
+        }
+
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), HEARTBEAT_TIMEOUT_MS);
+
+            const response = await fetch(HEARTBEAT_URL, {
+                method: 'HEAD',
+                cache: 'no-store',
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            const isReallyOnline = response.ok;
+            setState(prev => ({
+                ...prev,
+                isReallyOnline,
+                lastHeartbeat: new Date()
+            }));
+
+            return isReallyOnline;
+        } catch (err) {
+            // Si el fetch falla, aún podríamos tener conexión pero el backend está caído
+            // Intentamos con un ping alternativo
+            try {
+                const testImg = new Image();
+                const imgPromise = new Promise<boolean>((resolve) => {
+                    testImg.onload = () => resolve(true);
+                    testImg.onerror = () => resolve(false);
+                    setTimeout(() => resolve(false), HEARTBEAT_TIMEOUT_MS);
+                });
+                testImg.src = `https://www.google.com/favicon.ico?t=${Date.now()}`;
+                const result = await imgPromise;
+
+                setState(prev => ({
+                    ...prev,
+                    isReallyOnline: result,
+                    lastHeartbeat: new Date()
+                }));
+
+                return result;
+            } catch {
+                setState(prev => ({ ...prev, isReallyOnline: false }));
+                return false;
+            }
+        }
+    }, []);
 
     /**
      * Sync all pending operations (operations queue + GPS points)
@@ -219,19 +290,27 @@ export const useConnectivity = () => {
 
     // Handle online/offline events
     useEffect(() => {
-        const handleOnline = () => {
-            console.log('[Connectivity] Back online - starting sync');
+        const handleOnline = async () => {
+            console.log('[Connectivity] navigator.onLine: true - verificando conexión real...');
             setState(prev => ({
                 ...prev,
                 isOnline: true,
-                wasOffline: true,
-                lastOnlineAt: new Date()
+                wasOffline: true
             }));
 
-            // Start sync after a small delay to ensure network is stable
-            setTimeout(() => {
-                syncAllPending();
-            }, 1000);
+            // Verificar conexión real antes de sincronizar
+            const isReallyOnline = await checkRealConnectivity();
+
+            if (isReallyOnline) {
+                console.log('[Connectivity] Conexión verificada - iniciando sync');
+                setState(prev => ({ ...prev, lastOnlineAt: new Date() }));
+                // Delay para asegurar estabilidad de red
+                setTimeout(() => {
+                    syncAllPending();
+                }, 1500);
+            } else {
+                console.log('[Connectivity] navigator.onLine true pero sin conexión real');
+            }
         };
 
         const handleOffline = () => {
@@ -239,6 +318,7 @@ export const useConnectivity = () => {
             setState(prev => ({
                 ...prev,
                 isOnline: false,
+                isReallyOnline: false,
                 wasOffline: true
             }));
 
@@ -251,14 +331,36 @@ export const useConnectivity = () => {
         window.addEventListener('online', handleOnline);
         window.addEventListener('offline', handleOffline);
 
+        // Heartbeat interval para detectar cambios de conexión
+        heartbeatIntervalRef.current = setInterval(() => {
+            if (navigator.onLine) {
+                checkRealConnectivity().then(isOnline => {
+                    // Si recuperamos conexión real y teníamos datos pendientes, sincronizar
+                    if (isOnline && state.wasOffline) {
+                        offlineStorage.hasPendingData().then(hasPending => {
+                            if (hasPending && !syncInProgressRef.current) {
+                                console.log('[Heartbeat] Conexión recuperada con datos pendientes - syncing');
+                                syncAllPending();
+                            }
+                        });
+                    }
+                });
+            }
+        }, HEARTBEAT_INTERVAL_MS);
+
         // Check initial state and sync if needed
         if (navigator.onLine) {
-            setState(prev => ({ ...prev, isOnline: true, lastOnlineAt: new Date() }));
-            // Check if there's pending data on initial load
-            offlineStorage.hasPendingData().then(hasPending => {
-                if (hasPending) {
-                    console.log('[Connectivity] Found pending data on load - syncing');
-                    syncAllPending();
+            setState(prev => ({ ...prev, isOnline: true }));
+            // Verificar conexión real al iniciar
+            checkRealConnectivity().then(isReallyOnline => {
+                if (isReallyOnline) {
+                    setState(prev => ({ ...prev, lastOnlineAt: new Date() }));
+                    offlineStorage.hasPendingData().then(hasPending => {
+                        if (hasPending) {
+                            console.log('[Connectivity] Found pending data on load - syncing');
+                            syncAllPending();
+                        }
+                    });
                 }
             });
         }
@@ -269,12 +371,16 @@ export const useConnectivity = () => {
             if (retryTimeoutRef.current) {
                 clearTimeout(retryTimeoutRef.current);
             }
+            if (heartbeatIntervalRef.current) {
+                clearInterval(heartbeatIntervalRef.current);
+            }
         };
-    }, [syncAllPending]);
+    }, [syncAllPending, checkRealConnectivity, state.wasOffline]);
 
     return {
         ...state,
         manualSync,
-        syncAllPending
+        syncAllPending,
+        checkRealConnectivity
     };
 };

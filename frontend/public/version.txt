@@ -1,0 +1,6 @@
+v7.2.0-20260113-1430
+SITREP v7.2: Timer Sync Fix
+- FIX: Usar inicioTransporte como campo prioritario para timestamp
+- FIX: Sincronizar siempre que hay EN_TRANSITO sin verificar viajeActivo
+- FIX: Remover trip.viajeActivo de dependencias del useEffect
+Build: 2026-01-13T14:30:00Z

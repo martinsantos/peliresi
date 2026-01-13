@@ -9,6 +9,11 @@
 /* Import design system variables - CRITICAL for theming */
 @import '../styles/variables.css';
 
+/* ==================== GLOBAL BOX-SIZING ==================== */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 /* ==================== DESIGN TOKENS ==================== */
 
 .app-container {
@@ -1584,26 +1589,31 @@
 /* ==================== MODALS ==================== */
 
 .modal-overlay {
-  /* Changed to absolute to stay within container on desktop */
-  position: absolute;
+  /* Fixed para cubrir toda la pantalla en móvil */
+  position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.92);
   z-index: var(--z-modal, 500);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 16px;
   animation: fadeIn 0.2s ease;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .modal-content {
   width: 100%;
-  max-width: 420px;
+  max-width: min(400px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
   background: var(--ind-dark);
   border: 3px solid var(--ind-border-strong);
   border-radius: var(--radius-lg);
   padding: 24px;
   animation: slideUp 0.25s ease;
+  box-sizing: border-box;
 }
 
 @keyframes slideUp {

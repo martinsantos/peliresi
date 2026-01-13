@@ -13,7 +13,11 @@ import {
     validarQR,
     rechazarCarga,
     registrarPesaje,
-    registrarTratamiento
+    registrarTratamiento,
+    enviarAprobacion,
+    aprobarManifiesto,
+    rechazarAprobacion,
+    getManifiestosPendientes
 } from '../controllers/manifiesto.controller';
 import {
     actualizarUbicacion,
@@ -33,11 +37,20 @@ router.get('/sync-inicial', getSyncInicial);
 router.get('/esperados', hasRole('OPERADOR'), getManifiestosEsperados);
 router.post('/validar-qr', validarQR);
 
+// ============================================================
+// FLUJO DE APROBACIÓN DGFA (CU-G06, CU-A04)
+// Rutas específicas ANTES de /:id para evitar conflictos
+// ============================================================
+router.get('/pendientes/aprobacion', hasRole('ADMIN'), getManifiestosPendientes);
+
 // CRUD de Manifiestos
 router.get('/', getManifiestos);
 router.get('/:id', getManifiestoById);
 router.post('/', hasRole('GENERADOR'), createManifiesto);
 router.post('/:id/firmar', hasRole('GENERADOR'), firmarManifiesto);
+router.post('/:id/enviar-aprobacion', hasRole('GENERADOR'), enviarAprobacion);
+router.post('/:id/aprobar', hasRole('ADMIN'), aprobarManifiesto);
+router.post('/:id/rechazar-aprobacion', hasRole('ADMIN'), rechazarAprobacion);
 
 // ============================================================
 // TRANSPORTISTA: Retiro, Transporte y Entrega

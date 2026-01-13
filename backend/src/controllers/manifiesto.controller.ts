@@ -566,6 +566,244 @@ export const registrarTratamiento = async (req: AuthRequest, res: Response, next
     }
 };
 
+/**
+ * Enviar manifiesto a aprobación DGFA
+ * Transición: BORRADOR -> PENDIENTE_APROBACION
+ */
+export const enviarAprobacion = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+
+        // Obtener manifiesto con validaciones
+        const manifiesto = await prisma.manifiesto.findUnique({
+            where: { id },
+            include: {
+                generador: { select: { usuarioId: true, razonSocial: true } },
+                residuos: { include: { tipoResiduo: true } }
+            }
+        });
+
+        if (!manifiesto) {
+            throw new AppError('Manifiesto no encontrado', 404);
+        }
+
+        // Validar que el usuario es el generador o admin
+        if (manifiesto.generador.usuarioId !== userId && req.user.rol !== 'ADMIN') {
+            throw new AppError('Solo el generador puede enviar el manifiesto a aprobación', 403);
+        }
+
+        // Validar estado actual
+        if (manifiesto.estado !== 'BORRADOR') {
+            throw new AppError('Solo se pueden enviar a aprobación manifiestos en estado BORRADOR', 400);
+        }
+
+        // Validar que tiene al menos un residuo
+        if (!manifiesto.residuos || manifiesto.residuos.length === 0) {
+            throw new AppError('El manifiesto debe tener al menos un residuo declarado', 400);
+        }
+
+        // Actualizar estado a PENDIENTE_APROBACION
+        const manifiestoActualizado = await manifiestoService.updateEstado(
+            id,
+            'PENDIENTE_APROBACION',
+            userId,
+            'ENVIO_APROBACION',
+            `Manifiesto enviado a aprobación por ${manifiesto.generador.razonSocial}`
+        );
+
+        // Notificar a todos los administradores DGFA
+        const admins = await prisma.usuario.findMany({
+            where: { rol: 'ADMIN', activo: true },
+            select: { id: true }
+        });
+
+        for (const admin of admins) {
+            await notificationService.crearNotificacion({
+                usuarioId: admin.id,
+                tipo: 'MANIFIESTO_PENDIENTE',
+                titulo: 'Nuevo Manifiesto para Aprobar',
+                mensaje: `El generador ${manifiesto.generador.razonSocial} ha enviado el manifiesto ${manifiesto.numero} para aprobación`,
+                manifiestoId: id,
+                prioridad: 'ALTA'
+            });
+        }
+
+        res.json({
+            success: true,
+            data: {
+                manifiesto: manifiestoActualizado,
+                mensaje: 'Manifiesto enviado a aprobación exitosamente'
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Aprobar manifiesto (DGFA Admin)
+ * Transición: PENDIENTE_APROBACION -> APROBADO
+ */
+export const aprobarManifiesto = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { id } = req.params;
+        const { observaciones } = req.body;
+        const userId = req.user.id;
+
+        // Solo admins pueden aprobar
+        if (req.user.rol !== 'ADMIN') {
+            throw new AppError('Solo los administradores DGFA pueden aprobar manifiestos', 403);
+        }
+
+        const manifiesto = await prisma.manifiesto.findUnique({
+            where: { id },
+            include: {
+                generador: { select: { usuarioId: true, razonSocial: true } }
+            }
+        });
+
+        if (!manifiesto) {
+            throw new AppError('Manifiesto no encontrado', 404);
+        }
+
+        if (manifiesto.estado !== 'PENDIENTE_APROBACION') {
+            throw new AppError('Solo se pueden aprobar manifiestos en estado PENDIENTE_APROBACION', 400);
+        }
+
+        // Actualizar estado
+        const manifiestoActualizado = await manifiestoService.updateEstado(
+            id,
+            'APROBADO',
+            userId,
+            'APROBACION',
+            `Manifiesto aprobado por DGFA. ${observaciones || ''}`
+        );
+
+        // Notificar al generador
+        if (manifiesto.generador.usuarioId) {
+            await notificationService.crearNotificacion({
+                usuarioId: manifiesto.generador.usuarioId,
+                tipo: 'MANIFIESTO_APROBADO',
+                titulo: 'Manifiesto Aprobado',
+                mensaje: `Su manifiesto ${manifiesto.numero} ha sido aprobado por DGFA`,
+                manifiestoId: id,
+                prioridad: 'NORMAL'
+            });
+        }
+
+        await notificationService.notificarCambioEstado(id, 'APROBADO', userId);
+
+        res.json({
+            success: true,
+            data: {
+                manifiesto: manifiestoActualizado,
+                mensaje: 'Manifiesto aprobado exitosamente'
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Rechazar manifiesto (DGFA Admin)
+ * Transición: PENDIENTE_APROBACION -> BORRADOR (con observaciones)
+ */
+export const rechazarAprobacion = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { id } = req.params;
+        const { motivo } = req.body;
+        const userId = req.user.id;
+
+        if (req.user.rol !== 'ADMIN') {
+            throw new AppError('Solo los administradores DGFA pueden rechazar manifiestos', 403);
+        }
+
+        if (!motivo || motivo.trim().length < 10) {
+            throw new AppError('Debe especificar un motivo de rechazo (mínimo 10 caracteres)', 400);
+        }
+
+        const manifiesto = await prisma.manifiesto.findUnique({
+            where: { id },
+            include: {
+                generador: { select: { usuarioId: true, razonSocial: true } }
+            }
+        });
+
+        if (!manifiesto) {
+            throw new AppError('Manifiesto no encontrado', 404);
+        }
+
+        if (manifiesto.estado !== 'PENDIENTE_APROBACION') {
+            throw new AppError('Solo se pueden rechazar manifiestos en estado PENDIENTE_APROBACION', 400);
+        }
+
+        // Volver a BORRADOR para que el generador corrija
+        const manifiestoActualizado = await manifiestoService.updateEstado(
+            id,
+            'BORRADOR',
+            userId,
+            'RECHAZO_APROBACION',
+            `Manifiesto devuelto para corrección. Motivo: ${motivo}`
+        );
+
+        // Notificar al generador
+        if (manifiesto.generador.usuarioId) {
+            await notificationService.crearNotificacion({
+                usuarioId: manifiesto.generador.usuarioId,
+                tipo: 'MANIFIESTO_RECHAZADO',
+                titulo: 'Manifiesto Requiere Corrección',
+                mensaje: `Su manifiesto ${manifiesto.numero} fue devuelto por DGFA. Motivo: ${motivo}`,
+                manifiestoId: id,
+                prioridad: 'ALTA'
+            });
+        }
+
+        res.json({
+            success: true,
+            data: {
+                manifiesto: manifiestoActualizado,
+                mensaje: 'Manifiesto devuelto para corrección'
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Obtener manifiestos pendientes de aprobación (DGFA)
+ */
+export const getManifiestosPendientes = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        if (req.user.rol !== 'ADMIN') {
+            throw new AppError('Solo los administradores pueden ver manifiestos pendientes', 403);
+        }
+
+        const manifiestos = await prisma.manifiesto.findMany({
+            where: { estado: 'PENDIENTE_APROBACION' },
+            orderBy: { createdAt: 'asc' }, // FIFO - primero los más antiguos
+            include: {
+                generador: { select: { razonSocial: true, cuit: true, domicilio: true } },
+                transportista: { select: { razonSocial: true } },
+                operador: { select: { razonSocial: true } },
+                residuos: { include: { tipoResiduo: { select: { codigo: true, nombre: true } } } }
+            }
+        });
+
+        res.json({
+            success: true,
+            data: {
+                manifiestos,
+                total: manifiestos.length
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
 export const registrarPesaje = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const { id } = req.params;

@@ -1,6 +1,7 @@
 import { openDB } from 'idb';
 import type { DBSchema, IDBPDatabase } from 'idb';
 import type { Manifiesto } from '../types';
+import type { TripEvent, RoutePoint } from '../types/mobile.types';
 
 // Types
 interface PendingOperation {
@@ -29,6 +30,28 @@ interface GPSPoint {
   precision?: number;
   timestamp: string;
   sincronizado: boolean;
+}
+
+// ActiveTrip - Viaje activo persistido (FASE 1)
+export interface ActiveTrip {
+  key: string; // 'current' - solo 1 viaje activo
+  id: string;
+  manifiestoId: string;
+  startTimestamp: number; // epoch ms - momento de inicio
+  pausedAt: number | null; // epoch ms cuando se pausó
+  totalPausedMs: number; // total acumulado de pausas
+  events: TripEvent[];
+  routePoints: RoutePoint[];
+  isPaused: boolean;
+  role?: string;
+}
+
+// AuthData - Token para background sync (FASE 4)
+interface AuthData {
+  key: string;
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
 }
 
 // Database Schema
@@ -72,11 +95,19 @@ interface OfflineDB extends DBSchema {
       'by-sync': number;
     };
   };
+  activeTrip: {
+    key: string;
+    value: ActiveTrip;
+  };
+  authData: {
+    key: string;
+    value: AuthData;
+  };
 }
 
 // Constants
-const DB_NAME = 'sitrep-db-v3';
-const DB_VERSION = 3;
+const DB_NAME = 'sitrep-db-v4';
+const DB_VERSION = 4;
 
 class OfflineStorageService {
   private db: IDBPDatabase<OfflineDB> | null = null;
@@ -129,6 +160,16 @@ class OfflineStorageService {
             });
             gpsStore.createIndex('by-manifiesto', 'manifiestoId');
             gpsStore.createIndex('by-sync', 'sincronizado');
+          }
+        }
+
+        // FASE 1 y 4: ActiveTrip y AuthData stores
+        if (oldVersion < 4) {
+          if (!db.objectStoreNames.contains('activeTrip')) {
+            db.createObjectStore('activeTrip', { keyPath: 'key' });
+          }
+          if (!db.objectStoreNames.contains('authData')) {
+            db.createObjectStore('authData', { keyPath: 'key' });
           }
         }
       }
@@ -388,6 +429,113 @@ class OfflineStorageService {
     const gpsPoints = allPoints.filter(p => !p.sincronizado).length;
 
     return { operations, gpsPoints };
+  }
+
+  // --- FASE 1: Active Trip Persistence ---
+
+  /**
+   * Guarda el viaje activo en IndexedDB
+   * Se usa al iniciar viaje y periódicamente para persistir estado
+   */
+  async saveActiveTrip(trip: Omit<ActiveTrip, 'key'>): Promise<void> {
+    await this.init();
+    await this.db!.put('activeTrip', { ...trip, key: 'current' });
+    console.log('[OfflineStorage] Viaje activo guardado:', trip.id);
+  }
+
+  /**
+   * Obtiene el viaje activo guardado (si existe)
+   * Se usa al iniciar la app para recuperar viaje interrumpido
+   */
+  async getActiveTrip(): Promise<ActiveTrip | undefined> {
+    await this.init();
+    const trip = await this.db!.get('activeTrip', 'current');
+    if (trip) {
+      console.log('[OfflineStorage] Viaje activo recuperado:', trip.id);
+    }
+    return trip;
+  }
+
+  /**
+   * Actualiza parcialmente el viaje activo (eventos, ruta, estado pausa)
+   * Optimizado para actualizaciones frecuentes
+   */
+  async updateActiveTrip(updates: Partial<Omit<ActiveTrip, 'key' | 'id' | 'manifiestoId' | 'startTimestamp'>>): Promise<void> {
+    await this.init();
+    const existing = await this.db!.get('activeTrip', 'current');
+    if (existing) {
+      const updated = { ...existing, ...updates };
+      await this.db!.put('activeTrip', updated);
+    }
+  }
+
+  /**
+   * Limpia el viaje activo (al finalizar viaje)
+   */
+  async clearActiveTrip(): Promise<void> {
+    await this.init();
+    await this.db!.delete('activeTrip', 'current');
+    console.log('[OfflineStorage] Viaje activo eliminado');
+  }
+
+  /**
+   * Verifica si hay un viaje activo guardado
+   */
+  async hasActiveTrip(): Promise<boolean> {
+    await this.init();
+    const trip = await this.db!.get('activeTrip', 'current');
+    return !!trip;
+  }
+
+  // --- FASE 4: Auth Token Persistence (para background sync) ---
+
+  /**
+   * Guarda el token de autenticación en IndexedDB
+   * Permite que el Service Worker acceda al token para background sync
+   */
+  async saveAuthToken(accessToken: string, refreshToken: string, expiresIn: number): Promise<void> {
+    await this.init();
+    await this.db!.put('authData', {
+      key: 'current',
+      accessToken,
+      refreshToken,
+      expiresAt: Date.now() + expiresIn * 1000
+    });
+    console.log('[OfflineStorage] Token guardado en IndexedDB');
+  }
+
+  /**
+   * Obtiene el token de autenticación desde IndexedDB
+   */
+  async getAuthToken(): Promise<{ accessToken: string; refreshToken: string; expiresAt: number } | undefined> {
+    await this.init();
+    const auth = await this.db!.get('authData', 'current');
+    if (auth) {
+      return {
+        accessToken: auth.accessToken,
+        refreshToken: auth.refreshToken,
+        expiresAt: auth.expiresAt
+      };
+    }
+    return undefined;
+  }
+
+  /**
+   * Verifica si el token está expirado o próximo a expirar (5 min buffer)
+   */
+  async isTokenExpired(): Promise<boolean> {
+    const auth = await this.getAuthToken();
+    if (!auth) return true;
+    return Date.now() > auth.expiresAt - 5 * 60 * 1000; // 5 min buffer
+  }
+
+  /**
+   * Limpia los datos de autenticación
+   */
+  async clearAuthToken(): Promise<void> {
+    await this.init();
+    await this.db!.delete('authData', 'current');
+    console.log('[OfflineStorage] Token eliminado de IndexedDB');
   }
 }
 
