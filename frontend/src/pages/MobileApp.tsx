@@ -292,10 +292,11 @@ const MobileApp: React.FC = () => {
         }
     }, [role, hayManifiestoEnTransito, currentScreen]);
 
-    // CORRECCIÓN v7.2: Auto-sincronizar hook con estado backend
-    // FIX: Sincronizar SIEMPRE que hay manifiesto EN_TRANSITO y no se ha sincronizado
+    // CORRECCIÓN v7.3: Auto-sincronizar hook con estado backend
+    // FIX: Permitir que ADMIN también vea el viaje activo (solo lectura)
     useEffect(() => {
-        if (role !== 'TRANSPORTISTA') return;
+        // Solo TRANSPORTISTA y ADMIN pueden ver viajes activos
+        if (role !== 'TRANSPORTISTA' && role !== 'ADMIN') return;
         if (!hayManifiestoEnTransito) return;
 
         const manifiestoEnTransito = backendManifiestos.find(m => m.estado === 'EN_TRANSITO');
@@ -306,7 +307,7 @@ const MobileApp: React.FC = () => {
             return;
         }
 
-        console.log('[MobileApp] SYNC v7.2: Sincronizando viaje EN_TRANSITO:', manifiestoEnTransito.id);
+        console.log('[MobileApp] SYNC v7.3: Sincronizando viaje EN_TRANSITO:', manifiestoEnTransito.id, 'rol:', role);
 
         // Marcar como sincronizado ANTES de llamar para evitar re-ejecución
         syncedManifiestoRef.current = manifiestoEnTransito.id;

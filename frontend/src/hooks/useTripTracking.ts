@@ -374,7 +374,13 @@ export function useTripTracking({ role, manifiestoId, onToast }: UseTripTracking
     }, [viajeActivo, viajePausado, startTimestamp]);
 
     // ============ watchPosition GPS TRACKING (FASE 2) ============
+    // CORRECCIÓN v7.3: Solo activar GPS para TRANSPORTISTA
     useEffect(() => {
+        // Solo TRANSPORTISTA necesita GPS tracking activo
+        if (role !== 'TRANSPORTISTA') {
+            return;
+        }
+
         if (!viajeActivo || viajePausado) {
             // Limpiar watch y timeouts cuando no hay viaje activo o está pausado
             if (watchIdRef.current !== null) {
@@ -471,10 +477,16 @@ export function useTripTracking({ role, manifiestoId, onToast }: UseTripTracking
                 gpsRetryTimeoutRef.current = null;
             }
         };
-    }, [viajeActivo, viajePausado, manifiestoId, handleGPSError]);
+    }, [viajeActivo, viajePausado, manifiestoId, handleGPSError, role]);
 
     // ============ AUTO-SAVE TO IndexedDB (FASE 1) ============
+    // CORRECCIÓN v7.3: Solo auto-save para TRANSPORTISTA
     useEffect(() => {
+        // Solo TRANSPORTISTA guarda datos de viaje
+        if (role !== 'TRANSPORTISTA') {
+            return;
+        }
+
         if (!viajeActivo) {
             if (autoSaveIntervalRef.current) {
                 clearInterval(autoSaveIntervalRef.current);
@@ -510,7 +522,7 @@ export function useTripTracking({ role, manifiestoId, onToast }: UseTripTracking
                 autoSaveIntervalRef.current = null;
             }
         };
-    }, [viajeActivo, viajePausado, pausedAt, totalPausedMs, startTimestamp]);
+    }, [viajeActivo, viajePausado, pausedAt, totalPausedMs, startTimestamp, role]);
 
     // ============ RESTORE FROM SAVED (FASE 3) ============
     const restoreFromSaved = useCallback((savedTrip: ActiveTrip) => {
@@ -583,18 +595,20 @@ export function useTripTracking({ role, manifiestoId, onToast }: UseTripTracking
         setViajeEventos([syncEvento]);
         viajeEventosRef.current = [syncEvento];
 
-        // Guardar en IndexedDB para persistencia
-        offlineStorage.saveActiveTrip({
-            id: tripId,
-            manifiestoId: manifiesto.id,
-            startTimestamp: inicio,
-            pausedAt: null,
-            totalPausedMs: 0,
-            events: [syncEvento],
-            routePoints: [],
-            isPaused: false,
-            role: role
-        }).catch(err => console.error('[Trip] Error guardando sync:', err));
+        // CORRECCIÓN v7.3: Solo guardar en IndexedDB para TRANSPORTISTA
+        if (role === 'TRANSPORTISTA') {
+            offlineStorage.saveActiveTrip({
+                id: tripId,
+                manifiestoId: manifiesto.id,
+                startTimestamp: inicio,
+                pausedAt: null,
+                totalPausedMs: 0,
+                events: [syncEvento],
+                routePoints: [],
+                isPaused: false,
+                role: role
+            }).catch(err => console.error('[Trip] Error guardando sync:', err));
+        }
 
         console.log('[Trip] v5.1 SYNC COMPLETO - Estados establecidos:', {
             viajeActivo: true,
