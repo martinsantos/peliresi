@@ -185,7 +185,7 @@ const Reportes: React.FC = () => {
                                     <FileText size={28} />
                                 </div>
                                 <div className="stat-info">
-                                    <h3>{reporte.resumen.totalManifiestos}</h3>
+                                    <h3>{reporte?.resumen?.totalManifiestos || 0}</h3>
                                     <span>Total Manifiestos</span>
                                 </div>
                             </div>
@@ -194,7 +194,7 @@ const Reportes: React.FC = () => {
                                     <Package size={28} />
                                 </div>
                                 <div className="stat-info">
-                                    <h3>{reporte.resumen.totalResiduos.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</h3>
+                                    <h3>{(reporte?.resumen?.totalResiduos || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 })}</h3>
                                     <span>Kg de Residuos</span>
                                 </div>
                             </div>
@@ -203,7 +203,7 @@ const Reportes: React.FC = () => {
                                     <Activity size={28} />
                                 </div>
                                 <div className="stat-info">
-                                    <h3>{Object.keys(reporte.porTipoResiduo).length}</h3>
+                                    <h3>{Object.keys(reporte?.porTipoResiduo || {}).length}</h3>
                                     <span>Tipos de Residuo</span>
                                 </div>
                             </div>
@@ -212,7 +212,7 @@ const Reportes: React.FC = () => {
                                     <TrendingUp size={28} />
                                 </div>
                                 <div className="stat-info">
-                                    <h3>{Math.round((reporte.porEstado.TRATADO || 0) / reporte.resumen.totalManifiestos * 100)}%</h3>
+                                    <h3>{reporte?.resumen?.totalManifiestos ? Math.round((reporte?.porEstado?.TRATADO || 0) / reporte.resumen.totalManifiestos * 100) : 0}%</h3>
                                     <span>Tasa Completitud</span>
                                 </div>
                             </div>
@@ -222,7 +222,7 @@ const Reportes: React.FC = () => {
                         <div className="reporte-section">
                             <h3><PieChart size={20} /> Distribución por Estado</h3>
                             <div className="estado-bars">
-                                {Object.entries(reporte.porEstado).map(([estado, cantidad]) => (
+                                {Object.entries(reporte?.porEstado || {}).map(([estado, cantidad]) => (
                                     <div key={estado} className="estado-bar-item">
                                         <div className="estado-label">
                                             <span className="estado-dot" style={{ background: getEstadoColor(estado), color: getEstadoColor(estado) }} />
@@ -232,7 +232,7 @@ const Reportes: React.FC = () => {
                                             <div
                                                 className="bar-fill"
                                                 style={{
-                                                    width: `${(cantidad / reporte.resumen.totalManifiestos) * 100}%`,
+                                                    width: `${reporte?.resumen?.totalManifiestos ? (cantidad / reporte.resumen.totalManifiestos) * 100 : 0}%`,
                                                     background: `linear-gradient(90deg, ${getEstadoColor(estado)}, ${getEstadoColor(estado)}dd)`
                                                 }}
                                             />

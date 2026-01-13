@@ -139,7 +139,7 @@ const Tracking: React.FC = () => {
         setLoadingRuta(true);
         try {
             const response = await logisticsService.getRutaManifiesto(manifiestoId);
-            if (response.success && response.data.ruta.length > 0) {
+            if (response?.success && response?.data?.ruta?.length > 0) {
                 const positions: LatLngExpression[] = response.data.ruta.map(p => [p.lat, p.lng]);
                 setRutaReal(positions);
 

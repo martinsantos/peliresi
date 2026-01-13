@@ -60,9 +60,18 @@ export interface Anomalia {
 
 export const notificationService = {
     // Obtener notificaciones del usuario
-    async getNotificaciones(params?: { leidas?: boolean; limit?: number; offset?: number }) {
-        const response = await api.get('/notificaciones', { params });
-        return response.data.data;
+    async getNotificaciones(params?: { leidas?: boolean; limit?: number; offset?: number }): Promise<{ notificaciones: Notificacion[]; noLeidas: number }> {
+        try {
+            const response = await api.get('/notificaciones', { params });
+            const data = response.data?.data || response.data;
+            return {
+                notificaciones: data?.notificaciones || [],
+                noLeidas: data?.noLeidas || 0
+            };
+        } catch (error) {
+            console.error('[NotificationService] Error getNotificaciones:', error);
+            return { notificaciones: [], noLeidas: 0 };
+        }
     },
 
     // Obtener MIS alertas filtradas por rol y actor (relevancia directa)
@@ -88,21 +97,36 @@ export const notificationService = {
     },
 
     // Marcar como leída
-    async marcarLeida(id: string) {
-        const response = await api.put(`/notificaciones/${id}/leer`);
-        return response.data.data;
+    async marcarLeida(id: string): Promise<boolean> {
+        try {
+            await api.put(`/notificaciones/${id}/leer`);
+            return true;
+        } catch (error) {
+            console.error('[NotificationService] Error marcarLeida:', error);
+            return false;
+        }
     },
 
     // Marcar todas como leídas
-    async marcarTodasLeidas() {
-        const response = await api.put('/notificaciones/leer-todas');
-        return response.data;
+    async marcarTodasLeidas(): Promise<boolean> {
+        try {
+            await api.put('/notificaciones/leer-todas');
+            return true;
+        } catch (error) {
+            console.error('[NotificationService] Error marcarTodasLeidas:', error);
+            return false;
+        }
     },
 
     // Eliminar notificación
-    async eliminar(id: string) {
-        const response = await api.delete(`/notificaciones/${id}`);
-        return response.data;
+    async eliminar(id: string): Promise<boolean> {
+        try {
+            await api.delete(`/notificaciones/${id}`);
+            return true;
+        } catch (error) {
+            console.error('[NotificationService] Error eliminar:', error);
+            return false;
+        }
     }
 };
 
@@ -110,10 +134,15 @@ export const notificationService = {
 
 export const alertaService = {
     // Obtener reglas de alerta
-    async getReglas() {
-        const response = await api.get('/alertas/reglas');
-        // Handle different response structures: { data: [...] } or [...]
-        return response.data?.data || response.data || [];
+    async getReglas(): Promise<ReglaAlerta[]> {
+        try {
+            const response = await api.get('/alertas/reglas');
+            // Handle different response structures: { data: [...] } or [...]
+            return response.data?.data || response.data || [];
+        } catch (error) {
+            console.error('[AlertaService] Error getReglas:', error);
+            return [];
+        }
     },
 
     // Crear regla
@@ -123,35 +152,60 @@ export const alertaService = {
         evento: string;
         condicion: any;
         destinatarios: any;
-    }) {
-        const response = await api.post('/alertas/reglas', data);
-        return response.data.data;
+    }): Promise<ReglaAlerta | null> {
+        try {
+            const response = await api.post('/alertas/reglas', data);
+            return response.data?.data || null;
+        } catch (error) {
+            console.error('[AlertaService] Error crearRegla:', error);
+            throw error;
+        }
     },
 
     // Actualizar regla
-    async actualizarRegla(id: string, data: Partial<ReglaAlerta>) {
-        const response = await api.put(`/alertas/reglas/${id}`, data);
-        return response.data.data;
+    async actualizarRegla(id: string, data: Partial<ReglaAlerta>): Promise<ReglaAlerta | null> {
+        try {
+            const response = await api.put(`/alertas/reglas/${id}`, data);
+            return response.data?.data || null;
+        } catch (error) {
+            console.error('[AlertaService] Error actualizarRegla:', error);
+            throw error;
+        }
     },
 
     // Eliminar regla
-    async eliminarRegla(id: string) {
-        const response = await api.delete(`/alertas/reglas/${id}`);
-        return response.data;
+    async eliminarRegla(id: string): Promise<boolean> {
+        try {
+            await api.delete(`/alertas/reglas/${id}`);
+            return true;
+        } catch (error) {
+            console.error('[AlertaService] Error eliminarRegla:', error);
+            throw error;
+        }
     },
 
     // Obtener alertas generadas
-    async getAlertas(params?: { estado?: string; limit?: number; offset?: number }) {
-        const response = await api.get('/alertas', { params });
-        // La respuesta tiene estructura { alertas: [], total, pagina, totalPaginas }
-        const data = response.data.data;
-        return data.alertas || [];
+    async getAlertas(params?: { estado?: string; limit?: number; offset?: number }): Promise<AlertaGenerada[]> {
+        try {
+            const response = await api.get('/alertas', { params });
+            // La respuesta tiene estructura { alertas: [], total, pagina, totalPaginas }
+            const data = response.data?.data || response.data;
+            return data?.alertas || [];
+        } catch (error) {
+            console.error('[AlertaService] Error getAlertas:', error);
+            return [];
+        }
     },
 
     // Resolver alerta
-    async resolverAlerta(id: string, data: { estado: string; notas?: string }) {
-        const response = await api.put(`/alertas/${id}/resolver`, data);
-        return response.data.data;
+    async resolverAlerta(id: string, data: { estado: string; notas?: string }): Promise<AlertaGenerada | null> {
+        try {
+            const response = await api.put(`/alertas/${id}/resolver`, data);
+            return response.data?.data || null;
+        } catch (error) {
+            console.error('[AlertaService] Error resolverAlerta:', error);
+            throw error;
+        }
     }
 };
 
@@ -159,23 +213,38 @@ export const alertaService = {
 
 export const anomaliaService = {
     // Detectar anomalías de un manifiesto
-    async detectar(manifiestoId: string) {
-        const response = await api.post(`/anomalias/detectar/${manifiestoId}`);
-        return response.data.data;
+    async detectar(manifiestoId: string): Promise<Anomalia[]> {
+        try {
+            const response = await api.post(`/anomalias/detectar/${manifiestoId}`);
+            return response.data?.data || [];
+        } catch (error) {
+            console.error('[AnomaliaService] Error detectar:', error);
+            return [];
+        }
     },
 
     // Obtener anomalías de un manifiesto
-    async getAnomalias(manifiestoId: string, resuelta?: boolean) {
-        const params: any = {};
-        if (resuelta !== undefined) params.resuelta = resuelta;
-        const response = await api.get(`/anomalias/${manifiestoId}`, { params });
-        return response.data.data;
+    async getAnomalias(manifiestoId: string, resuelta?: boolean): Promise<Anomalia[]> {
+        try {
+            const params: any = {};
+            if (resuelta !== undefined) params.resuelta = resuelta;
+            const response = await api.get(`/anomalias/${manifiestoId}`, { params });
+            return response.data?.data || [];
+        } catch (error) {
+            console.error('[AnomaliaService] Error getAnomalias:', error);
+            return [];
+        }
     },
 
     // Resolver anomalía
-    async resolver(id: string, notas?: string) {
-        const response = await api.put(`/anomalias/${id}/resolver`, { notas });
-        return response.data.data;
+    async resolver(id: string, notas?: string): Promise<Anomalia | null> {
+        try {
+            const response = await api.put(`/anomalias/${id}/resolver`, { notas });
+            return response.data?.data || null;
+        } catch (error) {
+            console.error('[AnomaliaService] Error resolver:', error);
+            throw error;
+        }
     }
 };
 
@@ -183,29 +252,39 @@ export const anomaliaService = {
 
 export const cargaMasivaService = {
     // Descargar plantilla
-    async descargarPlantilla(tipo: 'generadores' | 'transportistas' | 'operadores') {
-        const response = await api.get(`/actores/carga-masiva/plantilla/${tipo}`, {
-            responseType: 'blob'
-        });
+    async descargarPlantilla(tipo: 'generadores' | 'transportistas' | 'operadores'): Promise<boolean> {
+        try {
+            const response = await api.get(`/actores/carga-masiva/plantilla/${tipo}`, {
+                responseType: 'blob'
+            });
 
-        const url = window.URL.createObjectURL(new Blob([response.data]));
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `plantilla_${tipo}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `plantilla_${tipo}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            return true;
+        } catch (error) {
+            console.error('[CargaMasivaService] Error descargarPlantilla:', error);
+            return false;
+        }
     },
 
     // Cargar archivo
-    async cargarArchivo(tipo: 'generadores' | 'transportistas' | 'operadores', archivo: File) {
-        const formData = new FormData();
-        formData.append('archivo', archivo);
+    async cargarArchivo(tipo: 'generadores' | 'transportistas' | 'operadores', archivo: File): Promise<any> {
+        try {
+            const formData = new FormData();
+            formData.append('archivo', archivo);
 
-        const response = await api.post(`/actores/carga-masiva/${tipo}`, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-        });
-        return response.data.data;
+            const response = await api.post(`/actores/carga-masiva/${tipo}`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            return response.data?.data || { procesados: 0, errores: [] };
+        } catch (error) {
+            console.error('[CargaMasivaService] Error cargarArchivo:', error);
+            throw error;
+        }
     }
 };
-// Updated for HMR refresh

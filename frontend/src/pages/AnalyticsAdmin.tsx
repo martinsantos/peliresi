@@ -7,9 +7,9 @@ import {
     Filter, RefreshCw
 } from 'lucide-react';
 
-// Auth credentials
-const ADMIN_EMAIL = 'santosma@gmail.com';
-const ADMIN_PASSWORD = 'mimica77';
+// Auth - Use environment variables or backend auth in production
+const ADMIN_EMAIL = import.meta.env.VITE_ANALYTICS_ADMIN_EMAIL || 'admin@sitrep.gov.ar';
+const ADMIN_PASSWORD = import.meta.env.VITE_ANALYTICS_ADMIN_PASSWORD || '';
 
 const AnalyticsAdmin: React.FC = () => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -58,7 +58,7 @@ const AnalyticsAdmin: React.FC = () => {
     const loadStats = () => {
         const newStats = analyticsService.getStats();
         setStats(newStats);
-        setAllEvents(newStats.recentEvents);
+        setAllEvents(newStats?.recentEvents || []);
     };
 
     const handleExport = () => {

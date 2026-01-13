@@ -75,13 +75,14 @@ const LogAuditoria: React.FC = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await response.json();
-      
-      if (data.success) {
-        setLogs(data.data.logs);
-        setPagination(data.data.pagination);
+
+      if (data?.success) {
+        setLogs(data?.data?.logs || []);
+        setPagination(data?.data?.pagination || { page: 1, limit: 50, total: 0, pages: 0 });
       }
     } catch (err) {
       console.error('Error fetching logs:', err);
+      setLogs([]);
     } finally {
       setLoading(false);
     }

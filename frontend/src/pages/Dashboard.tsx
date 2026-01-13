@@ -501,7 +501,7 @@ const Dashboard: React.FC = () => {
                         <TrendingUp size={20} />
                     </div>
                     <div className="quick-stat-content">
-                        <span className="quick-stat-value">{stats?.estadisticas.aprobados || 0}</span>
+                        <span className="quick-stat-value">{stats?.estadisticas?.aprobados || 0}</span>
                         <span className="quick-stat-label">Aprobados</span>
                     </div>
                 </div>
@@ -510,7 +510,7 @@ const Dashboard: React.FC = () => {
                         <CheckCircle size={20} />
                     </div>
                     <div className="quick-stat-content">
-                        <span className="quick-stat-value">{stats?.estadisticas.entregados || 0}</span>
+                        <span className="quick-stat-value">{stats?.estadisticas?.entregados || 0}</span>
                         <span className="quick-stat-label">Entregados</span>
                     </div>
                 </div>
@@ -519,7 +519,7 @@ const Dashboard: React.FC = () => {
                         <Activity size={20} />
                     </div>
                     <div className="quick-stat-content">
-                        <span className="quick-stat-value">{stats?.estadisticas.recibidos || 0}</span>
+                        <span className="quick-stat-value">{stats?.estadisticas?.recibidos || 0}</span>
                         <span className="quick-stat-label">Recibidos</span>
                     </div>
                 </div>

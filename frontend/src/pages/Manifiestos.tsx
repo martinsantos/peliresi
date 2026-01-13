@@ -80,10 +80,10 @@ const Manifiestos: React.FC = () => {
         });
     };
 
-    const filteredManifiestos = manifiestos.filter(m =>
-        m.numero.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.generador?.razonSocial.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.transportista?.razonSocial.toLowerCase().includes(searchTerm.toLowerCase())
+    const filteredManifiestos = (manifiestos || []).filter(m =>
+        m?.numero?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m?.generador?.razonSocial?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m?.transportista?.razonSocial?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     if (loading && manifiestos.length === 0) {

@@ -39,17 +39,18 @@ const Configuracion: React.FC = () => {
         try {
             setLoading(true);
             const data = await catalogoService.getTiposResiduos();
-            setResiduos(data);
+            setResiduos(data || []);
         } catch (err) {
             setError('Error al cargar tipos de residuos');
+            setResiduos([]);
         } finally {
             setLoading(false);
         }
     };
 
-    const filteredResiduos = residuos.filter(r =>
-        r.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+    const filteredResiduos = (residuos || []).filter(r =>
+        r?.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        r?.nombre?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     return (

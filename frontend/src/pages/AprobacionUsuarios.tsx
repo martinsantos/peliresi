@@ -36,9 +36,9 @@ const AprobacionUsuarios: React.FC = () => {
       });
       const data = await response.json();
       
-      if (!response.ok) throw new Error(data.error);
-      
-      setUsuarios(data.data.pendientes);
+      if (!response.ok) throw new Error(data.error || 'Error del servidor');
+
+      setUsuarios(data?.data?.pendientes || []);
     } catch (err: any) {
       setError(err.message || 'Error al cargar usuarios');
     } finally {

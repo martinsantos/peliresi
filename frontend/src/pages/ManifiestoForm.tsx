@@ -240,7 +240,11 @@ const ManifiestoForm: React.FC = () => {
             }
 
             const nuevoManifiesto = await manifiestoService.createManifiesto(submitData);
-            navigate(`/manifiestos/${nuevoManifiesto.id}`);
+            if (nuevoManifiesto) {
+                navigate(`/manifiestos/${nuevoManifiesto.id}`);
+            } else {
+                setError('Error al crear el manifiesto: respuesta inválida del servidor');
+            }
         } catch (err: any) {
             // Extraer el mensaje de error del backend (axios pone la respuesta en err.response)
             const backendMessage = err.response?.data?.message;

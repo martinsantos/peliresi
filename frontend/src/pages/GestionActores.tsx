@@ -53,16 +53,16 @@ const GestionActores: React.FC = () => {
 
             if (activeTab === 'generadores') {
                 const result = await actorService.getGeneradores(params);
-                setGeneradores(result.generadores);
-                setPagination(prev => ({ ...prev, ...result.pagination }));
+                setGeneradores(result?.generadores || []);
+                setPagination(prev => ({ ...prev, ...(result?.pagination || {}) }));
             } else if (activeTab === 'transportistas') {
                 const result = await actorService.getTransportistas(params);
-                setTransportistas(result.transportistas);
-                setPagination(prev => ({ ...prev, ...result.pagination }));
+                setTransportistas(result?.transportistas || []);
+                setPagination(prev => ({ ...prev, ...(result?.pagination || {}) }));
             } else {
                 const result = await actorService.getOperadores(params);
-                setOperadores(result.operadores);
-                setPagination(prev => ({ ...prev, ...result.pagination }));
+                setOperadores(result?.operadores || []);
+                setPagination(prev => ({ ...prev, ...(result?.pagination || {}) }));
             }
         } catch (error) {
             console.error('Error loading actores, using demo data:', error);

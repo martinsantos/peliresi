@@ -64,7 +64,7 @@ const ManifiestoDetalle: React.FC = () => {
 
         setActionLoading(true);
         try {
-            let updated: Manifiesto;
+            let updated: Manifiesto | null = null;
             switch (action) {
                 case 'firmar':
                     updated = await manifiestoService.firmarManifiesto(manifiesto.id);
@@ -98,7 +98,9 @@ const ManifiestoDetalle: React.FC = () => {
                 default:
                     return;
             }
-            setManifiesto(updated);
+            if (updated) {
+                setManifiesto(updated);
+            }
         } catch (err: any) {
             setError(err.response?.data?.message || 'Error al ejecutar la acción');
         } finally {

@@ -9,11 +9,30 @@ import type {
     Operador
 } from '../types';
 
+const DEFAULT_DASHBOARD_STATS: DashboardStats = {
+    estadisticas: {
+        borradores: 0,
+        aprobados: 0,
+        enTransito: 0,
+        entregados: 0,
+        recibidos: 0,
+        tratados: 0,
+        total: 0
+    },
+    recientes: [],
+    enTransitoList: []
+};
+
 export const manifiestoService = {
     // Dashboard
     async getDashboard(): Promise<DashboardStats> {
-        const response = await api.get<ApiResponse<DashboardStats>>('/manifiestos/dashboard');
-        return response.data.data;
+        try {
+            const response = await api.get<ApiResponse<DashboardStats>>('/manifiestos/dashboard');
+            return response.data?.data || DEFAULT_DASHBOARD_STATS;
+        } catch (error) {
+            console.error('[ManifiestoService] Error getDashboard:', error);
+            return DEFAULT_DASHBOARD_STATS;
+        }
     },
 
     // Manifiestos
@@ -26,13 +45,23 @@ export const manifiestoService = {
         generadorId?: string;
         operadorId?: string;
     }): Promise<{ manifiestos: Manifiesto[]; pagination: any }> {
-        const response = await api.get<ApiResponse<{ manifiestos: Manifiesto[]; pagination: any }>>('/manifiestos', { params });
-        return response.data.data;
+        try {
+            const response = await api.get<ApiResponse<{ manifiestos: Manifiesto[]; pagination: any }>>('/manifiestos', { params });
+            return response.data?.data || { manifiestos: [], pagination: { page: 1, limit: 10, total: 0, pages: 1 } };
+        } catch (error) {
+            console.error('[ManifiestoService] Error getManifiestos:', error);
+            return { manifiestos: [], pagination: { page: 1, limit: 10, total: 0, pages: 1 } };
+        }
     },
 
-    async getManifiesto(id: string): Promise<Manifiesto> {
-        const response = await api.get<ApiResponse<{ manifiesto: Manifiesto }>>(`/manifiestos/${id}`);
-        return response.data.data.manifiesto;
+    async getManifiesto(id: string): Promise<Manifiesto | null> {
+        try {
+            const response = await api.get<ApiResponse<{ manifiesto: Manifiesto }>>(`/manifiestos/${id}`);
+            return response.data?.data?.manifiesto || null;
+        } catch (error) {
+            console.error('[ManifiestoService] Error getManifiesto:', error);
+            return null;
+        }
     },
 
     async createManifiesto(data: {
@@ -45,23 +74,39 @@ export const manifiestoService = {
             unidad: string;
             descripcion?: string;
         }>;
-    }): Promise<Manifiesto> {
-        const response = await api.post<ApiResponse<{ manifiesto: Manifiesto }>>('/manifiestos', data);
-        return response.data.data.manifiesto;
+    }): Promise<Manifiesto | null> {
+        try {
+            const response = await api.post<ApiResponse<{ manifiesto: Manifiesto }>>('/manifiestos', data);
+            return response.data?.data?.manifiesto || null;
+        } catch (error) {
+            console.error('[ManifiestoService] Error createManifiesto:', error);
+            throw error;
+        }
     },
 
-    async firmarManifiesto(id: string): Promise<Manifiesto> {
-        const response = await api.post<ApiResponse<{ manifiesto: Manifiesto }>>(`/manifiestos/${id}/firmar`);
-        return response.data.data.manifiesto;
+    async firmarManifiesto(id: string): Promise<Manifiesto | null> {
+        try {
+            const response = await api.post<ApiResponse<{ manifiesto: Manifiesto }>>(`/manifiestos/${id}/firmar`);
+            return response.data?.data?.manifiesto || null;
+        } catch (error) {
+            console.error('[ManifiestoService] Error firmarManifiesto:', error);
+            throw error;
+        }
     },
 
     async confirmarRetiro(id: string, data: {
         latitud?: number;
         longitud?: number;
         observaciones?: string;
-    }): Promise<Manifiesto> {
-        const response = await api.post<ApiResponse<{ manifiesto: Manifiesto }>>(`/manifiestos/${id}/confirmar-retiro`, data);
-        return response.data.data.manifiesto;
+        firmaRetiro?: string; // base64
+    }): Promise<Manifiesto | null> {
+        try {
+            const response = await api.post<ApiResponse<{ manifiesto: Manifiesto }>>(`/manifiestos/${id}/confirmar-retiro`, data);
+            return response.data?.data?.manifiesto || null;
+        } catch (error) {
+            console.error('[ManifiestoService] Error confirmarRetiro:', error);
+            throw error;
+        }
     },
 
     async actualizarUbicacion(id: string, data: {
@@ -70,24 +115,42 @@ export const manifiestoService = {
         velocidad?: number;
         direccion?: number;
     }): Promise<void> {
-        await api.post(`/manifiestos/${id}/ubicacion`, data);
+        try {
+            await api.post(`/manifiestos/${id}/ubicacion`, data);
+        } catch (error) {
+            console.error('[ManifiestoService] Error actualizarUbicacion:', error);
+            // No throw - non-critical operation
+        }
     },
 
     async confirmarEntrega(id: string, data: {
         latitud?: number;
         longitud?: number;
         observaciones?: string;
-    }): Promise<Manifiesto> {
-        const response = await api.post<ApiResponse<{ manifiesto: Manifiesto }>>(`/manifiestos/${id}/confirmar-entrega`, data);
-        return response.data.data.manifiesto;
+        firmaEntrega?: string; // base64
+    }): Promise<Manifiesto | null> {
+        try {
+            const response = await api.post<ApiResponse<{ manifiesto: Manifiesto }>>(`/manifiestos/${id}/confirmar-entrega`, data);
+            return response.data?.data?.manifiesto || null;
+        } catch (error) {
+            console.error('[ManifiestoService] Error confirmarEntrega:', error);
+            throw error;
+        }
     },
 
     async confirmarRecepcion(id: string, data: {
         observaciones?: string;
         pesoReal?: number;
-    }): Promise<Manifiesto> {
-        const response = await api.post<ApiResponse<{ manifiesto: Manifiesto }>>(`/manifiestos/${id}/confirmar-recepcion`, data);
-        return response.data.data.manifiesto;
+        pesoRecibido?: number; // alias
+        firmaRecepcion?: string; // base64
+    }): Promise<Manifiesto | null> {
+        try {
+            const response = await api.post<ApiResponse<{ manifiesto: Manifiesto }>>(`/manifiestos/${id}/confirmar-recepcion`, data);
+            return response.data?.data?.manifiesto || null;
+        } catch (error) {
+            console.error('[ManifiestoService] Error confirmarRecepcion:', error);
+            throw error;
+        }
     },
 
     // Nuevos endpoints para casos de uso completos
@@ -95,9 +158,14 @@ export const manifiestoService = {
         motivo: string;
         descripcion?: string;
         cantidadRechazada?: number;
-    }): Promise<Manifiesto> {
-        const response = await api.post<ApiResponse<{ manifiesto: Manifiesto }>>(`/manifiestos/${id}/rechazar`, data);
-        return response.data.data.manifiesto;
+    }): Promise<Manifiesto | null> {
+        try {
+            const response = await api.post<ApiResponse<{ manifiesto: Manifiesto }>>(`/manifiestos/${id}/rechazar`, data);
+            return response.data?.data?.manifiesto || null;
+        } catch (error) {
+            console.error('[ManifiestoService] Error rechazarCarga:', error);
+            throw error;
+        }
     },
 
     async registrarIncidente(id: string, data: {
@@ -106,16 +174,26 @@ export const manifiestoService = {
         latitud?: number;
         longitud?: number;
     }): Promise<void> {
-        await api.post(`/manifiestos/${id}/incidente`, data);
+        try {
+            await api.post(`/manifiestos/${id}/incidente`, data);
+        } catch (error) {
+            console.error('[ManifiestoService] Error registrarIncidente:', error);
+            throw error;
+        }
     },
 
     async registrarTratamiento(id: string, data: {
         metodoTratamiento: string;
         fechaTratamiento?: string;
         observaciones?: string;
-    }): Promise<Manifiesto> {
-        const response = await api.post<ApiResponse<{ manifiesto: Manifiesto }>>(`/manifiestos/${id}/tratamiento`, data);
-        return response.data.data.manifiesto;
+    }): Promise<Manifiesto | null> {
+        try {
+            const response = await api.post<ApiResponse<{ manifiesto: Manifiesto }>>(`/manifiestos/${id}/tratamiento`, data);
+            return response.data?.data?.manifiesto || null;
+        } catch (error) {
+            console.error('[ManifiestoService] Error registrarTratamiento:', error);
+            throw error;
+        }
     },
 
     async registrarPesaje(id: string, data: {
@@ -127,13 +205,18 @@ export const manifiestoService = {
         diferencia: number;
         porcentajeDif: number;
     }> {
-        const response = await api.post<ApiResponse<{
-            pesoDeclarado: number;
-            pesoReal: number;
-            diferencia: number;
-            porcentajeDif: number;
-        }>>(`/manifiestos/${id}/pesaje`, data);
-        return response.data.data;
+        try {
+            const response = await api.post<ApiResponse<{
+                pesoDeclarado: number;
+                pesoReal: number;
+                diferencia: number;
+                porcentajeDif: number;
+            }>>(`/manifiestos/${id}/pesaje`, data);
+            return response.data?.data || { pesoDeclarado: 0, pesoReal: 0, diferencia: 0, porcentajeDif: 0 };
+        } catch (error) {
+            console.error('[ManifiestoService] Error registrarPesaje:', error);
+            throw error;
+        }
     },
 
     // ===== NUEVOS ENDPOINTS v3.1 =====
@@ -141,50 +224,36 @@ export const manifiestoService = {
     // CU-O09: Cerrar manifiesto (estado final)
     async cerrarManifiesto(id: string, data?: {
         observaciones?: string;
-    }): Promise<{ manifiesto: Manifiesto; certificado: string }> {
-        const response = await api.post<ApiResponse<{ manifiesto: Manifiesto; certificado: string }>>(`/manifiestos/${id}/cerrar`, data);
-        return response.data.data;
+    }): Promise<{ manifiesto: Manifiesto | null; certificado: string }> {
+        try {
+            const response = await api.post<ApiResponse<{ manifiesto: Manifiesto; certificado: string }>>(`/manifiestos/${id}/cerrar`, data);
+            return response.data?.data || { manifiesto: null, certificado: '' };
+        } catch (error) {
+            console.error('[ManifiestoService] Error cerrarManifiesto:', error);
+            throw error;
+        }
     },
 
     // CU-G10: Obtener datos para generar PDF con QR
-    async getPDFData(id: string): Promise<{
-        numero: string;
-        estado: string;
-        fechaEmision: string;
-        generador: { razonSocial: string; cuit: string; inscripcion: string };
-        transportista: { razonSocial: string; cuit: string; habilitacion: string; vehiculo: string; chofer: string };
-        operador: { razonSocial: string; cuit: string; habilitacion: string };
-        residuos: { tipo: string; peso: number; pesoRecibido: number | null; unidad: string };
-        recorrido: { origen: string; destino: string; inicioTransporte: string | null; finTransporte: string | null };
-        tratamiento: { tipo: string; fecha: string | null } | null;
-        certificado: string | null;
-        qrCode: string;
-        qrVerificationUrl: string;
-        firmas: {
-            generador: { firmado: boolean; fecha: string };
-            transportista: { firmado: boolean; fecha: string | null };
-            operador: { firmado: boolean; fecha: string | null };
-        };
-    }> {
-        const response = await api.get<ApiResponse<any>>(`/manifiestos/${id}/pdf`);
-        return response.data.data;
+    async getPDFData(id: string): Promise<any> {
+        try {
+            const response = await api.get<ApiResponse<any>>(`/manifiestos/${id}/pdf`);
+            return response.data?.data || null;
+        } catch (error) {
+            console.error('[ManifiestoService] Error getPDFData:', error);
+            return null;
+        }
     },
 
     // CU-O10: Obtener certificado de disposición final
-    async getCertificado(id: string): Promise<{
-        numero: string;
-        manifiesto: string;
-        fechaEmision: string;
-        operador: { razonSocial: string; cuit: string; habilitacion: string; categoria: string };
-        generador: { razonSocial: string; cuit: string };
-        residuo: { tipo: string; pesoRecibido: number; unidad: string };
-        tratamiento: { tipo: string; fecha: string; resultado: string };
-        declaracion: string;
-        firmaOperador: { nombre: string; fecha: string; sello: string };
-        qrVerification: string;
-    }> {
-        const response = await api.get<ApiResponse<any>>(`/manifiestos/${id}/certificado`);
-        return response.data.data;
+    async getCertificado(id: string): Promise<any> {
+        try {
+            const response = await api.get<ApiResponse<any>>(`/manifiestos/${id}/certificado`);
+            return response.data?.data || null;
+        } catch (error) {
+            console.error('[ManifiestoService] Error getCertificado:', error);
+            return null;
+        }
     },
 
     // CU-G07: Firmar con método alternativo (Token/PIN/SMS)
@@ -192,32 +261,36 @@ export const manifiestoService = {
         metodoFirma: 'USUARIO_PASSWORD' | 'TOKEN_PIN' | 'CODIGO_SMS' | 'CERTIFICADO_DIGITAL';
         tokenPin?: string;
         codigoSMS?: string;
-    }): Promise<{ manifiesto: Manifiesto; firma: { metodo: string; fecha: string; firmante: string; hashFirma: string } }> {
-        const response = await api.post<ApiResponse<any>>(`/manifiestos/${id}/firmar-con-token`, data);
-        return response.data.data;
+    }): Promise<{ manifiesto: Manifiesto | null; firma: any }> {
+        try {
+            const response = await api.post<ApiResponse<any>>(`/manifiestos/${id}/firmar-con-token`, data);
+            return response.data?.data || { manifiesto: null, firma: null };
+        } catch (error) {
+            console.error('[ManifiestoService] Error firmarConToken:', error);
+            throw error;
+        }
     },
 
     // Obtener métodos de firma disponibles
-    async getMetodosFirma(): Promise<{
-        metodos: Array<{
-            id: string;
-            nombre: string;
-            descripcion: string;
-            requiere2FA: boolean;
-            disponible: boolean;
-            pinsDePrueba?: string[];
-            codigosDePrueba?: string[];
-            nota?: string;
-        }>;
-    }> {
-        const response = await api.get<ApiResponse<any>>('/firma/metodos-disponibles');
-        return response.data.data;
+    async getMetodosFirma(): Promise<{ metodos: any[] }> {
+        try {
+            const response = await api.get<ApiResponse<any>>('/firma/metodos-disponibles');
+            return response.data?.data || { metodos: [] };
+        } catch (error) {
+            console.error('[ManifiestoService] Error getMetodosFirma:', error);
+            return { metodos: [] };
+        }
     },
 
     // Solicitar código SMS para firma
     async solicitarCodigoSMS(telefono: string): Promise<{ success: boolean; message: string; hint?: string; expiraEn?: number }> {
-        const response = await api.post<{ success: boolean; message: string; hint?: string; expiraEn?: number }>('/auth/enviar-codigo-sms', { telefono });
-        return response.data;
+        try {
+            const response = await api.post<{ success: boolean; message: string; hint?: string; expiraEn?: number }>('/auth/enviar-codigo-sms', { telefono });
+            return response.data || { success: false, message: 'Error al enviar código' };
+        } catch (error) {
+            console.error('[ManifiestoService] Error solicitarCodigoSMS:', error);
+            return { success: false, message: 'Error de conexión' };
+        }
     },
 };
 
