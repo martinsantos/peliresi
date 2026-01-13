@@ -92,8 +92,11 @@
   background: var(--ind-panel);
   border-bottom: 1px solid var(--ind-border);
   flex-shrink: 0;
-  z-index: 100;
+  /* v4.1: Higher z-index to stay above TripBanner */
+  z-index: 150;
   position: relative;
+  /* v4.1: Isolation creates new stacking context */
+  isolation: isolate;
   transition:
     background-color var(--duration-normal) var(--ease-out),
     border-color var(--duration-normal) var(--ease-out);
@@ -155,12 +158,21 @@
 
 .header-title {
   font-family: var(--font-display, 'Barlow Condensed', sans-serif);
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 3px;
+  letter-spacing: 2px;
   color: var(--ind-yellow);
   text-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
+  /* v4.1: Allow title to shrink and truncate if needed */
+  flex: 1;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* v4.1: Padding to prevent overlap with side elements */
+  padding: 0 8px;
+  min-width: 0;
 }
 
 .header-actions {
@@ -2554,12 +2566,21 @@
   margin: 0;
 }
 
-/* ==================== HEADER RIGHT SECTION ==================== */
+/* ═══════════════════════════════════════════════════════════════════════════
+   HEADER RIGHT SECTION - Fixed overlap v4.1
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 .header-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  /* v4.1: Ensure proper stacking above TripBanner */
+  position: relative;
+  z-index: 10;
+  /* v4.1: Prevent badge overflow from causing layout issues */
+  overflow: visible;
+  /* v4.1: Constrain width to prevent overlap with title */
+  flex-shrink: 0;
 }
 
 /* High contrast mode support */
