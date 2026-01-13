@@ -248,13 +248,69 @@ const LogAuditoria: React.FC = () => {
         </div>
       )}
 
-      {/* Table */}
+      {/* Loading State */}
+      {loading && (
+        <div className="loading-state">
+          <div className="loader"></div>
+        </div>
+      )}
+
+      {/* Mobile Cards View */}
+      {!loading && (
+        <div className="audit-cards">
+          {logs.map(log => (
+            <div key={log.id} className="audit-card">
+              <div className="audit-card-header">
+                <div className="audit-timestamp">
+                  <Clock size={14} />
+                  <span>{formatDate(log.timestamp)}</span>
+                </div>
+                <span className={`accion-badge ${getAccionColor(log.accion)}`}>
+                  {log.accion}
+                </span>
+                <span className="modulo-badge">{log.modulo}</span>
+              </div>
+              <div className="audit-card-body">
+                <div className="audit-user-row">
+                  <div className="audit-user-avatar">
+                    <User size={18} />
+                  </div>
+                  <div className="audit-user-info">
+                    <span className="audit-user-name">{log.usuario.nombre} {log.usuario.apellido || ''}</span>
+                    <span className="audit-user-email">{log.usuario.email}</span>
+                  </div>
+                </div>
+                <div className="audit-details-grid">
+                  <div className="audit-detail">
+                    <span className="audit-detail-label">IP</span>
+                    <span className="audit-detail-value">{log.ip || '—'}</span>
+                  </div>
+                  {log.entidadId && (
+                    <div className="audit-detail">
+                      <span className="audit-detail-label">Entidad</span>
+                      <span className="audit-detail-value">
+                        <code>{log.entidadId.slice(0, 12)}...</code>
+                      </span>
+                    </div>
+                  )}
+                  {log.detalles && Object.keys(log.detalles).length > 0 && (
+                    <div className="audit-detail">
+                      <span className="audit-detail-label">Detalles</span>
+                      <span className="audit-detail-value has-details" title={JSON.stringify(log.detalles)}>
+                        Ver detalles 📋
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Desktop Table View */}
       <div className="table-container">
-        {loading ? (
-          <div className="loading-state">
-            <div className="loader"></div>
-          </div>
-        ) : (
+        {!loading && (
           <table className="audit-table">
             <thead>
               <tr>

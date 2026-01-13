@@ -234,6 +234,144 @@ const GestionActores: React.FC = () => {
                     </div>
                 ) : (
                     <>
+                        {/* Mobile Cards View */}
+                        <div className="actor-cards">
+                            {activeTab === 'generadores' && generadores.map(g => (
+                                <div key={g.id} className="actor-card">
+                                    <div className="actor-card-header">
+                                        <div className="actor-card-icon generador">
+                                            <Factory size={20} />
+                                        </div>
+                                        <div className="actor-card-title">
+                                            <span className="actor-name">{g.razonSocial}</span>
+                                            <span className="actor-cuit">{g.cuit}</span>
+                                        </div>
+                                        <span className={`badge ${g.activo ? 'badge-success' : 'badge-warning'}`}>
+                                            {g.activo ? 'Activo' : 'Inactivo'}
+                                        </span>
+                                    </div>
+                                    <div className="actor-card-body">
+                                        <div className="actor-details-grid">
+                                            <div className="actor-detail">
+                                                <span className="actor-detail-label">Email</span>
+                                                <span className="actor-detail-value">{g.email || '—'}</span>
+                                            </div>
+                                            <div className="actor-detail">
+                                                <span className="actor-detail-label">Teléfono</span>
+                                                <span className="actor-detail-value">{g.telefono || '—'}</span>
+                                            </div>
+                                            <div className="actor-detail">
+                                                <span className="actor-detail-label">Manifiestos</span>
+                                                <span className="actor-detail-value">{g._count?.manifiestos || 0}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="actor-card-actions">
+                                        <button className="actor-action-btn primary" onClick={() => openModal('edit', g)}>
+                                            <Edit2 size={18} />
+                                            <span>Editar</span>
+                                        </button>
+                                        <button className="actor-action-btn danger" onClick={() => handleDelete(g.id)}>
+                                            <Trash2 size={18} />
+                                            <span>Eliminar</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                            {activeTab === 'transportistas' && transportistas.map(t => (
+                                <div key={t.id} className="actor-card">
+                                    <div className="actor-card-header">
+                                        <div className="actor-card-icon transportista">
+                                            <Truck size={20} />
+                                        </div>
+                                        <div className="actor-card-title">
+                                            <span className="actor-name">{t.razonSocial}</span>
+                                            <span className="actor-cuit">{t.cuit}</span>
+                                        </div>
+                                        <span className={`badge ${t.activo ? 'badge-success' : 'badge-warning'}`}>
+                                            {t.activo ? 'Activo' : 'Inactivo'}
+                                        </span>
+                                    </div>
+                                    <div className="actor-card-body">
+                                        <div className="actor-details-grid">
+                                            <div className="actor-detail">
+                                                <span className="actor-detail-label">Email</span>
+                                                <span className="actor-detail-value">{t.email || '—'}</span>
+                                            </div>
+                                            <div className="actor-detail">
+                                                <span className="actor-detail-label">Teléfono</span>
+                                                <span className="actor-detail-value">{t.telefono || '—'}</span>
+                                            </div>
+                                            <div className="actor-detail">
+                                                <span className="actor-detail-label">Flota</span>
+                                                <span className="actor-detail-value">
+                                                    {t.vehiculos?.length || 0} vehículos
+                                                    <small>{t.choferes?.length || 0} choferes</small>
+                                                </span>
+                                            </div>
+                                            <div className="actor-detail">
+                                                <span className="actor-detail-label">Manifiestos</span>
+                                                <span className="actor-detail-value">{t._count?.manifiestos || 0}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="actor-card-actions">
+                                        <button className="actor-action-btn primary" onClick={() => openModal('edit', t)}>
+                                            <Edit2 size={18} />
+                                            <span>Editar</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                            {activeTab === 'operadores' && operadores.map(o => (
+                                <div key={o.id} className="actor-card">
+                                    <div className="actor-card-header">
+                                        <div className="actor-card-icon operador">
+                                            <Building2 size={20} />
+                                        </div>
+                                        <div className="actor-card-title">
+                                            <span className="actor-name">{o.razonSocial}</span>
+                                            <span className="actor-cuit">{o.cuit}</span>
+                                        </div>
+                                        <span className={`badge ${o.activo ? 'badge-success' : 'badge-warning'}`}>
+                                            {o.activo ? 'Activo' : 'Inactivo'}
+                                        </span>
+                                    </div>
+                                    <div className="actor-card-body">
+                                        <div className="actor-details-grid">
+                                            <div className="actor-detail">
+                                                <span className="actor-detail-label">Email</span>
+                                                <span className="actor-detail-value">{o.email || '—'}</span>
+                                            </div>
+                                            <div className="actor-detail">
+                                                <span className="actor-detail-label">Teléfono</span>
+                                                <span className="actor-detail-value">{o.telefono || '—'}</span>
+                                            </div>
+                                            <div className="actor-detail">
+                                                <span className="actor-detail-label">Categoría</span>
+                                                <span className="actor-detail-value">{o.categoria || '—'}</span>
+                                            </div>
+                                            <div className="actor-detail">
+                                                <span className="actor-detail-label">Manifiestos</span>
+                                                <span className="actor-detail-value">{o._count?.manifiestos || 0}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="actor-card-actions">
+                                        <button className="actor-action-btn primary" onClick={() => openModal('edit', o)}>
+                                            <Edit2 size={18} />
+                                            <span>Editar</span>
+                                        </button>
+                                        <button className="actor-action-btn danger" onClick={() => handleDelete(o.id)}>
+                                            <Trash2 size={18} />
+                                            <span>Eliminar</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Desktop Table View */}
                         <div className="table-container">
                             <table>
                                 <thead>

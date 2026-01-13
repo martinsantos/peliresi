@@ -13,7 +13,18 @@ import {
     ChevronRight,
     AlertTriangle
 } from 'lucide-react';
+import { CustomSelect } from '../components/CustomSelect';
 import './Manifiestos.css';
+
+const ESTADO_OPTIONS = [
+    { value: '', label: 'Todos los estados' },
+    { value: 'BORRADOR', label: 'Borrador' },
+    { value: 'APROBADO', label: 'Aprobado' },
+    { value: 'EN_TRANSITO', label: 'En Tránsito' },
+    { value: 'ENTREGADO', label: 'Entregado' },
+    { value: 'RECIBIDO', label: 'Recibido' },
+    { value: 'TRATADO', label: 'Tratado' },
+];
 
 const Manifiestos: React.FC = () => {
     const { user } = useAuth();
@@ -122,24 +133,16 @@ const Manifiestos: React.FC = () => {
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-                <div className="filter-box">
-                    <Filter size={18} />
-                    <select
-                        value={estadoFilter}
-                        onChange={(e) => {
-                            setEstadoFilter(e.target.value);
-                            setPagination(prev => ({ ...prev, page: 1 }));
-                        }}
-                    >
-                        <option value="">Todos los estados</option>
-                        <option value="BORRADOR">Borrador</option>
-                        <option value="APROBADO">Aprobado</option>
-                        <option value="EN_TRANSITO">En Tránsito</option>
-                        <option value="ENTREGADO">Entregado</option>
-                        <option value="RECIBIDO">Recibido</option>
-                        <option value="TRATADO">Tratado</option>
-                    </select>
-                </div>
+                <CustomSelect
+                    options={ESTADO_OPTIONS}
+                    value={estadoFilter}
+                    onChange={(value) => {
+                        setEstadoFilter(value);
+                        setPagination(prev => ({ ...prev, page: 1 }));
+                    }}
+                    placeholder="Todos los estados"
+                    icon={<Filter size={18} />}
+                />
             </div>
 
             {error && (
@@ -149,9 +152,58 @@ const Manifiestos: React.FC = () => {
                 </div>
             )}
 
-            {/* Table */}
+            {/* Table / Cards */}
             {filteredManifiestos.length > 0 ? (
                 <>
+                    {/* Mobile Cards View */}
+                    <div className="mobile-cards">
+                        {filteredManifiestos.map((manifiesto) => {
+                            const badge = getEstadoBadge(manifiesto.estado);
+                            return (
+                                <div key={manifiesto.id} className="manifest-card">
+                                    <div className="manifest-card-header">
+                                        <div className="manifest-card-id">
+                                            <span className="manifest-number">{manifiesto.numero}</span>
+                                            <span className="manifest-date">{formatDate(manifiesto.createdAt)}</span>
+                                        </div>
+                                        <span className={`badge ${badge.class}`}>{badge.label}</span>
+                                        <Link
+                                            to={`/manifiestos/${manifiesto.id}`}
+                                            className="manifest-card-action"
+                                            title="Ver detalle"
+                                        >
+                                            <Eye size={20} />
+                                        </Link>
+                                    </div>
+                                    <div className="manifest-card-body">
+                                        <div className="manifest-actor-row">
+                                            <div className="actor-label generador">GEN</div>
+                                            <div className="actor-info">
+                                                <div className="actor-name">{manifiesto.generador?.razonSocial || '—'}</div>
+                                                <div className="actor-cuit">{manifiesto.generador?.cuit || ''}</div>
+                                            </div>
+                                        </div>
+                                        <div className="manifest-actor-row">
+                                            <div className="actor-label transportista">TRA</div>
+                                            <div className="actor-info">
+                                                <div className="actor-name">{manifiesto.transportista?.razonSocial || '—'}</div>
+                                                <div className="actor-cuit">{manifiesto.transportista?.cuit || ''}</div>
+                                            </div>
+                                        </div>
+                                        <div className="manifest-actor-row">
+                                            <div className="actor-label operador">OPE</div>
+                                            <div className="actor-info">
+                                                <div className="actor-name">{manifiesto.operador?.razonSocial || '—'}</div>
+                                                <div className="actor-cuit">{manifiesto.operador?.cuit || ''}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* Desktop Table View */}
                     <div className="table-container">
                         <table>
                             <thead>

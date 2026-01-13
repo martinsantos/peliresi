@@ -1,8 +1,13 @@
-/* Dashboard Styles */
+/* Dashboard Styles - Industrial Control Room Design */
 .dashboard {
     display: flex;
     flex-direction: column;
     gap: var(--space-6);
+
+    /* CRITICAL: Prevent horizontal scroll */
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
 }
 
 .dashboard-loading,

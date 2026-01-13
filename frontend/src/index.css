@@ -106,6 +106,8 @@ html {
   scroll-behavior: smooth;
 }
 
+/* overflow-x removed from html - handled by .layout container */
+
 body {
   font-family: var(--font-sans);
   background: var(--bg-primary);
@@ -114,6 +116,7 @@ body {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* overflow-x removed - handled by .layout container */
 }
 
 /* Background Pattern */
@@ -642,12 +645,12 @@ tr:last-child td {
 /* ========== MOBILE LARGE (max-width: 768px) ========== */
 @media (max-width: 768px) {
   html {
-    font-size: 15px;
+    font-size: 16px; /* MANTENER 16px mínimo para legibilidad */
   }
 
-  h1 { font-size: 1.75rem; }
-  h2 { font-size: 1.5rem; }
-  h3 { font-size: 1.25rem; }
+  h1 { font-size: 1.5rem; }
+  h2 { font-size: 1.35rem; }
+  h3 { font-size: 1.2rem; }
   h4 { font-size: 1.1rem; }
 
   .card {
@@ -655,16 +658,40 @@ tr:last-child td {
     border-radius: var(--radius-lg);
   }
 
-  /* Touch-friendly buttons */
+  /* Touch-friendly buttons - WCAG 2.1 compliant (48px targets) */
   .btn {
-    min-height: 44px;
+    min-height: 48px;
     padding: var(--space-3) var(--space-4);
     font-size: 0.9375rem;
   }
 
   .btn-icon {
+    min-width: 48px;
+    min-height: 48px;
+  }
+
+  /* Global touch target utilities */
+  .touch-target {
+    min-width: 48px;
+    min-height: 48px;
+  }
+
+  .touch-target-sm {
     min-width: 44px;
     min-height: 44px;
+  }
+
+  /* Ensure all interactive elements have proper touch targets */
+  button,
+  [role="button"],
+  a[href],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  .pagination button,
+  .action-btn {
+    min-height: 44px;
+    min-width: 44px;
   }
 
   /* Tables scroll horizontally */
@@ -692,12 +719,12 @@ tr:last-child td {
 /* ========== MOBILE SMALL (max-width: 480px) ========== */
 @media (max-width: 480px) {
   html {
-    font-size: 14px;
+    font-size: 16px; /* NUNCA reducir por debajo de 16px */
   }
 
-  h1 { font-size: 1.5rem; }
-  h2 { font-size: 1.35rem; }
-  h3 { font-size: 1.2rem; }
+  h1 { font-size: 1.375rem; }
+  h2 { font-size: 1.25rem; }
+  h3 { font-size: 1.125rem; }
 
   body {
     line-height: 1.5;
@@ -748,13 +775,7 @@ tr:last-child td {
 }
 
 /* ========== PWA SAFE AREA SUPPORT ========== */
-@supports (padding: env(safe-area-inset-bottom)) {
-  body {
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-}
+/* Safe area padding removed from body - applied only to .main-content */
 
 /* ========== TOUCH DEVICE OPTIMIZATIONS ========== */
 @media (hover: none) and (pointer: coarse) {
@@ -772,6 +793,34 @@ tr:last-child td {
   .btn, button {
     -webkit-user-select: none;
     user-select: none;
+  }
+}
+
+/* ========== SELECT/DROPDOWN MOBILE TYPOGRAPHY ========== */
+/* Force readable font size on all selects (prevents iOS zoom) */
+select {
+  font-size: 16px;
+  min-height: 44px;
+}
+
+select option {
+  font-size: 16px;
+  padding: 12px 16px;
+  line-height: 1.5;
+  background: var(--bg-secondary, #1e293b);
+  color: var(--text-primary, #f8fafc);
+}
+
+/* Ensure options are visible in native dropdown */
+@media (max-width: 768px) {
+  select {
+    font-size: 16px !important; /* Prevent iOS zoom on focus */
+  }
+
+  select option {
+    font-size: 16px !important;
+    padding: 14px 16px;
+    min-height: 44px;
   }
 }
 
@@ -822,38 +871,7 @@ html {
 }
 
 /* ========== SIDEBAR MOBILE ========== */
-@media (max-width: 768px) {
-  .sidebar, [class*="sidebar"] {
-    position: fixed;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    z-index: 1000;
-    transform: translateX(-100%);
-    transition: transform var(--transition-normal);
-    width: 280px;
-    max-width: 85vw;
-  }
-
-  .sidebar.open, [class*="sidebar"].open {
-    transform: translateX(0);
-  }
-
-  .sidebar-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 999;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity var(--transition-normal);
-  }
-
-  .sidebar-overlay.visible {
-    opacity: 1;
-    visibility: visible;
-  }
-}
+/* Sidebar styles handled ONLY by Layout.css - removed from here to prevent conflicts */
 
 /* ========== UTILITY MOBILE CLASSES ========== */
 .mobile-stack {
@@ -996,13 +1014,7 @@ html {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .sidebar, [class*="sidebar"] {
-    width: 220px;
-  }
-
-  .main-content, [class*="main-content"] {
-    margin-left: 220px;
-  }
+  /* sidebar/main-content margins handled by Layout.css ONLY - removed from here */
 
   /* Better use of tablet space */
   .card {
@@ -1022,11 +1034,11 @@ html {
 /* ========== MOBILE ESTRECHO (<400px) - CRÍTICO ========== */
 @media (max-width: 399px) {
   html {
-    font-size: 13px;
+    font-size: 16px; /* MANTENER 16px siempre */
   }
 
-  h1 { font-size: 1.35rem; }
-  h2 { font-size: 1.2rem; }
+  h1 { font-size: 1.25rem; }
+  h2 { font-size: 1.15rem; }
   h3 { font-size: 1.1rem; }
   h4 { font-size: 1rem; }
 
@@ -1090,10 +1102,10 @@ html {
 /* ========== EXTRA PEQUEÑO (320px) - iPhone SE ========== */
 @media (max-width: 320px) {
   html {
-    font-size: 12px;
+    font-size: 16px; /* NUNCA reducir - legibilidad es prioridad */
   }
 
-  h1 { font-size: 1.25rem; }
+  h1 { font-size: 1.2rem; }
   h2 { font-size: 1.1rem; }
   h3 { font-size: 1rem; }
 
@@ -1205,4 +1217,96 @@ html {
   .animate-slideUp {
     animation: none !important;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* GLOBAL MINIMUM STANDARDS - ACCESSIBILITY ENFORCEMENT                        */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Minimum touch targets - WCAG 2.1 Level AAA (44px) */
+@media (pointer: coarse) {
+  button,
+  [role="button"],
+  a.btn,
+  .btn,
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  .clickable,
+  .touchable {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Minimum font sizes for legibility on mobile */
+@media (max-width: 768px) {
+  /* Enforce minimum body text size */
+  body {
+    font-size: 16px;
+  }
+
+  /* Labels and captions - minimum 12px */
+  small,
+  .text-xs,
+  .text-2xs,
+  label,
+  caption,
+  figcaption {
+    font-size: max(0.75rem, 12px) !important;
+  }
+
+  /* Secondary text - minimum 13px */
+  .text-sm,
+  .text-muted,
+  .text-secondary {
+    font-size: max(0.8125rem, 13px);
+  }
+
+  /* All interactive elements must have readable text */
+  button,
+  .btn,
+  input,
+  select,
+  textarea,
+  a {
+    font-size: max(1rem, 16px);
+  }
+
+  /* Form inputs - prevent iOS zoom */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="search"],
+  input[type="date"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* Global CustomSelect styling */
+.custom-select-trigger,
+.custom-select-option {
+  font-size: 1rem !important;
+}
+
+/* Ensure all dropdown menus are readable */
+[role="listbox"],
+[role="menu"],
+.dropdown-menu,
+.select-menu {
+  font-size: 1rem;
+}
+
+[role="option"],
+[role="menuitem"],
+.dropdown-item,
+.select-option {
+  font-size: 1rem;
+  min-height: 44px;
+  padding: 0.75rem 1rem;
 }

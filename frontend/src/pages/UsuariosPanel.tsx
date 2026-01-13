@@ -252,9 +252,90 @@ const UsuariosPanel: React.FC = () => {
                 </div>
             )}
 
-            {/* Table */}
+            {/* Table & Cards */}
             {!loading && data && (
                 <>
+                    {/* Mobile Cards View */}
+                    <div className="users-cards">
+                        {data.usuarios.map(usuario => (
+                            <div key={usuario.id} className={`user-card ${!usuario.activo ? 'inactive' : ''}`}>
+                                <div className="user-card-header">
+                                    <div className="user-avatar" style={{ background: getRoleColor(usuario.rol) }}>
+                                        {usuario.nombre?.charAt(0)}{usuario.apellido?.charAt(0)}
+                                    </div>
+                                    <div className="user-card-info">
+                                        <span className="user-name">{usuario.nombre} {usuario.apellido}</span>
+                                        <span className="user-email">{usuario.email}</span>
+                                    </div>
+                                    <span className="role-badge" style={{ background: getRoleColor(usuario.rol) + '20', color: getRoleColor(usuario.rol) }}>
+                                        {getRoleIcon(usuario.rol)}
+                                        {usuario.rol}
+                                    </span>
+                                </div>
+                                <div className="user-card-body">
+                                    <div className="card-detail-grid">
+                                        <div className="card-detail">
+                                            <Building2 size={14} />
+                                            <span>{usuario.empresa || 'Sin empresa'}</span>
+                                        </div>
+                                        <div className="card-detail">
+                                            <Phone size={14} />
+                                            <span>{usuario.telefono || '—'}</span>
+                                        </div>
+                                        <div className="card-detail">
+                                            <Calendar size={14} />
+                                            <span>{formatDate(usuario.createdAt)}</span>
+                                        </div>
+                                        <div className="card-detail">
+                                            <span className={`status-badge ${usuario.activo ? 'active' : 'pending'}`}>
+                                                {usuario.activo ? 'Activo' : 'Pendiente'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="user-card-actions">
+                                    {!usuario.activo ? (
+                                        <>
+                                            <button
+                                                className="card-action-btn approve"
+                                                onClick={() => handleAprobar(usuario)}
+                                                disabled={procesando}
+                                            >
+                                                <Check size={18} />
+                                                <span>Aprobar</span>
+                                            </button>
+                                            <button
+                                                className="card-action-btn reject"
+                                                onClick={() => handleRechazar(usuario)}
+                                                disabled={procesando}
+                                            >
+                                                <X size={18} />
+                                                <span>Rechazar</span>
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <button
+                                            className="card-action-btn toggle"
+                                            onClick={() => handleToggleActivo(usuario)}
+                                            disabled={procesando}
+                                        >
+                                            <UserX size={18} />
+                                            <span>Desactivar</span>
+                                        </button>
+                                    )}
+                                    <button
+                                        className="card-action-btn more"
+                                        onClick={() => { setSelectedUser(usuario); setShowModal(true); }}
+                                    >
+                                        <MoreVertical size={18} />
+                                        <span>Más</span>
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Desktop Table View */}
                     <div className="users-table-container">
                         <table className="users-table">
                             <thead>

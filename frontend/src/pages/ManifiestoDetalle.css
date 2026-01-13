@@ -5,6 +5,10 @@
     padding: 1rem;
     max-width: 800px;
     margin: 0 auto;
+
+    /* CRITICAL: Prevent horizontal scroll */
+    width: 100%;
+    overflow-x: hidden;
 }
 
 .detalle-loading,

@@ -306,10 +306,16 @@ export const catalogoService = {
     async getTiposResiduos(): Promise<TipoResiduo[]> {
         try {
             const response = await api.get<ApiResponse<{ tiposResiduos: TipoResiduo[] }>>('/catalogos/tipos-residuos');
-            return response.data.data.tiposResiduos;
-        } catch {
+            const data = response.data?.data?.tiposResiduos;
+            if (data && Array.isArray(data) && data.length > 0) {
+                return data;
+            }
+            // Si la respuesta está vacía o es inválida, usar datos demo
+            console.log('[CatalogoService] Respuesta vacía, usando datos demo para tipos de residuos');
+            return tiposResiduosDemo;
+        } catch (error) {
             // Fallback a datos demo
-            console.log('[CatalogoService] Usando datos demo para tipos de residuos');
+            console.log('[CatalogoService] Error en API, usando datos demo para tipos de residuos:', error);
             return tiposResiduosDemo;
         }
     },
@@ -317,9 +323,14 @@ export const catalogoService = {
     async getGeneradores(): Promise<Generador[]> {
         try {
             const response = await api.get<ApiResponse<{ generadores: Generador[] }>>('/catalogos/generadores');
-            return response.data.data.generadores;
-        } catch {
-            console.log('[CatalogoService] Usando datos demo para generadores');
+            const data = response.data?.data?.generadores;
+            if (data && Array.isArray(data) && data.length > 0) {
+                return data;
+            }
+            console.log('[CatalogoService] Respuesta vacía, usando datos demo para generadores');
+            return generadoresDemo;
+        } catch (error) {
+            console.log('[CatalogoService] Error en API, usando datos demo para generadores:', error);
             return generadoresDemo;
         }
     },
@@ -327,9 +338,14 @@ export const catalogoService = {
     async getTransportistas(): Promise<Transportista[]> {
         try {
             const response = await api.get<ApiResponse<{ transportistas: Transportista[] }>>('/catalogos/transportistas');
-            return response.data.data.transportistas;
-        } catch {
-            console.log('[CatalogoService] Usando datos demo para transportistas');
+            const data = response.data?.data?.transportistas;
+            if (data && Array.isArray(data) && data.length > 0) {
+                return data;
+            }
+            console.log('[CatalogoService] Respuesta vacía, usando datos demo para transportistas');
+            return transportistasDemo;
+        } catch (error) {
+            console.log('[CatalogoService] Error en API, usando datos demo para transportistas:', error);
             return transportistasDemo;
         }
     },
@@ -338,9 +354,14 @@ export const catalogoService = {
         try {
             const params = tipoResiduoId ? { tipoResiduoId } : {};
             const response = await api.get<ApiResponse<{ operadores: Operador[] }>>('/catalogos/operadores', { params });
-            return response.data.data.operadores;
-        } catch {
-            console.log('[CatalogoService] Usando datos demo para operadores');
+            const data = response.data?.data?.operadores;
+            if (data && Array.isArray(data) && data.length > 0) {
+                return data;
+            }
+            console.log('[CatalogoService] Respuesta vacía, usando datos demo para operadores');
+            return operadoresDemo;
+        } catch (error) {
+            console.log('[CatalogoService] Error en API, usando datos demo para operadores:', error);
             return operadoresDemo;
         }
     },

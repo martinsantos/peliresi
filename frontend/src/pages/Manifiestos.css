@@ -1,8 +1,17 @@
-/* Manifiestos Page Styles */
+/* ═══════════════════════════════════════════════════════════════════════════
+   MANIFIESTOS - INDUSTRIAL CONTROL ROOM DESIGN
+   Mobile-First • Card-Based Tables • 100% Operable on Mobile
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ══════════════════ PAGE CONTAINER ══════════════════ */
 .manifiestos-page {
     display: flex;
     flex-direction: column;
-    gap: var(--space-6);
+    gap: 1rem;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    padding: 0.75rem;
 }
 
 .manifiestos-loading {
@@ -11,51 +20,75 @@
     align-items: center;
     justify-content: center;
     min-height: 400px;
-    gap: var(--space-4);
+    gap: 1rem;
     color: var(--text-secondary);
 }
 
-/* Header */
+/* ══════════════════ HEADER - MOBILE FIRST ══════════════════ */
 .manifiestos-header {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-4);
+    flex-direction: column;
+    gap: 1rem;
 }
 
 .header-title h2 {
-    font-size: 1.5rem;
-    margin-bottom: var(--space-1);
+    font-size: 1.375rem; /* Aumentado de 1.25rem */
+    font-weight: 700;
+    margin: 0;
+    color: var(--text-primary);
 }
 
 .header-title p {
     color: var(--text-muted);
-    font-size: 0.875rem;
+    font-size: 0.9rem; /* Aumentado de 0.8rem */
+    margin: 0.25rem 0 0;
 }
 
-/* Filters */
+.manifiestos-header .btn-primary {
+    width: 100%;
+    justify-content: center;
+    min-height: 48px;
+    font-size: 0.9rem;
+}
+
+/* ══════════════════ FILTERS - MOBILE FIRST ══════════════════ */
 .manifiestos-filters {
     display: flex;
-    gap: var(--space-4);
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+}
+
+/* CustomSelect integration */
+.manifiestos-filters .custom-select {
+    flex: 1;
 }
 
 .search-box,
 .filter-box {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-2) var(--space-4);
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-lg);
+    border-radius: 10px;
     color: var(--text-muted);
-    transition: all var(--transition-fast);
+    transition: all 0.2s ease;
+    min-height: 48px;
 }
 
 .search-box:focus-within,
 .filter-box:focus-within {
     border-color: var(--primary-500);
-    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.search-box svg,
+.filter-box svg {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
 }
 
 .search-box input,
@@ -63,151 +96,480 @@
     background: none;
     border: none;
     color: var(--text-primary);
-    font-size: 0.875rem;
+    font-size: 1rem; /* 16px base */
     outline: none;
-    min-width: 200px;
+    width: 100%;
+    min-width: 0;
 }
 
 .filter-box select {
     cursor: pointer;
-    min-width: 180px;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0 center;
+    padding-right: 1.5rem;
+    /* Mobile: Force readable font size - CRÍTICO */
+    font-size: 1rem !important; /* 16px prevents iOS zoom */
+    min-height: 44px;
 }
 
 .filter-box select option {
-    background: var(--bg-secondary);
+    background: var(--bg-secondary, #1e293b);
+    color: var(--text-primary, #f8fafc);
+    font-size: 1rem !important; /* Opciones legibles */
+    padding: 14px 16px;
+    line-height: 1.6;
+    min-height: 48px;
 }
 
-/* Error */
+/* ══════════════════ ERROR STATE ══════════════════ */
 .manifiestos-error {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-3) var(--space-4);
+    gap: 0.75rem;
+    padding: 1rem;
     background: rgba(239, 68, 68, 0.1);
     border: 1px solid rgba(239, 68, 68, 0.3);
-    border-radius: var(--radius-lg);
+    border-radius: 10px;
     color: var(--status-error);
-    font-size: 0.875rem;
+    font-size: 0.85rem;
 }
 
-/* Table */
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE CARD LAYOUT (< 768px)
+   Transform table rows into cards for full mobile operability
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Hide desktop table on mobile */
+.table-container {
+    display: none;
+}
+
+/* Mobile cards container */
+.mobile-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+/* Individual manifest card */
+.manifest-card {
+    background: linear-gradient(145deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95));
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+.manifest-card:active {
+    transform: scale(0.98);
+    border-color: var(--primary-500);
+}
+
+/* Card Header - Número + Estado + Action */
+.manifest-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid var(--border-color);
+    gap: 0.75rem;
+}
+
+.manifest-card-id {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 1;
+    min-width: 0;
+}
+
 .manifest-number {
-    font-family: var(--font-mono);
-    font-weight: 600;
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-weight: 700;
+    font-size: 1rem; /* Aumentado de 0.95rem */
     color: var(--primary-400);
+    letter-spacing: 0.5px;
 }
 
+.manifest-date {
+    font-size: 0.875rem; /* Aumentado de 0.7rem */
+    color: var(--text-muted);
+}
+
+/* Status badge in card header */
+.manifest-card-header .badge {
+    font-size: 0.75rem; /* Aumentado de 0.65rem */
+    padding: 0.4rem 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+}
+
+/* Action button in card header */
+.manifest-card-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    background: var(--primary-600);
+    border: none;
+    border-radius: 10px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    text-decoration: none;
+}
+
+.manifest-card-action:hover,
+.manifest-card-action:active {
+    background: var(--primary-500);
+    transform: scale(1.05);
+}
+
+.manifest-card-action svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* Card Body - Actors Grid */
+.manifest-card-body {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0;
+}
+
+/* Actor row in card */
+.manifest-actor-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.manifest-actor-row:last-child {
+    border-bottom: none;
+}
+
+/* Actor label with icon indicator */
+.actor-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    font-size: 0.7rem; /* Aumentado de 0.6rem */
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+}
+
+.actor-label.generador {
+    background: rgba(168, 85, 247, 0.2);
+    color: #c084fc;
+    border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.actor-label.transportista {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.actor-label.operador {
+    background: rgba(34, 197, 94, 0.2);
+    color: #4ade80;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+/* Actor info */
+.actor-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.actor-name {
+    font-size: 0.9375rem; /* 15px - Aumentado de 0.85rem */
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 0.125rem;
+}
+
+.actor-cuit {
+    font-size: 0.8125rem; /* 13px - Aumentado de 0.7rem */
+    color: var(--text-muted);
+    font-family: var(--font-mono, monospace);
+}
+
+/* ══════════════════ LEGACY TABLE CELL STYLES ══════════════════ */
+/* Keep for desktop table view */
 .actor-cell {
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
+    gap: 0.25rem;
 }
 
 .actor-cell strong {
-    font-size: 0.875rem;
+    font-size: 0.85rem;
     color: var(--text-primary);
 }
 
 .actor-cell span {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: var(--text-muted);
     font-family: var(--font-mono);
 }
 
-/* Pagination */
+/* ══════════════════ PAGINATION - MOBILE FIRST ══════════════════ */
 .pagination {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--space-4);
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
     background: var(--bg-card);
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-lg);
+    border-radius: 12px;
+    align-items: center;
 }
 
 .pagination-info {
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     color: var(--text-muted);
+    text-align: center;
 }
 
 .pagination-controls {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
+    gap: 0.5rem;
+}
+
+.pagination-controls .btn {
+    min-width: 48px;
+    min-height: 48px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .pagination-current {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-    min-width: 60px;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    font-weight: 600;
+    min-width: 80px;
     text-align: center;
+    padding: 0 0.5rem;
 }
 
-/* Empty State */
+/* ══════════════════ EMPTY STATE ══════════════════ */
 .manifiestos-empty {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: 400px;
-    gap: var(--space-4);
-    padding: var(--space-8);
+    min-height: 300px;
+    gap: 1rem;
+    padding: 2rem;
     background: var(--bg-card);
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-xl);
+    border-radius: 12px;
     text-align: center;
 }
 
 .manifiestos-empty svg {
     color: var(--text-muted);
-    opacity: 0.5;
+    opacity: 0.4;
+    width: 48px;
+    height: 48px;
 }
 
 .manifiestos-empty h3 {
-    font-size: 1.25rem;
+    font-size: 1.1rem;
     color: var(--text-primary);
+    margin: 0;
 }
 
 .manifiestos-empty p {
     color: var(--text-muted);
-    max-width: 400px;
+    font-size: 0.85rem;
+    max-width: 280px;
+    margin: 0;
 }
 
-/* Responsive */
-@media (max-width: 1024px) {
+.manifiestos-empty .btn {
+    min-height: 48px;
+    margin-top: 0.5rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TABLET BREAKPOINT (640px+)
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (min-width: 640px) {
+    .manifiestos-page {
+        padding: 1rem;
+        gap: 1.25rem;
+    }
+
+    .manifiestos-header {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .manifiestos-header .btn-primary {
+        width: auto;
+    }
+
+    .manifiestos-filters {
+        flex-direction: row;
+    }
+
+    .search-box {
+        flex: 1;
+        max-width: 320px;
+    }
+
+    .filter-box {
+        width: auto;
+        min-width: 180px;
+    }
+
+    /* Card body becomes 3-column grid on tablet */
+    .manifest-card-body {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .manifest-actor-row {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        border-bottom: none;
+        border-right: 1px solid rgba(148, 163, 184, 0.1);
+        padding: 1rem 0.75rem;
+    }
+
+    .manifest-actor-row:last-child {
+        border-right: none;
+    }
+
+    .actor-info {
+        text-align: center;
+    }
+
+    .actor-name {
+        white-space: normal;
+        font-size: 0.8rem;
+    }
+
+    .pagination {
+        flex-direction: row;
+        justify-content: space-between;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DESKTOP BREAKPOINT (768px+) - SHOW TABLE
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (min-width: 768px) {
+    .manifiestos-page {
+        padding: 1.5rem;
+        gap: 1.5rem;
+    }
+
+    .header-title h2 {
+        font-size: 1.5rem;
+    }
+
+    .header-title p {
+        font-size: 0.875rem;
+    }
+
+    /* Hide mobile cards, show desktop table */
+    .mobile-cards {
+        display: none;
+    }
+
     .table-container {
+        display: block;
         overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        background: var(--bg-card);
+    }
+
+    table {
+        width: 100%;
+        min-width: 700px;
+        border-collapse: collapse;
+    }
+
+    th {
+        text-align: left;
+        padding: 1rem;
+        color: var(--text-muted);
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        background: rgba(0, 0, 0, 0.2);
+        border-bottom: 1px solid var(--border-color);
+        white-space: nowrap;
+    }
+
+    td {
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-primary);
+        vertical-align: middle;
+    }
+
+    tr:last-child td {
+        border-bottom: none;
+    }
+
+    tr:hover {
+        background: rgba(16, 185, 129, 0.05);
+    }
+
+    .manifest-number {
+        font-family: var(--font-mono);
+        font-weight: 600;
+        color: var(--primary-400);
+        font-size: 0.9rem;
+    }
+
+    /* Table action button */
+    td .btn-icon {
+        min-width: 40px;
+        min-height: 40px;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LARGE DESKTOP (1024px+)
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (min-width: 1024px) {
+    .manifiestos-page {
+        padding: 2rem;
     }
 
     table {
         min-width: 900px;
     }
-}
 
-@media (max-width: 640px) {
-    .manifiestos-header {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .manifiestos-filters {
-        flex-direction: column;
-        width: 100%;
-    }
-
-    .search-box,
-    .filter-box {
-        width: 100%;
-    }
-
-    .search-box input,
-    .filter-box select {
-        min-width: 0;
-        flex: 1;
-    }
-
-    .pagination {
-        flex-direction: column;
-        gap: var(--space-3);
+    .search-box {
+        max-width: 400px;
     }
 }

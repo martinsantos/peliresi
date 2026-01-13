@@ -62,34 +62,31 @@
     to { transform: rotate(360deg); }
 }
 
-/* Tabs */
+/* Tabs - MOBILE FIRST: 3-column grid, no horizontal scroll */
 .actores-tabs {
-    display: flex;
-    gap: 8px;
-    overflow-x: auto;
-    padding-bottom: 4px;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-}
-
-.actores-tabs::-webkit-scrollbar {
-    display: none;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    width: 100%;
 }
 
 .actores-tab {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 8px;
-    padding: 10px 16px;
+    justify-content: center;
+    gap: 4px;
+    padding: 10px 6px;
     background: var(--ind-panel, rgba(26, 26, 46, 0.6));
     border: 1px solid var(--ind-border, rgba(255, 255, 255, 0.1));
     border-radius: 10px;
     color: var(--ind-text-muted, rgba(255, 255, 255, 0.6));
-    font-size: 13px;
-    font-weight: 500;
+    font-size: clamp(0.6rem, 2.5vw, 0.8rem);
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
-    white-space: nowrap;
+    text-align: center;
+    min-height: 52px; /* Touch target */
 }
 
 .actores-tab:hover {
@@ -103,10 +100,10 @@
 }
 
 .tab-count {
-    padding: 2px 8px;
+    padding: 2px 6px;
     background: rgba(255, 255, 255, 0.1);
     border-radius: 10px;
-    font-size: 11px;
+    font-size: clamp(0.55rem, 2vw, 0.7rem);
 }
 
 .actores-tab.active .tab-count {
@@ -296,4 +293,44 @@
     top: 50%;
     transform: translateY(-50%);
     color: var(--ind-text-muted, rgba(255, 255, 255, 0.3));
+}
+
+/* ==================== RESPONSIVE BREAKPOINTS ==================== */
+
+/* 480px+: Tabs horizontal layout with more space */
+@media (min-width: 480px) {
+    .actores-tabs {
+        gap: 10px;
+    }
+
+    .actores-tab {
+        flex-direction: row;
+        gap: 8px;
+        padding: 12px 16px;
+        font-size: 0.85rem;
+    }
+}
+
+/* 640px+: Better card layout */
+@media (min-width: 640px) {
+    .actores-list {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+}
+
+/* 768px+: Tablet optimizations */
+@media (min-width: 768px) {
+    .actores-screen {
+        gap: 20px;
+    }
+
+    .actores-search {
+        padding: 14px 20px;
+    }
+
+    .actor-card {
+        padding: 20px;
+    }
 }

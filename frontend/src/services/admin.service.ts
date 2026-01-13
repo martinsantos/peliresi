@@ -5,43 +5,76 @@ import { defaults } from '../utils/safeResponse';
 // ===== PDFs =====
 export const pdfService = {
     getManifiestoPDFUrl(id: string): string {
-        return `${api.defaults.baseURL}/pdf/manifiesto/${id}`;
+        return `${api.defaults.baseURL}/manifiestos/${id}/pdf`;
     },
 
     getCertificadoPDFUrl(id: string): string {
-        return `${api.defaults.baseURL}/pdf/certificado/${id}`;
+        return `${api.defaults.baseURL}/manifiestos/${id}/certificado`;
     },
 
     async descargarManifiestoPDF(id: string): Promise<void> {
         const token = localStorage.getItem('accessToken');
-        const response = await fetch(`${api.defaults.baseURL}/pdf/manifiesto/${id}`, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `manifiesto_${id}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
+        const baseURL = api.defaults.baseURL || '/api';
+
+        try {
+            const response = await fetch(`${baseURL}/manifiestos/${id}/pdf`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('[PDFService] Error descargando PDF:', response.status, errorText);
+                throw new Error(`Error al descargar PDF: ${response.status}`);
+            }
+
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/pdf')) {
+                console.warn('[PDFService] Respuesta no es PDF, tipo:', contentType);
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `manifiesto_${id}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('[PDFService] Error en descargarManifiestoPDF:', error);
+            throw error;
+        }
     },
 
     async descargarCertificadoPDF(id: string): Promise<void> {
         const token = localStorage.getItem('accessToken');
-        const response = await fetch(`${api.defaults.baseURL}/pdf/certificado/${id}`, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `certificado_${id}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
+        const baseURL = api.defaults.baseURL || '/api';
+
+        try {
+            const response = await fetch(`${baseURL}/manifiestos/${id}/certificado`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('[PDFService] Error descargando certificado:', response.status, errorText);
+                throw new Error(`Error al descargar certificado: ${response.status}`);
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `certificado_${id}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('[PDFService] Error en descargarCertificadoPDF:', error);
+            throw error;
+        }
     }
 };
 

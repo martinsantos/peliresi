@@ -1,6 +1,19 @@
+/**
+ * Login Page - Industrial Control Room Design
+ * SITREP v4.0 Design System
+ */
+
 import React, { useState } from 'react';
 import { authService } from '../services/auth.service';
 import { Lock, Mail, Loader2, AlertCircle } from 'lucide-react';
+import './Login.css';
+
+const TEST_USERS = [
+    { label: 'Admin', email: 'admin@dgfa.mendoza.gov.ar', pass: 'admin123' },
+    { label: 'Generador', email: 'quimica.mendoza@industria.com', pass: 'gen123' },
+    { label: 'Transporte', email: 'transportes.andes@logistica.com', pass: 'trans123' },
+    { label: 'Operador', email: 'tratamiento.residuos@planta.com', pass: 'op123' }
+];
 
 const Login: React.FC = () => {
     const [email, setEmail] = useState('');
@@ -12,7 +25,7 @@ const Login: React.FC = () => {
         e.preventDefault();
         setLoading(true);
         setError(null);
-        
+
         try {
             await authService.login(email, password);
             window.location.href = `${import.meta.env.BASE_URL}dashboard`.replace('//', '/');
@@ -24,151 +37,95 @@ const Login: React.FC = () => {
         }
     };
 
+    const handleTestUserClick = (user: typeof TEST_USERS[0]) => {
+        setEmail(user.email);
+        setPassword(user.pass);
+    };
+
     return (
-        <div style={{
-            minHeight: '100vh',
-            background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px'
-        }}>
-            <div style={{
-                background: 'rgba(30, 41, 59, 0.7)',
-                backdropFilter: 'blur(10px)',
-                padding: '40px',
-                borderRadius: '24px',
-                width: '100%',
-                maxWidth: '420px',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
-            }}>
-                <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-                    <h1 style={{ color: 'white', fontSize: '28px', fontWeight: '700', marginBottom: '8px' }}>
-                        SITREP
-                    </h1>
-                    <p style={{ color: '#94a3b8', fontSize: '15px' }}>
-                        Sistema de Trazabilidad de Residuos
-                    </p>
+        <div className="login-page">
+            <div className="login-card">
+                {/* Header */}
+                <div className="login-header">
+                    <h1 className="login-title">SITREP</h1>
+                    <p className="login-subtitle">Sistema de Trazabilidad de Residuos</p>
                 </div>
 
+                {/* Error Alert */}
                 {error && (
-                    <div style={{
-                        background: 'rgba(239, 68, 68, 0.1)',
-                        border: '1px solid rgba(239, 68, 68, 0.2)',
-                        color: '#fca5a5',
-                        padding: '12px',
-                        borderRadius: '12px',
-                        marginBottom: '20px',
-                        fontSize: '14px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px'
-                    }}>
+                    <div className="login-error">
                         <AlertCircle size={18} />
-                        {error}
+                        <span>{error}</span>
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    <div style={{ position: 'relative' }}>
-                        <Mail style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} size={20} />
+                {/* Form */}
+                <form onSubmit={handleSubmit} className="login-form">
+                    <div className="login-input-group">
+                        <Mail className="login-input-icon" size={20} />
                         <input
                             type="email"
+                            className="login-input"
                             placeholder="Correo electrónico"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
-                            style={{
-                                width: '100%',
-                                padding: '12px 12px 12px 42px',
-                                background: 'rgba(15, 23, 42, 0.6)',
-                                border: '1px solid rgba(255, 255, 255, 0.1)',
-                                borderRadius: '12px',
-                                color: 'white',
-                                outline: 'none'
-                            }}
+                            autoComplete="email"
                         />
                     </div>
 
-                    <div style={{ position: 'relative' }}>
-                        <Lock style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} size={20} />
+                    <div className="login-input-group">
+                        <Lock className="login-input-icon" size={20} />
                         <input
                             type="password"
+                            className="login-input"
                             placeholder="Contraseña"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
-                            style={{
-                                width: '100%',
-                                padding: '12px 12px 12px 42px',
-                                background: 'rgba(15, 23, 42, 0.6)',
-                                border: '1px solid rgba(255, 255, 255, 0.1)',
-                                borderRadius: '12px',
-                                color: 'white',
-                                outline: 'none'
-                            }}
+                            autoComplete="current-password"
                         />
                     </div>
 
                     <button
                         type="submit"
+                        className="login-submit"
                         disabled={loading}
-                        style={{
-                            padding: '14px',
-                            background: '#10b981',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '12px',
-                            fontSize: '16px',
-                            fontWeight: '600',
-                            cursor: loading ? 'not-allowed' : 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '10px',
-                            marginTop: '10px',
-                            transition: 'all 0.2s'
-                        }}
                     >
-                        {loading ? <Loader2 className="animate-spin" size={20} /> : 'Ingresar al sistema'}
+                        {loading ? (
+                            <>
+                                <Loader2 className="animate-spin" size={20} />
+                                <span>Ingresando...</span>
+                            </>
+                        ) : (
+                            'Ingresar al sistema'
+                        )}
                     </button>
                 </form>
 
-                <div style={{ marginTop: '24px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '20px' }}>
-                    <p style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        Usuarios de prueba (Desarrollo)
-                    </p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                        {[
-                            { label: 'Admin', email: 'admin@dgfa.mendoza.gov.ar', pass: 'admin123' },
-                            { label: 'Generador', email: 'quimica.mendoza@industria.com', pass: 'gen123' },
-                            { label: 'Transporte', email: 'transportes.andes@logistica.com', pass: 'trans123' },
-                            { label: 'Operador', email: 'tratamiento.residuos@planta.com', pass: 'op123' }
-                        ].map((u) => (
-                            <div 
-                                key={u.label} 
-                                onClick={() => { setEmail(u.email); setPassword(u.pass); }}
-                                style={{
-                                    padding: '8px',
-                                    background: 'rgba(15, 23, 42, 0.4)',
-                                    borderRadius: '8px',
-                                    fontSize: '11px',
-                                    color: '#cbd5e1',
-                                    cursor: 'pointer',
-                                    border: '1px solid rgba(255, 255, 255, 0.05)',
-                                    transition: 'all 0.2s'
-                                }}
+                {/* Test Users Section */}
+                <div className="login-test-users">
+                    <p className="login-test-label">Usuarios de prueba (Desarrollo)</p>
+                    <div className="login-test-grid">
+                        {TEST_USERS.map((user) => (
+                            <div
+                                key={user.label}
+                                className="login-test-user"
+                                onClick={() => handleTestUserClick(user)}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(e) => e.key === 'Enter' && handleTestUserClick(user)}
                             >
-                                <div style={{ fontWeight: '700', color: '#10b981', marginBottom: '2px' }}>{u.label}</div>
-                                <div style={{ opacity: 0.7, overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.email}</div>
+                                <div className="login-test-user-role">{user.label}</div>
+                                <div className="login-test-user-email">{user.email}</div>
                             </div>
                         ))}
                     </div>
                 </div>
 
-                <div style={{ marginTop: '24px', textAlign: 'center' }}>
-                    <p style={{ color: '#64748b', fontSize: '13px' }}>
+                {/* Footer */}
+                <div className="login-footer">
+                    <p className="login-footer-text">
                         Si tiene problemas para ingresar, contacte al administrador de la DGFA.
                     </p>
                 </div>

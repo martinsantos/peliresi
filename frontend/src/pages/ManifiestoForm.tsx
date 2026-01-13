@@ -79,14 +79,16 @@ const ManifiestoForm: React.FC = () => {
             }
 
             const results = await Promise.all(promises);
-            setTiposResiduos(results[0]);
-            setTransportistas(results[1]);
-            setOperadores(results[2]);
+            // Asegurarse de que siempre sean arrays válidos
+            setTiposResiduos(Array.isArray(results[0]) ? results[0] : []);
+            setTransportistas(Array.isArray(results[1]) ? results[1] : []);
+            setOperadores(Array.isArray(results[2]) ? results[2] : []);
 
-            if (isAdmin && results[3]) {
+            if (isAdmin && results[3] && Array.isArray(results[3])) {
                 setGeneradores(results[3]);
             }
         } catch (err) {
+            console.error('[ManifiestoForm] Error al cargar catálogos:', err);
             setError('Error al cargar catálogos. Por favor recargue la página.');
         } finally {
             setCatalogosLoading(false);

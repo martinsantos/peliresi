@@ -161,51 +161,236 @@
     backdrop-filter: blur(10px);
 }
 
+/* Hide desktop table on mobile by default */
 .table-container {
-    overflow-x: auto;
+    display: none;
 }
 
-.table-card table {
-    width: 100%;
-    border-collapse: collapse;
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE CARDS VIEW - ACTORS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.actor-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.75rem;
 }
 
-.table-card th,
-.table-card td {
-    padding: 1rem 1.25rem;
-    text-align: left;
+.actor-card {
+    background: linear-gradient(145deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+.actor-card:active {
+    transform: scale(0.98);
+    border-color: #10b981;
+}
+
+.actor-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.2);
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.table-card th {
-    font-size: 0.75rem;
+.actor-card-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+
+.actor-card-icon.generador {
+    background: rgba(168, 85, 247, 0.2);
+    color: #c084fc;
+    border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.actor-card-icon.transportista {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.actor-card-icon.operador {
+    background: rgba(34, 197, 94, 0.2);
+    color: #4ade80;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.actor-card-title {
+    flex: 1;
+    min-width: 0;
+}
+
+.actor-card-title .actor-name {
+    display: block;
+    font-size: 0.95rem;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: rgba(255, 255, 255, 0.5);
-    background: rgba(255, 255, 255, 0.05);
-}
-
-.table-card td {
-    font-size: 0.875rem;
-    color: rgba(255, 255, 255, 0.9);
-}
-
-.table-card td strong {
     color: white;
-    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.table-card td small {
+.actor-card-title .actor-cuit {
+    display: block;
+    font-size: 0.75rem;
     color: rgba(255, 255, 255, 0.5);
+    font-family: var(--font-mono, monospace);
+    margin-top: 0.25rem;
 }
 
-.table-card tbody tr {
-    transition: background 0.2s;
+.actor-card-body {
+    padding: 1rem;
 }
 
-.table-card tbody tr:hover {
+.actor-details-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+}
+
+.actor-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.actor-detail-label {
+    font-size: 0.65rem;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.actor-detail-value {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.9);
+    word-break: break-word;
+}
+
+.actor-detail-value small {
+    display: block;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.7rem;
+    margin-top: 0.125rem;
+}
+
+.actor-card-actions {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.actor-action-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    min-height: 48px;
     background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.actor-action-btn:hover,
+.actor-action-btn:active {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.actor-action-btn.primary {
+    background: #10b981;
+    border-color: #10b981;
+    color: white;
+}
+
+.actor-action-btn.primary:hover {
+    background: #059669;
+}
+
+.actor-action-btn.danger {
+    color: #f87171;
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+.actor-action-btn.danger:hover {
+    background: rgba(239, 68, 68, 0.15);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TABLET+ (768px) - SHOW DESKTOP TABLE
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (min-width: 768px) {
+    .actor-cards {
+        display: none;
+    }
+
+    .table-container {
+        display: block;
+        overflow-x: auto;
+    }
+
+    .table-card table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .table-card th,
+    .table-card td {
+        padding: 1rem 1.25rem;
+        text-align: left;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .table-card th {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: rgba(255, 255, 255, 0.5);
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .table-card td {
+        font-size: 0.875rem;
+        color: rgba(255, 255, 255, 0.9);
+    }
+
+    .table-card td strong {
+        color: white;
+        font-weight: 600;
+    }
+
+    .table-card td small {
+        color: rgba(255, 255, 255, 0.5);
+    }
+
+    .table-card tbody tr {
+        transition: background 0.2s;
+    }
+
+    .table-card tbody tr:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
 }
 
 /* Badges */

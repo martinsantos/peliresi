@@ -1,124 +1,594 @@
 /**
- * RoleSelector - Theme-aware styles
- * Supports both Dark and Light themes
+ * RoleSelector - Industrial Control Room Design
+ * SITREP v4.0 Design System
+ *
+ * Aesthetic: NASA Mission Control meets Modern Dashboard
+ * Supports: Dark (default) + Light themes
+ * WCAG: AA compliant
  */
 
-/* ========== DARK THEME (DEFAULT) ========== */
-.role-selection h1 {
-    color: var(--color-text-max, #ffffff);
-    margin: 0;
-    font-size: var(--text-3xl, 1.875rem);
-    font-weight: var(--font-extrabold, 800);
-    letter-spacing: 0.05em;
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* CONTAINER                                                                   */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+.role-selector-container {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%, var(--color-primary-surface) 0%, transparent 50%),
+    var(--color-bg-base);
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
-.role-selection p {
-    color: var(--color-text-secondary, #cbd5e1);
-    margin: var(--space-2, 8px) 0 0 0;
-    font-size: var(--text-sm, 0.875rem);
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* CONNECTIVITY BADGE - Floating Status Indicator                              */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+.connectivity-float {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  z-index: var(--z-fixed);
 }
 
-.role-btn .role-name {
-    color: var(--color-text-bright, #ffffff) !important;
-    font-weight: 600;
+.conn-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  padding: var(--space-1-5) var(--space-3);
+  border-radius: var(--radius-full);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: all var(--duration-fast) var(--ease-out);
 }
 
-.role-btn .lucide {
-    color: var(--color-text-muted, #94a3b8);
+.conn-badge.online {
+  background: var(--color-success-surface);
+  border: 1px solid var(--estado-aprobado-border);
+  color: var(--color-success-bright);
 }
 
-/* Install hint button */
-.install-hint {
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.1)) !important;
-    border: 1px solid rgba(16, 185, 129, 0.4) !important;
-    color: var(--color-success, #10b981) !important;
+.conn-badge.offline {
+  background: var(--color-danger-surface);
+  border: 1px solid var(--estado-rechazado-border);
+  color: var(--color-danger-bright);
+  animation: pulse 2s var(--ease-in-out) infinite;
 }
 
-/* Push notifications button */
-.install-hint.push-subscribed {
-    background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(34, 197, 94, 0.1)) !important;
-    border: 1px solid rgba(34, 197, 94, 0.4) !important;
-    color: var(--color-success-bright, #22c55e) !important;
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* ROLE SELECTION - Main Content Area                                          */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+.role-selection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: var(--space-6);
+  padding-top: var(--space-16);
+  padding-bottom: env(safe-area-inset-bottom, var(--space-6));
 }
 
-.install-hint.push-unsubscribed {
-    background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.1)) !important;
-    border: 1px solid rgba(245, 158, 11, 0.4) !important;
-    color: var(--color-warning, #f59e0b) !important;
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* LOGO - Industrial Shield Badge                                              */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+.role-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-xl);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dim) 100%);
+  color: var(--color-text-inverse);
+  box-shadow:
+    0 8px 32px var(--color-primary-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  margin-bottom: var(--space-5);
+  animation: scaleIn var(--duration-slow) var(--ease-bounce);
 }
 
+.role-logo svg {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* TYPOGRAPHY                                                                  */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+.role-title {
+  font-family: var(--font-display);
+  font-size: var(--text-4xl);
+  font-weight: var(--font-extrabold);
+  color: var(--color-text-max);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  margin: 0;
+  animation: slideUp var(--duration-normal) var(--ease-out);
+  animation-delay: 50ms;
+  animation-fill-mode: backwards;
+}
+
+.role-subtitle {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary);
+  margin: var(--space-1) 0 var(--space-8) 0;
+  animation: slideUp var(--duration-normal) var(--ease-out);
+  animation-delay: 100ms;
+  animation-fill-mode: backwards;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* ROLE LIST - Button Grid                                                     */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+.role-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  max-width: 360px;
+  margin-bottom: var(--space-8);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* ROLE BUTTON - Base Styles                                                   */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+.role-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  padding: var(--space-4);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--duration-fast) var(--ease-out);
+  animation: slideUp var(--duration-normal) var(--ease-out);
+  animation-fill-mode: backwards;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle gradient overlay on hover */
+.role-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, var(--role-color-surface, transparent) 100%);
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.role-btn:hover::before {
+  opacity: 1;
+}
+
+.role-btn:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--role-color, var(--color-border-strong));
+  transform: translateX(4px);
+  box-shadow: var(--shadow-card-hover);
+}
+
+.role-btn:active {
+  transform: scale(0.98) translateX(2px);
+  box-shadow: var(--shadow-card-active);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* ROLE ICON - Color-coded Badge                                               */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+.role-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+  color: #ffffff;
+  position: relative;
+  z-index: 1;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.role-icon svg {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+  transition: transform var(--duration-fast) var(--ease-bounce);
+}
+
+.role-btn:hover .role-icon svg {
+  transform: scale(1.1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* ROLE NAME                                                                   */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+.role-name {
+  flex: 1;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-bright);
+  position: relative;
+  z-index: 1;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* ROLE CHEVRON                                                                */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+.role-chevron {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.role-btn:hover .role-chevron {
+  color: var(--role-color, var(--color-text-secondary));
+  transform: translateX(4px);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* ROLE COLOR VARIANTS - Using CSS Variables                                   */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ADMIN - Authority Blue */
+.role-btn.role-admin {
+  --role-color: var(--role-admin);
+  --role-color-surface: var(--role-admin-surface);
+}
+
+.role-btn.role-admin .role-icon {
+  background: var(--role-admin-gradient);
+  box-shadow:
+    0 4px 16px var(--role-admin-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* GENERADOR - Production Purple */
+.role-btn.role-generador {
+  --role-color: var(--role-generador);
+  --role-color-surface: var(--role-generador-surface);
+}
+
+.role-btn.role-generador .role-icon {
+  background: var(--role-generador-gradient);
+  box-shadow:
+    0 4px 16px var(--role-generador-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* TRANSPORTISTA - Movement Orange */
+.role-btn.role-transportista {
+  --role-color: var(--role-transportista);
+  --role-color-surface: var(--role-transportista-surface);
+}
+
+.role-btn.role-transportista .role-icon {
+  background: var(--role-transportista-gradient);
+  box-shadow:
+    0 4px 16px var(--role-transportista-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* OPERADOR - Processing Green */
+.role-btn.role-operador {
+  --role-color: var(--role-operador);
+  --role-color-surface: var(--role-operador-surface);
+}
+
+.role-btn.role-operador .role-icon {
+  background: var(--role-operador-gradient);
+  box-shadow:
+    0 4px 16px var(--role-operador-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* ACTION BUTTONS CONTAINER                                                    */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+.role-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  max-width: 280px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* ACTION BUTTON - Base                                                        */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+.action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-full);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  min-height: var(--touch-target);
+}
+
+.action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.action-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* PRIMARY - Install App (Cyan/Primary) */
+.action-btn-primary {
+  background: var(--color-primary-surface);
+  border: 1px solid var(--color-primary-dim);
+  color: var(--color-primary-bright);
+}
+
+.action-btn-primary:hover:not(:disabled) {
+  background: rgba(6, 182, 212, 0.15);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 16px var(--color-primary-glow);
+}
+
+/* SECONDARY - Activate Notifications (Warning/Amber) */
+.action-btn-secondary {
+  background: var(--color-warning-surface);
+  border: 1px solid var(--color-warning-dim);
+  color: var(--color-warning-bright);
+}
+
+.action-btn-secondary:hover:not(:disabled) {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: var(--color-warning);
+  box-shadow: 0 0 16px var(--color-warning-glow);
+}
+
+/* SUCCESS - Notifications Active (Green) */
+.action-btn-success {
+  background: var(--color-success-surface);
+  border: 1px solid var(--color-success-dim);
+  color: var(--color-success-bright);
+}
+
+.action-btn-success:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: var(--color-success);
+  box-shadow: 0 0 16px var(--color-success-glow);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* ERROR BANNER - Improved visibility                                          */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+.error-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  max-width: 320px;
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-danger-surface);
+  border: 1px solid var(--estado-rechazado-border);
+  border-radius: var(--radius-lg);
+  color: var(--color-danger-bright);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  animation: slideUp var(--duration-fast) var(--ease-out);
+}
+
+.error-banner svg {
+  flex-shrink: 0;
+}
+
+/* Legacy class compatibility */
 .push-error {
-    color: var(--color-danger, #ef4444) !important;
-    font-size: 12px;
-    margin-top: 8px;
-    text-align: center;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-danger-surface);
+  border: 1px solid var(--estado-rechazado-border);
+  border-radius: var(--radius-lg);
+  color: var(--color-danger-bright);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  text-align: center;
 }
 
-/* ========== LIGHT THEME ========== */
-[data-theme="light"] .role-selection h1,
-.theme-light .role-selection h1 {
-    color: var(--color-text-max, #020617);
-    text-shadow: none;
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* LIGHT THEME OVERRIDES                                                       */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+[data-theme="light"] .role-selector-container,
+.theme-light .role-selector-container {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%, var(--color-primary-surface) 0%, transparent 50%),
+    var(--color-bg-base);
 }
 
-[data-theme="light"] .role-selection p,
-.theme-light .role-selection p {
-    color: var(--color-text-secondary, #475569);
-}
-
-[data-theme="light"] .role-btn .role-name,
-.theme-light .role-btn .role-name {
-    color: var(--color-text-primary, #1e293b) !important;
-}
-
-[data-theme="light"] .role-btn .lucide,
-.theme-light .role-btn .lucide {
-    color: var(--color-text-muted, #64748b);
-}
-
-/* Logo en tema claro con mejor contraste */
 [data-theme="light"] .role-logo,
 .theme-light .role-logo {
-    background: linear-gradient(135deg, #0891b2, #0e7490) !important;
-    box-shadow: 0 12px 40px rgba(8, 145, 178, 0.3) !important;
+  box-shadow:
+    0 8px 24px var(--color-primary-glow),
+    0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-/* Botones de rol en tema claro */
+[data-theme="light"] .role-title,
+.theme-light .role-title {
+  color: var(--color-text-max);
+}
+
+[data-theme="light"] .role-subtitle,
+.theme-light .role-subtitle {
+  color: var(--color-text-secondary);
+}
+
 [data-theme="light"] .role-btn,
 .theme-light .role-btn {
-    background: var(--color-bg-elevated, #ffffff);
-    border-color: var(--color-border-default, #e2e8f0);
+  background: var(--color-bg-card);
+  border-color: var(--color-border-default);
+  box-shadow: var(--shadow-card);
 }
 
 [data-theme="light"] .role-btn:hover,
 .theme-light .role-btn:hover {
-    background: var(--color-bg-hover, #f1f5f9);
-    border-color: var(--color-border-strong, #cbd5e1);
+  background: var(--color-bg-hover);
+  box-shadow: var(--shadow-card-hover);
 }
 
-/* Install hint en tema claro */
-[data-theme="light"] .install-hint,
-.theme-light .install-hint {
-    background: linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(6, 182, 212, 0.05)) !important;
-    border: 1px solid rgba(6, 182, 212, 0.3) !important;
-    color: var(--color-primary-darker, #155e75) !important;
+[data-theme="light"] .role-name,
+.theme-light .role-name {
+  color: var(--color-text-primary);
 }
 
-[data-theme="light"] .install-hint.push-subscribed,
-.theme-light .install-hint.push-subscribed {
-    background: linear-gradient(135deg, rgba(5, 150, 105, 0.15), rgba(5, 150, 105, 0.05)) !important;
-    border: 1px solid rgba(5, 150, 105, 0.3) !important;
-    color: var(--color-success-dim, #047857) !important;
+[data-theme="light"] .role-chevron,
+.theme-light .role-chevron {
+  color: var(--color-text-muted);
 }
 
-[data-theme="light"] .install-hint.push-unsubscribed,
-.theme-light .install-hint.push-unsubscribed {
-    background: linear-gradient(135deg, rgba(217, 119, 6, 0.15), rgba(217, 119, 6, 0.05)) !important;
-    border: 1px solid rgba(217, 119, 6, 0.3) !important;
-    color: var(--color-warning-dim, #d97706) !important;
+[data-theme="light"] .role-icon,
+.theme-light .role-icon {
+  box-shadow:
+    0 4px 12px var(--role-admin-glow, rgba(0, 0, 0, 0.15)),
+    0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-[data-theme="light"] .push-error,
-.theme-light .push-error {
-    color: var(--color-danger-dim, #b91c1c) !important;
+[data-theme="light"] .conn-badge.online,
+.theme-light .conn-badge.online {
+  background: var(--color-success-surface);
+  color: var(--color-success-dim);
+}
+
+[data-theme="light"] .conn-badge.offline,
+.theme-light .conn-badge.offline {
+  background: var(--color-danger-surface);
+  color: var(--color-danger-dim);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* RESPONSIVE - Mobile Optimizations                                           */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 375px) {
+  .role-selection {
+    padding: var(--space-4);
+    padding-top: var(--space-14);
+  }
+
+  .role-title {
+    font-size: var(--text-3xl);
+  }
+
+  .role-subtitle {
+    font-size: var(--text-sm);
+  }
+
+  .role-btn {
+    padding: var(--space-3);
+    gap: var(--space-3);
+  }
+
+  .role-icon {
+    width: 46px;
+    height: 46px;
+  }
+
+  .role-icon svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .role-name {
+    font-size: var(--text-sm);
+  }
+}
+
+@media (max-width: 320px) {
+  .role-selection {
+    padding: var(--space-3);
+    padding-top: var(--space-12);
+  }
+
+  .role-logo {
+    width: 64px;
+    height: 64px;
+  }
+
+  .role-logo svg {
+    width: 28px;
+    height: 28px;
+  }
+
+  .role-title {
+    font-size: var(--text-2xl);
+  }
+
+  .role-btn {
+    padding: var(--space-2-5);
+  }
+
+  .role-icon {
+    width: 42px;
+    height: 42px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* ANIMATIONS                                                                  */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .role-logo,
+  .role-title,
+  .role-subtitle,
+  .role-btn,
+  .error-banner {
+    animation: none;
+  }
+
+  .conn-badge.offline {
+    animation: none;
+  }
 }

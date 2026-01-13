@@ -1,1 +1,1 @@
-if('serviceWorker' in navigator) navigator.serviceWorker.register('/demoambiente/dev-sw.js?dev-sw', { scope: '/demoambiente/', type: 'classic' })
+if('serviceWorker' in navigator) navigator.serviceWorker.register('/demoambiente/dev-sw.js?dev-sw', { scope: '/demoambiente/', type: 'module' })
