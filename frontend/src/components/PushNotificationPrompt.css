@@ -1,0 +1,292 @@
+/* PushNotificationPrompt - CU-T10 */
+
+.push-prompt-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 20px;
+    z-index: 10000;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.push-prompt {
+    width: 100%;
+    max-width: 400px;
+    background: var(--bg-secondary, #12121f);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+    border-radius: 20px 20px 10px 10px;
+    padding: 24px;
+    text-align: center;
+    position: relative;
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.push-prompt .close-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-muted, rgba(255, 255, 255, 0.5));
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.push-prompt .close-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary, #fff);
+}
+
+.prompt-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 16px;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.1));
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary-500, #10b981);
+}
+
+.push-prompt h3 {
+    margin: 0 0 8px;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary, #fff);
+}
+
+.push-prompt > p {
+    margin: 0 0 20px;
+    font-size: 14px;
+    color: var(--text-muted, rgba(255, 255, 255, 0.6));
+    line-height: 1.5;
+}
+
+.prompt-benefits {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 24px;
+    text-align: left;
+}
+
+.benefit {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: rgba(16, 185, 129, 0.08);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--text-secondary, rgba(255, 255, 255, 0.8));
+}
+
+.benefit svg {
+    color: var(--primary-500, #10b981);
+    flex-shrink: 0;
+}
+
+.prompt-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.prompt-actions .btn {
+    flex: 1;
+    padding: 14px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.prompt-actions .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.2));
+    color: var(--text-muted, rgba(255, 255, 255, 0.6));
+}
+
+.prompt-actions .btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary, #fff);
+}
+
+.prompt-actions .btn-primary {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+}
+
+.prompt-actions .btn-primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #059669, #047857);
+}
+
+.prompt-actions .btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.prompt-note {
+    margin: 16px 0 0;
+    font-size: 12px;
+    color: var(--text-muted, rgba(255, 255, 255, 0.4));
+}
+
+.spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Toggle Component */
+.push-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    background: var(--bg-tertiary, rgba(15, 15, 25, 0.6));
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+    border-radius: 12px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.toggle-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.toggle-info svg {
+    color: var(--primary-500, #10b981);
+}
+
+.toggle-title {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary, #fff);
+}
+
+.toggle-status {
+    display: block;
+    font-size: 12px;
+    color: var(--text-muted, rgba(255, 255, 255, 0.5));
+}
+
+.toggle-btn {
+    width: 48px;
+    height: 26px;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 13px;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.3s;
+}
+
+.toggle-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.toggle-btn .toggle-slider {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    top: 3px;
+    left: 3px;
+    transition: transform 0.3s;
+}
+
+.toggle-btn.active {
+    background: var(--primary-500, #10b981);
+}
+
+.toggle-btn.active .toggle-slider {
+    transform: translateX(22px);
+}
+
+.spinner-small {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.toggle-help {
+    width: 100%;
+    margin: 0;
+    font-size: 12px;
+    color: #f59e0b;
+}
+
+.push-toggle-unsupported {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    border-radius: 12px;
+    font-size: 13px;
+    color: #f59e0b;
+}
+
+/* Desktop */
+@media (min-width: 640px) {
+    .push-prompt-overlay {
+        align-items: center;
+    }
+
+    .push-prompt {
+        border-radius: 20px;
+    }
+}

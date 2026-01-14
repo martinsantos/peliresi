@@ -467,6 +467,184 @@ table th {
 }
 
 /* ==================== */
+/* FIRMA MODAL (CU-G07) */
+/* ==================== */
+
+.firma-modal {
+    max-width: 480px;
+}
+
+.firma-modal-body {
+    padding: 1.5rem;
+}
+
+.firma-info {
+    margin: 0 0 1.5rem;
+    font-size: 1rem;
+    color: var(--text-muted);
+}
+
+.firma-info strong {
+    color: var(--primary-500);
+    font-family: monospace;
+}
+
+.metodos-firma {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.metodo-option {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--bg-tertiary);
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.metodo-option:hover {
+    border-color: var(--primary-500);
+    background: rgba(16, 185, 129, 0.05);
+}
+
+.metodo-option input[type="radio"] {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--primary-500);
+    flex-shrink: 0;
+}
+
+.metodo-option input[type="radio"]:checked + .metodo-content .metodo-titulo {
+    color: var(--primary-500);
+}
+
+.metodo-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.metodo-titulo {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.metodo-desc {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.firma-input-group {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: var(--bg-tertiary);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.firma-input-group label {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.firma-input {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 1.25rem;
+    font-family: monospace;
+    text-align: center;
+    letter-spacing: 0.5em;
+}
+
+.firma-input:focus {
+    outline: none;
+    border-color: var(--primary-500);
+}
+
+.sms-enviado {
+    margin: 0.75rem 0 0;
+    font-size: 0.85rem;
+    color: var(--success-500, #22c55e);
+    text-align: center;
+}
+
+.certificado-info {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.modal-actions .btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.875rem 1rem;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+}
+
+.modal-actions .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+}
+
+.modal-actions .btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+}
+
+.modal-actions .btn-primary {
+    background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
+    color: white;
+}
+
+.modal-actions .btn-primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, var(--primary-600), var(--primary-700));
+}
+
+.modal-actions .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ==================== */
 /* TABLET BREAKPOINT    */
 /* ==================== */
 @media (min-width: 640px) {

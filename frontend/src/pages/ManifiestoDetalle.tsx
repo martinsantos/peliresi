@@ -38,6 +38,15 @@ const ManifiestoDetalle: React.FC = () => {
     const [downloadingPDF, setDownloadingPDF] = useState(false);
     const [downloadingCert, setDownloadingCert] = useState(false);
 
+    // CU-G07: Estados para modal de firma
+    const [showFirmaModal, setShowFirmaModal] = useState(false);
+    const [metodoFirma, setMetodoFirma] = useState<'USUARIO_PASSWORD' | 'TOKEN_PIN' | 'CODIGO_SMS' | 'CERTIFICADO_DIGITAL'>('USUARIO_PASSWORD');
+    const [tokenPin, setTokenPin] = useState('');
+    const [codigoSMS, setCodigoSMS] = useState('');
+    const [enviandoSMS, setEnviandoSMS] = useState(false);
+    const [smsEnviado, setSmsEnviado] = useState(false);
+    const [firmaLoading, setFirmaLoading] = useState(false);
+
 
 
     useEffect(() => {
@@ -59,16 +68,70 @@ const ManifiestoDetalle: React.FC = () => {
         }
     };
 
+    // CU-G07: Handler para firmar con método seleccionado
+    const handleFirmarConMetodo = async () => {
+        if (!manifiesto) return;
+
+        setFirmaLoading(true);
+        try {
+            const result = await manifiestoService.firmarConToken(manifiesto.id, {
+                metodoFirma,
+                tokenPin: metodoFirma === 'TOKEN_PIN' ? tokenPin : undefined,
+                codigoSMS: metodoFirma === 'CODIGO_SMS' ? codigoSMS : undefined
+            });
+
+            if (result.manifiesto) {
+                setManifiesto(result.manifiesto);
+                setShowFirmaModal(false);
+                resetFirmaForm();
+            }
+        } catch (err: any) {
+            setError(err.response?.data?.message || 'Error al firmar el manifiesto');
+        } finally {
+            setFirmaLoading(false);
+        }
+    };
+
+    const handleSolicitarSMS = async () => {
+        if (!user?.telefono) {
+            setError('No hay número de teléfono registrado en tu perfil');
+            return;
+        }
+        setEnviandoSMS(true);
+        try {
+            const result = await manifiestoService.solicitarCodigoSMS(user.telefono);
+            if (result.success) {
+                setSmsEnviado(true);
+            } else {
+                setError(result.message);
+            }
+        } catch (err) {
+            setError('Error al enviar código SMS');
+        } finally {
+            setEnviandoSMS(false);
+        }
+    };
+
+    const resetFirmaForm = () => {
+        setMetodoFirma('USUARIO_PASSWORD');
+        setTokenPin('');
+        setCodigoSMS('');
+        setSmsEnviado(false);
+    };
+
     const handleAction = async (action: string) => {
         if (!manifiesto) return;
+
+        // CU-G07: Abrir modal de firma en lugar de firmar directamente
+        if (action === 'firmar') {
+            setShowFirmaModal(true);
+            return;
+        }
 
         setActionLoading(true);
         try {
             let updated: Manifiesto | null = null;
             switch (action) {
-                case 'firmar':
-                    updated = await manifiestoService.firmarManifiesto(manifiesto.id);
-                    break;
                 case 'confirmar-retiro':
                     updated = await manifiestoService.confirmarRetiro(manifiesto.id, {
                         latitud: -32.8908,
@@ -279,6 +342,170 @@ const ManifiestoDetalle: React.FC = () => {
                         <div className="qr-container">
                             <img src={manifiesto.qrCode} alt={`QR Manifiesto ${manifiesto.numero}`} />
                             <p className="qr-help">Escanea este código para verificar el manifiesto</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* CU-G07: Modal de Firma con Selector de Método */}
+            {showFirmaModal && (
+                <div className="modal-overlay" onClick={() => { setShowFirmaModal(false); resetFirmaForm(); }}>
+                    <div className="modal-content firma-modal" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3>Firmar Manifiesto</h3>
+                            <button className="btn-close" onClick={() => { setShowFirmaModal(false); resetFirmaForm(); }}>
+                                <X size={24} />
+                            </button>
+                        </div>
+                        <div className="firma-modal-body">
+                            <p className="firma-info">
+                                Manifiesto: <strong>#{manifiesto.numero}</strong>
+                            </p>
+
+                            <div className="metodos-firma">
+                                <label className="metodo-option">
+                                    <input
+                                        type="radio"
+                                        name="metodoFirma"
+                                        value="USUARIO_PASSWORD"
+                                        checked={metodoFirma === 'USUARIO_PASSWORD'}
+                                        onChange={() => setMetodoFirma('USUARIO_PASSWORD')}
+                                    />
+                                    <div className="metodo-content">
+                                        <span className="metodo-titulo">Firma con Usuario</span>
+                                        <span className="metodo-desc">Usar tus credenciales de acceso</span>
+                                    </div>
+                                </label>
+
+                                <label className="metodo-option">
+                                    <input
+                                        type="radio"
+                                        name="metodoFirma"
+                                        value="TOKEN_PIN"
+                                        checked={metodoFirma === 'TOKEN_PIN'}
+                                        onChange={() => setMetodoFirma('TOKEN_PIN')}
+                                    />
+                                    <div className="metodo-content">
+                                        <span className="metodo-titulo">Token PIN</span>
+                                        <span className="metodo-desc">Ingresar código de token</span>
+                                    </div>
+                                </label>
+
+                                <label className="metodo-option">
+                                    <input
+                                        type="radio"
+                                        name="metodoFirma"
+                                        value="CODIGO_SMS"
+                                        checked={metodoFirma === 'CODIGO_SMS'}
+                                        onChange={() => setMetodoFirma('CODIGO_SMS')}
+                                    />
+                                    <div className="metodo-content">
+                                        <span className="metodo-titulo">Código SMS</span>
+                                        <span className="metodo-desc">Verificación por mensaje de texto</span>
+                                    </div>
+                                </label>
+
+                                <label className="metodo-option">
+                                    <input
+                                        type="radio"
+                                        name="metodoFirma"
+                                        value="CERTIFICADO_DIGITAL"
+                                        checked={metodoFirma === 'CERTIFICADO_DIGITAL'}
+                                        onChange={() => setMetodoFirma('CERTIFICADO_DIGITAL')}
+                                    />
+                                    <div className="metodo-content">
+                                        <span className="metodo-titulo">Certificado Digital</span>
+                                        <span className="metodo-desc">Usar certificado de firma digital</span>
+                                    </div>
+                                </label>
+                            </div>
+
+                            {/* Inputs adicionales según método */}
+                            {metodoFirma === 'TOKEN_PIN' && (
+                                <div className="firma-input-group">
+                                    <label>Ingrese su Token PIN</label>
+                                    <input
+                                        type="text"
+                                        value={tokenPin}
+                                        onChange={(e) => setTokenPin(e.target.value)}
+                                        placeholder="123456"
+                                        maxLength={6}
+                                        className="firma-input"
+                                    />
+                                </div>
+                            )}
+
+                            {metodoFirma === 'CODIGO_SMS' && (
+                                <div className="firma-input-group">
+                                    {!smsEnviado ? (
+                                        <button
+                                            className="btn btn-secondary"
+                                            onClick={handleSolicitarSMS}
+                                            disabled={enviandoSMS}
+                                        >
+                                            {enviandoSMS ? (
+                                                <>
+                                                    <Loader2 size={18} className="spin" />
+                                                    Enviando...
+                                                </>
+                                            ) : (
+                                                'Enviar código a mi teléfono'
+                                            )}
+                                        </button>
+                                    ) : (
+                                        <>
+                                            <label>Ingrese el código recibido</label>
+                                            <input
+                                                type="text"
+                                                value={codigoSMS}
+                                                onChange={(e) => setCodigoSMS(e.target.value)}
+                                                placeholder="123456"
+                                                maxLength={6}
+                                                className="firma-input"
+                                            />
+                                            <p className="sms-enviado">Código enviado a tu teléfono</p>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+
+                            {metodoFirma === 'CERTIFICADO_DIGITAL' && (
+                                <div className="firma-input-group">
+                                    <p className="certificado-info">
+                                        Se utilizará el certificado digital asociado a tu cuenta.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="modal-actions">
+                            <button
+                                className="btn btn-ghost"
+                                onClick={() => { setShowFirmaModal(false); resetFirmaForm(); }}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                className="btn btn-primary"
+                                onClick={handleFirmarConMetodo}
+                                disabled={
+                                    firmaLoading ||
+                                    (metodoFirma === 'TOKEN_PIN' && !tokenPin) ||
+                                    (metodoFirma === 'CODIGO_SMS' && !codigoSMS)
+                                }
+                            >
+                                {firmaLoading ? (
+                                    <>
+                                        <Loader2 size={18} className="spin" />
+                                        Firmando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Edit3 size={18} />
+                                        Firmar Manifiesto
+                                    </>
+                                )}
+                            </button>
                         </div>
                     </div>
                 </div>

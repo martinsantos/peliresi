@@ -44,6 +44,8 @@ const CentroControl = lazy(() => import('./pages/CentroControl'));
 const LogAuditoria = lazy(() => import('./pages/LogAuditoria'));
 const ManifestoVerify = lazy(() => import('./pages/ManifestoVerify'));
 const Notificaciones = lazy(() => import('./pages/Notificaciones'));
+const VehiculosChoferes = lazy(() => import('./pages/VehiculosChoferes'));
+const Preferencias = lazy(() => import('./pages/Preferencias'));
 import './index.css';
 import './pages/DemoApp.css';
 
@@ -79,6 +81,7 @@ const App: React.FC = () => {
             <Route path="/carga-masiva" element={<PasswordGate><Layout><CargaMasiva /></Layout></PasswordGate>} />
             <Route path="/configuracion" element={<PasswordGate><Layout><Configuracion /></Layout></PasswordGate>} />
             <Route path="/notificaciones" element={<PasswordGate><Layout><Notificaciones /></Layout></PasswordGate>} />
+            <Route path="/preferencias" element={<PasswordGate><Layout><Preferencias /></Layout></PasswordGate>} />
 
             {/* Administración */}
             <Route path="/admin/centro-control" element={<PasswordGate><Layout><CentroControl /></Layout></PasswordGate>} />
@@ -86,6 +89,7 @@ const App: React.FC = () => {
             <Route path="/admin/usuarios-panel" element={<PasswordGate><Layout><UsuariosPanel /></Layout></PasswordGate>} />
             <Route path="/admin/actividad" element={<PasswordGate><Layout><ActividadGlobal /></Layout></PasswordGate>} />
             <Route path="/admin/auditoria" element={<PasswordGate><Layout><LogAuditoria /></Layout></PasswordGate>} />
+            <Route path="/admin/flota" element={<PasswordGate><Layout><VehiculosChoferes /></Layout></PasswordGate>} />
 
             {/* Redirecciones */}
             <Route path="/" element={<Navigate to="/dashboard" replace />} />

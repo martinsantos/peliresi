@@ -26,7 +26,7 @@ import {
     Navigation, Wifi, WifiOff,
     Users,
     ChevronLeft, Plus, LogOut,
-    Play, RefreshCw, Command
+    Play, RefreshCw, Command, Recycle
 } from 'lucide-react';
 
 // Hooks
@@ -58,6 +58,12 @@ import ActoresScreen from '../components/mobile/ActoresScreen';
 // FASE 3: Modales de firma y recepción
 import RecepcionModal from '../components/mobile/RecepcionModal';
 import TransportistaModal from '../components/mobile/TransportistaModal';
+// CU-O05: Modal de rechazo de carga
+import RechazoModal from '../components/mobile/RechazoModal';
+// CU-O07/O08: Modal de tratamiento
+import TratamientoModal from '../components/mobile/TratamientoModal';
+// CU-T10: Push notifications prompt
+import PushNotificationPrompt from '../components/PushNotificationPrompt';
 
 // FASE 3 & 5: Nuevos componentes de viaje y UI
 import TripRecoveryModal from '../components/mobile/TripRecoveryModal';
@@ -123,6 +129,10 @@ const MobileApp: React.FC = () => {
     const [showTransportistaModal, setShowTransportistaModal] = useState(false);
     const [transportistaModalAction, _setTransportistaModalAction] = useState<'retiro' | 'entrega'>('retiro');
     const [manifiestoParaModal, setManifiestoParaModal] = useState<any>(null);
+    // CU-O05: Modal de rechazo de carga
+    const [showRechazoModal, setShowRechazoModal] = useState(false);
+    // CU-O07/O08: Modal de tratamiento
+    const [showTratamientoModal, setShowTratamientoModal] = useState(false);
 
     // Backend data state
     const [backendManifiestos, setBackendManifiestos] = useState<any[]>([]);
@@ -1173,10 +1183,55 @@ const MobileApp: React.FC = () => {
                                         });
                                         setShowRecepcionModal(true);
                                     }}
-                                    style={{ width: '100%', padding: '14px', fontSize: '16px' }}
+                                    style={{ flex: 1, padding: '14px', fontSize: '16px' }}
                                 >
                                     <Package size={20} style={{ marginRight: '8px' }} />
-                                    Recibir Carga
+                                    Recibir
+                                </button>
+                                {/* CU-O05: Botón para rechazar carga */}
+                                <button
+                                    className="btn btn-danger"
+                                    onClick={() => {
+                                        setManifiestoParaModal({
+                                            id: originalData.id,
+                                            numero: selectedManifiesto.numero,
+                                            estado: selectedManifiesto.estado,
+                                            generador: { razonSocial: selectedManifiesto.generador },
+                                            transportista: { razonSocial: selectedManifiesto.transportista },
+                                            tipoResiduo: selectedManifiesto.residuo,
+                                            pesoKg: originalData.residuos?.[0]?.cantidad || 0
+                                        });
+                                        setShowRechazoModal(true);
+                                    }}
+                                    style={{ flex: 1, padding: '14px', fontSize: '16px', background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}
+                                >
+                                    <Command size={20} style={{ marginRight: '8px' }} />
+                                    Rechazar
+                                </button>
+                            </div>
+                        )}
+
+                        {/* CU-O07/O08: Botón para registrar tratamiento cuando ya se recibió la carga */}
+                        {role === 'OPERADOR' && selectedManifiesto.estado === 'RECIBIDO' && (
+                            <div className="form-actions" style={{ marginTop: '16px' }}>
+                                <button
+                                    className="btn btn-success"
+                                    onClick={() => {
+                                        setManifiestoParaModal({
+                                            id: originalData.id,
+                                            numero: selectedManifiesto.numero,
+                                            estado: selectedManifiesto.estado,
+                                            generador: { razonSocial: selectedManifiesto.generador },
+                                            transportista: { razonSocial: selectedManifiesto.transportista },
+                                            tipoResiduo: selectedManifiesto.residuo,
+                                            pesoKg: originalData.residuos?.[0]?.cantidad || 0
+                                        });
+                                        setShowTratamientoModal(true);
+                                    }}
+                                    style={{ width: '100%', padding: '14px', fontSize: '16px', background: 'linear-gradient(135deg, #22c55e, #16a34a)' }}
+                                >
+                                    <Recycle size={20} style={{ marginRight: '8px' }} />
+                                    Registrar Tratamiento
                                 </button>
                             </div>
                         )}
@@ -1394,6 +1449,60 @@ const MobileApp: React.FC = () => {
                             setCurrentScreen('home');
                         } catch (err: any) {
                             showToastMessage(`❌ Error: ${err.message || 'Error al confirmar recepción'}`);
+                            throw err;
+                        }
+                    }}
+                    manifiesto={manifiestoParaModal}
+                />
+            )}
+
+            {/* CU-O05: Modal de Rechazo de Carga para Operador */}
+            {showRechazoModal && manifiestoParaModal && (
+                <RechazoModal
+                    isOpen={showRechazoModal}
+                    onClose={() => {
+                        setShowRechazoModal(false);
+                        setManifiestoParaModal(null);
+                    }}
+                    onConfirm={async (data) => {
+                        try {
+                            await manifiestoService.rechazarCarga(manifiestoParaModal.id, {
+                                motivo: data.motivo,
+                                descripcion: data.descripcion,
+                                cantidadRechazada: data.cantidadRechazada
+                            });
+                            showToastMessage(`⚠️ Carga rechazada - ${manifiestoParaModal.numero}`);
+                            loadManifiestosFromBackend();
+                            setCurrentScreen('home');
+                        } catch (err: any) {
+                            showToastMessage(`❌ Error: ${err.message || 'Error al rechazar carga'}`);
+                            throw err;
+                        }
+                    }}
+                    manifiesto={manifiestoParaModal}
+                />
+            )}
+
+            {/* CU-O07/O08: Modal de Tratamiento para Operador */}
+            {showTratamientoModal && manifiestoParaModal && (
+                <TratamientoModal
+                    isOpen={showTratamientoModal}
+                    onClose={() => {
+                        setShowTratamientoModal(false);
+                        setManifiestoParaModal(null);
+                    }}
+                    onConfirm={async (data) => {
+                        try {
+                            await manifiestoService.registrarTratamiento(manifiestoParaModal.id, {
+                                metodoTratamiento: data.metodoTratamiento,
+                                fechaTratamiento: data.fechaTratamiento,
+                                observaciones: data.observaciones
+                            });
+                            showToastMessage(`✅ Tratamiento registrado - ${manifiestoParaModal.numero}`);
+                            loadManifiestosFromBackend();
+                            setCurrentScreen('home');
+                        } catch (err: any) {
+                            showToastMessage(`❌ Error: ${err.message || 'Error al registrar tratamiento'}`);
                             throw err;
                         }
                     }}
@@ -1702,6 +1811,14 @@ const MobileApp: React.FC = () => {
                     isPaused={trip.viajePausado}
                     onGoToTrip={handleGoToTrip}
                     onStayHere={handleStayHere}
+                />
+            )}
+
+            {/* CU-T10: Push notification prompt - muestra después de 5s en home */}
+            {currentScreen === 'home' && (
+                <PushNotificationPrompt
+                    autoShowDelay={5000}
+                    onAccept={() => console.log('Push notifications activadas')}
                 />
             )}
         </div>

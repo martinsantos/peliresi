@@ -1,20 +1,51 @@
+/**
+ * PesajeModal - Registro de pesaje con detección de anomalías
+ * CU-O04: Registrar pesaje
+ * CU-O06: Registrar anomalía de peso
+ */
+
 import React, { useState } from 'react';
-import { X, Scale, AlertTriangle, CheckCircle } from 'lucide-react';
+import { X, Scale, AlertTriangle, CheckCircle, FileWarning, ClipboardCheck } from 'lucide-react';
 import type { ManifiestoResiduo } from '../types';
 
 interface PesajeModalProps {
     residuos: ManifiestoResiduo[];
     onClose: () => void;
-    onSubmit: (data: { residuosPesados: Array<{ id: string; pesoReal: number }>; observaciones?: string }) => Promise<void>;
+    onSubmit: (data: {
+        residuosPesados: Array<{ id: string; pesoReal: number }>;
+        observaciones?: string;
+        anomalia?: {
+            tipo: 'EXCEDENTE' | 'FALTANTE';
+            porcentaje: number;
+            motivo: string;
+            justificacion: string;
+        };
+    }) => Promise<void>;
+    toleranciaPeso?: number; // Default 5%
 }
 
-const PesajeModal: React.FC<PesajeModalProps> = ({ residuos, onClose, onSubmit }) => {
+const MOTIVOS_ANOMALIA = [
+    { id: 'MEDICION_ORIGEN', label: 'Error en medición de origen' },
+    { id: 'PERDIDA_TRANSPORTE', label: 'Pérdida durante transporte' },
+    { id: 'CONTAMINACION', label: 'Material contaminado' },
+    { id: 'HUMEDAD', label: 'Diferencia por humedad' },
+    { id: 'CARGA_ADICIONAL', label: 'Carga adicional no declarada' },
+    { id: 'OTRO', label: 'Otro motivo' }
+];
+
+const PesajeModal: React.FC<PesajeModalProps> = ({ residuos, onClose, onSubmit, toleranciaPeso = 5 }) => {
     const [pesos, setPesos] = useState<Record<string, string>>(
         residuos.reduce((acc, r) => ({ ...acc, [r.id]: '' }), {})
     );
     const [observaciones, setObservaciones] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+
+    // CU-O06: Estado para registro de anomalía
+    const [showAnomaliaForm, setShowAnomaliaForm] = useState(false);
+    const [motivoAnomalia, setMotivoAnomalia] = useState('');
+    const [justificacionAnomalia, setJustificacionAnomalia] = useState('');
+    const [confirmarAnomalia, setConfirmarAnomalia] = useState(false);
 
     const calcularDiferencia = (residuo: ManifiestoResiduo) => {
         const pesoReal = parseFloat(pesos[residuo.id] || '0');
@@ -41,6 +72,25 @@ const PesajeModal: React.FC<PesajeModalProps> = ({ residuos, onClose, onSubmit }
             return;
         }
 
+        // CU-O06: Si hay anomalía y no se ha registrado, mostrar formulario
+        const porcentaje = Math.abs(parseFloat(porcentajeTotal));
+        if (porcentaje > toleranciaPeso && !showAnomaliaForm && !confirmarAnomalia) {
+            setShowAnomaliaForm(true);
+            return;
+        }
+
+        // CU-O06: Validar que la anomalía esté registrada si es requerida
+        if (showAnomaliaForm && !confirmarAnomalia) {
+            if (!motivoAnomalia) {
+                setError('Debe seleccionar un motivo para la anomalía');
+                return;
+            }
+            if (motivoAnomalia === 'OTRO' && !justificacionAnomalia.trim()) {
+                setError('Debe proporcionar una justificación para la anomalía');
+                return;
+            }
+        }
+
         setLoading(true);
         try {
             const residuosPesados = residuos.map(r => ({
@@ -48,7 +98,19 @@ const PesajeModal: React.FC<PesajeModalProps> = ({ residuos, onClose, onSubmit }
                 pesoReal: parseFloat(pesos[r.id])
             }));
 
-            await onSubmit({ residuosPesados, observaciones: observaciones || undefined });
+            // CU-O06: Incluir datos de anomalía si aplica
+            const anomaliaData = showAnomaliaForm && confirmarAnomalia ? {
+                tipo: tipoAnomalia as 'EXCEDENTE' | 'FALTANTE',
+                porcentaje: parseFloat(porcentajeTotal),
+                motivo: motivoAnomalia,
+                justificacion: justificacionAnomalia || MOTIVOS_ANOMALIA.find(m => m.id === motivoAnomalia)?.label || ''
+            } : undefined;
+
+            await onSubmit({
+                residuosPesados,
+                observaciones: observaciones || undefined,
+                anomalia: anomaliaData
+            });
             onClose();
         } catch (err: any) {
             setError(err.response?.data?.message || 'Error al registrar pesaje');
@@ -61,6 +123,8 @@ const PesajeModal: React.FC<PesajeModalProps> = ({ residuos, onClose, onSubmit }
     const totalReal = residuos.reduce((sum, r) => sum + (parseFloat(pesos[r.id]) || 0), 0);
     const diferenciaTotal = totalReal - totalDeclarado;
     const porcentajeTotal = totalDeclarado > 0 ? ((diferenciaTotal / totalDeclarado) * 100).toFixed(1) : '0';
+
+    const tipoAnomalia = diferenciaTotal > 0 ? 'EXCEDENTE' : 'FALTANTE';
 
     return (
         <div className="modal-overlay" onClick={onClose}>
@@ -184,7 +248,7 @@ const PesajeModal: React.FC<PesajeModalProps> = ({ residuos, onClose, onSubmit }
                                     <div style={{
                                         fontSize: '1.25rem',
                                         fontWeight: 600,
-                                        color: Math.abs(parseFloat(porcentajeTotal)) > 5 ? 'var(--warning)' : 'var(--success)'
+                                        color: Math.abs(parseFloat(porcentajeTotal)) > toleranciaPeso ? 'var(--warning)' : 'var(--success)'
                                     }}>
                                         {diferenciaTotal > 0 ? '+' : ''}{diferenciaTotal.toFixed(2)} ({porcentajeTotal}%)
                                     </div>
@@ -203,18 +267,118 @@ const PesajeModal: React.FC<PesajeModalProps> = ({ residuos, onClose, onSubmit }
                                 onChange={(e) => setObservaciones(e.target.value)}
                             />
                         </div>
+
+                        {/* CU-O06: Formulario de registro de anomalía */}
+                        {showAnomaliaForm && (
+                            <div style={{
+                                marginTop: '1.5rem',
+                                padding: '1.25rem',
+                                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(245, 158, 11, 0.1))',
+                                border: '1px solid rgba(239, 68, 68, 0.3)',
+                                borderRadius: '12px'
+                            }}>
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '10px',
+                                    marginBottom: '1rem'
+                                }}>
+                                    <FileWarning size={24} style={{ color: '#ef4444' }} />
+                                    <div>
+                                        <h4 style={{ margin: 0, color: '#ef4444', fontSize: '1rem' }}>
+                                            Registro de Anomalía de Peso
+                                        </h4>
+                                        <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                            Se detectó una diferencia de {Math.abs(parseFloat(porcentajeTotal))}% ({tipoAnomalia.toLowerCase()})
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                                    <label className="form-label">Motivo de la anomalía *</label>
+                                    <select
+                                        className="form-input"
+                                        value={motivoAnomalia}
+                                        onChange={(e) => setMotivoAnomalia(e.target.value)}
+                                        style={{ width: '100%' }}
+                                    >
+                                        <option value="">Seleccione un motivo...</option>
+                                        {MOTIVOS_ANOMALIA.map(motivo => (
+                                            <option key={motivo.id} value={motivo.id}>
+                                                {motivo.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {motivoAnomalia === 'OTRO' && (
+                                    <div className="form-group" style={{ marginBottom: '1rem' }}>
+                                        <label className="form-label">Justificación detallada *</label>
+                                        <textarea
+                                            className="form-input"
+                                            rows={2}
+                                            placeholder="Describa el motivo de la diferencia de peso..."
+                                            value={justificacionAnomalia}
+                                            onChange={(e) => setJustificacionAnomalia(e.target.value)}
+                                        />
+                                    </div>
+                                )}
+
+                                <label style={{
+                                    display: 'flex',
+                                    alignItems: 'flex-start',
+                                    gap: '10px',
+                                    padding: '12px',
+                                    background: 'rgba(255,255,255,0.05)',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    fontSize: '0.9rem'
+                                }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={confirmarAnomalia}
+                                        onChange={(e) => setConfirmarAnomalia(e.target.checked)}
+                                        style={{ marginTop: '2px' }}
+                                    />
+                                    <span>
+                                        <strong style={{ display: 'block', marginBottom: '4px' }}>
+                                            Confirmo el registro de esta anomalía
+                                        </strong>
+                                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                                            Esta información quedará registrada en el sistema y podrá ser auditada por la DGFA.
+                                        </span>
+                                    </span>
+                                </label>
+                            </div>
+                        )}
                     </div>
 
                     <div className="modal-footer">
                         <button type="button" className="btn btn-secondary" onClick={onClose} disabled={loading}>
                             Cancelar
                         </button>
-                        <button type="submit" className="btn btn-primary" disabled={loading}>
+                        <button
+                            type="submit"
+                            className={`btn ${showAnomaliaForm && !confirmarAnomalia ? 'btn-warning' : 'btn-primary'}`}
+                            disabled={loading || (showAnomaliaForm && !confirmarAnomalia && !motivoAnomalia)}
+                        >
                             {loading ? (
                                 <>
                                     <div className="spinner" style={{ width: 18, height: 18 }} />
                                     Guardando...
                                 </>
+                            ) : showAnomaliaForm ? (
+                                confirmarAnomalia ? (
+                                    <>
+                                        <ClipboardCheck size={18} />
+                                        Confirmar con Anomalía
+                                    </>
+                                ) : (
+                                    <>
+                                        <FileWarning size={18} />
+                                        Registrar Anomalía
+                                    </>
+                                )
                             ) : (
                                 <>
                                     <CheckCircle size={18} />
