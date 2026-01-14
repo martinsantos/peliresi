@@ -25,6 +25,9 @@ import publicRoutes from './routes/public.routes';
 import viajesRoutes from './routes/viajes.routes';
 import notificacionRoutes from './routes/notificacion.routes';
 import adminRoutes from './routes/admin.routes';
+import configRoutes from './routes/config.routes';
+import cronRoutes from './routes/cron.routes';
+import cronService from './services/cron.service';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -70,14 +73,25 @@ app.use('/api/sync', syncRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/admin/auditoria', auditoriaRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/config', configRoutes);
+app.use('/api/cron', cronRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
 
 const PORT = config.PORT;
-app.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`🚀 Server on port ${PORT}`);
+
+  // Inicializar tareas programadas (solo en producción o si está habilitado)
+  if (process.env.ENABLE_CRON === 'true' || process.env.NODE_ENV === 'production') {
+    cronService.initialize();
+    console.log('⏰ CRON jobs initialized');
+  }
+});
 
 process.on('SIGINT', async () => {
+  cronService.stop();
   await flushAnalytics();
   await prisma.$disconnect();
   process.exit(0);

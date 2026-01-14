@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { catalogoService } from '../services/manifiesto.service';
-import { usuarioService, type Usuario } from '../services/admin.service';
+import { usuarioService, configService, cronService, type Usuario, type CronTask } from '../services/admin.service';
 import type { TipoResiduo } from '../types';
 import {
     Settings,
@@ -20,7 +20,11 @@ import {
     UserPlus,
     Shield,
     Mail,
-    Phone
+    Phone,
+    Clock,
+    Play,
+    RefreshCw,
+    HardDrive
 } from 'lucide-react';
 import './Configuracion.css';
 
@@ -65,7 +69,7 @@ const PELIGROSIDAD_BADGE_CLASSES: Record<string, string> = {
     Baja: 'badge-success'
 };
 
-type TabType = 'usuarios' | 'residuos' | 'parametros';
+type TabType = 'usuarios' | 'residuos' | 'parametros' | 'tareas';
 type ThemeType = 'dark' | 'light' | 'system';
 
 // ===== Modal Component =====
@@ -130,6 +134,8 @@ function Configuracion(): React.ReactElement {
     const [residuoForm, setResiduoForm] = useState(DEFAULT_RESIDUO_FORM);
     const [usuarioForm, setUsuarioForm] = useState(DEFAULT_USUARIO_FORM);
     const [parametros, setParametros] = useState(DEFAULT_PARAMETROS);
+    const [cronTasks, setCronTasks] = useState<CronTask[]>([]);
+    const [runningTask, setRunningTask] = useState<string | null>(null);
 
     // Theme state
     const [theme, setTheme] = useState<ThemeType>(() => {
@@ -188,18 +194,38 @@ function Configuracion(): React.ReactElement {
         }
     }, [showToast]);
 
-    const loadParametros = useCallback(() => {
+    const loadParametros = useCallback(async () => {
         setLoading(true);
-        const saved = localStorage.getItem('sitrep_parametros');
-        if (saved) {
-            try {
-                setParametros(JSON.parse(saved));
-            } catch {
-                // Use defaults on parse error
-            }
+        try {
+            const config = await configService.getConfig();
+            setParametros({
+                vencimientoManifiestos: config.vencimientoManifiestos,
+                alertaDesvioGPS: config.alertaDesvioGPS,
+                tiempoMaxTransito: config.tiempoMaxTransito,
+                emailNotificaciones: config.emailNotificaciones,
+                toleranciaPeso: config.toleranciaPeso,
+                tiempoSesion: config.tiempoSesion
+            });
+        } catch (error) {
+            console.error('[Configuracion] Error loading params:', error);
+            showToast('Error al cargar parámetros', 'error');
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
-    }, []);
+    }, [showToast]);
+
+    const loadTareas = useCallback(async () => {
+        setLoading(true);
+        try {
+            const { tasks } = await cronService.getStatus();
+            setCronTasks(tasks);
+        } catch (error) {
+            console.error('[Configuracion] Error loading cron tasks:', error);
+            showToast('Error al cargar tareas programadas', 'error');
+        } finally {
+            setLoading(false);
+        }
+    }, [showToast]);
 
     useEffect(() => {
         switch (activeTab) {
@@ -212,8 +238,11 @@ function Configuracion(): React.ReactElement {
             case 'parametros':
                 loadParametros();
                 break;
+            case 'tareas':
+                loadTareas();
+                break;
         }
-    }, [activeTab, loadResiduos, loadUsuarios, loadParametros]);
+    }, [activeTab, loadResiduos, loadUsuarios, loadParametros, loadTareas]);
 
     // Apply theme
     useEffect(() => {
@@ -338,9 +367,14 @@ function Configuracion(): React.ReactElement {
     }
 
     // ===== Parametros Handlers =====
-    function handleSaveParametros(): void {
-        localStorage.setItem('sitrep_parametros', JSON.stringify(parametros));
-        showToast('Parametros guardados correctamente', 'success');
+    async function handleSaveParametros(): Promise<void> {
+        try {
+            await configService.updateConfig(parametros);
+            showToast('Parámetros guardados correctamente', 'success');
+        } catch (error) {
+            console.error('[Configuracion] Error saving params:', error);
+            showToast('Error al guardar parámetros', 'error');
+        }
     }
 
     function updateParametro(key: keyof typeof parametros, value: string): void {
@@ -382,7 +416,8 @@ function Configuracion(): React.ReactElement {
         const tabs: Array<{ id: TabType; icon: React.ReactElement; label: string }> = [
             { id: 'residuos', icon: <Database size={20} />, label: 'Catalogo de Residuos' },
             { id: 'usuarios', icon: <Users size={20} />, label: 'Gestion de Usuarios' },
-            { id: 'parametros', icon: <Settings size={20} />, label: 'Parametros Generales' }
+            { id: 'parametros', icon: <Settings size={20} />, label: 'Parametros Generales' },
+            { id: 'tareas', icon: <Clock size={20} />, label: 'Tareas Programadas' }
         ];
 
         return (
@@ -774,6 +809,175 @@ function Configuracion(): React.ReactElement {
         );
     }
 
+    async function handleRunTask(taskName: string): Promise<void> {
+        setRunningTask(taskName);
+        try {
+            const result = await cronService.runTask(taskName);
+            if (result.success) {
+                showToast(result.message, 'success');
+            } else {
+                showToast(result.message, 'error');
+            }
+        } catch {
+            showToast('Error al ejecutar tarea', 'error');
+        } finally {
+            setRunningTask(null);
+        }
+    }
+
+    async function handleRunBackup(tipo: 'daily' | 'weekly'): Promise<void> {
+        setRunningTask(`backup_${tipo}`);
+        try {
+            const result = await cronService.runBackup(tipo);
+            if (result.success) {
+                showToast(result.message, 'success');
+            } else {
+                showToast(result.message, 'error');
+            }
+        } catch {
+            showToast('Error al ejecutar backup', 'error');
+        } finally {
+            setRunningTask(null);
+        }
+    }
+
+    function getTaskIcon(taskName: string): React.ReactElement {
+        if (taskName.includes('backup')) return <HardDrive size={20} />;
+        if (taskName.includes('limpieza')) return <Trash2 size={20} />;
+        return <Clock size={20} />;
+    }
+
+    function renderTareasTab(): React.ReactElement {
+        return (
+            <div className="config-section animate-fadeIn">
+                <div className="section-header">
+                    <h3>Tareas Programadas (CRON)</h3>
+                    <button className="btn btn-secondary" onClick={loadTareas}>
+                        <RefreshCw size={18} />
+                        Actualizar
+                    </button>
+                </div>
+
+                {loading ? (
+                    <div className="loading-state">Cargando tareas...</div>
+                ) : (
+                    <>
+                        {/* Scheduled Tasks */}
+                        <div className="cron-section">
+                            <h4><Clock size={18} /> Reportes Automaticos</h4>
+                            <div className="cron-tasks-grid">
+                                {cronTasks.filter(t => !t.name.includes('backup') && !t.name.includes('limpieza')).map(task => (
+                                    <div key={task.name} className="cron-task-card">
+                                        <div className="cron-task-header">
+                                            {getTaskIcon(task.name)}
+                                            <div className="cron-task-info">
+                                                <span className="cron-task-name">{task.name}</span>
+                                                <span className="cron-task-schedule">{task.schedule}</span>
+                                            </div>
+                                        </div>
+                                        <p className="cron-task-description">{task.description}</p>
+                                        <button
+                                            className="btn btn-sm btn-primary"
+                                            onClick={() => handleRunTask(task.name)}
+                                            disabled={runningTask !== null}
+                                        >
+                                            {runningTask === task.name ? (
+                                                <><RefreshCw size={16} className="spin" /> Ejecutando...</>
+                                            ) : (
+                                                <><Play size={16} /> Ejecutar Ahora</>
+                                            )}
+                                        </button>
+                                    </div>
+                                ))}
+                                {cronTasks.filter(t => !t.name.includes('backup') && !t.name.includes('limpieza')).length === 0 && (
+                                    <div className="empty-state small">
+                                        <Clock size={32} />
+                                        <p>No hay tareas de reportes configuradas</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Backup Tasks */}
+                        <div className="cron-section">
+                            <h4><HardDrive size={18} /> Backups Automaticos</h4>
+                            <div className="cron-tasks-grid">
+                                {cronTasks.filter(t => t.name.includes('backup') || t.name.includes('limpieza')).map(task => (
+                                    <div key={task.name} className="cron-task-card">
+                                        <div className="cron-task-header">
+                                            {getTaskIcon(task.name)}
+                                            <div className="cron-task-info">
+                                                <span className="cron-task-name">{task.name}</span>
+                                                <span className="cron-task-schedule">{task.schedule}</span>
+                                            </div>
+                                        </div>
+                                        <p className="cron-task-description">{task.description}</p>
+                                        <button
+                                            className="btn btn-sm btn-primary"
+                                            onClick={() => handleRunTask(task.name)}
+                                            disabled={runningTask !== null}
+                                        >
+                                            {runningTask === task.name ? (
+                                                <><RefreshCw size={16} className="spin" /> Ejecutando...</>
+                                            ) : (
+                                                <><Play size={16} /> Ejecutar Ahora</>
+                                            )}
+                                        </button>
+                                    </div>
+                                ))}
+                                {cronTasks.filter(t => t.name.includes('backup') || t.name.includes('limpieza')).length === 0 && (
+                                    <div className="empty-state small">
+                                        <HardDrive size={32} />
+                                        <p>No hay tareas de backup configuradas</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Manual Backup Buttons */}
+                        <div className="cron-section">
+                            <h4><HardDrive size={18} /> Backup Manual</h4>
+                            <div className="backup-actions">
+                                <button
+                                    className="btn btn-primary"
+                                    onClick={() => handleRunBackup('daily')}
+                                    disabled={runningTask !== null}
+                                >
+                                    {runningTask === 'backup_daily' ? (
+                                        <><RefreshCw size={18} className="spin" /> Ejecutando...</>
+                                    ) : (
+                                        <><HardDrive size={18} /> Backup Diario</>
+                                    )}
+                                </button>
+                                <button
+                                    className="btn btn-secondary"
+                                    onClick={() => handleRunBackup('weekly')}
+                                    disabled={runningTask !== null}
+                                >
+                                    {runningTask === 'backup_weekly' ? (
+                                        <><RefreshCw size={18} className="spin" /> Ejecutando...</>
+                                    ) : (
+                                        <><HardDrive size={18} /> Backup Semanal (Comprimido)</>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Info */}
+                        <div className="cron-info">
+                            <AlertTriangle size={18} />
+                            <p>
+                                Las tareas programadas se ejecutan automaticamente segun el horario configurado.
+                                Puede ejecutar cualquier tarea manualmente usando los botones de arriba.
+                                Los backups se almacenan por 30 dias.
+                            </p>
+                        </div>
+                    </>
+                )}
+            </div>
+        );
+    }
+
     function renderResiduoModal(): React.ReactElement {
         return (
             <Modal
@@ -993,6 +1197,7 @@ function Configuracion(): React.ReactElement {
             case 'residuos': return renderResiduosTab();
             case 'usuarios': return renderUsuariosTab();
             case 'parametros': return renderParametrosTab();
+            case 'tareas': return renderTareasTab();
         }
     }
 

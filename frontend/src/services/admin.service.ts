@@ -512,3 +512,170 @@ export const usuarioService = {
         }
     }
 };
+
+// ===== System Configuration =====
+export interface SystemConfig {
+    vencimientoManifiestos: number;
+    alertaDesvioGPS: number;
+    tiempoMaxTransito: number;
+    emailNotificaciones: string;
+    toleranciaPeso: number;
+    tiempoSesion: number;
+    notificacionesPush: boolean;
+    notificacionesEmail: boolean;
+    notificacionesSMS: boolean;
+    backupAutomatico: boolean;
+    frecuenciaBackup: number;
+    retencionLogs: number;
+    maxArchivoCarga: number;
+    maxManifiestosPorPagina: number;
+    alertaTiempoExcesivo: boolean;
+    alertaVencimientoProximo: boolean;
+    diasAlertaVencimiento: number;
+}
+
+export const configService = {
+    /**
+     * Obtener configuración del sistema
+     */
+    async getConfig(): Promise<SystemConfig> {
+        try {
+            const response = await api.get<ApiResponse<{ config: SystemConfig }>>('/config');
+            return response.data?.data?.config || this.getDefaults();
+        } catch (error) {
+            console.error('[ConfigService] Error getConfig:', error);
+            // Fallback to localStorage for offline/demo mode
+            const saved = localStorage.getItem('sitrep_parametros');
+            if (saved) {
+                try {
+                    return { ...this.getDefaults(), ...JSON.parse(saved) };
+                } catch {
+                    // ignore
+                }
+            }
+            return this.getDefaults();
+        }
+    },
+
+    /**
+     * Actualizar configuración del sistema
+     */
+    async updateConfig(updates: Partial<SystemConfig>): Promise<SystemConfig> {
+        try {
+            const response = await api.put<ApiResponse<{ config: SystemConfig }>>('/config', updates);
+            // Also save to localStorage for offline access
+            const config = response.data?.data?.config;
+            if (config) {
+                localStorage.setItem('sitrep_parametros', JSON.stringify(config));
+            }
+            return config || this.getDefaults();
+        } catch (error) {
+            console.error('[ConfigService] Error updateConfig:', error);
+            // Fallback: save to localStorage only
+            const current = await this.getConfig();
+            const updated = { ...current, ...updates };
+            localStorage.setItem('sitrep_parametros', JSON.stringify(updated));
+            return updated;
+        }
+    },
+
+    /**
+     * Resetear configuración a valores por defecto
+     */
+    async resetConfig(): Promise<SystemConfig> {
+        try {
+            const response = await api.post<ApiResponse<{ config: SystemConfig }>>('/config/reset');
+            localStorage.removeItem('sitrep_parametros');
+            return response.data?.data?.config || this.getDefaults();
+        } catch (error) {
+            console.error('[ConfigService] Error resetConfig:', error);
+            localStorage.removeItem('sitrep_parametros');
+            return this.getDefaults();
+        }
+    },
+
+    /**
+     * Obtener valores por defecto
+     */
+    getDefaults(): SystemConfig {
+        return {
+            vencimientoManifiestos: 30,
+            alertaDesvioGPS: 5,
+            tiempoMaxTransito: 48,
+            emailNotificaciones: 'alertas@dgfa.mendoza.gov.ar',
+            toleranciaPeso: 5,
+            tiempoSesion: 60,
+            notificacionesPush: true,
+            notificacionesEmail: true,
+            notificacionesSMS: false,
+            backupAutomatico: true,
+            frecuenciaBackup: 24,
+            retencionLogs: 90,
+            maxArchivoCarga: 10,
+            maxManifiestosPorPagina: 50,
+            alertaTiempoExcesivo: true,
+            alertaVencimientoProximo: true,
+            diasAlertaVencimiento: 7,
+        };
+    },
+
+    /**
+     * Obtener tolerancia de peso (para usar en PesajeModal)
+     */
+    async getToleranciaPeso(): Promise<number> {
+        try {
+            const response = await api.get<ApiResponse<{ toleranciaPeso: number }>>('/config/public/tolerancia-peso');
+            return response.data?.data?.toleranciaPeso || 5;
+        } catch {
+            return 5;
+        }
+    }
+};
+
+// ===== CRON Service =====
+export interface CronTask {
+    name: string;
+    schedule: string;
+    description: string;
+}
+
+export const cronService = {
+    /**
+     * Obtener estado de tareas programadas
+     */
+    async getStatus(): Promise<{ tasks: CronTask[] }> {
+        try {
+            const response = await api.get<ApiResponse<{ tasks: CronTask[] }>>('/cron/status');
+            return response.data?.data || { tasks: [] };
+        } catch (error) {
+            console.error('[CronService] Error getStatus:', error);
+            return { tasks: [] };
+        }
+    },
+
+    /**
+     * Ejecutar tarea manualmente
+     */
+    async runTask(taskName: string): Promise<{ success: boolean; message: string }> {
+        try {
+            const response = await api.post<ApiResponse<{ success: boolean; message: string }>>(`/cron/run/${taskName}`);
+            return { success: true, message: response.data?.message || 'Tarea ejecutada' };
+        } catch (error: any) {
+            console.error('[CronService] Error runTask:', error);
+            return { success: false, message: error.response?.data?.error || 'Error al ejecutar tarea' };
+        }
+    },
+
+    /**
+     * Ejecutar backup manual
+     */
+    async runBackup(tipo: 'daily' | 'weekly' = 'daily'): Promise<{ success: boolean; message: string }> {
+        try {
+            const response = await api.post<ApiResponse<{ success: boolean; message: string }>>('/cron/backup', { tipo });
+            return { success: true, message: response.data?.message || 'Backup ejecutado' };
+        } catch (error: any) {
+            console.error('[CronService] Error runBackup:', error);
+            return { success: false, message: error.response?.data?.error || 'Error al ejecutar backup' };
+        }
+    }
+};
