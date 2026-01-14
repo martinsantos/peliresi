@@ -6,21 +6,11 @@
 import React from 'react';
 import { FileText, Search } from 'lucide-react';
 import { ESTADO_CONFIG } from '../types/mobile.types';
-
-interface ProcessedManifiesto {
-    id: string;
-    numero: string;
-    estado: string;
-    generador: string;
-    operador: string;
-    residuo: string;
-    cantidad: string;
-    fecha: string;
-}
+import type { DisplayManifiesto } from '../utils/manifiestoUtils';
 
 interface ManifiestosScreenProps {
-    manifiestos: ProcessedManifiesto[];
-    onSelectManifiesto: (m: ProcessedManifiesto) => void;
+    manifiestos: DisplayManifiesto[];
+    onSelectManifiesto: (m: DisplayManifiesto) => void;
 }
 
 const ManifiestosScreen: React.FC<ManifiestosScreenProps> = ({

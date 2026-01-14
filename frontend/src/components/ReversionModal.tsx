@@ -49,7 +49,7 @@ const ReversionModal: React.FC<ReversionModalProps> = ({
   const [loadingHistorial, setLoadingHistorial] = useState(false);
 
   const getHeaders = () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('accessToken');
     return {
       'Content-Type': 'application/json',
       Authorization: token ? `Bearer ${token}` : ''
@@ -120,16 +120,11 @@ const ReversionModal: React.FC<ReversionModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (motivo.trim().length < 20) {
-      setError('El motivo debe tener al menos 20 caracteres');
-      return;
-    }
-
     setLoading(true);
     setError(null);
 
     try {
-      const body: any = { motivo: motivo.trim() };
+      const body: any = { motivo: motivo.trim() || '' };
       if (tipoReversion === 'admin' && estadoDestino) {
         body.estadoNuevo = estadoDestino;
       }
@@ -185,21 +180,15 @@ const ReversionModal: React.FC<ReversionModalProps> = ({
           <form onSubmit={handleSubmit}>
             <div className="form-group">
               <label htmlFor="motivo">
-                Motivo de la Reversion <span className="required">*</span>
+                Motivo de la Reversion <span className="optional">(opcional)</span>
               </label>
               <textarea
                 id="motivo"
                 value={motivo}
                 onChange={(e) => setMotivo(e.target.value)}
-                placeholder="Explique detalladamente el motivo de esta reversion (minimo 20 caracteres)..."
-                rows={4}
-                required
-                minLength={20}
+                placeholder="Opcionalmente puede explicar el motivo de esta reversion..."
+                rows={3}
               />
-              <span className="char-count">
-                {motivo.length}/20 caracteres minimos
-                {motivo.length >= 20 && <span className="valid"> (Valido)</span>}
-              </span>
             </div>
 
             {error && (
@@ -227,7 +216,7 @@ const ReversionModal: React.FC<ReversionModalProps> = ({
                 <button
                   type="submit"
                   className="btn-revert"
-                  disabled={loading || motivo.trim().length < 20}
+                  disabled={loading}
                 >
                   <RotateCcw size={16} />
                   {loading ? 'Procesando...' : 'Confirmar Reversion'}

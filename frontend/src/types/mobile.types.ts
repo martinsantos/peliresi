@@ -82,8 +82,12 @@ export const ROLE_NAMES: Record<UserRole, string> = {
 };
 
 export const ESTADO_CONFIG: Record<string, { bg: string; color: string; label: string }> = {
+    'BORRADOR': { bg: '#e5e7eb', color: '#374151', label: 'Borrador' },
+    'PENDIENTE_APROBACION': { bg: '#fef3c7', color: '#92400e', label: 'Pend. Aprobacion' },
     'APROBADO': { bg: '#fef3c7', color: '#92400e', label: 'Pendiente' },
-    'EN_TRANSITO': { bg: '#dbeafe', color: '#1e40af', label: 'En Tránsito' },
+    'EN_TRANSITO': { bg: '#dbeafe', color: '#1e40af', label: 'En Transito' },
+    'ENTREGADO': { bg: '#fce7f3', color: '#9d174d', label: 'Entregado' },
     'RECIBIDO': { bg: '#d1fae5', color: '#065f46', label: 'Recibido' },
+    'EN_TRATAMIENTO': { bg: '#e0e7ff', color: '#3730a3', label: 'En Tratamiento' },
     'TRATADO': { bg: '#10b981', color: '#fff', label: 'Completado' },
 };

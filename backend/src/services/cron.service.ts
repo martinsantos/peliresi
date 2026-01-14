@@ -82,6 +82,14 @@ export const cronService = {
       await this.limpiarBackupsAntiguos();
     });
 
+    // ═══ ROTACIÓN DE LOGS (ESCALABILIDAD) ═══
+
+    // Limpiar analytics_logs > 30 días (Diario a las 3:30 AM)
+    this.tasks['rotacionLogs'] = cron.schedule('30 3 * * *', async () => {
+      console.log('[CronService] Running log rotation...');
+      await this.rotarLogs();
+    });
+
     console.log('[CronService] All scheduled tasks initialized');
   },
 
@@ -114,6 +122,9 @@ export const cronService = {
       case 'backupSemanal':
         await this.ejecutarBackup('weekly');
         return { success: true, message: 'Backup semanal ejecutado' };
+      case 'rotacionLogs':
+        await this.rotarLogs();
+        return { success: true, message: 'Rotación de logs ejecutada' };
       default:
         return { success: false, message: `Tarea '${taskName}' no encontrada` };
     }
@@ -368,6 +379,43 @@ export const cronService = {
   },
 
   /**
+   * ESCALABILIDAD: Rotación de logs de analytics y actividad
+   * Elimina registros con más de 30 días para mantener BD optimizada
+   */
+  async rotarLogs(): Promise<void> {
+    try {
+      const cutoffDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // 30 días
+
+      // Eliminar AnalyticsLog antiguos
+      const deletedAnalytics = await prisma.analyticsLog.deleteMany({
+        where: { timestamp: { lt: cutoffDate } }
+      });
+
+      // Eliminar LogActividad antiguos (nivel DEBUG/INFO solamente)
+      const deletedActivity = await prisma.logActividad.deleteMany({
+        where: {
+          timestamp: { lt: cutoffDate },
+          severidad: { in: ['DEBUG', 'INFO'] }
+        }
+      });
+
+      console.log(`[CronService] Log rotation completed: ${deletedAnalytics.count} analytics logs, ${deletedActivity.count} activity logs deleted`);
+
+      // Si se eliminaron muchos registros, notificar a admins
+      const totalDeleted = deletedAnalytics.count + deletedActivity.count;
+      if (totalDeleted > 1000) {
+        await this.notificarAdmins(
+          'Rotación de Logs Completada',
+          `Se eliminaron ${totalDeleted.toLocaleString()} registros antiguos para optimizar la base de datos.`
+        );
+      }
+
+    } catch (error) {
+      console.error('[CronService] Error in log rotation:', error);
+    }
+  },
+
+  /**
    * Obtener estado de las tareas
    */
   getStatus(): Array<{ name: string; schedule: string; description: string }> {
@@ -377,7 +425,8 @@ export const cronService = {
       reporteSemanal: { schedule: 'Lunes 9:00 AM', description: 'Genera resumen semanal de actividad' },
       backupDiario: { schedule: 'Diario 3:00 AM', description: 'Backup incremental de base de datos' },
       backupSemanal: { schedule: 'Domingo 2:00 AM', description: 'Backup completo comprimido' },
-      limpiezaBackups: { schedule: 'Mensual día 1 4:00 AM', description: 'Elimina backups con más de 30 días' }
+      limpiezaBackups: { schedule: 'Mensual día 1 4:00 AM', description: 'Elimina backups con más de 30 días' },
+      rotacionLogs: { schedule: 'Diario 3:30 AM', description: 'Elimina logs de analytics > 30 días (escalabilidad)' }
     };
 
     return Object.entries(this.tasks).map(([name]) => ({

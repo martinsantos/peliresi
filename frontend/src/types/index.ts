@@ -207,10 +207,12 @@ export interface PaginatedResponse<T> {
 export interface DashboardStats {
     estadisticas: {
         borradores: number;
+        pendientesAprobacion?: number;
         aprobados: number;
         enTransito: number;
         entregados: number;
         recibidos: number;
+        enTratamiento?: number;
         tratados: number;
         total: number;
     };
@@ -218,10 +220,12 @@ export interface DashboardStats {
     enTransitoList: Manifiesto[];
     // Also support flat structure from API
     borradores?: number;
+    pendientesAprobacion?: number;
     aprobados?: number;
     enTransito?: number;
     entregados?: number;
     recibidos?: number;
+    enTratamiento?: number;
     tratados?: number;
     total?: number;
 }

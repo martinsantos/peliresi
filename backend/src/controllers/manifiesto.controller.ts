@@ -225,35 +225,33 @@ export const getDashboardStats = async (req: AuthRequest, res: Response, next: N
       }
       // ADMIN sees all - no filter
 
-      const [total, borradores, pendientesAprobacion, aprobados, enTransito, entregados, recibidos, enTratamiento, tratados, rechazados] = await Promise.all([
-        prisma.manifiesto.count({ where: whereBase }),
-        prisma.manifiesto.count({ where: { ...whereBase, estado: 'BORRADOR' } }),
-        prisma.manifiesto.count({ where: { ...whereBase, estado: 'PENDIENTE_APROBACION' } }),
-        prisma.manifiesto.count({ where: { ...whereBase, estado: 'APROBADO' } }),
-        prisma.manifiesto.count({ where: { ...whereBase, estado: 'EN_TRANSITO' } }),
-        prisma.manifiesto.count({ where: { ...whereBase, estado: 'ENTREGADO' } }),
-        prisma.manifiesto.count({ where: { ...whereBase, estado: 'RECIBIDO' } }),
-        prisma.manifiesto.count({ where: { ...whereBase, estado: 'EN_TRATAMIENTO' } }),
-        prisma.manifiesto.count({ where: { ...whereBase, estado: 'TRATADO' } }),
-        prisma.manifiesto.count({ where: { ...whereBase, estado: 'RECHAZADO' } })
-      ]);
+      // OPTIMIZADO: Una sola query groupBy en lugar de 10 queries COUNT
+      const statsByEstado = await prisma.manifiesto.groupBy({
+        by: ['estado'],
+        _count: { id: true },
+        where: whereBase
+      });
+
+      // Construir objeto de stats desde el resultado del groupBy
+      const statsMap = new Map(statsByEstado.map(s => [s.estado as string, s._count.id]));
+      const getCount = (estado: string) => statsMap.get(estado) || 0;
+
+      const stats = {
+        total: statsByEstado.reduce((sum, s) => sum + s._count.id, 0),
+        borradores: getCount('BORRADOR'),
+        pendientesAprobacion: getCount('PENDIENTE_APROBACION'),
+        aprobados: getCount('APROBADO'),
+        enTransito: getCount('EN_TRANSITO'),
+        entregados: getCount('ENTREGADO'),
+        recibidos: getCount('RECIBIDO'),
+        enTratamiento: getCount('EN_TRATAMIENTO'),
+        tratados: getCount('TRATADO'),
+        rechazados: getCount('RECHAZADO')
+      };
 
       res.json({
         success: true,
-        data: {
-          stats: {
-            total,
-            borradores,
-            pendientesAprobacion,
-            aprobados,
-            enTransito,
-            entregados,
-            recibidos,
-            enTratamiento,
-            tratados,
-            rechazados
-          }
-        }
+        data: { stats }
       });
     } catch (error) {
       next(error);

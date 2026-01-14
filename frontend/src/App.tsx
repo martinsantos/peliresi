@@ -47,6 +47,10 @@ const ManifestoVerify = lazy(() => import('./pages/ManifestoVerify'));
 const Notificaciones = lazy(() => import('./pages/Notificaciones'));
 const VehiculosChoferes = lazy(() => import('./pages/VehiculosChoferes'));
 const Preferencias = lazy(() => import('./pages/Preferencias'));
+// Admin Sectoriales
+const AdminTransportistasPanel = lazy(() => import('./pages/admin/AdminTransportistasPanel'));
+const AdminOperadoresPanel = lazy(() => import('./pages/admin/AdminOperadoresPanel'));
+const AdminGeneradoresPanel = lazy(() => import('./pages/admin/AdminGeneradoresPanel'));
 import './index.css';
 import './pages/DemoApp.css';
 
@@ -92,6 +96,11 @@ const App: React.FC = () => {
             <Route path="/admin/auditoria" element={<PasswordGate><Layout><LogAuditoria /></Layout></PasswordGate>} />
             <Route path="/admin/logs" element={<PasswordGate><Layout><LogEnhanced /></Layout></PasswordGate>} />
             <Route path="/admin/flota" element={<PasswordGate><Layout><VehiculosChoferes /></Layout></PasswordGate>} />
+
+            {/* Admin Sectoriales */}
+            <Route path="/admin/transportistas" element={<PasswordGate><Layout><AdminTransportistasPanel /></Layout></PasswordGate>} />
+            <Route path="/admin/operadores" element={<PasswordGate><Layout><AdminOperadoresPanel /></Layout></PasswordGate>} />
+            <Route path="/admin/generadores" element={<PasswordGate><Layout><AdminGeneradoresPanel /></Layout></PasswordGate>} />
 
             {/* Redirecciones */}
             <Route path="/" element={<Navigate to="/dashboard" replace />} />

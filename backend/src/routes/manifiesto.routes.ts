@@ -83,14 +83,17 @@ router.get('/:id/certificado', generarCertificado);
 // ============================================================
 // REVERSIONES DE ESTADO
 // ============================================================
-// Transportista: Revertir entrega (operador rechazó)
-router.post('/:id/revertir-entrega', hasRole('TRANSPORTISTA'), revertirEntrega);
+// Revertir entrega: ENTREGADO -> EN_TRANSITO
+// Permitido: TRANSPORTISTA, OPERADOR (quien rechaza), ADMIN, ADMIN_TRANSPORTISTAS, ADMIN_OPERADORES
+router.post('/:id/revertir-entrega', hasRole('TRANSPORTISTA', 'OPERADOR', 'ADMIN', 'ADMIN_TRANSPORTISTAS', 'ADMIN_OPERADORES'), revertirEntrega);
 
 // Operador: Rechazar recepción (volver a ENTREGADO)
-router.post('/:id/rechazar-recepcion', hasRole('OPERADOR'), rechazarRecepcion);
+// Permitido: OPERADOR, ADMIN, ADMIN_OPERADORES
+router.post('/:id/rechazar-recepcion', hasRole('OPERADOR', 'ADMIN', 'ADMIN_OPERADORES'), rechazarRecepcion);
 
 // Operador: Revertir certificado/tratamiento
-router.post('/:id/revertir-certificado', hasRole('OPERADOR'), revertirCertificado);
+// Permitido: OPERADOR, ADMIN, ADMIN_OPERADORES
+router.post('/:id/revertir-certificado', hasRole('OPERADOR', 'ADMIN', 'ADMIN_OPERADORES'), revertirCertificado);
 
 // Admin: Revertir a cualquier estado
 router.post('/:id/revertir-estado', hasRole('ADMIN'), revertirEstadoAdmin);

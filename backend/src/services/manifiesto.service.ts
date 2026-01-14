@@ -3,6 +3,8 @@ import prisma from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
 import { config } from '../config/config';
 import { signatureService } from './signature.service';
+import { wsService, WS_EVENTS } from '../lib/websocket';
+import { redisService } from '../lib/redis';
 
 export class ManifiestoService {
   /**
@@ -239,7 +241,11 @@ export class ManifiestoService {
     const manifiesto = await prisma.manifiesto.update({
       where: { id },
       data: { estado: nuevoEstado, ...this.getFechaCampo(nuevoEstado) },
-      include: { generador: true, transportista: true, operador: true }
+      include: {
+        generador: { include: { usuario: { select: { id: true } } } },
+        transportista: { include: { usuario: { select: { id: true } } } },
+        operador: { include: { usuario: { select: { id: true } } } }
+      }
     });
 
     await prisma.eventoManifiesto.create({
@@ -250,6 +256,21 @@ export class ManifiestoService {
         usuarioId: userId
       }
     });
+
+    // WEBSOCKET: Notificar cambio de estado en tiempo real
+    wsService.notifyManifiestoEstadoChanged(
+      id,
+      nuevoEstado,
+      manifiesto.numero,
+      {
+        generadorUserId: manifiesto.generador.usuario?.id,
+        transportistaUserId: manifiesto.transportista.usuario?.id,
+        operadorUserId: manifiesto.operador.usuario?.id
+      }
+    );
+
+    // CACHE: Invalidar caché del manifiesto y stats
+    await redisService.invalidateManifiesto(id);
 
     return manifiesto;
   }

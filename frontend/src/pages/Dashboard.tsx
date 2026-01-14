@@ -20,9 +20,261 @@ import {
     UserCheck,
     Shield,
     Factory,
-    Building2
+    Building2,
+    Edit,
+    Award,
+    Package,
+    Recycle,
+    Navigation,
+    QrCode,
+    History,
+    BarChart3
 } from 'lucide-react';
 import './Dashboard.css';
+
+// ============================================
+// CONFIGURACIÓN UNIFICADA POR ROL
+// ============================================
+
+interface StatCardConfig {
+    label: string;
+    value: number;
+    icon: React.ComponentType<{ size: number }>;
+    color: string;
+    bgColor: string;
+    borderColor: string;
+}
+
+interface QuickActionConfig {
+    label: string;
+    icon: React.ComponentType<{ size: number }>;
+    to: string;
+    color: string;
+}
+
+// Función para obtener estadísticas específicas por rol
+const getStatCardsByRole = (
+    role: string | undefined,
+    stats: DashboardStats['estadisticas']
+): StatCardConfig[] => {
+    const s = stats || demoStats.estadisticas;
+
+    switch (role) {
+        case 'ADMIN':
+            return [
+                {
+                    label: 'TOTAL SISTEMA',
+                    value: s.total ?? 0,
+                    icon: FileText,
+                    color: '#10b981',
+                    bgColor: 'rgba(16, 185, 129, 0.15)',
+                    borderColor: 'rgba(16, 185, 129, 0.3)'
+                },
+                {
+                    label: 'PENDIENTES DGFA',
+                    value: s.pendientesAprobacion ?? s.borradores ?? 0,
+                    icon: Clock,
+                    color: '#f59e0b',
+                    bgColor: 'rgba(245, 158, 11, 0.15)',
+                    borderColor: 'rgba(245, 158, 11, 0.3)'
+                },
+                {
+                    label: 'EN PROCESO',
+                    value: (s.aprobados ?? 0) + (s.enTransito ?? 0) + (s.entregados ?? 0) + (s.recibidos ?? 0),
+                    icon: TrendingUp,
+                    color: '#3b82f6',
+                    bgColor: 'rgba(59, 130, 246, 0.15)',
+                    borderColor: 'rgba(59, 130, 246, 0.3)'
+                },
+                {
+                    label: 'COMPLETADOS',
+                    value: s.tratados ?? 0,
+                    icon: CheckCircle,
+                    color: '#22c55e',
+                    bgColor: 'rgba(34, 197, 94, 0.15)',
+                    borderColor: 'rgba(34, 197, 94, 0.3)'
+                }
+            ];
+
+        case 'GENERADOR':
+            return [
+                {
+                    label: 'MIS MANIFIESTOS',
+                    value: s.total ?? 0,
+                    icon: FileText,
+                    color: '#3b82f6',
+                    bgColor: 'rgba(59, 130, 246, 0.15)',
+                    borderColor: 'rgba(59, 130, 246, 0.3)'
+                },
+                {
+                    label: 'POR FIRMAR',
+                    value: s.borradores ?? 0,
+                    icon: Edit,
+                    color: '#f59e0b',
+                    bgColor: 'rgba(245, 158, 11, 0.15)',
+                    borderColor: 'rgba(245, 158, 11, 0.3)'
+                },
+                {
+                    label: 'EN PROCESO',
+                    // Sincronizado con APP: incluye pendientesAprobacion y enTratamiento
+                    value: (s.pendientesAprobacion ?? 0) + (s.aprobados ?? 0) + (s.enTransito ?? 0) + (s.entregados ?? 0) + (s.recibidos ?? 0) + (s.enTratamiento ?? 0),
+                    icon: Truck,
+                    color: '#f97316',
+                    bgColor: 'rgba(249, 115, 22, 0.15)',
+                    borderColor: 'rgba(249, 115, 22, 0.3)'
+                },
+                {
+                    label: 'COMPLETADOS',
+                    value: s.tratados ?? 0,
+                    icon: Award,
+                    color: '#22c55e',
+                    bgColor: 'rgba(34, 197, 94, 0.15)',
+                    borderColor: 'rgba(34, 197, 94, 0.3)'
+                }
+            ];
+
+        case 'TRANSPORTISTA':
+            return [
+                {
+                    label: 'ASIGNADOS',
+                    value: s.total ?? 0,
+                    icon: FileText,
+                    color: '#06b6d4',
+                    bgColor: 'rgba(6, 182, 212, 0.15)',
+                    borderColor: 'rgba(6, 182, 212, 0.3)'
+                },
+                {
+                    label: 'POR RETIRAR',
+                    value: s.aprobados ?? 0,
+                    icon: Clock,
+                    color: '#f59e0b',
+                    bgColor: 'rgba(245, 158, 11, 0.15)',
+                    borderColor: 'rgba(245, 158, 11, 0.3)'
+                },
+                {
+                    label: 'EN RUTA',
+                    value: s.enTransito ?? 0,
+                    icon: Truck,
+                    color: '#f97316',
+                    bgColor: 'rgba(249, 115, 22, 0.15)',
+                    borderColor: 'rgba(249, 115, 22, 0.3)'
+                },
+                {
+                    label: 'ENTREGADOS',
+                    // Sincronizado con APP: incluye enTratamiento
+                    value: (s.entregados ?? 0) + (s.recibidos ?? 0) + (s.enTratamiento ?? 0) + (s.tratados ?? 0),
+                    icon: CheckCircle,
+                    color: '#22c55e',
+                    bgColor: 'rgba(34, 197, 94, 0.15)',
+                    borderColor: 'rgba(34, 197, 94, 0.3)'
+                }
+            ];
+
+        case 'OPERADOR':
+            return [
+                {
+                    label: 'ENTRANTES',
+                    value: s.total ?? 0,
+                    icon: FileText,
+                    color: '#8b5cf6',
+                    bgColor: 'rgba(139, 92, 246, 0.15)',
+                    borderColor: 'rgba(139, 92, 246, 0.3)'
+                },
+                {
+                    label: 'POR RECIBIR',
+                    value: s.entregados ?? 0,
+                    icon: Package,
+                    color: '#f59e0b',
+                    bgColor: 'rgba(245, 158, 11, 0.15)',
+                    borderColor: 'rgba(245, 158, 11, 0.3)'
+                },
+                {
+                    label: 'EN TRATAMIENTO',
+                    value: (s.recibidos ?? 0) + (s.enTratamiento ?? 0),
+                    icon: Recycle,
+                    color: '#f97316',
+                    bgColor: 'rgba(249, 115, 22, 0.15)',
+                    borderColor: 'rgba(249, 115, 22, 0.3)'
+                },
+                {
+                    label: 'PROCESADOS',
+                    value: s.tratados ?? 0,
+                    icon: Award,
+                    color: '#22c55e',
+                    bgColor: 'rgba(34, 197, 94, 0.15)',
+                    borderColor: 'rgba(34, 197, 94, 0.3)'
+                }
+            ];
+
+        default:
+            return [
+                {
+                    label: 'TOTAL',
+                    value: s.total ?? 0,
+                    icon: FileText,
+                    color: '#10b981',
+                    bgColor: 'rgba(16, 185, 129, 0.15)',
+                    borderColor: 'rgba(16, 185, 129, 0.3)'
+                },
+                {
+                    label: 'PENDIENTES',
+                    value: s.borradores ?? 0,
+                    icon: Clock,
+                    color: '#f59e0b',
+                    bgColor: 'rgba(245, 158, 11, 0.15)',
+                    borderColor: 'rgba(245, 158, 11, 0.3)'
+                },
+                {
+                    label: 'EN CURSO',
+                    value: s.enTransito ?? 0,
+                    icon: Truck,
+                    color: '#3b82f6',
+                    bgColor: 'rgba(59, 130, 246, 0.15)',
+                    borderColor: 'rgba(59, 130, 246, 0.3)'
+                },
+                {
+                    label: 'COMPLETADOS',
+                    value: s.tratados ?? 0,
+                    icon: CheckCircle,
+                    color: '#22c55e',
+                    bgColor: 'rgba(34, 197, 94, 0.15)',
+                    borderColor: 'rgba(34, 197, 94, 0.3)'
+                }
+            ];
+    }
+};
+
+// Función para obtener acciones rápidas por rol
+const getQuickActionsByRole = (role: string | undefined): QuickActionConfig[] => {
+    switch (role) {
+        case 'ADMIN':
+            return [
+                { label: 'Cola de Aprobación', icon: Clock, to: '/admin/aprobaciones', color: '#f59e0b' },
+                { label: 'Centro de Control', icon: Activity, to: '/admin/centro-control', color: '#10b981' },
+                { label: 'Gestión Usuarios', icon: Users, to: '/usuarios', color: '#3b82f6' }
+            ];
+        case 'GENERADOR':
+            return [
+                { label: 'Nuevo Manifiesto', icon: FileText, to: '/manifiestos/nuevo', color: '#3b82f6' },
+                { label: 'Mis Manifiestos', icon: FileText, to: '/manifiestos', color: '#8b5cf6' },
+                { label: 'Seguimiento', icon: MapPin, to: '/seguimiento', color: '#06b6d4' }
+            ];
+        case 'TRANSPORTISTA':
+            return [
+                { label: 'Iniciar Viaje', icon: Navigation, to: '/tracking', color: '#f59e0b' },
+                { label: 'Escanear QR', icon: QrCode, to: '/escanear', color: '#06b6d4' },
+                { label: 'Historial Viajes', icon: History, to: '/historial-viajes', color: '#8b5cf6' }
+            ];
+        case 'OPERADOR':
+            return [
+                { label: 'Ver Llegadas', icon: Package, to: '/manifiestos', color: '#8b5cf6' },
+                { label: 'Escanear QR', icon: QrCode, to: '/escanear', color: '#06b6d4' },
+                { label: 'Reportes Planta', icon: BarChart3, to: '/reportes', color: '#10b981' }
+            ];
+        default:
+            return [];
+    }
+};
 
 // Demo data fallback - ahora importado de ../data/demoDashboard
 
@@ -79,10 +331,12 @@ const Dashboard: React.FC = () => {
                         : {
                             total: data.total ?? demoStats.estadisticas.total,
                             borradores: data.borradores ?? demoStats.estadisticas.borradores,
+                            pendientesAprobacion: data.pendientesAprobacion ?? 0,
                             aprobados: data.aprobados ?? demoStats.estadisticas.aprobados,
                             enTransito: data.enTransito ?? demoStats.estadisticas.enTransito,
                             entregados: data.entregados ?? demoStats.estadisticas.entregados,
                             recibidos: data.recibidos ?? demoStats.estadisticas.recibidos,
+                            enTratamiento: data.enTratamiento ?? 0,
                             tratados: data.tratados ?? demoStats.estadisticas.tratados
                         },
                     recientes: data.recientes || [],
@@ -304,96 +558,89 @@ const Dashboard: React.FC = () => {
                 </Link>
             </div>
 
-            {/* Stats Grid */}
+            {/* Stats Grid - Dinámico por rol */}
             <div className="stats-grid">
-                <div className="stat-card stat-card-primary" style={{
-                    display: 'flex', alignItems: 'center', gap: '16px', padding: '20px',
-                    background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05))',
-                    border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '16px'
-                }}>
-                    <div style={{
-                        width: '56px', height: '56px', borderRadius: '14px',
-                        background: 'rgba(16, 185, 129, 0.2)', display: 'flex',
-                        alignItems: 'center', justifyContent: 'center', color: '#10b981'
-                    }}>
-                        <FileText size={28} />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                        <div style={{ fontSize: '32px', fontWeight: 800, color: '#f8fafc', lineHeight: 1.1 }}>
-                            {stats?.estadisticas?.total ?? 8}
+                {getStatCardsByRole(user?.rol, stats?.estadisticas).map((card, index) => {
+                    const IconComponent = card.icon;
+                    return (
+                        <div key={index} className="stat-card" style={{
+                            display: 'flex', alignItems: 'center', gap: '16px', padding: '20px',
+                            background: `linear-gradient(135deg, ${card.bgColor}, ${card.bgColor.replace('0.15', '0.05')})`,
+                            border: `1px solid ${card.borderColor}`, borderRadius: '16px'
+                        }}>
+                            <div style={{
+                                width: '56px', height: '56px', borderRadius: '14px',
+                                background: card.bgColor.replace('0.15', '0.2'), display: 'flex',
+                                alignItems: 'center', justifyContent: 'center', color: card.color
+                            }}>
+                                <IconComponent size={28} />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                                <div style={{ fontSize: '32px', fontWeight: 800, color: '#f8fafc', lineHeight: 1.1 }}>
+                                    {card.value}
+                                </div>
+                                <div style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '4px', fontWeight: 600 }}>
+                                    {card.label}
+                                </div>
+                            </div>
                         </div>
-                        <div style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '4px', fontWeight: 600 }}>
-                            Total Manifiestos
-                        </div>
-                    </div>
-                </div>
-
-                <div className="stat-card stat-card-warning" style={{
-                    display: 'flex', alignItems: 'center', gap: '16px', padding: '20px',
-                    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(245, 158, 11, 0.05))',
-                    border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '16px'
-                }}>
-                    <div style={{
-                        width: '56px', height: '56px', borderRadius: '14px',
-                        background: 'rgba(245, 158, 11, 0.2)', display: 'flex',
-                        alignItems: 'center', justifyContent: 'center', color: '#f59e0b'
-                    }}>
-                        <Clock size={28} />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                        <div style={{ fontSize: '32px', fontWeight: 800, color: '#f8fafc', lineHeight: 1.1 }}>
-                            {stats?.estadisticas?.borradores ?? 2}
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '4px', fontWeight: 600 }}>
-                            En Borrador
-                        </div>
-                    </div>
-                </div>
-
-                <div className="stat-card stat-card-info" style={{
-                    display: 'flex', alignItems: 'center', gap: '16px', padding: '20px',
-                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.05))',
-                    border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '16px'
-                }}>
-                    <div style={{
-                        width: '56px', height: '56px', borderRadius: '14px',
-                        background: 'rgba(59, 130, 246, 0.2)', display: 'flex',
-                        alignItems: 'center', justifyContent: 'center', color: '#3b82f6'
-                    }}>
-                        <Truck size={28} />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                        <div style={{ fontSize: '32px', fontWeight: 800, color: '#f8fafc', lineHeight: 1.1 }}>
-                            {stats?.estadisticas?.enTransito ?? 2}
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '4px', fontWeight: 600 }}>
-                            En Tránsito
-                        </div>
-                    </div>
-                </div>
-
-                <div className="stat-card stat-card-success" style={{
-                    display: 'flex', alignItems: 'center', gap: '16px', padding: '20px',
-                    background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.05))',
-                    border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: '16px'
-                }}>
-                    <div style={{
-                        width: '56px', height: '56px', borderRadius: '14px',
-                        background: 'rgba(34, 197, 94, 0.2)', display: 'flex',
-                        alignItems: 'center', justifyContent: 'center', color: '#22c55e'
-                    }}>
-                        <CheckCircle size={28} />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                        <div style={{ fontSize: '32px', fontWeight: 800, color: '#f8fafc', lineHeight: 1.1 }}>
-                            {stats?.estadisticas?.tratados ?? 1}
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '4px', fontWeight: 600 }}>
-                            Completados
-                        </div>
-                    </div>
-                </div>
+                    );
+                })}
             </div>
+
+            {/* Acciones Rápidas - Dinámico por rol */}
+            {getQuickActionsByRole(user?.rol).length > 0 && (
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: '16px',
+                    marginBottom: '24px'
+                }}>
+                    {getQuickActionsByRole(user?.rol).map((action, index) => {
+                        const IconComponent = action.icon;
+                        return (
+                            <Link
+                                key={index}
+                                to={action.to}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '12px',
+                                    padding: '16px 20px',
+                                    background: `linear-gradient(135deg, ${action.color}20, ${action.color}10)`,
+                                    border: `1px solid ${action.color}40`,
+                                    borderRadius: '12px',
+                                    textDecoration: 'none',
+                                    color: '#f8fafc',
+                                    transition: 'transform 0.2s, box-shadow 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                    e.currentTarget.style.boxShadow = `0 8px 25px ${action.color}30`;
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                    e.currentTarget.style.boxShadow = 'none';
+                                }}
+                            >
+                                <div style={{
+                                    width: '40px',
+                                    height: '40px',
+                                    borderRadius: '10px',
+                                    background: `${action.color}30`,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: action.color
+                                }}>
+                                    <IconComponent size={20} />
+                                </div>
+                                <span style={{ fontWeight: 600, fontSize: '14px' }}>{action.label}</span>
+                            </Link>
+                        );
+                    })}
+                </div>
+            )}
 
             {/* Main Content Grid */}
             <div className="dashboard-grid">

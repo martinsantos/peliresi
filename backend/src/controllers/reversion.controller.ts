@@ -12,10 +12,6 @@ export const revertirEntrega = async (req: AuthRequest, res: Response, next: Nex
     const { id } = req.params;
     const { motivo } = req.body;
 
-    if (!motivo || motivo.trim().length < 20) {
-      throw new AppError('El motivo debe tener al menos 20 caracteres', 400);
-    }
-
     const resultado = await reversionService.revertirEntregaTransportista(
       id,
       motivo,
@@ -43,10 +39,6 @@ export const rechazarRecepcion = async (req: AuthRequest, res: Response, next: N
     const { id } = req.params;
     const { motivo } = req.body;
 
-    if (!motivo || motivo.trim().length < 20) {
-      throw new AppError('El motivo debe tener al menos 20 caracteres', 400);
-    }
-
     const resultado = await reversionService.rechazarRecepcionOperador(
       id,
       motivo,
@@ -73,10 +65,6 @@ export const revertirCertificado = async (req: AuthRequest, res: Response, next:
   try {
     const { id } = req.params;
     const { motivo } = req.body;
-
-    if (!motivo || motivo.trim().length < 20) {
-      throw new AppError('El motivo debe tener al menos 20 caracteres', 400);
-    }
 
     const resultado = await reversionService.revertirCertificadoOperador(
       id,
@@ -107,10 +95,6 @@ export const revertirEstadoAdmin = async (req: AuthRequest, res: Response, next:
 
     if (!estadoNuevo) {
       throw new AppError('Debe especificar el estado nuevo', 400);
-    }
-
-    if (!motivo || motivo.trim().length < 20) {
-      throw new AppError('El motivo debe tener al menos 20 caracteres', 400);
     }
 
     const resultado = await reversionService.revertirEstadoAdmin(

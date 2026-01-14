@@ -52,6 +52,9 @@ model Usuario {
   alertasSeguridad AlertaSeguridad[] @relation("AlertasUsuario")
   alertasResueltas AlertaSeguridad[] @relation("AlertasResueltas")
 
+  @@index([rol])
+  @@index([activo])
+  @@index([rol, activo])
   @@map("usuarios")
 }
 
@@ -213,6 +216,12 @@ model Manifiesto {
   viajes          Viaje[]
   reversiones     ReversionEstado[]
 
+  @@index([estado])
+  @@index([estado, createdAt])
+  @@index([generadorId])
+  @@index([transportistaId])
+  @@index([operadorId])
+  @@index([createdAt])
   @@map("manifiestos")
 }
 
@@ -233,6 +242,8 @@ model ManifiestoResiduo {
   manifiesto    Manifiesto    @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
   tipoResiduo   TipoResiduo   @relation(fields: [tipoResiduoId], references: [id])
 
+  @@index([manifiestoId])
+  @@index([tipoResiduoId])
   @@map("manifiestos_residuos")
 }
 
@@ -257,6 +268,9 @@ model EventoManifiesto {
   manifiesto    Manifiesto    @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
   usuario       Usuario       @relation(fields: [usuarioId], references: [id])
 
+  @@index([manifiestoId])
+  @@index([tipo])
+  @@index([createdAt])
   @@map("eventos_manifiesto")
 }
 
@@ -273,6 +287,9 @@ model TrackingGPS {
   // Relaciones
   manifiesto    Manifiesto    @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
 
+  @@index([manifiestoId])
+  @@index([manifiestoId, timestamp])
+  @@index([timestamp])
   @@map("tracking_gps")
 }
 

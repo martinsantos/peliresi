@@ -8,11 +8,12 @@ import { loggerService } from './logger.service';
 const REVERSIONES_PERMITIDAS: Record<string, { estadoActual: EstadoManifiesto; estadoNuevo: EstadoManifiesto; roles: Rol[] }[]> = {
   // Transportista puede revertir si el operador rechazó la entrega
   TRANSPORTISTA: [
-    { estadoActual: 'ENTREGADO', estadoNuevo: 'EN_TRANSITO', roles: ['TRANSPORTISTA', 'ADMIN', 'ADMIN_TRANSPORTISTAS'] },
+    { estadoActual: 'ENTREGADO', estadoNuevo: 'EN_TRANSITO', roles: ['TRANSPORTISTA', 'OPERADOR', 'ADMIN', 'ADMIN_TRANSPORTISTAS', 'ADMIN_OPERADORES'] },
     { estadoActual: 'EN_TRANSITO', estadoNuevo: 'APROBADO', roles: ['TRANSPORTISTA', 'ADMIN', 'ADMIN_TRANSPORTISTAS'] }
   ],
   // Operador puede revertir recepción y certificado
   OPERADOR: [
+    { estadoActual: 'ENTREGADO', estadoNuevo: 'EN_TRANSITO', roles: ['OPERADOR', 'TRANSPORTISTA', 'ADMIN', 'ADMIN_OPERADORES', 'ADMIN_TRANSPORTISTAS'] },
     { estadoActual: 'RECIBIDO', estadoNuevo: 'ENTREGADO', roles: ['OPERADOR', 'ADMIN', 'ADMIN_OPERADORES'] },
     { estadoActual: 'EN_TRATAMIENTO', estadoNuevo: 'RECIBIDO', roles: ['OPERADOR', 'ADMIN', 'ADMIN_OPERADORES'] },
     { estadoActual: 'TRATADO', estadoNuevo: 'EN_TRATAMIENTO', roles: ['OPERADOR', 'ADMIN', 'ADMIN_OPERADORES'] },
@@ -98,10 +99,8 @@ class ReversionService {
   async revertirEstado(params: ReversionParams): Promise<ReversionResult> {
     const { manifiestoId, estadoNuevo, motivo, usuarioId, rolUsuario, ip, userAgent } = params;
 
-    // Validar motivo mínimo
-    if (!motivo || motivo.trim().length < 20) {
-      throw new AppError('El motivo de la reversión debe tener al menos 20 caracteres', 400);
-    }
+    // El motivo es opcional
+    const motivoFinal = motivo?.trim() || 'Sin motivo especificado';
 
     // Obtener manifiesto actual
     const manifiesto = await prisma.manifiesto.findUnique({
@@ -138,7 +137,7 @@ class ReversionService {
           manifiestoId,
           estadoAnterior: estadoActual,
           estadoNuevo,
-          motivo: motivo.trim(),
+          motivo: motivoFinal,
           tipoReversion,
           usuarioId,
           rolUsuario,
@@ -164,7 +163,7 @@ class ReversionService {
       data: {
         manifiestoId,
         tipo: 'REVERSION',
-        descripcion: `Estado revertido de ${estadoActual} a ${estadoNuevo}. Motivo: ${motivo.trim()}. Realizado por: ${rolUsuario}`,
+        descripcion: `Estado revertido de ${estadoActual} a ${estadoNuevo}. Motivo: ${motivoFinal}. Realizado por: ${rolUsuario}`,
         usuarioId
       }
     });
@@ -179,7 +178,7 @@ class ReversionService {
         estadoAnterior: estadoActual,
         estadoNuevo,
         tipoReversion,
-        motivo: motivo.trim(),
+        motivo: motivoFinal,
         ip,
         userAgent
       }
@@ -197,7 +196,7 @@ class ReversionService {
         usuarioId: usuarioNotificarId,
         tipo: 'ALERTA_SISTEMA',
         titulo: 'Estado de Manifiesto Revertido',
-        mensaje: `El manifiesto ${manifiesto.numero} fue revertido de ${estadoActual} a ${estadoNuevo}. Motivo: ${motivo.trim().substring(0, 100)}...`,
+        mensaje: `El manifiesto ${manifiesto.numero} fue revertido de ${estadoActual} a ${estadoNuevo}. Motivo: ${motivoFinal.substring(0, 100)}`,
         manifiestoId,
         prioridad: 'ALTA'
       });

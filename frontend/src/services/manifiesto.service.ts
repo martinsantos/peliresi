@@ -25,10 +25,32 @@ const DEFAULT_DASHBOARD_STATS: DashboardStats = {
 
 export const manifiestoService = {
     // Dashboard
+    // IMPORTANTE: Backend devuelve "stats", frontend usa "estadisticas"
     async getDashboard(): Promise<DashboardStats> {
         try {
-            const response = await api.get<ApiResponse<DashboardStats>>('/manifiestos/dashboard');
-            return response.data?.data || DEFAULT_DASHBOARD_STATS;
+            const response = await api.get<ApiResponse<any>>('/manifiestos/dashboard');
+            const data = response.data?.data;
+
+            if (!data) return DEFAULT_DASHBOARD_STATS;
+
+            // Normalizar respuesta: backend usa "stats", frontend usa "estadisticas"
+            const estadisticas = data.estadisticas || data.stats || {};
+
+            return {
+                estadisticas: {
+                    total: estadisticas.total ?? 0,
+                    borradores: estadisticas.borradores ?? 0,
+                    pendientesAprobacion: estadisticas.pendientesAprobacion ?? 0,
+                    aprobados: estadisticas.aprobados ?? 0,
+                    enTransito: estadisticas.enTransito ?? 0,
+                    entregados: estadisticas.entregados ?? 0,
+                    recibidos: estadisticas.recibidos ?? 0,
+                    enTratamiento: estadisticas.enTratamiento ?? 0,
+                    tratados: estadisticas.tratados ?? 0
+                },
+                recientes: data.recientes || [],
+                enTransitoList: data.enTransitoList || []
+            };
         } catch (error) {
             console.error('[ManifiestoService] Error getDashboard:', error);
             return DEFAULT_DASHBOARD_STATS;

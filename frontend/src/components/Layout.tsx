@@ -173,10 +173,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         }
     };
 
+    // Título Dashboard dinámico por rol (SINCRONIZADO con APP)
+    const getDashboardLabel = (): string => {
+        switch (user?.rol) {
+            case 'ADMIN': return 'Centro de Control';
+            case 'GENERADOR': return 'Mis Manifiestos';
+            case 'TRANSPORTISTA': return 'Mis Viajes';
+            case 'OPERADOR': return 'Recepciones';
+            default: return 'Dashboard';
+        }
+    };
+
     // Menú diferenciado por rol
     const getNavItems = () => {
         const baseItems = [
-            { path: '/dashboard', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
+            { path: '/dashboard', icon: <LayoutDashboard size={20} />, label: getDashboardLabel() },
         ];
 
         switch (user?.rol) {

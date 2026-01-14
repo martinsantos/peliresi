@@ -1,32 +1,24 @@
 /**
- * MobileApp - Refactored Version
- * 
- * Original: 1781 lines
- * Refactored: ~450 lines (75% reduction)
- * 
- * Components extracted to:
- * - components/mobile/RoleSelector.tsx
- * - components/mobile/TripTracker.tsx
- * - components/mobile/TripModals.tsx
- * - components/mobile/QRScannerView.tsx
- * 
- * Logic extracted to:
- * - hooks/useTripTracking.ts
- * - hooks/useQRScanner.ts
- * 
- * Data extracted to:
- * - data/demoMobile.ts
- * - types/mobile.types.ts
+ * MobileApp - Refactored Version v2
+ *
+ * Simplificaciones realizadas:
+ * - Extraida logica de manifiestos a utils/manifiestoUtils.ts
+ * - Extraida carga de manifiestos a hooks/useManifiestos.ts
+ * - Extraida logica de notificaciones a hooks/useNotificaciones.ts
+ * - Extraido HomeScreen a components/mobile/HomeScreen.tsx
+ * - Extraido ManifiestoDetail a components/mobile/ManifiestoDetail.tsx
+ * - Consolidados handlers de modales
+ * - Eliminado codigo duplicado
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     Home, FileText, MapPin, Bell, Settings, User, Menu,
     Package, QrCode, Clock,
     Navigation, Wifi, WifiOff,
     Users,
     ChevronLeft, Plus, LogOut,
-    Play, RefreshCw, Command, Recycle, RotateCcw
+    RefreshCw, Command
 } from 'lucide-react';
 
 // Hooks
@@ -34,54 +26,50 @@ import { useConnectivity } from '../hooks/useConnectivity';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 import { useTripTracking } from '../hooks/useTripTracking';
 import { useQRScanner } from '../hooks/useQRScanner';
+import { useManifiestos } from '../hooks/useManifiestos';
+import { useNotificaciones } from '../hooks/useNotificaciones';
 
 // Services
 import { analyticsService } from '../services/analytics.service';
 import { manifiestoService } from '../services/manifiesto.service';
-import { notificationService, type Notificacion } from '../services/notification.service';
 import { authService } from '../services/auth.service';
+import { offlineStorage } from '../services/offlineStorage';
 
 // Components
 import RoleSelector from '../components/mobile/RoleSelector';
 import TripTracker from '../components/mobile/TripTracker';
 import QRScannerView from '../components/mobile/QRScannerView';
 import { IncidentModal, ParadaModal } from '../components/mobile/TripModals';
-// FASE 2: Historial de viajes
+import HomeScreen from '../components/mobile/HomeScreen';
+import ManifiestoDetail from '../components/mobile/ManifiestoDetail';
 import HistorialViajes from '../components/mobile/HistorialViajes';
 import ViajeDetalleModal from '../components/mobile/ViajeDetalleModal';
-// FASE 2: TripBanner colapsable (NO bloqueante)
 import TripBanner from '../components/layout/TripBanner';
-// FASE 4: Mapa de manifiesto
-import ManifiestoMap from '../components/mobile/ManifiestoMap';
-// FASE 4: Pantalla de actores funcional
 import ActoresScreen from '../components/mobile/ActoresScreen';
-// FASE 3: Modales de firma y recepción
 import RecepcionModal from '../components/mobile/RecepcionModal';
 import TransportistaModal from '../components/mobile/TransportistaModal';
-// CU-O05: Modal de rechazo de carga
 import RechazoModal from '../components/mobile/RechazoModal';
-// CU-O07/O08: Modal de tratamiento
 import TratamientoModal from '../components/mobile/TratamientoModal';
-// CU-T10: Push notifications prompt
 import PushNotificationPrompt from '../components/PushNotificationPrompt';
-// Reversiones de estado
 import ReversionModal from '../components/ReversionModal';
-
-// FASE 3 & 5: Nuevos componentes de viaje y UI
 import TripRecoveryModal from '../components/mobile/TripRecoveryModal';
 import ActiveTripOverlay from '../components/mobile/ActiveTripOverlay';
 import SyncIndicator from '../components/mobile/SyncIndicator';
 
-// Services para persistencia
-import { offlineStorage } from '../services/offlineStorage';
-
-// FASE 4 & 5: Pantallas extraídas
+// Screens
 import { AlertasScreen, PerfilScreen, ManifiestosScreen, AdminDashboard, AdminUsuariosScreen, CentroControlScreen } from '../screens';
 
-// Types and Data
+// Types and Utils
 import type { UserRole, Screen, MenuItem, SavedTrip } from '../types/mobile.types';
 import { ROLE_NAMES, ESTADO_CONFIG } from '../types/mobile.types';
-// CORRECCIÓN v3: Ya no se usa DEMO_MANIFIESTOS, solo datos reales/cacheados
+import {
+    formatManifiestoForDisplay,
+    hasManifiestoEnTransito,
+    findManifiestoEnTransito,
+    calcularDistanciaRuta,
+    getCurrentPosition,
+    type DisplayManifiesto
+} from '../utils/manifiestoUtils';
 
 import './MobileApp.css';
 
@@ -90,108 +78,218 @@ if (typeof window !== 'undefined') {
     (window as any).analyticsService = analyticsService;
 }
 
-const MobileApp: React.FC = () => {
-    // ========== ROLE MANAGEMENT ==========
-    const getSavedRole = (): UserRole | null => {
-        if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem('sitrep_mobile_role');
-            if (saved && ['ADMIN', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(saved)) {
-                return saved as UserRole;
-            }
-        }
-        return null;
-    };
+// ========== HELPER FUNCTIONS ==========
 
+function getSavedRole(): UserRole | null {
+    if (typeof window === 'undefined') return null;
+    const saved = localStorage.getItem('sitrep_mobile_role');
+    if (saved && ['ADMIN', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(saved)) {
+        return saved as UserRole;
+    }
+    return null;
+}
+
+function getEstadoBadge(estado: string): React.ReactElement {
+    const config = ESTADO_CONFIG[estado] || { bg: '#334155', color: '#94a3b8', label: estado };
+    return <span className="badge" style={{ background: config.bg, color: config.color }}>{config.label}</span>;
+}
+
+// ========== MAIN COMPONENT ==========
+
+const MobileApp: React.FC = () => {
+    // ========== STATE ==========
     const [role, setRole] = useState<UserRole | null>(getSavedRole);
     const [currentScreen, setCurrentScreen] = useState<Screen>('home');
     const [menuOpen, setMenuOpen] = useState(false);
-    const [selectedManifiesto, setSelectedManifiesto] = useState<any>(null);
+    const [selectedManifiesto, setSelectedManifiesto] = useState<DisplayManifiesto | null>(null);
     const [activeManifiestoId, setActiveManifiestoId] = useState<string | null>(null);
-
-    // CORRECCIÓN 6: Tab activo para historial
     const [activeTab, setActiveTab] = useState<'pendientes' | 'en-curso' | 'realizados'>('pendientes');
+
+    // Dashboard stats para sincronizar con WEB (usa mismo endpoint /api/manifiestos/dashboard)
+    const [dashboardStats, setDashboardStats] = useState<{
+        total: number;
+        borradores: number;
+        pendientesAprobacion?: number;
+        aprobados: number;
+        enTransito: number;
+        entregados: number;
+        recibidos: number;
+        enTratamiento?: number;
+        tratados: number;
+    } | null>(null);
 
     // Toast state
     const [showToast, setShowToast] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
-    
-    // Modal state
+
+    // Modal states
     const [showIncidentModal, setShowIncidentModal] = useState(false);
     const [showParadaModal, setShowParadaModal] = useState(false);
     const [incidentText, setIncidentText] = useState('');
     const [paradaText, setParadaText] = useState('');
 
-    // QR → Viaje modal state
+    // QR modal state
     const [showQRConfirmModal, setShowQRConfirmModal] = useState(false);
     const [scannedManifiesto, setScannedManifiesto] = useState<any>(null);
     const [loadingQRManifiesto, setLoadingQRManifiesto] = useState(false);
 
-    // FASE 3: Modales de recepción y transportista
+    // Modales de operaciones
     const [showRecepcionModal, setShowRecepcionModal] = useState(false);
     const [showTransportistaModal, setShowTransportistaModal] = useState(false);
     const [transportistaModalAction, _setTransportistaModalAction] = useState<'retiro' | 'entrega'>('retiro');
     const [manifiestoParaModal, setManifiestoParaModal] = useState<any>(null);
-    // CU-O05: Modal de rechazo de carga
     const [showRechazoModal, setShowRechazoModal] = useState(false);
-    // CU-O07/O08: Modal de tratamiento
     const [showTratamientoModal, setShowTratamientoModal] = useState(false);
-    // Reversiones de estado
     const [showReversionModal, setShowReversionModal] = useState(false);
     const [reversionType, setReversionType] = useState<'entrega' | 'recepcion' | 'certificado' | 'admin'>('entrega');
 
-    // Backend data state
-    const [backendManifiestos, setBackendManifiestos] = useState<any[]>([]);
-    const [_loadingManifiestos, setLoadingManifiestos] = useState(false); // Used for future loading indicators
-
-    // CORRECCIÓN 7: Estado de notificaciones reales
-    const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
-    const [noLeidas, setNoLeidas] = useState(0);
-
-    // FASE 2: Historial de viajes - estado del modal
+    // Historial y viaje
     const [selectedViaje, setSelectedViaje] = useState<SavedTrip | null>(null);
     const [showViajeModal, setShowViajeModal] = useState(false);
-
-    // FASE 3: Estados para recuperación de viaje y navegación bloqueante
     const [showTripRecoveryModal, setShowTripRecoveryModal] = useState(false);
     const [pendingRestoreTrip, setPendingRestoreTrip] = useState<any>(null);
     const [showActiveTripOverlay, setShowActiveTripOverlay] = useState(false);
     const [pendingNavigation, setPendingNavigation] = useState<Screen | null>(null);
 
-    // v5.1: Ref para evitar sincronización múltiple
-    const syncedManifiestoRef = React.useRef<string | null>(null);
+    // Ref para evitar sincronizacion multiple
+    const syncedManifiestoRef = useRef<string | null>(null);
 
     // ========== HOOKS ==========
     const { isOnline, syncPending, manualSync, isReallyOnline } = useConnectivity();
     const { promptInstall, canInstall, isIOS } = usePWAInstall();
-    
+
     const showToastMessage = useCallback((message: string) => {
         setToastMessage(message);
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
     }, []);
-    
+
     const trip = useTripTracking({
         role: role || undefined,
         manifiestoId: activeManifiestoId || undefined,
         onToast: showToastMessage
     });
 
-    // CORRECCIÓN v4: Detectar si hay manifiestos EN_TRANSITO (viaje activo en backend)
-    // Esto es CRÍTICO para bloquear la navegación aunque el hook no tenga viajeActivo
-    const hayManifiestoEnTransito = backendManifiestos.some(m => m.estado === 'EN_TRANSITO');
-    const debeBloquearNavegacion = trip.viajeActivo || hayManifiestoEnTransito;
-    
-    const qr = useQRScanner({
-        onToast: showToastMessage,
-        autoOpenUrl: false // Don't auto-open URLs, we handle the flow
+    const { manifiestos: backendManifiestos, reload: loadManifiestosFromBackend } = useManifiestos({
+        role,
+        isOnline
     });
 
-    // ===== QR → VIAJE AUTOMÁTICO =====
-    // Función para cargar manifiesto desde QR escaneado
-    const loadManifiestoFromQR = useCallback(async (manifiestoId: string) => {
+    const {
+        notificaciones,
+        noLeidas,
+        marcarLeida: handleMarcarLeida,
+        eliminar: handleEliminarNotificacion,
+        marcarTodasLeidas: handleMarcarTodasLeidas
+    } = useNotificaciones({
+        isOnline,
+        enabled: !!role
+    });
+
+    const qr = useQRScanner({
+        onToast: showToastMessage,
+        autoOpenUrl: false
+    });
+
+    // ========== DERIVED STATE ==========
+    const hayManifiestoEnTransito = hasManifiestoEnTransito(backendManifiestos);
+    const debeBloquearNavegacion = trip.viajeActivo || hayManifiestoEnTransito;
+    const displayManifiestos = backendManifiestos || [];
+
+    // ========== EFFECTS ==========
+
+    // Save role to localStorage
+    useEffect(() => {
+        if (role) {
+            localStorage.setItem('sitrep_mobile_role', role);
+        }
+    }, [role]);
+
+    // Cargar dashboard stats del backend (sincroniza con WEB)
+    useEffect(() => {
+        async function loadDashboardStats() {
+            if (!role || !isOnline) return;
+            try {
+                const data = await manifiestoService.getDashboard();
+                if (data?.estadisticas) {
+                    setDashboardStats(data.estadisticas);
+                    console.log('[MobileApp] Dashboard stats loaded:', data.estadisticas);
+                }
+            } catch (error) {
+                console.warn('[MobileApp] Error loading dashboard stats:', error);
+            }
+        }
+        loadDashboardStats();
+    }, [role, isOnline]);
+
+    // Verificar viaje activo guardado al iniciar
+    useEffect(() => {
+        async function checkActiveTrip(): Promise<void> {
+            if (!role || role !== 'TRANSPORTISTA') return;
+
+            if (trip.viajeActivo && currentScreen !== 'viaje') {
+                setCurrentScreen('viaje');
+                return;
+            }
+
+            try {
+                const savedTrip = await offlineStorage.getActiveTrip();
+                if (savedTrip && !trip.viajeActivo) {
+                    setPendingRestoreTrip(savedTrip);
+                    setShowTripRecoveryModal(true);
+                }
+            } catch (err) {
+                console.error('[MobileApp] Error verificando viaje activo:', err);
+            }
+        }
+
+        checkActiveTrip();
+    }, [role, trip.viajeActivo]);
+
+    // Redirigir a viaje cuando hay manifiesto EN_TRANSITO
+    useEffect(() => {
+        if (role === 'TRANSPORTISTA' && hayManifiestoEnTransito && currentScreen !== 'viaje') {
+            setCurrentScreen('viaje');
+        }
+    }, [role, hayManifiestoEnTransito, currentScreen]);
+
+    // Auto-sincronizar hook con estado backend
+    useEffect(() => {
+        if (role !== 'TRANSPORTISTA' && role !== 'ADMIN') return;
+        if (!hayManifiestoEnTransito) return;
+
+        const manifiestoEnTransito = findManifiestoEnTransito(backendManifiestos);
+        if (!manifiestoEnTransito) return;
+
+        if (syncedManifiestoRef.current === manifiestoEnTransito.id) return;
+
+        syncedManifiestoRef.current = manifiestoEnTransito.id;
+        setActiveManifiestoId(manifiestoEnTransito.id);
+        setSelectedManifiesto(formatManifiestoForDisplay(manifiestoEnTransito));
+        trip.sincronizarConBackend(manifiestoEnTransito);
+    }, [role, hayManifiestoEnTransito, backendManifiestos]);
+
+    // Auto-mostrar overlay si hay viaje activo y se navega fuera
+    useEffect(() => {
+        if (debeBloquearNavegacion && role === 'TRANSPORTISTA' && currentScreen !== 'viaje') {
+            const timer = setTimeout(() => setShowActiveTripOverlay(true), 300);
+            return () => clearTimeout(timer);
+        }
+        setShowActiveTripOverlay(false);
+    }, [currentScreen, debeBloquearNavegacion, role]);
+
+    // QR → Cargar manifiesto escaneado
+    useEffect(() => {
+        if (qr.parsedQR?.manifiestoId) {
+            loadManifiestoFromQR(qr.parsedQR.manifiestoId);
+        }
+    }, [qr.parsedQR]);
+
+    // ========== HANDLERS ==========
+
+    async function loadManifiestoFromQR(manifiestoId: string): Promise<void> {
         setLoadingQRManifiesto(true);
         try {
-            // Primero buscar en los manifiestos ya cargados
             const localMatch = backendManifiestos.find(
                 m => m.id === manifiestoId || m.numero === manifiestoId
             );
@@ -202,165 +300,187 @@ const MobileApp: React.FC = () => {
                 return;
             }
 
-            // Si no está local, cargar desde backend
             const manifiesto = await manifiestoService.getManifiesto(manifiestoId);
             setScannedManifiesto(manifiesto);
             setShowQRConfirmModal(true);
         } catch (err: any) {
-            console.error('[QR] Error loading manifiesto:', err);
-            showToastMessage('❌ Manifiesto no encontrado: ' + manifiestoId);
+            showToastMessage('Manifiesto no encontrado: ' + manifiestoId);
         } finally {
             setLoadingQRManifiesto(false);
         }
-    }, [backendManifiestos, showToastMessage]);
+    }
 
-    // Detectar QR parseado y mostrar modal
-    useEffect(() => {
-        if (qr.parsedQR && qr.parsedQR.manifiestoId) {
-            console.log('[QR] Detected manifiesto:', qr.parsedQR);
-            loadManifiestoFromQR(qr.parsedQR.manifiestoId);
-        }
-    }, [qr.parsedQR, loadManifiestoFromQR]);
-
-    // Función para iniciar viaje desde QR escaneado - CORREGIDO: llama directamente al backend
-    const handleIniciarViajeDesdeQR = useCallback(async () => {
+    async function handleIniciarViajeDesdeQR(): Promise<void> {
         if (!scannedManifiesto) return;
 
-        // Cerrar modal antes de iniciar
         setShowQRConfirmModal(false);
         qr.clearScannedQR();
 
         setActiveManifiestoId(scannedManifiesto.id);
         setSelectedManifiesto(scannedManifiesto);
 
-        // Si el manifiesto está APROBADO, llamar al backend para cambiar a EN_TRANSITO
         if (scannedManifiesto.estado === 'APROBADO' && isOnline) {
             try {
-                // Obtener posición GPS actual
-                const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-                    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000 });
-                }).catch(() => null);
-
+                const position = await getCurrentPosition();
                 await manifiestoService.confirmarRetiro(scannedManifiesto.id, {
                     latitud: position?.coords.latitude,
                     longitud: position?.coords.longitude,
                     observaciones: 'Retiro confirmado desde QR'
                 });
-
-                showToastMessage(`✅ Retiro confirmado - Manifiesto #${scannedManifiesto.numero}`);
-                console.log('[QR] Backend actualizado: manifiesto', scannedManifiesto.id, 'ahora EN_TRANSITO');
+                showToastMessage(`Retiro confirmado - Manifiesto #${scannedManifiesto.numero}`);
             } catch (err: any) {
-                console.error('[QR] Error confirmando retiro:', err);
-                showToastMessage(`⚠️ Error al confirmar retiro: ${err.message || 'Error de conexión'}`);
-                // NO iniciar viaje local si el backend falla
+                showToastMessage(`Error al confirmar retiro: ${err.message || 'Error de conexion'}`);
                 setScannedManifiesto(null);
                 return;
             }
         }
 
-        // Iniciar tracking local
         trip.iniciarViaje();
         setCurrentScreen('viaje');
         setScannedManifiesto(null);
-        showToastMessage(`🚛 Viaje iniciado desde QR - #${scannedManifiesto.numero}`);
-    }, [scannedManifiesto, qr, isOnline, trip, showToastMessage]);
+        showToastMessage(`Viaje iniciado desde QR - #${scannedManifiesto.numero}`);
+    }
 
-    // Save role to localStorage
-    useEffect(() => {
-        if (role) {
-            localStorage.setItem('sitrep_mobile_role', role);
+    const handleChangeRole = useCallback(() => {
+        localStorage.removeItem('sitrep_mobile_role');
+        qr.stopCamera();
+        setRole(null);
+        setCurrentScreen('home');
+        setMenuOpen(false);
+    }, [qr]);
+
+    const handleSelectManifiesto = useCallback((m: DisplayManifiesto) => {
+        setSelectedManifiesto(m);
+        setCurrentScreen('detalle');
+    }, []);
+
+    const handleConfirmIncident = useCallback(() => {
+        if (!incidentText.trim()) {
+            showToastMessage('Describa el incidente');
+            return;
         }
-    }, [role]);
+        trip.registrarIncidente(incidentText);
+        setShowIncidentModal(false);
+        setIncidentText('');
+    }, [incidentText, trip, showToastMessage]);
 
-    // FASE 3: Verificar viaje activo guardado al iniciar
-    useEffect(() => {
-        const checkActiveTrip = async () => {
-            if (!role || role !== 'TRANSPORTISTA') return;
+    const handleConfirmParada = useCallback(() => {
+        trip.registrarParada(paradaText);
+        setShowParadaModal(false);
+        setParadaText('');
+    }, [paradaText, trip]);
 
-            // Si ya hay viaje activo en el contexto, redirigir automáticamente
-            if (trip.viajeActivo && currentScreen !== 'viaje') {
-                console.log('[MobileApp] Viaje activo detectado, redirigiendo a pantalla de viaje');
-                setCurrentScreen('viaje');
+    async function handleIniciarViajeConManifiesto(manifiesto: DisplayManifiesto): Promise<void> {
+        const originalManifiesto = manifiesto._original || manifiesto;
+
+        setActiveManifiestoId(originalManifiesto.id);
+        setSelectedManifiesto(manifiesto);
+
+        if (originalManifiesto.estado === 'APROBADO' && isOnline) {
+            try {
+                const position = await getCurrentPosition();
+                await manifiestoService.confirmarRetiro(originalManifiesto.id, {
+                    latitud: position?.coords.latitude,
+                    longitud: position?.coords.longitude,
+                    observaciones: 'Retiro confirmado desde app movil'
+                });
+                showToastMessage(`Retiro confirmado - Manifiesto #${manifiesto.numero}`);
+                loadManifiestosFromBackend();
+            } catch (err: any) {
+                showToastMessage(`Error al confirmar retiro: ${err.message || 'Error de conexion'}`);
                 return;
             }
-
-            try {
-                const savedTrip = await offlineStorage.getActiveTrip();
-                if (savedTrip && !trip.viajeActivo) {
-                    console.log('[MobileApp] Viaje interrumpido encontrado:', savedTrip.id);
-                    setPendingRestoreTrip(savedTrip);
-                    setShowTripRecoveryModal(true);
-                }
-            } catch (err) {
-                console.error('[MobileApp] Error verificando viaje activo:', err);
-            }
-        };
-
-        checkActiveTrip();
-    }, [role, trip.viajeActivo]);
-
-    // CORRECCIÓN v4: Redirigir a viaje cuando hay manifiesto EN_TRANSITO detectado en backend
-    useEffect(() => {
-        if (role === 'TRANSPORTISTA' && hayManifiestoEnTransito && currentScreen !== 'viaje') {
-            console.log('[MobileApp] Manifiesto EN_TRANSITO detectado en backend, redirigiendo a viaje');
-            setCurrentScreen('viaje');
         }
-    }, [role, hayManifiestoEnTransito, currentScreen]);
 
-    // CORRECCIÓN v7.3: Auto-sincronizar hook con estado backend
-    // FIX: Permitir que ADMIN también vea el viaje activo (solo lectura)
-    useEffect(() => {
-        // Solo TRANSPORTISTA y ADMIN pueden ver viajes activos
-        if (role !== 'TRANSPORTISTA' && role !== 'ADMIN') return;
-        if (!hayManifiestoEnTransito) return;
+        trip.iniciarViaje();
+        setCurrentScreen('viaje');
+        showToastMessage(`Viaje iniciado para manifiesto #${manifiesto.numero}`);
+    }
 
-        const manifiestoEnTransito = backendManifiestos.find(m => m.estado === 'EN_TRANSITO');
-        if (!manifiestoEnTransito) return;
+    async function handleFinalizarViaje(): Promise<void> {
+        const currentUser = authService.getStoredUser();
+        const userTransportistaId = currentUser?.transportista?.id;
 
-        // Evitar sincronizar el mismo manifiesto múltiples veces
-        if (syncedManifiestoRef.current === manifiestoEnTransito.id) {
+        let manifiestoId = activeManifiestoId;
+        let manifiestoNumero = selectedManifiesto?.numero || '';
+
+        if (!manifiestoId) {
+            const manifiestoEnTransito = backendManifiestos.find(m => {
+                const isEnTransito = m.estado === 'EN_TRANSITO';
+                const belongsToUser = !userTransportistaId || m.transportistaId === userTransportistaId;
+                return isEnTransito && belongsToUser;
+            });
+
+            if (manifiestoEnTransito) {
+                manifiestoId = manifiestoEnTransito.id;
+                manifiestoNumero = manifiestoEnTransito.numero || '';
+            }
+        }
+
+        if (manifiestoId && isOnline) {
+            try {
+                const position = await getCurrentPosition();
+                await manifiestoService.confirmarEntrega(manifiestoId, {
+                    latitud: position?.coords.latitude,
+                    longitud: position?.coords.longitude,
+                    observaciones: 'Entrega confirmada desde app movil'
+                });
+
+                showToastMessage(`Entrega confirmada - Manifiesto #${manifiestoNumero} actualizado a ENTREGADO`);
+                finalizarViajeLocal();
+                loadManifiestosFromBackend();
+            } catch (err: any) {
+                const errorCode = err.response?.status || '';
+                const errorMsg = err.response?.data?.message || err.message || 'Error de conexion';
+                if (errorCode === 403) {
+                    showToastMessage(`Error 403: No tienes permiso para este manifiesto.`);
+                } else {
+                    showToastMessage(`Error ${errorCode}: ${errorMsg}`);
+                }
+            }
+        } else if (!isOnline) {
+            showToastMessage(`Offline - Entrega se sincronizara cuando haya conexion`);
+            finalizarViajeLocal();
+        } else {
+            showToastMessage(`No se encontro manifiesto para confirmar entrega`);
+            finalizarViajeLocal();
+        }
+    }
+
+    function finalizarViajeLocal(): void {
+        trip.finalizarViaje();
+        setActiveManifiestoId(null);
+        setSelectedManifiesto(null);
+        syncedManifiestoRef.current = null;
+        setCurrentScreen('home');
+    }
+
+    async function handleIniciarViajeAutomatico(): Promise<void> {
+        const manifiestosPendientes = backendManifiestos.filter(m => m.estado === 'APROBADO');
+
+        if (manifiestosPendientes.length === 0) {
+            showToastMessage('No hay manifiestos pendientes asignados');
             return;
         }
 
-        console.log('[MobileApp] SYNC v7.3: Sincronizando viaje EN_TRANSITO:', manifiestoEnTransito.id, 'rol:', role);
-
-        // Marcar como sincronizado ANTES de llamar para evitar re-ejecución
-        syncedManifiestoRef.current = manifiestoEnTransito.id;
-        setActiveManifiestoId(manifiestoEnTransito.id);
-        setSelectedManifiesto(formatManifiestoForDisplay(manifiestoEnTransito));
-
-        // Siempre sincronizar - el hook manejará el estado correctamente
-        trip.sincronizarConBackend(manifiestoEnTransito);
-    }, [role, hayManifiestoEnTransito, backendManifiestos]);
-
-    // FASE 3 + CORRECCIÓN v4: Auto-mostrar overlay si hay viaje activo (local O backend) y se navega fuera
-    useEffect(() => {
-        // Usar debeBloquearNavegacion que considera AMBOS: trip.viajeActivo Y manifiestos EN_TRANSITO
-        if (debeBloquearNavegacion && role === 'TRANSPORTISTA' && currentScreen !== 'viaje') {
-            // Dar un pequeño delay para que la navegación se estabilice
-            const timer = setTimeout(() => {
-                setShowActiveTripOverlay(true);
-            }, 300);
-            return () => clearTimeout(timer);
+        if (manifiestosPendientes.length === 1) {
+            await handleIniciarViajeConManifiesto(formatManifiestoForDisplay(manifiestosPendientes[0]));
         } else {
-            // Resetear overlay cuando las condiciones no se cumplen
-            setShowActiveTripOverlay(false);
+            setActiveTab('pendientes');
+            showToastMessage('Selecciona un manifiesto de la lista para iniciar el viaje');
         }
-    }, [currentScreen, debeBloquearNavegacion, role]);
+    }
 
-    // FASE 3 + CORRECCIÓN v4: Navegación con viaje activo - mostrar overlay
-    const handleNavigationWithActiveTrip = useCallback((targetScreen: Screen) => {
-        // Usar debeBloquearNavegacion que considera AMBOS: trip.viajeActivo Y manifiestos EN_TRANSITO
+    const handleNavigationWithActiveTrip = useCallback((targetScreen: Screen): boolean => {
         if (debeBloquearNavegacion && targetScreen !== 'viaje' && role === 'TRANSPORTISTA') {
             setPendingNavigation(targetScreen);
             setShowActiveTripOverlay(true);
-            return false; // No navegar directamente
+            return false;
         }
         setCurrentScreen(targetScreen);
         return true;
     }, [debeBloquearNavegacion, role]);
 
-    // FASE 3: Handlers para TripRecoveryModal
     const handleResumeTrip = useCallback(() => {
         if (pendingRestoreTrip) {
             trip.restoreFromSaved(pendingRestoreTrip);
@@ -368,7 +488,7 @@ const MobileApp: React.FC = () => {
             setCurrentScreen('viaje');
             setShowTripRecoveryModal(false);
             setPendingRestoreTrip(null);
-            showToastMessage('✅ Viaje restaurado correctamente');
+            showToastMessage('Viaje restaurado correctamente');
         }
     }, [pendingRestoreTrip, trip, showToastMessage]);
 
@@ -383,7 +503,6 @@ const MobileApp: React.FC = () => {
         }
     }, [showToastMessage]);
 
-    // FASE 3: Handlers para ActiveTripOverlay
     const handleGoToTrip = useCallback(() => {
         setShowActiveTripOverlay(false);
         setPendingNavigation(null);
@@ -398,362 +517,75 @@ const MobileApp: React.FC = () => {
         setPendingNavigation(null);
     }, [pendingNavigation]);
 
-    // Load manifiestos from backend when role changes
-    // FASE 1: Filtrar por transportista asignado
-    const loadManifiestosFromBackend = useCallback(async () => {
-        if (!role) return;
+    // Handlers para modales de operaciones
+    function openModalForManifiesto(
+        tipo: 'recepcion' | 'rechazo' | 'tratamiento' | 'reversion',
+        revType?: 'entrega' | 'recepcion' | 'certificado'
+    ): void {
+        if (!selectedManifiesto) return;
 
-        setLoadingManifiestos(true);
-        try {
-            // Obtener usuario actual si existe (puede tener transportistaId)
-            const currentUser = authService.getStoredUser();
+        const original = selectedManifiesto._original || selectedManifiesto;
+        const modalData = {
+            id: original.id,
+            numero: selectedManifiesto.numero,
+            estado: selectedManifiesto.estado,
+            generador: { razonSocial: selectedManifiesto.generador },
+            transportista: { razonSocial: selectedManifiesto.transportista },
+            tipoResiduo: selectedManifiesto.residuo,
+            pesoKg: original.residuos?.[0]?.cantidad || 0
+        };
 
-            // Cargar manifiestos según el rol
-            let estados: string[] = [];
-            let filterParams: { transportistaId?: string; generadorId?: string; operadorId?: string } = {};
+        setManifiestoParaModal(modalData);
 
-            switch (role) {
-                case 'TRANSPORTISTA':
-                    estados = ['APROBADO', 'EN_TRANSITO'];
-                    // FASE 1: Filtrar SOLO los manifiestos asignados a este transportista
-                    if (currentUser?.transportista?.id) {
-                        filterParams.transportistaId = currentUser.transportista.id;
-                        console.log('[MobileApp] Filtering by transportistaId:', currentUser.transportista.id);
-                    }
-                    break;
-                case 'OPERADOR':
-                    estados = ['EN_TRANSITO', 'ENTREGADO', 'RECIBIDO'];
-                    // Filtrar por operador asignado
-                    if (currentUser?.operador?.id) {
-                        filterParams.operadorId = currentUser.operador.id;
-                    }
-                    break;
-                case 'GENERADOR':
-                    estados = ['BORRADOR', 'PENDIENTE_APROBACION', 'APROBADO', 'EN_TRANSITO', 'ENTREGADO'];
-                    // Filtrar por generador
-                    if (currentUser?.generador?.id) {
-                        filterParams.generadorId = currentUser.generador.id;
-                    }
-                    break;
-                default:
-                    estados = ['APROBADO', 'EN_TRANSITO', 'ENTREGADO', 'RECIBIDO'];
-            }
-
-            // Cargar todos los estados relevantes
-            const allManifiestos: any[] = [];
-            for (const estado of estados) {
-                try {
-                    const data = await manifiestoService.getManifiestos({
-                        estado,
-                        limit: 20,
-                        ...filterParams  // FASE 1: Incluir filtros por actor
-                    });
-                    allManifiestos.push(...(data.manifiestos || []));
-                } catch (e) {
-                    console.warn(`Error loading ${estado}:`, e);
-                }
-            }
-
-            console.log('[MobileApp] Loaded', allManifiestos.length, 'manifiestos from backend', filterParams);
-
-            // FIX v7.7: Función para filtrar manifiestos cacheados por actor del usuario
-            const filterCachedManifiestos = (cached: any[]) => {
-                if (role === 'TRANSPORTISTA' && filterParams.transportistaId) {
-                    return cached.filter(m => m.transportistaId === filterParams.transportistaId);
-                } else if (role === 'OPERADOR' && filterParams.operadorId) {
-                    return cached.filter(m => m.operadorId === filterParams.operadorId);
-                } else if (role === 'GENERADOR' && filterParams.generadorId) {
-                    return cached.filter(m => m.generadorId === filterParams.generadorId);
-                }
-                return cached;
-            };
-
-            // CORRECCIÓN v5.2: Si backend devuelve 0, intentar cargar del caché
-            if (allManifiestos.length === 0) {
-                console.log('[MobileApp] Backend devolvió 0, intentando caché...');
-                const cached = await offlineStorage.getAllManifiestos();
-                // FIX v7.7: Filtrar cache por actor del usuario para evitar 403
-                const filteredCached = filterCachedManifiestos(cached);
-                if (filteredCached.length > 0) {
-                    setBackendManifiestos(filteredCached);
-                    console.log('[MobileApp] Usando', filteredCached.length, 'manifiestos cacheados filtrados (backend vacío)');
-                } else {
-                    setBackendManifiestos([]);
-                }
-            } else {
-                setBackendManifiestos(allManifiestos);
-                // Cachear manifiestos en IndexedDB para offline
-                for (const m of allManifiestos) {
-                    await offlineStorage.saveManifiesto(m);
-                }
-                console.log('[MobileApp] Cacheados', allManifiestos.length, 'manifiestos en IndexedDB');
-            }
-        } catch (err) {
-            console.error('[MobileApp] Error loading manifiestos:', err);
-            // Cargar desde caché en caso de error - FIX v7.7: También filtrar aquí
-            const currentUser = authService.getStoredUser();
-            const cached = await offlineStorage.getAllManifiestos();
-            let filteredCached = cached;
-            const transportistaId = currentUser?.transportista?.id;
-            const operadorId = currentUser?.operador?.id;
-            const generadorId = currentUser?.generador?.id;
-            if (role === 'TRANSPORTISTA' && transportistaId) {
-                filteredCached = cached.filter(m => m.transportistaId === transportistaId);
-            } else if (role === 'OPERADOR' && operadorId) {
-                filteredCached = cached.filter(m => m.operadorId === operadorId);
-            } else if (role === 'GENERADOR' && generadorId) {
-                filteredCached = cached.filter(m => m.generadorId === generadorId);
-            }
-            if (filteredCached.length > 0) {
-                setBackendManifiestos(filteredCached);
-                console.log('[MobileApp] Usando', filteredCached.length, 'manifiestos cacheados filtrados (error)');
-            } else {
-                setBackendManifiestos([]);
-            }
-        } finally {
-            setLoadingManifiestos(false);
+        switch (tipo) {
+            case 'recepcion':
+                setShowRecepcionModal(true);
+                break;
+            case 'rechazo':
+                setShowRechazoModal(true);
+                break;
+            case 'tratamiento':
+                setShowTratamientoModal(true);
+                break;
+            case 'reversion':
+                setReversionType(revType || 'entrega');
+                setShowReversionModal(true);
+                break;
         }
-    }, [role]);
+    }
 
-    useEffect(() => {
-        if (role && isOnline) {
+    async function handleFirmarManifiesto(): Promise<void> {
+        if (!selectedManifiesto) return;
+        const original = selectedManifiesto._original || selectedManifiesto;
+        try {
+            await manifiestoService.firmarManifiesto(original.id);
+            showToastMessage(`Manifiesto #${selectedManifiesto.numero} firmado correctamente`);
             loadManifiestosFromBackend();
+            setSelectedManifiesto(null);
+            setCurrentScreen('home');
+        } catch (err: any) {
+            showToastMessage(`Error: ${err.response?.data?.message || 'Error al firmar'}`);
         }
-    }, [role, isOnline, loadManifiestosFromBackend]);
+    }
 
-    // CORRECCIÓN 7: Cargar notificaciones reales
-    const loadNotificaciones = useCallback(async () => {
-        if (!isOnline) return;
+    async function handleCerrarManifiesto(): Promise<void> {
+        if (!selectedManifiesto) return;
+        const original = selectedManifiesto._original || selectedManifiesto;
         try {
-            const data = await notificationService.getNotificaciones({ limit: 20 });
-            setNotificaciones(data.notificaciones || []);
-            setNoLeidas(data.noLeidas || 0);
-        } catch (err) {
-            console.warn('[MobileApp] Error loading notifications:', err);
-        }
-    }, [isOnline]);
-
-    useEffect(() => {
-        if (role && isOnline) {
-            loadNotificaciones();
-            // Polling cada 30 segundos
-            const interval = setInterval(loadNotificaciones, 30000);
-            return () => clearInterval(interval);
-        }
-    }, [role, isOnline, loadNotificaciones]);
-
-    // CORRECCIÓN 7: Marcar notificación como leída
-    const handleMarcarLeida = useCallback(async (id: string) => {
-        try {
-            await notificationService.marcarLeida(id);
-            setNotificaciones(prev => prev.map(n => n.id === id ? { ...n, leida: true } : n));
-            setNoLeidas(prev => Math.max(0, prev - 1));
-            showToastMessage('✓ Marcada como leída');
-        } catch (err) {
-            showToastMessage('Error al marcar notificación');
-        }
-    }, [showToastMessage]);
-
-    // CORRECCIÓN 7: Eliminar notificación
-    const handleEliminarNotificacion = useCallback(async (id: string) => {
-        try {
-            await notificationService.eliminar(id);
-            setNotificaciones(prev => prev.filter(n => n.id !== id));
-            showToastMessage('✓ Notificación eliminada');
-        } catch (err) {
-            showToastMessage('Error al eliminar notificación');
-        }
-    }, [showToastMessage]);
-
-    // CORRECCIÓN 7: Marcar todas como leídas
-    const handleMarcarTodasLeidas = useCallback(async () => {
-        try {
-            await notificationService.marcarTodasLeidas();
-            setNotificaciones(prev => prev.map(n => ({ ...n, leida: true })));
-            setNoLeidas(0);
-            showToastMessage('✓ Todas marcadas como leídas');
-        } catch (err) {
-            showToastMessage('Error al marcar notificaciones');
-        }
-    }, [showToastMessage]);
-
-    // ========== HANDLERS ==========
-    const handleChangeRole = useCallback(() => {
-        localStorage.removeItem('sitrep_mobile_role');
-        qr.stopCamera();
-        setRole(null);
-        setCurrentScreen('home');
-        setMenuOpen(false);
-    }, [qr]);
-
-    const handleSelectManifiesto = useCallback((m: any) => {
-        setSelectedManifiesto(m);
-        setCurrentScreen('detalle');
-    }, []);
-
-    const handleConfirmIncident = useCallback(() => {
-        if (!incidentText.trim()) {
-            showToastMessage('⚠️ Describa el incidente');
-            return;
-        }
-        trip.registrarIncidente(incidentText);
-        setShowIncidentModal(false);
-        setIncidentText('');
-    }, [incidentText, trip, showToastMessage]);
-
-    const handleConfirmParada = useCallback(() => {
-        trip.registrarParada(paradaText);
-        setShowParadaModal(false);
-        setParadaText('');
-    }, [paradaText, trip]);
-
-    // Handler para iniciar viaje CON manifiesto - LLAMA AL BACKEND
-    const handleIniciarViajeConManifiesto = useCallback(async (manifiesto: any) => {
-        // Use original backend object if available (from formatManifiestoForDisplay)
-        const originalManifiesto = manifiesto._original || manifiesto;
-
-        setActiveManifiestoId(originalManifiesto.id);
-        setSelectedManifiesto(manifiesto);
-
-        // Si el manifiesto está APROBADO, llamar confirmarRetiro para cambiar a EN_TRANSITO
-        if (originalManifiesto.estado === 'APROBADO' && isOnline) {
-            try {
-                // Obtener posición GPS actual
-                const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-                    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000 });
-                }).catch(() => null);
-
-                await manifiestoService.confirmarRetiro(originalManifiesto.id, {
-                    latitud: position?.coords.latitude,
-                    longitud: position?.coords.longitude,
-                    observaciones: 'Retiro confirmado desde app móvil'
-                });
-
-                showToastMessage(`✅ Retiro confirmado - Manifiesto #${manifiesto.numero}`);
-                console.log('[MobileApp] Backend actualizado: manifiesto', originalManifiesto.id, 'ahora EN_TRANSITO');
-                // Actualizar lista de manifiestos
-                loadManifiestosFromBackend();
-            } catch (err: any) {
-                console.error('[MobileApp] Error confirmando retiro:', err);
-                showToastMessage(`⚠️ Error al confirmar retiro: ${err.message || 'Error de conexión'}`);
-                // NO iniciar viaje local si el backend falla
-                return;
-            }
-        }
-
-        trip.iniciarViaje();
-        setCurrentScreen('viaje');
-        showToastMessage(`🚛 Viaje iniciado para manifiesto #${manifiesto.numero}`);
-    }, [trip, showToastMessage, isOnline, loadManifiestosFromBackend]);
-
-    // Finalizar viaje y actualizar backend
-    // FIX v7.7: Verificar que el manifiesto pertenece al usuario actual
-    const handleFinalizarViaje = useCallback(async () => {
-        const currentUser = authService.getStoredUser();
-        const userTransportistaId = currentUser?.transportista?.id;
-
-        // FIX v7.7: Solo buscar manifiestos que pertenecen al transportista actual
-        let manifiestoId = activeManifiestoId;
-        let manifiestoNumero = selectedManifiesto?.numero || '';
-
-        if (!manifiestoId) {
-            // Buscar SOLO entre manifiestos del transportista actual
-            const manifiestoEnTransito = backendManifiestos.find(m => {
-                const isEnTransito = m.estado === 'EN_TRANSITO';
-                // Verificar que pertenece a este transportista
-                const belongsToUser = !userTransportistaId || m.transportistaId === userTransportistaId;
-                return isEnTransito && belongsToUser;
+            await manifiestoService.cerrarManifiesto(original.id, {
+                observaciones: 'Tratamiento completado desde app movil'
             });
-
-            if (manifiestoEnTransito) {
-                manifiestoId = manifiestoEnTransito.id;
-                manifiestoNumero = manifiestoEnTransito.numero || '';
-                console.log('[MobileApp] FIX v7.7: Usando manifiesto EN_TRANSITO encontrado:', manifiestoId, 'transportistaId:', userTransportistaId);
-            }
-        }
-
-        // Si estamos online y hay un manifiesto, actualizar el backend primero
-        if (manifiestoId && isOnline) {
-            try {
-                // Obtener posición GPS actual
-                const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-                    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000 });
-                }).catch(() => null);
-
-                await manifiestoService.confirmarEntrega(manifiestoId, {
-                    latitud: position?.coords.latitude,
-                    longitud: position?.coords.longitude,
-                    observaciones: 'Entrega confirmada desde app móvil'
-                });
-
-                showToastMessage(`✅ Entrega confirmada - Manifiesto #${manifiestoNumero} actualizado a ENTREGADO`);
-
-                // Finalizar viaje local SOLO después de éxito en backend
-                trip.finalizarViaje();
-                setActiveManifiestoId(null);
-                setSelectedManifiesto(null);
-                syncedManifiestoRef.current = null; // Reset para permitir nueva sincronización
-                setCurrentScreen('home');
-
-                // Actualizar lista de manifiestos
-                loadManifiestosFromBackend();
-            } catch (err: any) {
-                console.error('[MobileApp] Error confirmando entrega:', err);
-                // FIX v7.7: Mensaje más descriptivo con código de error
-                const errorCode = err.response?.status || '';
-                const errorMsg = err.response?.data?.message || err.message || 'Error de conexión';
-                if (errorCode === 403) {
-                    showToastMessage(`⚠️ Error 403: No tienes permiso para este manifiesto. Verifica que esté asignado a ti.`);
-                } else {
-                    showToastMessage(`⚠️ Error ${errorCode}: ${errorMsg}`);
-                }
-                // NO finalizar el viaje local si falla el backend
-                // El usuario puede reintentar
-            }
-        } else if (!isOnline) {
-            // Modo offline: guardar en cola y finalizar local
-            showToastMessage(`📴 Offline - Entrega se sincronizará cuando haya conexión`);
-            trip.finalizarViaje();
-            setActiveManifiestoId(null);
+            showToastMessage(`Certificado emitido - Manifiesto #${selectedManifiesto.numero} cerrado`);
+            loadManifiestosFromBackend();
             setSelectedManifiesto(null);
-            syncedManifiestoRef.current = null;
             setCurrentScreen('home');
-        } else {
-            // Sin manifiesto asociado - solo finalizar viaje local
-            console.warn('[MobileApp] Finalizando viaje sin manifiesto asociado');
-            showToastMessage(`⚠️ No se encontró manifiesto para confirmar entrega`);
-            trip.finalizarViaje();
-            setActiveManifiestoId(null);
-            setSelectedManifiesto(null);
-            syncedManifiestoRef.current = null;
-            setCurrentScreen('home');
+        } catch (err: any) {
+            showToastMessage(`Error: ${err.response?.data?.message || 'Error al cerrar manifiesto'}`);
         }
-    }, [activeManifiestoId, selectedManifiesto, backendManifiestos, isOnline, trip, showToastMessage, loadManifiestosFromBackend]);
-
-    // CORRECCIÓN CRÍTICA: Función para el botón "Iniciar Viaje" de acciones rápidas
-    // Si hay 1 manifiesto pendiente: lo inicia automáticamente
-    // Si hay varios: muestra la lista para seleccionar
-    const handleIniciarViajeAutomatico = useCallback(async () => {
-        const manifiestosPendientes = backendManifiestos.filter(m => m.estado === 'APROBADO');
-
-        if (manifiestosPendientes.length === 0) {
-            showToastMessage('⚠️ No hay manifiestos pendientes asignados');
-            return;
-        }
-
-        if (manifiestosPendientes.length === 1) {
-            // Si solo hay uno, iniciar automáticamente con ese
-            const manifiesto = manifiestosPendientes[0];
-            await handleIniciarViajeConManifiesto(formatManifiestoForDisplay(manifiesto));
-        } else {
-            // Si hay varios, mostrar la pestaña de pendientes para que elija
-            setActiveTab('pendientes');
-            showToastMessage('📋 Selecciona un manifiesto de la lista para iniciar el viaje');
-        }
-    }, [backendManifiestos, showToastMessage, handleIniciarViajeConManifiesto]);
+    }
 
     // ========== MENU CONFIGURATION ==========
-    const getMenuItems = (): MenuItem[] => {
+    function getMenuItems(): MenuItem[] {
         switch (role) {
             case 'ADMIN':
                 return [
@@ -790,82 +622,51 @@ const MobileApp: React.FC = () => {
             default:
                 return [];
         }
-    };
+    }
 
     const getRoleName = (): string => role ? ROLE_NAMES[role] : 'Usuario';
 
-    // Screens that show back button instead of menu
+    const menuItems = getMenuItems();
     const backScreens = ['detalle', 'viaje', 'actores'];
     const isBackScreen = backScreens.includes(currentScreen);
 
-    const getHeaderTitle = (): string => {
+    function getHeaderTitle(): string {
         if (currentScreen === 'viaje') return 'Viaje Activo';
         if (currentScreen === 'actores') return 'Actores';
-        return menuItems.find(m => m.id === currentScreen)?.label || 'Detalle';
-    };
-
-    const renderHeaderButton = () => (
-        <button
-            className="header-btn"
-            onClick={() => isBackScreen ? setCurrentScreen('home') : setMenuOpen(!menuOpen)}
-        >
-            {isBackScreen ? <ChevronLeft size={20} /> : <Menu size={20} />}
-        </button>
-    );
-
-    const getEstadoBadge = (estado: string) => {
-        const s = ESTADO_CONFIG[estado] || { bg: '#334155', color: '#94a3b8', label: estado };
-        return <span className="badge" style={{ background: s.bg, color: s.color }}>{s.label}</span>;
-    };
-
-    const menuItems = getMenuItems();
-
-    // Use backend data if available, fallback to demo data
-    // CORRECCIÓN v3: No usar DEMO_MANIFIESTOS, solo datos reales o cacheados
-    const displayManifiestos = backendManifiestos || [];
-
-    // FASE 2: Helper para calcular distancia total del viaje (Haversine)
-    const calcularDistanciaViaje = (): number => {
-        if (!trip.viajeRuta || trip.viajeRuta.length < 2) return 0;
-        const toRad = (deg: number) => (deg * Math.PI) / 180;
-        let total = 0;
-        for (let i = 1; i < trip.viajeRuta.length; i++) {
-            const lat1 = trip.viajeRuta[i - 1].lat;
-            const lon1 = trip.viajeRuta[i - 1].lng;
-            const lat2 = trip.viajeRuta[i].lat;
-            const lon2 = trip.viajeRuta[i].lng;
-            const R = 6371;
-            const dLat = toRad(lat2 - lat1);
-            const dLon = toRad(lon2 - lon1);
-            const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-            total += R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        // Títulos de Home sincronizados con WEB Dashboard
+        if (currentScreen === 'home') {
+            switch (role) {
+                case 'ADMIN': return 'Centro de Control';
+                case 'GENERADOR': return 'Mis Manifiestos';
+                case 'TRANSPORTISTA': return 'Mis Viajes';
+                case 'OPERADOR': return 'Recepciones';
+                default: return 'Inicio';
+            }
         }
-        return Math.round(total * 100) / 100;
-    };
+        return menuItems.find(m => m.id === currentScreen)?.label || 'Detalle';
+    }
 
-    // FASE 2: Determinar estado GPS para el banner
-    const getGpsStatus = (): 'active' | 'weak' | 'lost' => {
+    function calcularDistanciaViaje(): number {
+        return calcularDistanciaRuta(trip.viajeRuta);
+    }
+
+    function getGpsStatus(): 'active' | 'weak' | 'lost' {
         if (!trip.gpsPosition) return 'lost';
-        // Si tenemos posición reciente, está activo
-        // En el futuro se puede mejorar con accuracy check
         return trip.gpsAvailable ? 'active' : 'weak';
-    };
+    }
 
-    // Helper to adapt backend manifest format to display format
-    const formatManifiestoForDisplay = (m: any) => ({
-        id: m.id,
-        numero: m.numero || `MAN-${m.id?.slice(-6)}`,
-        estado: m.estado,
-        generador: m.generador?.razonSocial || m.generador || 'Generador',
-        operador: m.operador?.razonSocial || m.operador || 'Operador',
-        transportista: m.transportista?.razonSocial || m.transportista || 'Transportista',
-        residuo: m.residuos?.[0]?.tipoResiduo?.nombre || m.residuo || 'Residuos',
-        cantidad: m.residuos?.[0] ? `${m.residuos[0].cantidad} ${m.residuos[0].unidad}` : m.cantidad || '-',
-        fecha: m.fechaCreacion ? new Date(m.fechaCreacion).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) : m.fecha || '-',
-        eta: m.eta || null,
-        // Keep original object for backend operations
-        _original: m
-    });
+    // ========== RENDER HELPERS ==========
+
+    function renderHeaderButton(): React.ReactElement {
+        return (
+            <button
+                className="header-btn"
+                onClick={() => isBackScreen ? setCurrentScreen('home') : setMenuOpen(!menuOpen)}
+            >
+                {isBackScreen ? <ChevronLeft size={20} /> : <Menu size={20} />}
+            </button>
+        );
+    }
 
     // ========== ROLE SELECTION SCREEN ==========
     if (!role) {
@@ -881,7 +682,7 @@ const MobileApp: React.FC = () => {
     }
 
     // ========== RENDER CONTENT ==========
-    const renderContent = () => {
+    function renderContent(): React.ReactElement | null {
         switch (currentScreen) {
             case 'escanear':
                 return (
@@ -915,479 +716,82 @@ const MobileApp: React.FC = () => {
                 );
 
             case 'home':
-                // FASE 2: Ya NO bloqueamos la navegación con viaje activo
-                // El TripBanner se muestra arriba y permite navegar libremente
-
-                // FASE 5: Dashboard especial para ADMIN
                 if (role === 'ADMIN') {
                     return (
                         <AdminDashboard
-                            manifiestos={displayManifiestos.map(m => formatManifiestoForDisplay(m))}
+                            manifiestos={displayManifiestos.map(formatManifiestoForDisplay)}
                             onSelectManifiesto={handleSelectManifiesto}
+                            onNavigate={setCurrentScreen}
+                            backendStats={dashboardStats || undefined}
                         />
                     );
                 }
 
-                // CORRECCIÓN 6: Filtrar manifiestos según tab activo
-                const getManifiestosByTab = () => {
-                    switch (activeTab) {
-                        case 'pendientes':
-                            return displayManifiestos.filter(m => m.estado === 'APROBADO');
-                        case 'en-curso':
-                            return displayManifiestos.filter(m => m.estado === 'EN_TRANSITO');
-                        case 'realizados':
-                            return displayManifiestos.filter(m =>
-                                ['ENTREGADO', 'RECIBIDO', 'TRATADO'].includes(m.estado)
-                            );
-                        default:
-                            return displayManifiestos;
-                    }
-                };
-
-                const manifiestosFiltrados = getManifiestosByTab();
-
                 return (
-                    <>
-                        {/* Connectivity Status */}
-                        <div className={`connectivity-bar ${isOnline ? 'online' : 'offline'}`}>
-                            {syncPending ? (
-                                <><RefreshCw size={14} className="spinning" /><span>Sincronizando...</span></>
-                            ) : (
-                                <>{isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}<span>{isOnline ? 'Conectado' : 'Modo Offline'}</span></>
-                            )}
-                        </div>
-
-                        {/* Stats Grid */}
-                        <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                            <div className={`stat-card ${activeTab === 'pendientes' ? 'active' : ''}`} onClick={() => setActiveTab('pendientes')}>
-                                <div className="stat-value">{displayManifiestos.filter(m => m.estado === 'APROBADO').length}</div>
-                                <div className="stat-label">Pendientes</div>
-                            </div>
-                            <div className={`stat-card ${activeTab === 'en-curso' ? 'active' : ''}`} onClick={() => setActiveTab('en-curso')}>
-                                <div className="stat-value">{displayManifiestos.filter(m => m.estado === 'EN_TRANSITO').length}</div>
-                                <div className="stat-label">En Curso</div>
-                            </div>
-                            <div className={`stat-card ${activeTab === 'realizados' ? 'active' : ''}`} onClick={() => setActiveTab('realizados')}>
-                                <div className="stat-value">{displayManifiestos.filter(m => ['ENTREGADO', 'RECIBIDO', 'TRATADO'].includes(m.estado)).length}</div>
-                                <div className="stat-label">Realizados</div>
-                            </div>
-                        </div>
-
-                        {/* Quick Actions for Transportista - FASE 3/P4: Validación de manifiestos pendientes */}
-                        {role === 'TRANSPORTISTA' && (() => {
-                            const manifiestosPendientes = displayManifiestos.filter(m => m.estado === 'APROBADO');
-                            const hayViajeActivoGlobal = displayManifiestos.some(m => m.estado === 'EN_TRANSITO') || trip.viajeActivo;
-                            const puedeIniciarViaje = manifiestosPendientes.length > 0 && !hayViajeActivoGlobal;
-
-                            return (
-                                <div className="section">
-                                    <h3>Acciones</h3>
-                                    <div className="actions-grid">
-                                        <button className="action-card primary" onClick={() => setCurrentScreen('escanear')}>
-                                            <QrCode size={24} />
-                                            <span>Escanear QR</span>
-                                        </button>
-                                        <button
-                                            className={`action-card ${trip.viajeActivo ? 'active' : ''} ${!puedeIniciarViaje && !trip.viajeActivo ? 'disabled' : ''}`}
-                                            onClick={trip.viajeActivo
-                                                ? () => setCurrentScreen('viaje')
-                                                : puedeIniciarViaje
-                                                    ? handleIniciarViajeAutomatico
-                                                    : undefined}
-                                            disabled={!trip.viajeActivo && !puedeIniciarViaje}
-                                        >
-                                            {trip.viajeActivo ? <Navigation size={24} /> : <Play size={24} />}
-                                            <span>
-                                                {trip.viajeActivo
-                                                    ? 'Ver Viaje'
-                                                    : hayViajeActivoGlobal
-                                                        ? 'Viaje en Curso'
-                                                        : manifiestosPendientes.length === 0
-                                                            ? 'Sin Pendientes'
-                                                            : 'Iniciar Viaje'}
-                                            </span>
-                                        </button>
-                                        {/* FASE 2: Botón historial de viajes */}
-                                        <button
-                                            className="action-card"
-                                            onClick={() => setCurrentScreen('historial-viajes')}
-                                            style={{
-                                                background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.15) 0%, var(--ind-panel) 100%)',
-                                                borderColor: 'var(--ind-cyan)',
-                                                borderWidth: '2px'
-                                            }}
-                                        >
-                                            <Clock size={24} style={{ color: 'var(--ind-cyan)' }} />
-                                            <span style={{ color: 'var(--ind-cyan)' }}>Historial ({trip.savedTrips.length})</span>
-                                        </button>
-                                    </div>
-                                    {/* Mensaje informativo */}
-                                    {!trip.viajeActivo && manifiestosPendientes.length === 0 && !hayViajeActivoGlobal && (
-                                        <p className="info-text" style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px', textAlign: 'center' }}>
-                                            No hay manifiestos asignados pendientes de transporte
-                                        </p>
-                                    )}
-                                </div>
-                            );
-                        })()}
-
-                        {/* CORRECCIÓN 6: Tabs de historial */}
-                        <div className="section">
-                            <div className="tabs-container">
-                                <button
-                                    className={`tab-btn ${activeTab === 'pendientes' ? 'active' : ''}`}
-                                    onClick={() => setActiveTab('pendientes')}
-                                >
-                                    Pendientes
-                                </button>
-                                <button
-                                    className={`tab-btn ${activeTab === 'en-curso' ? 'active' : ''}`}
-                                    onClick={() => setActiveTab('en-curso')}
-                                >
-                                    En Curso
-                                </button>
-                                <button
-                                    className={`tab-btn ${activeTab === 'realizados' ? 'active' : ''}`}
-                                    onClick={() => setActiveTab('realizados')}
-                                >
-                                    Realizados
-                                </button>
-                            </div>
-                            <div className="list">
-                                {manifiestosFiltrados.length > 0 ? (
-                                    manifiestosFiltrados.map(m => formatManifiestoForDisplay(m)).map(m => (
-                                        <div key={m.id} className="list-item" onClick={() => handleSelectManifiesto(m)}>
-                                            <div className="list-icon"><FileText size={18} /></div>
-                                            <div className="list-body">
-                                                <div className="list-title">#{m.numero}</div>
-                                                <div className="list-sub">{m.generador} → {m.operador}</div>
-                                                {/* FASE 5: Datos adicionales en lista */}
-                                                <div className="list-meta" style={{ display: 'flex', gap: '8px', marginTop: '4px', fontSize: '11px', color: 'var(--ind-text-mid)' }}>
-                                                    <span style={{ color: 'var(--ind-cyan)' }}>{m.residuo || 'Residuo'}</span>
-                                                    <span style={{ color: 'var(--ind-orange)' }}>{m.cantidad || ''}</span>
-                                                    {m.fecha && <span>{m.fecha}</span>}
-                                                </div>
-                                            </div>
-                                            <div className="list-badge">{getEstadoBadge(m.estado)}</div>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="empty-state">
-                                        <FileText size={32} />
-                                        <p>No hay manifiestos {activeTab === 'pendientes' ? 'pendientes' : activeTab === 'en-curso' ? 'en curso' : 'realizados'}</p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </>
+                    <HomeScreen
+                        role={role!}
+                        manifiestos={backendManifiestos}
+                        activeTab={activeTab}
+                        onTabChange={setActiveTab}
+                        onSelectManifiesto={handleSelectManifiesto}
+                        onNavigate={handleNavigationWithActiveTrip}
+                        isOnline={isOnline}
+                        syncPending={syncPending}
+                        viajeActivo={trip.viajeActivo}
+                        onIniciarViajeAutomatico={handleIniciarViajeAutomatico}
+                        backendStats={dashboardStats || undefined}
+                    />
                 );
 
             case 'manifiestos':
-                // FASE 4: Usando componente extraído
                 return (
                     <ManifiestosScreen
-                        manifiestos={displayManifiestos.map(m => formatManifiestoForDisplay(m))}
+                        manifiestos={displayManifiestos.map(formatManifiestoForDisplay)}
                         onSelectManifiesto={handleSelectManifiesto}
                     />
                 );
 
             case 'alertas':
-                // FASE 4: Usando componente extraído
                 return (
                     <AlertasScreen
                         notificaciones={notificaciones}
                         noLeidas={noLeidas}
-                        onMarcarLeida={handleMarcarLeida}
-                        onEliminar={handleEliminarNotificacion}
-                        onMarcarTodasLeidas={handleMarcarTodasLeidas}
+                        onMarcarLeida={(id) => handleMarcarLeida(id).then(ok => ok && showToastMessage('Marcada como leida'))}
+                        onEliminar={(id) => handleEliminarNotificacion(id).then(ok => ok && showToastMessage('Notificacion eliminada'))}
+                        onMarcarTodasLeidas={() => handleMarcarTodasLeidas().then(ok => ok && showToastMessage('Todas marcadas como leidas'))}
                     />
                 );
 
             case 'usuarios':
-                // FASE 6: Gestión de usuarios para ADMIN
-                return (
-                    <AdminUsuariosScreen />
-                );
+                return <AdminUsuariosScreen />;
 
             case 'control':
-                // FASE 7: Centro de Control para ADMIN
-                return (
-                    <CentroControlScreen
-                        onNavigate={(screen) => setCurrentScreen(screen as Screen)}
-                    />
-                );
+                return <CentroControlScreen onNavigate={(screen) => setCurrentScreen(screen as Screen)} />;
 
             case 'perfil':
-                // FASE 4: Usando componente extraído
-                return (
-                    <PerfilScreen
-                        roleName={getRoleName()}
-                        onChangeRole={handleChangeRole}
-                    />
-                );
+                return <PerfilScreen roleName={getRoleName()} onChangeRole={handleChangeRole} />;
 
             case 'detalle':
                 if (!selectedManifiesto) return null;
-                const originalData = selectedManifiesto._original || selectedManifiesto;
-                const allResiduos = originalData.residuos || [];
-                // FASE 3: Validación unificada - cualquier viaje activo (backend O hook)
                 const hayViajeActivoEnDetalle = displayManifiestos.some(m => m.estado === 'EN_TRANSITO') || trip.viajeActivo;
 
                 return (
-                    <div className="section">
-                        <h3>Manifiesto #{selectedManifiesto.numero}</h3>
-                        <div className="detail-card">
-                            <div className="detail-row"><label>Estado:</label>{getEstadoBadge(selectedManifiesto.estado)}</div>
-                            <div className="detail-row"><label>Generador:</label><span>{selectedManifiesto.generador}</span></div>
-                            <div className="detail-row"><label>Transportista:</label><span>{selectedManifiesto.transportista}</span></div>
-                            <div className="detail-row"><label>Operador:</label><span>{selectedManifiesto.operador}</span></div>
-                            <div className="detail-row"><label>Fecha:</label><span>{selectedManifiesto.fecha}</span></div>
-                        </div>
-
-                        {/* FASE 4: Mapa origen/destino del manifiesto */}
-                        <div style={{ margin: '12px 0' }}>
-                            <ManifiestoMap
-                                origen={{
-                                    nombre: selectedManifiesto.generador,
-                                    direccion: originalData.generador?.domicilio,
-                                    coords: originalData.generador?.latitud
-                                        ? { lat: originalData.generador.latitud, lng: originalData.generador.longitud }
-                                        : undefined
-                                }}
-                                destino={{
-                                    nombre: selectedManifiesto.operador,
-                                    direccion: originalData.operador?.domicilio,
-                                    coords: originalData.operador?.latitud
-                                        ? { lat: originalData.operador.latitud, lng: originalData.operador.longitud }
-                                        : undefined
-                                }}
-                                altura="180px"
-                            />
-                        </div>
-
-                        {/* CORRECCIÓN 4: Mostrar TODOS los residuos con descripción */}
-                        <div className="detail-card" style={{ marginTop: '12px' }}>
-                            <h4 style={{ margin: '0 0 12px', color: 'var(--ind-cyan)' }}>
-                                Residuos ({allResiduos.length || 1})
-                            </h4>
-                            {allResiduos.length > 0 ? (
-                                allResiduos.map((r: any, idx: number) => (
-                                    <div key={idx} className="residuo-detail-item">
-                                        <div className="residuo-detail-header">
-                                            <span className="residuo-codigo">{r.tipoResiduo?.codigo || 'N/A'}</span>
-                                            <span className="residuo-cantidad">{r.cantidad} {r.unidad}</span>
-                                        </div>
-                                        <div className="residuo-nombre">{r.tipoResiduo?.nombre || 'Residuo'}</div>
-                                        {r.descripcion && (
-                                            <div className="residuo-descripcion">
-                                                <strong>Descripción:</strong> {r.descripcion}
-                                            </div>
-                                        )}
-                                        {r.observaciones && (
-                                            <div className="residuo-observaciones">
-                                                <strong>Obs:</strong> {r.observaciones}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="residuo-detail-item">
-                                    <div className="residuo-nombre">{selectedManifiesto.residuo}</div>
-                                    <div className="residuo-cantidad">{selectedManifiesto.cantidad}</div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Observaciones generales del manifiesto */}
-                        {originalData.observaciones && (
-                            <div className="detail-card" style={{ marginTop: '12px' }}>
-                                <h4 style={{ margin: '0 0 8px', color: 'var(--ind-yellow)' }}>Observaciones</h4>
-                                <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                                    {originalData.observaciones}
-                                </p>
-                            </div>
-                        )}
-
-                        {/* FASE 3: Validación unificada - deshabilitar si hay viaje activo */}
-                        {role === 'TRANSPORTISTA' && selectedManifiesto.estado === 'APROBADO' && (
-                            <div className="form-actions" style={{ marginTop: '16px' }}>
-                                {hayViajeActivoEnDetalle ? (
-                                    <div className="warning-box" style={{
-                                        background: 'rgba(245, 158, 11, 0.1)',
-                                        border: '1px solid #f59e0b',
-                                        borderRadius: '8px',
-                                        padding: '12px',
-                                        textAlign: 'center',
-                                        color: '#f59e0b'
-                                    }}>
-                                        ⚠️ Ya tienes un viaje en tránsito. Finalízalo antes de iniciar otro.
-                                    </div>
-                                ) : (
-                                    <button
-                                        className="btn btn-primary"
-                                        onClick={() => handleIniciarViajeConManifiesto(selectedManifiesto)}
-                                        style={{ width: '100%', padding: '14px', fontSize: '16px' }}
-                                    >
-                                        <Play size={20} style={{ marginRight: '8px' }} />
-                                        Iniciar Transporte
-                                    </button>
-                                )}
-                            </div>
-                        )}
-
-                        {role === 'TRANSPORTISTA' && selectedManifiesto.estado === 'EN_TRANSITO' && (
-                            <div className="form-actions" style={{ marginTop: '16px' }}>
-                                <button
-                                    className="btn btn-primary"
-                                    onClick={() => {
-                                        setActiveManifiestoId(originalData.id);
-                                        setCurrentScreen('viaje');
-                                    }}
-                                    style={{ width: '100%', padding: '14px', fontSize: '16px' }}
-                                >
-                                    <Navigation size={20} style={{ marginRight: '8px' }} />
-                                    Ver Viaje Activo
-                                </button>
-                            </div>
-                        )}
-
-                        {/* REVERSION: Transportista puede revertir ENTREGADO → EN_TRANSITO */}
-                        {role === 'TRANSPORTISTA' && selectedManifiesto.estado === 'ENTREGADO' && (
-                            <div className="form-actions" style={{ marginTop: '16px' }}>
-                                <button
-                                    className="btn btn-warning"
-                                    onClick={() => {
-                                        setManifiestoParaModal({
-                                            id: originalData.id,
-                                            numero: selectedManifiesto.numero,
-                                            estado: selectedManifiesto.estado
-                                        });
-                                        setReversionType('entrega');
-                                        setShowReversionModal(true);
-                                    }}
-                                    style={{ width: '100%', padding: '14px', fontSize: '16px', background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}
-                                >
-                                    <RotateCcw size={20} style={{ marginRight: '8px' }} />
-                                    Revertir Entrega
-                                </button>
-                                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', textAlign: 'center' }}>
-                                    Use esta opcion si el operador rechazo la carga
-                                </p>
-                            </div>
-                        )}
-
-                        {role === 'OPERADOR' && selectedManifiesto.estado === 'ENTREGADO' && (
-                            <div className="form-actions" style={{ marginTop: '16px' }}>
-                                <button
-                                    className="btn btn-primary"
-                                    onClick={() => {
-                                        // FASE 3: Abrir modal de recepción con pesaje y firma
-                                        setManifiestoParaModal({
-                                            id: originalData.id,
-                                            numero: selectedManifiesto.numero,
-                                            estado: selectedManifiesto.estado,
-                                            generador: { razonSocial: selectedManifiesto.generador },
-                                            transportista: { razonSocial: selectedManifiesto.transportista },
-                                            tipoResiduo: selectedManifiesto.residuo,
-                                            pesoKg: originalData.residuos?.[0]?.cantidad || 0
-                                        });
-                                        setShowRecepcionModal(true);
-                                    }}
-                                    style={{ flex: 1, padding: '14px', fontSize: '16px' }}
-                                >
-                                    <Package size={20} style={{ marginRight: '8px' }} />
-                                    Recibir
-                                </button>
-                                {/* CU-O05: Botón para rechazar carga */}
-                                <button
-                                    className="btn btn-danger"
-                                    onClick={() => {
-                                        setManifiestoParaModal({
-                                            id: originalData.id,
-                                            numero: selectedManifiesto.numero,
-                                            estado: selectedManifiesto.estado,
-                                            generador: { razonSocial: selectedManifiesto.generador },
-                                            transportista: { razonSocial: selectedManifiesto.transportista },
-                                            tipoResiduo: selectedManifiesto.residuo,
-                                            pesoKg: originalData.residuos?.[0]?.cantidad || 0
-                                        });
-                                        setShowRechazoModal(true);
-                                    }}
-                                    style={{ flex: 1, padding: '14px', fontSize: '16px', background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}
-                                >
-                                    <Command size={20} style={{ marginRight: '8px' }} />
-                                    Rechazar
-                                </button>
-                            </div>
-                        )}
-
-                        {/* CU-O07/O08: Botón para registrar tratamiento cuando ya se recibió la carga */}
-                        {role === 'OPERADOR' && selectedManifiesto.estado === 'RECIBIDO' && (
-                            <div className="form-actions" style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <button
-                                    className="btn btn-success"
-                                    onClick={() => {
-                                        setManifiestoParaModal({
-                                            id: originalData.id,
-                                            numero: selectedManifiesto.numero,
-                                            estado: selectedManifiesto.estado,
-                                            generador: { razonSocial: selectedManifiesto.generador },
-                                            transportista: { razonSocial: selectedManifiesto.transportista },
-                                            tipoResiduo: selectedManifiesto.residuo,
-                                            pesoKg: originalData.residuos?.[0]?.cantidad || 0
-                                        });
-                                        setShowTratamientoModal(true);
-                                    }}
-                                    style={{ width: '100%', padding: '14px', fontSize: '16px', background: 'linear-gradient(135deg, #22c55e, #16a34a)' }}
-                                >
-                                    <Recycle size={20} style={{ marginRight: '8px' }} />
-                                    Registrar Tratamiento
-                                </button>
-                                {/* REVERSION: Operador puede revertir RECIBIDO → ENTREGADO */}
-                                <button
-                                    className="btn btn-warning"
-                                    onClick={() => {
-                                        setManifiestoParaModal({
-                                            id: originalData.id,
-                                            numero: selectedManifiesto.numero,
-                                            estado: selectedManifiesto.estado
-                                        });
-                                        setReversionType('recepcion');
-                                        setShowReversionModal(true);
-                                    }}
-                                    style={{ width: '100%', padding: '12px', fontSize: '14px', background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}
-                                >
-                                    <RotateCcw size={18} style={{ marginRight: '8px' }} />
-                                    Revertir Recepcion
-                                </button>
-                            </div>
-                        )}
-
-                        {/* REVERSION: Operador puede revertir TRATADO → RECIBIDO */}
-                        {role === 'OPERADOR' && selectedManifiesto.estado === 'TRATADO' && (
-                            <div className="form-actions" style={{ marginTop: '16px' }}>
-                                <button
-                                    className="btn btn-warning"
-                                    onClick={() => {
-                                        setManifiestoParaModal({
-                                            id: originalData.id,
-                                            numero: selectedManifiesto.numero,
-                                            estado: selectedManifiesto.estado
-                                        });
-                                        setReversionType('certificado');
-                                        setShowReversionModal(true);
-                                    }}
-                                    style={{ width: '100%', padding: '14px', fontSize: '16px', background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}
-                                >
-                                    <RotateCcw size={20} style={{ marginRight: '8px' }} />
-                                    Revertir Certificado
-                                </button>
-                                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', textAlign: 'center' }}>
-                                    Use esta opcion para corregir el certificado de tratamiento
-                                </p>
-                            </div>
-                        )}
-                    </div>
+                    <ManifiestoDetail
+                        manifiesto={selectedManifiesto}
+                        role={role!}
+                        hayViajeActivo={hayViajeActivoEnDetalle}
+                        onIniciarViaje={handleIniciarViajeConManifiesto}
+                        onVerViajeActivo={() => {
+                            setActiveManifiestoId((selectedManifiesto._original || selectedManifiesto).id);
+                            setCurrentScreen('viaje');
+                        }}
+                        onFirmar={handleFirmarManifiesto}
+                        onRecibir={() => openModalForManifiesto('recepcion')}
+                        onRechazar={() => openModalForManifiesto('rechazo')}
+                        onTratamiento={() => openModalForManifiesto('tratamiento')}
+                        onCerrar={handleCerrarManifiesto}
+                        onRevertir={(tipo) => openModalForManifiesto('reversion', tipo)}
+                    />
                 );
 
             case 'tracking':
@@ -1401,7 +805,7 @@ const MobileApp: React.FC = () => {
                             </div>
                             <div className="tracking-info">
                                 <span className="tracking-label">Estado GPS</span>
-                                <span className="tracking-value">{trip.gpsPosition ? 'Activo' : 'Sin señal'}</span>
+                                <span className="tracking-value">{trip.gpsPosition ? 'Activo' : 'Sin senal'}</span>
                             </div>
                         </div>
                         {trip.gpsPosition && (
@@ -1414,26 +818,17 @@ const MobileApp: React.FC = () => {
                                     <label>Longitud:</label>
                                     <span>{trip.gpsPosition.lng.toFixed(6)}</span>
                                 </div>
-                                <div className="detail-row">
-                                    <label>Precisión:</label>
-                                    <span>±{(trip.gpsPosition as any).accuracy?.toFixed(0) || 'N/A'}m</span>
-                                </div>
                             </div>
                         )}
                         <div className="list">
                             <h4 style={{ margin: '16px 0 8px', color: 'var(--ind-yellow)' }}>Viajes Activos</h4>
                             {displayManifiestos.filter(m => m.estado === 'EN_TRANSITO').length > 0 ? (
-                                displayManifiestos.filter(m => m.estado === 'EN_TRANSITO').map(m => formatManifiestoForDisplay(m)).map(m => (
+                                displayManifiestos.filter(m => m.estado === 'EN_TRANSITO').map(formatManifiestoForDisplay).map(m => (
                                     <div key={m.id} className="list-item" onClick={() => handleSelectManifiesto(m)}>
                                         <div className="list-icon"><Navigation size={18} /></div>
                                         <div className="list-body">
                                             <div className="list-title">#{m.numero}</div>
                                             <div className="list-sub">{m.generador} → {m.operador}</div>
-                                            {/* FASE 5: Datos adicionales en lista */}
-                                            <div className="list-meta" style={{ display: 'flex', gap: '8px', marginTop: '4px', fontSize: '11px', color: 'var(--ind-text-mid)' }}>
-                                                <span style={{ color: 'var(--ind-cyan)' }}>{m.residuo || 'Residuo'}</span>
-                                                <span style={{ color: 'var(--ind-orange)' }}>{m.cantidad || ''}</span>
-                                            </div>
                                         </div>
                                         <div className="list-badge">{getEstadoBadge(m.estado)}</div>
                                     </div>
@@ -1441,7 +836,7 @@ const MobileApp: React.FC = () => {
                             ) : (
                                 <div className="empty-state">
                                     <MapPin size={32} />
-                                    <p>No hay viajes en tránsito</p>
+                                    <p>No hay viajes en transito</p>
                                 </div>
                             )}
                         </div>
@@ -1457,8 +852,8 @@ const MobileApp: React.FC = () => {
                                 <label>Tipo de Residuo</label>
                                 <select className="form-select">
                                     <option value="">Seleccione...</option>
-                                    <option value="Y1">Y1 - Desechos clínicos</option>
-                                    <option value="Y2">Y2 - Desechos farmacéuticos</option>
+                                    <option value="Y1">Y1 - Desechos clinicos</option>
+                                    <option value="Y2">Y2 - Desechos farmaceuticos</option>
                                     <option value="Y3">Y3 - Desechos medicamentos</option>
                                     <option value="Y8">Y8 - Aceites usados</option>
                                     <option value="Y9">Y9 - Mezclas de aceite/agua</option>
@@ -1472,7 +867,7 @@ const MobileApp: React.FC = () => {
                                 <label>Transportista</label>
                                 <select className="form-select">
                                     <option value="">Seleccione...</option>
-                                    <option value="t1">Transporte Ecológico S.A.</option>
+                                    <option value="t1">Transporte Ecologico S.A.</option>
                                     <option value="t2">LogiResiduos Ltda.</option>
                                 </select>
                             </div>
@@ -1481,7 +876,7 @@ const MobileApp: React.FC = () => {
                                 <select className="form-select">
                                     <option value="">Seleccione...</option>
                                     <option value="o1">Planta Tratamiento Norte</option>
-                                    <option value="o2">Centro Disposición Final</option>
+                                    <option value="o2">Centro Disposicion Final</option>
                                 </select>
                             </div>
                             <div className="form-actions">
@@ -1514,14 +909,14 @@ const MobileApp: React.FC = () => {
                         <h3>Historial de Viajes</h3>
                         <div className="filter-bar">
                             <select className="form-select compact">
-                                <option value="7">Últimos 7 días</option>
-                                <option value="30">Últimos 30 días</option>
-                                <option value="90">Últimos 90 días</option>
+                                <option value="7">Ultimos 7 dias</option>
+                                <option value="30">Ultimos 30 dias</option>
+                                <option value="90">Ultimos 90 dias</option>
                             </select>
                         </div>
                         <div className="list">
                             {displayManifiestos.filter(m => m.estado === 'TRATADO' || m.estado === 'RECIBIDO').length > 0 ? (
-                                displayManifiestos.filter(m => m.estado === 'TRATADO' || m.estado === 'RECIBIDO').map(m => formatManifiestoForDisplay(m)).map(m => (
+                                displayManifiestos.filter(m => m.estado === 'TRATADO' || m.estado === 'RECIBIDO').map(formatManifiestoForDisplay).map(m => (
                                     <div key={m.id} className="list-item" onClick={() => handleSelectManifiesto(m)}>
                                         <div className="list-icon"><FileText size={18} /></div>
                                         <div className="list-body">
@@ -1541,22 +936,20 @@ const MobileApp: React.FC = () => {
                     </div>
                 );
 
-            // FASE 2: Pantalla de historial de viajes - renderizada a nivel superior
-            // El componente se renderiza fuera de app-content para cubrir header/nav
             case 'historial-viajes':
                 return null;
 
             default:
                 return (
                     <div className="screen-not-found">
-                        <div className="screen-not-found-icon">🔍</div>
+                        <div className="screen-not-found-icon">?</div>
                         <h2>Pantalla no disponible</h2>
-                        <p>La función solicitada está en desarrollo</p>
+                        <p>La funcion solicitada esta en desarrollo</p>
                         <button className="btn btn-primary" onClick={() => setCurrentScreen('home')}>Volver al inicio</button>
                     </div>
                 );
         }
-    };
+    }
 
     // ========== MAIN RENDER ==========
     return (
@@ -1580,98 +973,70 @@ const MobileApp: React.FC = () => {
                 onClose={() => setShowParadaModal(false)}
             />
 
-            {/* FASE 3: Modal de Recepción para Operador */}
+            {/* Modal de Recepcion */}
             {showRecepcionModal && manifiestoParaModal && (
                 <RecepcionModal
                     isOpen={showRecepcionModal}
-                    onClose={() => {
-                        setShowRecepcionModal(false);
-                        setManifiestoParaModal(null);
-                    }}
+                    onClose={() => { setShowRecepcionModal(false); setManifiestoParaModal(null); }}
                     onConfirm={async (data) => {
-                        try {
-                            // Llamar al backend para confirmar recepción
-                            await manifiestoService.confirmarRecepcion(manifiestoParaModal.id, {
-                                pesoRecibido: data.pesoReal,
-                                observaciones: data.observaciones,
-                                firmaRecepcion: data.firma
-                            });
-                            showToastMessage(`✅ Recepción confirmada - ${manifiestoParaModal.numero}`);
-                            loadManifiestosFromBackend();
-                            setCurrentScreen('home');
-                        } catch (err: any) {
-                            showToastMessage(`❌ Error: ${err.message || 'Error al confirmar recepción'}`);
-                            throw err;
-                        }
+                        await manifiestoService.confirmarRecepcion(manifiestoParaModal.id, {
+                            pesoRecibido: data.pesoReal,
+                            observaciones: data.observaciones,
+                            firmaRecepcion: data.firma
+                        });
+                        showToastMessage(`Recepcion confirmada - ${manifiestoParaModal.numero}`);
+                        loadManifiestosFromBackend();
+                        setCurrentScreen('home');
                     }}
                     manifiesto={manifiestoParaModal}
                 />
             )}
 
-            {/* CU-O05: Modal de Rechazo de Carga para Operador */}
+            {/* Modal de Rechazo */}
             {showRechazoModal && manifiestoParaModal && (
                 <RechazoModal
                     isOpen={showRechazoModal}
-                    onClose={() => {
-                        setShowRechazoModal(false);
-                        setManifiestoParaModal(null);
-                    }}
+                    onClose={() => { setShowRechazoModal(false); setManifiestoParaModal(null); }}
                     onConfirm={async (data) => {
-                        try {
-                            await manifiestoService.rechazarCarga(manifiestoParaModal.id, {
-                                motivo: data.motivo,
-                                descripcion: data.descripcion,
-                                cantidadRechazada: data.cantidadRechazada
-                            });
-                            showToastMessage(`⚠️ Carga rechazada - ${manifiestoParaModal.numero}`);
-                            loadManifiestosFromBackend();
-                            setCurrentScreen('home');
-                        } catch (err: any) {
-                            showToastMessage(`❌ Error: ${err.message || 'Error al rechazar carga'}`);
-                            throw err;
-                        }
+                        await manifiestoService.rechazarCarga(manifiestoParaModal.id, {
+                            motivo: data.motivo,
+                            descripcion: data.descripcion,
+                            cantidadRechazada: data.cantidadRechazada
+                        });
+                        showToastMessage(`Carga rechazada - ${manifiestoParaModal.numero}`);
+                        loadManifiestosFromBackend();
+                        setCurrentScreen('home');
                     }}
                     manifiesto={manifiestoParaModal}
                 />
             )}
 
-            {/* CU-O07/O08: Modal de Tratamiento para Operador */}
+            {/* Modal de Tratamiento */}
             {showTratamientoModal && manifiestoParaModal && (
                 <TratamientoModal
                     isOpen={showTratamientoModal}
-                    onClose={() => {
-                        setShowTratamientoModal(false);
-                        setManifiestoParaModal(null);
-                    }}
+                    onClose={() => { setShowTratamientoModal(false); setManifiestoParaModal(null); }}
                     onConfirm={async (data) => {
-                        try {
-                            await manifiestoService.registrarTratamiento(manifiestoParaModal.id, {
-                                metodoTratamiento: data.metodoTratamiento,
-                                fechaTratamiento: data.fechaTratamiento,
-                                observaciones: data.observaciones
-                            });
-                            showToastMessage(`✅ Tratamiento registrado - ${manifiestoParaModal.numero}`);
-                            loadManifiestosFromBackend();
-                            setCurrentScreen('home');
-                        } catch (err: any) {
-                            showToastMessage(`❌ Error: ${err.message || 'Error al registrar tratamiento'}`);
-                            throw err;
-                        }
+                        await manifiestoService.registrarTratamiento(manifiestoParaModal.id, {
+                            metodoTratamiento: data.metodoTratamiento,
+                            fechaTratamiento: data.fechaTratamiento,
+                            observaciones: data.observaciones
+                        });
+                        showToastMessage(`Tratamiento registrado - ${manifiestoParaModal.numero}`);
+                        loadManifiestosFromBackend();
+                        setCurrentScreen('home');
                     }}
                     manifiesto={manifiestoParaModal}
                 />
             )}
 
-            {/* Modal de Reversion de Estado */}
+            {/* Modal de Reversion */}
             {showReversionModal && manifiestoParaModal && (
                 <ReversionModal
                     isOpen={showReversionModal}
-                    onClose={() => {
-                        setShowReversionModal(false);
-                        setManifiestoParaModal(null);
-                    }}
+                    onClose={() => { setShowReversionModal(false); setManifiestoParaModal(null); }}
                     onSuccess={() => {
-                        showToastMessage(`✅ Estado revertido correctamente`);
+                        showToastMessage(`Estado revertido correctamente`);
                         loadManifiestosFromBackend();
                         setCurrentScreen('home');
                     }}
@@ -1682,38 +1047,30 @@ const MobileApp: React.FC = () => {
                 />
             )}
 
-            {/* FASE 3: Modal de Transportista para Retiro/Entrega */}
+            {/* Modal de Transportista */}
             {showTransportistaModal && manifiestoParaModal && (
                 <TransportistaModal
                     isOpen={showTransportistaModal}
-                    onClose={() => {
-                        setShowTransportistaModal(false);
-                        setManifiestoParaModal(null);
-                    }}
+                    onClose={() => { setShowTransportistaModal(false); setManifiestoParaModal(null); }}
                     onConfirm={async (data) => {
-                        try {
-                            if (data.action === 'retiro') {
-                                await manifiestoService.confirmarRetiro(manifiestoParaModal.id, {
-                                    latitud: data.ubicacion?.lat,
-                                    longitud: data.ubicacion?.lng,
-                                    observaciones: data.observaciones,
-                                    firmaRetiro: data.firma
-                                });
-                                showToastMessage(`✅ Retiro confirmado - ${manifiestoParaModal.numero}`);
-                            } else {
-                                await manifiestoService.confirmarEntrega(manifiestoParaModal.id, {
-                                    latitud: data.ubicacion?.lat,
-                                    longitud: data.ubicacion?.lng,
-                                    observaciones: data.observaciones,
-                                    firmaEntrega: data.firma
-                                });
-                                showToastMessage(`✅ Entrega confirmada - ${manifiestoParaModal.numero}`);
-                            }
-                            loadManifiestosFromBackend();
-                        } catch (err: any) {
-                            showToastMessage(`❌ Error: ${err.message || 'Error al procesar'}`);
-                            throw err;
+                        if (data.action === 'retiro') {
+                            await manifiestoService.confirmarRetiro(manifiestoParaModal.id, {
+                                latitud: data.ubicacion?.lat,
+                                longitud: data.ubicacion?.lng,
+                                observaciones: data.observaciones,
+                                firmaRetiro: data.firma
+                            });
+                            showToastMessage(`Retiro confirmado - ${manifiestoParaModal.numero}`);
+                        } else {
+                            await manifiestoService.confirmarEntrega(manifiestoParaModal.id, {
+                                latitud: data.ubicacion?.lat,
+                                longitud: data.ubicacion?.lng,
+                                observaciones: data.observaciones,
+                                firmaEntrega: data.firma
+                            });
+                            showToastMessage(`Entrega confirmada - ${manifiestoParaModal.numero}`);
                         }
+                        loadManifiestosFromBackend();
                     }}
                     manifiesto={manifiestoParaModal}
                     action={transportistaModalAction}
@@ -1721,7 +1078,7 @@ const MobileApp: React.FC = () => {
                 />
             )}
 
-            {/* QR → Viaje Confirmation Modal */}
+            {/* QR Confirmation Modal */}
             {showQRConfirmModal && scannedManifiesto && (
                 <div className="modal-overlay" onClick={() => {
                     setShowQRConfirmModal(false);
@@ -1769,19 +1126,14 @@ const MobileApp: React.FC = () => {
                         </div>
 
                         <div className="qr-modal-actions">
-                            {/* FASE 3: Validación unificada - verificar backend Y hook */}
                             {scannedManifiesto.estado === 'APROBADO' && role === 'TRANSPORTISTA' &&
                              !trip.viajeActivo && !displayManifiestos.some(m => m.estado === 'EN_TRANSITO') && (
-                                <button
-                                    className="btn btn-primary qr-btn-iniciar"
-                                    onClick={handleIniciarViajeDesdeQR}
-                                >
+                                <button className="btn btn-primary qr-btn-iniciar" onClick={handleIniciarViajeDesdeQR}>
                                     <Navigation size={18} />
                                     INICIAR VIAJE AHORA
                                 </button>
                             )}
 
-                            {/* Mostrar botón de VER VIAJE si está EN_TRANSITO */}
                             {scannedManifiesto.estado === 'EN_TRANSITO' && (
                                 <button
                                     className="btn btn-primary qr-btn-ver"
@@ -1799,7 +1151,6 @@ const MobileApp: React.FC = () => {
                                 </button>
                             )}
 
-                            {/* Botón para ver detalles */}
                             <button
                                 className="btn btn-secondary qr-btn-detalle"
                                 onClick={() => {
@@ -1814,7 +1165,6 @@ const MobileApp: React.FC = () => {
                                 Ver Detalles
                             </button>
 
-                            {/* Botón cerrar */}
                             <button
                                 className="btn btn-ghost qr-btn-cerrar"
                                 onClick={() => {
@@ -1830,7 +1180,7 @@ const MobileApp: React.FC = () => {
                 </div>
             )}
 
-            {/* Loading overlay for QR manifiesto */}
+            {/* Loading overlay for QR */}
             {loadingQRManifiesto && (
                 <div className="modal-overlay">
                     <div className="loading-spinner">
@@ -1840,25 +1190,19 @@ const MobileApp: React.FC = () => {
                 </div>
             )}
 
-            {/* FASE 2: Modal de detalle de viaje con mapa */}
+            {/* Modal de detalle de viaje */}
             {showViajeModal && selectedViaje && (
                 <ViajeDetalleModal
                     viaje={selectedViaje}
-                    onClose={() => {
-                        setShowViajeModal(false);
-                        setSelectedViaje(null);
-                    }}
+                    onClose={() => { setShowViajeModal(false); setSelectedViaje(null); }}
                 />
             )}
 
-            {/* FASE 2: HistorialViajes - RENDERIZADO A NIVEL SUPERIOR para cubrir todo */}
+            {/* HistorialViajes - Renderizado a nivel superior */}
             {currentScreen === 'historial-viajes' && (
                 <HistorialViajes
                     viajes={trip.savedTrips}
-                    onSelectViaje={(viaje) => {
-                        setSelectedViaje(viaje);
-                        setShowViajeModal(true);
-                    }}
+                    onSelectViaje={(viaje) => { setSelectedViaje(viaje); setShowViajeModal(true); }}
                     onBack={() => setCurrentScreen('home')}
                 />
             )}
@@ -1868,7 +1212,6 @@ const MobileApp: React.FC = () => {
                 {renderHeaderButton()}
                 <span className="header-title">{getHeaderTitle()}</span>
                 <div className="header-right">
-                    {/* FASE 5: SyncIndicator compacto */}
                     <SyncIndicator
                         isOnline={isReallyOnline}
                         isSyncing={syncPending}
@@ -1884,7 +1227,7 @@ const MobileApp: React.FC = () => {
                 </div>
             </header>
 
-            {/* FASE 2 + CORRECCIÓN v4: TripBanner colapsable */}
+            {/* TripBanner colapsable */}
             {debeBloquearNavegacion && currentScreen !== 'viaje' && (
                 <TripBanner
                     isActive={debeBloquearNavegacion}
@@ -1952,7 +1295,6 @@ const MobileApp: React.FC = () => {
                         className={`nav-btn ${currentScreen === item.id ? 'active' : ''}`}
                         onClick={() => {
                             const previousScreen = currentScreen;
-                            // FASE 3: Usar navegación con verificación de viaje activo
                             if (handleNavigationWithActiveTrip(item.id)) {
                                 analyticsService.trackNavigation(item.id, previousScreen, role || undefined);
                                 analyticsService.trackPageView(item.id, role || undefined);
@@ -1965,7 +1307,7 @@ const MobileApp: React.FC = () => {
                 ))}
             </nav>
 
-            {/* FASE 3: Modal de recuperación de viaje interrumpido */}
+            {/* Modal de recuperacion de viaje */}
             {showTripRecoveryModal && pendingRestoreTrip && (
                 <TripRecoveryModal
                     savedTrip={pendingRestoreTrip}
@@ -1974,7 +1316,7 @@ const MobileApp: React.FC = () => {
                 />
             )}
 
-            {/* FASE 3 + CORRECCIÓN v4: Overlay de viaje activo al navegar */}
+            {/* Overlay de viaje activo */}
             {showActiveTripOverlay && debeBloquearNavegacion && (
                 <ActiveTripOverlay
                     duration={trip.tiempoViaje}
@@ -1986,7 +1328,7 @@ const MobileApp: React.FC = () => {
                 />
             )}
 
-            {/* CU-T10: Push notification prompt - muestra después de 5s en home */}
+            {/* Push notification prompt */}
             {currentScreen === 'home' && (
                 <PushNotificationPrompt
                     autoShowDelay={5000}

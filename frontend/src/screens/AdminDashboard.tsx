@@ -11,28 +11,33 @@
 import React, { useState } from 'react';
 import {
     FileText, Clock, CheckCircle, AlertTriangle,
-    TrendingUp, Navigation, ChevronRight
+    TrendingUp, ChevronRight, Activity, Users
 } from 'lucide-react';
+import type { Screen } from '../types/mobile.types';
 import { ESTADO_CONFIG } from '../types/mobile.types';
+import type { DisplayManifiesto } from '../utils/manifiestoUtils';
 
-interface ProcessedManifiesto {
-    id: string;
-    numero: string;
-    estado: string;
-    generador: string;
-    operador: string;
-    transportista: string;
-    residuo: string;
-    cantidad: string;
-    fecha: string;
-    _original?: any;
+// Tipo para estadísticas del backend (sincronizado con DashboardStats)
+interface BackendStats {
+    total: number;
+    borradores: number;
+    pendientesAprobacion?: number;
+    aprobados: number;
+    enTransito: number;
+    entregados: number;
+    recibidos: number;
+    enTratamiento?: number;
+    tratados: number;
 }
 
 interface AdminDashboardProps {
-    manifiestos: ProcessedManifiesto[];
-    onSelectManifiesto: (m: ProcessedManifiesto) => void;
+    manifiestos: DisplayManifiesto[];
+    onSelectManifiesto: (m: DisplayManifiesto) => void;
+    onNavigate: (screen: Screen) => void;
     onAprobar?: (id: string) => void;
     onRechazar?: (id: string) => void;
+    // Stats del backend para sincronización con WEB
+    backendStats?: BackendStats;
 }
 
 type AdminTab = 'resumen' | 'pendientes' | 'todos' | 'viajes';
@@ -40,19 +45,38 @@ type AdminTab = 'resumen' | 'pendientes' | 'todos' | 'viajes';
 const AdminDashboard: React.FC<AdminDashboardProps> = ({
     manifiestos,
     onSelectManifiesto,
+    onNavigate,
     onAprobar,
-    onRechazar
+    onRechazar,
+    backendStats
 }) => {
     const [activeTab, setActiveTab] = useState<AdminTab>('resumen');
 
-    // Estadisticas
-    const stats = {
+    // Estadisticas SINCRONIZADAS con WEB (Dashboard.tsx)
+    // Usa backendStats cuando está disponible (desde /api/manifiestos/dashboard)
+    const stats = backendStats ? {
+        total: backendStats.total,
+        pendientesDGFA: backendStats.pendientesAprobacion ?? 0,
+        enProceso: (backendStats.aprobados ?? 0) + (backendStats.enTransito ?? 0) +
+                   (backendStats.entregados ?? 0) + (backendStats.recibidos ?? 0) +
+                   (backendStats.enTratamiento ?? 0),
+        completados: backendStats.tratados ?? 0,
+        // Para gráfico de distribución
+        borradores: backendStats.borradores ?? 0,
+        aprobados: backendStats.aprobados ?? 0,
+        enTransito: backendStats.enTransito ?? 0,
+        entregados: (backendStats.entregados ?? 0) + (backendStats.recibidos ?? 0) + (backendStats.enTratamiento ?? 0)
+    } : {
+        // Fallback: calcular desde manifiestos (solo para offline/cache)
         total: manifiestos.length,
-        pendientes: manifiestos.filter(m => m.estado === 'PENDIENTE_APROBACION').length,
+        pendientesDGFA: manifiestos.filter(m => m.estado === 'PENDIENTE_APROBACION').length,
+        enProceso: manifiestos.filter(m => ['APROBADO', 'EN_TRANSITO', 'ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO'].includes(m.estado)).length,
+        completados: manifiestos.filter(m => m.estado === 'TRATADO').length,
+        // Para gráfico de distribución
+        borradores: manifiestos.filter(m => m.estado === 'BORRADOR').length,
         aprobados: manifiestos.filter(m => m.estado === 'APROBADO').length,
         enTransito: manifiestos.filter(m => m.estado === 'EN_TRANSITO').length,
-        entregados: manifiestos.filter(m => ['ENTREGADO', 'RECIBIDO', 'TRATADO'].includes(m.estado)).length,
-        borradores: manifiestos.filter(m => m.estado === 'BORRADOR').length
+        entregados: manifiestos.filter(m => ['ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO'].includes(m.estado)).length
     };
 
     const getEstadoBadge = (estado: string) => {
@@ -79,7 +103,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     onClick={() => setActiveTab('pendientes')}
                 >
                     <Clock size={16} />
-                    <span>Aprobar ({stats.pendientes})</span>
+                    <span>Aprobar ({stats.pendientesDGFA})</span>
                 </button>
                 <button
                     className={`admin-tab ${activeTab === 'todos' ? 'active' : ''}`}
@@ -94,59 +118,67 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="admin-content">
                 {activeTab === 'resumen' && (
                     <div className="admin-resumen">
-                        {/* Stats Grid */}
+                        {/* Stats Grid - SINCRONIZADO con WEB Dashboard */}
                         <div className="admin-stats-grid">
                             <div className="admin-stat-card primary">
                                 <div className="stat-icon"><FileText size={24} /></div>
                                 <div className="stat-info">
                                     <span className="stat-value">{stats.total}</span>
-                                    <span className="stat-label">Total Manifiestos</span>
+                                    <span className="stat-label">TOTAL SISTEMA</span>
                                 </div>
                             </div>
                             <div className="admin-stat-card warning">
                                 <div className="stat-icon"><Clock size={24} /></div>
                                 <div className="stat-info">
-                                    <span className="stat-value">{stats.pendientes}</span>
-                                    <span className="stat-label">Pendientes</span>
+                                    <span className="stat-value">{stats.pendientesDGFA}</span>
+                                    <span className="stat-label">PENDIENTES DGFA</span>
+                                </div>
+                            </div>
+                            <div className="admin-stat-card info">
+                                <div className="stat-icon"><TrendingUp size={24} /></div>
+                                <div className="stat-info">
+                                    <span className="stat-value">{stats.enProceso}</span>
+                                    <span className="stat-label">EN PROCESO</span>
                                 </div>
                             </div>
                             <div className="admin-stat-card success">
                                 <div className="stat-icon"><CheckCircle size={24} /></div>
                                 <div className="stat-info">
-                                    <span className="stat-value">{stats.aprobados}</span>
-                                    <span className="stat-label">Aprobados</span>
-                                </div>
-                            </div>
-                            <div className="admin-stat-card info">
-                                <div className="stat-icon"><Navigation size={24} /></div>
-                                <div className="stat-info">
-                                    <span className="stat-value">{stats.enTransito}</span>
-                                    <span className="stat-label">En Transito</span>
+                                    <span className="stat-value">{stats.completados}</span>
+                                    <span className="stat-label">COMPLETADOS</span>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Quick Actions */}
+                        {/* Quick Actions - SINCRONIZADO con WEB Dashboard */}
                         <div className="admin-section">
-                            <h3>Acciones Rapidas</h3>
+                            <h3>Acciones Rápidas</h3>
                             <div className="admin-actions">
                                 <button
                                     className="admin-action-btn"
                                     onClick={() => setActiveTab('pendientes')}
                                 >
                                     <Clock size={20} />
-                                    <span>Cola de Aprobacion</span>
-                                    {stats.pendientes > 0 && (
-                                        <span className="action-badge">{stats.pendientes}</span>
+                                    <span>Cola de Aprobación</span>
+                                    {stats.pendientesDGFA > 0 && (
+                                        <span className="action-badge">{stats.pendientesDGFA}</span>
                                     )}
                                     <ChevronRight size={16} />
                                 </button>
                                 <button
                                     className="admin-action-btn"
-                                    onClick={() => setActiveTab('todos')}
+                                    onClick={() => onNavigate('control')}
                                 >
-                                    <FileText size={20} />
-                                    <span>Ver Todos los Manifiestos</span>
+                                    <Activity size={20} />
+                                    <span>Centro de Control</span>
+                                    <ChevronRight size={16} />
+                                </button>
+                                <button
+                                    className="admin-action-btn"
+                                    onClick={() => onNavigate('usuarios')}
+                                >
+                                    <Users size={20} />
+                                    <span>Gestión Usuarios</span>
                                     <ChevronRight size={16} />
                                 </button>
                             </div>
@@ -154,14 +186,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                         {/* Estado Distribution */}
                         <div className="admin-section">
-                            <h3>Distribucion por Estado</h3>
+                            <h3>Distribución por Estado</h3>
                             <div className="estado-bars">
                                 {[
                                     { label: 'Borradores', count: stats.borradores, color: '#64748b' },
-                                    { label: 'Pendientes', count: stats.pendientes, color: '#f59e0b' },
+                                    { label: 'Pendientes DGFA', count: stats.pendientesDGFA, color: '#f59e0b' },
                                     { label: 'Aprobados', count: stats.aprobados, color: '#10b981' },
-                                    { label: 'En Transito', count: stats.enTransito, color: '#06b6d4' },
-                                    { label: 'Completados', count: stats.entregados, color: '#8b5cf6' }
+                                    { label: 'En Tránsito', count: stats.enTransito, color: '#06b6d4' },
+                                    { label: 'Completados', count: stats.completados, color: '#22c55e' }
                                 ].map(item => (
                                     <div key={item.label} className="estado-bar-item">
                                         <div className="estado-bar-header">

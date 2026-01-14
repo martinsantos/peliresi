@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
 import { config } from '../config/config';
 import { AppError } from './errorHandler';
+import { redisService, CACHE_TTL, CACHE_PREFIX } from '../lib/redis';
 
 const prisma = new PrismaClient();
 
@@ -23,23 +24,34 @@ export const isAuthenticated = async (
     }
 
     const token = authHeader.split(' ')[1];
-    
+
     // Verificar el token
     const decoded = jwt.verify(token, config.JWT_SECRET as string) as { id: string };
-    
-    // Obtener el usuario de la base de datos
-    const user = await prisma.usuario.findUnique({
-      where: { id: decoded.id },
-      select: {
-        id: true,
-        email: true,
-        rol: true,
-        activo: true,
-        generador: true,
-        transportista: true,
-        operador: true,
-      },
-    });
+
+    // OPTIMIZACIÓN: Intentar obtener usuario de caché Redis
+    const cacheKey = `${CACHE_PREFIX.USER}${decoded.id}`;
+    let user = await redisService.get<typeof req.user>(cacheKey);
+
+    if (!user) {
+      // Cache miss - obtener de base de datos
+      user = await prisma.usuario.findUnique({
+        where: { id: decoded.id },
+        select: {
+          id: true,
+          email: true,
+          rol: true,
+          activo: true,
+          generador: true,
+          transportista: true,
+          operador: true,
+        },
+      });
+
+      // Guardar en caché si usuario válido (5 min TTL)
+      if (user && user.activo) {
+        await redisService.set(cacheKey, user, CACHE_TTL.USER);
+      }
+    }
 
     if (!user || !user.activo) {
       throw new AppError('Usuario no autorizado o inactivo', 401);

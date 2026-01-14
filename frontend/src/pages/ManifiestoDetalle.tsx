@@ -30,9 +30,11 @@ import {
     Trash2,
     Leaf,
     MoreHorizontal,
-    FlaskConical
+    FlaskConical,
+    RotateCcw
 } from 'lucide-react';
 import ManifiestoMap from '../components/mobile/ManifiestoMap';
+import ReversionModal from '../components/ReversionModal';
 import './ManifiestoDetalle.css';
 
 const ManifiestoDetalle: React.FC = () => {
@@ -61,7 +63,9 @@ const ManifiestoDetalle: React.FC = () => {
     const [smsEnviado, setSmsEnviado] = useState(false);
     const [firmaLoading, setFirmaLoading] = useState(false);
 
-
+    // Estados para modal de reversión
+    const [showReversionModal, setShowReversionModal] = useState(false);
+    const [reversionType, setReversionType] = useState<'entrega' | 'recepcion' | 'certificado' | 'admin'>('entrega');
 
     useEffect(() => {
         if (id) {
@@ -167,6 +171,23 @@ const ManifiestoDetalle: React.FC = () => {
             return;
         }
 
+        // Abrir modal de reversión según tipo
+        if (action === 'revertir-entrega') {
+            setReversionType('entrega');
+            setShowReversionModal(true);
+            return;
+        }
+        if (action === 'revertir-recepcion') {
+            setReversionType('recepcion');
+            setShowReversionModal(true);
+            return;
+        }
+        if (action === 'revertir-certificado') {
+            setReversionType('certificado');
+            setShowReversionModal(true);
+            return;
+        }
+
         setActionLoading(true);
         try {
             let updated: Manifiesto | null = null;
@@ -255,6 +276,12 @@ const ManifiestoDetalle: React.FC = () => {
             case 'ENTREGADO':
                 if (user.rol === 'OPERADOR') {
                     actions.push({ action: 'confirmar-recepcion', label: 'Confirmar Recepción', icon: <Building2 size={18} />, variant: 'primary' });
+                    // OPERADOR puede rechazar carga (revertir entrega)
+                    actions.push({ action: 'revertir-entrega', label: 'Rechazar Carga', icon: <RotateCcw size={18} />, variant: 'secondary' });
+                }
+                // TRANSPORTISTA puede revertir entrega si operador rechazó
+                if (user.rol === 'TRANSPORTISTA' || user.rol === 'ADMIN' || user.rol === 'ADMIN_TRANSPORTISTAS' || user.rol === 'ADMIN_OPERADORES') {
+                    actions.push({ action: 'revertir-entrega', label: 'Revertir Entrega', icon: <RotateCcw size={18} />, variant: 'secondary' });
                 }
                 break;
             case 'RECIBIDO':
@@ -262,26 +289,34 @@ const ManifiestoDetalle: React.FC = () => {
                     // OPERADOR puede iniciar tratamiento (RECIBIDO → EN_TRATAMIENTO)
                     actions.push({ action: 'tratamiento', label: 'Iniciar Tratamiento', icon: <CheckCircle size={18} />, variant: 'primary' });
                 }
+                // OPERADOR puede revertir recepción
+                if (user.rol === 'OPERADOR' || user.rol === 'ADMIN' || user.rol === 'ADMIN_OPERADORES') {
+                    actions.push({ action: 'revertir-recepcion', label: 'Revertir Recepción', icon: <RotateCcw size={18} />, variant: 'secondary' });
+                }
                 break;
             case 'EN_TRATAMIENTO':
                 if (user.rol === 'OPERADOR') {
                     // OPERADOR puede cerrar y emitir certificado (EN_TRATAMIENTO → TRATADO)
                     actions.push({ action: 'cerrar', label: 'Cerrar y Emitir Certificado', icon: <Award size={18} />, variant: 'primary' });
+                    // OPERADOR puede revertir tratamiento (volver a RECIBIDO)
+                    actions.push({ action: 'revertir-certificado', label: 'Revertir a Recibido', icon: <RotateCcw size={18} />, variant: 'secondary' });
+                }
+                // ADMIN puede revertir tratamiento
+                if (user.rol === 'ADMIN' || user.rol === 'ADMIN_OPERADORES') {
+                    actions.push({ action: 'revertir-certificado', label: 'Revertir Tratamiento', icon: <RotateCcw size={18} />, variant: 'secondary' });
                 }
                 break;
             case 'TRATADO':
-                // Estado final - solo visualización y descarga de certificado
+                // OPERADOR puede revertir certificado
+                if (user.rol === 'OPERADOR' || user.rol === 'ADMIN' || user.rol === 'ADMIN_OPERADORES') {
+                    actions.push({ action: 'revertir-certificado', label: 'Revertir Certificado', icon: <RotateCcw size={18} />, variant: 'secondary' });
+                }
                 break;
         }
         return actions;
     };
 
-    // Mantener compatibilidad con código existente
-    const getAvailableAction = () => {
-        const actions = getAvailableActions();
-        return actions.length > 0 ? actions[0] : null;
-    };
-
+    
     if (loading) {
         return (
             <div className="detalle-loading">
@@ -305,7 +340,6 @@ const ManifiestoDetalle: React.FC = () => {
     }
 
     const estadoInfo = getEstadoInfo(manifiesto.estado);
-    const availableAction = getAvailableAction();
 
     return (
         <div className="detalle-page animate-fadeIn">
@@ -365,20 +399,21 @@ const ManifiestoDetalle: React.FC = () => {
                             Certificado
                         </button>
                     )}
-                    {availableAction && (
+                    {getAvailableActions().map((action) => (
                         <button
-                            className="btn btn-primary"
-                            onClick={() => handleAction(availableAction.action)}
+                            key={action.action}
+                            className={`btn ${action.variant === 'secondary' ? 'btn-secondary' : 'btn-primary'}`}
+                            onClick={() => handleAction(action.action)}
                             disabled={actionLoading}
                         >
                             {actionLoading ? (
                                 <div className="spinner" style={{ width: 18, height: 18 }} />
                             ) : (
-                                availableAction.icon
+                                action.icon
                             )}
-                            {availableAction.label}
+                            {action.label}
                         </button>
-                    )}
+                    ))}
                 </div>
             </div>
 
@@ -913,6 +948,22 @@ const ManifiestoDetalle: React.FC = () => {
                         ))}
                     </div>
                 </div>
+            )}
+
+            {/* Modal de Reversión */}
+            {manifiesto && (
+                <ReversionModal
+                    isOpen={showReversionModal}
+                    onClose={() => setShowReversionModal(false)}
+                    manifiestoId={manifiesto.id}
+                    manifiestoNumero={manifiesto.numero}
+                    estadoActual={manifiesto.estado}
+                    tipoReversion={reversionType}
+                    onSuccess={() => {
+                        setShowReversionModal(false);
+                        loadManifiesto();
+                    }}
+                />
             )}
         </div>
     );
