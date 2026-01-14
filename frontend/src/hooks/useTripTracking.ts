@@ -547,12 +547,12 @@ export function useTripTracking({ role, manifiestoId, onToast }: UseTripTracking
         showToast('Viaje restaurado correctamente');
     }, [showToast]);
 
-    // ============ SINCRONIZAR CON BACKEND (v7.1) ============
+    // ============ SINCRONIZAR CON BACKEND (v7.7) ============
     // Cuando hay un manifiesto EN_TRANSITO en el backend pero no hay viaje local activo,
     // este método inicializa el hook usando la fecha de inicio de transporte del manifiesto
     const sincronizarConBackend = useCallback((manifiesto: any) => {
-        console.log('[Trip] v7.1 SYNC INICIO - manifiesto:', manifiesto.id);
-        console.log('[Trip] v7.1 Datos manifiesto:', {
+        console.log('[Trip] v7.7 SYNC INICIO - manifiesto:', manifiesto.id);
+        console.log('[Trip] v7.7 Datos manifiesto:', {
             inicioTransporte: manifiesto.inicioTransporte,
             fechaRetiro: manifiesto.fechaRetiro,
             updatedAt: manifiesto.updatedAt,
@@ -560,16 +560,26 @@ export function useTripTracking({ role, manifiestoId, onToast }: UseTripTracking
             estado: manifiesto.estado
         });
 
-        // CORRECCIÓN v7.1: Usar inicioTransporte como campo prioritario
+        // CORRECCIÓN v7.7: Usar inicioTransporte como campo prioritario
         const fechaInicio = manifiesto.inicioTransporte || manifiesto.fechaRetiro || manifiesto.updatedAt || manifiesto.createdAt;
-        const inicio = fechaInicio ? new Date(fechaInicio).getTime() : Date.now();
+        let inicio = fechaInicio ? new Date(fechaInicio).getTime() : Date.now();
 
-        console.log('[Trip] v7.1 Timestamp calculado:', {
+        // FIX v7.7: Limitar el timestamp de inicio a máximo 8 horas atrás
+        // Si el manifiesto tiene una fecha muy antigua, el timer mostraría 650+ horas
+        const MAX_TRIP_DURATION_MS = 8 * 60 * 60 * 1000; // 8 horas máximo
+        const ahora = Date.now();
+        if (ahora - inicio > MAX_TRIP_DURATION_MS) {
+            console.log('[Trip] v7.7 FIX: Timestamp muy antiguo, usando máximo 8h atrás');
+            inicio = ahora - MAX_TRIP_DURATION_MS;
+        }
+
+        console.log('[Trip] v7.7 Timestamp calculado:', {
             fechaInicio,
+            inicioOriginal: fechaInicio ? new Date(fechaInicio).getTime() : 'N/A',
             inicio,
             inicioDate: new Date(inicio).toISOString(),
-            ahora: Date.now(),
-            diferencia: Math.floor((Date.now() - inicio) / 1000) + ' segundos'
+            ahora,
+            diferencia: Math.floor((ahora - inicio) / 1000) + ' segundos (máx 8h)'
         });
 
         const tripId = `trip_backend_${manifiesto.id}`;

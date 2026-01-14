@@ -1,5 +1,5 @@
 // Tipos de usuario
-export type Rol = 'ADMIN' | 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR';
+export type Rol = 'ADMIN' | 'ADMIN_TRANSPORTISTAS' | 'ADMIN_OPERADORES' | 'ADMIN_GENERADORES' | 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR';
 
 export interface Usuario {
     id: string;

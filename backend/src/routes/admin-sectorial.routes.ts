@@ -1,0 +1,100 @@
+import { Router } from 'express';
+import { isAuthenticated, hasRole } from '../middlewares/auth.middleware';
+import {
+  // Transportistas
+  getDashboardTransportistas,
+  getTransportistas,
+  aprobarTransportista,
+  getReportesTransportistas,
+  // Operadores
+  getDashboardOperadores,
+  getOperadores,
+  aprobarOperador,
+  getReportesOperadores,
+  // Generadores
+  getDashboardGeneradores,
+  getGeneradores,
+  aprobarGenerador,
+  getReportesGeneradores
+} from '../controllers/admin-sectorial.controller';
+
+const router = Router();
+
+router.use(isAuthenticated);
+
+// ============================================================
+// ADMIN TRANSPORTISTAS
+// Accesible por: ADMIN, ADMIN_TRANSPORTISTAS
+// ============================================================
+router.get(
+  '/transportistas/dashboard',
+  hasRole('ADMIN', 'ADMIN_TRANSPORTISTAS'),
+  getDashboardTransportistas
+);
+router.get(
+  '/transportistas/lista',
+  hasRole('ADMIN', 'ADMIN_TRANSPORTISTAS'),
+  getTransportistas
+);
+router.post(
+  '/transportistas/:id/aprobar',
+  hasRole('ADMIN', 'ADMIN_TRANSPORTISTAS'),
+  aprobarTransportista
+);
+router.get(
+  '/transportistas/reportes',
+  hasRole('ADMIN', 'ADMIN_TRANSPORTISTAS'),
+  getReportesTransportistas
+);
+
+// ============================================================
+// ADMIN OPERADORES
+// Accesible por: ADMIN, ADMIN_OPERADORES
+// ============================================================
+router.get(
+  '/operadores/dashboard',
+  hasRole('ADMIN', 'ADMIN_OPERADORES'),
+  getDashboardOperadores
+);
+router.get(
+  '/operadores/lista',
+  hasRole('ADMIN', 'ADMIN_OPERADORES'),
+  getOperadores
+);
+router.post(
+  '/operadores/:id/aprobar',
+  hasRole('ADMIN', 'ADMIN_OPERADORES'),
+  aprobarOperador
+);
+router.get(
+  '/operadores/reportes',
+  hasRole('ADMIN', 'ADMIN_OPERADORES'),
+  getReportesOperadores
+);
+
+// ============================================================
+// ADMIN GENERADORES
+// Accesible por: ADMIN, ADMIN_GENERADORES
+// ============================================================
+router.get(
+  '/generadores/dashboard',
+  hasRole('ADMIN', 'ADMIN_GENERADORES'),
+  getDashboardGeneradores
+);
+router.get(
+  '/generadores/lista',
+  hasRole('ADMIN', 'ADMIN_GENERADORES'),
+  getGeneradores
+);
+router.post(
+  '/generadores/:id/aprobar',
+  hasRole('ADMIN', 'ADMIN_GENERADORES'),
+  aprobarGenerador
+);
+router.get(
+  '/generadores/reportes',
+  hasRole('ADMIN', 'ADMIN_GENERADORES'),
+  getReportesGeneradores
+);
+
+export default router;

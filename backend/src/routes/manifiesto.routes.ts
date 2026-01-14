@@ -25,6 +25,14 @@ import {
     confirmarRetiro,
     confirmarEntrega
 } from '../controllers/logistics.controller';
+import { generarCertificado } from '../controllers/pdf.controller';
+import {
+    revertirEntrega,
+    rechazarRecepcion,
+    revertirCertificado,
+    revertirEstadoAdmin,
+    getHistorialReversiones
+} from '../controllers/reversion.controller';
 
 const router = Router();
 
@@ -68,5 +76,26 @@ router.post('/:id/pesaje', hasRole('OPERADOR'), registrarPesaje);
 router.post('/:id/rechazar', hasRole('OPERADOR'), rechazarCarga);
 router.post('/:id/tratamiento', hasRole('OPERADOR'), registrarTratamiento);
 router.post('/:id/cerrar', hasRole('OPERADOR'), cerrarManifiesto);
+
+// Certificado de disposición final (PDF)
+router.get('/:id/certificado', generarCertificado);
+
+// ============================================================
+// REVERSIONES DE ESTADO
+// ============================================================
+// Transportista: Revertir entrega (operador rechazó)
+router.post('/:id/revertir-entrega', hasRole('TRANSPORTISTA'), revertirEntrega);
+
+// Operador: Rechazar recepción (volver a ENTREGADO)
+router.post('/:id/rechazar-recepcion', hasRole('OPERADOR'), rechazarRecepcion);
+
+// Operador: Revertir certificado/tratamiento
+router.post('/:id/revertir-certificado', hasRole('OPERADOR'), revertirCertificado);
+
+// Admin: Revertir a cualquier estado
+router.post('/:id/revertir-estado', hasRole('ADMIN'), revertirEstadoAdmin);
+
+// Historial de reversiones
+router.get('/:id/reversiones', getHistorialReversiones);
 
 export default router;

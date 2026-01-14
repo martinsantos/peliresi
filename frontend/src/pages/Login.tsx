@@ -9,10 +9,10 @@ import { Lock, Mail, Loader2, AlertCircle } from 'lucide-react';
 import './Login.css';
 
 const TEST_USERS = [
-    { label: 'Admin', email: 'admin@dgfa.mendoza.gov.ar', pass: 'admin123' },
-    { label: 'Generador', email: 'quimica.mendoza@industria.com', pass: 'gen123' },
-    { label: 'Transporte', email: 'transportes.andes@logistica.com', pass: 'trans123' },
-    { label: 'Operador', email: 'tratamiento.residuos@planta.com', pass: 'op123' }
+    { label: 'Admin', email: 'admin@dgfa.mendoza.gov.ar', pass: 'password' },
+    { label: 'Generador', email: 'quimica.mendoza@industria.com', pass: 'password' },
+    { label: 'Transporte', email: 'transportes.andes@logistica.com', pass: 'password' },
+    { label: 'Operador', email: 'tratamiento.residuos@planta.com', pass: 'password' }
 ];
 
 const Login: React.FC = () => {

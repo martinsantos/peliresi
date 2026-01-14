@@ -47,6 +47,10 @@ model Usuario {
   reglasCreadas   ReglaAlerta[]       @relation("ReglasCreadas")
   pushSubscriptions PushSubscription[]
   logsActividad   LogActividad[]
+  preferencias    PreferenciaUsuario?
+  reversionesRealizadas ReversionEstado[]
+  alertasSeguridad AlertaSeguridad[] @relation("AlertasUsuario")
+  alertasResueltas AlertaSeguridad[] @relation("AlertasResueltas")
 
   @@map("usuarios")
 }
@@ -207,6 +211,7 @@ model Manifiesto {
   alertas         AlertaGenerada[]
   anomalias       AnomaliaTransporte[]
   viajes          Viaje[]
+  reversiones     ReversionEstado[]
 
   @@map("manifiestos")
 }
@@ -327,6 +332,9 @@ model Auditoria {
 // Enumeraciones
 enum Rol {
   ADMIN
+  ADMIN_TRANSPORTISTAS
+  ADMIN_OPERADORES
+  ADMIN_GENERADORES
   GENERADOR
   TRANSPORTISTA
   OPERADOR
@@ -540,22 +548,31 @@ model PushSubscription {
 // ========== LOG DE ACTIVIDAD (AUDITORÍA COMPLETA) ==========
 
 model LogActividad {
-  id         String   @id @default(cuid())
-  usuarioId  String
-  accion     String   // LOGIN, LOGOUT, CREAR_MANIFIESTO, FIRMAR, etc.
-  modulo     String   // MANIFIESTOS, USUARIOS, SISTEMA, AUTH
-  entidadId  String?  // ID del manifiesto, usuario, etc.
-  detalles   Json?    // Datos adicionales
-  ip         String?
-  userAgent  String?
-  timestamp  DateTime @default(now())
+  id             String        @id @default(cuid())
+  usuarioId      String
+  accion         String        // LOGIN, LOGOUT, CREAR_MANIFIESTO, FIRMAR, REVERSION, etc.
+  modulo         String        // MANIFIESTOS, USUARIOS, SISTEMA, AUTH, REVERSIONES
+  entidadId      String?       // ID del manifiesto, usuario, etc.
+  detalles       Json?         // Datos adicionales
+  ip             String?
+  userAgent      String?
+  timestamp      DateTime      @default(now())
 
-  usuario    Usuario  @relation(fields: [usuarioId], references: [id])
+  // Campos mejorados para LOG avanzado
+  severidad      SeveridadLog  @default(INFO)
+  duracionMs     Int?          // Tiempo de operación en ms
+  resultadoExito Boolean       @default(true)
+  datosAntes     Json?         // Estado antes del cambio
+  datosDespues   Json?         // Estado después del cambio
+
+  usuario        Usuario       @relation(fields: [usuarioId], references: [id])
 
   @@index([usuarioId])
   @@index([accion])
   @@index([modulo])
   @@index([timestamp])
+  @@index([severidad])
+  @@index([usuarioId, timestamp])
   @@map("log_actividad")
 }
 
@@ -602,4 +619,92 @@ enum EstadoViaje {
   COMPLETADO
   CANCELADO
   INCIDENTE
+}
+
+// ========== PREFERENCIAS DE USUARIO ==========
+
+model PreferenciaUsuario {
+  id                  String    @id @default(cuid())
+  usuarioId           String    @unique
+  mostrarTourInicio   Boolean   @default(true)
+  ultimaVersionTour   String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  usuario             Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@map("preferencias_usuario")
+}
+
+// ========== REVERSIONES DE ESTADO ==========
+
+model ReversionEstado {
+  id              String           @id @default(cuid())
+  manifiestoId    String
+  estadoAnterior  EstadoManifiesto
+  estadoNuevo     EstadoManifiesto
+  motivo          String           // Obligatorio, min 20 chars
+  tipoReversion   TipoReversion
+  usuarioId       String
+  rolUsuario      Rol              // Registrar el rol del usuario que hizo la reversión
+  ip              String?
+  userAgent       String?
+  createdAt       DateTime         @default(now())
+
+  manifiesto      Manifiesto       @relation(fields: [manifiestoId], references: [id])
+  usuario         Usuario          @relation(fields: [usuarioId], references: [id])
+
+  @@index([manifiestoId])
+  @@index([usuarioId])
+  @@index([createdAt])
+  @@map("reversiones_estado")
+}
+
+enum TipoReversion {
+  RECHAZO_ENTREGA        // Operador rechaza la entrega
+  ERROR_TRANSPORTISTA    // Transportista corrige error
+  REVISION_CERTIFICADO   // Corrección de certificado
+  CORRECCION_ADMIN       // Admin/Admin sectorial corrige estado
+}
+
+// ========== LOG MEJORADO ==========
+
+enum SeveridadLog {
+  DEBUG
+  INFO
+  WARNING
+  ERROR
+  CRITICAL
+}
+
+// ========== ALERTAS DE SEGURIDAD (Patrones Inusuales) ==========
+
+model AlertaSeguridad {
+  id              String              @id @default(cuid())
+  tipo            TipoAlertaSeguridad
+  descripcion     String
+  usuarioAfectadoId String?
+  datos           Json?               // Datos adicionales del patrón detectado
+  severidad       SeveridadLog        @default(WARNING)
+  resuelta        Boolean             @default(false)
+  resueltaPorId   String?
+  fechaResolucion DateTime?
+  notas           String?
+  createdAt       DateTime            @default(now())
+
+  usuarioAfectado Usuario?            @relation("AlertasUsuario", fields: [usuarioAfectadoId], references: [id])
+  resueltaPor     Usuario?            @relation("AlertasResueltas", fields: [resueltaPorId], references: [id])
+
+  @@index([tipo])
+  @@index([createdAt])
+  @@index([resuelta])
+  @@map("alertas_seguridad")
+}
+
+enum TipoAlertaSeguridad {
+  MULTIPLES_LOGIN_FALLIDOS
+  ACTIVIDAD_FUERA_HORARIO
+  REVERSIONES_FRECUENTES
+  IP_INUSUAL
+  PATRON_ANOMALO
 }

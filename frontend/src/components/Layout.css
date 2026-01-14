@@ -330,6 +330,28 @@
     color: var(--text-primary);
 }
 
+.user-menu-item.active {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+    cursor: default;
+}
+
+.user-menu-item:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.current-badge {
+    margin-left: auto;
+    padding: 2px 8px;
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+    font-size: 0.65rem;
+    font-weight: 600;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+
 .user-menu-section {
     padding: var(--space-2) 0;
 }

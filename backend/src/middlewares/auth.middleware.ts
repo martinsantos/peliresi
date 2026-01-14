@@ -92,7 +92,7 @@ export const authMiddleware = isAuthenticated;
 // Definición de permisos por rol
 const PERMISSIONS_BY_ROLE: Record<string, string[]> = {
   ADMIN: [
-    'manifiestos:read', 'manifiestos:write', 'manifiestos:delete',
+    'manifiestos:read', 'manifiestos:write', 'manifiestos:delete', 'manifiestos:revertir',
     'usuarios:read', 'usuarios:write', 'usuarios:delete',
     'generadores:read', 'generadores:write', 'generadores:delete',
     'transportistas:read', 'transportistas:write', 'transportistas:delete',
@@ -100,7 +100,37 @@ const PERMISSIONS_BY_ROLE: Record<string, string[]> = {
     'reportes:read', 'reportes:export',
     'auditoria:read',
     'alertas:read', 'alertas:write',
-    'configuracion:read', 'configuracion:write'
+    'configuracion:read', 'configuracion:write',
+    'logs:read', 'logs:export'
+  ],
+  // Admin Sectorial de Transportistas
+  ADMIN_TRANSPORTISTAS: [
+    'transportistas:read', 'transportistas:write', 'transportistas:delete', 'transportistas:aprobar',
+    'vehiculos:read', 'vehiculos:write', 'vehiculos:delete',
+    'choferes:read', 'choferes:write', 'choferes:delete',
+    'manifiestos:read', // Solo lectura de manifiestos
+    'manifiestos:revertir:transportista', // Puede revertir estados de transportistas
+    'reportes:read:transportistas',
+    'usuarios:read:transportistas', 'usuarios:write:transportistas',
+    'logs:read:sector'
+  ],
+  // Admin Sectorial de Operadores
+  ADMIN_OPERADORES: [
+    'operadores:read', 'operadores:write', 'operadores:delete', 'operadores:aprobar',
+    'tratamientos:read', 'tratamientos:write', 'tratamientos:delete',
+    'manifiestos:read', // Solo lectura de manifiestos
+    'manifiestos:revertir:operador', // Puede revertir estados de operadores
+    'reportes:read:operadores',
+    'usuarios:read:operadores', 'usuarios:write:operadores',
+    'logs:read:sector'
+  ],
+  // Admin Sectorial de Generadores
+  ADMIN_GENERADORES: [
+    'generadores:read', 'generadores:write', 'generadores:delete', 'generadores:aprobar',
+    'manifiestos:read', // Solo lectura de manifiestos
+    'reportes:read:generadores',
+    'usuarios:read:generadores', 'usuarios:write:generadores',
+    'logs:read:sector'
   ],
   GENERADOR: [
     'manifiestos:read', 'manifiestos:write',
@@ -109,17 +139,22 @@ const PERMISSIONS_BY_ROLE: Record<string, string[]> = {
   ],
   TRANSPORTISTA: [
     'manifiestos:read', 'manifiestos:update-status',
+    'manifiestos:revertir:transportista', // Puede revertir sus entregas
     'tracking:write',
     'perfil:read', 'perfil:write'
   ],
   OPERADOR: [
     'manifiestos:read', 'manifiestos:update-status', 'manifiestos:close',
+    'manifiestos:revertir:operador', // Puede revertir sus recepciones
     'recepcion:write',
     'tratamiento:write',
     'certificados:write',
     'perfil:read', 'perfil:write'
   ]
 };
+
+// Roles que tienen permisos de administrador (bypass en hasRole)
+const ADMIN_ROLES = ['ADMIN', 'ADMIN_TRANSPORTISTAS', 'ADMIN_OPERADORES', 'ADMIN_GENERADORES'];
 
 /**
  * Middleware para verificar permisos específicos

@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { authService } from '../services/auth.service';
+import { preferenciasService, type PreferenciasUsuario } from '../services/preferencias.service';
 import {
     LayoutDashboard,
     FileText,
@@ -42,14 +44,57 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     const [qrScannerOpen, setQrScannerOpen] = useState(false);
     const [showTour, setShowTour] = useState(false);
     const [showContextualHelp, setShowContextualHelp] = useState(false);
+    const [switchingProfile, setSwitchingProfile] = useState(false);
+    const [preferencias, setPreferencias] = useState<PreferenciasUsuario | null>(null);
+    const [prefsLoaded, setPrefsLoaded] = useState(false);
 
-    // TOUR: Siempre se muestra al cargar el dashboard
+    // Usuarios de prueba para cambio rápido de perfil
+    const PROFILE_USERS = [
+        { email: 'admin@dgfa.mendoza.gov.ar', label: 'Administrador SITREP', icon: Shield, rol: 'ADMIN' },
+        { email: 'quimica.mendoza@industria.com', label: 'Generador', icon: Factory, rol: 'GENERADOR' },
+        { email: 'transportes.andes@logistica.com', label: 'Transportista', icon: Truck, rol: 'TRANSPORTISTA' },
+        { email: 'tratamiento.residuos@planta.com', label: 'Operador', icon: Building2, rol: 'OPERADOR' }
+    ];
+
+    // Cambiar perfil haciendo login real con el backend
+    const handleSwitchProfile = useCallback(async (email: string) => {
+        setSwitchingProfile(true);
+        setUserMenuOpen(false);
+        try {
+            await authService.login(email, 'password');
+            window.location.href = '/dashboard';
+        } catch (err) {
+            console.error('Error cambiando perfil:', err);
+            alert('Error al cambiar perfil. Verifique las credenciales.');
+        } finally {
+            setSwitchingProfile(false);
+        }
+    }, []);
+
+    // Cargar preferencias del usuario al iniciar
     useEffect(() => {
-        if (location.pathname === '/dashboard') {
+        const loadPreferencias = async () => {
+            if (user?.id) {
+                try {
+                    const prefs = await preferenciasService.getMisPreferencias();
+                    setPreferencias(prefs);
+                } catch (error) {
+                    console.error('Error cargando preferencias:', error);
+                    setPreferencias({ mostrarTourInicio: true, ultimaVersionTour: null });
+                }
+                setPrefsLoaded(true);
+            }
+        };
+        loadPreferencias();
+    }, [user?.id]);
+
+    // TOUR: Solo se muestra si el usuario tiene habilitada la preferencia
+    useEffect(() => {
+        if (location.pathname === '/dashboard' && prefsLoaded && preferencias?.mostrarTourInicio) {
             const timer = setTimeout(() => setShowTour(true), 800);
             return () => clearTimeout(timer);
         }
-    }, [location.pathname]);
+    }, [location.pathname, prefsLoaded, preferencias?.mostrarTourInicio]);
 
     // AYUDA CONTEXTUAL: Solo la primera vez
     useEffect(() => {
@@ -63,10 +108,28 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         }
     }, [location.pathname]);
 
-    const handleStartTour = () => {
+    const handleStartTour = async () => {
         localStorage.removeItem('tourCompleted');
+        // Reactivar el tour en preferencias si estaba desactivado
+        try {
+            await preferenciasService.reactivarTour();
+            setPreferencias(prev => prev ? { ...prev, mostrarTourInicio: true } : null);
+        } catch (error) {
+            console.error('Error reactivando tour:', error);
+        }
         navigate('/dashboard');
         setTimeout(() => setShowTour(true), 300);
+    };
+
+    const handleCompleteTour = async () => {
+        setShowTour(false);
+        // Desactivar el tour en preferencias al completarlo
+        try {
+            await preferenciasService.skipTour('1.0.0');
+            setPreferencias(prev => prev ? { ...prev, mostrarTourInicio: false } : null);
+        } catch (error) {
+            console.error('Error desactivando tour:', error);
+        }
     };
 
     const handleLogout = async () => {
@@ -93,6 +156,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         switch (user?.rol) {
             case 'ADMIN':
                 return 'Administrador SITREP';
+            case 'ADMIN_TRANSPORTISTAS':
+                return 'Admin Transportistas';
+            case 'ADMIN_OPERADORES':
+                return 'Admin Operadores';
+            case 'ADMIN_GENERADORES':
+                return 'Admin Generadores';
             case 'GENERADOR':
                 return 'Generador de Residuos';
             case 'TRANSPORTISTA':
@@ -118,11 +187,34 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     { path: '/manifiestos', icon: <FileText size={20} />, label: 'Manifiestos' },
                     { path: '/tracking', icon: <MapPin size={20} />, label: 'Tracking GPS' },
                     { path: '/admin/usuarios-panel', icon: <User size={20} />, label: 'Usuarios' },
+                    { path: '/admin/logs', icon: <Shield size={20} />, label: 'Auditoria' },
                     { path: '/admin/actividad', icon: <Activity size={20} />, label: 'Timeline' },
                     { path: '/alertas', icon: <Bell size={20} />, label: 'Alertas' },
                     { path: '/actores', icon: <Users size={20} />, label: 'Actores' },
                     { path: '/reportes', icon: <BarChart3 size={20} />, label: 'Reportes' },
                     { path: '/configuracion', icon: <Settings size={20} />, label: 'Config' },
+                ];
+            case 'ADMIN_TRANSPORTISTAS':
+                return [
+                    ...baseItems,
+                    { path: '/admin/transportistas', icon: <Truck size={20} />, label: 'Mi Panel' },
+                    { path: '/manifiestos', icon: <FileText size={20} />, label: 'Manifiestos' },
+                    { path: '/tracking', icon: <MapPin size={20} />, label: 'Tracking GPS' },
+                    { path: '/reportes', icon: <BarChart3 size={20} />, label: 'Reportes' },
+                ];
+            case 'ADMIN_OPERADORES':
+                return [
+                    ...baseItems,
+                    { path: '/admin/operadores', icon: <Building2 size={20} />, label: 'Mi Panel' },
+                    { path: '/manifiestos', icon: <FileText size={20} />, label: 'Manifiestos' },
+                    { path: '/reportes', icon: <BarChart3 size={20} />, label: 'Reportes' },
+                ];
+            case 'ADMIN_GENERADORES':
+                return [
+                    ...baseItems,
+                    { path: '/admin/generadores', icon: <Factory size={20} />, label: 'Mi Panel' },
+                    { path: '/manifiestos', icon: <FileText size={20} />, label: 'Manifiestos' },
+                    { path: '/reportes', icon: <BarChart3 size={20} />, label: 'Reportes' },
                 ];
             case 'GENERADOR':
                 return [
@@ -137,7 +229,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     ...baseItems,
                     { path: '/manifiestos', icon: <FileText size={20} />, label: 'Viajes Asignados' },
                     { path: '/tracking', icon: <MapPin size={20} />, label: 'Mi Ruta GPS' },
-                    { path: '/demo-app', icon: <Truck size={20} />, label: 'App Móvil' },
+                    { path: '/demo-app', icon: <Truck size={20} />, label: 'App Movil' },
                 ];
             case 'OPERADOR':
                 return [
@@ -286,84 +378,22 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                     <div className="user-menu-divider" />
                                     <div className="user-menu-section">
                                         <span className="user-menu-section-title">Cambiar perfil:</span>
-                                        <button
-                                            className="user-menu-item"
-                                            onClick={() => {
-                                                localStorage.setItem('user', JSON.stringify({
-                                                    id: '1',
-                                                    email: 'admin@dgfa.mendoza.gov.ar',
-                                                    nombre: 'Admin',
-                                                    apellido: 'DGFA',
-                                                    rol: 'ADMIN'
-                                                }));
-                                                localStorage.setItem('token', 'demo-token-admin');
-                                                localStorage.setItem('accessToken', 'demo-token-admin');
-                                                window.location.reload();
-                                            }}
-                                        >
-                                            <Shield size={16} />
-                                            <span>Administrador SITREP</span>
-                                        </button>
-                                        <button
-                                            className="user-menu-item"
-                                            onClick={() => {
-                                                localStorage.setItem('user', JSON.stringify({
-                                                    id: '2',
-                                                    email: 'generador@demo.com',
-                                                    nombre: 'Juan',
-                                                    apellido: 'Pérez',
-                                                    rol: 'GENERADOR',
-                                                    generadorId: 'g1',
-                                                    generador: { id: 'g1', razonSocial: 'Industrias del Norte SA' }
-                                                }));
-                                                localStorage.setItem('token', 'demo-token-generador');
-                                                localStorage.setItem('accessToken', 'demo-token-generador');
-                                                window.location.reload();
-                                            }}
-                                        >
-                                            <Factory size={16} />
-                                            <span>Generador (Juan Pérez)</span>
-                                        </button>
-                                        <button
-                                            className="user-menu-item"
-                                            onClick={() => {
-                                                localStorage.setItem('user', JSON.stringify({
-                                                    id: '4',
-                                                    email: 'transportista@demo.com',
-                                                    nombre: 'Carlos',
-                                                    apellido: 'López',
-                                                    rol: 'TRANSPORTISTA',
-                                                    transportistaId: 't1',
-                                                    transportista: { id: 't1', razonSocial: 'Transportes López' }
-                                                }));
-                                                localStorage.setItem('token', 'demo-token-transportista');
-                                                localStorage.setItem('accessToken', 'demo-token-transportista');
-                                                window.location.reload();
-                                            }}
-                                        >
-                                            <Truck size={16} />
-                                            <span>Transportista (Carlos López)</span>
-                                        </button>
-                                        <button
-                                            className="user-menu-item"
-                                            onClick={() => {
-                                                localStorage.setItem('user', JSON.stringify({
-                                                    id: '6',
-                                                    email: 'operador@demo.com',
-                                                    nombre: 'Roberto',
-                                                    apellido: 'Silva',
-                                                    rol: 'OPERADOR',
-                                                    operadorId: 'o1',
-                                                    operador: { id: 'o1', razonSocial: 'Planta Tratamiento Mendoza' }
-                                                }));
-                                                localStorage.setItem('token', 'demo-token-operador');
-                                                localStorage.setItem('accessToken', 'demo-token-operador');
-                                                window.location.reload();
-                                            }}
-                                        >
-                                            <Building2 size={16} />
-                                            <span>Operador (Roberto Silva)</span>
-                                        </button>
+                                        {PROFILE_USERS.map((profile) => {
+                                            const IconComponent = profile.icon;
+                                            const isCurrentUser = user?.email === profile.email;
+                                            return (
+                                                <button
+                                                    key={profile.email}
+                                                    className={`user-menu-item ${isCurrentUser ? 'active' : ''}`}
+                                                    onClick={() => !isCurrentUser && handleSwitchProfile(profile.email)}
+                                                    disabled={isCurrentUser || switchingProfile}
+                                                >
+                                                    <IconComponent size={16} />
+                                                    <span>{profile.label}</span>
+                                                    {isCurrentUser && <span className="current-badge">Actual</span>}
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                     <div className="user-menu-divider" />
                                     <button className="user-menu-item" onClick={handleLogout}>
@@ -396,7 +426,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <OnboardingTour
                 userRole={user?.rol as 'ADMIN' | 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR'}
                 isOpen={showTour}
-                onComplete={() => setShowTour(false)}
+                onComplete={handleCompleteTour}
             />
 
             {/* Contextual Help */}

@@ -21,7 +21,16 @@ import {
     X,
     Award,
     Loader2,
-    Map
+    Map,
+    Flame,
+    Beaker,
+    Droplets,
+    Box,
+    Recycle,
+    Trash2,
+    Leaf,
+    MoreHorizontal,
+    FlaskConical
 } from 'lucide-react';
 import ManifiestoMap from '../components/mobile/ManifiestoMap';
 import './ManifiestoDetalle.css';
@@ -43,6 +52,11 @@ const ManifiestoDetalle: React.FC = () => {
     const [metodoFirma, setMetodoFirma] = useState<'USUARIO_PASSWORD' | 'TOKEN_PIN' | 'CODIGO_SMS' | 'CERTIFICADO_DIGITAL'>('USUARIO_PASSWORD');
     const [tokenPin, setTokenPin] = useState('');
     const [codigoSMS, setCodigoSMS] = useState('');
+
+    // Estados para modal de tratamiento (OPERADOR)
+    const [showTratamientoModal, setShowTratamientoModal] = useState(false);
+    const [tipoTratamiento, setTipoTratamiento] = useState('');
+    const [tratamientoLoading, setTratamientoLoading] = useState(false);
     const [enviandoSMS, setEnviandoSMS] = useState(false);
     const [smsEnviado, setSmsEnviado] = useState(false);
     const [firmaLoading, setFirmaLoading] = useState(false);
@@ -74,14 +88,11 @@ const ManifiestoDetalle: React.FC = () => {
 
         setFirmaLoading(true);
         try {
-            const result = await manifiestoService.firmarConToken(manifiesto.id, {
-                metodoFirma,
-                tokenPin: metodoFirma === 'TOKEN_PIN' ? tokenPin : undefined,
-                codigoSMS: metodoFirma === 'CODIGO_SMS' ? codigoSMS : undefined
-            });
+            // Usar firmarManifiesto que es el endpoint que existe en el backend
+            const updated = await manifiestoService.firmarManifiesto(manifiesto.id);
 
-            if (result.manifiesto) {
-                setManifiesto(result.manifiesto);
+            if (updated) {
+                setManifiesto(updated);
                 setShowFirmaModal(false);
                 resetFirmaForm();
             }
@@ -89,6 +100,28 @@ const ManifiestoDetalle: React.FC = () => {
             setError(err.response?.data?.message || 'Error al firmar el manifiesto');
         } finally {
             setFirmaLoading(false);
+        }
+    };
+
+    // Handler para registrar tratamiento con tipo seleccionado
+    const handleRegistrarTratamiento = async () => {
+        if (!manifiesto || !tipoTratamiento) return;
+
+        setTratamientoLoading(true);
+        try {
+            const updated = await manifiestoService.registrarTratamiento(manifiesto.id, {
+                metodoTratamiento: tipoTratamiento
+            });
+
+            if (updated) {
+                setManifiesto(updated);
+                setShowTratamientoModal(false);
+                setTipoTratamiento('');
+            }
+        } catch (err: any) {
+            setError(err.response?.data?.message || 'Error al registrar tratamiento');
+        } finally {
+            setTratamientoLoading(false);
         }
     };
 
@@ -128,6 +161,12 @@ const ManifiestoDetalle: React.FC = () => {
             return;
         }
 
+        // Abrir modal de tratamiento para OPERADOR
+        if (action === 'tratamiento') {
+            setShowTratamientoModal(true);
+            return;
+        }
+
         setActionLoading(true);
         try {
             let updated: Manifiesto | null = null;
@@ -146,11 +185,6 @@ const ManifiestoDetalle: React.FC = () => {
                     break;
                 case 'confirmar-recepcion':
                     updated = await manifiestoService.confirmarRecepcion(manifiesto.id, {});
-                    break;
-                case 'tratamiento':
-                    updated = await manifiestoService.registrarTratamiento(manifiesto.id, {
-                        metodoTratamiento: 'Incineración controlada'
-                    });
                     break;
                 case 'cerrar':
                     const resultado = await manifiestoService.cerrarManifiesto(manifiesto.id, {
@@ -179,6 +213,7 @@ const ManifiestoDetalle: React.FC = () => {
             EN_TRANSITO: { class: 'badge-warning', label: 'En Tránsito', icon: <Truck size={16} /> },
             ENTREGADO: { class: 'badge-primary', label: 'Entregado', icon: <MapPin size={16} /> },
             RECIBIDO: { class: 'badge-info', label: 'Recibido', icon: <Building2 size={16} /> },
+            EN_TRATAMIENTO: { class: 'badge-warning', label: 'En Tratamiento', icon: <Clock size={16} /> },
             TRATADO: { class: 'badge-success', label: 'Tratado', icon: <CheckCircle size={16} /> },
             CERRADO: { class: 'badge-success', label: 'Cerrado', icon: <Award size={16} /> },
         };
@@ -196,37 +231,55 @@ const ManifiestoDetalle: React.FC = () => {
         });
     };
 
-    const getAvailableAction = () => {
-        if (!manifiesto || !user) return null;
+    // Obtener todas las acciones disponibles para el usuario según su rol y estado del manifiesto
+    const getAvailableActions = () => {
+        if (!manifiesto || !user) return [];
+        const actions: Array<{ action: string; label: string; icon: React.ReactNode; variant?: 'primary' | 'secondary' }> = [];
 
         switch (manifiesto.estado) {
             case 'BORRADOR':
                 if (user.rol === 'GENERADOR') {
-                    return { action: 'firmar', label: 'Firmar Manifiesto', icon: <Edit3 size={18} /> };
+                    actions.push({ action: 'firmar', label: 'Firmar Manifiesto', icon: <Edit3 size={18} />, variant: 'primary' });
                 }
                 break;
             case 'APROBADO':
                 if (user.rol === 'TRANSPORTISTA') {
-                    return { action: 'confirmar-retiro', label: 'Confirmar Retiro', icon: <Truck size={18} /> };
+                    actions.push({ action: 'confirmar-retiro', label: 'Confirmar Retiro', icon: <Truck size={18} />, variant: 'primary' });
                 }
                 break;
             case 'EN_TRANSITO':
                 if (user.rol === 'TRANSPORTISTA') {
-                    return { action: 'confirmar-entrega', label: 'Confirmar Entrega', icon: <MapPin size={18} /> };
+                    actions.push({ action: 'confirmar-entrega', label: 'Confirmar Entrega', icon: <MapPin size={18} />, variant: 'primary' });
                 }
                 break;
             case 'ENTREGADO':
                 if (user.rol === 'OPERADOR') {
-                    return { action: 'confirmar-recepcion', label: 'Confirmar Recepción', icon: <Building2 size={18} /> };
+                    actions.push({ action: 'confirmar-recepcion', label: 'Confirmar Recepción', icon: <Building2 size={18} />, variant: 'primary' });
                 }
                 break;
             case 'RECIBIDO':
                 if (user.rol === 'OPERADOR') {
-                    return { action: 'cerrar', label: 'Cerrar Manifiesto', icon: <CheckCircle size={18} /> };
+                    // OPERADOR puede iniciar tratamiento (RECIBIDO → EN_TRATAMIENTO)
+                    actions.push({ action: 'tratamiento', label: 'Iniciar Tratamiento', icon: <CheckCircle size={18} />, variant: 'primary' });
                 }
                 break;
+            case 'EN_TRATAMIENTO':
+                if (user.rol === 'OPERADOR') {
+                    // OPERADOR puede cerrar y emitir certificado (EN_TRATAMIENTO → TRATADO)
+                    actions.push({ action: 'cerrar', label: 'Cerrar y Emitir Certificado', icon: <Award size={18} />, variant: 'primary' });
+                }
+                break;
+            case 'TRATADO':
+                // Estado final - solo visualización y descarga de certificado
+                break;
         }
-        return null;
+        return actions;
+    };
+
+    // Mantener compatibilidad con código existente
+    const getAvailableAction = () => {
+        const actions = getAvailableActions();
+        return actions.length > 0 ? actions[0] : null;
     };
 
     if (loading) {
@@ -503,6 +556,106 @@ const ManifiestoDetalle: React.FC = () => {
                                     <>
                                         <Edit3 size={18} />
                                         Firmar Manifiesto
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Tratamiento (OPERADOR) - Mejorado */}
+            {showTratamientoModal && (
+                <div className="modal-overlay" onClick={() => setShowTratamientoModal(false)}>
+                    <div className="modal-content tratamiento-modal" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header tratamiento-header">
+                            <div className="tratamiento-header-icon">
+                                <FlaskConical size={24} />
+                            </div>
+                            <div className="tratamiento-header-text">
+                                <h3>Registrar Tratamiento</h3>
+                                <span className="tratamiento-manifiesto">Manifiesto #{manifiesto?.numero}</span>
+                            </div>
+                            <button className="btn-close" onClick={() => setShowTratamientoModal(false)}>
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="tratamiento-body">
+                            <p className="tratamiento-instruccion">Seleccione el tipo de tratamiento aplicado:</p>
+
+                            <div className="tratamiento-grid">
+                                {[
+                                    { value: 'Incineración controlada', icon: Flame, color: '#ef4444', desc: 'Destrucción térmica' },
+                                    { value: 'Tratamiento físico-químico', icon: Beaker, color: '#8b5cf6', desc: 'Procesos químicos' },
+                                    { value: 'Neutralización', icon: Droplets, color: '#3b82f6', desc: 'Balance pH' },
+                                    { value: 'Estabilización/Solidificación', icon: Box, color: '#6b7280', desc: 'Encapsulamiento' },
+                                    { value: 'Reciclaje', icon: Recycle, color: '#10b981', desc: 'Recuperación' },
+                                    { value: 'Disposición final', icon: Trash2, color: '#f59e0b', desc: 'Celda seguridad' },
+                                    { value: 'Tratamiento biológico', icon: Leaf, color: '#22c55e', desc: 'Biodegradación' },
+                                    { value: 'Otro', icon: MoreHorizontal, color: '#64748b', desc: 'Especificar' },
+                                ].map((tratamiento) => {
+                                    const IconComponent = tratamiento.icon;
+                                    const isSelected = tipoTratamiento === tratamiento.value;
+                                    return (
+                                        <button
+                                            key={tratamiento.value}
+                                            className={`tratamiento-option ${isSelected ? 'selected' : ''}`}
+                                            onClick={() => setTipoTratamiento(tratamiento.value)}
+                                            style={{ '--option-color': tratamiento.color } as React.CSSProperties}
+                                        >
+                                            <div className="tratamiento-option-icon">
+                                                <IconComponent size={24} />
+                                            </div>
+                                            <div className="tratamiento-option-text">
+                                                <span className="tratamiento-option-name">{tratamiento.value}</span>
+                                                <span className="tratamiento-option-desc">{tratamiento.desc}</span>
+                                            </div>
+                                            {isSelected && (
+                                                <div className="tratamiento-check">
+                                                    <CheckCircle size={18} />
+                                                </div>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {tipoTratamiento === 'Otro' && (
+                                <div className="tratamiento-otro-input">
+                                    <label>Especificar tratamiento:</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Describa el tipo de tratamiento aplicado"
+                                        onChange={(e) => setTipoTratamiento(e.target.value || 'Otro')}
+                                        className="form-input"
+                                        autoFocus
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="tratamiento-footer">
+                            <button
+                                className="btn btn-ghost"
+                                onClick={() => { setShowTratamientoModal(false); setTipoTratamiento(''); }}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                className="btn btn-primary btn-tratamiento"
+                                onClick={handleRegistrarTratamiento}
+                                disabled={tratamientoLoading || !tipoTratamiento}
+                            >
+                                {tratamientoLoading ? (
+                                    <>
+                                        <Loader2 size={18} className="spin" />
+                                        Registrando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <CheckCircle size={18} />
+                                        Confirmar Tratamiento
                                     </>
                                 )}
                             </button>

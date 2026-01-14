@@ -27,6 +27,8 @@ import notificacionRoutes from './routes/notificacion.routes';
 import adminRoutes from './routes/admin.routes';
 import configRoutes from './routes/config.routes';
 import cronRoutes from './routes/cron.routes';
+import preferenciasRoutes from './routes/preferencias.routes';
+import adminSectorialRoutes from './routes/admin-sectorial.routes';
 import cronService from './services/cron.service';
 
 const app = express();
@@ -75,6 +77,8 @@ app.use('/api/admin/auditoria', auditoriaRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/cron', cronRoutes);
+app.use('/api/preferencias', preferenciasRoutes);
+app.use('/api/admin-sectorial', adminSectorialRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

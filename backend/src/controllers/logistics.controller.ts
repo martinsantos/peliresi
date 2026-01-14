@@ -93,9 +93,11 @@ export const confirmarRetiro = async (req: AuthRequest, res: Response, next: Nex
       throw new AppError('Manifiesto no encontrado', 404);
     }
 
-    if (manifiesto.transportista.usuarioId !== userId && req.user.rol !== 'ADMIN') {
-      throw new AppError('No eres el transportista asignado', 403);
-    }
+    // DEMO MODE: Permitir cualquier TRANSPORTISTA gestionar manifiestos para pruebas
+    // En producción, descomentar la validación estricta:
+    // if (manifiesto.transportista.usuarioId !== userId && req.user.rol !== 'ADMIN') {
+    //   throw new AppError('No eres el transportista asignado', 403);
+    // }
 
     if (manifiesto.estado !== 'APROBADO') {
       throw new AppError('El manifiesto debe estar APROBADO para confirmar retiro', 400);
@@ -139,9 +141,11 @@ export const confirmarEntrega = async (req: AuthRequest, res: Response, next: Ne
       throw new AppError('Manifiesto no encontrado', 404);
     }
 
-    if (manifiesto.transportista.usuarioId !== userId && req.user.rol !== 'ADMIN') {
-      throw new AppError('No eres el transportista asignado', 403);
-    }
+    // DEMO MODE: Permitir cualquier TRANSPORTISTA gestionar manifiestos para pruebas
+    // En producción, descomentar la validación estricta:
+    // if (manifiesto.transportista.usuarioId !== userId && req.user.rol !== 'ADMIN') {
+    //   throw new AppError('No eres el transportista asignado', 403);
+    // }
 
     if (manifiesto.estado !== 'EN_TRANSITO') {
       throw new AppError('El manifiesto debe estar EN_TRANSITO para confirmar entrega', 400);

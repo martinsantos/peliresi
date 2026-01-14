@@ -26,7 +26,7 @@ import {
     Navigation, Wifi, WifiOff,
     Users,
     ChevronLeft, Plus, LogOut,
-    Play, RefreshCw, Command, Recycle
+    Play, RefreshCw, Command, Recycle, RotateCcw
 } from 'lucide-react';
 
 // Hooks
@@ -64,6 +64,8 @@ import RechazoModal from '../components/mobile/RechazoModal';
 import TratamientoModal from '../components/mobile/TratamientoModal';
 // CU-T10: Push notifications prompt
 import PushNotificationPrompt from '../components/PushNotificationPrompt';
+// Reversiones de estado
+import ReversionModal from '../components/ReversionModal';
 
 // FASE 3 & 5: Nuevos componentes de viaje y UI
 import TripRecoveryModal from '../components/mobile/TripRecoveryModal';
@@ -133,6 +135,9 @@ const MobileApp: React.FC = () => {
     const [showRechazoModal, setShowRechazoModal] = useState(false);
     // CU-O07/O08: Modal de tratamiento
     const [showTratamientoModal, setShowTratamientoModal] = useState(false);
+    // Reversiones de estado
+    const [showReversionModal, setShowReversionModal] = useState(false);
+    const [reversionType, setReversionType] = useState<'entrega' | 'recepcion' | 'certificado' | 'admin'>('entrega');
 
     // Backend data state
     const [backendManifiestos, setBackendManifiestos] = useState<any[]>([]);
@@ -451,13 +456,27 @@ const MobileApp: React.FC = () => {
 
             console.log('[MobileApp] Loaded', allManifiestos.length, 'manifiestos from backend', filterParams);
 
+            // FIX v7.7: Función para filtrar manifiestos cacheados por actor del usuario
+            const filterCachedManifiestos = (cached: any[]) => {
+                if (role === 'TRANSPORTISTA' && filterParams.transportistaId) {
+                    return cached.filter(m => m.transportistaId === filterParams.transportistaId);
+                } else if (role === 'OPERADOR' && filterParams.operadorId) {
+                    return cached.filter(m => m.operadorId === filterParams.operadorId);
+                } else if (role === 'GENERADOR' && filterParams.generadorId) {
+                    return cached.filter(m => m.generadorId === filterParams.generadorId);
+                }
+                return cached;
+            };
+
             // CORRECCIÓN v5.2: Si backend devuelve 0, intentar cargar del caché
             if (allManifiestos.length === 0) {
                 console.log('[MobileApp] Backend devolvió 0, intentando caché...');
                 const cached = await offlineStorage.getAllManifiestos();
-                if (cached.length > 0) {
-                    setBackendManifiestos(cached);
-                    console.log('[MobileApp] Usando', cached.length, 'manifiestos cacheados (backend vacío)');
+                // FIX v7.7: Filtrar cache por actor del usuario para evitar 403
+                const filteredCached = filterCachedManifiestos(cached);
+                if (filteredCached.length > 0) {
+                    setBackendManifiestos(filteredCached);
+                    console.log('[MobileApp] Usando', filteredCached.length, 'manifiestos cacheados filtrados (backend vacío)');
                 } else {
                     setBackendManifiestos([]);
                 }
@@ -471,11 +490,23 @@ const MobileApp: React.FC = () => {
             }
         } catch (err) {
             console.error('[MobileApp] Error loading manifiestos:', err);
-            // Cargar desde caché en caso de error
+            // Cargar desde caché en caso de error - FIX v7.7: También filtrar aquí
+            const currentUser = authService.getStoredUser();
             const cached = await offlineStorage.getAllManifiestos();
-            if (cached.length > 0) {
-                setBackendManifiestos(cached);
-                console.log('[MobileApp] Usando', cached.length, 'manifiestos cacheados (error)');
+            let filteredCached = cached;
+            const transportistaId = currentUser?.transportista?.id;
+            const operadorId = currentUser?.operador?.id;
+            const generadorId = currentUser?.generador?.id;
+            if (role === 'TRANSPORTISTA' && transportistaId) {
+                filteredCached = cached.filter(m => m.transportistaId === transportistaId);
+            } else if (role === 'OPERADOR' && operadorId) {
+                filteredCached = cached.filter(m => m.operadorId === operadorId);
+            } else if (role === 'GENERADOR' && generadorId) {
+                filteredCached = cached.filter(m => m.generadorId === generadorId);
+            }
+            if (filteredCached.length > 0) {
+                setBackendManifiestos(filteredCached);
+                console.log('[MobileApp] Usando', filteredCached.length, 'manifiestos cacheados filtrados (error)');
             } else {
                 setBackendManifiestos([]);
             }
@@ -616,34 +647,88 @@ const MobileApp: React.FC = () => {
     }, [trip, showToastMessage, isOnline, loadManifiestosFromBackend]);
 
     // Finalizar viaje y actualizar backend
+    // FIX v7.7: Verificar que el manifiesto pertenece al usuario actual
     const handleFinalizarViaje = useCallback(async () => {
-        if (activeManifiestoId && isOnline) {
+        const currentUser = authService.getStoredUser();
+        const userTransportistaId = currentUser?.transportista?.id;
+
+        // FIX v7.7: Solo buscar manifiestos que pertenecen al transportista actual
+        let manifiestoId = activeManifiestoId;
+        let manifiestoNumero = selectedManifiesto?.numero || '';
+
+        if (!manifiestoId) {
+            // Buscar SOLO entre manifiestos del transportista actual
+            const manifiestoEnTransito = backendManifiestos.find(m => {
+                const isEnTransito = m.estado === 'EN_TRANSITO';
+                // Verificar que pertenece a este transportista
+                const belongsToUser = !userTransportistaId || m.transportistaId === userTransportistaId;
+                return isEnTransito && belongsToUser;
+            });
+
+            if (manifiestoEnTransito) {
+                manifiestoId = manifiestoEnTransito.id;
+                manifiestoNumero = manifiestoEnTransito.numero || '';
+                console.log('[MobileApp] FIX v7.7: Usando manifiesto EN_TRANSITO encontrado:', manifiestoId, 'transportistaId:', userTransportistaId);
+            }
+        }
+
+        // Si estamos online y hay un manifiesto, actualizar el backend primero
+        if (manifiestoId && isOnline) {
             try {
                 // Obtener posición GPS actual
                 const position = await new Promise<GeolocationPosition>((resolve, reject) => {
                     navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000 });
                 }).catch(() => null);
 
-                await manifiestoService.confirmarEntrega(activeManifiestoId, {
+                await manifiestoService.confirmarEntrega(manifiestoId, {
                     latitud: position?.coords.latitude,
                     longitud: position?.coords.longitude,
                     observaciones: 'Entrega confirmada desde app móvil'
                 });
 
-                showToastMessage(`✅ Entrega confirmada para manifiesto`);
+                showToastMessage(`✅ Entrega confirmada - Manifiesto #${manifiestoNumero} actualizado a ENTREGADO`);
+
+                // Finalizar viaje local SOLO después de éxito en backend
+                trip.finalizarViaje();
+                setActiveManifiestoId(null);
+                setSelectedManifiesto(null);
+                syncedManifiestoRef.current = null; // Reset para permitir nueva sincronización
+                setCurrentScreen('home');
+
                 // Actualizar lista de manifiestos
                 loadManifiestosFromBackend();
             } catch (err: any) {
-                console.error('Error confirmando entrega:', err);
-                showToastMessage(`⚠️ Error al confirmar entrega: ${err.message || 'Error de conexión'}`);
+                console.error('[MobileApp] Error confirmando entrega:', err);
+                // FIX v7.7: Mensaje más descriptivo con código de error
+                const errorCode = err.response?.status || '';
+                const errorMsg = err.response?.data?.message || err.message || 'Error de conexión';
+                if (errorCode === 403) {
+                    showToastMessage(`⚠️ Error 403: No tienes permiso para este manifiesto. Verifica que esté asignado a ti.`);
+                } else {
+                    showToastMessage(`⚠️ Error ${errorCode}: ${errorMsg}`);
+                }
+                // NO finalizar el viaje local si falla el backend
+                // El usuario puede reintentar
             }
+        } else if (!isOnline) {
+            // Modo offline: guardar en cola y finalizar local
+            showToastMessage(`📴 Offline - Entrega se sincronizará cuando haya conexión`);
+            trip.finalizarViaje();
+            setActiveManifiestoId(null);
+            setSelectedManifiesto(null);
+            syncedManifiestoRef.current = null;
+            setCurrentScreen('home');
+        } else {
+            // Sin manifiesto asociado - solo finalizar viaje local
+            console.warn('[MobileApp] Finalizando viaje sin manifiesto asociado');
+            showToastMessage(`⚠️ No se encontró manifiesto para confirmar entrega`);
+            trip.finalizarViaje();
+            setActiveManifiestoId(null);
+            setSelectedManifiesto(null);
+            syncedManifiestoRef.current = null;
+            setCurrentScreen('home');
         }
-
-        trip.finalizarViaje();
-        setActiveManifiestoId(null);
-        setSelectedManifiesto(null);
-        setCurrentScreen('home');
-    }, [activeManifiestoId, isOnline, trip, showToastMessage, loadManifiestosFromBackend]);
+    }, [activeManifiestoId, selectedManifiesto, backendManifiestos, isOnline, trip, showToastMessage, loadManifiestosFromBackend]);
 
     // CORRECCIÓN CRÍTICA: Función para el botón "Iniciar Viaje" de acciones rápidas
     // Si hay 1 manifiesto pendiente: lo inicia automáticamente
@@ -1166,6 +1251,31 @@ const MobileApp: React.FC = () => {
                             </div>
                         )}
 
+                        {/* REVERSION: Transportista puede revertir ENTREGADO → EN_TRANSITO */}
+                        {role === 'TRANSPORTISTA' && selectedManifiesto.estado === 'ENTREGADO' && (
+                            <div className="form-actions" style={{ marginTop: '16px' }}>
+                                <button
+                                    className="btn btn-warning"
+                                    onClick={() => {
+                                        setManifiestoParaModal({
+                                            id: originalData.id,
+                                            numero: selectedManifiesto.numero,
+                                            estado: selectedManifiesto.estado
+                                        });
+                                        setReversionType('entrega');
+                                        setShowReversionModal(true);
+                                    }}
+                                    style={{ width: '100%', padding: '14px', fontSize: '16px', background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}
+                                >
+                                    <RotateCcw size={20} style={{ marginRight: '8px' }} />
+                                    Revertir Entrega
+                                </button>
+                                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', textAlign: 'center' }}>
+                                    Use esta opcion si el operador rechazo la carga
+                                </p>
+                            </div>
+                        )}
+
                         {role === 'OPERADOR' && selectedManifiesto.estado === 'ENTREGADO' && (
                             <div className="form-actions" style={{ marginTop: '16px' }}>
                                 <button
@@ -1213,7 +1323,7 @@ const MobileApp: React.FC = () => {
 
                         {/* CU-O07/O08: Botón para registrar tratamiento cuando ya se recibió la carga */}
                         {role === 'OPERADOR' && selectedManifiesto.estado === 'RECIBIDO' && (
-                            <div className="form-actions" style={{ marginTop: '16px' }}>
+                            <div className="form-actions" style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 <button
                                     className="btn btn-success"
                                     onClick={() => {
@@ -1233,6 +1343,48 @@ const MobileApp: React.FC = () => {
                                     <Recycle size={20} style={{ marginRight: '8px' }} />
                                     Registrar Tratamiento
                                 </button>
+                                {/* REVERSION: Operador puede revertir RECIBIDO → ENTREGADO */}
+                                <button
+                                    className="btn btn-warning"
+                                    onClick={() => {
+                                        setManifiestoParaModal({
+                                            id: originalData.id,
+                                            numero: selectedManifiesto.numero,
+                                            estado: selectedManifiesto.estado
+                                        });
+                                        setReversionType('recepcion');
+                                        setShowReversionModal(true);
+                                    }}
+                                    style={{ width: '100%', padding: '12px', fontSize: '14px', background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}
+                                >
+                                    <RotateCcw size={18} style={{ marginRight: '8px' }} />
+                                    Revertir Recepcion
+                                </button>
+                            </div>
+                        )}
+
+                        {/* REVERSION: Operador puede revertir TRATADO → RECIBIDO */}
+                        {role === 'OPERADOR' && selectedManifiesto.estado === 'TRATADO' && (
+                            <div className="form-actions" style={{ marginTop: '16px' }}>
+                                <button
+                                    className="btn btn-warning"
+                                    onClick={() => {
+                                        setManifiestoParaModal({
+                                            id: originalData.id,
+                                            numero: selectedManifiesto.numero,
+                                            estado: selectedManifiesto.estado
+                                        });
+                                        setReversionType('certificado');
+                                        setShowReversionModal(true);
+                                    }}
+                                    style={{ width: '100%', padding: '14px', fontSize: '16px', background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}
+                                >
+                                    <RotateCcw size={20} style={{ marginRight: '8px' }} />
+                                    Revertir Certificado
+                                </button>
+                                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', textAlign: 'center' }}>
+                                    Use esta opcion para corregir el certificado de tratamiento
+                                </p>
                             </div>
                         )}
                     </div>
@@ -1507,6 +1659,26 @@ const MobileApp: React.FC = () => {
                         }
                     }}
                     manifiesto={manifiestoParaModal}
+                />
+            )}
+
+            {/* Modal de Reversion de Estado */}
+            {showReversionModal && manifiestoParaModal && (
+                <ReversionModal
+                    isOpen={showReversionModal}
+                    onClose={() => {
+                        setShowReversionModal(false);
+                        setManifiestoParaModal(null);
+                    }}
+                    onSuccess={() => {
+                        showToastMessage(`✅ Estado revertido correctamente`);
+                        loadManifiestosFromBackend();
+                        setCurrentScreen('home');
+                    }}
+                    manifiestoId={manifiestoParaModal.id}
+                    manifiestoNumero={manifiestoParaModal.numero}
+                    estadoActual={manifiestoParaModal.estado}
+                    tipoReversion={reversionType}
                 />
             )}
 
