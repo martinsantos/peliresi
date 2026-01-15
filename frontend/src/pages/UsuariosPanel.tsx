@@ -27,10 +27,14 @@ import {
     Calendar,
     Check,
     X,
-    Loader2
+    Loader2,
+    ArrowUpDown,
+    ArrowUp,
+    ArrowDown
 } from 'lucide-react';
 import { usuarioService } from '../services/admin.service';
 import type { Usuario, UsuariosResponse } from '../services/admin.service';
+import { useSorting } from '../hooks/useSorting';
 import './UsuariosPanel.css';
 
 const ROLES = [
@@ -153,6 +157,21 @@ const UsuariosPanel: React.FC = () => {
         });
     };
 
+    // Sorting hook
+    const { sortedData: sortedUsuarios, handleSort, getSortIcon } = useSorting(
+        data?.usuarios || [],
+        { defaultKey: 'createdAt', defaultDirection: 'desc' }
+    );
+
+    // Renderizar icono de sorting
+    const SortIcon = ({ column }: { column: string }) => {
+        const direction = getSortIcon(column);
+        if (!direction) return <ArrowUpDown size={14} className="sort-icon" />;
+        return direction === 'asc'
+            ? <ArrowUp size={14} className="sort-icon active" />
+            : <ArrowDown size={14} className="sort-icon active" />;
+    };
+
     return (
         <div className="usuarios-panel">
             {/* Header */}
@@ -257,7 +276,7 @@ const UsuariosPanel: React.FC = () => {
                 <>
                     {/* Mobile Cards View */}
                     <div className="users-cards">
-                        {data.usuarios.map(usuario => (
+                        {sortedUsuarios.map(usuario => (
                             <div key={usuario.id} className={`user-card ${!usuario.activo ? 'inactive' : ''}`}>
                                 <div className="user-card-header">
                                     <div className="user-avatar" style={{ background: getRoleColor(usuario.rol) }}>
@@ -340,17 +359,25 @@ const UsuariosPanel: React.FC = () => {
                         <table className="users-table">
                             <thead>
                                 <tr>
-                                    <th>Usuario</th>
-                                    <th>Rol</th>
+                                    <th className="sortable-header" onClick={() => handleSort('nombre')}>
+                                        Usuario <SortIcon column="nombre" />
+                                    </th>
+                                    <th className="sortable-header" onClick={() => handleSort('rol')}>
+                                        Rol <SortIcon column="rol" />
+                                    </th>
                                     <th>Empresa</th>
                                     <th>Contacto</th>
-                                    <th>Estado</th>
-                                    <th>Registro</th>
+                                    <th className="sortable-header" onClick={() => handleSort('activo')}>
+                                        Estado <SortIcon column="activo" />
+                                    </th>
+                                    <th className="sortable-header" onClick={() => handleSort('createdAt')}>
+                                        Registro <SortIcon column="createdAt" />
+                                    </th>
                                     <th>Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {data.usuarios.map(usuario => (
+                                {sortedUsuarios.map(usuario => (
                                     <tr key={usuario.id} className={!usuario.activo ? 'inactive' : ''}>
                                         <td className="user-cell">
                                             <div className="user-avatar" style={{ background: getRoleColor(usuario.rol) }}>

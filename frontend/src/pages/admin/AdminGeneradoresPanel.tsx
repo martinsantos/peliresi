@@ -57,7 +57,7 @@ const AdminGeneradoresPanel: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
 
   const getHeaders = () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('accessToken');
     return {
       'Content-Type': 'application/json',
       Authorization: token ? `Bearer ${token}` : ''

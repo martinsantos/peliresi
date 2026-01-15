@@ -1310,3 +1310,48 @@ html {
   min-height: 44px;
   padding: 0.75rem 1rem;
 }
+
+/* ========== SORTABLE TABLE HEADERS ========== */
+.sortable-header {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  white-space: nowrap;
+}
+
+.sortable-header:hover {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: var(--primary-400);
+}
+
+.sortable-header:active {
+  background-color: rgba(16, 185, 129, 0.15);
+}
+
+.sort-icon {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  opacity: 0.4;
+  transition: opacity 0.2s, color 0.2s;
+  vertical-align: middle;
+}
+
+.sort-icon.active {
+  opacity: 1;
+  color: var(--primary-500);
+}
+
+.sortable-header:hover .sort-icon {
+  opacity: 0.7;
+}
+
+/* Ensure sort icons look good in tables */
+table th.sortable-header {
+  display: table-cell;
+}
+
+table th.sortable-header > * {
+  display: inline;
+  vertical-align: middle;
+}

@@ -1,0 +1,467 @@
+/**
+ * ActiveTripBanner CSS - Estilos premium para banner de viaje activo
+ */
+
+.active-trip-banner {
+    position: relative;
+    background: linear-gradient(135deg,
+        rgba(16, 185, 129, 0.15) 0%,
+        rgba(5, 150, 105, 0.1) 50%,
+        rgba(4, 120, 87, 0.15) 100%
+    );
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 16px;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+    box-shadow:
+        0 4px 20px rgba(16, 185, 129, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Pulse animado de fondo */
+.trip-banner-pulse {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 200%;
+    height: 200%;
+    transform: translateY(-50%);
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(16, 185, 129, 0.1) 50%,
+        transparent 100%
+    );
+    animation: banner-pulse 3s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes banner-pulse {
+    0%, 100% { transform: translateY(-50%) translateX(-100%); }
+    50% { transform: translateY(-50%) translateX(0%); }
+}
+
+.trip-banner-content {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+/* Icono animado */
+.trip-icon-container {
+    position: relative;
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border-radius: 14px;
+    flex-shrink: 0;
+}
+
+.trip-icon {
+    color: white;
+    animation: truck-bounce 2s ease-in-out infinite;
+}
+
+@keyframes truck-bounce {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(2px); }
+    75% { transform: translateX(-2px); }
+}
+
+.trip-icon-pulse {
+    position: absolute;
+    inset: -4px;
+    border: 2px solid rgba(16, 185, 129, 0.5);
+    border-radius: 18px;
+    animation: icon-pulse 2s ease-in-out infinite;
+}
+
+@keyframes icon-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.1); }
+}
+
+/* Info del viaje */
+.trip-info {
+    flex: 1;
+    min-width: 200px;
+}
+
+.trip-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.trip-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.875rem;
+    background: rgba(16, 185, 129, 0.2);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #10b981;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    background: #10b981;
+    border-radius: 50%;
+    animation: status-blink 1s ease-in-out infinite;
+}
+
+@keyframes status-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+.trip-numero {
+    font-family: var(--font-mono, monospace);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary, #f8fafc);
+}
+
+.trip-details {
+    color: var(--text-secondary, #cbd5e1);
+}
+
+.trip-route {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    flex-wrap: wrap;
+}
+
+.route-from,
+.route-to {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.route-arrow {
+    color: var(--primary-500, #10b981);
+    flex-shrink: 0;
+}
+
+/* Timer */
+.trip-timer {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    flex-shrink: 0;
+}
+
+.trip-timer svg {
+    color: var(--primary-400, #34d399);
+}
+
+.timer-value {
+    font-family: var(--font-mono, monospace);
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary, #f8fafc);
+    letter-spacing: 0.1em;
+}
+
+/* GPS Status */
+.trip-gps {
+    flex-shrink: 0;
+}
+
+.gps-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #10b981;
+}
+
+.gps-dot {
+    width: 8px;
+    height: 8px;
+    background: #10b981;
+    border-radius: 50%;
+    animation: gps-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes gps-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+    50% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+}
+
+/* Acciones */
+.trip-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-shrink: 0;
+}
+
+.trip-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.trip-btn.map {
+    background: rgba(59, 130, 246, 0.2);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    color: #60a5fa;
+}
+
+.trip-btn.map:hover {
+    background: rgba(59, 130, 246, 0.3);
+    transform: translateY(-2px);
+}
+
+.trip-btn.finish {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.trip-btn.finish:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+}
+
+/* Botón cerrar */
+.trip-close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 8px;
+    color: var(--text-muted, #94a3b8);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.trip-close:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--text-primary, #f8fafc);
+}
+
+/* Modal de confirmación */
+.confirm-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.confirm-modal {
+    background: linear-gradient(165deg,
+        rgba(30, 41, 59, 0.98) 0%,
+        rgba(15, 23, 42, 0.99) 100%
+    );
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 20px;
+    padding: 2rem;
+    max-width: 420px;
+    width: 90%;
+    text-align: center;
+    box-shadow:
+        0 25px 50px -12px rgba(0, 0, 0, 0.5),
+        0 0 40px rgba(16, 185, 129, 0.1);
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.confirm-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(245, 158, 11, 0.1);
+    border: 2px solid rgba(245, 158, 11, 0.3);
+    border-radius: 50%;
+    color: #f59e0b;
+}
+
+.confirm-modal h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary, #f8fafc);
+    margin-bottom: 0.75rem;
+}
+
+.confirm-modal p {
+    color: var(--text-secondary, #cbd5e1);
+    margin-bottom: 0.5rem;
+    line-height: 1.5;
+}
+
+.confirm-note {
+    font-size: 0.875rem;
+    color: var(--text-muted, #94a3b8);
+    margin-bottom: 1.5rem !important;
+}
+
+.confirm-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+
+.btn-cancel,
+.btn-confirm {
+    padding: 0.875rem 1.5rem;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-cancel {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-secondary, #cbd5e1);
+}
+
+.btn-cancel:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.btn-confirm {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.btn-confirm:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .active-trip-banner {
+        padding: 1rem;
+    }
+
+    .trip-banner-content {
+        gap: 1rem;
+    }
+
+    .trip-icon-container {
+        width: 48px;
+        height: 48px;
+    }
+
+    .trip-icon-container svg {
+        width: 24px;
+        height: 24px;
+    }
+
+    .trip-header {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .trip-route {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+    }
+
+    .route-arrow {
+        transform: rotate(90deg);
+    }
+
+    .trip-timer {
+        padding: 0.5rem 1rem;
+    }
+
+    .timer-value {
+        font-size: 1.25rem;
+    }
+
+    .trip-actions {
+        width: 100%;
+        justify-content: stretch;
+    }
+
+    .trip-btn {
+        flex: 1;
+        justify-content: center;
+        padding: 0.625rem 1rem;
+    }
+
+    .trip-btn span {
+        display: none;
+    }
+
+    @media (min-width: 480px) {
+        .trip-btn span {
+            display: inline;
+        }
+    }
+}

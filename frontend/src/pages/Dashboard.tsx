@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { manifiestoService } from '../services/manifiesto.service';
 import { usuarioService } from '../services/admin.service';
+import { offlineStorage } from '../services/offlineStorage';
 import { demoStats } from '../data/demoDashboard';
 import type { DashboardStats } from '../types';
 import {
@@ -30,6 +31,7 @@ import {
     History,
     BarChart3
 } from 'lucide-react';
+import ActiveTripBanner from '../components/ActiveTripBanner';
 import './Dashboard.css';
 
 // ============================================
@@ -291,19 +293,119 @@ interface AdminStats {
     };
 }
 
+// Interfaz para viaje activo
+interface ViajeActivo {
+    manifiesto: {
+        id: string;
+        numero: string;
+        generador?: { razonSocial: string };
+        operador?: { razonSocial: string };
+    };
+    startTime: number;
+    ubicacionActual?: { lat: number; lng: number };
+}
+
 const Dashboard: React.FC = () => {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const [stats, setStats] = useState<DashboardStats>(demoStats);
     const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
     const [loading, setLoading] = useState(true);
     const [error] = useState('');
+    const [viajeActivo, setViajeActivo] = useState<ViajeActivo | null>(null);
 
     useEffect(() => {
         loadDashboard();
         if (user?.rol === 'ADMIN') {
             loadAdminStats();
         }
+        // Cargar viaje activo para TRANSPORTISTA
+        if (user?.rol === 'TRANSPORTISTA') {
+            loadViajeActivo();
+        }
     }, [user?.rol]);
+
+    // Cargar viaje activo desde IndexedDB (sincronizado con APP) o API
+    const loadViajeActivo = async () => {
+        try {
+            // Primero intentar cargar de IndexedDB (sincronizado con APP móvil)
+            const activeTrip = await offlineStorage.getActiveTrip();
+            if (activeTrip) {
+                // Obtener detalles del manifiesto desde API
+                try {
+                    const manifiestoData = await manifiestoService.getManifiesto(activeTrip.manifiestoId);
+                    if (manifiestoData) {
+                        const tripData: ViajeActivo = {
+                            manifiesto: {
+                                id: manifiestoData.id,
+                                numero: manifiestoData.numero,
+                                generador: manifiestoData.generador,
+                                operador: manifiestoData.operador
+                            },
+                            startTime: activeTrip.startTimestamp,
+                            ubicacionActual: activeTrip.routePoints?.length > 0
+                                ? {
+                                    lat: activeTrip.routePoints[activeTrip.routePoints.length - 1].lat,
+                                    lng: activeTrip.routePoints[activeTrip.routePoints.length - 1].lng
+                                }
+                                : undefined
+                        };
+                        setViajeActivo(tripData);
+                        console.log('[Dashboard] Viaje activo cargado desde IndexedDB:', tripData.manifiesto.numero);
+                        return;
+                    }
+                } catch (e) {
+                    console.warn('[Dashboard] Error obteniendo detalles del manifiesto:', e);
+                }
+            }
+
+            // Si no hay en IndexedDB, buscar manifiestos EN_TRANSITO del transportista actual
+            const response = await manifiestoService.getManifiestos({ estado: 'EN_TRANSITO', limit: 1 });
+            if (response?.manifiestos && response.manifiestos.length > 0) {
+                const manifiesto = response.manifiestos[0];
+                const tripData: ViajeActivo = {
+                    manifiesto: {
+                        id: manifiesto.id,
+                        numero: manifiesto.numero,
+                        generador: manifiesto.generador,
+                        operador: manifiesto.operador
+                    },
+                    startTime: new Date(manifiesto.fechaRetiro || manifiesto.updatedAt).getTime(),
+                    ubicacionActual: undefined
+                };
+                setViajeActivo(tripData);
+                console.log('[Dashboard] Viaje activo cargado desde API:', tripData.manifiesto.numero);
+            }
+        } catch (err) {
+            console.error('Error cargando viaje activo:', err);
+        }
+    };
+
+    // Handlers para el banner de viaje activo
+    const handleVerMapa = () => {
+        navigate('/tracking');
+    };
+
+    const handleFinalizarViaje = async () => {
+        if (!viajeActivo) return;
+        try {
+            await manifiestoService.confirmarEntrega(viajeActivo.manifiesto.id, {
+                latitud: viajeActivo.ubicacionActual?.lat,
+                longitud: viajeActivo.ubicacionActual?.lng
+            });
+            // Limpiar viaje activo de IndexedDB
+            await offlineStorage.clearActiveTrip();
+            setViajeActivo(null);
+            loadDashboard(); // Recargar stats
+        } catch (err) {
+            console.error('Error finalizando viaje:', err);
+            alert('Error al finalizar el viaje. Intente nuevamente.');
+        }
+    };
+
+    const handleCerrarBanner = () => {
+        setViajeActivo(null);
+    };
 
     const loadAdminStats = async () => {
         try {
@@ -427,6 +529,18 @@ const Dashboard: React.FC = () => {
 
     return (
         <div className="dashboard animate-fadeIn">
+            {/* Banner de Viaje Activo - Solo para TRANSPORTISTA */}
+            {user?.rol === 'TRANSPORTISTA' && viajeActivo && (
+                <ActiveTripBanner
+                    manifiesto={viajeActivo.manifiesto}
+                    startTime={viajeActivo.startTime}
+                    ubicacionActual={viajeActivo.ubicacionActual}
+                    onVerMapa={handleVerMapa}
+                    onFinalizarViaje={handleFinalizarViaje}
+                    onCerrar={handleCerrarBanner}
+                />
+            )}
+
             {/* Welcome Section - Personalizado por rol */}
             <div className="dashboard-welcome" style={{
                 background: user?.rol === 'ADMIN' ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(59, 130, 246, 0.1))' :

@@ -202,6 +202,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     { path: '/admin/actividad', icon: <Activity size={20} />, label: 'Timeline' },
                     { path: '/alertas', icon: <Bell size={20} />, label: 'Alertas' },
                     { path: '/actores', icon: <Users size={20} />, label: 'Actores' },
+                    // Admin Sectorial
+                    { path: '/admin/generadores', icon: <Factory size={20} />, label: 'Admin Generadores' },
+                    { path: '/admin/transportistas', icon: <Truck size={20} />, label: 'Admin Transportistas' },
+                    { path: '/admin/operadores', icon: <Building2 size={20} />, label: 'Admin Operadores' },
                     { path: '/reportes', icon: <BarChart3 size={20} />, label: 'Reportes' },
                     { path: '/configuracion', icon: <Settings size={20} />, label: 'Config' },
                 ];

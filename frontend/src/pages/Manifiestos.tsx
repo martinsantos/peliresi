@@ -11,9 +11,13 @@ import {
     Eye,
     ChevronLeft,
     ChevronRight,
-    AlertTriangle
+    AlertTriangle,
+    ArrowUpDown,
+    ArrowUp,
+    ArrowDown
 } from 'lucide-react';
 import { CustomSelect } from '../components/CustomSelect';
+import { useSorting } from '../hooks/useSorting';
 import './Manifiestos.css';
 
 const ESTADO_OPTIONS = [
@@ -97,6 +101,21 @@ const Manifiestos: React.FC = () => {
         m?.transportista?.razonSocial?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    // Sorting hook
+    const { sortedData, sortConfig, handleSort, getSortIcon } = useSorting(filteredManifiestos, {
+        defaultKey: 'createdAt',
+        defaultDirection: 'desc'
+    });
+
+    // Renderizar icono de sorting
+    const SortIcon = ({ column }: { column: string }) => {
+        const direction = getSortIcon(column);
+        if (!direction) return <ArrowUpDown size={14} className="sort-icon" />;
+        return direction === 'asc'
+            ? <ArrowUp size={14} className="sort-icon active" />
+            : <ArrowDown size={14} className="sort-icon active" />;
+    };
+
     if (loading && manifiestos.length === 0) {
         return (
             <div className="manifiestos-loading">
@@ -153,11 +172,11 @@ const Manifiestos: React.FC = () => {
             )}
 
             {/* Table / Cards */}
-            {filteredManifiestos.length > 0 ? (
+            {sortedData.length > 0 ? (
                 <>
                     {/* Mobile Cards View */}
                     <div className="mobile-cards">
-                        {filteredManifiestos.map((manifiesto) => {
+                        {sortedData.map((manifiesto) => {
                             const badge = getEstadoBadge(manifiesto.estado);
                             return (
                                 <div key={manifiesto.id} className="manifest-card">
@@ -208,17 +227,23 @@ const Manifiestos: React.FC = () => {
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Número</th>
+                                    <th className="sortable-header" onClick={() => handleSort('numero')}>
+                                        Número <SortIcon column="numero" />
+                                    </th>
                                     <th>Generador</th>
                                     <th>Transportista</th>
                                     <th>Operador</th>
-                                    <th>Estado</th>
-                                    <th>Fecha</th>
+                                    <th className="sortable-header" onClick={() => handleSort('estado')}>
+                                        Estado <SortIcon column="estado" />
+                                    </th>
+                                    <th className="sortable-header" onClick={() => handleSort('createdAt')}>
+                                        Fecha <SortIcon column="createdAt" />
+                                    </th>
                                     <th>Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredManifiestos.map((manifiesto) => {
+                                {sortedData.map((manifiesto) => {
                                     const badge = getEstadoBadge(manifiesto.estado);
                                     return (
                                         <tr key={manifiesto.id}>
@@ -266,7 +291,7 @@ const Manifiestos: React.FC = () => {
                     {/* Pagination */}
                     <div className="pagination">
                         <span className="pagination-info">
-                            Mostrando {((pagination.page - 1) * pagination.limit) + 1} - {Math.min(pagination.page * pagination.limit, pagination.total)} de {pagination.total}
+                            Mostrando {sortedData.length} de {pagination.total} (ordenado por {sortConfig.key} {sortConfig.direction === 'asc' ? '↑' : '↓'})
                         </span>
                         <div className="pagination-controls">
                             <button

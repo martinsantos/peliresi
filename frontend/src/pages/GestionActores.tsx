@@ -15,8 +15,12 @@ import {
     Loader2,
     ChevronLeft,
     ChevronRight,
-    Check
+    Check,
+    ArrowUpDown,
+    ArrowUp,
+    ArrowDown
 } from 'lucide-react';
+import { useSorting } from '../hooks/useSorting';
 import './GestionActores.css';
 
 type ActorType = 'generadores' | 'transportistas' | 'operadores';
@@ -167,6 +171,44 @@ const GestionActores: React.FC = () => {
         }
     };
 
+    // Sorting hooks para cada tipo de actor
+    const { sortedData: sortedGeneradores, handleSort: handleSortGen, getSortIcon: getSortIconGen } = useSorting(generadores, {
+        defaultKey: 'razonSocial',
+        defaultDirection: 'asc'
+    });
+
+    const { sortedData: sortedTransportistas, handleSort: handleSortTrans, getSortIcon: getSortIconTrans } = useSorting(transportistas, {
+        defaultKey: 'razonSocial',
+        defaultDirection: 'asc'
+    });
+
+    const { sortedData: sortedOperadores, handleSort: handleSortOp, getSortIcon: getSortIconOp } = useSorting(operadores, {
+        defaultKey: 'razonSocial',
+        defaultDirection: 'asc'
+    });
+
+    // Función de sorting activa según el tab
+    const handleSort = (column: string) => {
+        if (activeTab === 'generadores') handleSortGen(column);
+        else if (activeTab === 'transportistas') handleSortTrans(column);
+        else handleSortOp(column);
+    };
+
+    const getSortIcon = (column: string) => {
+        if (activeTab === 'generadores') return getSortIconGen(column);
+        else if (activeTab === 'transportistas') return getSortIconTrans(column);
+        else return getSortIconOp(column);
+    };
+
+    // Renderizar icono de sorting
+    const SortIcon = ({ column }: { column: string }) => {
+        const direction = getSortIcon(column);
+        if (!direction) return <ArrowUpDown size={14} className="sort-icon" />;
+        return direction === 'asc'
+            ? <ArrowUp size={14} className="sort-icon active" />
+            : <ArrowDown size={14} className="sort-icon active" />;
+    };
+
     return (
         <div className="gestion-page animate-fadeIn">
             <div className="page-header">
@@ -236,7 +278,7 @@ const GestionActores: React.FC = () => {
                     <>
                         {/* Mobile Cards View */}
                         <div className="actor-cards">
-                            {activeTab === 'generadores' && generadores.map(g => (
+                            {activeTab === 'generadores' && sortedGeneradores.map(g => (
                                 <div key={g.id} className="actor-card">
                                     <div className="actor-card-header">
                                         <div className="actor-card-icon generador">
@@ -278,7 +320,7 @@ const GestionActores: React.FC = () => {
                                     </div>
                                 </div>
                             ))}
-                            {activeTab === 'transportistas' && transportistas.map(t => (
+                            {activeTab === 'transportistas' && sortedTransportistas.map(t => (
                                 <div key={t.id} className="actor-card">
                                     <div className="actor-card-header">
                                         <div className="actor-card-icon transportista">
@@ -323,7 +365,7 @@ const GestionActores: React.FC = () => {
                                     </div>
                                 </div>
                             ))}
-                            {activeTab === 'operadores' && operadores.map(o => (
+                            {activeTab === 'operadores' && sortedOperadores.map(o => (
                                 <div key={o.id} className="actor-card">
                                     <div className="actor-card-header">
                                         <div className="actor-card-icon operador">
@@ -376,17 +418,25 @@ const GestionActores: React.FC = () => {
                             <table>
                                 <thead>
                                     <tr>
-                                        <th>Razón Social</th>
-                                        <th>CUIT</th>
+                                        <th className="sortable-header" onClick={() => handleSort('razonSocial')}>
+                                            Razón Social <SortIcon column="razonSocial" />
+                                        </th>
+                                        <th className="sortable-header" onClick={() => handleSort('cuit')}>
+                                            CUIT <SortIcon column="cuit" />
+                                        </th>
                                         <th>Email</th>
                                         <th>Teléfono</th>
-                                        <th>Estado</th>
-                                        <th>Manifiestos</th>
+                                        <th className="sortable-header" onClick={() => handleSort('activo')}>
+                                            Estado <SortIcon column="activo" />
+                                        </th>
+                                        <th className="sortable-header" onClick={() => handleSort('_count.manifiestos')}>
+                                            Manifiestos <SortIcon column="_count.manifiestos" />
+                                        </th>
                                         <th>Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {activeTab === 'generadores' && generadores.map(g => (
+                                    {activeTab === 'generadores' && sortedGeneradores.map(g => (
                                         <tr key={g.id}>
                                             <td><strong>{g.razonSocial}</strong></td>
                                             <td>{g.cuit}</td>
@@ -410,7 +460,7 @@ const GestionActores: React.FC = () => {
                                             </td>
                                         </tr>
                                     ))}
-                                    {activeTab === 'transportistas' && transportistas.map(t => (
+                                    {activeTab === 'transportistas' && sortedTransportistas.map(t => (
                                         <tr key={t.id}>
                                             <td>
                                                 <strong>{t.razonSocial}</strong>
@@ -435,7 +485,7 @@ const GestionActores: React.FC = () => {
                                             </td>
                                         </tr>
                                     ))}
-                                    {activeTab === 'operadores' && operadores.map(o => (
+                                    {activeTab === 'operadores' && sortedOperadores.map(o => (
                                         <tr key={o.id}>
                                             <td>
                                                 <strong>{o.razonSocial}</strong>

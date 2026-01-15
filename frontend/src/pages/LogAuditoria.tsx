@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  FileText, Filter, Download, RefreshCw, Search, 
-  ChevronLeft, ChevronRight, User, Clock, Activity
+import {
+  FileText, Filter, Download, RefreshCw, Search,
+  ChevronLeft, ChevronRight, User, Clock, Activity,
+  ArrowUpDown, ArrowUp, ArrowDown
 } from 'lucide-react';
+import { useSorting } from '../hooks/useSorting';
 import './LogAuditoria.css';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -156,6 +158,21 @@ const LogAuditoria: React.FC = () => {
 
   const modulos = ['AUTH', 'MANIFIESTOS', 'USUARIOS', 'REPORTES', 'SISTEMA', 'PUSH'];
 
+  // Sorting hook
+  const { sortedData: sortedLogs, sortConfig, handleSort, getSortIcon } = useSorting(logs, {
+    defaultKey: 'timestamp',
+    defaultDirection: 'desc'
+  });
+
+  // Renderizar icono de sorting
+  const SortIcon = ({ column }: { column: string }) => {
+    const direction = getSortIcon(column);
+    if (!direction) return <ArrowUpDown size={14} className="sort-icon" />;
+    return direction === 'asc'
+      ? <ArrowUp size={14} className="sort-icon active" />
+      : <ArrowDown size={14} className="sort-icon active" />;
+  };
+
   return (
     <div className="auditoria-container">
       <div className="page-header">
@@ -258,7 +275,7 @@ const LogAuditoria: React.FC = () => {
       {/* Mobile Cards View */}
       {!loading && (
         <div className="audit-cards">
-          {logs.map(log => (
+          {sortedLogs.map(log => (
             <div key={log.id} className="audit-card">
               <div className="audit-card-header">
                 <div className="audit-timestamp">
@@ -314,16 +331,24 @@ const LogAuditoria: React.FC = () => {
           <table className="audit-table">
             <thead>
               <tr>
-                <th>Fecha/Hora</th>
-                <th>Usuario</th>
-                <th>Acción</th>
-                <th>Módulo</th>
+                <th className="sortable-header" onClick={() => handleSort('timestamp')}>
+                  Fecha/Hora <SortIcon column="timestamp" />
+                </th>
+                <th className="sortable-header" onClick={() => handleSort('usuario.nombre')}>
+                  Usuario <SortIcon column="usuario.nombre" />
+                </th>
+                <th className="sortable-header" onClick={() => handleSort('accion')}>
+                  Acción <SortIcon column="accion" />
+                </th>
+                <th className="sortable-header" onClick={() => handleSort('modulo')}>
+                  Módulo <SortIcon column="modulo" />
+                </th>
                 <th>Detalles</th>
                 <th>IP</th>
               </tr>
             </thead>
             <tbody>
-              {logs.map(log => (
+              {sortedLogs.map(log => (
                 <tr key={log.id}>
                   <td className="td-timestamp">
                     <Clock size={14} />
@@ -363,7 +388,7 @@ const LogAuditoria: React.FC = () => {
       {/* Pagination */}
       <div className="pagination">
         <span className="pagination-info">
-          Mostrando {logs.length} de {pagination.total} registros
+          Mostrando {sortedLogs.length} de {pagination.total} registros (ordenado por {sortConfig.key} {sortConfig.direction === 'asc' ? '↑' : '↓'})
         </span>
         <div className="pagination-controls">
           <button 
