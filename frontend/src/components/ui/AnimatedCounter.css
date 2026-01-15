@@ -1,0 +1,226 @@
+/**
+ * AnimatedCounter.css - Premium Counter Styles
+ * Control Room 2077 Design System
+ */
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* BASE STYLES                                                                  */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+.animated-counter {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.animated-counter__value {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-text-max, #ffffff);
+  transition: text-shadow 0.3s ease;
+}
+
+.animated-counter__prefix,
+.animated-counter__suffix {
+  font-weight: 500;
+  opacity: 0.7;
+}
+
+.animated-counter__number {
+  font-variant-numeric: tabular-nums;
+}
+
+.animated-counter__label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-text-muted, #a1afc2);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* SIZE VARIANTS                                                                */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+.animated-counter--sm .animated-counter__value {
+  font-size: 1.25rem;
+}
+
+.animated-counter--sm .animated-counter__prefix,
+.animated-counter--sm .animated-counter__suffix {
+  font-size: 0.875rem;
+}
+
+.animated-counter--md .animated-counter__value {
+  font-size: 1.75rem;
+}
+
+.animated-counter--md .animated-counter__prefix,
+.animated-counter--md .animated-counter__suffix {
+  font-size: 1rem;
+}
+
+.animated-counter--lg .animated-counter__value {
+  font-size: 2.5rem;
+}
+
+.animated-counter--lg .animated-counter__prefix,
+.animated-counter--lg .animated-counter__suffix {
+  font-size: 1.25rem;
+}
+
+.animated-counter--xl .animated-counter__value {
+  font-size: 3.5rem;
+}
+
+.animated-counter--xl .animated-counter__prefix,
+.animated-counter--xl .animated-counter__suffix {
+  font-size: 1.5rem;
+}
+
+.animated-counter--2xl .animated-counter__value {
+  font-size: 4.5rem;
+}
+
+.animated-counter--2xl .animated-counter__prefix,
+.animated-counter--2xl .animated-counter__suffix {
+  font-size: 2rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* COLOR VARIANTS                                                               */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Cyan (Default) */
+.animated-counter--cyan .animated-counter__value,
+.animated-counter--default .animated-counter__value {
+  color: var(--neon-cyan, #00fff2);
+}
+
+.animated-counter--cyan.animated-counter--glow .animated-counter__value,
+.animated-counter--default.animated-counter--glow .animated-counter__value {
+  text-shadow: 0 0 10px var(--neon-cyan-glow, rgba(0, 255, 242, 0.6)),
+               0 0 20px rgba(0, 255, 242, 0.3);
+}
+
+/* Green */
+.animated-counter--green .animated-counter__value {
+  color: var(--neon-green, #22ff66);
+}
+
+.animated-counter--green.animated-counter--glow .animated-counter__value {
+  text-shadow: 0 0 10px var(--neon-green-glow, rgba(34, 255, 102, 0.6)),
+               0 0 20px rgba(34, 255, 102, 0.3);
+}
+
+/* Amber */
+.animated-counter--amber .animated-counter__value {
+  color: var(--neon-amber, #ffb800);
+}
+
+.animated-counter--amber.animated-counter--glow .animated-counter__value {
+  text-shadow: 0 0 10px var(--neon-amber-glow, rgba(255, 184, 0, 0.6)),
+               0 0 20px rgba(255, 184, 0, 0.3);
+}
+
+/* Red */
+.animated-counter--red .animated-counter__value {
+  color: var(--neon-red, #ff3366);
+}
+
+.animated-counter--red.animated-counter--glow .animated-counter__value {
+  text-shadow: 0 0 10px var(--neon-red-glow, rgba(255, 51, 102, 0.6)),
+               0 0 20px rgba(255, 51, 102, 0.3);
+}
+
+/* Purple */
+.animated-counter--purple .animated-counter__value {
+  color: var(--neon-purple, #a855f7);
+}
+
+.animated-counter--purple.animated-counter--glow .animated-counter__value {
+  text-shadow: 0 0 10px var(--neon-purple-glow, rgba(168, 85, 247, 0.6)),
+               0 0 20px rgba(168, 85, 247, 0.3);
+}
+
+/* Blue */
+.animated-counter--blue .animated-counter__value {
+  color: var(--neon-blue, #3b82f6);
+}
+
+.animated-counter--blue.animated-counter--glow .animated-counter__value {
+  text-shadow: 0 0 10px var(--neon-blue-glow, rgba(59, 130, 246, 0.6)),
+               0 0 20px rgba(59, 130, 246, 0.3);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* HIGHLIGHT ANIMATION                                                          */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+.animated-counter__value--highlight {
+  animation: counterHighlight 0.5s ease-out;
+}
+
+@keyframes counterHighlight {
+  0% {
+    text-shadow: none;
+    transform: scale(1);
+  }
+  50% {
+    text-shadow: 0 0 30px currentColor,
+                 0 0 60px currentColor;
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* RESPONSIVE                                                                   */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .animated-counter--lg .animated-counter__value {
+    font-size: 2rem;
+  }
+
+  .animated-counter--xl .animated-counter__value {
+    font-size: 2.5rem;
+  }
+
+  .animated-counter--2xl .animated-counter__value {
+    font-size: 3rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .animated-counter--lg .animated-counter__value {
+    font-size: 1.75rem;
+  }
+
+  .animated-counter--xl .animated-counter__value {
+    font-size: 2rem;
+  }
+
+  .animated-counter--2xl .animated-counter__value {
+    font-size: 2.5rem;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* REDUCED MOTION                                                               */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .animated-counter__value,
+  .animated-counter__value--highlight {
+    animation: none !important;
+    transition: none !important;
+  }
+}

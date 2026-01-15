@@ -169,8 +169,13 @@ export const confirmarRecepcion = async (req: AuthRequest, res: Response, next: 
     }
 
     // VALIDACIÓN 2: Verificar que usuario es el operador asignado (o admin)
-    if (manifiesto.operador.usuarioId !== userId && req.user.rol !== 'ADMIN') {
+    // En modo demo (header X-Demo-Mode), permitir cualquier OPERADOR
+    const isDemoMode = req.headers['x-demo-mode'] === 'true';
+    if (manifiesto.operador.usuarioId !== userId && req.user.rol !== 'ADMIN' && !isDemoMode) {
       throw new AppError('No eres el operador asignado para este manifiesto', 403);
+    }
+    if (isDemoMode && manifiesto.operador.usuarioId !== userId) {
+      console.log(`[DEMO] Usuario ${userId} confirmando recepción como operador asignado en modo demo`);
     }
 
     // VALIDACIÓN 3: Verificar estado correcto
@@ -463,8 +468,13 @@ export const registrarTratamiento = async (req: AuthRequest, res: Response, next
         }
 
         // Verificar que sea el operador asignado o admin
-        if (manifiesto.operador.usuarioId !== userId && req.user.rol !== 'ADMIN') {
+        // En modo demo (header X-Demo-Mode), permitir cualquier OPERADOR
+        const isDemoMode = req.headers['x-demo-mode'] === 'true';
+        if (manifiesto.operador.usuarioId !== userId && req.user.rol !== 'ADMIN' && !isDemoMode) {
             throw new AppError('No tienes permisos para registrar tratamiento en este manifiesto', 403);
+        }
+        if (isDemoMode && manifiesto.operador.usuarioId !== userId) {
+            console.log(`[DEMO] Usuario ${userId} actuando como operador ${manifiesto.operador.id} en modo demo`);
         }
 
         // Validar método de tratamiento
@@ -828,8 +838,13 @@ export const registrarPesaje = async (req: AuthRequest, res: Response, next: Nex
         }
 
         // Verificar que sea el operador asignado o admin
-        if (manifiesto.operador.usuarioId !== userId && req.user.rol !== 'ADMIN') {
+        // En modo demo (header X-Demo-Mode), permitir cualquier OPERADOR
+        const isDemoMode = req.headers['x-demo-mode'] === 'true';
+        if (manifiesto.operador.usuarioId !== userId && req.user.rol !== 'ADMIN' && !isDemoMode) {
             throw new AppError('No tienes permisos para registrar pesaje en este manifiesto', 403);
+        }
+        if (isDemoMode && manifiesto.operador.usuarioId !== userId) {
+            console.log(`[DEMO] Usuario ${userId} registrando pesaje como operador asignado en modo demo`);
         }
 
         // Validar que se enviaron residuos

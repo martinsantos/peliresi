@@ -378,6 +378,62 @@
 }
 
 /* ============================================
+   PREMIUM GLOW CARD KPIs
+   ============================================ */
+.mega-kpi-card {
+    min-height: 140px;
+}
+
+.mega-kpi-card .kpi-content {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.mega-kpi-card .kpi-label {
+    font-family: var(--font-display, 'Orbitron', sans-serif);
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--color-text-muted, #64748b);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+}
+
+.mega-kpi-card .kpi-trend {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: var(--neon-green, #22ff66);
+}
+
+.mega-kpi-card .kpi-live {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.7rem;
+    color: var(--neon-cyan, #00fff2);
+}
+
+.mega-kpi-card .kpi-alert {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    color: var(--neon-amber, #ffb800);
+    font-weight: 600;
+}
+
+.mega-kpi-card .kpi-pending {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    color: var(--neon-purple, #a855f7);
+}
+
+/* ============================================
    MEGA GRID
    ============================================ */
 .mega-grid {
@@ -1295,4 +1351,65 @@
     .ranking-others {
         display: none;
     }
+}
+
+/* ============================================
+   KPI CARDS - Professional Style
+   ============================================ */
+.kpi-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px;
+    border: 1px solid;
+    border-radius: 16px;
+    transition: all 0.2s ease;
+}
+
+.kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+.kpi-icon {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.kpi-value {
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 1.1;
+}
+
+/* ============================================
+   CHART CARDS - Professional Style
+   ============================================ */
+.chart-card {
+    background: var(--bg-secondary, #1e293b);
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    border-radius: 16px;
+    padding: 20px;
+}
+
+.chart-header {
+    margin-bottom: 16px;
+}
+
+.chart-header h4 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #f8fafc;
+}
+
+.chart-header p {
+    margin: 4px 0 0;
+    font-size: 12px;
+    color: #94a3b8;
 }

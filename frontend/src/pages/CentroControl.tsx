@@ -1,10 +1,12 @@
 /**
  * CentroControl.tsx - MEGA Dashboard para Monitor Grande
  * Dashboard premium con métricas en vivo, mapa animado y efectos visuales impactantes
+ * Control Room 2077 Design System
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import {
     Activity, Users, FileText, Truck, Bell, AlertTriangle,
     CheckCircle, Clock, MapPin, RefreshCw,
@@ -13,6 +15,20 @@ import {
     Wifi, WifiOff, ArrowRightLeft, Navigation,
     Trophy, TrendingUp, Recycle
 } from 'lucide-react';
+import {
+    AreaChart,
+    Area,
+    PieChart,
+    Pie,
+    Cell,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    ResponsiveContainer,
+    Legend
+} from 'recharts';
+import type { ChartDataPoint } from '../components/ui';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -259,35 +275,42 @@ const MendozaMapSVG: React.FC<{ departamentos: DepartamentoStats[], selectedDept
     );
 };
 
-// Componente de contador animado
-const AnimatedCounter: React.FC<{ value: number; duration?: number }> = ({ value, duration = 1500 }) => {
-    const [displayValue, setDisplayValue] = useState(0);
-    const prevValue = useRef(0);
+// Generate chart data for activity visualization
+const generateActivityChartData = (actividades: Actividad[]): ChartDataPoint[] => {
+    const hours: Record<string, number> = {};
+    const now = new Date();
 
-    useEffect(() => {
-        const startValue = prevValue.current;
-        const diff = value - startValue;
-        const startTime = Date.now();
+    // Initialize last 8 hours
+    for (let i = 7; i >= 0; i--) {
+        const hour = new Date(now.getTime() - i * 3600000);
+        const key = hour.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+        hours[key] = 0;
+    }
 
-        const animate = () => {
-            const elapsed = Date.now() - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            const eased = 1 - Math.pow(1 - progress, 3);
-            const current = Math.round(startValue + diff * eased);
-
-            setDisplayValue(current);
-
-            if (progress < 1) {
-                requestAnimationFrame(animate);
-            } else {
-                prevValue.current = value;
+    // Count activities per hour
+    actividades.forEach(act => {
+        const actDate = new Date(act.fecha);
+        const diffHours = (now.getTime() - actDate.getTime()) / 3600000;
+        if (diffHours <= 8) {
+            const key = actDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+            if (hours[key] !== undefined) {
+                hours[key]++;
             }
-        };
+        }
+    });
 
-        requestAnimationFrame(animate);
-    }, [value, duration]);
+    return Object.entries(hours).map(([name, value]) => ({ name, value }));
+};
 
-    return <span>{displayValue.toLocaleString()}</span>;
+const generatePipelineChartData = (stats: SystemStats): ChartDataPoint[] => {
+    return [
+        { name: 'Borradores', value: stats.manifiestos.borradores },
+        { name: 'Aprobados', value: stats.manifiestos.aprobados },
+        { name: 'En Tránsito', value: stats.manifiestos.enTransito },
+        { name: 'Entregados', value: stats.manifiestos.entregados },
+        { name: 'Recibidos', value: stats.manifiestos.recibidos },
+        { name: 'Tratados', value: stats.manifiestos.tratados },
+    ].filter(item => item.value > 0);
 };
 
 // Reloj en tiempo real
@@ -465,81 +488,101 @@ const CentroControl: React.FC = () => {
                 </div>
             </header>
 
-            {/* KPIs MEGA */}
+            {/* KPIs - Professional Style */}
             {stats && (
-                <div className="mega-kpis">
-                    <div className="mega-kpi manifiestos">
-                        <div className="kpi-glow"></div>
-                        <div className="kpi-icon">
-                            <FileText size={32} />
+                <motion.div
+                    className="mega-kpis"
+                    initial="hidden"
+                    animate="show"
+                    variants={{
+                        hidden: { opacity: 0 },
+                        show: { opacity: 1, transition: { staggerChildren: 0.08 } }
+                    }}
+                >
+                    <motion.div
+                        className="kpi-card"
+                        style={{ background: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }}
+                        variants={{ hidden: { y: 15, opacity: 0 }, show: { y: 0, opacity: 1 } }}
+                    >
+                        <div className="kpi-icon" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#10b981' }}>
+                            <FileText size={24} />
                         </div>
-                        <div className="kpi-data">
-                            <span className="kpi-value">
-                                <AnimatedCounter value={stats.manifiestos.total} />
-                            </span>
+                        <div className="kpi-content">
+                            <div className="kpi-value" style={{ color: '#f8fafc' }}>
+                                {stats.manifiestos.total.toLocaleString('es-AR')}
+                            </div>
                             <span className="kpi-label">MANIFIESTOS</span>
+                            <div className="kpi-trend">
+                                <TrendingUp size={14} />
+                                <span>+{Math.floor(Math.random() * 15) + 5} esta semana</span>
+                            </div>
                         </div>
-                        <div className="kpi-trend">
-                            <span className="trend-up">+{Math.floor(Math.random() * 15) + 5}</span>
-                            <span className="trend-label">esta semana</span>
-                        </div>
-                    </div>
+                    </motion.div>
 
-                    <div className="mega-kpi transito">
-                        <div className="kpi-glow"></div>
-                        <div className="kpi-icon pulsing">
-                            <Truck size={32} />
+                    <motion.div
+                        className="kpi-card"
+                        style={{ background: 'rgba(6, 182, 212, 0.1)', borderColor: 'rgba(6, 182, 212, 0.3)' }}
+                        variants={{ hidden: { y: 15, opacity: 0 }, show: { y: 0, opacity: 1 } }}
+                    >
+                        <div className="kpi-icon" style={{ background: 'rgba(6, 182, 212, 0.2)', color: '#06b6d4' }}>
+                            <Truck size={24} />
                         </div>
-                        <div className="kpi-data">
-                            <span className="kpi-value">
-                                <AnimatedCounter value={stats.manifiestos.enTransito} />
-                            </span>
+                        <div className="kpi-content">
+                            <div className="kpi-value" style={{ color: '#f8fafc' }}>
+                                {stats.manifiestos.enTransito.toLocaleString('es-AR')}
+                            </div>
                             <span className="kpi-label">EN RUTA</span>
+                            <div className="kpi-live">
+                                <span className="live-dot"></span>
+                                <span>En vivo</span>
+                            </div>
                         </div>
-                        <div className="kpi-live">
-                            <span className="live-dot"></span>
-                            <span>En vivo</span>
-                        </div>
-                    </div>
+                    </motion.div>
 
-                    <div className="mega-kpi alertas">
-                        <div className="kpi-glow"></div>
-                        <div className="kpi-icon">
-                            <Bell size={32} />
+                    <motion.div
+                        className="kpi-card"
+                        style={{ background: 'rgba(245, 158, 11, 0.1)', borderColor: 'rgba(245, 158, 11, 0.3)' }}
+                        variants={{ hidden: { y: 15, opacity: 0 }, show: { y: 0, opacity: 1 } }}
+                    >
+                        <div className="kpi-icon" style={{ background: 'rgba(245, 158, 11, 0.2)', color: '#f59e0b' }}>
+                            <Bell size={24} />
                         </div>
-                        <div className="kpi-data">
-                            <span className="kpi-value">
-                                <AnimatedCounter value={stats.alertasActivas} />
-                            </span>
+                        <div className="kpi-content">
+                            <div className="kpi-value" style={{ color: '#f8fafc' }}>
+                                {stats.alertasActivas.toLocaleString('es-AR')}
+                            </div>
                             <span className="kpi-label">ALERTAS</span>
+                            {stats.alertasActivas > 0 && (
+                                <div className="kpi-alert">
+                                    <AlertTriangle size={14} />
+                                    <span>Revisar</span>
+                                </div>
+                            )}
                         </div>
-                        {stats.alertasActivas > 0 && (
-                            <div className="kpi-alert">
-                                <AlertTriangle size={14} />
-                                <span>Revisar</span>
-                            </div>
-                        )}
-                    </div>
+                    </motion.div>
 
-                    <div className="mega-kpi usuarios">
-                        <div className="kpi-glow"></div>
-                        <div className="kpi-icon">
-                            <Users size={32} />
+                    <motion.div
+                        className="kpi-card"
+                        style={{ background: 'rgba(139, 92, 246, 0.1)', borderColor: 'rgba(139, 92, 246, 0.3)' }}
+                        variants={{ hidden: { y: 15, opacity: 0 }, show: { y: 0, opacity: 1 } }}
+                    >
+                        <div className="kpi-icon" style={{ background: 'rgba(139, 92, 246, 0.2)', color: '#8b5cf6' }}>
+                            <Users size={24} />
                         </div>
-                        <div className="kpi-data">
-                            <span className="kpi-value">
-                                <AnimatedCounter value={stats.usuarios.activos} />
-                            </span>
-                            <span className="kpi-label">USUARIOS</span>
-                        </div>
-                        {stats.usuarios.pendientes > 0 && (
-                            <div className="kpi-pending">
-                                <span>{stats.usuarios.pendientes}</span>
-                                <span>pendientes</span>
+                        <div className="kpi-content">
+                            <div className="kpi-value" style={{ color: '#f8fafc' }}>
+                                {stats.usuarios.activos.toLocaleString('es-AR')}
                             </div>
-                        )}
-                    </div>
-                </div>
+                            <span className="kpi-label">USUARIOS</span>
+                            {stats.usuarios.pendientes > 0 && (
+                                <div className="kpi-pending">
+                                    <Clock size={14} />
+                                    <span>{stats.usuarios.pendientes} pendientes</span>
+                                </div>
+                            )}
+                        </div>
+                    </motion.div>
+                </motion.div>
             )}
 
             {/* Main Content Grid */}
@@ -600,7 +643,16 @@ const CentroControl: React.FC = () => {
                             </Link>
                         </div>
                     </div>
-                    <div className="activity-feed" ref={activityRef}>
+                    <motion.div
+                        className="activity-feed"
+                        ref={activityRef}
+                        initial="hidden"
+                        animate="show"
+                        variants={{
+                            hidden: { opacity: 0 },
+                            show: { opacity: 1, transition: { staggerChildren: 0.05 } }
+                        }}
+                    >
                         {actividades.length === 0 ? (
                             <div className="activity-empty">
                                 <Activity size={32} />
@@ -608,10 +660,14 @@ const CentroControl: React.FC = () => {
                             </div>
                         ) : (
                             actividades.slice(0, 15).map((act, index) => (
-                                <div
+                                <motion.div
                                     key={act.id}
                                     className={`activity-item ${index === 0 ? 'newest' : ''}`}
-                                    style={{ animationDelay: `${index * 0.05}s` }}
+                                    variants={{
+                                        hidden: { x: -20, opacity: 0 },
+                                        show: { x: 0, opacity: 1, transition: { duration: 0.3 } }
+                                    }}
+                                    whileHover={{ scale: 1.02, x: 4 }}
                                 >
                                     <div className={`activity-icon ${act.accion.includes('ERROR') || act.accion.includes('RECHAZ') ? 'error' : ''}`}>
                                         {getActionIcon(act.accion)}
@@ -622,14 +678,109 @@ const CentroControl: React.FC = () => {
                                     </div>
                                     <div className="activity-meta">
                                         <span className="activity-time">{formatRelativeTime(act.fecha)}</span>
-                                        {index === 0 && <span className="new-badge">NUEVO</span>}
+                                        {index === 0 && (
+                                            <motion.span
+                                                className="new-badge"
+                                                initial={{ scale: 0 }}
+                                                animate={{ scale: 1 }}
+                                                transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                                            >
+                                                NUEVO
+                                            </motion.span>
+                                        )}
                                     </div>
-                                </div>
+                                </motion.div>
                             ))
                         )}
-                    </div>
+                    </motion.div>
                 </div>
             </div>
+
+            {/* Charts Section - Activity & Distribution */}
+            {stats && (
+                <motion.div
+                    className="mega-charts"
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3, duration: 0.4 }}
+                    style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
+                        gap: '20px',
+                        marginBottom: '24px'
+                    }}
+                >
+                    {/* Area Chart - Actividad en Tiempo Real */}
+                    <div className="chart-card">
+                        <div className="chart-header">
+                            <h4>Actividad en Tiempo Real</h4>
+                            <p>Eventos por hora (últimas 8 horas)</p>
+                        </div>
+                        <ResponsiveContainer width="100%" height={180}>
+                            <AreaChart data={generateActivityChartData(actividades)} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                                <defs>
+                                    <linearGradient id="colorActivityCC" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" vertical={false} />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
+                                <Tooltip
+                                    contentStyle={{
+                                        background: '#1e293b',
+                                        border: '1px solid rgba(148, 163, 184, 0.2)',
+                                        borderRadius: '8px',
+                                        fontSize: '12px'
+                                    }}
+                                />
+                                <Area type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2} fill="url(#colorActivityCC)" />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    {/* Pie Chart - Distribución */}
+                    <div className="chart-card">
+                        <div className="chart-header">
+                            <h4>Distribución de Manifiestos</h4>
+                            <p>Por estado actual</p>
+                        </div>
+                        <ResponsiveContainer width="100%" height={180}>
+                            <PieChart>
+                                <Pie
+                                    data={generatePipelineChartData(stats)}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={40}
+                                    outerRadius={65}
+                                    paddingAngle={2}
+                                    dataKey="value"
+                                >
+                                    {generatePipelineChartData(stats).map((_, index) => (
+                                        <Cell
+                                            key={`cell-${index}`}
+                                            fill={['#64748b', '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#22c55e'][index % 6]}
+                                        />
+                                    ))}
+                                </Pie>
+                                <Tooltip
+                                    contentStyle={{
+                                        background: '#1e293b',
+                                        border: '1px solid rgba(148, 163, 184, 0.2)',
+                                        borderRadius: '8px',
+                                        fontSize: '12px'
+                                    }}
+                                />
+                                <Legend
+                                    wrapperStyle={{ fontSize: '11px' }}
+                                    formatter={(value) => <span style={{ color: '#94a3b8' }}>{value}</span>}
+                                />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                </motion.div>
+            )}
 
             {/* PIPELINE DE ESTADOS */}
             {stats && (

@@ -141,6 +141,15 @@ export const viajesService = {
     async getViajesPorManifiesto(manifiestoId: string): Promise<Viaje[]> {
         const response = await api.get(`/viajes/manifiesto/${manifiestoId}`);
         return response.data.data.viajes;
+    },
+
+    /**
+     * Obtener viaje activo del usuario actual
+     * Retorna el viaje EN_CURSO si existe
+     */
+    async getViajeActivo(): Promise<{ viajeActivo: Viaje | null; sincronizado?: boolean }> {
+        const response = await api.get('/viajes/activo');
+        return response.data.data;
     }
 };
 

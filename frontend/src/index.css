@@ -1,4 +1,8 @@
 /* ===== DESIGN SYSTEM - TRAZABILIDAD RRPP ===== */
+/* Control Room 2077 Edition */
+
+/* Premium Typography - Orbitron for futuristic headers */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@400;500;600;700&display=swap');
 
 /* Color Palette */
 :root {
@@ -90,6 +94,7 @@
   /* Typography */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', Consolas, monospace;
+  --font-display: 'Orbitron', 'Rajdhani', 'Inter', sans-serif;
 }
 
 /* CSS Reset & Base */

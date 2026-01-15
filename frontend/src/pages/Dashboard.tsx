@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { manifiestoService } from '../services/manifiesto.service';
 import { usuarioService } from '../services/admin.service';
 import { offlineStorage } from '../services/offlineStorage';
+import { viajesService } from '../services/viajes.service';
 import { demoStats } from '../data/demoDashboard';
 import type { DashboardStats } from '../types';
 import {
@@ -31,6 +33,18 @@ import {
     History,
     BarChart3
 } from 'lucide-react';
+import {
+    AreaChart,
+    Area,
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    ResponsiveContainer
+} from 'recharts';
+import type { ChartDataPoint } from '../components/ui';
 import ActiveTripBanner from '../components/ActiveTripBanner';
 import './Dashboard.css';
 
@@ -41,7 +55,7 @@ import './Dashboard.css';
 interface StatCardConfig {
     label: string;
     value: number;
-    icon: React.ComponentType<{ size: number }>;
+    icon: React.ComponentType<{ size?: number; className?: string }>;
     color: string;
     bgColor: string;
     borderColor: string;
@@ -280,6 +294,26 @@ const getQuickActionsByRole = (role: string | undefined): QuickActionConfig[] =>
 
 // Demo data fallback - ahora importado de ../data/demoDashboard
 
+// Sample chart data for activity visualization
+const generateActivityData = (): ChartDataPoint[] => {
+    const days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+    return days.map((name) => ({
+        name,
+        value: Math.floor(Math.random() * 50) + 10,
+    }));
+};
+
+const generateStatusDistribution = (stats: DashboardStats['estadisticas']): ChartDataPoint[] => {
+    const s = stats || demoStats.estadisticas;
+    return [
+        { name: 'Borradores', value: s.borradores ?? 0 },
+        { name: 'Aprobados', value: s.aprobados ?? 0 },
+        { name: 'En Tránsito', value: s.enTransito ?? 0 },
+        { name: 'Entregados', value: s.entregados ?? 0 },
+        { name: 'Tratados', value: s.tratados ?? 0 },
+    ].filter(item => item.value > 0);
+};
+
 interface AdminStats {
     usuarios: {
         total: number;
@@ -325,13 +359,35 @@ const Dashboard: React.FC = () => {
         }
     }, [user?.rol]);
 
-    // Cargar viaje activo desde IndexedDB (sincronizado con APP) o API
+    // Cargar viaje activo desde backend, IndexedDB o API de manifiestos
     const loadViajeActivo = async () => {
         try {
-            // Primero intentar cargar de IndexedDB (sincronizado con APP móvil)
+            // 1. PRIMERO: Consultar endpoint de viaje activo del backend
+            // Este es el método más confiable ya que sincroniza entre dispositivos
+            try {
+                const { viajeActivo: viajeBackend } = await viajesService.getViajeActivo();
+                if (viajeBackend) {
+                    const tripData: ViajeActivo = {
+                        manifiesto: {
+                            id: viajeBackend.manifiestoId,
+                            numero: viajeBackend.manifiesto?.numero || 'N/A',
+                            generador: viajeBackend.manifiesto?.generador as { razonSocial: string } | undefined,
+                            operador: viajeBackend.manifiesto?.operador as { razonSocial: string } | undefined
+                        },
+                        startTime: new Date(viajeBackend.inicio).getTime(),
+                        ubicacionActual: undefined
+                    };
+                    setViajeActivo(tripData);
+                    console.log('[Dashboard] Viaje activo cargado desde backend:', tripData.manifiesto.numero);
+                    return;
+                }
+            } catch (backendErr) {
+                console.warn('[Dashboard] Error consultando viaje activo del backend:', backendErr);
+            }
+
+            // 2. SEGUNDO: Intentar cargar de IndexedDB (sincronizado con APP móvil local)
             const activeTrip = await offlineStorage.getActiveTrip();
             if (activeTrip) {
-                // Obtener detalles del manifiesto desde API
                 try {
                     const manifiestoData = await manifiestoService.getManifiesto(activeTrip.manifiestoId);
                     if (manifiestoData) {
@@ -355,11 +411,11 @@ const Dashboard: React.FC = () => {
                         return;
                     }
                 } catch (e) {
-                    console.warn('[Dashboard] Error obteniendo detalles del manifiesto:', e);
+                    console.warn('[Dashboard] Error obteniendo detalles del manifiesto desde IndexedDB:', e);
                 }
             }
 
-            // Si no hay en IndexedDB, buscar manifiestos EN_TRANSITO del transportista actual
+            // 3. TERCERO: Buscar manifiestos EN_TRANSITO del transportista actual
             const response = await manifiestoService.getManifiestos({ estado: 'EN_TRANSITO', limit: 1 });
             if (response?.manifiestos && response.manifiestos.length > 0) {
                 const manifiesto = response.manifiestos[0];
@@ -374,7 +430,7 @@ const Dashboard: React.FC = () => {
                     ubicacionActual: undefined
                 };
                 setViajeActivo(tripData);
-                console.log('[Dashboard] Viaje activo cargado desde API:', tripData.manifiesto.numero);
+                console.log('[Dashboard] Viaje activo cargado desde API manifiestos:', tripData.manifiesto.numero);
             }
         } catch (err) {
             console.error('Error cargando viaje activo:', err);
@@ -672,35 +728,144 @@ const Dashboard: React.FC = () => {
                 </Link>
             </div>
 
-            {/* Stats Grid - Dinámico por rol */}
-            <div className="stats-grid">
+            {/* Stats Grid - Professional Style */}
+            <motion.div
+                className="stats-grid"
+                initial="hidden"
+                animate="show"
+                variants={{
+                    hidden: { opacity: 0 },
+                    show: {
+                        opacity: 1,
+                        transition: { staggerChildren: 0.08 }
+                    }
+                }}
+            >
                 {getStatCardsByRole(user?.rol, stats?.estadisticas).map((card, index) => {
                     const IconComponent = card.icon;
                     return (
-                        <div key={index} className="stat-card" style={{
-                            display: 'flex', alignItems: 'center', gap: '16px', padding: '20px',
-                            background: `linear-gradient(135deg, ${card.bgColor}, ${card.bgColor.replace('0.15', '0.05')})`,
-                            border: `1px solid ${card.borderColor}`, borderRadius: '16px'
-                        }}>
-                            <div style={{
-                                width: '56px', height: '56px', borderRadius: '14px',
-                                background: card.bgColor.replace('0.15', '0.2'), display: 'flex',
-                                alignItems: 'center', justifyContent: 'center', color: card.color
+                        <motion.div
+                            key={index}
+                            className="stat-card"
+                            style={{
+                                background: card.bgColor,
+                                border: `1px solid ${card.borderColor}`,
+                            }}
+                            variants={{
+                                hidden: { y: 15, opacity: 0 },
+                                show: { y: 0, opacity: 1, transition: { duration: 0.3 } }
+                            }}
+                        >
+                            <div className="stat-icon" style={{
+                                background: `${card.color}20`,
+                                color: card.color
                             }}>
-                                <IconComponent size={28} />
+                                <IconComponent size={24} />
                             </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                                <div style={{ fontSize: '32px', fontWeight: 800, color: '#f8fafc', lineHeight: 1.1 }}>
-                                    {card.value}
+                            <div className="stat-content">
+                                <div className="stat-value">
+                                    {card.value.toLocaleString('es-AR')}
                                 </div>
-                                <div style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '4px', fontWeight: 600 }}>
+                                <div className="stat-label">
                                     {card.label}
                                 </div>
                             </div>
-                        </div>
+                        </motion.div>
                     );
                 })}
-            </div>
+            </motion.div>
+
+            {/* Activity Charts Section - Professional Style */}
+            <motion.div
+                className="charts-section"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, duration: 0.4 }}
+                style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
+                    gap: '20px',
+                    marginBottom: '24px'
+                }}
+            >
+                {/* Area Chart - Actividad Semanal */}
+                <div style={{
+                    background: 'var(--bg-secondary, #1e293b)',
+                    border: '1px solid var(--border-color, rgba(148, 163, 184, 0.1))',
+                    borderRadius: '16px',
+                    padding: '20px'
+                }}>
+                    <div style={{ marginBottom: '16px' }}>
+                        <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#f8fafc' }}>
+                            Actividad Semanal
+                        </h4>
+                        <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#94a3b8' }}>
+                            Manifiestos procesados por día
+                        </p>
+                    </div>
+                    <ResponsiveContainer width="100%" height={160}>
+                        <AreaChart data={generateActivityData()} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                            <defs>
+                                <linearGradient id="colorActivity" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" vertical={false} />
+                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
+                            <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
+                            <Tooltip
+                                contentStyle={{
+                                    background: '#1e293b',
+                                    border: '1px solid rgba(148, 163, 184, 0.2)',
+                                    borderRadius: '8px',
+                                    fontSize: '12px'
+                                }}
+                            />
+                            <Area
+                                type="monotone"
+                                dataKey="value"
+                                stroke="#10b981"
+                                strokeWidth={2}
+                                fill="url(#colorActivity)"
+                            />
+                        </AreaChart>
+                    </ResponsiveContainer>
+                </div>
+
+                {/* Bar Chart - Distribución por Estado */}
+                <div style={{
+                    background: 'var(--bg-secondary, #1e293b)',
+                    border: '1px solid var(--border-color, rgba(148, 163, 184, 0.1))',
+                    borderRadius: '16px',
+                    padding: '20px'
+                }}>
+                    <div style={{ marginBottom: '16px' }}>
+                        <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#f8fafc' }}>
+                            Distribución por Estado
+                        </h4>
+                        <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#94a3b8' }}>
+                            Manifiestos actuales en el sistema
+                        </p>
+                    </div>
+                    <ResponsiveContainer width="100%" height={160}>
+                        <BarChart data={generateStatusDistribution(stats?.estadisticas)} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" vertical={false} />
+                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10 }} />
+                            <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
+                            <Tooltip
+                                contentStyle={{
+                                    background: '#1e293b',
+                                    border: '1px solid rgba(148, 163, 184, 0.2)',
+                                    borderRadius: '8px',
+                                    fontSize: '12px'
+                                }}
+                            />
+                            <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            </motion.div>
 
             {/* Acciones Rápidas - Dinámico por rol */}
             {getQuickActionsByRole(user?.rol).length > 0 && (

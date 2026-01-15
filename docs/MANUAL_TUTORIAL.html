@@ -473,12 +473,22 @@
         </div>
 
         <div class="nav-section">
-            <div class="nav-section-title">📋 Casos de Uso</div>
-            <a href="#cu-admin" class="nav-link">🛡️ Administrador (15)</a>
+            <div class="nav-section-title">🆕 Nuevas Funcionalidades</div>
+            <a href="#centro-control" class="nav-link">🎯 Centro de Control</a>
+            <a href="#admin-sectoriales" class="nav-link">👥 Admin Sectoriales</a>
+            <a href="#reversiones" class="nav-link">↩️ Sistema Reversiones</a>
+            <a href="#firma-pki" class="nav-link">🔐 Firma Digital PKI</a>
+            <a href="#arquitectura" class="nav-link">🏗️ Arquitectura</a>
+        </div>
+
+        <div class="nav-section">
+            <div class="nav-section-title">📋 Casos de Uso (86)</div>
+            <a href="#cu-admin" class="nav-link">🛡️ Administrador (20)</a>
+            <a href="#cu-admin-sectorial" class="nav-link">👥 Admin Sectoriales (9)</a>
             <a href="#cu-generador" class="nav-link">🏭 Generador (12)</a>
-            <a href="#cu-transportista" class="nav-link">🚛 Transportista (11)</a>
-            <a href="#cu-operador" class="nav-link">🏢 Operador (12)</a>
-            <a href="#cu-sistema" class="nav-link">⚙️ Sistema (11)</a>
+            <a href="#cu-transportista" class="nav-link">🚛 Transportista (12)</a>
+            <a href="#cu-operador" class="nav-link">🏢 Operador (15)</a>
+            <a href="#cu-sistema" class="nav-link">⚙️ Sistema (18)</a>
         </div>
     </nav>
 
@@ -3284,10 +3294,456 @@
 
         </section>
 
+        <!-- NUEVAS SECCIONES -->
+
+        <section id="centro-control" class="section">
+            <h2>🎯 Centro de Control</h2>
+            <p class="lead">Dashboard premium para administradores con monitoreo en tiempo real de toda la operación.</p>
+
+            <div class="card card-highlight">
+                <h4>Acceso al Centro de Control</h4>
+                <p>Disponible exclusivamente para usuarios con rol <strong>ADMIN</strong> desde el menú principal del Dashboard.</p>
+            </div>
+
+            <h3>KPIs en Tiempo Real</h3>
+            <div class="grid grid-2">
+                <div class="card">
+                    <h4>📊 Total Manifiestos</h4>
+                    <p>Contador global de manifiestos en el sistema con actualización automática.</p>
+                </div>
+                <div class="card">
+                    <h4>🚚 En Ruta</h4>
+                    <p>Vehículos actualmente en tránsito con tracking GPS activo.</p>
+                </div>
+                <div class="card">
+                    <h4>⚠️ Alertas Activas</h4>
+                    <p>Notificaciones pendientes de atención: desvíos, demoras, incidentes.</p>
+                </div>
+                <div class="card">
+                    <h4>👥 Usuarios Conectados</h4>
+                    <p>Usuarios activos via WebSocket en tiempo real.</p>
+                </div>
+            </div>
+
+            <h3>Mapa Interactivo (Leaflet)</h3>
+            <div class="card">
+                <p>Visualización geográfica de:</p>
+                <ul>
+                    <li><strong>Vehículos en tránsito:</strong> Posición GPS actualizada cada 30 segundos</li>
+                    <li><strong>Rutas activas:</strong> Trayectorias de origen a destino</li>
+                    <li><strong>Puntos de interés:</strong> Generadores, operadores, checkpoints</li>
+                    <li><strong>Alertas geolocalizadas:</strong> Incidentes y desvíos de ruta</li>
+                </ul>
+            </div>
+
+            <h3>Pipeline Visual de Estados</h3>
+            <div class="card" style="background: linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%);">
+                <div style="display: flex; justify-content: space-between; text-align: center; flex-wrap: wrap; gap: 8px;">
+                    <div style="flex: 1; min-width: 100px; padding: 12px; background: rgba(59,130,246,0.2); border-radius: 8px;">
+                        <div style="font-size: 24px; font-weight: bold; color: #3b82f6;">📝</div>
+                        <div style="font-size: 11px; color: #94a3b8;">BORRADOR</div>
+                    </div>
+                    <div style="flex: 1; min-width: 100px; padding: 12px; background: rgba(139,92,246,0.2); border-radius: 8px;">
+                        <div style="font-size: 24px; font-weight: bold; color: #8b5cf6;">✓</div>
+                        <div style="font-size: 11px; color: #94a3b8;">APROBADO</div>
+                    </div>
+                    <div style="flex: 1; min-width: 100px; padding: 12px; background: rgba(245,158,11,0.2); border-radius: 8px;">
+                        <div style="font-size: 24px; font-weight: bold; color: #f59e0b;">🚚</div>
+                        <div style="font-size: 11px; color: #94a3b8;">EN TRÁNSITO</div>
+                    </div>
+                    <div style="flex: 1; min-width: 100px; padding: 12px; background: rgba(6,182,212,0.2); border-radius: 8px;">
+                        <div style="font-size: 24px; font-weight: bold; color: #06b6d4;">📦</div>
+                        <div style="font-size: 11px; color: #94a3b8;">ENTREGADO</div>
+                    </div>
+                    <div style="flex: 1; min-width: 100px; padding: 12px; background: rgba(34,197,94,0.2); border-radius: 8px;">
+                        <div style="font-size: 24px; font-weight: bold; color: #22c55e;">✅</div>
+                        <div style="font-size: 11px; color: #94a3b8;">RECIBIDO</div>
+                    </div>
+                    <div style="flex: 1; min-width: 100px; padding: 12px; background: rgba(16,185,129,0.2); border-radius: 8px;">
+                        <div style="font-size: 24px; font-weight: bold; color: #10b981;">♻️</div>
+                        <div style="font-size: 11px; color: #94a3b8;">TRATADO</div>
+                    </div>
+                </div>
+            </div>
+
+            <h3>Ranking por Departamento</h3>
+            <p>Estadísticas agrupadas por los 18 departamentos de Mendoza, mostrando:</p>
+            <ul>
+                <li>Kg de residuos tratados</li>
+                <li>Items en proceso</li>
+                <li>Tendencia mensual</li>
+            </ul>
+
+            <h3>Feed de Actividad</h3>
+            <p>Últimos 15 eventos del sistema en tiempo real: nuevos manifiestos, cambios de estado, alertas, reversiones.</p>
+        </section>
+
+        <section id="admin-sectoriales" class="section">
+            <h2>👥 Administradores Sectoriales</h2>
+            <p class="lead">Tres nuevos roles especializados para la gestión descentralizada por tipo de actor.</p>
+
+            <div class="grid grid-3">
+                <div class="card" style="border-left: 4px solid #3b82f6;">
+                    <h4>🏭 Admin Generadores</h4>
+                    <p>Rol: <code>ADMIN_GENERADORES</code></p>
+                    <ul>
+                        <li>Dashboard de generadores</li>
+                        <li>Listar y filtrar generadores</li>
+                        <li>Aprobar nuevos generadores</li>
+                    </ul>
+                    <p><strong>Casos de Uso:</strong> CU-AS01, CU-AS02, CU-AS03</p>
+                </div>
+                <div class="card" style="border-left: 4px solid #f59e0b;">
+                    <h4>🚛 Admin Transportistas</h4>
+                    <p>Rol: <code>ADMIN_TRANSPORTISTAS</code></p>
+                    <ul>
+                        <li>Dashboard de transportistas</li>
+                        <li>Listar y filtrar transportistas</li>
+                        <li>Aprobar nuevos transportistas</li>
+                    </ul>
+                    <p><strong>Casos de Uso:</strong> CU-AS04, CU-AS05, CU-AS06</p>
+                </div>
+                <div class="card" style="border-left: 4px solid #10b981;">
+                    <h4>🏢 Admin Operadores</h4>
+                    <p>Rol: <code>ADMIN_OPERADORES</code></p>
+                    <ul>
+                        <li>Dashboard de operadores</li>
+                        <li>Listar y filtrar operadores</li>
+                        <li>Aprobar nuevos operadores</li>
+                    </ul>
+                    <p><strong>Casos de Uso:</strong> CU-AS07, CU-AS08, CU-AS09</p>
+                </div>
+            </div>
+
+            <h3>Funcionalidades Comunes</h3>
+            <table>
+                <thead>
+                    <tr><th>Funcionalidad</th><th>Descripción</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><strong>Dashboard Sectorial</strong></td><td>KPIs específicos del sector: totales, activos, categorías</td></tr>
+                    <tr><td><strong>Listado con Filtros</strong></td><td>Búsqueda por razón social, CUIT, estado, categoría</td></tr>
+                    <tr><td><strong>Aprobación</strong></td><td>Workflow de aprobación con notificación automática</td></tr>
+                    <tr><td><strong>Auditoría</strong></td><td>Registro de todas las acciones con usuario, timestamp e IP</td></tr>
+                </tbody>
+            </table>
+
+            <h3>Endpoints API</h3>
+            <div class="card" style="background: #1a1a2e;">
+                <code style="display: block; color: #10b981;">
+                    GET  /api/admin-sectorial/generadores/dashboard<br>
+                    GET  /api/admin-sectorial/generadores/lista<br>
+                    POST /api/admin-sectorial/generadores/:id/aprobar<br>
+                    <br>
+                    GET  /api/admin-sectorial/transportistas/dashboard<br>
+                    GET  /api/admin-sectorial/transportistas/lista<br>
+                    POST /api/admin-sectorial/transportistas/:id/aprobar<br>
+                    <br>
+                    GET  /api/admin-sectorial/operadores/dashboard<br>
+                    GET  /api/admin-sectorial/operadores/lista<br>
+                    POST /api/admin-sectorial/operadores/:id/aprobar
+                </code>
+            </div>
+        </section>
+
+        <section id="reversiones" class="section">
+            <h2>↩️ Sistema de Reversiones</h2>
+            <p class="lead">Mecanismo controlado para revertir estados de manifiestos con auditoría completa.</p>
+
+            <div class="card card-highlight">
+                <h4>⚠️ Importante</h4>
+                <p>Las reversiones son acciones auditadas que generan alertas cuando se detecta uso excesivo (más de 3 en 24 horas).</p>
+            </div>
+
+            <h3>Tipos de Reversión</h3>
+            <table>
+                <thead>
+                    <tr><th>Tipo</th><th>Actor</th><th>Transición</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>CORRECCION_ADMIN</code></td><td>Administrador DGFA</td><td>Cualquier estado → Anterior (excepto CANCELADO)</td></tr>
+                    <tr><td><code>REVERSION_ENTREGA</code></td><td>Transportista</td><td>ENTREGADO → EN_TRANSITO</td></tr>
+                    <tr><td><code>RECHAZO_RECEPCION</code></td><td>Operador</td><td>ENTREGADO → EN_TRANSITO</td></tr>
+                    <tr><td><code>REVERSION_TRATAMIENTO</code></td><td>Operador</td><td>TRATADO → RECIBIDO</td></tr>
+                </tbody>
+            </table>
+
+            <h3>Matriz de Permisos</h3>
+            <div class="card" style="overflow-x: auto;">
+                <table style="min-width: 500px;">
+                    <thead>
+                        <tr><th>Estado Actual</th><th>Admin DGFA</th><th>Transportista</th><th>Operador</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>APROBADO</td><td style="color:#22c55e">✓</td><td style="color:#ef4444">✗</td><td style="color:#ef4444">✗</td></tr>
+                        <tr><td>EN_TRANSITO</td><td style="color:#22c55e">✓</td><td style="color:#ef4444">✗</td><td style="color:#ef4444">✗</td></tr>
+                        <tr><td>ENTREGADO</td><td style="color:#22c55e">✓</td><td style="color:#22c55e">✓</td><td style="color:#22c55e">✓</td></tr>
+                        <tr><td>RECIBIDO</td><td style="color:#22c55e">✓</td><td style="color:#ef4444">✗</td><td style="color:#ef4444">✗</td></tr>
+                        <tr><td>TRATADO</td><td style="color:#22c55e">✓</td><td style="color:#ef4444">✗</td><td style="color:#22c55e">✓</td></tr>
+                        <tr><td>CANCELADO</td><td style="color:#ef4444">✗</td><td style="color:#ef4444">✗</td><td style="color:#ef4444">✗</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>Flujo de Reversión</h3>
+            <ol>
+                <li>Usuario accede al detalle del manifiesto</li>
+                <li>Selecciona "Revertir Estado" (si está habilitado según matriz)</li>
+                <li>Sistema muestra estados disponibles para revertir</li>
+                <li>Usuario ingresa <strong>motivo obligatorio</strong></li>
+                <li>Sistema muestra modal de firma para confirmar</li>
+                <li>Usuario firma digitalmente la acción</li>
+                <li>Sistema ejecuta reversión en transacción ACID</li>
+                <li>Sistema registra en tabla <code>reversiones_estado</code></li>
+                <li>Sistema notifica a todas las partes</li>
+            </ol>
+
+            <h3>Registro de Auditoría</h3>
+            <p>Cada reversión queda registrada con:</p>
+            <ul>
+                <li>Estado anterior y nuevo</li>
+                <li>Tipo de reversión</li>
+                <li>Motivo (obligatorio)</li>
+                <li>Usuario que ejecutó (ID, nombre, rol)</li>
+                <li>IP de origen</li>
+                <li>Timestamp</li>
+            </ul>
+        </section>
+
+        <section id="firma-pki" class="section">
+            <h2>🔐 Firma Digital PKI</h2>
+            <p class="lead">Sistema de firma digital con certificados PKI para garantizar integridad y no repudio.</p>
+
+            <h3>Componentes de la Firma</h3>
+            <table>
+                <thead>
+                    <tr><th>Campo</th><th>Descripción</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>signatureData</code></td><td>Firma visual en Base64</td></tr>
+                    <tr><td><code>hash</code></td><td>Hash SHA-256 del documento</td></tr>
+                    <tr><td><code>certificateSerial</code></td><td>Número serial del certificado</td></tr>
+                    <tr><td><code>certificateSubject</code></td><td>Titular (CN, Email, CUIT)</td></tr>
+                    <tr><td><code>certificateIssuer</code></td><td>Emisor: SITREP Demo CA</td></tr>
+                    <tr><td><code>certificateValidFrom</code></td><td>Fecha inicio validez</td></tr>
+                    <tr><td><code>certificateValidTo</code></td><td>Fecha fin validez</td></tr>
+                    <tr><td><code>timestamp</code></td><td>Momento de la firma</td></tr>
+                </tbody>
+            </table>
+
+            <h3>Flujo de Firma</h3>
+            <div class="card">
+                <ol>
+                    <li>Usuario completa operación (recepción, tratamiento, cierre)</li>
+                    <li><strong>SignatureModal</strong> captura firma visual en canvas táctil</li>
+                    <li><code>signatureService.firmar()</code> genera hash SHA-256</li>
+                    <li>Firma hash con clave privada del certificado PKI</li>
+                    <li>Almacena firma + metadatos en base de datos</li>
+                    <li>Valida: certificado vigente, emisor confiable</li>
+                    <li>Confirma con datos del certificado</li>
+                </ol>
+            </div>
+
+            <h3>Validación de Firma</h3>
+            <div class="grid grid-2">
+                <div class="card" style="border-left: 4px solid #22c55e;">
+                    <h4>✓ Firma Válida</h4>
+                    <ul>
+                        <li><code>hashCoincide: true</code></li>
+                        <li><code>certificadoVigente: true</code></li>
+                        <li><code>timestampValido: true</code></li>
+                    </ul>
+                </div>
+                <div class="card" style="border-left: 4px solid #ef4444;">
+                    <h4>✗ Firma Inválida</h4>
+                    <ul>
+                        <li>Hash no coincide (documento alterado)</li>
+                        <li>Certificado expirado</li>
+                        <li>Emisor no confiable</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section id="arquitectura" class="section">
+            <h2>🏗️ Arquitectura de Alta Concurrencia</h2>
+            <p class="lead">Sistema diseñado para soportar 500+ usuarios concurrentes con baja latencia.</p>
+
+            <h3>Componentes Principales</h3>
+            <table>
+                <thead>
+                    <tr><th>Componente</th><th>Tecnología</th><th>Propósito</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><strong>Cache Distribuido</strong></td><td>Redis 7.x</td><td>Reducir latencia y carga en DB</td></tr>
+                    <tr><td><strong>Tiempo Real</strong></td><td>Socket.IO</td><td>Notificaciones instantáneas</td></tr>
+                    <tr><td><strong>Rate Limiting</strong></td><td>express-rate-limit</td><td>Protección contra abuso</td></tr>
+                    <tr><td><strong>Firma Digital</strong></td><td>PKI + SHA-256</td><td>Integridad y no repudio</td></tr>
+                </tbody>
+            </table>
+
+            <h3>Cache Redis</h3>
+            <div class="card">
+                <h4>TTL por Tipo de Dato</h4>
+                <table>
+                    <tr><td><code>user:</code></td><td>5 minutos</td><td>Datos de usuario</td></tr>
+                    <tr><td><code>catalogo:</code></td><td>1 hora</td><td>Catálogos</td></tr>
+                    <tr><td><code>stats:</code></td><td>1 minuto</td><td>Estadísticas</td></tr>
+                    <tr><td><code>manifiesto:</code></td><td>30 segundos</td><td>Manifiestos</td></tr>
+                </table>
+                <p style="margin-top: 16px;"><strong>Modo Degradado:</strong> Si Redis no está disponible, el sistema continúa funcionando sin caché (graceful degradation).</p>
+            </div>
+
+            <h3>WebSocket (Socket.IO)</h3>
+            <div class="card">
+                <h4>Eventos Tipados</h4>
+                <table>
+                    <tr><td><code>manifiesto:creado</code></td><td>Nuevo manifiesto</td></tr>
+                    <tr><td><code>manifiesto:actualizado</code></td><td>Cambio de estado</td></tr>
+                    <tr><td><code>manifiesto:revertido</code></td><td>Reversión de estado</td></tr>
+                    <tr><td><code>gps:ubicacion</code></td><td>Actualización GPS</td></tr>
+                    <tr><td><code>notification</code></td><td>Notificación general</td></tr>
+                </table>
+                <h4 style="margin-top: 16px;">Sistema de Rooms</h4>
+                <ul>
+                    <li><code>user:{userId}</code> - Notificaciones personales</li>
+                    <li><code>role:{rol}</code> - Broadcast por rol</li>
+                    <li><code>manifiesto:{id}</code> - Actualizaciones de manifiesto</li>
+                    <li><code>viaje:{id}</code> - Tracking GPS en tiempo real</li>
+                </ul>
+            </div>
+
+            <h3>Rate Limiting</h3>
+            <div class="card">
+                <table>
+                    <thead>
+                        <tr><th>Endpoint</th><th>Límite</th><th>Ventana</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>/api/auth/*</code></td><td>10 req</td><td>1 minuto</td></tr>
+                        <tr><td><code>/api/gps/*</code></td><td>10 req</td><td>1 segundo</td></tr>
+                        <tr><td><code>/api/*</code></td><td>100 req</td><td>1 minuto</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>Métricas de Capacidad</h3>
+            <div class="grid grid-3">
+                <div class="card" style="text-align: center;">
+                    <div style="font-size: 32px; font-weight: bold; color: #10b981;">500+</div>
+                    <div style="color: #94a3b8;">Usuarios concurrentes</div>
+                </div>
+                <div class="card" style="text-align: center;">
+                    <div style="font-size: 32px; font-weight: bold; color: #3b82f6;">2,000+</div>
+                    <div style="color: #94a3b8;">Manifiestos/día</div>
+                </div>
+                <div class="card" style="text-align: center;">
+                    <div style="font-size: 32px; font-weight: bold; color: #f59e0b;">&lt;50ms</div>
+                    <div style="color: #94a3b8;">Latencia con caché</div>
+                </div>
+            </div>
+        </section>
+
+        <section id="cu-admin-sectorial" class="section">
+            <h2>👥 Casos de Uso - Administradores Sectoriales</h2>
+            <p class="lead">9 casos de uso para los tres nuevos roles de administración sectorial.</p>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-as01">
+                <h4 style="margin-top:0">CU-AS01: Visualizar Dashboard de Generadores</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Admin Generadores</td></tr>
+                    <tr><th>Descripción</th><td>Dashboard con KPIs específicos de generadores: Total, Activos, Categorías, Manifiestos por estado.</td></tr>
+                    <tr><th>Endpoint</th><td><code>GET /admin-sectorial/generadores/dashboard</code></td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-as02">
+                <h4 style="margin-top:0">CU-AS02: Listar y Filtrar Generadores</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Admin Generadores</td></tr>
+                    <tr><th>Descripción</th><td>Lista paginada con filtros por razón social, CUIT, estado, categoría.</td></tr>
+                    <tr><th>Endpoint</th><td><code>GET /admin-sectorial/generadores/lista</code></td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #3b82f6;" id="cu-as03">
+                <h4 style="margin-top:0">CU-AS03: Aprobar Nuevo Generador</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Admin Generadores</td></tr>
+                    <tr><th>Descripción</th><td>Aprobación de generadores pendientes con activación de cuenta.</td></tr>
+                    <tr><th>Endpoint</th><td><code>POST /admin-sectorial/generadores/:id/aprobar</code></td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #f59e0b;" id="cu-as04">
+                <h4 style="margin-top:0">CU-AS04: Visualizar Dashboard de Transportistas</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Admin Transportistas</td></tr>
+                    <tr><th>Descripción</th><td>Dashboard con KPIs: Total transportistas, Activos, Vehículos, Choferes, Manifiestos en tránsito.</td></tr>
+                    <tr><th>Endpoint</th><td><code>GET /admin-sectorial/transportistas/dashboard</code></td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #f59e0b;" id="cu-as05">
+                <h4 style="margin-top:0">CU-AS05: Listar y Filtrar Transportistas</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Admin Transportistas</td></tr>
+                    <tr><th>Descripción</th><td>Lista paginada con filtros por razón social, CUIT, estado.</td></tr>
+                    <tr><th>Endpoint</th><td><code>GET /admin-sectorial/transportistas/lista</code></td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #f59e0b;" id="cu-as06">
+                <h4 style="margin-top:0">CU-AS06: Aprobar Nuevo Transportista</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Admin Transportistas</td></tr>
+                    <tr><th>Descripción</th><td>Aprobación de transportistas pendientes con activación de cuenta.</td></tr>
+                    <tr><th>Endpoint</th><td><code>POST /admin-sectorial/transportistas/:id/aprobar</code></td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-as07">
+                <h4 style="margin-top:0">CU-AS07: Visualizar Dashboard de Operadores</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Admin Operadores</td></tr>
+                    <tr><th>Descripción</th><td>Dashboard con KPIs específicos de operadores.</td></tr>
+                    <tr><th>Endpoint</th><td><code>GET /admin-sectorial/operadores/dashboard</code></td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-as08">
+                <h4 style="margin-top:0">CU-AS08: Listar y Filtrar Operadores</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Admin Operadores</td></tr>
+                    <tr><th>Descripción</th><td>Lista paginada con filtros por razón social, CUIT, estado.</td></tr>
+                    <tr><th>Endpoint</th><td><code>GET /admin-sectorial/operadores/lista</code></td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#f59e0b">Alta</strong></td></tr>
+                </table>
+            </div>
+
+            <div class="card" style="margin: 16px 0; border-left: 4px solid #10b981;" id="cu-as09">
+                <h4 style="margin-top:0">CU-AS09: Aprobar Nuevo Operador</h4>
+                <table>
+                    <tr><th style="width:150px">Actor Principal</th><td>Admin Operadores</td></tr>
+                    <tr><th>Descripción</th><td>Aprobación de operadores pendientes con activación de cuenta.</td></tr>
+                    <tr><th>Endpoint</th><td><code>POST /admin-sectorial/operadores/:id/aprobar</code></td></tr>
+                    <tr><th>Prioridad</th><td><strong style="color:#ef4444">Alta - Crítico</strong></td></tr>
+                </table>
+            </div>
+        </section>
+
         <footer
             style="margin-top: 64px; padding-top: 32px; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted);">
             <p><strong>Dirección de Gestión y Fiscalización Ambiental</strong></p>
-            <p>Gobierno de Mendoza - Diciembre 2025</p>
+            <p>Gobierno de Mendoza - Enero 2026</p>
+            <p style="margin-top: 16px; font-size: 12px;">Total Casos de Uso: <strong>86</strong> | Actores: <strong>8</strong></p>
         </footer>
     </main>
 

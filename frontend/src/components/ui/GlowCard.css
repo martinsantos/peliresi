@@ -1,0 +1,383 @@
+/**
+ * GlowCard.css - Premium Neon Card Styles
+ * Control Room 2077 Design System
+ */
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* BASE CARD                                                                    */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+.glow-card {
+  position: relative;
+  padding: 24px;
+  background: var(--space-panel, #111827);
+  border: 1px solid var(--color-border-default, rgba(161, 175, 194, 0.22));
+  border-radius: var(--radius-xl, 16px);
+  overflow: hidden;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Glass morphism background */
+.glow-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.03) 0%,
+    rgba(255, 255, 255, 0) 50%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+  pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* GLOW BORDER EFFECT                                                           */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+.glow-card--border .glow-card__border-glow {
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--neon-cyan, #00fff2) 25%,
+    var(--neon-purple, #a855f7) 50%,
+    var(--neon-cyan, #00fff2) 75%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+  animation: borderGlow 4s ease infinite;
+}
+
+.glow-card:hover .glow-card__border-glow {
+  opacity: 0.6;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* SCAN LINE EFFECT                                                             */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+.glow-card__scanline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--neon-cyan, #00fff2),
+    transparent
+  );
+  opacity: 0;
+  transform: translateY(-100%);
+  pointer-events: none;
+}
+
+.glow-card:hover .glow-card__scanline {
+  opacity: 0.5;
+  animation: scanLinePass 2s ease-in-out infinite;
+}
+
+@keyframes scanLinePass {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.5;
+  }
+  90% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateY(calc(100% + var(--card-height, 200px)));
+    opacity: 0;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* COLOR VARIANTS                                                               */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Cyan (Default) */
+.glow-card--cyan,
+.glow-card--default {
+  --card-glow: var(--neon-cyan-glow, rgba(0, 255, 242, 0.6));
+  --card-color: var(--neon-cyan, #00fff2);
+  --card-surface: var(--neon-cyan-surface, rgba(0, 255, 242, 0.08));
+}
+
+.glow-card--cyan:hover,
+.glow-card--default:hover {
+  border-color: rgba(0, 255, 242, 0.4);
+  box-shadow: 0 0 20px var(--card-glow), 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.glow-card--cyan .glow-card__icon,
+.glow-card--default .glow-card__icon {
+  background: var(--card-surface);
+  color: var(--card-color);
+  box-shadow: 0 0 15px var(--card-glow);
+}
+
+/* Green */
+.glow-card--green {
+  --card-glow: var(--neon-green-glow, rgba(34, 255, 102, 0.6));
+  --card-color: var(--neon-green, #22ff66);
+  --card-surface: var(--neon-green-surface, rgba(34, 255, 102, 0.08));
+}
+
+.glow-card--green:hover {
+  border-color: rgba(34, 255, 102, 0.4);
+  box-shadow: 0 0 20px var(--card-glow), 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.glow-card--green .glow-card__icon {
+  background: var(--card-surface);
+  color: var(--card-color);
+  box-shadow: 0 0 15px var(--card-glow);
+}
+
+/* Amber */
+.glow-card--amber {
+  --card-glow: var(--neon-amber-glow, rgba(255, 184, 0, 0.6));
+  --card-color: var(--neon-amber, #ffb800);
+  --card-surface: var(--neon-amber-surface, rgba(255, 184, 0, 0.08));
+}
+
+.glow-card--amber:hover {
+  border-color: rgba(255, 184, 0, 0.4);
+  box-shadow: 0 0 20px var(--card-glow), 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.glow-card--amber .glow-card__icon {
+  background: var(--card-surface);
+  color: var(--card-color);
+  box-shadow: 0 0 15px var(--card-glow);
+}
+
+/* Red */
+.glow-card--red {
+  --card-glow: var(--neon-red-glow, rgba(255, 51, 102, 0.6));
+  --card-color: var(--neon-red, #ff3366);
+  --card-surface: var(--neon-red-surface, rgba(255, 51, 102, 0.08));
+}
+
+.glow-card--red:hover {
+  border-color: rgba(255, 51, 102, 0.4);
+  box-shadow: 0 0 20px var(--card-glow), 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.glow-card--red .glow-card__icon {
+  background: var(--card-surface);
+  color: var(--card-color);
+  box-shadow: 0 0 15px var(--card-glow);
+}
+
+/* Purple */
+.glow-card--purple {
+  --card-glow: var(--neon-purple-glow, rgba(168, 85, 247, 0.6));
+  --card-color: var(--neon-purple, #a855f7);
+  --card-surface: var(--neon-purple-surface, rgba(168, 85, 247, 0.08));
+}
+
+.glow-card--purple:hover {
+  border-color: rgba(168, 85, 247, 0.4);
+  box-shadow: 0 0 20px var(--card-glow), 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.glow-card--purple .glow-card__icon {
+  background: var(--card-surface);
+  color: var(--card-color);
+  box-shadow: 0 0 15px var(--card-glow);
+}
+
+/* Blue */
+.glow-card--blue {
+  --card-glow: var(--neon-blue-glow, rgba(59, 130, 246, 0.6));
+  --card-color: var(--neon-blue, #3b82f6);
+  --card-surface: var(--neon-blue-surface, rgba(59, 130, 246, 0.08));
+}
+
+.glow-card--blue:hover {
+  border-color: rgba(59, 130, 246, 0.4);
+  box-shadow: 0 0 20px var(--card-glow), 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.glow-card--blue .glow-card__icon {
+  background: var(--card-surface);
+  color: var(--card-color);
+  box-shadow: 0 0 15px var(--card-glow);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* PULSE EFFECT                                                                 */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+.glow-card--pulse {
+  animation: cardPulse 2s ease-in-out infinite;
+}
+
+@keyframes cardPulse {
+  0%, 100% {
+    box-shadow: 0 0 10px var(--card-glow, rgba(0, 255, 242, 0.3));
+  }
+  50% {
+    box-shadow: 0 0 25px var(--card-glow, rgba(0, 255, 242, 0.5)),
+                0 0 50px var(--card-glow, rgba(0, 255, 242, 0.2));
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* CONTENT LAYOUT                                                               */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+.glow-card__content {
+  position: relative;
+  z-index: 1;
+}
+
+.glow-card__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.glow-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-lg, 12px);
+  flex-shrink: 0;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.glow-card__titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.glow-card__title {
+  margin: 0;
+  font-family: var(--font-display, 'Orbitron', sans-serif);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-bright, #f8fafc);
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+}
+
+.glow-card__subtitle {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #a1afc2);
+  letter-spacing: 0.02em;
+}
+
+.glow-card__value {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--card-color, var(--neon-cyan, #00fff2));
+  line-height: 1;
+  text-shadow: 0 0 20px var(--card-glow, rgba(0, 255, 242, 0.5));
+  margin-bottom: 8px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* STAT CARD VARIANT                                                            */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+.glow-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.glow-stat__value {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-text-max, #ffffff);
+  line-height: 1.2;
+}
+
+.glow-stat__label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-text-muted, #a1afc2);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.glow-stat__trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm, 6px);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.glow-stat__trend--up {
+  background: rgba(34, 255, 102, 0.15);
+  color: var(--neon-green, #22ff66);
+}
+
+.glow-stat__trend--down {
+  background: rgba(255, 51, 102, 0.15);
+  color: var(--neon-red, #ff3366);
+}
+
+.glow-stat__trend--neutral {
+  background: rgba(255, 184, 0, 0.15);
+  color: var(--neon-amber, #ffb800);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* RESPONSIVE                                                                   */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .glow-card {
+    padding: 16px;
+  }
+
+  .glow-card__icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .glow-card__value {
+    font-size: 2rem;
+  }
+
+  .glow-stat__value {
+    font-size: 1.5rem;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* REDUCED MOTION                                                               */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .glow-card,
+  .glow-card__icon,
+  .glow-card__border-glow,
+  .glow-card__scanline {
+    animation: none !important;
+    transition: none !important;
+  }
+}

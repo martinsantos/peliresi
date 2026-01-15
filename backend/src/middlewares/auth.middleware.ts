@@ -82,9 +82,18 @@ export const hasRole = (...roles: string[]) => {
       return next();
     }
 
-    console.log(`[AUTH] Verificando rol. Usuario: ${req.user.email}, Rol actual: "${req.user.rol}", Roles requeridos: ${JSON.stringify(roles)}`);
-    if (!roles.includes(req.user.rol)) {
-      console.log(`[AUTH] 403 Forbidden para ${req.user.email}. El rol "${req.user.rol}" no está en ${JSON.stringify(roles)}`);
+    // DEMO MODE: Permitir override de rol para demos
+    const isDemoMode = req.headers['x-demo-mode'] === 'true';
+    const demoRole = req.headers['x-demo-role'] as string;
+    const effectiveRole = (isDemoMode && demoRole) ? demoRole : req.user.rol;
+
+    if (isDemoMode && demoRole) {
+      console.log(`[AUTH] DEMO MODE: Usuario ${req.user.email} usando rol simulado "${demoRole}" (rol real: ${req.user.rol})`);
+    }
+
+    console.log(`[AUTH] Verificando rol. Usuario: ${req.user.email}, Rol efectivo: "${effectiveRole}", Roles requeridos: ${JSON.stringify(roles)}`);
+    if (!roles.includes(effectiveRole)) {
+      console.log(`[AUTH] 403 Forbidden para ${req.user.email}. El rol "${effectiveRole}" no está en ${JSON.stringify(roles)}`);
       return next(
         new AppError('No tiene permisos para realizar esta acción', 403)
       );

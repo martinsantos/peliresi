@@ -201,16 +201,33 @@ const LogEnhanced: React.FC = () => {
   // Action color
   const getAccionColor = (accion: string) => {
     if (accion.includes('LOGIN_FALLIDO') || accion.includes('RECHAZAR') || accion.includes('ELIMINAR'))
-      return { bg: '#fee2e2', color: '#991b1b' };
+      return { bg: '#fee2e2', color: '#991b1b', border: '#fecaca' };
     if (accion.includes('LOGIN') || accion.includes('LOGOUT'))
-      return { bg: '#dbeafe', color: '#1d4ed8' };
+      return { bg: '#dbeafe', color: '#1e40af', border: '#bfdbfe' };
     if (accion.includes('CREAR') || accion.includes('APROBAR'))
-      return { bg: '#d1fae5', color: '#059669' };
+      return { bg: '#d1fae5', color: '#065f46', border: '#a7f3d0' };
     if (accion.includes('FIRMAR') || accion.includes('CONFIRMAR'))
-      return { bg: '#e0e7ff', color: '#4338ca' };
-    if (accion.includes('REVERTIR'))
-      return { bg: '#fef3c7', color: '#d97706' };
-    return { bg: '#f3f4f6', color: '#374151' };
+      return { bg: '#e0e7ff', color: '#3730a3', border: '#c7d2fe' };
+    if (accion.includes('REVERTIR') || accion.includes('REVERSION'))
+      return { bg: '#fef3c7', color: '#92400e', border: '#fde68a' };
+    if (accion.includes('VER') || accion.includes('EXPORTAR'))
+      return { bg: '#f0fdf4', color: '#166534', border: '#bbf7d0' };
+    return { bg: '#f3f4f6', color: '#374151', border: '#e5e7eb' };
+  };
+
+  // Module color
+  const getModuloColor = (modulo: string) => {
+    switch (modulo) {
+      case 'AUTH': return { bg: '#dbeafe', color: '#1e40af', border: '#bfdbfe' };
+      case 'MANIFIESTOS': return { bg: '#d1fae5', color: '#065f46', border: '#a7f3d0' };
+      case 'REPORTES': return { bg: '#fef3c7', color: '#92400e', border: '#fde68a' };
+      case 'USUARIOS': return { bg: '#e0e7ff', color: '#3730a3', border: '#c7d2fe' };
+      case 'REVERSIONES': return { bg: '#fee2e2', color: '#991b1b', border: '#fecaca' };
+      case 'SISTEMA': return { bg: '#f3e8ff', color: '#6b21a8', border: '#e9d5ff' };
+      case 'PUSH': return { bg: '#cffafe', color: '#0e7490', border: '#a5f3fc' };
+      case 'ADMIN_SECTORIAL': return { bg: '#fce7f3', color: '#9d174d', border: '#fbcfe8' };
+      default: return { bg: '#f3f4f6', color: '#374151', border: '#e5e7eb' };
+    }
   };
 
   const formatTime = (dateStr: string) => {
@@ -260,11 +277,16 @@ const LogEnhanced: React.FC = () => {
                   <div className="entry-header">
                     <span
                       className="entry-accion"
-                      style={{ background: getAccionColor(log.accion).bg, color: getAccionColor(log.accion).color }}
+                      style={{ background: getAccionColor(log.accion).bg, color: getAccionColor(log.accion).color, border: `1px solid ${getAccionColor(log.accion).border}` }}
                     >
                       {log.accion}
                     </span>
-                    <span className="entry-modulo">{log.modulo}</span>
+                    <span
+                      className="entry-modulo"
+                      style={{ background: getModuloColor(log.modulo).bg, color: getModuloColor(log.modulo).color, border: `1px solid ${getModuloColor(log.modulo).border}` }}
+                    >
+                      {log.modulo}
+                    </span>
                     {log.severidad && log.severidad !== 'INFO' && (
                       <span
                         className="entry-severidad"
@@ -458,12 +480,19 @@ const LogEnhanced: React.FC = () => {
               <td>
                 <span
                   className="accion-badge"
-                  style={{ background: getAccionColor(log.accion).bg, color: getAccionColor(log.accion).color }}
+                  style={{ background: getAccionColor(log.accion).bg, color: getAccionColor(log.accion).color, border: `1px solid ${getAccionColor(log.accion).border}` }}
                 >
                   {log.accion}
                 </span>
               </td>
-              <td><span className="modulo-badge">{log.modulo}</span></td>
+              <td>
+                <span
+                  className="modulo-badge"
+                  style={{ background: getModuloColor(log.modulo).bg, color: getModuloColor(log.modulo).color, border: `1px solid ${getModuloColor(log.modulo).border}` }}
+                >
+                  {log.modulo}
+                </span>
+              </td>
               <td>
                 {log.severidad && (
                   <span

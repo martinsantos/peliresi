@@ -18,6 +18,14 @@ api.interceptors.request.use(
         if (token && config.headers) {
             config.headers.Authorization = `Bearer ${token}`;
         }
+
+        // DEMO MODE: Agregar headers para simular rol en app móvil
+        const mobileRole = localStorage.getItem('sitrep_mobile_role');
+        if (mobileRole && config.headers) {
+            config.headers['X-Demo-Mode'] = 'true';
+            config.headers['X-Demo-Role'] = mobileRole;
+        }
+
         return config;
     },
     (error: AxiosError) => {

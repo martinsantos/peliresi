@@ -13,7 +13,8 @@ import {
     agregarEvento,
     actualizarRuta,
     syncViaje,
-    getViajesPorManifiesto
+    getViajesPorManifiesto,
+    getViajeActivo
 } from '../controllers/viajes.controller';
 
 const router = Router();
@@ -22,6 +23,9 @@ const router = Router();
 router.use(isAuthenticated);
 
 // ============ CRUD VIAJES ============
+
+// Obtener viaje activo del usuario actual
+router.get('/activo', getViajeActivo);
 
 // Iniciar un nuevo viaje
 router.post('/', iniciarViaje);

@@ -1,0 +1,183 @@
+/**
+ * NeonChart.css - Premium Chart Styles
+ * Control Room 2077 Design System
+ */
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* CONTAINER                                                                    */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+.neon-chart-container {
+  background: linear-gradient(
+    135deg,
+    rgba(17, 24, 39, 0.8) 0%,
+    rgba(15, 23, 42, 0.9) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle scan line effect */
+.neon-chart-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 255, 242, 0.3) 50%,
+    transparent 100%
+  );
+  animation: chartScanline 4s linear infinite;
+}
+
+@keyframes chartScanline {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(200px);
+    opacity: 0;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* HEADER                                                                       */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+.neon-chart-header {
+  margin-bottom: 16px;
+}
+
+.neon-chart-title {
+  font-family: var(--font-display, 'Orbitron', sans-serif);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-max, #f8fafc);
+  margin: 0 0 4px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.neon-chart-subtitle {
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #64748b);
+  margin: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* TOOLTIP                                                                      */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+.neon-chart-tooltip {
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid;
+  border-radius: 10px;
+  padding: 12px 16px;
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+}
+
+.neon-chart-tooltip__label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 6px 0;
+}
+
+.neon-chart-tooltip__value {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.875rem;
+  margin: 0;
+  color: #e2e8f0;
+}
+
+.neon-chart-tooltip__value strong {
+  font-weight: 700;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* RECHARTS OVERRIDES                                                           */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Axis styling */
+.neon-chart-container .recharts-cartesian-axis-tick-value {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 10px;
+}
+
+/* Grid styling */
+.neon-chart-container .recharts-cartesian-grid-horizontal line,
+.neon-chart-container .recharts-cartesian-grid-vertical line {
+  stroke: rgba(255, 255, 255, 0.03);
+}
+
+/* Legend styling */
+.neon-chart-container .recharts-legend-wrapper {
+  padding-top: 8px !important;
+}
+
+.neon-chart-container .recharts-legend-item {
+  margin-right: 16px !important;
+}
+
+.neon-chart-container .recharts-legend-item-text {
+  font-size: 12px !important;
+  color: #94a3b8 !important;
+}
+
+/* Pie chart labels */
+.neon-chart-container .recharts-pie-label-text {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 11px;
+  fill: #e2e8f0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* RESPONSIVE                                                                   */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .neon-chart-container {
+    padding: 16px;
+  }
+
+  .neon-chart-title {
+    font-size: 0.8rem;
+  }
+
+  .neon-chart-tooltip {
+    padding: 10px 12px;
+  }
+
+  .neon-chart-tooltip__value {
+    font-size: 0.8rem;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* REDUCED MOTION                                                               */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .neon-chart-container::before {
+    animation: none;
+  }
+}

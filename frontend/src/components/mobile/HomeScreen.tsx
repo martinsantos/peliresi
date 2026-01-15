@@ -2,15 +2,18 @@
  * HomeScreen - Pantalla principal de la app movil
  * Extraido de MobileApp.tsx para mejorar legibilidad
  * SINCRONIZADO con Dashboard.tsx (WEB) - Usa mismo endpoint /api/manifiestos/dashboard
+ * Control Room 2077 Design System - Neon Mobile Edition
  */
 
 import React from 'react';
+import { motion } from 'framer-motion';
 import {
     FileText, QrCode, Navigation, Play, Clock,
     Wifi, WifiOff, RefreshCw, Edit, Truck, Award,
     Package, Recycle, TrendingUp, CheckCircle, MapPin, BarChart3,
     Plus
 } from 'lucide-react';
+import type { GlowVariant } from '../ui';
 import type { UserRole, Screen } from '../../types/mobile.types';
 import { ESTADO_CONFIG } from '../../types/mobile.types';
 import {
@@ -32,7 +35,19 @@ interface StatCardConfig {
     value: number;
     icon: React.ComponentType<{ size: number }>;
     color: string;
+    glowVariant: GlowVariant;
 }
+
+// Neon color mappings for glow effects
+const neonColors: Record<GlowVariant, { glow: string; gradient: string }> = {
+    cyan: { glow: 'rgba(0, 255, 242, 0.4)', gradient: 'linear-gradient(135deg, rgba(0, 255, 242, 0.2), rgba(0, 255, 242, 0.05))' },
+    green: { glow: 'rgba(34, 255, 102, 0.4)', gradient: 'linear-gradient(135deg, rgba(34, 255, 102, 0.2), rgba(34, 255, 102, 0.05))' },
+    amber: { glow: 'rgba(255, 184, 0, 0.4)', gradient: 'linear-gradient(135deg, rgba(255, 184, 0, 0.2), rgba(255, 184, 0, 0.05))' },
+    red: { glow: 'rgba(255, 51, 102, 0.4)', gradient: 'linear-gradient(135deg, rgba(255, 51, 102, 0.2), rgba(255, 51, 102, 0.05))' },
+    purple: { glow: 'rgba(168, 85, 247, 0.4)', gradient: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(168, 85, 247, 0.05))' },
+    blue: { glow: 'rgba(59, 130, 246, 0.4)', gradient: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.05))' },
+    default: { glow: 'rgba(16, 185, 129, 0.4)', gradient: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.05))' },
+};
 
 // Tipo para estadísticas del backend (mismo que DashboardStats.estadisticas)
 interface BackendStats {
@@ -55,36 +70,36 @@ const getStatsByRoleFromBackend = (role: UserRole, stats: BackendStats): StatCar
     switch (role) {
         case 'GENERADOR':
             return [
-                { label: 'MIS MANIFIESTOS', value: s.total ?? 0, icon: FileText, color: '#3b82f6' },
-                { label: 'POR FIRMAR', value: s.borradores ?? 0, icon: Edit, color: '#f59e0b' },
+                { label: 'MIS MANIFIESTOS', value: s.total ?? 0, icon: FileText, color: '#3b82f6', glowVariant: 'blue' },
+                { label: 'POR FIRMAR', value: s.borradores ?? 0, icon: Edit, color: '#ffb800', glowVariant: 'amber' },
                 // Sincronizado con WEB: incluye pendientesAprobacion y enTratamiento
-                { label: 'EN PROCESO', value: (s.pendientesAprobacion ?? 0) + (s.aprobados ?? 0) + (s.enTransito ?? 0) + (s.entregados ?? 0) + (s.recibidos ?? 0) + (s.enTratamiento ?? 0), icon: Truck, color: '#f97316' },
-                { label: 'COMPLETADOS', value: s.tratados ?? 0, icon: Award, color: '#22c55e' }
+                { label: 'EN PROCESO', value: (s.pendientesAprobacion ?? 0) + (s.aprobados ?? 0) + (s.enTransito ?? 0) + (s.entregados ?? 0) + (s.recibidos ?? 0) + (s.enTratamiento ?? 0), icon: Truck, color: '#ffb800', glowVariant: 'amber' },
+                { label: 'COMPLETADOS', value: s.tratados ?? 0, icon: Award, color: '#22ff66', glowVariant: 'green' }
             ];
 
         case 'TRANSPORTISTA':
             return [
-                { label: 'ASIGNADOS', value: s.total ?? 0, icon: FileText, color: '#06b6d4' },
-                { label: 'POR RETIRAR', value: s.aprobados ?? 0, icon: Clock, color: '#f59e0b' },
-                { label: 'EN RUTA', value: s.enTransito ?? 0, icon: Truck, color: '#f97316' },
+                { label: 'ASIGNADOS', value: s.total ?? 0, icon: FileText, color: '#00fff2', glowVariant: 'cyan' },
+                { label: 'POR RETIRAR', value: s.aprobados ?? 0, icon: Clock, color: '#ffb800', glowVariant: 'amber' },
+                { label: 'EN RUTA', value: s.enTransito ?? 0, icon: Truck, color: '#ffb800', glowVariant: 'amber' },
                 // Sincronizado con WEB: incluye enTratamiento
-                { label: 'ENTREGADOS', value: (s.entregados ?? 0) + (s.recibidos ?? 0) + (s.enTratamiento ?? 0) + (s.tratados ?? 0), icon: CheckCircle, color: '#22c55e' }
+                { label: 'ENTREGADOS', value: (s.entregados ?? 0) + (s.recibidos ?? 0) + (s.enTratamiento ?? 0) + (s.tratados ?? 0), icon: CheckCircle, color: '#22ff66', glowVariant: 'green' }
             ];
 
         case 'OPERADOR':
             return [
-                { label: 'ENTRANTES', value: s.total ?? 0, icon: FileText, color: '#8b5cf6' },
-                { label: 'POR RECIBIR', value: s.entregados ?? 0, icon: Package, color: '#f59e0b' },
-                { label: 'EN TRATAMIENTO', value: (s.recibidos ?? 0) + (s.enTratamiento ?? 0), icon: Recycle, color: '#f97316' },
-                { label: 'PROCESADOS', value: s.tratados ?? 0, icon: Award, color: '#22c55e' }
+                { label: 'ENTRANTES', value: s.total ?? 0, icon: FileText, color: '#a855f7', glowVariant: 'purple' },
+                { label: 'POR RECIBIR', value: s.entregados ?? 0, icon: Package, color: '#ffb800', glowVariant: 'amber' },
+                { label: 'EN TRATAMIENTO', value: (s.recibidos ?? 0) + (s.enTratamiento ?? 0), icon: Recycle, color: '#ffb800', glowVariant: 'amber' },
+                { label: 'PROCESADOS', value: s.tratados ?? 0, icon: Award, color: '#22ff66', glowVariant: 'green' }
             ];
 
         default:
             return [
-                { label: 'TOTAL', value: s.total ?? 0, icon: FileText, color: '#10b981' },
-                { label: 'PENDIENTES', value: (s.borradores ?? 0) + (s.pendientesAprobacion ?? 0), icon: Clock, color: '#f59e0b' },
-                { label: 'EN CURSO', value: (s.aprobados ?? 0) + (s.enTransito ?? 0) + (s.entregados ?? 0) + (s.recibidos ?? 0) + (s.enTratamiento ?? 0), icon: TrendingUp, color: '#3b82f6' },
-                { label: 'COMPLETADOS', value: s.tratados ?? 0, icon: CheckCircle, color: '#22c55e' }
+                { label: 'TOTAL', value: s.total ?? 0, icon: FileText, color: '#22ff66', glowVariant: 'green' },
+                { label: 'PENDIENTES', value: (s.borradores ?? 0) + (s.pendientesAprobacion ?? 0), icon: Clock, color: '#ffb800', glowVariant: 'amber' },
+                { label: 'EN CURSO', value: (s.aprobados ?? 0) + (s.enTransito ?? 0) + (s.entregados ?? 0) + (s.recibidos ?? 0) + (s.enTratamiento ?? 0), icon: TrendingUp, color: '#00fff2', glowVariant: 'cyan' },
+                { label: 'COMPLETADOS', value: s.tratados ?? 0, icon: CheckCircle, color: '#22ff66', glowVariant: 'green' }
             ];
     }
 };
@@ -175,30 +190,91 @@ export default function HomeScreen({
                 )}
             </div>
 
-            {/* Stats Grid - 4 cards específicas por rol (sincronizado con WEB via /api/manifiestos/dashboard) */}
-            <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            {/* Stats Grid - Premium Neon Cards (Control Room 2077 Mobile) */}
+            <motion.div
+                className="stats-grid"
+                style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}
+                initial="hidden"
+                animate="show"
+                variants={{
+                    hidden: { opacity: 0 },
+                    show: { opacity: 1, transition: { staggerChildren: 0.08 } }
+                }}
+            >
                 {statsCards.map((stat, index) => {
                     const IconComponent = stat.icon;
+                    const neonStyle = neonColors[stat.glowVariant];
                     return (
-                        <div
+                        <motion.div
                             key={index}
-                            className="stat-card"
+                            className="stat-card neon-stat-card"
+                            variants={{
+                                hidden: { y: 15, opacity: 0, scale: 0.95 },
+                                show: { y: 0, opacity: 1, scale: 1, transition: { duration: 0.35 } }
+                            }}
+                            whileTap={{ scale: 0.97 }}
                             style={{
-                                background: `linear-gradient(135deg, ${stat.color}20 0%, ${stat.color}10 100%)`,
-                                borderColor: `${stat.color}40`,
+                                background: neonStyle.gradient,
+                                borderColor: stat.color,
                                 borderWidth: '1px',
-                                borderStyle: 'solid'
+                                borderStyle: 'solid',
+                                borderRadius: '12px',
+                                position: 'relative',
+                                overflow: 'hidden'
                             }}
                         >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ color: stat.color }}><IconComponent size={18} /></span>
-                                <div className="stat-value" style={{ color: stat.color }}>{stat.value}</div>
+                            {/* Neon glow border effect */}
+                            <div style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                height: '2px',
+                                background: `linear-gradient(90deg, transparent, ${stat.color}, transparent)`,
+                                opacity: 0.8
+                            }} />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative', zIndex: 1 }}>
+                                <motion.span
+                                    style={{
+                                        color: stat.color,
+                                        filter: `drop-shadow(0 0 6px ${neonStyle.glow})`
+                                    }}
+                                    whileHover={{ scale: 1.1, rotate: 5 }}
+                                >
+                                    <IconComponent size={18} />
+                                </motion.span>
+                                <div
+                                    className="stat-value"
+                                    style={{
+                                        color: stat.color,
+                                        fontFamily: "'JetBrains Mono', monospace",
+                                        fontWeight: 700,
+                                        fontSize: '1.5rem',
+                                        textShadow: `0 0 10px ${neonStyle.glow}`
+                                    }}
+                                >
+                                    {stat.value.toLocaleString()}
+                                </div>
                             </div>
-                            <div className="stat-label" style={{ fontSize: '10px', marginTop: '4px' }}>{stat.label}</div>
-                        </div>
+                            <div
+                                className="stat-label"
+                                style={{
+                                    fontSize: '9px',
+                                    marginTop: '4px',
+                                    fontWeight: 600,
+                                    letterSpacing: '0.08em',
+                                    color: 'rgba(255,255,255,0.7)',
+                                    textTransform: 'uppercase',
+                                    position: 'relative',
+                                    zIndex: 1
+                                }}
+                            >
+                                {stat.label}
+                            </div>
+                        </motion.div>
                     );
                 })}
-            </div>
+            </motion.div>
 
             {/* Acciones Rápidas - Específicas por rol */}
             <div className="section">
@@ -297,19 +373,44 @@ export default function HomeScreen({
                         Realizados
                     </button>
                 </div>
-                <div className="list">
+                <motion.div
+                    className="list"
+                    initial="hidden"
+                    animate="show"
+                    variants={{
+                        hidden: { opacity: 0 },
+                        show: { opacity: 1, transition: { staggerChildren: 0.06 } }
+                    }}
+                >
                     {manifiestosFiltrados.length > 0 ? (
                         manifiestosFiltrados.map(m => {
                             const display = formatManifiestoForDisplay(m);
                             return (
-                                <div
+                                <motion.div
                                     key={display.id}
                                     className="list-item"
                                     onClick={() => onSelectManifiesto(display)}
+                                    variants={{
+                                        hidden: { x: -15, opacity: 0 },
+                                        show: { x: 0, opacity: 1, transition: { duration: 0.3 } }
+                                    }}
+                                    whileTap={{ scale: 0.98 }}
+                                    whileHover={{ x: 4, backgroundColor: 'rgba(0, 255, 242, 0.05)' }}
                                 >
-                                    <div className="list-icon"><FileText size={18} /></div>
+                                    <div className="list-icon" style={{
+                                        background: 'rgba(0, 255, 242, 0.1)',
+                                        borderRadius: '8px',
+                                        padding: '8px'
+                                    }}>
+                                        <FileText size={18} style={{ color: 'var(--neon-cyan, #00fff2)' }} />
+                                    </div>
                                     <div className="list-body">
-                                        <div className="list-title">#{display.numero}</div>
+                                        <div className="list-title" style={{
+                                            fontFamily: "'JetBrains Mono', monospace",
+                                            fontWeight: 600
+                                        }}>
+                                            #{display.numero}
+                                        </div>
                                         <div className="list-sub">{display.generador} → {display.operador}</div>
                                         <div className="list-meta" style={{
                                             display: 'flex',
@@ -318,26 +419,31 @@ export default function HomeScreen({
                                             fontSize: '11px',
                                             color: 'var(--ind-text-mid)'
                                         }}>
-                                            <span style={{ color: 'var(--ind-cyan)' }}>{display.residuo}</span>
-                                            <span style={{ color: 'var(--ind-orange)' }}>{display.cantidad}</span>
+                                            <span style={{ color: 'var(--neon-cyan, #00fff2)' }}>{display.residuo}</span>
+                                            <span style={{ color: 'var(--neon-amber, #ffb800)' }}>{display.cantidad}</span>
                                             {display.fecha && <span>{display.fecha}</span>}
                                         </div>
                                     </div>
                                     <div className="list-badge">{getEstadoBadge(display.estado)}</div>
-                                </div>
+                                </motion.div>
                             );
                         })
                     ) : (
-                        <div className="empty-state">
-                            <FileText size={32} />
+                        <motion.div
+                            className="empty-state"
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ duration: 0.4 }}
+                        >
+                            <FileText size={32} style={{ color: 'var(--neon-cyan, #00fff2)', opacity: 0.5 }} />
                             <p>No hay manifiestos {
                                 activeTab === 'pendientes' ? 'pendientes' :
                                 activeTab === 'en-curso' ? 'en curso' :
                                 'realizados'
                             }</p>
-                        </div>
+                        </motion.div>
                     )}
-                </div>
+                </motion.div>
             </div>
         </>
     );

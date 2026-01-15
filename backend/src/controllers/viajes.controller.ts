@@ -449,3 +449,107 @@ export const getViajesPorManifiesto = async (req: AuthRequest, res: Response, ne
         next(error);
     }
 };
+
+/**
+ * Obtener viaje activo del usuario actual
+ * GET /api/viajes/activo
+ * Retorna el viaje EN_CURSO del transportista actual, si existe
+ */
+export const getViajeActivo = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const userId = req.user.id;
+
+        // Buscar viaje EN_CURSO del usuario
+        const viajeActivo = await prisma.viaje.findFirst({
+            where: {
+                usuarioId: userId,
+                estado: 'EN_CURSO'
+            },
+            include: {
+                manifiesto: {
+                    select: {
+                        id: true,
+                        numero: true,
+                        estado: true,
+                        generador: { select: { razonSocial: true, domicilio: true } },
+                        operador: { select: { razonSocial: true, domicilio: true } },
+                        transportista: { select: { razonSocial: true } }
+                    }
+                }
+            }
+        });
+
+        // Si no hay viaje EN_CURSO, buscar manifiesto EN_TRANSITO asignado
+        if (!viajeActivo) {
+            const usuario = await prisma.usuario.findUnique({
+                where: { id: userId },
+                include: { transportista: true }
+            });
+
+            if (usuario?.transportista) {
+                const manifiestoEnTransito = await prisma.manifiesto.findFirst({
+                    where: {
+                        transportistaId: usuario.transportista.id,
+                        estado: 'EN_TRANSITO'
+                    },
+                    include: {
+                        generador: { select: { razonSocial: true, domicilio: true } },
+                        operador: { select: { razonSocial: true, domicilio: true } },
+                        transportista: { select: { razonSocial: true } }
+                    }
+                });
+
+                if (manifiestoEnTransito) {
+                    // Crear viaje retroactivo para el manifiesto EN_TRANSITO
+                    const viajeCreado = await prisma.viaje.create({
+                        data: {
+                            manifiestoId: manifiestoEnTransito.id,
+                            transportistaId: manifiestoEnTransito.transportistaId,
+                            usuarioId: userId,
+                            inicio: manifiestoEnTransito.fechaRetiro || new Date(),
+                            estado: 'EN_CURSO',
+                            ruta: [],
+                            eventos: [{
+                                tipo: 'INICIO',
+                                timestamp: (manifiestoEnTransito.fechaRetiro || new Date()).toISOString(),
+                                descripcion: 'Viaje iniciado (sincronizado)'
+                            }]
+                        },
+                        include: {
+                            manifiesto: {
+                                select: {
+                                    id: true,
+                                    numero: true,
+                                    estado: true,
+                                    generador: { select: { razonSocial: true, domicilio: true } },
+                                    operador: { select: { razonSocial: true, domicilio: true } },
+                                    transportista: { select: { razonSocial: true } }
+                                }
+                            }
+                        }
+                    });
+
+                    return res.json({
+                        success: true,
+                        data: {
+                            viajeActivo: viajeCreado,
+                            sincronizado: true
+                        }
+                    });
+                }
+            }
+
+            return res.json({
+                success: true,
+                data: { viajeActivo: null }
+            });
+        }
+
+        res.json({
+            success: true,
+            data: { viajeActivo }
+        });
+    } catch (error) {
+        next(error);
+    }
+};

@@ -695,6 +695,95 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════ */
+/* NEON SYSTEM - Control Room 2077 Premium Effects                             */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* Core Neon Colors - Ultra bright for maximum impact */
+  --neon-cyan: #00fff2;
+  --neon-cyan-bright: #66fffa;
+  --neon-cyan-dim: #00d4c8;
+  --neon-cyan-glow: rgba(0, 255, 242, 0.6);
+  --neon-cyan-surface: rgba(0, 255, 242, 0.08);
+
+  --neon-green: #22ff66;
+  --neon-green-bright: #66ff99;
+  --neon-green-dim: #00e650;
+  --neon-green-glow: rgba(34, 255, 102, 0.6);
+  --neon-green-surface: rgba(34, 255, 102, 0.08);
+
+  --neon-amber: #ffb800;
+  --neon-amber-bright: #ffd54f;
+  --neon-amber-dim: #e6a600;
+  --neon-amber-glow: rgba(255, 184, 0, 0.6);
+  --neon-amber-surface: rgba(255, 184, 0, 0.08);
+
+  --neon-red: #ff3366;
+  --neon-red-bright: #ff6699;
+  --neon-red-dim: #e62958;
+  --neon-red-glow: rgba(255, 51, 102, 0.6);
+  --neon-red-surface: rgba(255, 51, 102, 0.08);
+
+  --neon-purple: #a855f7;
+  --neon-purple-bright: #c084fc;
+  --neon-purple-dim: #9333ea;
+  --neon-purple-glow: rgba(168, 85, 247, 0.6);
+  --neon-purple-surface: rgba(168, 85, 247, 0.08);
+
+  --neon-blue: #3b82f6;
+  --neon-blue-bright: #60a5fa;
+  --neon-blue-dim: #2563eb;
+  --neon-blue-glow: rgba(59, 130, 246, 0.6);
+  --neon-blue-surface: rgba(59, 130, 246, 0.08);
+
+  /* Deep Space Backgrounds - For maximum neon contrast */
+  --void-black: #030712;
+  --deep-space: #0a0f1a;
+  --space-panel: #111827;
+  --space-surface: rgba(17, 24, 39, 0.85);
+  --space-glass: rgba(17, 24, 39, 0.7);
+
+  /* Neon Glow Shadows - Multi-layer for depth */
+  --shadow-neon-cyan: 0 0 10px var(--neon-cyan-glow), 0 0 20px rgba(0, 255, 242, 0.4), 0 0 40px rgba(0, 255, 242, 0.2);
+  --shadow-neon-green: 0 0 10px var(--neon-green-glow), 0 0 20px rgba(34, 255, 102, 0.4), 0 0 40px rgba(34, 255, 102, 0.2);
+  --shadow-neon-amber: 0 0 10px var(--neon-amber-glow), 0 0 20px rgba(255, 184, 0, 0.4), 0 0 40px rgba(255, 184, 0, 0.2);
+  --shadow-neon-red: 0 0 10px var(--neon-red-glow), 0 0 20px rgba(255, 51, 102, 0.4), 0 0 40px rgba(255, 51, 102, 0.2);
+  --shadow-neon-purple: 0 0 10px var(--neon-purple-glow), 0 0 20px rgba(168, 85, 247, 0.4), 0 0 40px rgba(168, 85, 247, 0.2);
+
+  /* Neon Borders */
+  --border-neon-cyan: 1px solid rgba(0, 255, 242, 0.5);
+  --border-neon-green: 1px solid rgba(34, 255, 102, 0.5);
+  --border-neon-amber: 1px solid rgba(255, 184, 0, 0.5);
+  --border-neon-red: 1px solid rgba(255, 51, 102, 0.5);
+  --border-neon-purple: 1px solid rgba(168, 85, 247, 0.5);
+
+  /* Neon Gradients - For buttons and highlights */
+  --gradient-neon-cyan: linear-gradient(135deg, var(--neon-cyan-dim) 0%, var(--neon-cyan) 50%, var(--neon-cyan-bright) 100%);
+  --gradient-neon-green: linear-gradient(135deg, var(--neon-green-dim) 0%, var(--neon-green) 50%, var(--neon-green-bright) 100%);
+  --gradient-neon-amber: linear-gradient(135deg, var(--neon-amber-dim) 0%, var(--neon-amber) 50%, var(--neon-amber-bright) 100%);
+  --gradient-neon-red: linear-gradient(135deg, var(--neon-red-dim) 0%, var(--neon-red) 50%, var(--neon-red-bright) 100%);
+  --gradient-neon-purple: linear-gradient(135deg, var(--neon-purple-dim) 0%, var(--neon-purple) 50%, var(--neon-purple-bright) 100%);
+
+  /* Holographic Effect */
+  --gradient-hologram: linear-gradient(
+    135deg,
+    rgba(0, 255, 242, 0.1) 0%,
+    rgba(168, 85, 247, 0.1) 25%,
+    rgba(255, 184, 0, 0.1) 50%,
+    rgba(34, 255, 102, 0.1) 75%,
+    rgba(0, 255, 242, 0.1) 100%
+  );
+
+  /* Scan Line Effect */
+  --gradient-scanline: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 255, 242, 0.03) 2px,
+    rgba(0, 255, 242, 0.03) 4px
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
 /* PREMIUM ANIMATIONS                                                          */
 /* ═══════════════════════════════════════════════════════════════════════════ */
 @keyframes fadeIn {
@@ -802,6 +891,187 @@ body {
 .stagger-3 { animation-delay: 150ms; }
 .stagger-4 { animation-delay: 200ms; }
 .stagger-5 { animation-delay: 250ms; }
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* NEON PREMIUM ANIMATIONS - Control Room 2077                                  */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Neon Glow Pulse - For active status indicators */
+@keyframes neonPulse {
+  0%, 100% {
+    box-shadow: 0 0 5px var(--neon-cyan-glow), 0 0 10px rgba(0, 255, 242, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px var(--neon-cyan-glow), 0 0 40px rgba(0, 255, 242, 0.5), 0 0 60px rgba(0, 255, 242, 0.3);
+  }
+}
+
+@keyframes neonPulseGreen {
+  0%, 100% {
+    box-shadow: 0 0 5px var(--neon-green-glow), 0 0 10px rgba(34, 255, 102, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px var(--neon-green-glow), 0 0 40px rgba(34, 255, 102, 0.5), 0 0 60px rgba(34, 255, 102, 0.3);
+  }
+}
+
+@keyframes neonPulseAmber {
+  0%, 100% {
+    box-shadow: 0 0 5px var(--neon-amber-glow), 0 0 10px rgba(255, 184, 0, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px var(--neon-amber-glow), 0 0 40px rgba(255, 184, 0, 0.5), 0 0 60px rgba(255, 184, 0, 0.3);
+  }
+}
+
+@keyframes neonPulseRed {
+  0%, 100% {
+    box-shadow: 0 0 5px var(--neon-red-glow), 0 0 10px rgba(255, 51, 102, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px var(--neon-red-glow), 0 0 40px rgba(255, 51, 102, 0.5), 0 0 60px rgba(255, 51, 102, 0.3);
+  }
+}
+
+/* Counter Roll Animation - For animated numbers */
+@keyframes counterRoll {
+  0% {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Scan Line - Retro-futuristic effect */
+@keyframes scanLine {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh);
+    opacity: 0.5;
+  }
+}
+
+/* Hologram Flicker - For holographic badges */
+@keyframes holoFlicker {
+  0%, 100% {
+    opacity: 1;
+    filter: hue-rotate(0deg);
+  }
+  25% {
+    opacity: 0.95;
+    filter: hue-rotate(5deg);
+  }
+  50% {
+    opacity: 0.9;
+    filter: hue-rotate(-5deg);
+  }
+  75% {
+    opacity: 0.95;
+    filter: hue-rotate(3deg);
+  }
+}
+
+/* Data Stream - For activity feeds */
+@keyframes dataStream {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Glow Border Rotation - For premium cards */
+@keyframes borderGlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Radar Sweep - For maps */
+@keyframes radarSweep {
+  0% {
+    transform: rotate(0deg);
+    opacity: 0.8;
+  }
+  100% {
+    transform: rotate(360deg);
+    opacity: 0.8;
+  }
+}
+
+/* Value Highlight - For stat changes */
+@keyframes valueHighlight {
+  0% {
+    transform: scale(1);
+    text-shadow: none;
+  }
+  50% {
+    transform: scale(1.05);
+    text-shadow: 0 0 20px var(--neon-cyan-glow);
+  }
+  100% {
+    transform: scale(1);
+    text-shadow: none;
+  }
+}
+
+/* Float Effect - For hovering elements */
+@keyframes floatEffect {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+/* Energy Bar Fill - For progress indicators */
+@keyframes energyFill {
+  0% {
+    width: 0%;
+    box-shadow: none;
+  }
+  100% {
+    box-shadow: 0 0 10px var(--neon-cyan-glow), 0 0 20px rgba(0, 255, 242, 0.3);
+  }
+}
+
+/* Neon animation utility classes */
+.animate-neon-pulse { animation: neonPulse 2s ease-in-out infinite; }
+.animate-neon-pulse-green { animation: neonPulseGreen 2s ease-in-out infinite; }
+.animate-neon-pulse-amber { animation: neonPulseAmber 2s ease-in-out infinite; }
+.animate-neon-pulse-red { animation: neonPulseRed 2s ease-in-out infinite; }
+.animate-counter-roll { animation: counterRoll 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.animate-holo-flicker { animation: holoFlicker 3s ease-in-out infinite; }
+.animate-data-stream { animation: dataStream 8s linear infinite; }
+.animate-border-glow { animation: borderGlow 4s ease infinite; background-size: 200% 200%; }
+.animate-radar-sweep { animation: radarSweep 4s linear infinite; }
+.animate-value-highlight { animation: valueHighlight 0.5s ease-out; }
+.animate-float { animation: floatEffect 4s ease-in-out infinite; }
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {

@@ -34,6 +34,7 @@ import { analyticsService } from '../services/analytics.service';
 import { manifiestoService } from '../services/manifiesto.service';
 import { authService } from '../services/auth.service';
 import { offlineStorage } from '../services/offlineStorage';
+import { viajesService } from '../services/viajes.service';
 
 // Components
 import RoleSelector from '../components/mobile/RoleSelector';
@@ -335,6 +336,19 @@ const MobileApp: React.FC = () => {
             }
         }
 
+        // Registrar inicio de viaje en backend para sincronización entre dispositivos
+        if (isOnline) {
+            try {
+                await viajesService.iniciarViaje({
+                    manifiestoId: scannedManifiesto.id,
+                    appVersion: '2.1.0'
+                });
+                console.log('[MobileApp] Viaje registrado en backend desde QR');
+            } catch (err) {
+                console.warn('[MobileApp] Error registrando viaje en backend:', err);
+            }
+        }
+
         trip.iniciarViaje();
         setCurrentScreen('viaje');
         setScannedManifiesto(null);
@@ -389,6 +403,20 @@ const MobileApp: React.FC = () => {
             } catch (err: any) {
                 showToastMessage(`Error al confirmar retiro: ${err.message || 'Error de conexion'}`);
                 return;
+            }
+        }
+
+        // Registrar inicio de viaje en backend para sincronización entre dispositivos
+        if (isOnline) {
+            try {
+                await viajesService.iniciarViaje({
+                    manifiestoId: originalManifiesto.id,
+                    appVersion: '2.1.0'
+                });
+                console.log('[MobileApp] Viaje registrado en backend');
+            } catch (err) {
+                console.warn('[MobileApp] Error registrando viaje en backend:', err);
+                // Continuar aunque falle - el viaje se sincronizará después
             }
         }
 

@@ -80,32 +80,41 @@
 }
 
 .stat-card svg {
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
+  padding: 8px;
+  border-radius: 10px;
 }
 
 .stat-primary { border-left: 4px solid #3b82f6; }
-.stat-primary svg { color: #3b82f6; }
+.stat-primary svg { color: #3b82f6; background: #dbeafe; }
+.stat-primary .stat-value { color: #1e40af; }
 
 .stat-warning { border-left: 4px solid #f59e0b; }
-.stat-warning svg { color: #f59e0b; }
+.stat-warning svg { color: #d97706; background: #fef3c7; }
+.stat-warning .stat-value { color: #b45309; }
 
 .stat-info { border-left: 4px solid #06b6d4; }
-.stat-info svg { color: #06b6d4; }
+.stat-info svg { color: #0891b2; background: #cffafe; }
+.stat-info .stat-value { color: #0e7490; }
 
 .stat-success { border-left: 4px solid #10b981; }
-.stat-success svg { color: #10b981; }
+.stat-success svg { color: #059669; background: #d1fae5; }
+.stat-success .stat-value { color: #047857; }
 
 .stat-value {
   display: block;
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #111827;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .stat-label {
   font-size: 0.75rem;
   color: #6b7280;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 /* View Tabs */
@@ -321,16 +330,25 @@
 .entry-accion,
 .entry-modulo,
 .entry-severidad {
-  padding: 0.125rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.688rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 6px;
+  font-size: 0.7rem;
   font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .entry-modulo {
-  background: #f3f4f6;
-  color: #4b5563;
+  background: #e0e7ff;
+  color: #3730a3;
+  border: 1px solid #c7d2fe;
 }
+
+/* Module-specific colors */
+.entry-modulo[data-module="AUTH"] { background: #dbeafe; color: #1e40af; border-color: #bfdbfe; }
+.entry-modulo[data-module="MANIFIESTOS"] { background: #d1fae5; color: #065f46; border-color: #a7f3d0; }
+.entry-modulo[data-module="REPORTES"] { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+.entry-modulo[data-module="USUARIOS"] { background: #e0e7ff; color: #3730a3; border-color: #c7d2fe; }
+.entry-modulo[data-module="REVERSIONES"] { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
 
 .entry-user {
   display: flex;
@@ -448,15 +466,18 @@
 .accion-badge,
 .modulo-badge,
 .severidad-badge {
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.688rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 6px;
+  font-size: 0.7rem;
   font-weight: 600;
+  letter-spacing: 0.02em;
+  display: inline-block;
 }
 
 .modulo-badge {
-  background: #f3f4f6;
-  color: #4b5563;
+  background: #e0e7ff;
+  color: #3730a3;
+  border: 1px solid #c7d2fe;
 }
 
 .td-ip {
