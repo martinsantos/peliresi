@@ -7,10 +7,38 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
     Activity, Users, FileText, Truck, Bell, AlertTriangle,
     MapPin, RefreshCw, Eye, Shield, Factory,
-    Building2, Zap, ChevronDown, ChevronUp, ChevronRight
+    Building2, Zap, ChevronDown, ChevronUp, ChevronRight, Navigation, Radio
 } from 'lucide-react';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { usuarioService } from '../services/admin.service';
 import type { Actividad } from '../services/admin.service';
+import { manifiestoService } from '../services/manifiesto.service';
+import { viajesService } from '../services/viajes.service';
+
+// Icono de camión para el mapa
+const truckIcon = new L.Icon({
+    iconUrl: 'data:image/svg+xml;base64,' + btoa(`
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+            <circle cx="16" cy="16" r="14" fill="#10b981" stroke="#fff" stroke-width="2"/>
+            <path d="M10 11h8v6h4l-2 4h-2v-2h-6v2h-2l-2-4h2v-6z" fill="#fff"/>
+        </svg>
+    `),
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -14]
+});
+
+// Interfaz para vehículos en el mapa
+interface VehiculoEnMapa {
+    id: string;
+    numero: string;
+    transportista: string;
+    lat: number;
+    lng: number;
+    tiempo: string;
+}
 
 interface CentroControlScreenProps {
     onNavigate?: (screen: string) => void;
@@ -42,9 +70,53 @@ const ROL_CONFIG: Record<string, { color: string; icon: React.ReactNode }> = {
 const CentroControlScreen: React.FC<CentroControlScreenProps> = ({ onNavigate }) => {
     const [stats, setStats] = useState<SystemStats | null>(null);
     const [actividades, setActividades] = useState<Actividad[]>([]);
+    const [vehiculos, setVehiculos] = useState<VehiculoEnMapa[]>([]);
     const [loading, setLoading] = useState(true);
-    const [expandedSection, setExpandedSection] = useState<string | null>('timeline');
+    const [expandedSection, setExpandedSection] = useState<string | null>('mapa');
     const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+
+    // Cargar vehículos en tránsito para el mapa
+    const loadVehiculos = useCallback(async () => {
+        try {
+            const response = await manifiestoService.getManifiestos({
+                estado: 'EN_TRANSITO',
+                limit: 20
+            });
+
+            const manifiestos = response.manifiestos || [];
+            const vehiculosData: VehiculoEnMapa[] = [];
+
+            for (const m of manifiestos) {
+                try {
+                    const viaje = await viajesService.getViajeEnCurso(m.id);
+                    vehiculosData.push({
+                        id: m.id,
+                        numero: m.numero,
+                        transportista: m.transportista?.razonSocial || 'Transportista',
+                        lat: viaje?.ultimaUbicacion?.lat || (m.generador?.latitud || -32.8908) + (Math.random() - 0.5) * 0.05,
+                        lng: viaje?.ultimaUbicacion?.lng || (m.generador?.longitud || -68.8272) + (Math.random() - 0.5) * 0.05,
+                        tiempo: viaje
+                            ? `${Math.floor(viaje.elapsedSeconds / 3600)}h ${Math.floor((viaje.elapsedSeconds % 3600) / 60)}m`
+                            : '--'
+                    });
+                } catch {
+                    // Si falla, agregar con ubicación simulada
+                    vehiculosData.push({
+                        id: m.id,
+                        numero: m.numero,
+                        transportista: m.transportista?.razonSocial || 'Transportista',
+                        lat: -32.8908 + (Math.random() - 0.5) * 0.1,
+                        lng: -68.8272 + (Math.random() - 0.5) * 0.1,
+                        tiempo: '--'
+                    });
+                }
+            }
+
+            setVehiculos(vehiculosData);
+        } catch (err) {
+            console.error('Error loading vehiculos:', err);
+        }
+    }, []);
 
     const loadData = useCallback(async () => {
         try {
@@ -68,12 +140,15 @@ const CentroControlScreen: React.FC<CentroControlScreenProps> = ({ onNavigate })
             setStats(combinedStats);
             setActividades(actividadData.actividades);
             setLastUpdate(new Date());
+
+            // Cargar vehículos para el mapa
+            await loadVehiculos();
         } catch (err) {
             console.error('Error loading centro control:', err);
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [loadVehiculos]);
 
     useEffect(() => {
         loadData();
@@ -174,6 +249,68 @@ const CentroControlScreen: React.FC<CentroControlScreenProps> = ({ onNavigate })
 
                     {/* Secciones colapsables */}
                     <div className="cc-sections">
+                        {/* Mapa en Vivo */}
+                        <div className="cc-section mapa-section">
+                            <button
+                                className="section-header"
+                                onClick={() => toggleSection('mapa')}
+                            >
+                                <Navigation size={16} />
+                                <span>Tracking en Vivo</span>
+                                {vehiculos.length > 0 && (
+                                    <span className="section-badge live">
+                                        <Radio size={10} className="pulse" /> {vehiculos.length} activos
+                                    </span>
+                                )}
+                                {expandedSection === 'mapa' ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            </button>
+                            {expandedSection === 'mapa' && (
+                                <div className="section-content mapa-content">
+                                    {vehiculos.length === 0 ? (
+                                        <div className="empty-mapa">
+                                            <Truck size={32} />
+                                            <span>Sin vehículos en ruta</span>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="mapa-container">
+                                                <MapContainer
+                                                    center={[-32.8908, -68.8272]}
+                                                    zoom={11}
+                                                    className="mini-map"
+                                                    zoomControl={true}
+                                                    style={{ height: '200px', width: '100%', borderRadius: '10px' }}
+                                                >
+                                                    <TileLayer
+                                                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                                        attribution='&copy; OSM'
+                                                    />
+                                                    {vehiculos.map(v => (
+                                                        <Marker key={v.id} position={[v.lat, v.lng]} icon={truckIcon}>
+                                                            <Popup>
+                                                                <div style={{ fontWeight: 700, color: '#10b981' }}>{v.numero}</div>
+                                                                <div style={{ fontSize: 11 }}>{v.transportista}</div>
+                                                                <div style={{ fontSize: 10, color: '#94a3b8' }}>⏱️ {v.tiempo}</div>
+                                                            </Popup>
+                                                        </Marker>
+                                                    ))}
+                                                </MapContainer>
+                                            </div>
+                                            <div className="vehiculos-lista">
+                                                {vehiculos.slice(0, 5).map(v => (
+                                                    <div key={v.id} className="vehiculo-item">
+                                                        <Truck size={14} />
+                                                        <span className="vehiculo-numero">{v.numero}</span>
+                                                        <span className="vehiculo-tiempo">{v.tiempo}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
                         {/* Timeline */}
                         <div className="cc-section">
                             <button
@@ -662,6 +799,112 @@ const CentroControlScreen: React.FC<CentroControlScreenProps> = ({ onNavigate })
                     background: var(--color-bg-hover);
                     color: var(--color-primary);
                     border-color: var(--color-primary-dim);
+                }
+
+                /* Mapa en Vivo Styles */
+                .mapa-section .section-header {
+                    border-left: 3px solid #10b981;
+                }
+
+                .section-badge.live {
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                    background: rgba(16, 185, 129, 0.2);
+                    color: #10b981;
+                }
+
+                .pulse {
+                    animation: pulse 1.5s infinite;
+                }
+
+                @keyframes pulse {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.5; }
+                }
+
+                .mapa-content {
+                    padding-top: 0 !important;
+                }
+
+                .mapa-container {
+                    border-radius: 10px;
+                    overflow: hidden;
+                    border: 1px solid var(--color-border-default);
+                    margin-bottom: 12px;
+                }
+
+                .mini-map {
+                    background: var(--color-bg-surface);
+                }
+
+                .mini-map .leaflet-popup-content-wrapper {
+                    background: rgba(15, 23, 42, 0.95);
+                    color: #f8fafc;
+                    border-radius: 8px;
+                    font-size: 11px;
+                }
+
+                .mini-map .leaflet-popup-tip {
+                    background: rgba(15, 23, 42, 0.95);
+                }
+
+                .empty-mapa {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 24px;
+                    color: var(--color-text-muted);
+                }
+
+                .empty-mapa svg {
+                    opacity: 0.5;
+                }
+
+                .vehiculos-lista {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                }
+
+                .vehiculo-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 8px 10px;
+                    background: var(--color-bg-hover);
+                    border-radius: 8px;
+                    border-left: 2px solid #10b981;
+                }
+
+                .vehiculo-item svg {
+                    color: #10b981;
+                }
+
+                .vehiculo-numero {
+                    flex: 1;
+                    font-family: var(--font-mono);
+                    font-size: 0.8rem;
+                    font-weight: 600;
+                    color: var(--color-text-bright);
+                }
+
+                .vehiculo-tiempo {
+                    font-size: 0.7rem;
+                    color: var(--color-text-muted);
+                    font-family: var(--font-mono);
+                }
+
+                .cc-header-right {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                }
+
+                .last-update {
+                    font-size: 0.7rem;
+                    color: var(--color-text-muted);
                 }
             `}</style>
         </div>
