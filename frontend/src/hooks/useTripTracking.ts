@@ -845,7 +845,8 @@ export function useTripTracking({ role, manifiestoId, onToast }: UseTripTracking
     }, [gpsPosition, role, showToast]);
 
     // ============ REGISTRAR PARADA (PAUSA) ============
-    const registrarParada = useCallback((descripcion?: string) => {
+    // v9.0: Sincroniza con backend para que WEB vea el estado de pausa
+    const registrarParada = useCallback(async (descripcion?: string) => {
         const now = Date.now();
         const paradaEvento: TripEvent = {
             tipo: 'PARADA',
@@ -859,19 +860,40 @@ export function useTripTracking({ role, manifiestoId, onToast }: UseTripTracking
         setViajePausado(true);
         setPausedAt(now);
 
-        // Actualizar en IndexedDB
+        // Actualizar en IndexedDB (offline-first)
         offlineStorage.updateActiveTrip({
             events: viajeEventosRef.current,
             isPaused: true,
             pausedAt: now
         }).catch(console.error);
 
+        // v9.0: SINCRONIZAR CON BACKEND para que WEB lo vea
+        if (navigator.onLine && manifiestoId) {
+            try {
+                const viajeEnCurso = await viajesService.getViajeEnCurso(manifiestoId);
+                if (viajeEnCurso?.id) {
+                    await viajesService.pausarViaje(viajeEnCurso.id);
+                    console.log('[Trip] v9.0 Pausa sincronizada con backend');
+                }
+            } catch (err) {
+                console.warn('[Trip] v9.0 Error sincronizando pausa con backend:', err);
+                // Encolar para sync posterior si falla
+                offlineStorage.queueOperation({
+                    tipo: 'UPDATE',
+                    method: 'POST',
+                    endpoint: `/api/viajes/${tripIdRef.current}/pausar`,
+                    datos: {}
+                }).catch(console.error);
+            }
+        }
+
         showToast('⏸️ VIAJE EN PAUSA');
         analyticsService.trackAction('registrar_parada', 'viaje', role, paradaEvento);
-    }, [gpsPosition, role, showToast]);
+    }, [gpsPosition, role, showToast, manifiestoId]);
 
     // ============ REANUDAR VIAJE ============
-    const reanudarViaje = useCallback(() => {
+    // v9.0: Sincroniza con backend para que WEB vea el estado de reanudación
+    const reanudarViaje = useCallback(async () => {
         const now = Date.now();
         const reanudacionEvento: TripEvent = {
             tipo: 'REANUDACION',
@@ -890,7 +912,7 @@ export function useTripTracking({ role, manifiestoId, onToast }: UseTripTracking
         setPausedAt(null);
         setTotalPausedMs(newTotalPaused);
 
-        // Actualizar en IndexedDB
+        // Actualizar en IndexedDB (offline-first)
         offlineStorage.updateActiveTrip({
             events: viajeEventosRef.current,
             isPaused: false,
@@ -898,9 +920,29 @@ export function useTripTracking({ role, manifiestoId, onToast }: UseTripTracking
             totalPausedMs: newTotalPaused
         }).catch(console.error);
 
+        // v9.0: SINCRONIZAR CON BACKEND para que WEB lo vea
+        if (navigator.onLine && manifiestoId) {
+            try {
+                const viajeEnCurso = await viajesService.getViajeEnCurso(manifiestoId);
+                if (viajeEnCurso?.id) {
+                    await viajesService.reanudarViaje(viajeEnCurso.id);
+                    console.log('[Trip] v9.0 Reanudación sincronizada con backend');
+                }
+            } catch (err) {
+                console.warn('[Trip] v9.0 Error sincronizando reanudación con backend:', err);
+                // Encolar para sync posterior si falla
+                offlineStorage.queueOperation({
+                    tipo: 'UPDATE',
+                    method: 'POST',
+                    endpoint: `/api/viajes/${tripIdRef.current}/reanudar`,
+                    datos: {}
+                }).catch(console.error);
+            }
+        }
+
         showToast('▶️ VIAJE REANUDADO');
         analyticsService.trackAction('reanudar_viaje', 'viaje', role, reanudacionEvento);
-    }, [gpsPosition, pausedAt, totalPausedMs, role, showToast]);
+    }, [gpsPosition, pausedAt, totalPausedMs, role, showToast, manifiestoId]);
 
     return {
         viajeActivo,

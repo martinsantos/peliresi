@@ -1090,6 +1090,40 @@
     color: #f59e0b;
 }
 
+.ranking-controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.filtro-tiempo-select {
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: #f8fafc;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.filtro-tiempo-select:hover {
+    border-color: rgba(16, 185, 129, 0.5);
+    background: rgba(30, 41, 59, 1);
+}
+
+.filtro-tiempo-select:focus {
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+.filtro-tiempo-select option {
+    background: #1e293b;
+    color: #f8fafc;
+}
+
 .ranking-total {
     display: flex;
     align-items: center;
@@ -1179,6 +1213,25 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+}
+
+.ranking-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 40px;
+    color: #64748b;
+    text-align: center;
+}
+
+.ranking-empty svg {
+    color: #475569;
+}
+
+.ranking-empty span {
+    font-size: 0.9rem;
 }
 
 .ranking-item {
@@ -1412,4 +1465,517 @@
     margin: 4px 0 0;
     font-size: 12px;
     color: #94a3b8;
+}
+
+/* ============================================
+   PANEL DE VIAJES ACTIVOS EN TIEMPO REAL
+   ============================================ */
+.viajes-activos-panel {
+    margin-bottom: 24px;
+}
+
+.viajes-count-badges {
+    display: flex;
+    gap: 10px;
+}
+
+.viaje-badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.viaje-badge.en-curso {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+}
+
+.viaje-badge.pausado {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+}
+
+.viaje-badge.incidente {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+.viajes-activos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    padding-top: 16px;
+}
+
+.viaje-activo-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 18px;
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 14px;
+    transition: all 0.2s ease;
+}
+
+.viaje-activo-card.pausado {
+    background: rgba(245, 158, 11, 0.08);
+    border-color: rgba(245, 158, 11, 0.3);
+}
+
+.viaje-activo-card.incidente {
+    background: rgba(239, 68, 68, 0.08);
+    border-color: rgba(239, 68, 68, 0.3);
+    animation: pulse-border-red 2s infinite;
+}
+
+@keyframes pulse-border-red {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+    50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+}
+
+.viaje-icon-wrapper {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: rgba(16, 185, 129, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #10b981;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.viaje-activo-card.pausado .viaje-icon-wrapper {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+}
+
+.viaje-activo-card.incidente .viaje-icon-wrapper {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+.icon-pausado { color: #f59e0b; }
+.icon-incidente { color: #ef4444; }
+.icon-en-ruta { color: #10b981; }
+
+.pulse-indicator {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    width: 10px;
+    height: 10px;
+    background: #10b981;
+    border-radius: 50%;
+    animation: pulse 1.5s infinite;
+}
+
+.viaje-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.viaje-numero {
+    font-weight: 700;
+    font-size: 14px;
+    color: #f8fafc;
+}
+
+.viaje-transportista {
+    font-size: 12px;
+    color: #94a3b8;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.viaje-timer-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #10b981;
+}
+
+.viaje-activo-card.pausado .viaje-timer-wrapper {
+    color: #f59e0b;
+}
+
+.viaje-activo-card.incidente .viaje-timer-wrapper {
+    color: #ef4444;
+}
+
+.viaje-timer-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.viaje-estado-badge {
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+}
+
+.viaje-estado-badge.en_curso {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+}
+
+.viaje-estado-badge.pausado {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+}
+
+.viaje-estado-badge.incidente {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+/* Leyenda del mapa mejorada */
+.map-legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.legend-item.origen { color: #059669; }
+.legend-item.en-ruta { color: #10b981; }
+.legend-item.pausado { color: #f59e0b; }
+.legend-item.incidente { color: #ef4444; }
+.legend-item.destino { color: #dc2626; }
+
+/* Popup del mapa con estado */
+.popup-estado {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    margin-left: 8px;
+}
+
+.popup-estado.pausado {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+}
+
+.popup-estado.incidente {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+/* Popup de Origen (Generador) y Destino (Operador) */
+.popup-content.origen,
+.popup-content.destino {
+    text-align: center;
+    padding: 12px 8px;
+}
+
+.popup-content.origen strong,
+.popup-content.destino strong {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.popup-tipo {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+
+.popup-content.origen .popup-tipo {
+    background: rgba(5, 150, 105, 0.2);
+    color: #059669;
+}
+
+.popup-content.destino .popup-tipo {
+    background: rgba(220, 38, 38, 0.2);
+    color: #dc2626;
+}
+
+.popup-label {
+    display: block;
+    font-size: 10px;
+    color: #64748b;
+    margin-top: 4px;
+}
+
+/* ============================================
+   EXPANDED POPUP STYLES - Info Completa de Viaje
+   ============================================ */
+
+/* Popup expandido base */
+.mega-popup.expanded .leaflet-popup-content-wrapper {
+    min-width: 280px;
+    max-width: 320px;
+}
+
+.mega-popup.viaje-popup .leaflet-popup-content-wrapper {
+    min-width: 300px;
+    max-width: 350px;
+    border-color: rgba(59, 130, 246, 0.4);
+}
+
+/* Header del popup expandido */
+.popup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.popup-manifiesto {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: #64748b;
+    background: rgba(100, 116, 139, 0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.popup-tipo.origen-badge {
+    background: linear-gradient(135deg, rgba(5, 150, 105, 0.3), rgba(16, 185, 129, 0.2));
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.popup-tipo.destino-badge {
+    background: linear-gradient(135deg, rgba(220, 38, 38, 0.3), rgba(239, 68, 68, 0.2));
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* Título con icono */
+.popup-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.popup-title strong {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+/* Detalles adicionales */
+.popup-detail {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 6px;
+    line-height: 1.4;
+}
+
+.popup-detail svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+    opacity: 0.7;
+}
+
+/* ============================================
+   VIAJE POPUP - Popup Principal del Transporte
+   ============================================ */
+
+.popup-content.viaje {
+    padding: 12px;
+}
+
+/* Header del viaje */
+.popup-viaje-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.popup-viaje-numero {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: #f8fafc;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(99, 102, 241, 0.2));
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.popup-viaje-estado {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.popup-viaje-estado.en_curso,
+.popup-viaje-estado.en_transito {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.popup-viaje-estado.pausado {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.popup-viaje-estado.incidente {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* Secciones del viaje */
+.popup-viaje-section {
+    padding: 10px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.popup-viaje-section:last-child {
+    margin-bottom: 0;
+}
+
+.popup-viaje-section.origen {
+    border-left: 3px solid #10b981;
+}
+
+.popup-viaje-section.transporte {
+    border-left: 3px solid #3b82f6;
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.popup-viaje-section.destino {
+    border-left: 3px solid #ef4444;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.section-header svg {
+    opacity: 0.7;
+}
+
+.section-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.popup-viaje-section strong {
+    display: block;
+    margin: 0;
+    font-size: 12px;
+    color: #f8fafc;
+}
+
+.section-detail {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    margin-top: 4px;
+    font-size: 10px;
+    color: #94a3b8;
+    line-height: 1.3;
+}
+
+.section-detail svg {
+    flex-shrink: 0;
+    margin-top: 1px;
+    opacity: 0.6;
+}
+
+/* Detalles del transporte */
+.transporte-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.detail-badge.patente {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: #f8fafc;
+    background: rgba(59, 130, 246, 0.3);
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(59, 130, 246, 0.4);
+}
+
+.detail-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    color: #94a3b8;
+}
+
+.transporte-stats {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.transporte-stats .stat {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.transporte-stats .stat:first-child {
+    color: #10b981;
+}
+
+.transporte-stats .stat:last-child {
+    color: #3b82f6;
 }

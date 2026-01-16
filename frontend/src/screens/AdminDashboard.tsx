@@ -8,14 +8,19 @@
  * - Ver todos los viajes
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     FileText, Clock, CheckCircle, AlertTriangle,
-    TrendingUp, ChevronRight, Activity, Users
+    TrendingUp, ChevronRight, Activity, Users, Truck, Navigation, Radio
 } from 'lucide-react';
 import type { Screen } from '../types/mobile.types';
 import { ESTADO_CONFIG } from '../types/mobile.types';
 import type { DisplayManifiesto } from '../utils/manifiestoUtils';
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { manifiestoService } from '../services/manifiesto.service';
+import { viajesService } from '../services/viajes.service';
 
 // Tipo para estadísticas del backend (sincronizado con DashboardStats)
 interface BackendStats {
@@ -40,7 +45,63 @@ interface AdminDashboardProps {
     backendStats?: BackendStats;
 }
 
-type AdminTab = 'resumen' | 'pendientes' | 'todos' | 'viajes';
+type AdminTab = 'resumen' | 'pendientes' | 'todos' | 'mapa';
+
+// Icono de camión para el mapa
+const truckIcon = new L.Icon({
+    iconUrl: 'data:image/svg+xml;base64,' + btoa(`
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="#10b981">
+            <circle cx="16" cy="16" r="14" fill="#10b981" stroke="#fff" stroke-width="2"/>
+            <path d="M10 11h8v6h4l-2 4h-2v-2h-6v2h-2l-2-4h2v-6z" fill="#fff"/>
+        </svg>
+    `),
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -14]
+});
+
+// Icono de origen (Generador)
+const generadorIcon = new L.Icon({
+    iconUrl: 'data:image/svg+xml;base64,' + btoa(`
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" fill="#059669" stroke="#fff" stroke-width="2"/>
+            <text x="12" y="16" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">G</text>
+        </svg>
+    `),
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+    popupAnchor: [0, -12]
+});
+
+// Icono de destino (Operador)
+const operadorIcon = new L.Icon({
+    iconUrl: 'data:image/svg+xml;base64,' + btoa(`
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" fill="#dc2626" stroke="#fff" stroke-width="2"/>
+            <text x="12" y="16" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">O</text>
+        </svg>
+    `),
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+    popupAnchor: [0, -12]
+});
+
+// Interfaz para viajes activos en el mapa
+interface ViajeEnMapa {
+    id: string;
+    manifiestoNumero: string;
+    transportista: string;
+    generador: string;
+    operador: string;
+    lat: number;
+    lng: number;
+    origenLat?: number;
+    origenLng?: number;
+    destinoLat?: number;
+    destinoLng?: number;
+    tiempoEnRuta: string;
+    estado: string;
+}
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({
     manifiestos,
@@ -51,6 +112,64 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     backendStats
 }) => {
     const [activeTab, setActiveTab] = useState<AdminTab>('resumen');
+    const [viajesEnMapa, setViajesEnMapa] = useState<ViajeEnMapa[]>([]);
+    const [loadingMapa, setLoadingMapa] = useState(false);
+
+    // Cargar viajes activos para el mapa
+    const loadViajesActivos = useCallback(async () => {
+        if (activeTab !== 'mapa') return;
+
+        setLoadingMapa(true);
+        try {
+            const response = await manifiestoService.getManifiestos({
+                estado: 'EN_TRANSITO',
+                limit: 50
+            });
+
+            const manifiestos = response.manifiestos || [];
+
+            const viajesPromises = manifiestos.map(async (m: any) => {
+                try {
+                    const viaje = await viajesService.getViajeEnCurso(m.id);
+                    return {
+                        id: m.id,
+                        manifiestoNumero: m.numero,
+                        transportista: m.transportista?.razonSocial || 'Transportista',
+                        generador: m.generador?.razonSocial || 'Generador',
+                        operador: m.operador?.razonSocial || 'Operador',
+                        lat: viaje?.ultimaUbicacion?.lat || (m.generador?.latitud || -32.8908) + (Math.random() - 0.5) * 0.05,
+                        lng: viaje?.ultimaUbicacion?.lng || (m.generador?.longitud || -68.8272) + (Math.random() - 0.5) * 0.05,
+                        origenLat: m.generador?.latitud || null,
+                        origenLng: m.generador?.longitud || null,
+                        destinoLat: m.operador?.latitud || null,
+                        destinoLng: m.operador?.longitud || null,
+                        tiempoEnRuta: viaje
+                            ? `${Math.floor(viaje.elapsedSeconds / 3600)}h ${Math.floor((viaje.elapsedSeconds % 3600) / 60)}m`
+                            : '--',
+                        estado: viaje?.estado || 'EN_CURSO'
+                    };
+                } catch {
+                    return null;
+                }
+            });
+
+            const viajes = (await Promise.all(viajesPromises)).filter(Boolean) as ViajeEnMapa[];
+            setViajesEnMapa(viajes);
+        } catch (err) {
+            console.error('[AdminDashboard] Error cargando viajes:', err);
+        } finally {
+            setLoadingMapa(false);
+        }
+    }, [activeTab]);
+
+    // Cargar viajes cuando se activa la tab mapa
+    useEffect(() => {
+        if (activeTab === 'mapa') {
+            loadViajesActivos();
+            const interval = setInterval(loadViajesActivos, 15000); // Actualizar cada 15s
+            return () => clearInterval(interval);
+        }
+    }, [activeTab, loadViajesActivos]);
 
     // Estadisticas SINCRONIZADAS con WEB (Dashboard.tsx)
     // Usa backendStats cuando está disponible (desde /api/manifiestos/dashboard)
@@ -111,6 +230,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 >
                     <FileText size={16} />
                     <span>Todos</span>
+                </button>
+                <button
+                    className={`admin-tab ${activeTab === 'mapa' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('mapa')}
+                >
+                    <Navigation size={16} />
+                    <span>Mapa</span>
+                    {stats.enTransito > 0 && (
+                        <span className="tab-live-badge">
+                            <Radio size={10} />
+                        </span>
+                    )}
                 </button>
             </div>
 
@@ -316,6 +447,118 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 </div>
                             ))}
                         </div>
+                    </div>
+                )}
+
+                {activeTab === 'mapa' && (
+                    <div className="admin-mapa">
+                        <div className="section-header">
+                            <h3>
+                                <Navigation size={16} />
+                                Tracking en Vivo
+                            </h3>
+                            <span className="count-badge live">
+                                <Radio size={10} className="live-pulse" />
+                                {viajesEnMapa.length} vehículos
+                            </span>
+                        </div>
+
+                        {loadingMapa && viajesEnMapa.length === 0 ? (
+                            <div className="mapa-loading">
+                                <div className="spinner" />
+                                <span>Cargando viajes...</span>
+                            </div>
+                        ) : viajesEnMapa.length === 0 ? (
+                            <div className="empty-state">
+                                <Truck size={48} />
+                                <h3>Sin viajes activos</h3>
+                                <p>No hay vehículos en ruta en este momento</p>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="mapa-container">
+                                    <MapContainer
+                                        center={[-32.8908, -68.8272]}
+                                        zoom={11}
+                                        className="admin-map"
+                                        zoomControl={true}
+                                        style={{ height: '300px', width: '100%', borderRadius: '10px' }}
+                                    >
+                                        <TileLayer
+                                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                            attribution='&copy; OSM'
+                                        />
+                                        {viajesEnMapa.map(viaje => (
+                                            <React.Fragment key={viaje.id}>
+                                                {/* Línea origen → transporte */}
+                                                {viaje.origenLat && viaje.origenLng && (
+                                                    <Polyline
+                                                        positions={[[viaje.origenLat, viaje.origenLng], [viaje.lat, viaje.lng]]}
+                                                        pathOptions={{ color: '#059669', weight: 2, opacity: 0.6, dashArray: '5, 5' }}
+                                                    />
+                                                )}
+                                                {/* Línea transporte → destino */}
+                                                {viaje.destinoLat && viaje.destinoLng && (
+                                                    <Polyline
+                                                        positions={[[viaje.lat, viaje.lng], [viaje.destinoLat, viaje.destinoLng]]}
+                                                        pathOptions={{ color: '#dc2626', weight: 2, opacity: 0.4, dashArray: '5, 5' }}
+                                                    />
+                                                )}
+                                                {/* Marker origen */}
+                                                {viaje.origenLat && viaje.origenLng && (
+                                                    <Marker position={[viaje.origenLat, viaje.origenLng]} icon={generadorIcon}>
+                                                        <Popup>
+                                                            <div style={{ color: '#059669', fontWeight: 600 }}>ORIGEN</div>
+                                                            <div>{viaje.generador}</div>
+                                                        </Popup>
+                                                    </Marker>
+                                                )}
+                                                {/* Marker destino */}
+                                                {viaje.destinoLat && viaje.destinoLng && (
+                                                    <Marker position={[viaje.destinoLat, viaje.destinoLng]} icon={operadorIcon}>
+                                                        <Popup>
+                                                            <div style={{ color: '#dc2626', fontWeight: 600 }}>DESTINO</div>
+                                                            <div>{viaje.operador}</div>
+                                                        </Popup>
+                                                    </Marker>
+                                                )}
+                                                {/* Marker transporte */}
+                                                <Marker position={[viaje.lat, viaje.lng]} icon={truckIcon}>
+                                                    <Popup>
+                                                        <div style={{ fontWeight: 700, color: '#10b981', marginBottom: 4 }}>
+                                                            {viaje.manifiestoNumero}
+                                                        </div>
+                                                        <div style={{ fontSize: 12 }}>{viaje.transportista}</div>
+                                                        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
+                                                            ⏱️ {viaje.tiempoEnRuta}
+                                                        </div>
+                                                    </Popup>
+                                                </Marker>
+                                            </React.Fragment>
+                                        ))}
+                                    </MapContainer>
+                                </div>
+
+                                {/* Lista de viajes activos */}
+                                <div className="viajes-lista">
+                                    <h4>Viajes Activos</h4>
+                                    {viajesEnMapa.map(viaje => (
+                                        <div key={viaje.id} className="viaje-card">
+                                            <div className="viaje-header">
+                                                <Truck size={16} />
+                                                <span className="viaje-numero">{viaje.manifiestoNumero}</span>
+                                                <span className="viaje-tiempo">{viaje.tiempoEnRuta}</span>
+                                            </div>
+                                            <div className="viaje-ruta">
+                                                <span className="origen">{viaje.generador}</span>
+                                                <ChevronRight size={14} />
+                                                <span className="destino">{viaje.operador}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
+                        )}
                     </div>
                 )}
             </div>
@@ -771,6 +1014,179 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     overflow: hidden;
                     text-overflow: ellipsis;
                     line-height: 1.2;
+                }
+
+                /* Tab Live Badge */
+                .tab-live-badge {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 16px;
+                    height: 16px;
+                    background: rgba(16, 185, 129, 0.2);
+                    border-radius: 50%;
+                    animation: pulse 2s infinite;
+                }
+
+                .tab-live-badge svg {
+                    color: #10b981;
+                }
+
+                @keyframes pulse {
+                    0%, 100% { opacity: 1; transform: scale(1); }
+                    50% { opacity: 0.6; transform: scale(0.9); }
+                }
+
+                /* Mapa Tab Styles */
+                .admin-mapa {
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--space-3, 12px);
+                }
+
+                .admin-mapa .section-header h3 {
+                    display: flex;
+                    align-items: center;
+                    gap: var(--space-2, 8px);
+                }
+
+                .count-badge.live {
+                    display: flex;
+                    align-items: center;
+                    gap: var(--space-1, 4px);
+                    background: rgba(16, 185, 129, 0.15);
+                    border-color: rgba(16, 185, 129, 0.3);
+                    color: #10b981;
+                }
+
+                .live-pulse {
+                    animation: pulse 1.5s infinite;
+                }
+
+                .mapa-loading {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    padding: var(--space-10, 40px);
+                    gap: var(--space-3, 12px);
+                    color: var(--color-text-muted);
+                }
+
+                .spinner {
+                    width: 32px;
+                    height: 32px;
+                    border: 3px solid rgba(16, 185, 129, 0.2);
+                    border-top-color: #10b981;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                }
+
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+
+                .mapa-container {
+                    border-radius: var(--radius-md, 10px);
+                    overflow: hidden;
+                    border: 1px solid var(--color-border-default);
+                }
+
+                .admin-map {
+                    background: var(--color-bg-surface);
+                }
+
+                .viajes-lista {
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--space-2, 8px);
+                }
+
+                .viajes-lista h4 {
+                    font-size: var(--text-xs, 0.75rem);
+                    color: var(--color-text-muted);
+                    margin: 0;
+                    text-transform: uppercase;
+                    letter-spacing: 0.08em;
+                }
+
+                .viaje-card {
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--space-1, 4px);
+                    padding: var(--space-3, 12px);
+                    background: var(--color-bg-surface);
+                    border: 1px solid var(--color-border-default);
+                    border-radius: var(--radius-md, 10px);
+                    border-left: 3px solid #10b981;
+                }
+
+                .viaje-header {
+                    display: flex;
+                    align-items: center;
+                    gap: var(--space-2, 8px);
+                }
+
+                .viaje-header svg {
+                    color: #10b981;
+                }
+
+                .viaje-numero {
+                    font-family: var(--font-mono);
+                    font-weight: var(--font-bold);
+                    color: var(--color-text-bright);
+                    font-size: var(--text-sm, 0.875rem);
+                }
+
+                .viaje-tiempo {
+                    margin-left: auto;
+                    font-size: var(--text-xs, 0.75rem);
+                    color: var(--color-text-muted);
+                    font-family: var(--font-mono);
+                }
+
+                .viaje-ruta {
+                    display: flex;
+                    align-items: center;
+                    gap: var(--space-1, 4px);
+                    font-size: var(--text-xs, 0.75rem);
+                    color: var(--color-text-secondary);
+                    overflow: hidden;
+                }
+
+                .viaje-ruta .origen {
+                    color: #059669;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    flex: 1;
+                }
+
+                .viaje-ruta svg {
+                    flex-shrink: 0;
+                    color: var(--color-text-muted);
+                }
+
+                .viaje-ruta .destino {
+                    color: #dc2626;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    flex: 1;
+                    text-align: right;
+                }
+
+                /* Leaflet popup customization for mobile */
+                .admin-map .leaflet-popup-content-wrapper {
+                    background: rgba(15, 23, 42, 0.95);
+                    color: #f8fafc;
+                    border-radius: 8px;
+                    border: 1px solid rgba(16, 185, 129, 0.3);
+                    font-size: 12px;
+                }
+
+                .admin-map .leaflet-popup-tip {
+                    background: rgba(15, 23, 42, 0.95);
                 }
             `}</style>
         </div>

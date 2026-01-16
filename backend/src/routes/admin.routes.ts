@@ -22,7 +22,9 @@ import {
     aprobarUsuario,
     rechazarUsuario,
     getActividadGlobal,
-    getEstadisticasAdmin
+    getEstadisticasAdmin,
+    getEstadisticasDepartamento,
+    getEstadisticasHistoricas
 } from '../controllers/admin.controller';
 
 const router = Router();
@@ -43,5 +45,7 @@ router.get('/actividad', getActividadGlobal);
 
 // Estadísticas
 router.get('/estadisticas', getEstadisticasAdmin);
+router.get('/estadisticas-departamento', getEstadisticasDepartamento);
+router.get('/estadisticas-historicas', getEstadisticasHistoricas);
 
 export default router;

@@ -10,7 +10,11 @@
     "test": "jest",
     "db:migrate": "npx prisma migrate dev",
     "db:generate": "npx prisma generate",
-    "db:seed": "ts-node prisma/seed.ts"
+    "db:seed": "ts-node prisma/seed.ts",
+    "demo:seed": "ts-node prisma/seed-concurrent-demo.ts",
+    "demo:simulate": "ts-node scripts/simulate-concurrent-trips.ts",
+    "demo:concurrent": "npm run demo:seed && npm run demo:simulate",
+    "demo:historical": "ts-node prisma/seed-historical-data.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.6.0",

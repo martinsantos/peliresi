@@ -64,6 +64,8 @@ model Generador {
   razonSocial       String
   cuit              String      @unique
   domicilio         String
+  latitud           Float?      // Coordenada GPS para mapa
+  longitud          Float?      // Coordenada GPS para mapa
   telefono          String
   email             String
   numeroInscripcion String
@@ -107,6 +109,8 @@ model Operador {
   razonSocial         String
   cuit                String    @unique
   domicilio           String
+  latitud             Float?    // Coordenada GPS para mapa
+  longitud            Float?    // Coordenada GPS para mapa
   telefono            String
   email               String
   numeroHabilitacion  String

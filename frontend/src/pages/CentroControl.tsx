@@ -13,7 +13,7 @@ import {
     ChevronRight, Package, Radio,
     Factory, Building2, BarChart3,
     Wifi, WifiOff, ArrowRightLeft, Navigation,
-    Trophy, TrendingUp, Recycle
+    Trophy, TrendingUp, Recycle, Phone, Gauge, User, Pause
 } from 'lucide-react';
 import {
     AreaChart,
@@ -29,12 +29,15 @@ import {
     Legend
 } from 'recharts';
 import type { ChartDataPoint } from '../components/ui';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { usuarioService } from '../services/admin.service';
 import type { Actividad } from '../services/admin.service';
 import { alertaService } from '../services/alerta.service';
+import { manifiestoService } from '../services/manifiesto.service';
+import { viajesService } from '../services/viajes.service';
+import { useWebSocket, WS_EVENTS } from '../hooks/useWebSocket';
 import './CentroControl.css';
 
 // Componente para invalidar el tamaño del mapa cuando cambia el contenedor
@@ -48,7 +51,7 @@ const MapResizer: React.FC = () => {
     return null;
 };
 
-// Icono de camión para el mapa
+// Icono de camión para el mapa - EN CURSO (verde)
 const truckIcon = new L.Icon({
     iconUrl: 'data:image/svg+xml;base64,' + btoa(`
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="#10b981">
@@ -61,6 +64,82 @@ const truckIcon = new L.Icon({
     popupAnchor: [0, -16]
 });
 
+// Icono de camión PAUSADO (amarillo)
+const truckPausedIcon = new L.Icon({
+    iconUrl: 'data:image/svg+xml;base64,' + btoa(`
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+            <circle cx="16" cy="16" r="14" fill="#f59e0b" stroke="#fff" stroke-width="2"/>
+            <rect x="11" y="10" width="4" height="12" fill="#fff"/>
+            <rect x="17" y="10" width="4" height="12" fill="#fff"/>
+        </svg>
+    `),
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -16]
+});
+
+// Icono de camión INCIDENTE (rojo)
+const truckIncidentIcon = new L.Icon({
+    iconUrl: 'data:image/svg+xml;base64,' + btoa(`
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+            <circle cx="16" cy="16" r="14" fill="#ef4444" stroke="#fff" stroke-width="2"/>
+            <text x="16" y="22" text-anchor="middle" fill="#fff" font-size="18" font-weight="bold">!</text>
+        </svg>
+    `),
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -16]
+});
+
+// Icono de GENERADOR (origen) - Fábrica verde
+const generadorIcon = new L.Icon({
+    iconUrl: 'data:image/svg+xml;base64,' + btoa(`
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28">
+            <rect x="2" y="8" width="24" height="18" rx="2" fill="#059669" stroke="#fff" stroke-width="1.5"/>
+            <rect x="5" y="2" width="6" height="10" fill="#059669" stroke="#fff" stroke-width="1"/>
+            <rect x="17" y="4" width="4" height="8" fill="#059669" stroke="#fff" stroke-width="1"/>
+            <rect x="6" y="14" width="4" height="4" fill="#fff"/>
+            <rect x="12" y="14" width="4" height="4" fill="#fff"/>
+            <rect x="18" y="14" width="4" height="4" fill="#fff"/>
+            <rect x="10" y="20" width="8" height="6" fill="#fff"/>
+        </svg>
+    `),
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -14]
+});
+
+// Icono de OPERADOR (destino) - Edificio rojo
+const operadorIcon = new L.Icon({
+    iconUrl: 'data:image/svg+xml;base64,' + btoa(`
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28">
+            <rect x="4" y="4" width="20" height="22" rx="2" fill="#dc2626" stroke="#fff" stroke-width="1.5"/>
+            <rect x="7" y="7" width="4" height="4" fill="#fff"/>
+            <rect x="12" y="7" width="4" height="4" fill="#fff"/>
+            <rect x="17" y="7" width="4" height="4" fill="#fff"/>
+            <rect x="7" y="13" width="4" height="4" fill="#fff"/>
+            <rect x="12" y="13" width="4" height="4" fill="#fff"/>
+            <rect x="17" y="13" width="4" height="4" fill="#fff"/>
+            <rect x="11" y="19" width="6" height="7" fill="#fff"/>
+        </svg>
+    `),
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -14]
+});
+
+// Interfaz para viajes activos en tiempo real
+interface ViajeActivo {
+    id: string;
+    manifiestoId: string;
+    manifiestoNumero: string;
+    transportistaRazonSocial: string;
+    estado: 'EN_CURSO' | 'PAUSADO' | 'INCIDENTE';
+    elapsedSeconds: number;
+    ultimaUbicacion: { lat: number; lng: number } | null;
+    isPaused: boolean;
+}
+
 interface ManifiestoEnTransito {
     id: string;
     numero: string;
@@ -70,6 +149,20 @@ interface ManifiestoEnTransito {
     operador: string;
     estado: string;
     tiempoEnRuta?: string;
+    // Coordenadas de origen (Generador) y destino (Operador)
+    origenLat?: number;
+    origenLng?: number;
+    destinoLat?: number;
+    destinoLng?: number;
+    // Info adicional para popups expandidos
+    generadorDomicilio?: string;
+    generadorTelefono?: string;
+    operadorDomicilio?: string;
+    operadorTelefono?: string;
+    transportista?: string;
+    vehiculoPatente?: string;
+    chofer?: string;
+    velocidad?: number;
 }
 
 interface SystemStats {
@@ -92,7 +185,7 @@ interface SystemStats {
     eventosHoy: number;
 }
 
-// Datos de departamentos de Mendoza con ranking simulado
+// Interfaz para departamentos de Mendoza con estadísticas reales
 interface DepartamentoStats {
     nombre: string;
     codigo: string;
@@ -101,26 +194,54 @@ interface DepartamentoStats {
     color: string;
 }
 
-const DEPARTAMENTOS_MENDOZA: DepartamentoStats[] = [
-    { nombre: 'Godoy Cruz', codigo: 'GC', tratados: 487, enProceso: 23, color: '#10b981' },
-    { nombre: 'Ciudad', codigo: 'CD', tratados: 423, enProceso: 31, color: '#3b82f6' },
-    { nombre: 'Guaymallén', codigo: 'GY', tratados: 356, enProceso: 18, color: '#8b5cf6' },
-    { nombre: 'Las Heras', codigo: 'LH', tratados: 312, enProceso: 15, color: '#f59e0b' },
-    { nombre: 'Maipú', codigo: 'MP', tratados: 287, enProceso: 12, color: '#ef4444' },
-    { nombre: 'Luján de Cuyo', codigo: 'LJ', tratados: 245, enProceso: 9, color: '#06b6d4' },
-    { nombre: 'San Martín', codigo: 'SM', tratados: 198, enProceso: 14, color: '#84cc16' },
-    { nombre: 'San Rafael', codigo: 'SR', tratados: 176, enProceso: 8, color: '#f97316' },
-    { nombre: 'Rivadavia', codigo: 'RV', tratados: 134, enProceso: 6, color: '#ec4899' },
-    { nombre: 'Tunuyán', codigo: 'TN', tratados: 112, enProceso: 5, color: '#14b8a6' },
-    { nombre: 'Tupungato', codigo: 'TP', tratados: 98, enProceso: 4, color: '#a855f7' },
-    { nombre: 'General Alvear', codigo: 'GA', tratados: 87, enProceso: 3, color: '#22c55e' },
-    { nombre: 'San Carlos', codigo: 'SC', tratados: 76, enProceso: 3, color: '#0ea5e9' },
-    { nombre: 'Lavalle', codigo: 'LV', tratados: 65, enProceso: 2, color: '#eab308' },
-    { nombre: 'Malargüe', codigo: 'MG', tratados: 54, enProceso: 2, color: '#f43f5e' },
-    { nombre: 'Santa Rosa', codigo: 'SRo', tratados: 43, enProceso: 1, color: '#6366f1' },
-    { nombre: 'La Paz', codigo: 'LP', tratados: 32, enProceso: 1, color: '#d946ef' },
-    { nombre: 'Junín', codigo: 'JN', tratados: 28, enProceso: 1, color: '#78716c' },
-];
+// Colores para departamentos
+const DEPT_COLORS: Record<string, string> = {
+    'Capital': '#3b82f6',
+    'Ciudad': '#3b82f6',
+    'Godoy Cruz': '#10b981',
+    'Guaymallén': '#8b5cf6',
+    'Las Heras': '#f59e0b',
+    'Maipú': '#ef4444',
+    'Luján de Cuyo': '#06b6d4',
+    'San Martín': '#84cc16',
+    'San Rafael': '#f97316',
+    'Rivadavia': '#ec4899',
+    'Tunuyán': '#14b8a6',
+    'Tupungato': '#a855f7',
+    'General Alvear': '#22c55e',
+    'San Carlos': '#0ea5e9',
+    'Lavalle': '#eab308',
+    'Malargüe': '#f43f5e',
+    'Santa Rosa': '#6366f1',
+    'La Paz': '#d946ef',
+    'Junín': '#78716c',
+};
+
+// Códigos abreviados para departamentos
+const DEPT_CODES: Record<string, string> = {
+    'Capital': 'CD',
+    'Ciudad': 'CD',
+    'Godoy Cruz': 'GC',
+    'Guaymallén': 'GY',
+    'Las Heras': 'LH',
+    'Maipú': 'MP',
+    'Luján de Cuyo': 'LJ',
+    'San Martín': 'SM',
+    'San Rafael': 'SR',
+    'Rivadavia': 'RV',
+    'Tunuyán': 'TN',
+    'Tupungato': 'TP',
+    'General Alvear': 'GA',
+    'San Carlos': 'SC',
+    'Lavalle': 'LV',
+    'Malargüe': 'MG',
+    'Santa Rosa': 'SRo',
+    'La Paz': 'LP',
+    'Junín': 'JN',
+};
+
+// Tipo de filtro de tiempo
+type FiltroTiempo = 'hoy' | 'semana' | 'mes' | 'trimestre';
 
 // Mapa esquemático de Mendoza SVG
 const MendozaMapSVG: React.FC<{ departamentos: DepartamentoStats[], selectedDept: string | null, onSelect: (codigo: string) => void }> = ({ departamentos, selectedDept, onSelect }) => {
@@ -334,19 +455,61 @@ const LiveClock: React.FC = () => {
     );
 };
 
+// Timer para viajes activos
+const ViajeTimer: React.FC<{ initialSeconds: number; isPaused: boolean }> = ({ initialSeconds, isPaused }) => {
+    const [seconds, setSeconds] = useState(initialSeconds);
+
+    useEffect(() => {
+        if (isPaused) return;
+
+        const interval = setInterval(() => {
+            setSeconds(s => s + 1);
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [isPaused]);
+
+    // Sync con servidor cuando cambia initialSeconds
+    useEffect(() => {
+        setSeconds(initialSeconds);
+    }, [initialSeconds]);
+
+    const formatTime = (secs: number) => {
+        const h = Math.floor(secs / 3600);
+        const m = Math.floor((secs % 3600) / 60);
+        const s = secs % 60;
+        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    };
+
+    return <span className="viaje-timer-value">{formatTime(seconds)}</span>;
+};
+
 const CentroControl: React.FC = () => {
     const [stats, setStats] = useState<SystemStats | null>(null);
     const [actividades, setActividades] = useState<Actividad[]>([]);
     const [enTransito, setEnTransito] = useState<ManifiestoEnTransito[]>([]);
+    const [viajesActivos, setViajesActivos] = useState<ViajeActivo[]>([]);
     const [loading, setLoading] = useState(true);
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
     const [selectedDept, setSelectedDept] = useState<string | null>(null);
     const activityRef = useRef<HTMLDivElement>(null);
 
-    // Total de residuos tratados
-    const totalTratados = DEPARTAMENTOS_MENDOZA.reduce((sum, d) => sum + d.tratados, 0);
-    const maxTratados = Math.max(...DEPARTAMENTOS_MENDOZA.map(d => d.tratados));
+    // Estado para departamentos (datos reales de API)
+    const [departamentos, setDepartamentos] = useState<DepartamentoStats[]>([]);
+
+    // Estado para filtro de tiempo
+    const [filtroTiempo, setFiltroTiempo] = useState<FiltroTiempo>('mes');
+
+    // Estado para tendencia real (viene del API)
+    const [tendencia, setTendencia] = useState<{ manifiestos: number; residuos: number }>({ manifiestos: 0, residuos: 0 });
+
+    // WebSocket para actualizaciones en tiempo real
+    const { on, subscribeToManifiesto } = useWebSocket();
+
+    // Total de residuos tratados (calculado de datos reales)
+    const totalTratados = departamentos.reduce((sum, d) => sum + d.tratados, 0);
+    const maxTratados = Math.max(...departamentos.map(d => d.tratados), 1);
 
     // Simular manifiestos en tránsito con ubicaciones de Mendoza
     const simulateEnTransito = useCallback(() => {
@@ -370,14 +533,121 @@ const CentroControl: React.FC = () => {
         }));
     }, []);
 
+    // Cargar viajes activos desde el backend
+    const loadViajesActivos = useCallback(async () => {
+        try {
+            // Obtener manifiestos EN_TRANSITO
+            const response = await manifiestoService.getManifiestos({
+                estado: 'EN_TRANSITO',
+                limit: 20
+            });
+            const manifiestos = response.manifiestos || [];
+
+            // Para cada manifiesto, obtener estado del viaje
+            const viajesPromises = manifiestos.map(async (m: any) => {
+                try {
+                    const viaje = await viajesService.getViajeEnCurso(m.id);
+                    if (viaje) {
+                        return {
+                            id: viaje.id,
+                            manifiestoId: m.id,
+                            manifiestoNumero: m.numero,
+                            transportistaRazonSocial: m.transportista?.razonSocial || 'Transportista',
+                            estado: viaje.estado as 'EN_CURSO' | 'PAUSADO' | 'INCIDENTE',
+                            elapsedSeconds: viaje.elapsedSeconds,
+                            ultimaUbicacion: viaje.ultimaUbicacion,
+                            isPaused: viaje.isPaused
+                        };
+                    }
+                } catch (err) {
+                    console.warn(`Error cargando viaje para manifiesto ${m.id}:`, err);
+                }
+                return null;
+            });
+
+            const viajes = (await Promise.all(viajesPromises)).filter(Boolean) as ViajeActivo[];
+            setViajesActivos(viajes);
+
+            // También actualizar enTransito con ubicaciones reales + origen/destino + info completa
+            const enTransitoConUbicaciones = manifiestos.map((m: any, i: number) => {
+                const viaje = viajes.find(v => v.manifiestoId === m.id);
+                return {
+                    id: m.id,
+                    numero: m.numero,
+                    lat: viaje?.ultimaUbicacion?.lat || (-32.8908 + (Math.random() - 0.5) * 0.1),
+                    lng: viaje?.ultimaUbicacion?.lng || (-68.8272 + (Math.random() - 0.5) * 0.1),
+                    generador: m.generador?.razonSocial || 'Generador',
+                    operador: m.operador?.razonSocial || 'Operador',
+                    estado: viaje?.estado || 'EN_TRANSITO',
+                    tiempoEnRuta: viaje ? `${Math.floor(viaje.elapsedSeconds / 3600)}h ${Math.floor((viaje.elapsedSeconds % 3600) / 60)}m` : `${i + 1}h`,
+                    // Coordenadas de origen (Generador) y destino (Operador)
+                    origenLat: m.generador?.latitud || undefined,
+                    origenLng: m.generador?.longitud || undefined,
+                    destinoLat: m.operador?.latitud || undefined,
+                    destinoLng: m.operador?.longitud || undefined,
+                    // Info adicional para popups expandidos
+                    generadorDomicilio: m.generador?.domicilio || undefined,
+                    generadorTelefono: m.generador?.telefono || undefined,
+                    operadorDomicilio: m.operador?.domicilio || undefined,
+                    operadorTelefono: m.operador?.telefono || undefined,
+                    transportista: m.transportista?.razonSocial || undefined,
+                    vehiculoPatente: m.vehiculo?.patente || undefined,
+                    chofer: m.chofer ? `${m.chofer.nombre} ${m.chofer.apellido || ''}`.trim() : undefined,
+                    velocidad: Math.floor(30 + Math.random() * 40),
+                };
+            });
+            setEnTransito(enTransitoConUbicaciones);
+
+            console.log('[CentroControl] Viajes activos cargados:', viajes.length);
+        } catch (err) {
+            console.error('Error cargando viajes activos:', err);
+            // Fallback a simulación si hay error
+            setEnTransito(simulateEnTransito());
+        }
+    }, [simulateEnTransito]);
+
+    // Calcular fechas según filtro de tiempo
+    const calcularFechasFiltro = useCallback(() => {
+        const hasta = new Date();
+        const desde = new Date();
+
+        switch (filtroTiempo) {
+            case 'hoy':
+                desde.setHours(0, 0, 0, 0);
+                break;
+            case 'semana':
+                desde.setDate(desde.getDate() - 7);
+                break;
+            case 'mes':
+                desde.setMonth(desde.getMonth() - 1);
+                break;
+            case 'trimestre':
+                desde.setMonth(desde.getMonth() - 3);
+                break;
+        }
+
+        return {
+            desde: desde.toISOString().split('T')[0],
+            hasta: hasta.toISOString().split('T')[0]
+        };
+    }, [filtroTiempo]);
+
     const loadData = useCallback(async () => {
         try {
-            const [statsData, actividadData, advertenciasData, tiemposData, vencimientosData] = await Promise.all([
+            const fechas = calcularFechasFiltro();
+
+            const [statsData, actividadData, advertenciasData, tiemposData, vencimientosData, deptData, histData] = await Promise.all([
                 usuarioService.getEstadisticas(),
                 usuarioService.getActividad({ limit: 30 }),
                 alertaService.getAdvertenciasActivas(),
                 alertaService.evaluarTiemposExcesivos(),
-                alertaService.evaluarVencimientos()
+                alertaService.evaluarVencimientos(),
+                usuarioService.getEstadisticasDepartamento(),
+                usuarioService.getEstadisticasHistoricas({
+                    desde: fechas.desde,
+                    hasta: fechas.hasta,
+                    agrupacion: filtroTiempo === 'hoy' ? 'dia' : filtroTiempo === 'semana' ? 'dia' : 'semana'
+                })
             ]);
 
             const todasLasAlertas = [...advertenciasData, ...tiemposData, ...vencimientosData];
@@ -399,20 +669,113 @@ const CentroControl: React.FC = () => {
 
             setStats(combinedStats);
             setActividades(actividadData.actividades);
-            setEnTransito(simulateEnTransito());
+
+            // Cargar departamentos con datos reales
+            if (deptData.departamentos && deptData.departamentos.length > 0) {
+                const deptStats: DepartamentoStats[] = deptData.departamentos
+                    .map((d: any) => ({
+                        nombre: d.nombre,
+                        codigo: DEPT_CODES[d.nombre] || d.nombre.substring(0, 2).toUpperCase(),
+                        tratados: Math.round(d.residuosTratados || 0),
+                        enProceso: d.enProceso || 0,
+                        color: DEPT_COLORS[d.nombre] || '#6366f1'
+                    }))
+                    .sort((a: DepartamentoStats, b: DepartamentoStats) => b.tratados - a.tratados);
+                setDepartamentos(deptStats);
+            }
+
+            // Cargar tendencia real
+            if (histData.tendencia) {
+                setTendencia(histData.tendencia);
+            }
+
+            // Cargar viajes activos reales
+            await loadViajesActivos();
+
             setLastUpdate(new Date());
         } catch (err) {
             console.error('Error loading control center data:', err);
         } finally {
             setLoading(false);
         }
-    }, [simulateEnTransito]);
+    }, [loadViajesActivos, calcularFechasFiltro, filtroTiempo]);
 
     useEffect(() => {
         loadData();
         const interval = setInterval(loadData, 30000);
         return () => clearInterval(interval);
     }, [loadData]);
+
+    // WebSocket: Suscribirse a manifiestos en tránsito para actualizaciones en tiempo real
+    useEffect(() => {
+        if (enTransito.length === 0) return;
+
+        // Suscribirse a cada manifiesto en tránsito
+        enTransito.forEach(m => subscribeToManifiesto(m.id));
+
+        // Escuchar eventos de pausa
+        const unsubPausado = on(WS_EVENTS.VIAJE_PAUSADO, (data: any) => {
+            console.log('[CentroControl] WebSocket: VIAJE_PAUSADO', data);
+            setViajesActivos(prev => prev.map(v =>
+                v.manifiestoId === data.manifiestoId
+                    ? { ...v, isPaused: true, estado: 'PAUSADO' as const }
+                    : v
+            ));
+            setEnTransito(prev => prev.map(m =>
+                m.id === data.manifiestoId
+                    ? { ...m, estado: 'PAUSADO' }
+                    : m
+            ));
+        });
+
+        // Escuchar eventos de reanudación
+        const unsubReanudado = on(WS_EVENTS.VIAJE_REANUDADO, (data: any) => {
+            console.log('[CentroControl] WebSocket: VIAJE_REANUDADO', data);
+            setViajesActivos(prev => prev.map(v =>
+                v.manifiestoId === data.manifiestoId
+                    ? { ...v, isPaused: false, estado: 'EN_CURSO' as const }
+                    : v
+            ));
+            setEnTransito(prev => prev.map(m =>
+                m.id === data.manifiestoId
+                    ? { ...m, estado: 'EN_TRANSITO' }
+                    : m
+            ));
+        });
+
+        // Escuchar eventos de incidente
+        const unsubIncidente = on(WS_EVENTS.VIAJE_INCIDENTE, (data: any) => {
+            console.log('[CentroControl] WebSocket: VIAJE_INCIDENTE', data);
+            setViajesActivos(prev => prev.map(v =>
+                v.manifiestoId === data.manifiestoId
+                    ? { ...v, estado: 'INCIDENTE' as const }
+                    : v
+            ));
+            setEnTransito(prev => prev.map(m =>
+                m.id === data.manifiestoId
+                    ? { ...m, estado: 'INCIDENTE' }
+                    : m
+            ));
+        });
+
+        // Escuchar actualizaciones GPS
+        const unsubGps = on(WS_EVENTS.GPS_UPDATE, (data: any) => {
+            if (data.lat && data.lng) {
+                setEnTransito(prev => prev.map(m =>
+                    m.id === data.manifiestoId
+                        ? { ...m, lat: data.lat, lng: data.lng }
+                        : m
+                ));
+            }
+        });
+
+        return () => {
+            unsubPausado();
+            unsubReanudado();
+            unsubIncidente();
+            unsubGps();
+        };
+    }, [enTransito.length, on, subscribeToManifiesto]);
 
     // Online status
     useEffect(() => {
@@ -512,9 +875,9 @@ const CentroControl: React.FC = () => {
                                 {stats.manifiestos.total.toLocaleString('es-AR')}
                             </div>
                             <span className="kpi-label">MANIFIESTOS</span>
-                            <div className="kpi-trend">
-                                <TrendingUp size={14} />
-                                <span>+{Math.floor(Math.random() * 15) + 5} esta semana</span>
+                            <div className="kpi-trend" style={{ color: tendencia.manifiestos >= 0 ? '#10b981' : '#ef4444' }}>
+                                <TrendingUp size={14} style={{ transform: tendencia.manifiestos < 0 ? 'rotate(180deg)' : 'none' }} />
+                                <span>{tendencia.manifiestos >= 0 ? '+' : ''}{tendencia.manifiestos.toFixed(1)}% vs período anterior</span>
                             </div>
                         </div>
                     </motion.div>
@@ -607,26 +970,186 @@ const CentroControl: React.FC = () => {
                                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                             />
                             {enTransito.map(m => (
-                                <Marker key={m.id} position={[m.lat, m.lng]} icon={truckIcon}>
-                                    <Popup className="mega-popup">
-                                        <div className="popup-content">
-                                            <strong>{m.numero}</strong>
-                                            <div className="popup-route">
-                                                <span><Factory size={12} /> {m.generador}</span>
-                                                <ArrowRightLeft size={12} />
-                                                <span><Building2 size={12} /> {m.operador}</span>
+                                <React.Fragment key={m.id}>
+                                    {/* Línea punteada: Origen → Transporte (verde) */}
+                                    {m.origenLat && m.origenLng && (
+                                        <Polyline
+                                            positions={[[m.origenLat, m.origenLng], [m.lat, m.lng]]}
+                                            pathOptions={{
+                                                color: '#059669',
+                                                weight: 2,
+                                                opacity: 0.6,
+                                                dashArray: '8, 8'
+                                            }}
+                                        />
+                                    )}
+                                    {/* Línea punteada: Transporte → Destino (roja) */}
+                                    {m.destinoLat && m.destinoLng && (
+                                        <Polyline
+                                            positions={[[m.lat, m.lng], [m.destinoLat, m.destinoLng]]}
+                                            pathOptions={{
+                                                color: '#dc2626',
+                                                weight: 2,
+                                                opacity: 0.6,
+                                                dashArray: '8, 8'
+                                            }}
+                                        />
+                                    )}
+                                    {/* Marker de ORIGEN (Generador) */}
+                                    {m.origenLat && m.origenLng && (
+                                        <Marker
+                                            position={[m.origenLat, m.origenLng]}
+                                            icon={generadorIcon}
+                                        >
+                                            <Popup className="mega-popup expanded">
+                                                <div className="popup-content origen">
+                                                    <div className="popup-header">
+                                                        <span className="popup-tipo origen-badge">ORIGEN</span>
+                                                        <span className="popup-manifiesto">{m.numero}</span>
+                                                    </div>
+                                                    <div className="popup-title">
+                                                        <Factory size={16} />
+                                                        <strong>{m.generador}</strong>
+                                                    </div>
+                                                    <span className="popup-label">Generador de residuos</span>
+                                                    {m.generadorDomicilio && (
+                                                        <div className="popup-detail">
+                                                            <MapPin size={12} />
+                                                            <span>{m.generadorDomicilio}</span>
+                                                        </div>
+                                                    )}
+                                                    {m.generadorTelefono && (
+                                                        <div className="popup-detail">
+                                                            <Phone size={12} />
+                                                            <span>{m.generadorTelefono}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </Popup>
+                                        </Marker>
+                                    )}
+                                    {/* Marker de DESTINO (Operador) */}
+                                    {m.destinoLat && m.destinoLng && (
+                                        <Marker
+                                            position={[m.destinoLat, m.destinoLng]}
+                                            icon={operadorIcon}
+                                        >
+                                            <Popup className="mega-popup expanded">
+                                                <div className="popup-content destino">
+                                                    <div className="popup-header">
+                                                        <span className="popup-tipo destino-badge">DESTINO</span>
+                                                        <span className="popup-manifiesto">{m.numero}</span>
+                                                    </div>
+                                                    <div className="popup-title">
+                                                        <Building2 size={16} />
+                                                        <strong>{m.operador}</strong>
+                                                    </div>
+                                                    <span className="popup-label">Planta de tratamiento</span>
+                                                    {m.operadorDomicilio && (
+                                                        <div className="popup-detail">
+                                                            <MapPin size={12} />
+                                                            <span>{m.operadorDomicilio}</span>
+                                                        </div>
+                                                    )}
+                                                    {m.operadorTelefono && (
+                                                        <div className="popup-detail">
+                                                            <Phone size={12} />
+                                                            <span>{m.operadorTelefono}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </Popup>
+                                        </Marker>
+                                    )}
+                                    {/* Marker de TRANSPORTE (camión) */}
+                                    <Marker
+                                        position={[m.lat, m.lng]}
+                                        icon={
+                                            m.estado === 'PAUSADO' ? truckPausedIcon :
+                                            m.estado === 'INCIDENTE' ? truckIncidentIcon :
+                                            truckIcon
+                                        }
+                                    >
+                                        <Popup className="mega-popup expanded viaje-popup">
+                                            <div className="popup-content viaje">
+                                                {/* Header con manifiesto y estado */}
+                                                <div className="popup-viaje-header">
+                                                    <span className="popup-viaje-numero">{m.numero}</span>
+                                                    <span className={`popup-viaje-estado ${m.estado.toLowerCase()}`}>
+                                                        {m.estado === 'PAUSADO' && <><Pause size={12} /> PAUSADO</>}
+                                                        {m.estado === 'INCIDENTE' && <><AlertTriangle size={12} /> INCIDENTE</>}
+                                                        {m.estado === 'EN_CURSO' && <><Truck size={12} /> EN RUTA</>}
+                                                        {m.estado === 'EN_TRANSITO' && <><Truck size={12} /> EN RUTA</>}
+                                                    </span>
+                                                </div>
+
+                                                {/* Sección ORIGEN */}
+                                                <div className="popup-viaje-section origen">
+                                                    <div className="section-header">
+                                                        <Factory size={14} />
+                                                        <span className="section-label">ORIGEN</span>
+                                                    </div>
+                                                    <strong>{m.generador}</strong>
+                                                    {m.generadorDomicilio && (
+                                                        <div className="section-detail">
+                                                            <MapPin size={11} /> {m.generadorDomicilio}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Sección TRANSPORTE */}
+                                                <div className="popup-viaje-section transporte">
+                                                    <div className="section-header">
+                                                        <Truck size={14} />
+                                                        <span className="section-label">TRANSPORTE</span>
+                                                    </div>
+                                                    {m.transportista && <strong>{m.transportista}</strong>}
+                                                    <div className="transporte-details">
+                                                        {m.vehiculoPatente && (
+                                                            <span className="detail-badge patente">{m.vehiculoPatente}</span>
+                                                        )}
+                                                        {m.chofer && (
+                                                            <span className="detail-item">
+                                                                <User size={11} /> {m.chofer}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="transporte-stats">
+                                                        <span className="stat">
+                                                            <Clock size={11} /> {m.tiempoEnRuta}
+                                                        </span>
+                                                        <span className="stat">
+                                                            <Gauge size={11} /> {m.velocidad || 0} km/h
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Sección DESTINO */}
+                                                <div className="popup-viaje-section destino">
+                                                    <div className="section-header">
+                                                        <Building2 size={14} />
+                                                        <span className="section-label">DESTINO</span>
+                                                    </div>
+                                                    <strong>{m.operador}</strong>
+                                                    {m.operadorDomicilio && (
+                                                        <div className="section-detail">
+                                                            <MapPin size={11} /> {m.operadorDomicilio}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <div className="popup-time">
-                                                <Clock size={12} /> {m.tiempoEnRuta}
-                                            </div>
-                                        </div>
-                                    </Popup>
-                                </Marker>
+                                        </Popup>
+                                    </Marker>
+                                </React.Fragment>
                             ))}
                         </MapContainer>
                         <div className="map-overlay">
                             <div className="map-legend">
-                                <span><Truck size={14} /> Vehículos en ruta</span>
+                                <span className="legend-item origen"><Factory size={14} /> Origen</span>
+                                <span className="legend-item en-ruta"><Truck size={14} /> En ruta</span>
+                                <span className="legend-item pausado"><Pause size={14} /> Pausado</span>
+                                <span className="legend-item incidente"><AlertTriangle size={14} /> Incidente</span>
+                                <span className="legend-item destino"><Building2 size={14} /> Destino</span>
                             </div>
                         </div>
                     </div>
@@ -695,6 +1218,72 @@ const CentroControl: React.FC = () => {
                     </motion.div>
                 </div>
             </div>
+
+            {/* PANEL DE VIAJES ACTIVOS EN TIEMPO REAL */}
+            {viajesActivos.length > 0 && (
+                <motion.div
+                    className="mega-panel viajes-activos-panel"
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2, duration: 0.4 }}
+                >
+                    <div className="panel-header">
+                        <h3><Truck size={18} /> Viajes en Tiempo Real</h3>
+                        <div className="viajes-count-badges">
+                            <span className="viaje-badge en-curso">
+                                {viajesActivos.filter(v => !v.isPaused && v.estado !== 'INCIDENTE').length} en ruta
+                            </span>
+                            <span className="viaje-badge pausado">
+                                {viajesActivos.filter(v => v.isPaused || v.estado === 'PAUSADO').length} pausados
+                            </span>
+                            {viajesActivos.filter(v => v.estado === 'INCIDENTE').length > 0 && (
+                                <span className="viaje-badge incidente">
+                                    {viajesActivos.filter(v => v.estado === 'INCIDENTE').length} incidentes
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                    <div className="viajes-activos-grid">
+                        {viajesActivos.map(viaje => (
+                            <motion.div
+                                key={viaje.id}
+                                className={`viaje-activo-card ${viaje.isPaused ? 'pausado' : ''} ${viaje.estado === 'INCIDENTE' ? 'incidente' : ''}`}
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                whileHover={{ scale: 1.02 }}
+                            >
+                                <div className="viaje-icon-wrapper">
+                                    {viaje.isPaused ? (
+                                        <Pause size={20} className="icon-pausado" />
+                                    ) : viaje.estado === 'INCIDENTE' ? (
+                                        <AlertTriangle size={20} className="icon-incidente" />
+                                    ) : (
+                                        <>
+                                            <Truck size={20} className="icon-en-ruta" />
+                                            <div className="pulse-indicator" />
+                                        </>
+                                    )}
+                                </div>
+                                <div className="viaje-info">
+                                    <span className="viaje-numero">{viaje.manifiestoNumero}</span>
+                                    <span className="viaje-transportista">{viaje.transportistaRazonSocial}</span>
+                                </div>
+                                <div className="viaje-timer-wrapper">
+                                    <Clock size={14} />
+                                    <ViajeTimer
+                                        initialSeconds={viaje.elapsedSeconds}
+                                        isPaused={viaje.isPaused}
+                                    />
+                                </div>
+                                <span className={`viaje-estado-badge ${viaje.estado.toLowerCase()}`}>
+                                    {viaje.isPaused ? 'PAUSADO' :
+                                     viaje.estado === 'INCIDENTE' ? 'INCIDENTE' : 'EN RUTA'}
+                                </span>
+                            </motion.div>
+                        ))}
+                    </div>
+                </motion.div>
+            )}
 
             {/* Charts Section - Activity & Distribution */}
             {stats && (
@@ -833,23 +1422,35 @@ const CentroControl: React.FC = () => {
             <div className="mega-ranking">
                 <div className="ranking-header">
                     <h3><Trophy size={20} /> Ranking Departamentos Mendoza</h3>
-                    <div className="ranking-total">
-                        <Recycle size={16} />
-                        <span>{totalTratados.toLocaleString()} kg tratados total</span>
+                    <div className="ranking-controls">
+                        <select
+                            className="filtro-tiempo-select"
+                            value={filtroTiempo}
+                            onChange={(e) => setFiltroTiempo(e.target.value as FiltroTiempo)}
+                        >
+                            <option value="hoy">Hoy</option>
+                            <option value="semana">Esta semana</option>
+                            <option value="mes">Este mes</option>
+                            <option value="trimestre">Último trimestre</option>
+                        </select>
+                        <div className="ranking-total">
+                            <Recycle size={16} />
+                            <span>{totalTratados.toLocaleString()} kg tratados total</span>
+                        </div>
                     </div>
                 </div>
                 <div className="ranking-content">
                     {/* Mapa de Mendoza */}
                     <div className="ranking-map">
                         <MendozaMapSVG
-                            departamentos={DEPARTAMENTOS_MENDOZA}
+                            departamentos={departamentos}
                             selectedDept={selectedDept}
                             onSelect={(codigo) => setSelectedDept(selectedDept === codigo ? null : codigo)}
                         />
                         {selectedDept && (
                             <div className="dept-tooltip">
                                 {(() => {
-                                    const dept = DEPARTAMENTOS_MENDOZA.find(d => d.codigo === selectedDept);
+                                    const dept = departamentos.find(d => d.codigo === selectedDept);
                                     if (!dept) return null;
                                     return (
                                         <>
@@ -865,61 +1466,70 @@ const CentroControl: React.FC = () => {
 
                     {/* Lista de ranking */}
                     <div className="ranking-list">
-                        {DEPARTAMENTOS_MENDOZA.slice(0, 10).map((dept, index) => (
-                            <div
-                                key={dept.codigo}
-                                className={`ranking-item ${selectedDept === dept.codigo ? 'selected' : ''} ${index < 3 ? 'top-three' : ''}`}
-                                onClick={() => setSelectedDept(selectedDept === dept.codigo ? null : dept.codigo)}
-                            >
-                                <div className="ranking-position">
-                                    {index === 0 ? <Trophy size={16} className="gold" /> :
-                                     index === 1 ? <Trophy size={16} className="silver" /> :
-                                     index === 2 ? <Trophy size={16} className="bronze" /> :
-                                     <span>{index + 1}</span>}
-                                </div>
-                                <div className="ranking-info">
-                                    <span className="ranking-name">{dept.nombre}</span>
-                                    <div className="ranking-bar-container">
-                                        <div
-                                            className="ranking-bar"
-                                            style={{
-                                                width: `${(dept.tratados / maxTratados) * 100}%`,
-                                                backgroundColor: dept.color
-                                            }}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="ranking-stats">
-                                    <span className="ranking-value">{dept.tratados.toLocaleString()}</span>
-                                    <span className="ranking-unit">kg</span>
-                                </div>
-                                {dept.enProceso > 0 && (
-                                    <div className="ranking-pending">
-                                        <TrendingUp size={12} />
-                                        <span>+{dept.enProceso}</span>
-                                    </div>
-                                )}
+                        {departamentos.length === 0 ? (
+                            <div className="ranking-empty">
+                                <Package size={24} />
+                                <span>Sin datos para el período seleccionado</span>
                             </div>
-                        ))}
+                        ) : (
+                            departamentos.slice(0, 10).map((dept, index) => (
+                                <div
+                                    key={dept.codigo}
+                                    className={`ranking-item ${selectedDept === dept.codigo ? 'selected' : ''} ${index < 3 ? 'top-three' : ''}`}
+                                    onClick={() => setSelectedDept(selectedDept === dept.codigo ? null : dept.codigo)}
+                                >
+                                    <div className="ranking-position">
+                                        {index === 0 ? <Trophy size={16} className="gold" /> :
+                                         index === 1 ? <Trophy size={16} className="silver" /> :
+                                         index === 2 ? <Trophy size={16} className="bronze" /> :
+                                         <span>{index + 1}</span>}
+                                    </div>
+                                    <div className="ranking-info">
+                                        <span className="ranking-name">{dept.nombre}</span>
+                                        <div className="ranking-bar-container">
+                                            <div
+                                                className="ranking-bar"
+                                                style={{
+                                                    width: `${(dept.tratados / maxTratados) * 100}%`,
+                                                    backgroundColor: dept.color
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="ranking-stats">
+                                        <span className="ranking-value">{dept.tratados.toLocaleString()}</span>
+                                        <span className="ranking-unit">kg</span>
+                                    </div>
+                                    {dept.enProceso > 0 && (
+                                        <div className="ranking-pending">
+                                            <TrendingUp size={12} />
+                                            <span>+{dept.enProceso}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            ))
+                        )}
                     </div>
                 </div>
 
                 {/* Mini lista de los restantes */}
-                <div className="ranking-others">
-                    <span className="others-label">Otros departamentos:</span>
-                    <div className="others-list">
-                        {DEPARTAMENTOS_MENDOZA.slice(10).map((dept) => (
-                            <span
-                                key={dept.codigo}
-                                className="other-dept"
-                                style={{ borderColor: dept.color }}
-                                onClick={() => setSelectedDept(dept.codigo)}
-                            >
-                                {dept.nombre}: {dept.tratados}kg
-                            </span>
-                        ))}
+                {departamentos.length > 10 && (
+                    <div className="ranking-others">
+                        <span className="others-label">Otros departamentos:</span>
+                        <div className="others-list">
+                            {departamentos.slice(10).map((dept) => (
+                                <span
+                                    key={dept.codigo}
+                                    className="other-dept"
+                                    style={{ borderColor: dept.color }}
+                                    onClick={() => setSelectedDept(dept.codigo)}
+                                >
+                                    {dept.nombre}: {dept.tratados}kg
+                                </span>
+                            ))}
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
             {/* Quick Actions Footer */}

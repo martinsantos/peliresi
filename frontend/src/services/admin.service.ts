@@ -510,6 +510,85 @@ export const usuarioService = {
                 manifiestos: { total: 0, porEstado: {} }
             };
         }
+    },
+
+    /**
+     * Obtener estadísticas por departamento de Mendoza
+     */
+    async getEstadisticasDepartamento(): Promise<{
+        departamentos: Array<{
+            nombre: string;
+            manifiestos: { total: number; enTransito: number; entregados: number; tratados: number };
+            residuosTratados: number;
+            enProceso: number;
+            ultimaActividad: string | null;
+        }>;
+        totales: {
+            manifiestos: number;
+            residuosTratados: number;
+            departamentosActivos: number;
+        };
+    }> {
+        try {
+            const response = await api.get<ApiResponse<any>>('/admin/estadisticas-departamento');
+            return response.data?.data || {
+                departamentos: [],
+                totales: { manifiestos: 0, residuosTratados: 0, departamentosActivos: 0 }
+            };
+        } catch (error) {
+            console.error('[UsuarioService] Error getEstadisticasDepartamento:', error);
+            return {
+                departamentos: [],
+                totales: { manifiestos: 0, residuosTratados: 0, departamentosActivos: 0 }
+            };
+        }
+    },
+
+    /**
+     * Obtener estadísticas históricas con filtros de tiempo
+     */
+    async getEstadisticasHistoricas(params?: {
+        desde?: string;
+        hasta?: string;
+        agrupacion?: 'dia' | 'semana' | 'mes';
+    }): Promise<{
+        periodo: { desde: string; hasta: string };
+        agrupacion: string;
+        datos: Array<{
+            fecha: string;
+            manifiestos: number;
+            residuos: number;
+            alertas: number;
+        }>;
+        totales: {
+            manifiestos: number;
+            residuos: number;
+            alertas: number;
+        };
+        tendencia: {
+            manifiestos: number;
+            residuos: number;
+        };
+    }> {
+        try {
+            const response = await api.get<ApiResponse<any>>('/admin/estadisticas-historicas', { params });
+            return response.data?.data || {
+                periodo: { desde: '', hasta: '' },
+                agrupacion: 'dia',
+                datos: [],
+                totales: { manifiestos: 0, residuos: 0, alertas: 0 },
+                tendencia: { manifiestos: 0, residuos: 0 }
+            };
+        } catch (error) {
+            console.error('[UsuarioService] Error getEstadisticasHistoricas:', error);
+            return {
+                periodo: { desde: '', hasta: '' },
+                agrupacion: 'dia',
+                datos: [],
+                totales: { manifiestos: 0, residuos: 0, alertas: 0 },
+                tendencia: { manifiestos: 0, residuos: 0 }
+            };
+        }
     }
 };
 
