@@ -875,9 +875,9 @@ const CentroControl: React.FC = () => {
                                 {stats.manifiestos.total.toLocaleString('es-AR')}
                             </div>
                             <span className="kpi-label">MANIFIESTOS</span>
-                            <div className="kpi-trend" style={{ color: tendencia.manifiestos >= 0 ? '#10b981' : '#ef4444' }}>
-                                <TrendingUp size={14} style={{ transform: tendencia.manifiestos < 0 ? 'rotate(180deg)' : 'none' }} />
-                                <span>{tendencia.manifiestos >= 0 ? '+' : ''}{tendencia.manifiestos.toFixed(1)}% vs período anterior</span>
+                            <div className="kpi-trend" style={{ color: (tendencia?.manifiestos ?? 0) >= 0 ? '#10b981' : '#ef4444' }}>
+                                <TrendingUp size={14} style={{ transform: (tendencia?.manifiestos ?? 0) < 0 ? 'rotate(180deg)' : 'none' }} />
+                                <span>{(tendencia?.manifiestos ?? 0) >= 0 ? '+' : ''}{(tendencia?.manifiestos ?? 0).toFixed(1)}% vs período anterior</span>
                             </div>
                         </div>
                     </motion.div>
