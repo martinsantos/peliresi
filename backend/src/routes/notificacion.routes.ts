@@ -20,6 +20,9 @@ router.use(isAuthenticated);
 // GET /api/notificaciones - Obtener notificaciones del usuario
 router.get('/', getNotificaciones);
 
+// GET /api/notificaciones/mis-alertas - Alias para compatibilidad con frontend
+router.get('/mis-alertas', getNotificaciones);
+
 // PUT /api/notificaciones/leer-todas - Marcar todas como leídas
 router.put('/leer-todas', marcarTodasLeidas);
 

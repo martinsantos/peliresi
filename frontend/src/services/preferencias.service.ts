@@ -9,7 +9,19 @@ export interface PreferenciasUsuario {
 
 class PreferenciasService {
   private getHeaders() {
-    const token = localStorage.getItem('token');
+    // Buscar token en ambas ubicaciones posibles
+    let token = localStorage.getItem('token');
+    if (!token) {
+      try {
+        const authData = localStorage.getItem('auth');
+        if (authData) {
+          const parsed = JSON.parse(authData);
+          token = parsed.token || parsed.accessToken;
+        }
+      } catch {
+        // Ignorar errores de parsing
+      }
+    }
     return {
       'Content-Type': 'application/json',
       Authorization: token ? `Bearer ${token}` : ''
