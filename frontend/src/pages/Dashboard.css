@@ -329,6 +329,17 @@
     background: var(--bg-tertiary);
     border-radius: var(--radius-lg);
     border-left: 3px solid var(--status-warning);
+    transition: all 0.2s ease;
+}
+
+.transit-item:hover {
+    background: rgba(245, 158, 11, 0.1);
+}
+
+.transit-item-selected {
+    background: rgba(59, 130, 246, 0.15);
+    border-left-color: var(--status-primary);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
 }
 
 .transit-indicator {

@@ -158,10 +158,12 @@ export function useTripTracking({ role, manifiestoId, onToast }: UseTripTracking
 
     // ============ TIMER CALCULADO (no contador) ============
     // tick se incluye en dependencias para forzar recálculo cada segundo
+    // FIX: Nunca puede ser negativo
     const tiempoViaje = useMemo(() => {
         if (!startTimestamp) return 0;
         const now = pausedAt || Date.now();
-        return Math.floor((now - startTimestamp - totalPausedMs) / 1000);
+        const elapsed = Math.floor((now - startTimestamp - totalPausedMs) / 1000);
+        return Math.max(0, elapsed); // FIX: Evitar tiempos negativos
     }, [startTimestamp, pausedAt, totalPausedMs, tick]);
 
     // Format time helper
@@ -547,87 +549,120 @@ export function useTripTracking({ role, manifiestoId, onToast }: UseTripTracking
         showToast('Viaje restaurado correctamente');
     }, [showToast]);
 
-    // ============ SINCRONIZAR CON BACKEND (v7.7) ============
-    // Cuando hay un manifiesto EN_TRANSITO en el backend pero no hay viaje local activo,
-    // este método inicializa el hook usando la fecha de inicio de transporte del manifiesto
-    const sincronizarConBackend = useCallback((manifiesto: any) => {
-        console.log('[Trip] v7.7 SYNC INICIO - manifiesto:', manifiesto.id);
-        console.log('[Trip] v7.7 Datos manifiesto:', {
-            inicioTransporte: manifiesto.inicioTransporte,
-            fechaRetiro: manifiesto.fechaRetiro,
-            updatedAt: manifiesto.updatedAt,
-            createdAt: manifiesto.createdAt,
-            estado: manifiesto.estado
-        });
+    // ============ SINCRONIZAR CON BACKEND (v8.0 - SERVER TIME) ============
+    // CRÍTICO: Obtiene tiempo calculado por el SERVIDOR para sincronizar APP ↔ WEB
+    // Ambos (APP y WEB) deben usar la misma fuente de verdad: /manifiestos/:id/viaje-actual
+    const sincronizarConBackend = useCallback(async (manifiesto: any) => {
+        console.log('[Trip] v8.0 SYNC INICIO - manifiestoId:', manifiesto.id);
 
-        // CORRECCIÓN v7.7: Usar inicioTransporte como campo prioritario
-        const fechaInicio = manifiesto.inicioTransporte || manifiesto.fechaRetiro || manifiesto.updatedAt || manifiesto.createdAt;
-        let inicio = fechaInicio ? new Date(fechaInicio).getTime() : Date.now();
-
-        // FIX v7.7: Limitar el timestamp de inicio a máximo 8 horas atrás
-        // Si el manifiesto tiene una fecha muy antigua, el timer mostraría 650+ horas
-        const MAX_TRIP_DURATION_MS = 8 * 60 * 60 * 1000; // 8 horas máximo
-        const ahora = Date.now();
-        if (ahora - inicio > MAX_TRIP_DURATION_MS) {
-            console.log('[Trip] v7.7 FIX: Timestamp muy antiguo, usando máximo 8h atrás');
-            inicio = ahora - MAX_TRIP_DURATION_MS;
+        // Paso 1: Obtener estado actual del viaje desde el servidor
+        // Esto incluye elapsedSeconds calculado por el servidor considerando pausas
+        let viajeServidor = null;
+        try {
+            viajeServidor = await viajesService.getViajeEnCurso(manifiesto.id);
+            console.log('[Trip] v8.0 Estado del servidor:', viajeServidor);
+        } catch (error) {
+            console.warn('[Trip] v8.0 No se pudo obtener estado del servidor:', error);
         }
 
-        console.log('[Trip] v7.7 Timestamp calculado:', {
-            fechaInicio,
-            inicioOriginal: fechaInicio ? new Date(fechaInicio).getTime() : 'N/A',
-            inicio,
-            inicioDate: new Date(inicio).toISOString(),
-            ahora,
-            diferencia: Math.floor((ahora - inicio) / 1000) + ' segundos (máx 8h)'
-        });
+        const ahora = Date.now();
+        let inicio: number;
+        let isPaused = false;
+        let pausasTotales = 0;
+        let rutaServidor: RoutePoint[] = [];
+        let eventosServidor: TripEvent[] = [];
 
-        const tripId = `trip_backend_${manifiesto.id}`;
+        if (viajeServidor) {
+            // USAR TIEMPO DEL SERVIDOR: Calcular inicio basado en elapsedSeconds del servidor
+            // startTimestamp = ahora - (elapsedSeconds * 1000)
+            // Esto asegura que el timer local muestre el mismo tiempo que el servidor
+            inicio = ahora - (viajeServidor.elapsedSeconds * 1000);
+            isPaused = viajeServidor.isPaused;
+            pausasTotales = viajeServidor.pausasTotales * 1000; // Convertir a ms
+            rutaServidor = viajeServidor.ruta || [];
+            eventosServidor = (viajeServidor.eventos as TripEvent[]) || [];
+
+            console.log('[Trip] v8.0 SYNC CON SERVIDOR:', {
+                elapsedSecondsServidor: viajeServidor.elapsedSeconds,
+                inicioCalculado: new Date(inicio).toISOString(),
+                isPaused,
+                pausasTotales: viajeServidor.pausasTotales + ' segundos',
+                puntosRuta: rutaServidor.length
+            });
+        } else {
+            // Fallback: calcular desde manifiesto si no hay viaje en servidor
+            const fechaInicio = manifiesto.inicioTransporte || manifiesto.fechaRetiro || manifiesto.updatedAt;
+            inicio = fechaInicio ? new Date(fechaInicio).getTime() : ahora;
+
+            // Limitar a máximo 8 horas para evitar tiempos absurdos
+            const MAX_TRIP_DURATION_MS = 8 * 60 * 60 * 1000;
+            if (ahora - inicio > MAX_TRIP_DURATION_MS) {
+                console.log('[Trip] v8.0 Fallback: timestamp muy antiguo, limitando a 8h');
+                inicio = ahora - MAX_TRIP_DURATION_MS;
+            }
+        }
+
+        const tripId = viajeServidor?.id || `trip_backend_${manifiesto.id}`;
         tripIdRef.current = tripId;
 
+        // Establecer estado basado en servidor
         setStartTimestamp(inicio);
-        setPausedAt(null);
-        setTotalPausedMs(0);
-        setViajeActivo(true);  // CRÍTICO: Esto activa el timer useEffect
-        setViajePausado(false);
+        setPausedAt(isPaused ? ahora : null);
+        setTotalPausedMs(pausasTotales);
+        setViajeActivo(true);
+        setViajePausado(isPaused);
         setViajeInicio(new Date(inicio));
-        viajeRutaRef.current = [];
-        setViajeRuta([]);
-        lastPointRef.current = null;
 
-        const syncEvento: TripEvent = {
-            tipo: 'INICIO',
-            descripcion: 'Viaje sincronizado desde servidor',
-            timestamp: new Date().toISOString(),
-            gps: gpsPosition
-        };
+        // Cargar ruta y eventos del servidor
+        if (rutaServidor.length > 0) {
+            viajeRutaRef.current = rutaServidor;
+            setViajeRuta(rutaServidor);
+            lastPointRef.current = rutaServidor[rutaServidor.length - 1];
+        } else {
+            viajeRutaRef.current = [];
+            setViajeRuta([]);
+            lastPointRef.current = null;
+        }
 
-        setViajeEventos([syncEvento]);
-        viajeEventosRef.current = [syncEvento];
+        if (eventosServidor.length > 0) {
+            viajeEventosRef.current = eventosServidor;
+            setViajeEventos(eventosServidor);
+        } else {
+            const syncEvento: TripEvent = {
+                tipo: 'INICIO',
+                descripcion: 'Viaje sincronizado desde servidor',
+                timestamp: new Date().toISOString(),
+                gps: gpsPosition
+            };
+            setViajeEventos([syncEvento]);
+            viajeEventosRef.current = [syncEvento];
+        }
 
-        // CORRECCIÓN v7.3: Solo guardar en IndexedDB para TRANSPORTISTA
+        // Guardar en IndexedDB para TRANSPORTISTA
         if (role === 'TRANSPORTISTA') {
             offlineStorage.saveActiveTrip({
                 id: tripId,
                 manifiestoId: manifiesto.id,
                 startTimestamp: inicio,
-                pausedAt: null,
-                totalPausedMs: 0,
-                events: [syncEvento],
-                routePoints: [],
-                isPaused: false,
+                pausedAt: isPaused ? ahora : null,
+                totalPausedMs: pausasTotales,
+                events: viajeEventosRef.current,
+                routePoints: viajeRutaRef.current,
+                isPaused: isPaused,
                 role: role
             }).catch(err => console.error('[Trip] Error guardando sync:', err));
         }
 
-        console.log('[Trip] v5.1 SYNC COMPLETO - Estados establecidos:', {
+        const tiempoCalculado = Math.floor((ahora - inicio - pausasTotales) / 1000);
+        console.log('[Trip] v8.0 SYNC COMPLETO:', {
             viajeActivo: true,
-            startTimestamp: inicio,
-            tiempoEsperado: Math.floor((Date.now() - inicio) / 1000) + ' segundos'
+            isPaused,
+            tiempoCalculado: tiempoCalculado + ' segundos',
+            tiempoFormateado: formatTime(Math.max(0, tiempoCalculado))
         });
 
-        showToast('🔄 Viaje sincronizado');
-    }, [gpsPosition, role, showToast]);
+        showToast(isPaused ? '⏸️ Viaje pausado sincronizado' : '🔄 Viaje sincronizado');
+    }, [gpsPosition, role, showToast, formatTime]);
 
     // ============ INICIAR VIAJE ============
     const iniciarViaje = useCallback(async (): Promise<boolean> => {

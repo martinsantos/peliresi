@@ -46,6 +46,7 @@ import {
 } from 'recharts';
 import type { ChartDataPoint } from '../components/ui';
 import ActiveTripBanner from '../components/ActiveTripBanner';
+import ViajeEnCursoCard from '../components/ViajeEnCursoCard';
 import './Dashboard.css';
 
 // ============================================
@@ -347,6 +348,7 @@ const Dashboard: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error] = useState('');
     const [viajeActivo, setViajeActivo] = useState<ViajeActivo | null>(null);
+    const [selectedManifiestoId, setSelectedManifiestoId] = useState<string | null>(null);
 
     useEffect(() => {
         loadDashboard();
@@ -359,14 +361,24 @@ const Dashboard: React.FC = () => {
         }
     }, [user?.rol]);
 
-    // Cargar viaje activo desde backend, IndexedDB o API de manifiestos
+    // Cargar viaje activo desde backend usando TIEMPO CALCULADO POR SERVIDOR
+    // CRÍTICO: Usar elapsedSeconds del servidor para sincronizar APP ↔ WEB
     const loadViajeActivo = async () => {
         try {
             // 1. PRIMERO: Consultar endpoint de viaje activo del backend
-            // Este es el método más confiable ya que sincroniza entre dispositivos
             try {
                 const { viajeActivo: viajeBackend } = await viajesService.getViajeActivo();
                 if (viajeBackend) {
+                    // Obtener tiempo calculado por el servidor incluyendo pausas
+                    const viajeEnCurso = await viajesService.getViajeEnCurso(viajeBackend.manifiestoId);
+
+                    // CRÍTICO: Calcular startTime basado en elapsedSeconds del servidor
+                    // startTime = ahora - (segundosTranscurridos * 1000)
+                    // Esto asegura que WEB muestre el mismo tiempo que APP
+                    const ahora = Date.now();
+                    const elapsedSeconds = viajeEnCurso?.elapsedSeconds ?? 0;
+                    const startTimeCalculado = ahora - (elapsedSeconds * 1000);
+
                     const tripData: ViajeActivo = {
                         manifiesto: {
                             id: viajeBackend.manifiestoId,
@@ -374,11 +386,13 @@ const Dashboard: React.FC = () => {
                             generador: viajeBackend.manifiesto?.generador as { razonSocial: string } | undefined,
                             operador: viajeBackend.manifiesto?.operador as { razonSocial: string } | undefined
                         },
-                        startTime: new Date(viajeBackend.inicio).getTime(),
-                        ubicacionActual: undefined
+                        startTime: startTimeCalculado,
+                        ubicacionActual: viajeEnCurso?.ultimaUbicacion
+                            ? { lat: viajeEnCurso.ultimaUbicacion.lat, lng: viajeEnCurso.ultimaUbicacion.lng }
+                            : undefined
                     };
                     setViajeActivo(tripData);
-                    console.log('[Dashboard] Viaje activo cargado desde backend:', tripData.manifiesto.numero);
+                    console.log('[Dashboard] v8.0 Viaje activo sincronizado - elapsed:', elapsedSeconds, 'seg');
                     return;
                 }
             } catch (backendErr) {
@@ -391,6 +405,16 @@ const Dashboard: React.FC = () => {
                 try {
                     const manifiestoData = await manifiestoService.getManifiesto(activeTrip.manifiestoId);
                     if (manifiestoData) {
+                        // También intentar sincronizar con servidor para IndexedDB
+                        const viajeEnCurso = await viajesService.getViajeEnCurso(activeTrip.manifiestoId);
+                        const ahora = Date.now();
+                        const elapsedSeconds = viajeEnCurso?.elapsedSeconds;
+
+                        // Usar tiempo del servidor si disponible, sino fallback a IndexedDB
+                        const startTimeCalculado = elapsedSeconds !== undefined
+                            ? ahora - (elapsedSeconds * 1000)
+                            : activeTrip.startTimestamp;
+
                         const tripData: ViajeActivo = {
                             manifiesto: {
                                 id: manifiestoData.id,
@@ -398,16 +422,18 @@ const Dashboard: React.FC = () => {
                                 generador: manifiestoData.generador,
                                 operador: manifiestoData.operador
                             },
-                            startTime: activeTrip.startTimestamp,
-                            ubicacionActual: activeTrip.routePoints?.length > 0
-                                ? {
-                                    lat: activeTrip.routePoints[activeTrip.routePoints.length - 1].lat,
-                                    lng: activeTrip.routePoints[activeTrip.routePoints.length - 1].lng
-                                }
-                                : undefined
+                            startTime: startTimeCalculado,
+                            ubicacionActual: viajeEnCurso?.ultimaUbicacion
+                                ? { lat: viajeEnCurso.ultimaUbicacion.lat, lng: viajeEnCurso.ultimaUbicacion.lng }
+                                : activeTrip.routePoints?.length > 0
+                                    ? {
+                                        lat: activeTrip.routePoints[activeTrip.routePoints.length - 1].lat,
+                                        lng: activeTrip.routePoints[activeTrip.routePoints.length - 1].lng
+                                    }
+                                    : undefined
                         };
                         setViajeActivo(tripData);
-                        console.log('[Dashboard] Viaje activo cargado desde IndexedDB:', tripData.manifiesto.numero);
+                        console.log('[Dashboard] Viaje activo cargado desde IndexedDB con sync servidor');
                         return;
                     }
                 } catch (e) {
@@ -419,6 +445,17 @@ const Dashboard: React.FC = () => {
             const response = await manifiestoService.getManifiestos({ estado: 'EN_TRANSITO', limit: 1 });
             if (response?.manifiestos && response.manifiestos.length > 0) {
                 const manifiesto = response.manifiestos[0];
+
+                // Intentar obtener tiempo del servidor
+                const viajeEnCurso = await viajesService.getViajeEnCurso(manifiesto.id);
+                const ahora = Date.now();
+                const elapsedSeconds = viajeEnCurso?.elapsedSeconds;
+
+                // Usar tiempo del servidor si disponible
+                const startTimeCalculado = elapsedSeconds !== undefined
+                    ? ahora - (elapsedSeconds * 1000)
+                    : new Date(manifiesto.fechaRetiro || manifiesto.updatedAt).getTime();
+
                 const tripData: ViajeActivo = {
                     manifiesto: {
                         id: manifiesto.id,
@@ -426,11 +463,13 @@ const Dashboard: React.FC = () => {
                         generador: manifiesto.generador,
                         operador: manifiesto.operador
                     },
-                    startTime: new Date(manifiesto.fechaRetiro || manifiesto.updatedAt).getTime(),
-                    ubicacionActual: undefined
+                    startTime: startTimeCalculado,
+                    ubicacionActual: viajeEnCurso?.ultimaUbicacion
+                        ? { lat: viajeEnCurso.ultimaUbicacion.lat, lng: viajeEnCurso.ultimaUbicacion.lng }
+                        : undefined
                 };
                 setViajeActivo(tripData);
-                console.log('[Dashboard] Viaje activo cargado desde API manifiestos:', tripData.manifiesto.numero);
+                console.log('[Dashboard] Viaje activo desde API manifiestos con sync servidor');
             }
         } catch (err) {
             console.error('Error cargando viaje activo:', err);
@@ -990,10 +1029,27 @@ const Dashboard: React.FC = () => {
                         </div>
                     </div>
 
+                    {/* Viaje seleccionado con controles sincronizados */}
+                    {selectedManifiestoId && (
+                        <div style={{ marginBottom: '16px' }}>
+                            <ViajeEnCursoCard
+                                manifiestoId={selectedManifiestoId}
+                                onClose={() => setSelectedManifiestoId(null)}
+                            />
+                        </div>
+                    )}
+
                     <div className="transit-list">
                         {stats?.enTransitoList && stats.enTransitoList.length > 0 ? (
                             stats.enTransitoList.map((manifiesto) => (
-                                <div key={manifiesto.id} className="transit-item">
+                                <div
+                                    key={manifiesto.id}
+                                    className={`transit-item ${selectedManifiestoId === manifiesto.id ? 'transit-item-selected' : ''}`}
+                                    onClick={() => setSelectedManifiestoId(
+                                        selectedManifiestoId === manifiesto.id ? null : manifiesto.id
+                                    )}
+                                    style={{ cursor: 'pointer' }}
+                                >
                                     <div className="transit-indicator">
                                         <Truck size={20} />
                                         <span className="transit-pulse" />
@@ -1005,7 +1061,11 @@ const Dashboard: React.FC = () => {
                                             {manifiesto.generador?.domicilio?.split(',')[0]} → {manifiesto.operador?.domicilio?.split(',')[0]}
                                         </span>
                                     </div>
-                                    <Link to={`/manifiestos/${manifiesto.id}`} className="btn btn-icon btn-ghost">
+                                    <Link
+                                        to={`/manifiestos/${manifiesto.id}`}
+                                        className="btn btn-icon btn-ghost"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
                                         <ArrowRight size={18} />
                                     </Link>
                                 </div>

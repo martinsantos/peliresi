@@ -33,6 +33,10 @@ import {
     revertirEstadoAdmin,
     getHistorialReversiones
 } from '../controllers/reversion.controller';
+import {
+    getViajeEnCurso,
+    subirUbicacionesBatch
+} from '../controllers/viajes.controller';
 
 const router = Router();
 
@@ -100,5 +104,14 @@ router.post('/:id/revertir-estado', hasRole('ADMIN'), revertirEstadoAdmin);
 
 // Historial de reversiones
 router.get('/:id/reversiones', getHistorialReversiones);
+
+// ============================================================
+// VIAJE EN CURSO (SINCRONIZACIÓN APP ↔ WEB)
+// ============================================================
+// Obtener viaje en curso de un manifiesto (tiempo calculado desde servidor)
+router.get('/:manifiestoId/viaje-actual', getViajeEnCurso);
+
+// Subir ubicaciones en batch (sync offline)
+router.post('/:manifiestoId/ubicacion-batch', subirUbicacionesBatch);
 
 export default router;

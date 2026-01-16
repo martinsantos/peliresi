@@ -80,7 +80,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     setPreferencias(prefs);
                 } catch (error) {
                     console.error('Error cargando preferencias:', error);
-                    setPreferencias({ mostrarTourInicio: true, ultimaVersionTour: null });
+                    setPreferencias({ mostrarTourInicio: false, ultimaVersionTour: null });
                 }
                 setPrefsLoaded(true);
             }

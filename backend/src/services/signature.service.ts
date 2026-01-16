@@ -1,9 +1,21 @@
 import crypto from 'crypto';
+import { isProduction } from '../config/config';
 
 /**
  * Servicio de Firma Digital Simulada (PKI Demo)
  * En producción, reemplazar por integración con ONTI/PKI real
  */
+
+// Secret configurable - usa variable de entorno si existe, sino demo key
+const DEMO_SECRET = 'sitrep-demo-secret-key';
+const SIGNATURE_SECRET = process.env.SIGNATURE_SECRET || DEMO_SECRET;
+
+// Validar en producción que no se use el secret demo
+if (isProduction() && SIGNATURE_SECRET === DEMO_SECRET) {
+  console.error('[SIGNATURE] ERROR FATAL - SIGNATURE_SECRET debe configurarse en producción');
+  console.error('  Generar con: openssl rand -hex 32');
+  process.exit(1);
+}
 
 export interface FirmaDigital {
   hash: string;              // SHA-256 del documento
@@ -40,10 +52,10 @@ export const signatureService = {
     // 1. Calcular hash del contenido
     const hash = crypto.createHash('sha256').update(contenido).digest('hex');
 
-    // 2. Simular firma (en producción usaría HSM/PKI real)
+    // 2. Generar firma HMAC (en producción PKI/HSM reemplazará esto)
     const dataToSign = `${hash}|${CERT_DEMO.serial}|${new Date().toISOString()}`;
     const firmaBase64 = crypto
-      .createHmac('sha256', 'sitrep-demo-secret-key')
+      .createHmac('sha256', SIGNATURE_SECRET)
       .update(dataToSign)
       .digest('base64');
 

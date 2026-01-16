@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
-import { config } from '../config/config';
+import { config, isProduction } from '../config/config';
 import { AppError } from './errorHandler';
 import { redisService, CACHE_TTL, CACHE_PREFIX } from '../lib/redis';
 
@@ -82,10 +82,17 @@ export const hasRole = (...roles: string[]) => {
       return next();
     }
 
-    // DEMO MODE: Permitir override de rol para demos
-    const isDemoMode = req.headers['x-demo-mode'] === 'true';
+    // DEMO MODE: Permitir override de rol SOLO en development
+    // En producción, demo mode se bloquea automáticamente
+    const demoModeRequested = req.headers['x-demo-mode'] === 'true';
+    const isDemoMode = !isProduction() && demoModeRequested;
     const demoRole = req.headers['x-demo-role'] as string;
     const effectiveRole = (isDemoMode && demoRole) ? demoRole : req.user.rol;
+
+    // Log de advertencia si intentan usar demo mode en producción
+    if (isProduction() && demoModeRequested) {
+      console.warn(`[AUTH] BLOCKED: Intento de usar Demo Mode en producción por ${req.user.email}`);
+    }
 
     if (isDemoMode && demoRole) {
       console.log(`[AUTH] DEMO MODE: Usuario ${req.user.email} usando rol simulado "${demoRole}" (rol real: ${req.user.rol})`);

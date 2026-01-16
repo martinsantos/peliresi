@@ -13,7 +13,10 @@ export const WS_EVENTS = {
   STATS_UPDATED: 'stats:updated',
   VIAJE_STARTED: 'viaje:started',
   VIAJE_ENDED: 'viaje:ended',
-  VIAJE_UPDATE: 'viaje:update'
+  VIAJE_UPDATE: 'viaje:update',
+  VIAJE_PAUSADO: 'viaje:pausado',
+  VIAJE_REANUDADO: 'viaje:reanudado',
+  VIAJE_INCIDENTE: 'viaje:incidente'
 } as const;
 
 export type WSEvent = typeof WS_EVENTS[keyof typeof WS_EVENTS];

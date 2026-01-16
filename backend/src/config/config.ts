@@ -11,14 +11,14 @@ export const config = {
   // Configuración del servidor
   NODE_ENV: process.env.NODE_ENV || 'development',
   PORT: parseInt(process.env.PORT || '3001', 10),
-  
+
   // Base de datos
   DATABASE_URL: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/trazabilidad_rrpp?schema=public',
-  
+
   // JWT
   JWT_SECRET: process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production',
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '24h',
-  
+
   // CORS
   CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:3000',
 
@@ -37,5 +37,37 @@ if (!config.DATABASE_URL) {
   console.error('ERROR: DATABASE_URL no está definida en las variables de entorno');
   process.exit(1);
 }
+
+// ====================================================
+// HELPERS DE ENTORNO
+// ====================================================
+export const isProduction = () => config.NODE_ENV === 'production';
+export const isDevelopment = () => config.NODE_ENV === 'development';
+
+// Variables requeridas SOLO en producción
+const validateProductionEnv = () => {
+  if (!isProduction()) return;
+
+  const required = ['JWT_SECRET', 'DATABASE_URL', 'SIGNATURE_SECRET', 'CORS_ORIGIN'];
+  const missing = required.filter(v => !process.env[v]);
+
+  if (missing.length > 0) {
+    console.error('[CONFIG] ERROR FATAL - Variables requeridas en producción no definidas:');
+    missing.forEach(v => console.error(`  - ${v}`));
+    process.exit(1);
+  }
+
+  // Validar que JWT_SECRET no sea el valor por defecto
+  if (process.env.JWT_SECRET === 'your-super-secret-jwt-key-change-in-production') {
+    console.error('[CONFIG] ERROR FATAL - JWT_SECRET debe cambiarse en producción');
+    console.error('  Generar con: openssl rand -hex 32');
+    process.exit(1);
+  }
+
+  console.log('[CONFIG] Modo PRODUCCIÓN - Variables validadas correctamente');
+};
+
+// Ejecutar validación al cargar config
+validateProductionEnv();
 
 export default config;

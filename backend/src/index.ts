@@ -5,7 +5,7 @@ import rateLimit from 'express-rate-limit';
 import prisma from './lib/prisma';
 import { redisService } from './lib/redis';
 import { wsService } from './lib/websocket';
-import { config } from './config/config';
+import { config, isProduction } from './config/config';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 import { flushAnalytics, analyticsMiddleware } from './middlewares/analytics.middleware';
 
@@ -88,6 +88,18 @@ const generalLimiter = rateLimit({
 
 // Middlewares
 app.use(cors({ origin: config.CORS_ORIGIN.split(',').map(o => o.trim()), credentials: true }));
+
+// Validar HTTPS en producción
+if (isProduction()) {
+  const origins = config.CORS_ORIGIN.split(',');
+  const nonHttps = origins.filter(o => !o.trim().startsWith('https://'));
+  if (nonHttps.length > 0) {
+    console.error(`[CORS] ERROR FATAL - Orígenes sin HTTPS en producción: ${nonHttps.join(', ')}`);
+    process.exit(1);
+  }
+  console.log('[CONFIG] CORS validado para producción (HTTPS requerido)');
+}
+
 app.use(express.json());
 app.use('/api/', generalLimiter);
 

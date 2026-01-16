@@ -1,0 +1,373 @@
+/**
+ * ViajeEnCursoCard - Estilos para card de viaje sincronizada
+ */
+
+.viaje-card {
+    background: linear-gradient(135deg, #1a365d 0%, #2c5282 100%);
+    border-radius: 12px;
+    padding: 1.25rem;
+    color: white;
+    box-shadow: 0 4px 20px rgba(26, 54, 93, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.viaje-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #48bb78, #38a169);
+}
+
+.viaje-card.viaje-pausado {
+    background: linear-gradient(135deg, #744210 0%, #975a16 100%);
+}
+
+.viaje-card.viaje-pausado::before {
+    background: linear-gradient(90deg, #ed8936, #dd6b20);
+}
+
+.viaje-card.viaje-incidente {
+    background: linear-gradient(135deg, #742a2a 0%, #9b2c2c 100%);
+}
+
+.viaje-card.viaje-incidente::before {
+    background: linear-gradient(90deg, #fc8181, #f56565);
+}
+
+.viaje-card-loading,
+.viaje-card-error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 2rem;
+    background: #2d3748;
+}
+
+.viaje-card-error button {
+    margin-left: 1rem;
+    padding: 0.5rem 1rem;
+    background: #4299e1;
+    border: none;
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Header */
+.viaje-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.viaje-icon {
+    position: relative;
+    width: 48px;
+    height: 48px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.viaje-pulse {
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 2px solid rgba(72, 187, 120, 0.6);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.2); opacity: 0.5; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.viaje-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.viaje-numero {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.viaje-estado {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    display: inline-block;
+    width: fit-content;
+}
+
+.viaje-estado-en_curso {
+    background: rgba(72, 187, 120, 0.3);
+    color: #9ae6b4;
+}
+
+.viaje-estado-pausado {
+    background: rgba(237, 137, 54, 0.3);
+    color: #fbd38d;
+}
+
+.viaje-estado-incidente {
+    background: rgba(245, 101, 101, 0.3);
+    color: #feb2b2;
+}
+
+.viaje-ws-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.ws-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #e53e3e;
+}
+
+.ws-dot.connected {
+    background: #48bb78;
+    box-shadow: 0 0 8px rgba(72, 187, 120, 0.5);
+}
+
+/* Timer */
+.viaje-timer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 1.25rem;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.timer-value {
+    font-size: 2.5rem;
+    font-family: 'SF Mono', 'Consolas', monospace;
+    font-weight: 700;
+    letter-spacing: 2px;
+}
+
+.pausas-total {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* Ubicacion */
+.viaje-ubicacion {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.8);
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 6px;
+}
+
+.ubicacion-time {
+    margin-left: auto;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* Controles */
+.viaje-controles {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.viaje-controles button {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.viaje-controles button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-pausar {
+    background: #ed8936;
+    color: white;
+}
+
+.btn-pausar:hover:not(:disabled) {
+    background: #dd6b20;
+}
+
+.btn-reanudar {
+    background: #48bb78;
+    color: white;
+}
+
+.btn-reanudar:hover:not(:disabled) {
+    background: #38a169;
+}
+
+.btn-incidente {
+    background: rgba(245, 101, 101, 0.2);
+    color: #feb2b2;
+    border: 1px solid rgba(245, 101, 101, 0.4) !important;
+}
+
+.btn-incidente:hover:not(:disabled) {
+    background: rgba(245, 101, 101, 0.3);
+}
+
+/* Stats */
+.viaje-stats {
+    display: flex;
+    gap: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.stat-label {
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.6);
+    text-transform: uppercase;
+}
+
+.stat-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+/* Modal incidente */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+}
+
+.modal-incidente {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    max-width: 400px;
+    width: 100%;
+    color: #1a202c;
+}
+
+.modal-incidente h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0 0 1rem;
+    color: #c53030;
+}
+
+.modal-incidente textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    resize: vertical;
+    margin-bottom: 1rem;
+}
+
+.modal-incidente textarea:focus {
+    outline: none;
+    border-color: #4299e1;
+    box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.2);
+}
+
+.modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+}
+
+.modal-actions button {
+    padding: 0.625rem 1.25rem;
+    border: none;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.modal-actions button:first-child {
+    background: #e2e8f0;
+    color: #4a5568;
+}
+
+.modal-actions .btn-confirm {
+    background: #c53030;
+    color: white;
+}
+
+.modal-actions .btn-confirm:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+    .viaje-card {
+        padding: 1rem;
+    }
+
+    .timer-value {
+        font-size: 2rem;
+    }
+
+    .viaje-controles {
+        flex-direction: column;
+    }
+
+    .viaje-stats {
+        flex-wrap: wrap;
+    }
+}

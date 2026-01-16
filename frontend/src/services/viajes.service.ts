@@ -150,6 +150,61 @@ export const viajesService = {
     async getViajeActivo(): Promise<{ viajeActivo: Viaje | null; sincronizado?: boolean }> {
         const response = await api.get('/viajes/activo');
         return response.data.data;
+    },
+
+    /**
+     * Obtener viaje en curso por manifiesto (con tiempo calculado por servidor)
+     * IMPORTANTE: Usar este endpoint para sincronizar timer entre APP y WEB
+     */
+    async getViajeEnCurso(manifiestoId: string): Promise<{
+        id: string;
+        manifiestoId: string;
+        manifiestoNumero: string;
+        inicio: string;
+        estado: string;
+        isPaused: boolean;
+        elapsedSeconds: number;
+        pausasTotales: number;
+        ruta: RoutePoint[];
+        eventos: TripEvent[];
+        ultimaUbicacion: { lat: number; lng: number; timestamp: string } | null;
+    } | null> {
+        try {
+            const response = await api.get(`/manifiestos/${manifiestoId}/viaje-actual`);
+            return response.data.data;
+        } catch (error) {
+            console.error('[viajes.service] Error obteniendo viaje en curso:', error);
+            return null;
+        }
+    },
+
+    /**
+     * Pausar viaje
+     */
+    async pausarViaje(viajeId: string): Promise<Viaje> {
+        const response = await api.post(`/viajes/${viajeId}/pausar`);
+        return response.data.data.viaje;
+    },
+
+    /**
+     * Reanudar viaje
+     */
+    async reanudarViaje(viajeId: string): Promise<Viaje> {
+        const response = await api.post(`/viajes/${viajeId}/reanudar`);
+        return response.data.data.viaje;
+    },
+
+    /**
+     * Registrar incidente en viaje
+     */
+    async registrarIncidenteViaje(viajeId: string, params: {
+        tipo: string;
+        descripcion: string;
+        latitud?: number;
+        longitud?: number;
+    }): Promise<{ viaje: Viaje; evento: any }> {
+        const response = await api.post(`/viajes/${viajeId}/incidente`, params);
+        return response.data.data;
     }
 };
 

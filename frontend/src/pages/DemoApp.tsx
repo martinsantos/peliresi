@@ -69,8 +69,10 @@ const roleScreens = {
 
 const DemoApp: React.FC = () => {
     const [expandedRole, setExpandedRole] = useState<string | null>(null);
-    // Onboarding SIEMPRE visible al iniciar (producción)
-    const [showOnboarding, setShowOnboarding] = useState(true);
+    // Onboarding solo si no se ha completado antes (opcional)
+    const [showOnboarding, setShowOnboarding] = useState(() => {
+        return localStorage.getItem('demoAppOnboardingCompleted') !== 'true';
+    });
 
     const handleOnboardingComplete = () => {
         setShowOnboarding(false);

@@ -4,6 +4,7 @@ import { logisticsService } from '../services/logistics.service';
 import { notificationService } from '../services/notification.service';
 import prisma from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
+import { isProduction } from '../config/config';
 
 export const actualizarUbicacion = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -93,11 +94,12 @@ export const confirmarRetiro = async (req: AuthRequest, res: Response, next: Nex
       throw new AppError('Manifiesto no encontrado', 404);
     }
 
-    // DEMO MODE: Permitir cualquier TRANSPORTISTA gestionar manifiestos para pruebas
-    // En producción, descomentar la validación estricta:
-    // if (manifiesto.transportista.usuarioId !== userId && req.user.rol !== 'ADMIN') {
-    //   throw new AppError('No eres el transportista asignado', 403);
-    // }
+    // En producción se valida estrictamente, en development se permite para demos
+    if (isProduction()) {
+      if (manifiesto.transportista.usuarioId !== userId && req.user.rol !== 'ADMIN') {
+        throw new AppError('No eres el transportista asignado', 403);
+      }
+    }
 
     if (manifiesto.estado !== 'APROBADO') {
       throw new AppError('El manifiesto debe estar APROBADO para confirmar retiro', 400);
@@ -141,11 +143,12 @@ export const confirmarEntrega = async (req: AuthRequest, res: Response, next: Ne
       throw new AppError('Manifiesto no encontrado', 404);
     }
 
-    // DEMO MODE: Permitir cualquier TRANSPORTISTA gestionar manifiestos para pruebas
-    // En producción, descomentar la validación estricta:
-    // if (manifiesto.transportista.usuarioId !== userId && req.user.rol !== 'ADMIN') {
-    //   throw new AppError('No eres el transportista asignado', 403);
-    // }
+    // En producción se valida estrictamente, en development se permite para demos
+    if (isProduction()) {
+      if (manifiesto.transportista.usuarioId !== userId && req.user.rol !== 'ADMIN') {
+        throw new AppError('No eres el transportista asignado', 403);
+      }
+    }
 
     if (manifiesto.estado !== 'EN_TRANSITO') {
       throw new AppError('El manifiesto debe estar EN_TRANSITO para confirmar entrega', 400);

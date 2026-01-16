@@ -24,7 +24,10 @@ export const WS_EVENTS = {
   // Viajes
   VIAJE_STARTED: 'viaje:started',
   VIAJE_ENDED: 'viaje:ended',
-  VIAJE_UPDATE: 'viaje:update'
+  VIAJE_UPDATE: 'viaje:update',
+  VIAJE_PAUSADO: 'viaje:pausado',
+  VIAJE_REANUDADO: 'viaje:reanudado',
+  VIAJE_INCIDENTE: 'viaje:incidente'
 };
 
 interface AuthenticatedSocket extends Socket {

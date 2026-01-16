@@ -14,7 +14,10 @@ import {
     actualizarRuta,
     syncViaje,
     getViajesPorManifiesto,
-    getViajeActivo
+    getViajeActivo,
+    pausarViaje,
+    reanudarViaje,
+    registrarIncidenteViaje
 } from '../controllers/viajes.controller';
 
 const router = Router();
@@ -50,5 +53,16 @@ router.post('/:id/ruta', actualizarRuta);
 
 // Obtener viajes por manifiesto
 router.get('/manifiesto/:manifiestoId', getViajesPorManifiesto);
+
+// ============ CONTROL DE VIAJE (SINCRONIZACIÓN APP ↔ WEB) ============
+
+// Pausar viaje
+router.post('/:id/pausar', pausarViaje);
+
+// Reanudar viaje
+router.post('/:id/reanudar', reanudarViaje);
+
+// Registrar incidente
+router.post('/:id/incidente', registrarIncidenteViaje);
 
 export default router;

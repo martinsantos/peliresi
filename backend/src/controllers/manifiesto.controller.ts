@@ -4,6 +4,7 @@ import { manifiestoService } from '../services/manifiesto.service';
 import { notificationService } from '../services/notification.service';
 import prisma from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
+import { isProduction } from '../config/config';
 
 /**
  * Controller for Manifest Lifecycle
@@ -169,8 +170,8 @@ export const confirmarRecepcion = async (req: AuthRequest, res: Response, next: 
     }
 
     // VALIDACIÓN 2: Verificar que usuario es el operador asignado (o admin)
-    // En modo demo (header X-Demo-Mode), permitir cualquier OPERADOR
-    const isDemoMode = req.headers['x-demo-mode'] === 'true';
+    // En desarrollo permite demo mode, en producción se bloquea automáticamente
+    const isDemoMode = !isProduction() && req.headers['x-demo-mode'] === 'true';
     if (manifiesto.operador.usuarioId !== userId && req.user.rol !== 'ADMIN' && !isDemoMode) {
       throw new AppError('No eres el operador asignado para este manifiesto', 403);
     }
@@ -468,8 +469,8 @@ export const registrarTratamiento = async (req: AuthRequest, res: Response, next
         }
 
         // Verificar que sea el operador asignado o admin
-        // En modo demo (header X-Demo-Mode), permitir cualquier OPERADOR
-        const isDemoMode = req.headers['x-demo-mode'] === 'true';
+        // En desarrollo permite demo mode, en producción se bloquea automáticamente
+        const isDemoMode = !isProduction() && req.headers['x-demo-mode'] === 'true';
         if (manifiesto.operador.usuarioId !== userId && req.user.rol !== 'ADMIN' && !isDemoMode) {
             throw new AppError('No tienes permisos para registrar tratamiento en este manifiesto', 403);
         }
@@ -838,8 +839,8 @@ export const registrarPesaje = async (req: AuthRequest, res: Response, next: Nex
         }
 
         // Verificar que sea el operador asignado o admin
-        // En modo demo (header X-Demo-Mode), permitir cualquier OPERADOR
-        const isDemoMode = req.headers['x-demo-mode'] === 'true';
+        // En desarrollo permite demo mode, en producción se bloquea automáticamente
+        const isDemoMode = !isProduction() && req.headers['x-demo-mode'] === 'true';
         if (manifiesto.operador.usuarioId !== userId && req.user.rol !== 'ADMIN' && !isDemoMode) {
             throw new AppError('No tienes permisos para registrar pesaje en este manifiesto', 403);
         }

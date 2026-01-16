@@ -27,9 +27,9 @@ class PreferenciasService {
       return response.data.data.preferencias;
     } catch (error) {
       console.error('Error obteniendo preferencias:', error);
-      // Devolver valores por defecto si hay error
+      // Devolver valores por defecto si hay error - NO mostrar tour por defecto
       return {
-        mostrarTourInicio: true,
+        mostrarTourInicio: false,
         ultimaVersionTour: null
       };
     }

@@ -608,6 +608,10 @@ model Viaje {
 
   estado          EstadoViaje   @default(EN_CURSO)
 
+  // Campos para control de pausas (sincronización APP ↔ WEB)
+  pausas          Int           @default(0)   // Segundos totales pausados
+  ultimaPausa     DateTime?                   // Inicio de pausa actual (null = no pausado)
+
   // Ruta completa como JSON: [{lat, lng, timestamp, velocidad}]
   ruta            Json?
   // Eventos del viaje como JSON: [{tipo, timestamp, descripcion, lat, lng}]
@@ -633,6 +637,7 @@ model Viaje {
 
 enum EstadoViaje {
   EN_CURSO
+  PAUSADO
   COMPLETADO
   CANCELADO
   INCIDENTE
