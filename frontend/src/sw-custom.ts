@@ -2,7 +2,7 @@
 /**
  * SITREP Custom Service Worker
  * Implements Background Sync + Workbox Precaching
- * v7.1.0
+ * v7.2.0
  */
 
 import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
@@ -312,4 +312,4 @@ self.addEventListener('activate', (event) => {
     event.waitUntil(self.clients.claim());
 });
 
-console.log('[SW] SITREP Custom Service Worker v7.1.0 loaded');
+console.log('[SW] SITREP Custom Service Worker v7.2.0 loaded');
