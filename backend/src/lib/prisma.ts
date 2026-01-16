@@ -7,9 +7,10 @@ const getDatabaseUrl = (): string => {
   // Si ya tiene parámetros, agregar con &, sino con ?
   const separator = baseUrl.includes('?') ? '&' : '?';
 
-  // Pool de 30 conexiones para soportar 200+ usuarios concurrentes
-  // pool_timeout=20 segundos para evitar conexiones huérfanas
-  return `${baseUrl}${separator}connection_limit=30&pool_timeout=20`;
+  // OPTIMIZADO: Pool de 50 conexiones para soportar 500+ usuarios concurrentes
+  // pool_timeout=30 segundos para manejar picos de carga
+  // socket_timeout=15 segundos para evitar queries colgadas
+  return `${baseUrl}${separator}connection_limit=50&pool_timeout=30&socket_timeout=15`;
 };
 
 const prisma = new PrismaClient({

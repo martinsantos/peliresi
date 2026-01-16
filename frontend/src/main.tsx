@@ -1,6 +1,8 @@
 import { StrictMode, Component } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { queryClient } from './lib/queryClient'
 // Design System
 import './styles/variables.css'
 import './styles/layers.css'
@@ -43,9 +45,11 @@ if (!rootElement) {
   try {
     createRoot(rootElement).render(
       <StrictMode>
-        <ErrorBoundary>
-          <App />
-        </ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
+        </QueryClientProvider>
       </StrictMode>,
     )
   } catch (e) {

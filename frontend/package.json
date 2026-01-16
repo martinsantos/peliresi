@@ -14,6 +14,8 @@
     "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.90.18",
+    "@tanstack/react-virtual": "^3.13.18",
     "@types/leaflet": "^1.9.21",
     "axios": "^1.13.2",
     "framer-motion": "^12.23.26",

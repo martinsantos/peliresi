@@ -107,8 +107,75 @@ if (process.env.ENABLE_ANALYTICS === 'true') {
   app.use(analyticsMiddleware);
 }
 
-// Health Check
-app.get('/api/health', (req: Request, res: Response) => res.json({ status: 'ok' }));
+// ========================================
+// HEALTH CHECKS ROBUSTOS (Para Load Balancers)
+// ========================================
+
+// Liveness probe - respuesta instantánea (el proceso está vivo)
+app.get('/api/health/live', (req: Request, res: Response) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Readiness probe - valida dependencias críticas
+app.get('/api/health/ready', async (req: Request, res: Response) => {
+  const startTime = Date.now();
+  const checks: { database: boolean; redis: boolean; latencyMs: number } = {
+    database: false,
+    redis: false,
+    latencyMs: 0
+  };
+
+  try {
+    // Check database
+    await prisma.$queryRaw`SELECT 1`;
+    checks.database = true;
+  } catch (error) {
+    console.error('[HEALTH] Database check failed:', error);
+  }
+
+  try {
+    // Check Redis (puede estar en degraded mode)
+    if (redisService.connected) {
+      await redisService.get('health-check-test');
+      checks.redis = true;
+    }
+  } catch (error) {
+    console.error('[HEALTH] Redis check failed:', error);
+  }
+
+  checks.latencyMs = Date.now() - startTime;
+
+  // El servidor está listo si la DB funciona (Redis es opcional)
+  const isReady = checks.database;
+  res.status(isReady ? 200 : 503).json({
+    status: isReady ? 'ready' : 'not_ready',
+    checks,
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Health general (compatibilidad + resumen)
+app.get('/api/health', async (req: Request, res: Response) => {
+  const checks = {
+    status: 'ok',
+    version: process.env.npm_package_version || '1.0.0',
+    uptime: Math.floor(process.uptime()),
+    database: 'unknown',
+    redis: redisService.connected ? 'connected' : 'disconnected',
+    timestamp: new Date().toISOString()
+  };
+
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    checks.database = 'connected';
+  } catch {
+    checks.database = 'error';
+    checks.status = 'degraded';
+  }
+
+  res.json(checks);
+});
 
 // Rutas Públicas
 app.use('/api/public', publicRoutes);

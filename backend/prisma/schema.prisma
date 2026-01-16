@@ -226,6 +226,10 @@ model Manifiesto {
   @@index([transportistaId])
   @@index([operadorId])
   @@index([createdAt])
+  // OPTIMIZADO: Índices compuestos para queries frecuentes por actor + estado + fecha
+  @@index([generadorId, estado, createdAt])
+  @@index([transportistaId, estado, createdAt])
+  @@index([operadorId, estado, createdAt])
   @@map("manifiestos")
 }
 

@@ -55,17 +55,27 @@ export const getAllUsuarios = async (req: AuthRequest, res: Response, next: Next
             prisma.usuario.count({ where })
         ]);
 
-        // Obtener estadísticas por rol
-        const statsByRole = await prisma.usuario.groupBy({
-            by: ['rol'],
-            _count: { id: true },
-            where: { activo: true }
-        });
+        // OPTIMIZADO: Obtener estadísticas en una sola query con groupBy múltiple
+        const [statsByRole, statsByActivo] = await Promise.all([
+            prisma.usuario.groupBy({
+                by: ['rol'],
+                _count: { id: true },
+                where: { activo: true }
+            }),
+            prisma.usuario.groupBy({
+                by: ['activo'],
+                _count: { id: true }
+            })
+        ]);
+
+        // Calcular activos/inactivos del groupBy (evita 2 queries adicionales)
+        const activosCount = statsByActivo.find(s => s.activo === true)?._count.id || 0;
+        const inactivosCount = statsByActivo.find(s => s.activo === false)?._count.id || 0;
 
         const stats = {
             total,
-            activos: await prisma.usuario.count({ where: { activo: true } }),
-            inactivos: await prisma.usuario.count({ where: { activo: false } }),
+            activos: activosCount,
+            inactivos: inactivosCount,
             porRol: statsByRole.reduce((acc, item) => {
                 acc[item.rol] = item._count.id;
                 return acc;

@@ -100,43 +100,80 @@ export const pushService = {
 
   /**
    * Enviar notificación push a todos los usuarios de un rol
+   * OPTIMIZADO: Batch query + Promise.all (evita N+1)
    */
   async sendToRole(rol: string, payload: PushPayload): Promise<number> {
-    const usuarios = await prisma.usuario.findMany({
-      where: { rol: rol as any, activo: true },
-      select: { id: true },
+    // Una sola query para obtener todas las suscripciones del rol
+    const subscriptions = await prisma.pushSubscription.findMany({
+      where: {
+        usuario: { rol: rol as any, activo: true }
+      }
     });
 
-    let total = 0;
-    for (const usuario of usuarios) {
-      total += await this.sendToUser(usuario.id, payload);
-    }
-    return total;
+    if (subscriptions.length === 0) return 0;
+
+    // Enviar en paralelo con Promise.allSettled para no fallar si una falla
+    const results = await Promise.allSettled(
+      subscriptions.map(async (sub) => {
+        try {
+          await webpush.sendNotification(
+            {
+              endpoint: sub.endpoint,
+              keys: { p256dh: sub.p256dh, auth: sub.auth },
+            },
+            JSON.stringify(payload)
+          );
+          return true;
+        } catch (error: any) {
+          // Si la suscripción expiró, eliminarla
+          if (error.statusCode === 404 || error.statusCode === 410) {
+            await prisma.pushSubscription.delete({ where: { id: sub.id } }).catch(() => {});
+          }
+          return false;
+        }
+      })
+    );
+
+    return results.filter(r => r.status === 'fulfilled' && r.value === true).length;
   },
 
   /**
    * Enviar notificación push a todos los usuarios
+   * OPTIMIZADO: Promise.allSettled para envío paralelo
    */
   async sendToAll(payload: PushPayload): Promise<number> {
     const subscriptions = await prisma.pushSubscription.findMany();
 
+    if (subscriptions.length === 0) return 0;
+
+    // Enviar en paralelo con batches de 50 para evitar sobrecarga
+    const BATCH_SIZE = 50;
     let enviadas = 0;
-    for (const sub of subscriptions) {
-      try {
-        await webpush.sendNotification(
-          {
-            endpoint: sub.endpoint,
-            keys: { p256dh: sub.p256dh, auth: sub.auth },
-          },
-          JSON.stringify(payload)
-        );
-        enviadas++;
-      } catch (error: any) {
-        if (error.statusCode === 404 || error.statusCode === 410) {
-          await prisma.pushSubscription.delete({ where: { id: sub.id } });
-        }
-      }
+
+    for (let i = 0; i < subscriptions.length; i += BATCH_SIZE) {
+      const batch = subscriptions.slice(i, i + BATCH_SIZE);
+      const results = await Promise.allSettled(
+        batch.map(async (sub) => {
+          try {
+            await webpush.sendNotification(
+              {
+                endpoint: sub.endpoint,
+                keys: { p256dh: sub.p256dh, auth: sub.auth },
+              },
+              JSON.stringify(payload)
+            );
+            return true;
+          } catch (error: any) {
+            if (error.statusCode === 404 || error.statusCode === 410) {
+              await prisma.pushSubscription.delete({ where: { id: sub.id } }).catch(() => {});
+            }
+            return false;
+          }
+        })
+      );
+      enviadas += results.filter(r => r.status === 'fulfilled' && r.value === true).length;
     }
+
     return enviadas;
   },
 

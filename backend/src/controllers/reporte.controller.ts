@@ -6,9 +6,11 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 const prisma = new PrismaClient();
 
 // Reporte de manifiestos por período (CU-A11)
+// OPTIMIZADO: Paginación + filtro de tipoResiduo en query (no en JS)
 export const reporteManifiestosPorPeriodo = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const { fechaInicio, fechaFin, estado, tipoResiduoId } = req.query;
+        const { fechaInicio, fechaFin, estado, tipoResiduoId, page = 1, limit = 100 } = req.query;
+        const skip = (Number(page) - 1) * Number(limit);
 
         const where: any = {};
 
@@ -22,6 +24,13 @@ export const reporteManifiestosPorPeriodo = async (req: AuthRequest, res: Respon
         // Filtrar por estado
         if (estado) where.estado = estado;
 
+        // OPTIMIZADO: Filtrar por tipo de residuo en la query (no en JS)
+        if (tipoResiduoId) {
+            where.residuos = {
+                some: { tipoResiduoId: String(tipoResiduoId) }
+            };
+        }
+
         // Filtrar por rol
         if (req.user.rol === 'GENERADOR' && req.user.generador) {
             where.generadorId = req.user.generador.id;
@@ -31,25 +40,25 @@ export const reporteManifiestosPorPeriodo = async (req: AuthRequest, res: Respon
             where.operadorId = req.user.operador.id;
         }
 
-        // Obtener manifiestos
-        const manifiestos = await prisma.manifiesto.findMany({
-            where,
-            include: {
-                generador: { select: { razonSocial: true, cuit: true } },
-                transportista: { select: { razonSocial: true, cuit: true } },
-                operador: { select: { razonSocial: true, cuit: true } },
-                residuos: { include: { tipoResiduo: true } }
-            },
-            orderBy: { createdAt: 'desc' }
-        });
+        // OPTIMIZADO: Paginación + count en paralelo
+        const [manifiestos, total] = await Promise.all([
+            prisma.manifiesto.findMany({
+                where,
+                skip,
+                take: Number(limit),
+                include: {
+                    generador: { select: { razonSocial: true, cuit: true } },
+                    transportista: { select: { razonSocial: true, cuit: true } },
+                    operador: { select: { razonSocial: true, cuit: true } },
+                    residuos: { include: { tipoResiduo: true } }
+                },
+                orderBy: { createdAt: 'desc' }
+            }),
+            prisma.manifiesto.count({ where })
+        ]);
 
-        // Filtrar por tipo de residuo si está especificado
-        let manifiestosFiltrados = manifiestos;
-        if (tipoResiduoId) {
-            manifiestosFiltrados = manifiestos.filter(m =>
-                m.residuos.some(r => r.tipoResiduoId === tipoResiduoId)
-            );
-        }
+        // Ya no necesitamos filtrar en JS
+        const manifiestosFiltrados = manifiestos;
 
         // Calcular estadísticas
         const totalResiduos = manifiestosFiltrados.reduce((acc, m) => {
@@ -78,7 +87,7 @@ export const reporteManifiestosPorPeriodo = async (req: AuthRequest, res: Respon
             success: true,
             data: {
                 resumen: {
-                    totalManifiestos: manifiestosFiltrados.length,
+                    totalManifiestos: total, // Total real de la BD
                     totalResiduos,
                     periodo: {
                         desde: fechaInicio || 'Sin límite',
@@ -99,7 +108,14 @@ export const reporteManifiestosPorPeriodo = async (req: AuthRequest, res: Respon
                         cantidad: r.cantidad,
                         unidad: r.unidad
                     }))
-                }))
+                })),
+                // OPTIMIZADO: Info de paginación
+                pagination: {
+                    page: Number(page),
+                    limit: Number(limit),
+                    total,
+                    pages: Math.ceil(total / Number(limit))
+                }
             }
         });
     } catch (error) {

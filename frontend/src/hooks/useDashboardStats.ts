@@ -1,22 +1,23 @@
 /**
  * useDashboardStats - Hook compartido para WEB y APP
+ * OPTIMIZADO: Usa React Query para caché y deduplicación
  *
  * Centraliza la carga de estadísticas del dashboard desde el backend.
  * Usado por Dashboard.tsx (WEB) y MobileApp.tsx (APP) para garantizar
  * que ambas plataformas muestren la misma información.
  *
  * Endpoint: /api/manifiestos/dashboard
- * Auto-refresh: cada 30 segundos
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { manifiestoService } from '../services/manifiesto.service';
+import { queryKeys } from '../lib/queryClient';
 import type { DashboardStats, Manifiesto } from '../types';
 
 interface UseDashboardStatsOptions {
   /** Auto-refresh interval in ms (default: 30000 = 30s) */
   refreshInterval?: number;
-  /** Whether to enable auto-refresh (default: true) */
+  /** Whether to enable auto-refresh (default: false with React Query) */
   autoRefresh?: boolean;
 }
 
@@ -41,7 +42,7 @@ interface UseDashboardStatsResult {
 
 const DEFAULT_OPTIONS: UseDashboardStatsOptions = {
   refreshInterval: 30000,
-  autoRefresh: true,
+  autoRefresh: false, // React Query maneja el caché inteligentemente
 };
 
 export function useDashboardStats(
@@ -51,77 +52,48 @@ export function useDashboardStats(
 ): UseDashboardStatsResult {
   const { refreshInterval, autoRefresh } = { ...DEFAULT_OPTIONS, ...options };
 
-  const [stats, setStats] = useState<DashboardStats['estadisticas'] | null>(null);
-  const [recientes, setRecientes] = useState<Manifiesto[]>([]);
-  const [enTransitoList, setEnTransitoList] = useState<Manifiesto[]>([]);
-  const [fullData, setFullData] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const {
+    data,
+    isLoading,
+    error,
+    dataUpdatedAt,
+    refetch,
+  } = useQuery({
+    queryKey: queryKeys.dashboardStats(role || 'unknown'),
+    queryFn: async () => {
+      const result = await manifiestoService.getDashboard();
+      console.log('[useDashboardStats] Stats loaded via React Query:', result?.estadisticas);
+      return result;
+    },
+    // Solo fetch si hay rol y estamos online
+    enabled: !!role && isOnline,
+    // Datos frescos por 30 segundos (reduce requests duplicados)
+    staleTime: 30 * 1000,
+    // Mantener en caché 5 minutos
+    gcTime: 5 * 60 * 1000,
+    // Auto-refresh solo si está habilitado explícitamente
+    refetchInterval: autoRefresh ? refreshInterval : false,
+    // No refetch automático al enfocar ventana
+    refetchOnWindowFocus: false,
+    // Reintentos con backoff
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+  });
 
-  const fetchStats = useCallback(async () => {
-    // Skip if no role or offline
-    if (!role) {
-      setLoading(false);
-      return;
-    }
-
-    if (!isOnline) {
-      console.log('[useDashboardStats] Offline - skipping fetch');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setError(null);
-      const data = await manifiestoService.getDashboard();
-
-      if (data) {
-        setFullData(data);
-        setStats(data.estadisticas || null);
-        setRecientes(data.recientes || []);
-        setEnTransitoList(data.enTransitoList || []);
-        setLastUpdated(new Date());
-        console.log('[useDashboardStats] Stats loaded:', data.estadisticas);
-      }
-    } catch (err: any) {
-      const errorMsg = err.message || 'Error cargando estadísticas';
-      console.error('[useDashboardStats] Error:', errorMsg);
-      setError(errorMsg);
-    } finally {
-      setLoading(false);
-    }
-  }, [role, isOnline]);
-
-  // Initial fetch
-  useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
-
-  // Auto-refresh interval
-  useEffect(() => {
-    if (!autoRefresh || !isOnline || !role) return;
-
-    const interval = setInterval(fetchStats, refreshInterval);
-    return () => clearInterval(interval);
-  }, [autoRefresh, refreshInterval, fetchStats, isOnline, role]);
-
-  // Refetch when coming back online
-  useEffect(() => {
-    if (isOnline && role && !loading) {
-      fetchStats();
-    }
-  }, [isOnline]);
+  // Función de refresh manual
+  const refresh = async () => {
+    await refetch();
+  };
 
   return {
-    stats,
-    recientes,
-    enTransitoList,
-    fullData,
-    loading,
-    error,
-    refresh: fetchStats,
-    lastUpdated,
+    stats: data?.estadisticas || null,
+    recientes: data?.recientes || [],
+    enTransitoList: data?.enTransitoList || [],
+    fullData: data || null,
+    loading: isLoading,
+    error: error ? (error as Error).message : null,
+    refresh,
+    lastUpdated: dataUpdatedAt ? new Date(dataUpdatedAt) : null,
   };
 }
 
