@@ -4,7 +4,7 @@
  * Control Room 2077 Design System
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -507,9 +507,19 @@ const CentroControl: React.FC = () => {
     // WebSocket para actualizaciones en tiempo real
     const { on, subscribeToManifiesto } = useWebSocket();
 
-    // Total de residuos tratados (calculado de datos reales)
-    const totalTratados = departamentos.reduce((sum, d) => sum + d.tratados, 0);
-    const maxTratados = Math.max(...departamentos.map(d => d.tratados), 1);
+    // Total de residuos tratados (calculado de datos reales) - MEMOIZADO
+    const totalTratados = useMemo(() =>
+        departamentos.reduce((sum, d) => sum + d.tratados, 0), [departamentos]);
+    const maxTratados = useMemo(() =>
+        Math.max(...departamentos.map(d => d.tratados), 1), [departamentos]);
+
+    // Contadores de viajes por estado - MEMOIZADO para evitar recálculos en render
+    const viajesEnRuta = useMemo(() =>
+        viajesActivos.filter(v => !v.isPaused && v.estado !== 'INCIDENTE').length, [viajesActivos]);
+    const viajesPausados = useMemo(() =>
+        viajesActivos.filter(v => v.isPaused || v.estado === 'PAUSADO').length, [viajesActivos]);
+    const viajesIncidentes = useMemo(() =>
+        viajesActivos.filter(v => v.estado === 'INCIDENTE').length, [viajesActivos]);
 
     // Simular manifiestos en tránsito con ubicaciones de Mendoza
     const simulateEnTransito = useCallback(() => {
@@ -1231,14 +1241,14 @@ const CentroControl: React.FC = () => {
                         <h3><Truck size={18} /> Viajes en Tiempo Real</h3>
                         <div className="viajes-count-badges">
                             <span className="viaje-badge en-curso">
-                                {viajesActivos.filter(v => !v.isPaused && v.estado !== 'INCIDENTE').length} en ruta
+                                {viajesEnRuta} en ruta
                             </span>
                             <span className="viaje-badge pausado">
-                                {viajesActivos.filter(v => v.isPaused || v.estado === 'PAUSADO').length} pausados
+                                {viajesPausados} pausados
                             </span>
-                            {viajesActivos.filter(v => v.estado === 'INCIDENTE').length > 0 && (
+                            {viajesIncidentes > 0 && (
                                 <span className="viaje-badge incidente">
-                                    {viajesActivos.filter(v => v.estado === 'INCIDENTE').length} incidentes
+                                    {viajesIncidentes} incidentes
                                 </span>
                             )}
                         </div>
