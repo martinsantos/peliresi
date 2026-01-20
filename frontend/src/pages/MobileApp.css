@@ -157,7 +157,7 @@
 }
 
 .header-title {
-  font-family: var(--font-display, 'Barlow Condensed', sans-serif);
+  font-family: var(--font-display, 'Plus Jakarta Sans', sans-serif);
   font-size: 20px;
   font-weight: 800;
   text-transform: uppercase;

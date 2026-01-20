@@ -352,6 +352,28 @@
     text-transform: uppercase;
 }
 
+.demo-badge {
+    margin-left: auto;
+    padding: 2px 8px;
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+    font-size: 0.65rem;
+    font-weight: 600;
+    border-radius: 4px;
+    text-transform: uppercase;
+    animation: pulse-demo 2s infinite;
+}
+
+@keyframes pulse-demo {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+.demo-profile-btn.active {
+    background: rgba(245, 158, 11, 0.1);
+    border-left: 2px solid #f59e0b;
+}
+
 .user-menu-section {
     padding: var(--space-2) 0;
 }

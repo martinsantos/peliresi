@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { bulkUploadService } from '../services/bulkUpload.service';
+import { parsePagination, buildPaginationResult } from '../utils/pagination';
 
 const prisma = new PrismaClient();
 
@@ -11,8 +12,9 @@ const prisma = new PrismaClient();
 
 export const getGeneradores = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const { search, activo, page = 1, limit = 10 } = req.query;
-        const skip = (Number(page) - 1) * Number(limit);
+        const { search, activo } = req.query;
+        // Paginación segura con límite máximo de 100
+        const { page, limit, skip } = parsePagination(req.query.page as string, req.query.limit as string);
 
         const where: any = {};
         if (search) {
@@ -29,8 +31,16 @@ export const getGeneradores = async (req: AuthRequest, res: Response, next: Next
             prisma.generador.findMany({
                 where,
                 skip,
-                take: Number(limit),
-                include: {
+                take: limit,
+                select: {
+                    id: true,
+                    razonSocial: true,
+                    cuit: true,
+                    domicilio: true,
+                    telefono: true,
+                    email: true,
+                    activo: true,
+                    categoria: true,
                     usuario: { select: { email: true, nombre: true, apellido: true } },
                     _count: { select: { manifiestos: true } }
                 },
@@ -43,7 +53,7 @@ export const getGeneradores = async (req: AuthRequest, res: Response, next: Next
             success: true,
             data: {
                 generadores,
-                pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) }
+                pagination: buildPaginationResult(page, limit, total)
             }
         });
     } catch (error) {
@@ -153,8 +163,9 @@ export const deleteGenerador = async (req: AuthRequest, res: Response, next: Nex
 
 export const getTransportistas = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const { search, activo, page = 1, limit = 10 } = req.query;
-        const skip = (Number(page) - 1) * Number(limit);
+        const { search, activo } = req.query;
+        // Paginación segura con límite máximo de 100
+        const { page, limit, skip } = parsePagination(req.query.page as string, req.query.limit as string);
 
         const where: any = {};
         if (search) {
@@ -171,11 +182,19 @@ export const getTransportistas = async (req: AuthRequest, res: Response, next: N
             prisma.transportista.findMany({
                 where,
                 skip,
-                take: Number(limit),
-                include: {
+                take: limit,
+                select: {
+                    id: true,
+                    razonSocial: true,
+                    cuit: true,
+                    domicilio: true,
+                    numeroHabilitacion: true,
+                    telefono: true,
+                    email: true,
+                    activo: true,
                     usuario: { select: { email: true, nombre: true, apellido: true } },
-                    vehiculos: true,
-                    choferes: true,
+                    vehiculos: { select: { id: true, patente: true, marca: true, modelo: true, activo: true } },
+                    choferes: { select: { id: true, nombre: true, apellido: true, dni: true, activo: true } },
                     _count: { select: { manifiestos: true } }
                 },
                 orderBy: { razonSocial: 'asc' }
@@ -187,7 +206,7 @@ export const getTransportistas = async (req: AuthRequest, res: Response, next: N
             success: true,
             data: {
                 transportistas,
-                pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) }
+                pagination: buildPaginationResult(page, limit, total)
             }
         });
     } catch (error) {
@@ -328,8 +347,9 @@ export const addChofer = async (req: AuthRequest, res: Response, next: NextFunct
 
 export const getOperadores = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const { search, activo, page = 1, limit = 10 } = req.query;
-        const skip = (Number(page) - 1) * Number(limit);
+        const { search, activo } = req.query;
+        // Paginación segura con límite máximo de 100
+        const { page, limit, skip } = parsePagination(req.query.page as string, req.query.limit as string);
 
         const where: any = {};
         if (search) {
@@ -346,10 +366,26 @@ export const getOperadores = async (req: AuthRequest, res: Response, next: NextF
             prisma.operador.findMany({
                 where,
                 skip,
-                take: Number(limit),
-                include: {
+                take: limit,
+                select: {
+                    id: true,
+                    razonSocial: true,
+                    cuit: true,
+                    numeroHabilitacion: true,
+                    domicilio: true,
+                    telefono: true,
+                    email: true,
+                    categoria: true,
+                    activo: true,
                     usuario: { select: { email: true, nombre: true, apellido: true } },
-                    tratamientos: { include: { tipoResiduo: true } },
+                    tratamientos: {
+                        select: {
+                            id: true,
+                            metodo: true,
+                            activo: true,
+                            tipoResiduo: { select: { id: true, codigo: true, nombre: true } }
+                        }
+                    },
                     _count: { select: { manifiestos: true } }
                 },
                 orderBy: { razonSocial: 'asc' }
@@ -361,7 +397,7 @@ export const getOperadores = async (req: AuthRequest, res: Response, next: NextF
             success: true,
             data: {
                 operadores,
-                pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) }
+                pagination: buildPaginationResult(page, limit, total)
             }
         });
     } catch (error) {

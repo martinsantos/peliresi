@@ -29,41 +29,57 @@
   <div id="root"></div>
   <script type="module" src="/src/main.tsx"></script>
 
-  <!-- CORRECCIÓN v5.2: Forzar limpieza de Service Workers y caché corruptos -->
+  <!-- EMERGENCY v9.0: Forzar limpieza de cache INCONDICIONAL -->
   <script>
     (function() {
-      var VERSION = 'v8.5.1-header-overlap-fix';
+      var EMERGENCY_VERSION = 'v9.0.0-EMERGENCY-CACHE-CLEAR';
       var lastVersion = localStorage.getItem('sitrep_app_version');
+      var emergencyCleared = sessionStorage.getItem('emergency_cache_cleared');
 
-      if (lastVersion !== VERSION) {
-        console.log('🔄 Nueva versión detectada:', VERSION, '(anterior:', lastVersion, ')');
-        localStorage.setItem('sitrep_app_version', VERSION);
+      console.log('[EMERGENCY] Version actual:', EMERGENCY_VERSION, '| Anterior:', lastVersion);
 
-        // Limpiar TODOS los Service Workers
+      // SIEMPRE limpiar en esta versión de emergencia (una vez por sesión)
+      if (!emergencyCleared || lastVersion !== EMERGENCY_VERSION) {
+        console.log('[EMERGENCY] Forzando limpieza de cache...');
+
+        // Marcar que ya limpiamos en esta sesión
+        sessionStorage.setItem('emergency_cache_cleared', 'true');
+        localStorage.setItem('sitrep_app_version', EMERGENCY_VERSION);
+
+        // SIEMPRE limpiar Service Workers
         if ('serviceWorker' in navigator) {
           navigator.serviceWorker.getRegistrations().then(function(registrations) {
-            console.log('🧹 Limpiando', registrations.length, 'Service Workers...');
-            var promises = registrations.map(function(reg) {
-              return reg.unregister();
-            });
-            Promise.all(promises).then(function() {
-              // Limpiar todos los caches
-              if ('caches' in window) {
-                caches.keys().then(function(keys) {
-                  console.log('🧹 Limpiando', keys.length, 'caches...');
-                  return Promise.all(keys.map(function(key) {
-                    return caches.delete(key);
-                  }));
-                }).then(function() {
-                  console.log('✅ Limpieza completa, recargando...');
-                  window.location.reload(true);
-                });
-              } else {
-                window.location.reload(true);
-              }
-            });
+            if (registrations.length > 0) {
+              console.log('[EMERGENCY] Eliminando', registrations.length, 'Service Workers...');
+              registrations.forEach(function(reg) {
+                console.log('[EMERGENCY] Eliminando SW:', reg.scope);
+                reg.unregister();
+              });
+            }
           });
         }
+
+        // SIEMPRE limpiar caches
+        if ('caches' in window) {
+          caches.keys().then(function(keys) {
+            if (keys.length > 0) {
+              console.log('[EMERGENCY] Eliminando', keys.length, 'caches:', keys);
+              keys.forEach(function(key) {
+                caches.delete(key);
+              });
+            }
+          });
+        }
+
+        // Si es primera vez con esta versión, recargar para aplicar
+        if (lastVersion !== EMERGENCY_VERSION) {
+          console.log('[EMERGENCY] Recargando para aplicar limpieza...');
+          setTimeout(function() {
+            window.location.reload(true);
+          }, 500);
+        }
+      } else {
+        console.log('[EMERGENCY] Cache ya limpiado en esta sesión');
       }
     })();
   </script>

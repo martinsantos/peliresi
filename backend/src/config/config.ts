@@ -44,6 +44,18 @@ if (!config.DATABASE_URL) {
 export const isProduction = () => config.NODE_ENV === 'production';
 export const isDevelopment = () => config.NODE_ENV === 'development';
 
+/**
+ * Ambiente DEMO: Permite cambio de perfiles y funciones de prueba
+ * Se activa con:
+ * - NODE_ENV=demo
+ * - NODE_ENV=development
+ * - DEMO_MODE=true (incluso en producción para demos controlados)
+ */
+export const isDemoEnvironment = () =>
+  config.NODE_ENV === 'demo' ||
+  config.NODE_ENV === 'development' ||
+  process.env.DEMO_MODE === 'true';
+
 // Variables requeridas SOLO en producción
 const validateProductionEnv = () => {
   if (!isProduction()) return;

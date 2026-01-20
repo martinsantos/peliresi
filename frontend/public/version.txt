@@ -1,6 +1,6 @@
-v7.3.0-20260113-1500
-SITREP v7.3: Admin View Fix
-- FIX: ADMIN ahora puede ver viaje activo con timer funcionando
-- FIX: GPS tracking solo se activa para TRANSPORTISTA
-- FIX: Auto-save IndexedDB solo para TRANSPORTISTA
-Build: 2026-01-13T15:00:00Z
+v9.0.0-20260120-EMERGENCY
+SITREP v9.0: EMERGENCY FIX - Cache Invalidation
+- FIX CRÍTICO: Service Worker fuerza limpieza de cache
+- FIX: Eliminado preferenciasService que causaba loop infinito
+- FIX: Dashboard simplificado
+Build: 2026-01-20T20:00:00Z

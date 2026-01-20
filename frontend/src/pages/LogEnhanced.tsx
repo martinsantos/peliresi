@@ -1,9 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Activity, AlertTriangle, BarChart3, Calendar, ChevronLeft, ChevronRight,
-  Clock, Download, FileText, Filter, RefreshCw, Search, Shield, TrendingUp,
+  Activity, AlertTriangle, BarChart3, Calendar,
+  Clock, Download, FileText, RefreshCw, Search, Shield, TrendingUp,
   User, Users, Zap, X, Eye, AlertCircle
 } from 'lucide-react';
+import {
+  AdminStatCard,
+  AdminStatsGrid,
+  AdminPageHeader,
+  AdminBadge,
+  AdminPagination,
+  AdminFilterPanel,
+  AdminButton,
+  getModuleVariant
+} from '../components/admin';
 import './LogEnhanced.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3010/api';
@@ -198,35 +208,28 @@ const LogEnhanced: React.FC = () => {
     }
   };
 
-  // Action color
-  const getAccionColor = (accion: string) => {
+  // Badge variants for AdminBadge
+  const getAccionVariant = (accion: string): 'primary' | 'success' | 'warning' | 'danger' | 'info' | 'neutral' => {
     if (accion.includes('LOGIN_FALLIDO') || accion.includes('RECHAZAR') || accion.includes('ELIMINAR'))
-      return { bg: '#fee2e2', color: '#991b1b', border: '#fecaca' };
+      return 'danger';
     if (accion.includes('LOGIN') || accion.includes('LOGOUT'))
-      return { bg: '#dbeafe', color: '#1e40af', border: '#bfdbfe' };
+      return 'info';
     if (accion.includes('CREAR') || accion.includes('APROBAR'))
-      return { bg: '#d1fae5', color: '#065f46', border: '#a7f3d0' };
+      return 'success';
     if (accion.includes('FIRMAR') || accion.includes('CONFIRMAR'))
-      return { bg: '#e0e7ff', color: '#3730a3', border: '#c7d2fe' };
+      return 'primary';
     if (accion.includes('REVERTIR') || accion.includes('REVERSION'))
-      return { bg: '#fef3c7', color: '#92400e', border: '#fde68a' };
-    if (accion.includes('VER') || accion.includes('EXPORTAR'))
-      return { bg: '#f0fdf4', color: '#166534', border: '#bbf7d0' };
-    return { bg: '#f3f4f6', color: '#374151', border: '#e5e7eb' };
+      return 'warning';
+    return 'neutral';
   };
 
-  // Module color
-  const getModuloColor = (modulo: string) => {
-    switch (modulo) {
-      case 'AUTH': return { bg: '#dbeafe', color: '#1e40af', border: '#bfdbfe' };
-      case 'MANIFIESTOS': return { bg: '#d1fae5', color: '#065f46', border: '#a7f3d0' };
-      case 'REPORTES': return { bg: '#fef3c7', color: '#92400e', border: '#fde68a' };
-      case 'USUARIOS': return { bg: '#e0e7ff', color: '#3730a3', border: '#c7d2fe' };
-      case 'REVERSIONES': return { bg: '#fee2e2', color: '#991b1b', border: '#fecaca' };
-      case 'SISTEMA': return { bg: '#f3e8ff', color: '#6b21a8', border: '#e9d5ff' };
-      case 'PUSH': return { bg: '#cffafe', color: '#0e7490', border: '#a5f3fc' };
-      case 'ADMIN_SECTORIAL': return { bg: '#fce7f3', color: '#9d174d', border: '#fbcfe8' };
-      default: return { bg: '#f3f4f6', color: '#374151', border: '#e5e7eb' };
+  const getSeveridadVariant = (severidad?: string): 'primary' | 'success' | 'warning' | 'danger' | 'info' | 'neutral' => {
+    switch (severidad) {
+      case 'CRITICAL': return 'danger';
+      case 'ERROR': return 'danger';
+      case 'WARNING': return 'warning';
+      case 'INFO': return 'info';
+      default: return 'neutral';
     }
   };
 
@@ -275,25 +278,16 @@ const LogEnhanced: React.FC = () => {
                 </div>
                 <div className="entry-content">
                   <div className="entry-header">
-                    <span
-                      className="entry-accion"
-                      style={{ background: getAccionColor(log.accion).bg, color: getAccionColor(log.accion).color, border: `1px solid ${getAccionColor(log.accion).border}` }}
-                    >
+                    <AdminBadge variant={getAccionVariant(log.accion)} size="sm">
                       {log.accion}
-                    </span>
-                    <span
-                      className="entry-modulo"
-                      style={{ background: getModuloColor(log.modulo).bg, color: getModuloColor(log.modulo).color, border: `1px solid ${getModuloColor(log.modulo).border}` }}
-                    >
+                    </AdminBadge>
+                    <AdminBadge variant={getModuleVariant(log.modulo)} size="sm">
                       {log.modulo}
-                    </span>
+                    </AdminBadge>
                     {log.severidad && log.severidad !== 'INFO' && (
-                      <span
-                        className="entry-severidad"
-                        style={{ background: getSeveridadColor(log.severidad).bg, color: getSeveridadColor(log.severidad).color }}
-                      >
+                      <AdminBadge variant={getSeveridadVariant(log.severidad)} size="sm">
                         {getSeveridadColor(log.severidad).label}
-                      </span>
+                      </AdminBadge>
                     )}
                   </div>
                   <div className="entry-user">
@@ -447,68 +441,127 @@ const LogEnhanced: React.FC = () => {
   // Render table view
   const renderTable = () => (
     <div className="table-view">
-      <table className="log-table">
-        <thead>
-          <tr>
-            <th>Fecha/Hora</th>
-            <th>Usuario</th>
-            <th>Accion</th>
-            <th>Modulo</th>
-            <th>Severidad</th>
-            <th>Duracion</th>
-            <th>IP</th>
-          </tr>
-        </thead>
-        <tbody>
-          {logs.map(log => (
-            <tr
-              key={log.id}
-              className={log.severidad === 'ERROR' || log.severidad === 'CRITICAL' ? 'row-error' : ''}
-              onClick={() => { setSelectedLog(log); setShowDiffModal(true); }}
-            >
-              <td className="td-timestamp">
-                <Clock size={14} />
-                {formatDate(log.timestamp)}
-              </td>
-              <td className="td-user">
-                <User size={14} />
-                <div>
-                  <span className="user-name">{log.usuario.nombre}</span>
-                  <span className="user-email">{log.usuario.email}</span>
+      {/* Mobile Cards View */}
+      <div className="admin-mobile-cards admin-show-mobile">
+        {logs.map(log => (
+          <div
+            key={log.id}
+            className={`admin-mobile-card ${log.severidad === 'ERROR' || log.severidad === 'CRITICAL' ? 'admin-mobile-card--error' : ''}`}
+            onClick={() => { setSelectedLog(log); setShowDiffModal(true); }}
+          >
+            <div className="admin-mobile-card__header">
+              <div className="admin-mobile-card__avatar">
+                <User size={18} />
+              </div>
+              <div className="admin-mobile-card__title">
+                <h3>{log.usuario.nombre} {log.usuario.apellido || ''}</h3>
+                <span className="admin-mobile-card__subtitle">{log.usuario.email}</span>
+              </div>
+            </div>
+
+            <div className="admin-mobile-card__badges">
+              <AdminBadge variant={getAccionVariant(log.accion)} size="sm">
+                {log.accion}
+              </AdminBadge>
+              <AdminBadge variant={getModuleVariant(log.modulo)} size="sm">
+                {log.modulo}
+              </AdminBadge>
+              {log.severidad && log.severidad !== 'INFO' && (
+                <AdminBadge variant={getSeveridadVariant(log.severidad)} size="sm">
+                  {log.severidad}
+                </AdminBadge>
+              )}
+            </div>
+
+            <div className="admin-mobile-card__body">
+              <div className="admin-mobile-card__grid">
+                <div className="admin-mobile-card__detail">
+                  <Clock size={14} />
+                  <span>{formatDate(log.timestamp)}</span>
                 </div>
-              </td>
-              <td>
-                <span
-                  className="accion-badge"
-                  style={{ background: getAccionColor(log.accion).bg, color: getAccionColor(log.accion).color, border: `1px solid ${getAccionColor(log.accion).border}` }}
-                >
-                  {log.accion}
-                </span>
-              </td>
-              <td>
-                <span
-                  className="modulo-badge"
-                  style={{ background: getModuloColor(log.modulo).bg, color: getModuloColor(log.modulo).color, border: `1px solid ${getModuloColor(log.modulo).border}` }}
-                >
-                  {log.modulo}
-                </span>
-              </td>
-              <td>
-                {log.severidad && (
-                  <span
-                    className="severidad-badge"
-                    style={{ background: getSeveridadColor(log.severidad).bg, color: getSeveridadColor(log.severidad).color }}
-                  >
-                    {log.severidad}
-                  </span>
+                {log.ip && (
+                  <div className="admin-mobile-card__detail">
+                    <Shield size={14} />
+                    <span>{log.ip}</span>
+                  </div>
                 )}
-              </td>
-              <td>{log.duracionMs ? `${log.duracionMs}ms` : '-'}</td>
-              <td className="td-ip">{log.ip || '-'}</td>
+                {log.duracionMs && (
+                  <div className="admin-mobile-card__detail">
+                    <Zap size={14} />
+                    <span>{log.duracionMs}ms</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {(log.datosAntes || log.datosDespues) && (
+              <div className="admin-mobile-card__actions">
+                <button className="admin-mobile-card__action admin-mobile-card__action--primary">
+                  <Eye size={16} />
+                  Ver cambios
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="admin-hide-mobile">
+        <table className="log-table">
+          <thead>
+            <tr>
+              <th>Fecha/Hora</th>
+              <th>Usuario</th>
+              <th>Accion</th>
+              <th>Modulo</th>
+              <th>Severidad</th>
+              <th>Duracion</th>
+              <th>IP</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {logs.map(log => (
+              <tr
+                key={log.id}
+                className={log.severidad === 'ERROR' || log.severidad === 'CRITICAL' ? 'row-error' : ''}
+                onClick={() => { setSelectedLog(log); setShowDiffModal(true); }}
+              >
+                <td className="td-timestamp">
+                  <Clock size={14} />
+                  {formatDate(log.timestamp)}
+                </td>
+                <td className="td-user">
+                  <User size={14} />
+                  <div>
+                    <span className="user-name">{log.usuario.nombre}</span>
+                    <span className="user-email">{log.usuario.email}</span>
+                  </div>
+                </td>
+                <td>
+                  <AdminBadge variant={getAccionVariant(log.accion)} size="sm">
+                    {log.accion}
+                  </AdminBadge>
+                </td>
+                <td>
+                  <AdminBadge variant={getModuleVariant(log.modulo)} size="sm">
+                    {log.modulo}
+                  </AdminBadge>
+                </td>
+                <td>
+                  {log.severidad && (
+                    <AdminBadge variant={getSeveridadVariant(log.severidad)} size="sm">
+                      {log.severidad}
+                    </AdminBadge>
+                  )}
+                </td>
+                <td>{log.duracionMs ? `${log.duracionMs}ms` : '-'}</td>
+                <td className="td-ip">{log.ip || '-'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 
@@ -575,62 +628,62 @@ const LogEnhanced: React.FC = () => {
   };
 
   return (
-    <div className="log-enhanced-container">
+    <div className="log-enhanced-container admin-page">
       {/* Header */}
-      <div className="page-header">
-        <div className="header-left">
-          <h1><Activity size={28} /> Log de Auditoria Avanzado</h1>
-          <p>Monitoreo en tiempo real y analisis de actividad</p>
-        </div>
-        <div className="header-actions">
-          <button className="btn-icon" onClick={() => setShowFilters(!showFilters)}>
-            <Filter size={18} />
-            Filtros
-          </button>
-          <div className="export-dropdown">
-            <button className="btn-icon" onClick={() => handleExport('csv')}>
-              <Download size={18} />
+      <AdminPageHeader
+        icon={<Activity size={28} />}
+        title="Log de Auditoria Avanzado"
+        subtitle="Monitoreo en tiempo real y analisis de actividad"
+        actions={
+          <>
+            <AdminButton
+              variant="ghost"
+              size="sm"
+              icon={<Download size={16} />}
+              onClick={() => handleExport('csv')}
+            >
               CSV
-            </button>
-          </div>
-          <button className="btn-icon" onClick={() => { fetchLogs(1); fetchStats(); }}>
-            <RefreshCw size={18} className={loading ? 'spinning' : ''} />
-          </button>
-        </div>
-      </div>
+            </AdminButton>
+            <AdminButton
+              variant="ghost"
+              size="sm"
+              icon={<RefreshCw size={16} className={loading ? 'spinning' : ''} />}
+              onClick={() => { fetchLogs(1); fetchStats(); }}
+            >
+              Actualizar
+            </AdminButton>
+          </>
+        }
+      />
 
       {/* Stats Cards */}
       {stats && (
-        <div className="stats-grid">
-          <div className="stat-card stat-primary">
-            <Activity size={24} />
-            <div>
-              <span className="stat-value">{stats.total.toLocaleString()}</span>
-              <span className="stat-label">Total Eventos</span>
-            </div>
-          </div>
-          <div className="stat-card stat-warning">
-            <AlertTriangle size={24} />
-            <div>
-              <span className="stat-value">{alertas.filter(a => !a.resuelta).length}</span>
-              <span className="stat-label">Alertas Activas</span>
-            </div>
-          </div>
-          <div className="stat-card stat-info">
-            <Users size={24} />
-            <div>
-              <span className="stat-value">{new Set(logs.map(l => l.usuarioId)).size}</span>
-              <span className="stat-label">Usuarios Activos</span>
-            </div>
-          </div>
-          <div className="stat-card stat-success">
-            <TrendingUp size={24} />
-            <div>
-              <span className="stat-value">{stats.porModulo.length}</span>
-              <span className="stat-label">Modulos</span>
-            </div>
-          </div>
-        </div>
+        <AdminStatsGrid columns="auto">
+          <AdminStatCard
+            icon={<Activity size={24} />}
+            value={stats.total.toLocaleString()}
+            label="Total Eventos"
+            variant="primary"
+          />
+          <AdminStatCard
+            icon={<AlertTriangle size={24} />}
+            value={alertas.filter(a => !a.resuelta).length}
+            label="Alertas Activas"
+            variant="warning"
+          />
+          <AdminStatCard
+            icon={<Users size={24} />}
+            value={new Set(logs.map(l => l.usuarioId)).size}
+            label="Usuarios Activos"
+            variant="info"
+          />
+          <AdminStatCard
+            icon={<TrendingUp size={24} />}
+            value={stats.porModulo.length}
+            label="Modulos"
+            variant="success"
+          />
+        </AdminStatsGrid>
       )}
 
       {/* View Tabs */}
@@ -665,62 +718,74 @@ const LogEnhanced: React.FC = () => {
       </div>
 
       {/* Filters */}
-      {showFilters && (
-        <div className="filters-panel">
-          <div className="filter-row">
-            <div className="filter-group">
-              <label>Accion</label>
-              <select
-                value={filtros.accion}
-                onChange={e => setFiltros(prev => ({ ...prev, accion: e.target.value }))}
-              >
-                <option value="">Todas</option>
-                {acciones.map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
-            </div>
-            <div className="filter-group">
-              <label>Modulo</label>
-              <select
-                value={filtros.modulo}
-                onChange={e => setFiltros(prev => ({ ...prev, modulo: e.target.value }))}
-              >
-                <option value="">Todos</option>
-                {modulos.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-            <div className="filter-group">
-              <label>Severidad</label>
-              <select
-                value={filtros.severidad}
-                onChange={e => setFiltros(prev => ({ ...prev, severidad: e.target.value }))}
-              >
-                <option value="">Todas</option>
-                {severidades.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div className="filter-group">
-              <label>Desde</label>
-              <input
-                type="date"
-                value={filtros.desde}
-                onChange={e => setFiltros(prev => ({ ...prev, desde: e.target.value }))}
-              />
-            </div>
-            <div className="filter-group">
-              <label>Hasta</label>
-              <input
-                type="date"
-                value={filtros.hasta}
-                onChange={e => setFiltros(prev => ({ ...prev, hasta: e.target.value }))}
-              />
-            </div>
-            <button className="btn-apply" onClick={() => fetchLogs(1)}>
-              <Search size={16} />
+      <AdminFilterPanel
+        isOpen={showFilters}
+        onToggle={() => setShowFilters(!showFilters)}
+        title="Filtros de Auditoria"
+      >
+        <div className="admin-filter-grid">
+          <div className="admin-form-group">
+            <label className="admin-label">Accion</label>
+            <select
+              className="admin-select"
+              value={filtros.accion}
+              onChange={e => setFiltros(prev => ({ ...prev, accion: e.target.value }))}
+            >
+              <option value="">Todas</option>
+              {acciones.map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
+          <div className="admin-form-group">
+            <label className="admin-label">Modulo</label>
+            <select
+              className="admin-select"
+              value={filtros.modulo}
+              onChange={e => setFiltros(prev => ({ ...prev, modulo: e.target.value }))}
+            >
+              <option value="">Todos</option>
+              {modulos.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+          <div className="admin-form-group">
+            <label className="admin-label">Severidad</label>
+            <select
+              className="admin-select"
+              value={filtros.severidad}
+              onChange={e => setFiltros(prev => ({ ...prev, severidad: e.target.value }))}
+            >
+              <option value="">Todas</option>
+              {severidades.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div className="admin-form-group">
+            <label className="admin-label">Desde</label>
+            <input
+              type="date"
+              className="admin-input"
+              value={filtros.desde}
+              onChange={e => setFiltros(prev => ({ ...prev, desde: e.target.value }))}
+            />
+          </div>
+          <div className="admin-form-group">
+            <label className="admin-label">Hasta</label>
+            <input
+              type="date"
+              className="admin-input"
+              value={filtros.hasta}
+              onChange={e => setFiltros(prev => ({ ...prev, hasta: e.target.value }))}
+            />
+          </div>
+          <div className="admin-form-group admin-form-group--action">
+            <AdminButton
+              variant="primary"
+              icon={<Search size={16} />}
+              onClick={() => fetchLogs(1)}
+            >
               Buscar
-            </button>
+            </AdminButton>
           </div>
         </div>
-      )}
+      </AdminFilterPanel>
 
       {/* Loading */}
       {loading && (
@@ -742,20 +807,13 @@ const LogEnhanced: React.FC = () => {
 
       {/* Pagination */}
       {!loading && (activeView === 'timeline' || activeView === 'table') && (
-        <div className="pagination">
-          <span className="pagination-info">
-            Mostrando {logs.length} de {pagination.total} eventos
-          </span>
-          <div className="pagination-controls">
-            <button disabled={pagination.page <= 1} onClick={() => fetchLogs(pagination.page - 1)}>
-              <ChevronLeft size={18} />
-            </button>
-            <span>Pagina {pagination.page} de {pagination.pages}</span>
-            <button disabled={pagination.page >= pagination.pages} onClick={() => fetchLogs(pagination.page + 1)}>
-              <ChevronRight size={18} />
-            </button>
-          </div>
-        </div>
+        <AdminPagination
+          page={pagination.page}
+          totalPages={pagination.pages}
+          totalItems={pagination.total}
+          itemsPerPage={pagination.limit}
+          onPageChange={fetchLogs}
+        />
       )}
 
       {/* Diff Modal */}

@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { preferenciasService, type PreferenciasUsuario } from '../services/preferencias.service';
+// ELIMINADO: preferenciasService causaba loop infinito con error 401
+// import { preferenciasService, type PreferenciasUsuario } from '../services/preferencias.service';
+type PreferenciasUsuario = { mostrarTourInicio: boolean; ultimaVersionTour: string | null };
 import {
     LayoutDashboard,
     FileText,
@@ -38,7 +40,7 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-    const { user, logout, loading } = useAuth();
+    const { user, logout, loading, effectiveRole, effectiveRoleName, demoProfile } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -48,26 +50,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     const [_showTour, _setShowTour] = useState(false);
     const [_showContextualHelp, _setShowContextualHelp] = useState(false);
     const [profileSwitcherOpen, setProfileSwitcherOpen] = useState(false);
-    const [demoProfileActive, setDemoProfileActive] = useState(!!demoService.getActiveProfile());
+    // demoProfileActive ahora viene del context (demoProfile !== null)
     const [_preferencias, _setPreferencias] = useState<PreferenciasUsuario | null>(null);
     const [_prefsLoaded, _setPrefsLoaded] = useState(false);
 
-    // COMENTADO: Cargar preferencias del usuario al iniciar (no se usa por ahora)
-    useEffect(() => {
-        const loadPreferencias = async () => {
-            if (user?.id) {
-                try {
-                    const prefs = await preferenciasService.getMisPreferencias();
-                    _setPreferencias(prefs);
-                } catch (error) {
-                    console.error('Error cargando preferencias:', error);
-                    _setPreferencias({ mostrarTourInicio: false, ultimaVersionTour: null });
-                }
-                _setPrefsLoaded(true);
-            }
-        };
-        loadPreferencias();
-    }, [user?.id]);
+    // ELIMINADO COMPLETAMENTE: preferenciasService causaba loop infinito
+    // La carga de preferencias fue removida para evitar el crash RESULT_CODE_KILLED_BAD_MESSAGE
 
     // COMENTADO: TOUR - Puede bloquear interacción
     // useEffect(() => {
@@ -89,15 +77,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     //     }
     // }, [location.pathname]);
 
-    // COMENTADO: Funciones de tour deshabilitadas
+    // ELIMINADO: Funciones de tour deshabilitadas (preferenciasService eliminado)
     const _handleStartTour = async () => {
         localStorage.removeItem('tourCompleted');
-        try {
-            await preferenciasService.reactivarTour();
-            _setPreferencias(prev => prev ? { ...prev, mostrarTourInicio: true } : null);
-        } catch (error) {
-            console.error('Error reactivando tour:', error);
-        }
+        // preferenciasService.reactivarTour() - ELIMINADO
+        _setPreferencias(prev => prev ? { ...prev, mostrarTourInicio: true } : null);
         navigate('/dashboard');
         setTimeout(() => _setShowTour(true), 300);
     };
@@ -109,11 +93,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         navigate('/login');
     };
 
-    // Obtener el perfil demo activo
-    const activeDemoProfile = demoService.getActiveProfile();
-    const effectiveRole = activeDemoProfile?.role || user?.rol;
-
-    const getRolIcon = () => {
+    // Fix 7: Memoizar getRolIcon para evitar crear JSX nuevo en cada render
+    const rolIcon = useMemo(() => {
         switch (effectiveRole) {
             case 'ADMIN':
                 return <Shield size={20} />;
@@ -126,42 +107,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             default:
                 return <User size={20} />;
         }
-    };
+    }, [effectiveRole]);
 
     const getRolLabel = () => {
-        // Si hay perfil demo con nombre de actor, mostrarlo
-        if (activeDemoProfile?.actorName) {
-            return activeDemoProfile.actorName;
-        }
-        if (activeDemoProfile?.roleName) {
-            return activeDemoProfile.roleName;
-        }
-        switch (effectiveRole) {
-            case 'ADMIN':
-                return 'Administrador SITREP';
-            case 'ADMIN_TRANSPORTISTAS':
-                return 'Admin Transportistas';
-            case 'ADMIN_OPERADORES':
-                return 'Admin Operadores';
-            case 'ADMIN_GENERADORES':
-                return 'Admin Generadores';
-            case 'GENERADOR':
-                return 'Generador de Residuos';
-            case 'TRANSPORTISTA':
-                return 'Transportista';
-            case 'OPERADOR':
-                return 'Operador de Tratamiento';
-            default:
-                return user?.rol;
-        }
-    };
-
-    // Nombre a mostrar (demo o real)
-    const getDisplayName = () => {
-        if (activeDemoProfile?.actorName) {
-            return activeDemoProfile.actorName;
-        }
-        return `${user?.nombre} ${user?.apellido}`;
+        // Usar effectiveRoleName del context (ya calculado)
+        return effectiveRoleName || effectiveRole || '';
     };
 
     // Título Dashboard dinámico por rol (SINCRONIZADO con APP)
@@ -249,7 +199,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         }
     };
 
-    const navItems = getNavItems();
+    // Fix 6: Memoizar navItems para evitar crear arrays nuevos en cada render
+    const navItems = useMemo(() => getNavItems(), [effectiveRole]);
 
     // Loading state while auth is initializing
     if (loading) {
@@ -307,14 +258,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <div className="sidebar-footer">
                     <div className="user-info">
                         <div className="user-avatar">
-                            {getRolIcon()}
+                            {rolIcon}
                         </div>
                         <div className="user-details">
-                            <span className="user-name">{getDisplayName()}</span>
+                            <span className="user-name">{user?.nombre} {user?.apellido}</span>
                             <span className="user-role">{getRolLabel()}</span>
-                            {activeDemoProfile && (
-                                <span className="demo-indicator" style={{ fontSize: '10px', color: '#f59e0b' }}>MODO DEMO</span>
-                            )}
                         </div>
                     </div>
                 </div>
@@ -372,7 +320,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                 onClick={() => setUserMenuOpen(!userMenuOpen)}
                             >
                                 <div className="user-menu-avatar">
-                                    {getRolIcon()}
+                                    {rolIcon}
                                 </div>
                                 <span className="user-menu-name">{user?.nombre}</span>
                                 <ChevronDown size={16} />
@@ -388,7 +336,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                     <div className="user-menu-section">
                                         <span className="user-menu-section-title">Modo Demo:</span>
                                         <button
-                                            className={`user-menu-item demo-profile-btn ${demoProfileActive ? 'active' : ''}`}
+                                            className={`user-menu-item demo-profile-btn ${demoProfile ? 'active' : ''}`}
                                             onClick={() => {
                                                 setUserMenuOpen(false);
                                                 setProfileSwitcherOpen(true);
@@ -396,16 +344,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                         >
                                             <Users size={16} />
                                             <span>Cambiar Perfil</span>
-                                            {demoProfileActive && <span className="demo-badge">DEMO</span>}
+                                            {demoProfile && <span className="demo-badge">DEMO</span>}
                                         </button>
-                                        {demoProfileActive && (
+                                        {demoProfile && (
                                             <button
                                                 className="user-menu-item"
                                                 onClick={() => {
                                                     demoService.clearProfile();
-                                                    setDemoProfileActive(false);
                                                     setUserMenuOpen(false);
-                                                    window.location.reload();
                                                 }}
                                             >
                                                 <X size={16} />
@@ -459,7 +405,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <ProfileSwitcher
                 isOpen={profileSwitcherOpen}
                 onClose={() => setProfileSwitcherOpen(false)}
-                onProfileChanged={() => setDemoProfileActive(!!demoService.getActiveProfile())}
+                onProfileChanged={() => {
+                    // El estado se actualiza automáticamente via evento en AuthContext
+                }}
             />
         </div>
     );

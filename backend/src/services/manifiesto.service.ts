@@ -5,6 +5,7 @@ import { config } from '../config/config';
 import { signatureService } from './signature.service';
 import { wsService, WS_EVENTS } from '../lib/websocket';
 import { redisService } from '../lib/redis';
+import { parsePagination, buildPaginationResult, PAGINATION_DEFAULTS } from '../utils/pagination';
 
 export class ManifiestoService {
   /**
@@ -33,7 +34,8 @@ export class ManifiestoService {
   }
 
   /**
-   * Obtener manifiestos con filtros y paginación
+   * Obtener manifiestos con filtros y paginación segura
+   * Límite máximo: 100 registros por página
    */
   async getManifiestos(filters: {
     estado?: string;
@@ -43,8 +45,10 @@ export class ManifiestoService {
     page?: number;
     limit?: number;
   }) {
-    const { estado, generadorId, transportistaId, operadorId, page = 1, limit = 10 } = filters;
-    const skip = (page - 1) * limit;
+    const { estado, generadorId, transportistaId, operadorId } = filters;
+
+    // Paginación segura con límite máximo
+    const { page, limit, skip } = parsePagination(filters.page, filters.limit);
 
     const where: any = {};
     if (estado) where.estado = estado;
@@ -58,16 +62,33 @@ export class ManifiestoService {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: {
-          generador: true,
-          transportista: true,
-          operador: true,
-          residuos: {
-            include: { tipoResiduo: true }
+        // OPTIMIZADO: Solo campos necesarios para listado
+        select: {
+          id: true,
+          numero: true,
+          estado: true,
+          createdAt: true,
+          updatedAt: true,
+          observaciones: true,
+          generador: {
+            select: { id: true, razonSocial: true, cuit: true }
           },
-          eventos: {
-            orderBy: { createdAt: 'desc' },
-            take: 5
+          transportista: {
+            select: { id: true, razonSocial: true, cuit: true }
+          },
+          operador: {
+            select: { id: true, razonSocial: true }
+          },
+          residuos: {
+            select: {
+              id: true,
+              cantidad: true,
+              unidad: true,
+              tipoResiduo: { select: { codigo: true, nombre: true } }
+            }
+          },
+          _count: {
+            select: { eventos: true }
           }
         }
       }),
@@ -76,12 +97,7 @@ export class ManifiestoService {
 
     return {
       manifiestos,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit)
-      }
+      pagination: buildPaginationResult(page, limit, total)
     };
   }
 

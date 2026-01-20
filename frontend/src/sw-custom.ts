@@ -2,10 +2,32 @@
 /**
  * SITREP Custom Service Worker
  * Implements Background Sync + Workbox Precaching
- * v7.2.0
+ * v9.0.0 - EMERGENCY FIX: Force cache invalidation
  */
 
 import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
+
+// CRITICAL: Force immediate activation to clear old caches
+self.addEventListener('install', () => {
+    console.log('[SW] v9.0 Installing - skipWaiting');
+    self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+    console.log('[SW] v9.0 Activating - claiming clients');
+    event.waitUntil(
+        caches.keys().then((cacheNames) => {
+            return Promise.all(
+                cacheNames.map((cacheName) => {
+                    console.log('[SW] Deleting old cache:', cacheName);
+                    return caches.delete(cacheName);
+                })
+            );
+        }).then(() => {
+            return self.clients.claim();
+        })
+    );
+});
 import { registerRoute } from 'workbox-routing';
 import { NetworkFirst, CacheFirst } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';

@@ -246,7 +246,36 @@ const Reportes: React.FC = () => {
                         {/* Por Tipo de Residuo */}
                         <div className="reporte-section">
                             <h3><BarChart3 size={20} /> Volumen por Tipo de Residuo</h3>
-                            <div className="table-container">
+
+                            {/* Mobile Cards */}
+                            <div className="reporte-mobile-cards">
+                                {Object.entries(reporte.porTipoResiduo).map(([tipo, data]) => {
+                                    const porcentaje = (data.cantidad / reporte.resumen.totalResiduos) * 100;
+                                    return (
+                                        <div key={tipo} className="reporte-mobile-card">
+                                            <div className="reporte-card-header">
+                                                <span className="reporte-card-title">{tipo}</span>
+                                                <span className="reporte-card-badge">{porcentaje.toFixed(1)}%</span>
+                                            </div>
+                                            <div className="reporte-card-body">
+                                                <div className="reporte-card-stat">
+                                                    <span className="stat-value">{data.cantidad.toLocaleString('es-AR', { maximumFractionDigits: 1 })}</span>
+                                                    <span className="stat-unit">{data.unidad}</span>
+                                                </div>
+                                                <div className="reporte-card-bar">
+                                                    <div
+                                                        className="reporte-card-bar-fill"
+                                                        style={{ width: `${porcentaje}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Desktop Table */}
+                            <div className="table-container reporte-desktop-table">
                                 <table>
                                     <thead>
                                         <tr>
@@ -392,7 +421,45 @@ const Reportes: React.FC = () => {
 
                         <div className="reporte-section">
                             <h3><Truck size={20} /> Rendimiento por Transportista</h3>
-                            <div className="table-container">
+
+                            {/* Mobile Cards */}
+                            <div className="reporte-mobile-cards">
+                                {reporteTransporte.transportistas.map((t: any) => (
+                                    <div key={t.cuit} className="transportista-mobile-card">
+                                        <div className="transportista-card-header">
+                                            <div className="transportista-info">
+                                                <span className="transportista-name">{t.transportista}</span>
+                                                <span className="transportista-cuit">{t.cuit}</span>
+                                            </div>
+                                            <span className="transportista-badge">{t.tasaCompletitud}</span>
+                                        </div>
+                                        <div className="transportista-card-body">
+                                            <div className="transportista-stats-grid">
+                                                <div className="transportista-stat">
+                                                    <span className="stat-value">{t.totalViajes}</span>
+                                                    <span className="stat-label">Total</span>
+                                                </div>
+                                                <div className="transportista-stat success">
+                                                    <span className="stat-value">{t.completados}</span>
+                                                    <span className="stat-label">Completados</span>
+                                                </div>
+                                                <div className="transportista-stat warning">
+                                                    <span className="stat-value">{t.enTransito}</span>
+                                                    <span className="stat-label">En Tránsito</span>
+                                                </div>
+                                            </div>
+                                            <div className="transportista-flota">
+                                                <span>{t.vehiculos} vehículos</span>
+                                                <span className="separator">·</span>
+                                                <span>{t.choferes} choferes</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Desktop Table */}
+                            <div className="table-container reporte-desktop-table">
                                 <table>
                                     <thead>
                                         <tr>

@@ -2,13 +2,16 @@
  * RoleSelector - Role selection screen for mobile app
  * Industrial Control Room aesthetic with theme support
  * The first screen users see when accessing the demo app
+ *
+ * Updated: Now shows actor selection when clicking on a role
  */
 
-import React from 'react';
-import { Shield, Factory, Truck, Building2, Download, ChevronRight, Wifi, WifiOff, Bell, BellOff, Loader2, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Shield, Factory, Truck, Building2, Download, ChevronRight, ChevronLeft, Wifi, WifiOff, Bell, BellOff, Loader2, AlertCircle } from 'lucide-react';
 import type { UserRole } from '../../types/mobile.types';
 import { analyticsService } from '../../services/analytics.service';
 import { usePushNotifications } from '../../hooks/usePushNotifications';
+import { demoService, type DemoRole, type DemoActor } from '../../services/demo.service';
 import './RoleSelector.css';
 
 interface RoleSelectorProps {
@@ -63,10 +66,75 @@ const RoleSelector: React.FC<RoleSelectorProps> = ({
 }) => {
     const push = usePushNotifications();
 
+    // State for actor selection
+    const [availableRoles, setAvailableRoles] = useState<DemoRole[]>([]);
+    const [selectedRoleData, setSelectedRoleData] = useState<DemoRole | null>(null);
+    const [loadingActors, setLoadingActors] = useState(false);
+    const [actorError, setActorError] = useState<string | null>(null);
+
+    // Load available profiles on mount
+    useEffect(() => {
+        const loadProfiles = async () => {
+            try {
+                const data = await demoService.getAvailableProfiles();
+                setAvailableRoles(data.availableRoles);
+            } catch (err) {
+                console.log('Demo profiles not available:', err);
+                // Si falla, funciona sin selección de actores (modo legacy)
+            }
+        };
+        if (isOnline) {
+            loadProfiles();
+        }
+    }, [isOnline]);
+
     const handleRoleClick = (role: UserRole) => {
+        // Find role data to check if it has actors
+        const roleData = availableRoles.find(r => r.role === role);
+
+        if (roleData && roleData.actors.length > 0) {
+            // Show actor selection
+            setSelectedRoleData(roleData);
+            setActorError(null);
+        } else {
+            // No actors, proceed directly (ADMIN or fallback)
+            proceedWithRole(role);
+        }
+    };
+
+    const handleActorSelect = async (actor: DemoActor) => {
+        if (!selectedRoleData) return;
+
+        setLoadingActors(true);
+        setActorError(null);
+
+        try {
+            // Validate and apply demo profile
+            await demoService.validateProfile(selectedRoleData.role, actor.id);
+            demoService.setActiveProfile({
+                role: selectedRoleData.role,
+                actorId: actor.id
+            });
+
+            // Proceed with the selected role
+            proceedWithRole(selectedRoleData.role as UserRole);
+        } catch (err: any) {
+            console.error('Error selecting actor:', err);
+            setActorError(err.response?.data?.error?.message || 'Error al seleccionar actor');
+        } finally {
+            setLoadingActors(false);
+        }
+    };
+
+    const proceedWithRole = (role: UserRole) => {
         analyticsService.trackRoleSelection(role);
         analyticsService.trackPageView('home', role);
         onSelectRole(role);
+    };
+
+    const handleBackFromActors = () => {
+        setSelectedRoleData(null);
+        setActorError(null);
     };
 
     const handlePushToggle = async () => {
@@ -79,6 +147,71 @@ const RoleSelector: React.FC<RoleSelectorProps> = ({
             }
         }
     };
+
+    // Actor selection view
+    if (selectedRoleData) {
+        const roleOption = ROLE_OPTIONS.find(r => r.role === selectedRoleData.role);
+        return (
+            <div className="app-container role-selector-container">
+                <div className="connectivity-float">
+                    <div className={`conn-badge ${isOnline ? 'online' : 'offline'}`}>
+                        {isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
+                        <span>{isOnline ? 'Online' : 'Offline'}</span>
+                    </div>
+                </div>
+
+                <div className="role-selection actor-selection">
+                    {/* Back button */}
+                    <button className="actor-back-btn" onClick={handleBackFromActors}>
+                        <ChevronLeft size={24} />
+                        <span>Volver</span>
+                    </button>
+
+                    {/* Header with role info */}
+                    <div className={`actor-header ${roleOption?.colorClass || ''}`}>
+                        <div className="actor-header-icon">
+                            {roleOption?.icon}
+                        </div>
+                        <h2>{selectedRoleData.name}</h2>
+                        <p>{selectedRoleData.description}</p>
+                    </div>
+
+                    {/* Actor list */}
+                    <div className="actor-list">
+                        <p className="actor-list-hint">Selecciona un {selectedRoleData.name.toLowerCase()}:</p>
+
+                        {selectedRoleData.actors.map((actor, index) => (
+                            <button
+                                key={actor.id}
+                                className="actor-btn"
+                                onClick={() => handleActorSelect(actor)}
+                                disabled={loadingActors}
+                                style={{ animationDelay: `${index * 30}ms` }}
+                            >
+                                <div className="actor-btn-info">
+                                    <span className="actor-btn-name">{actor.name}</span>
+                                    <span className="actor-btn-detail">{actor.cuit} · {actor.detail}</span>
+                                </div>
+                                {loadingActors ? (
+                                    <Loader2 size={18} className="animate-spin" />
+                                ) : (
+                                    <ChevronRight size={18} />
+                                )}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Error */}
+                    {actorError && (
+                        <div className="error-banner">
+                            <AlertCircle size={16} />
+                            <span>{actorError}</span>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="app-container role-selector-container">

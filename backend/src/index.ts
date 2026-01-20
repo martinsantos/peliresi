@@ -32,6 +32,7 @@ import configRoutes from './routes/config.routes';
 import cronRoutes from './routes/cron.routes';
 import preferenciasRoutes from './routes/preferencias.routes';
 import adminSectorialRoutes from './routes/admin-sectorial.routes';
+import demoRoutes from './routes/demo.routes';
 import cronService from './services/cron.service';
 
 const app = express();
@@ -204,6 +205,7 @@ app.use('/api/config', apiLimiter, configRoutes);
 app.use('/api/cron', apiLimiter, cronRoutes);
 app.use('/api/preferencias', apiLimiter, preferenciasRoutes);
 app.use('/api/admin-sectorial', apiLimiter, adminSectorialRoutes);
+app.use('/api/demo', apiLimiter, demoRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

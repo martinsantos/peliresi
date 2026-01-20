@@ -9,10 +9,19 @@ import {
   Search,
   Filter,
   RefreshCw,
-  FileText
+  FileText,
+  Phone,
+  Mail,
+  User,
+  MapPin
 } from 'lucide-react';
 import axios from 'axios';
-import './AdminSectorialPanel.css';
+import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
+import { AdminStatsGrid } from '../../components/admin/AdminStatsGrid';
+import { AdminStatCard } from '../../components/admin/AdminStatCard';
+import { AdminBadge } from '../../components/admin/AdminBadge';
+import { AdminPagination } from '../../components/admin/AdminPagination';
+import '../../components/admin/admin.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3010/api';
 
@@ -52,6 +61,8 @@ const AdminTransportistasPanel: React.FC = () => {
   const [filtroActivo, setFiltroActivo] = useState<string>('todos');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const ITEMS_PER_PAGE = 10;
 
   const getHeaders = () => {
     const token = localStorage.getItem('accessToken');
@@ -77,7 +88,7 @@ const AdminTransportistasPanel: React.FC = () => {
     try {
       const params = new URLSearchParams();
       params.append('page', page.toString());
-      params.append('limit', '10');
+      params.append('limit', ITEMS_PER_PAGE.toString());
       if (busqueda) params.append('busqueda', busqueda);
       if (filtroActivo !== 'todos') params.append('activo', filtroActivo);
 
@@ -87,6 +98,7 @@ const AdminTransportistasPanel: React.FC = () => {
       );
       setTransportistas(response.data.data.transportistas);
       setTotalPages(response.data.data.pagination.totalPages);
+      setTotalItems(response.data.data.pagination.total || response.data.data.transportistas.length);
     } catch (error) {
       console.error('Error cargando transportistas:', error);
     } finally {
@@ -119,230 +131,298 @@ const AdminTransportistasPanel: React.FC = () => {
     cargarTransportistas();
   };
 
+  const handleRefresh = () => {
+    cargarDashboard();
+    cargarTransportistas();
+  };
+
   return (
-    <div className="admin-sectorial-panel">
-      <div className="panel-header">
-        <div className="header-title">
-          <Truck className="header-icon" />
-          <div>
-            <h1>Panel Admin Transportistas</h1>
-            <p>Gestion de transportistas, vehiculos y choferes</p>
-          </div>
-        </div>
-        <button className="btn-refresh" onClick={() => { cargarDashboard(); cargarTransportistas(); }}>
-          <RefreshCw size={18} />
-          Actualizar
-        </button>
-      </div>
+    <div className="admin-page">
+      {/* Header */}
+      <AdminPageHeader
+        icon={<Truck size={24} />}
+        title="Panel Admin Transportistas"
+        subtitle="Gestión de transportistas, vehículos y choferes"
+        actions={
+          <button className="admin-btn admin-btn--secondary" onClick={handleRefresh}>
+            <RefreshCw size={18} />
+            <span className="admin-hide-mobile">Actualizar</span>
+          </button>
+        }
+      />
 
       {/* Stats Cards */}
       {stats && (
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-icon blue">
-              <Truck size={24} />
-            </div>
-            <div className="stat-content">
-              <span className="stat-value">{stats.totalTransportistas}</span>
-              <span className="stat-label">Total Transportistas</span>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-icon green">
-              <CheckCircle size={24} />
-            </div>
-            <div className="stat-content">
-              <span className="stat-value">{stats.transportistasActivos}</span>
-              <span className="stat-label">Activos</span>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-icon purple">
-              <Car size={24} />
-            </div>
-            <div className="stat-content">
-              <span className="stat-value">{stats.totalVehiculos}</span>
-              <span className="stat-label">Vehiculos</span>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-icon orange">
-              <Users size={24} />
-            </div>
-            <div className="stat-content">
-              <span className="stat-value">{stats.totalChoferes}</span>
-              <span className="stat-label">Choferes</span>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-icon yellow">
-              <Clock size={24} />
-            </div>
-            <div className="stat-content">
-              <span className="stat-value">{stats.manifestosEnTransito}</span>
-              <span className="stat-label">En Transito</span>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-icon teal">
-              <TrendingUp size={24} />
-            </div>
-            <div className="stat-content">
-              <span className="stat-value">{stats.manifestosEntregados}</span>
-              <span className="stat-label">Entregados</span>
-            </div>
-          </div>
-        </div>
+        <AdminStatsGrid columns={3}>
+          <AdminStatCard
+            icon={<Truck size={22} />}
+            value={stats.totalTransportistas}
+            label="Total Transportistas"
+            variant="primary"
+          />
+          <AdminStatCard
+            icon={<CheckCircle size={22} />}
+            value={stats.transportistasActivos}
+            label="Activos"
+            variant="success"
+          />
+          <AdminStatCard
+            icon={<Car size={22} />}
+            value={stats.totalVehiculos}
+            label="Vehículos"
+            variant="info"
+          />
+          <AdminStatCard
+            icon={<Users size={22} />}
+            value={stats.totalChoferes}
+            label="Choferes"
+            variant="warning"
+          />
+          <AdminStatCard
+            icon={<Clock size={22} />}
+            value={stats.manifestosEnTransito}
+            label="En Tránsito"
+            variant="primary"
+          />
+          <AdminStatCard
+            icon={<TrendingUp size={22} />}
+            value={stats.manifestosEntregados}
+            label="Entregados"
+            variant="success"
+          />
+        </AdminStatsGrid>
       )}
 
-      {/* Filtros y Busqueda */}
-      <div className="filters-section">
-        <form onSubmit={handleBuscar} className="search-form">
-          <div className="search-input-wrapper">
+      {/* Filtros y Búsqueda */}
+      <div className="admin-filters">
+        <form onSubmit={handleBuscar} className="admin-search-form">
+          <div className="admin-search-input">
             <Search size={18} />
             <input
               type="text"
-              placeholder="Buscar por razon social o CUIT..."
+              placeholder="Buscar por razón social o CUIT..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
             />
           </div>
-          <button type="submit" className="btn-search">Buscar</button>
+          <button type="submit" className="admin-btn admin-btn--primary admin-touch-target">
+            Buscar
+          </button>
         </form>
 
-        <div className="filter-buttons">
-          <Filter size={18} />
-          <button
-            className={`filter-btn ${filtroActivo === 'todos' ? 'active' : ''}`}
-            onClick={() => { setFiltroActivo('todos'); setPage(1); }}
-          >
-            Todos
-          </button>
-          <button
-            className={`filter-btn ${filtroActivo === 'true' ? 'active' : ''}`}
-            onClick={() => { setFiltroActivo('true'); setPage(1); }}
-          >
-            Activos
-          </button>
-          <button
-            className={`filter-btn ${filtroActivo === 'false' ? 'active' : ''}`}
-            onClick={() => { setFiltroActivo('false'); setPage(1); }}
-          >
-            Inactivos
-          </button>
+        <div className="admin-filter-group">
+          <Filter size={18} className="admin-filter-icon" />
+          <div className="admin-filter-buttons">
+            <button
+              className={`admin-filter-btn ${filtroActivo === 'todos' ? 'admin-filter-btn--active' : ''}`}
+              onClick={() => { setFiltroActivo('todos'); setPage(1); }}
+            >
+              Todos
+            </button>
+            <button
+              className={`admin-filter-btn ${filtroActivo === 'true' ? 'admin-filter-btn--active' : ''}`}
+              onClick={() => { setFiltroActivo('true'); setPage(1); }}
+            >
+              Activos
+            </button>
+            <button
+              className={`admin-filter-btn ${filtroActivo === 'false' ? 'admin-filter-btn--active' : ''}`}
+              onClick={() => { setFiltroActivo('false'); setPage(1); }}
+            >
+              Inactivos
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Lista de Transportistas */}
-      <div className="list-section">
-        <h2>
+      <div className="admin-section">
+        <h2 className="admin-section-title">
           <FileText size={20} />
           Listado de Transportistas
         </h2>
 
         {loading ? (
-          <div className="loading">Cargando...</div>
+          <div className="admin-loading">
+            <RefreshCw className="admin-loading-spinner" size={24} />
+            <span>Cargando...</span>
+          </div>
         ) : (
-          <div className="transportistas-list">
-            {transportistas.map((t) => (
-              <div key={t.id} className="transportista-card">
-                <div className="card-header">
-                  <div className="card-title">
-                    <h3>{t.razonSocial}</h3>
-                    <span className="cuit">CUIT: {t.cuit}</span>
+          <>
+            {/* Mobile Cards View */}
+            <div className="admin-mobile-cards admin-show-mobile">
+              {transportistas.map((t) => (
+                <div key={t.id} className="admin-mobile-card">
+                  <div className="admin-mobile-card__header">
+                    <div className="admin-mobile-card__avatar">
+                      <Truck size={20} />
+                    </div>
+                    <div className="admin-mobile-card__title">
+                      <h3>{t.razonSocial}</h3>
+                      <span className="admin-mobile-card__subtitle">CUIT: {t.cuit}</span>
+                    </div>
                   </div>
-                  <div className="card-badges">
-                    <span className={`badge ${t.activo ? 'badge-active' : 'badge-inactive'}`}>
+
+                  <div className="admin-mobile-card__badges">
+                    <AdminBadge variant={t.activo ? 'success' : 'danger'} size="sm">
                       {t.activo ? 'Activo' : 'Inactivo'}
-                    </span>
+                    </AdminBadge>
                     {!t.usuario.aprobado && (
-                      <span className="badge badge-pending">Pendiente Aprobacion</span>
+                      <AdminBadge variant="warning" size="sm">
+                        Pendiente
+                      </AdminBadge>
                     )}
                   </div>
+
+                  <div className="admin-mobile-card__body">
+                    <div className="admin-mobile-card__grid">
+                      <div className="admin-mobile-card__detail">
+                        <User size={14} />
+                        <span>{t.usuario.nombre} {t.usuario.apellido}</span>
+                      </div>
+                      <div className="admin-mobile-card__detail">
+                        <Mail size={14} />
+                        <span>{t.usuario.email}</span>
+                      </div>
+                      <div className="admin-mobile-card__detail">
+                        <Phone size={14} />
+                        <span>{t.telefono}</span>
+                      </div>
+                      <div className="admin-mobile-card__detail">
+                        <MapPin size={14} />
+                        <span>{t.domicilio}</span>
+                      </div>
+                    </div>
+
+                    <div className="admin-mobile-card__stats">
+                      <div className="admin-mobile-card__stat">
+                        <Car size={14} />
+                        <span>{t.vehiculos.length} vehículos</span>
+                      </div>
+                      <div className="admin-mobile-card__stat">
+                        <Users size={14} />
+                        <span>{t.choferes.length} choferes</span>
+                      </div>
+                      <div className="admin-mobile-card__stat">
+                        <FileText size={14} />
+                        <span>{t._count.manifiestos} manifiestos</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {!t.usuario.aprobado && (
+                    <div className="admin-mobile-card__actions">
+                      <button
+                        className="admin-mobile-card__action admin-mobile-card__action--success"
+                        onClick={() => aprobarTransportista(t.id)}
+                      >
+                        <CheckCircle size={16} />
+                        Aprobar Transportista
+                      </button>
+                    </div>
+                  )}
                 </div>
+              ))}
+            </div>
 
-                <div className="card-body">
-                  <div className="card-info">
-                    <div className="info-item">
-                      <span className="label">Contacto:</span>
-                      <span>{t.usuario.nombre} {t.usuario.apellido}</span>
-                    </div>
-                    <div className="info-item">
-                      <span className="label">Email:</span>
-                      <span>{t.usuario.email}</span>
-                    </div>
-                    <div className="info-item">
-                      <span className="label">Telefono:</span>
-                      <span>{t.telefono}</span>
-                    </div>
-                    <div className="info-item">
-                      <span className="label">Domicilio:</span>
-                      <span>{t.domicilio}</span>
-                    </div>
-                  </div>
-
-                  <div className="card-stats">
-                    <div className="mini-stat">
-                      <Car size={16} />
-                      <span>{t.vehiculos.length} vehiculos</span>
-                    </div>
-                    <div className="mini-stat">
-                      <Users size={16} />
-                      <span>{t.choferes.length} choferes</span>
-                    </div>
-                    <div className="mini-stat">
-                      <FileText size={16} />
-                      <span>{t._count.manifiestos} manifiestos</span>
-                    </div>
-                  </div>
-                </div>
-
-                {!t.usuario.aprobado && (
-                  <div className="card-actions">
-                    <button
-                      className="btn-aprobar"
-                      onClick={() => aprobarTransportista(t.id)}
-                    >
-                      <CheckCircle size={16} />
-                      Aprobar Transportista
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
+            {/* Desktop Table View */}
+            <div className="admin-table-container admin-hide-mobile">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Razón Social</th>
+                    <th>CUIT</th>
+                    <th>Contacto</th>
+                    <th>Flota</th>
+                    <th>Estado</th>
+                    <th>Manifiestos</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transportistas.map((t) => (
+                    <tr key={t.id}>
+                      <td>
+                        <div className="admin-table-cell-main">
+                          <span className="admin-table-cell-title">{t.razonSocial}</span>
+                          <span className="admin-table-cell-subtitle">{t.domicilio}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <code className="admin-code">{t.cuit}</code>
+                      </td>
+                      <td>
+                        <div className="admin-table-cell-main">
+                          <span>{t.usuario.nombre} {t.usuario.apellido}</span>
+                          <span className="admin-table-cell-subtitle">{t.usuario.email}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="admin-table-fleet">
+                          <span className="admin-table-count">
+                            <Car size={14} />
+                            {t.vehiculos.length}
+                          </span>
+                          <span className="admin-table-count">
+                            <Users size={14} />
+                            {t.choferes.length}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="admin-badge-stack">
+                          <AdminBadge variant={t.activo ? 'success' : 'danger'} size="sm">
+                            {t.activo ? 'Activo' : 'Inactivo'}
+                          </AdminBadge>
+                          {!t.usuario.aprobado && (
+                            <AdminBadge variant="warning" size="sm">
+                              Pendiente
+                            </AdminBadge>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <span className="admin-table-count">
+                          <FileText size={14} />
+                          {t._count.manifiestos}
+                        </span>
+                      </td>
+                      <td>
+                        {!t.usuario.aprobado ? (
+                          <button
+                            className="admin-btn admin-btn--success admin-btn--sm"
+                            onClick={() => aprobarTransportista(t.id)}
+                          >
+                            <CheckCircle size={14} />
+                            Aprobar
+                          </button>
+                        ) : (
+                          <span className="admin-text-muted">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
             {transportistas.length === 0 && (
-              <div className="empty-state">
+              <div className="admin-empty-state">
                 <Truck size={48} />
                 <p>No se encontraron transportistas</p>
               </div>
             )}
-          </div>
+          </>
         )}
 
-        {/* Paginacion */}
-        {totalPages > 1 && (
-          <div className="pagination">
-            <button
-              disabled={page === 1}
-              onClick={() => setPage(page - 1)}
-            >
-              Anterior
-            </button>
-            <span>Pagina {page} de {totalPages}</span>
-            <button
-              disabled={page === totalPages}
-              onClick={() => setPage(page + 1)}
-            >
-              Siguiente
-            </button>
-          </div>
-        )}
+        {/* Paginación */}
+        <AdminPagination
+          page={page}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          itemsPerPage={ITEMS_PER_PAGE}
+          onPageChange={setPage}
+        />
       </div>
     </div>
   );

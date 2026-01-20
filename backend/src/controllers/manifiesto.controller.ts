@@ -4,7 +4,9 @@ import { manifiestoService } from '../services/manifiesto.service';
 import { notificationService } from '../services/notification.service';
 import prisma from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
-import { isProduction } from '../config/config';
+import { isProduction, config } from '../config/config';
+import QRCode from 'qrcode';
+import { parsePagination, buildPaginationResult } from '../utils/pagination';
 
 /**
  * Controller for Manifest Lifecycle
@@ -680,6 +682,23 @@ export const aprobarManifiesto = async (req: AuthRequest, res: Response, next: N
             throw new AppError('Solo se pueden aprobar manifiestos en estado PENDIENTE_APROBACION', 400);
         }
 
+        // Generar QR Code para el manifiesto aprobado
+        const baseUrl = config.CORS_ORIGIN.split(',')[0].trim();
+        const verificationUrl = `${baseUrl}/verify/${id}`;
+        let qrCode = '';
+        try {
+            qrCode = await QRCode.toDataURL(verificationUrl);
+        } catch (qrErr) {
+            console.error('Error generando QR:', qrErr);
+            qrCode = `data:text/plain;base64,${Buffer.from(verificationUrl).toString('base64')}`;
+        }
+
+        // Actualizar manifiesto con QR y nuevo estado
+        await prisma.manifiesto.update({
+            where: { id },
+            data: { qrCode }
+        });
+
         // Actualizar estado
         const manifiestoActualizado = await manifiestoService.updateEstado(
             id,
@@ -783,6 +802,7 @@ export const rechazarAprobacion = async (req: AuthRequest, res: Response, next: 
 
 /**
  * Obtener manifiestos pendientes de aprobación (DGFA)
+ * Con paginación para evitar cargar todos de golpe
  */
 export const getManifiestosPendientes = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -790,22 +810,44 @@ export const getManifiestosPendientes = async (req: AuthRequest, res: Response, 
             throw new AppError('Solo los administradores pueden ver manifiestos pendientes', 403);
         }
 
-        const manifiestos = await prisma.manifiesto.findMany({
-            where: { estado: 'PENDIENTE_APROBACION' },
-            orderBy: { createdAt: 'asc' }, // FIFO - primero los más antiguos
-            include: {
-                generador: { select: { razonSocial: true, cuit: true, domicilio: true } },
-                transportista: { select: { razonSocial: true } },
-                operador: { select: { razonSocial: true } },
-                residuos: { include: { tipoResiduo: { select: { codigo: true, nombre: true } } } }
-            }
-        });
+        // Paginación segura con límite máximo de 100
+        const { page, limit, skip } = parsePagination(req.query.page as string, req.query.limit as string);
+
+        const where = { estado: 'PENDIENTE_APROBACION' as const };
+
+        const [manifiestos, total] = await Promise.all([
+            prisma.manifiesto.findMany({
+                where,
+                skip,
+                take: limit,
+                orderBy: { createdAt: 'asc' }, // FIFO - primero los más antiguos
+                select: {
+                    id: true,
+                    numero: true,
+                    estado: true,
+                    createdAt: true,
+                    observaciones: true,
+                    generador: { select: { razonSocial: true, cuit: true, domicilio: true } },
+                    transportista: { select: { razonSocial: true } },
+                    operador: { select: { razonSocial: true } },
+                    residuos: {
+                        select: {
+                            id: true,
+                            cantidad: true,
+                            unidad: true,
+                            tipoResiduo: { select: { codigo: true, nombre: true } }
+                        }
+                    }
+                }
+            }),
+            prisma.manifiesto.count({ where })
+        ]);
 
         res.json({
             success: true,
             data: {
                 manifiestos,
-                total: manifiestos.length
+                pagination: buildPaginationResult(page, limit, total)
             }
         });
     } catch (error) {

@@ -1,7 +1,10 @@
 /**
  * ActividadGlobal.css - Timeline Premium Dark Theme
+ * SITREP Design System v4.0 - NASA Control Room Aesthetic
  * Diseño moderno para Timeline de Actividad del Sistema
  */
+
+@import '../components/admin/admin.css';
 
 .actividad-global-page {
   padding: 24px;
@@ -577,6 +580,10 @@
     flex-direction: column;
   }
 
+  .header-content h1 {
+    font-size: 1.5rem;
+  }
+
   .header-actions {
     width: 100%;
   }
@@ -584,6 +591,7 @@
   .header-actions .btn {
     flex: 1;
     justify-content: center;
+    min-height: 44px; /* WCAG touch target */
   }
 
   .filters-panel {
@@ -595,12 +603,25 @@
     width: 100%;
   }
 
+  .filter-group select,
+  .filter-group input {
+    min-height: 44px; /* WCAG touch target */
+  }
+
   .stats-row {
     grid-template-columns: 1fr;
   }
 
+  .stat-card {
+    padding: 16px;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+  }
+
   .timeline-container {
-    padding: 20px;
+    padding: 16px;
   }
 
   .timeline-items {
@@ -611,6 +632,7 @@
   .timeline-item {
     flex-direction: column;
     gap: 12px;
+    padding: 16px;
   }
 
   .timeline-item::before {
@@ -624,7 +646,62 @@
   }
 
   .timeline-marker {
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px; /* WCAG touch target */
+    min-height: 44px;
+  }
+
+  .timeline-user,
+  .timeline-manifiesto {
+    flex-wrap: wrap;
+  }
+}
+
+/* Small mobile (portrait) */
+@media (max-width: 480px) {
+  .actividad-global-page {
+    padding: 12px;
+  }
+
+  .header-content h1 {
+    font-size: 1.25rem;
+  }
+
+  .timeline-items {
+    margin-left: 0;
+    padding-left: var(--space-3, 12px);
+    border-left: none;
+  }
+
+  .timeline-item::before {
+    display: none;
+  }
+
+  .timeline-date {
+    font-size: 0.75rem;
+    padding: 8px 12px;
+  }
+
+  .timeline-action {
+    font-size: 0.8rem;
+  }
+
+  .timeline-description {
+    font-size: 0.85rem;
+  }
+
+  .timeline-user,
+  .timeline-manifiesto {
+    font-size: 0.8rem;
+  }
+
+  .metadata-item {
+    font-size: 0.75rem;
+  }
+
+  .stat-icon {
+    width: 44px;
+    height: 44px;
   }
 }

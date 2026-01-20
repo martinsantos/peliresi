@@ -9,10 +9,20 @@ import {
   Filter,
   RefreshCw,
   FileText,
-  Recycle
+  Recycle,
+  Phone,
+  Mail,
+  User,
+  MapPin
 } from 'lucide-react';
 import axios from 'axios';
-import './AdminSectorialPanel.css';
+import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
+import { AdminStatsGrid } from '../../components/admin/AdminStatsGrid';
+import { AdminStatCard } from '../../components/admin/AdminStatCard';
+import { AdminBadge } from '../../components/admin/AdminBadge';
+import type { BadgeVariant } from '../../components/admin/AdminBadge';
+import { AdminPagination } from '../../components/admin/AdminPagination';
+import '../../components/admin/admin.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3010/api';
 
@@ -63,6 +73,8 @@ const AdminOperadoresPanel: React.FC = () => {
   const [filtroActivo, setFiltroActivo] = useState<string>('todos');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const ITEMS_PER_PAGE = 10;
 
   const getHeaders = () => {
     const token = localStorage.getItem('accessToken');
@@ -88,7 +100,7 @@ const AdminOperadoresPanel: React.FC = () => {
     try {
       const params = new URLSearchParams();
       params.append('page', page.toString());
-      params.append('limit', '10');
+      params.append('limit', ITEMS_PER_PAGE.toString());
       if (busqueda) params.append('busqueda', busqueda);
       if (filtroActivo !== 'todos') params.append('activo', filtroActivo);
 
@@ -98,6 +110,7 @@ const AdminOperadoresPanel: React.FC = () => {
       );
       setOperadores(response.data.data.operadores);
       setTotalPages(response.data.data.pagination.totalPages);
+      setTotalItems(response.data.data.pagination.total || response.data.data.operadores.length);
     } catch (error) {
       console.error('Error cargando operadores:', error);
     } finally {
@@ -130,248 +143,332 @@ const AdminOperadoresPanel: React.FC = () => {
     cargarOperadores();
   };
 
+  const handleRefresh = () => {
+    cargarDashboard();
+    cargarOperadores();
+  };
+
+  const getCategoriaVariant = (categoria: string): BadgeVariant => {
+    switch (categoria?.toUpperCase()) {
+      case 'CATEGORIA_A': return 'danger';
+      case 'CATEGORIA_B': return 'warning';
+      case 'CATEGORIA_C': return 'info';
+      default: return 'neutral';
+    }
+  };
+
   return (
-    <div className="admin-sectorial-panel">
-      <div className="panel-header">
-        <div className="header-title">
-          <Factory className="header-icon" />
-          <div>
-            <h1>Panel Admin Operadores</h1>
-            <p>Gestion de operadores y tratamientos autorizados</p>
-          </div>
-        </div>
-        <button className="btn-refresh" onClick={() => { cargarDashboard(); cargarOperadores(); }}>
-          <RefreshCw size={18} />
-          Actualizar
-        </button>
-      </div>
+    <div className="admin-page">
+      {/* Header */}
+      <AdminPageHeader
+        icon={<Factory size={24} />}
+        title="Panel Admin Operadores"
+        subtitle="Gestión de operadores y tratamientos autorizados"
+        actions={
+          <button className="admin-btn admin-btn--secondary" onClick={handleRefresh}>
+            <RefreshCw size={18} className={loading ? 'admin-loading-spinner' : ''} />
+            <span className="admin-hide-mobile">Actualizar</span>
+          </button>
+        }
+      />
 
       {/* Stats Cards */}
       {stats && (
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-icon blue">
-              <Factory size={24} />
-            </div>
-            <div className="stat-content">
-              <span className="stat-value">{stats.totalOperadores}</span>
-              <span className="stat-label">Total Operadores</span>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-icon green">
-              <CheckCircle size={24} />
-            </div>
-            <div className="stat-content">
-              <span className="stat-value">{stats.operadoresActivos}</span>
-              <span className="stat-label">Activos</span>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-icon purple">
-              <Recycle size={24} />
-            </div>
-            <div className="stat-content">
-              <span className="stat-value">{stats.totalTratamientos}</span>
-              <span className="stat-label">Tratamientos</span>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-icon orange">
-              <Leaf size={24} />
-            </div>
-            <div className="stat-content">
-              <span className="stat-value">{stats.capacidadTotal?.toLocaleString() || 0} kg</span>
-              <span className="stat-label">Capacidad Total</span>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-icon yellow">
-              <Clock size={24} />
-            </div>
-            <div className="stat-content">
-              <span className="stat-value">{stats.manifestosRecibidos}</span>
-              <span className="stat-label">Recibidos</span>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-icon teal">
-              <TrendingUp size={24} />
-            </div>
-            <div className="stat-content">
-              <span className="stat-value">{stats.manifestosTratados}</span>
-              <span className="stat-label">Tratados</span>
-            </div>
-          </div>
-        </div>
+        <AdminStatsGrid columns={3}>
+          <AdminStatCard
+            icon={<Factory size={22} />}
+            value={stats.totalOperadores}
+            label="Total Operadores"
+            variant="primary"
+          />
+          <AdminStatCard
+            icon={<CheckCircle size={22} />}
+            value={stats.operadoresActivos}
+            label="Activos"
+            variant="success"
+          />
+          <AdminStatCard
+            icon={<Recycle size={22} />}
+            value={stats.totalTratamientos}
+            label="Tratamientos"
+            variant="info"
+          />
+          <AdminStatCard
+            icon={<Leaf size={22} />}
+            value={`${stats.capacidadTotal?.toLocaleString('es-AR') || 0} kg`}
+            label="Capacidad Total"
+            variant="warning"
+          />
+          <AdminStatCard
+            icon={<Clock size={22} />}
+            value={stats.manifestosRecibidos}
+            label="Recibidos"
+            variant="neutral"
+          />
+          <AdminStatCard
+            icon={<TrendingUp size={22} />}
+            value={stats.manifestosTratados}
+            label="Tratados"
+            variant="success"
+          />
+        </AdminStatsGrid>
       )}
 
-      {/* Filtros y Busqueda */}
-      <div className="filters-section">
-        <form onSubmit={handleBuscar} className="search-form">
-          <div className="search-input-wrapper">
+      {/* Filtros y Búsqueda */}
+      <div className="admin-filters">
+        <form onSubmit={handleBuscar} className="admin-search-form">
+          <div className="admin-search-input">
             <Search size={18} />
             <input
               type="text"
-              placeholder="Buscar por razon social o CUIT..."
+              placeholder="Buscar por razón social o CUIT..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
             />
           </div>
-          <button type="submit" className="btn-search">Buscar</button>
+          <button type="submit" className="admin-btn admin-btn--primary admin-touch-target">
+            Buscar
+          </button>
         </form>
 
-        <div className="filter-buttons">
-          <Filter size={18} />
-          <button
-            className={`filter-btn ${filtroActivo === 'todos' ? 'active' : ''}`}
-            onClick={() => { setFiltroActivo('todos'); setPage(1); }}
-          >
-            Todos
-          </button>
-          <button
-            className={`filter-btn ${filtroActivo === 'true' ? 'active' : ''}`}
-            onClick={() => { setFiltroActivo('true'); setPage(1); }}
-          >
-            Activos
-          </button>
-          <button
-            className={`filter-btn ${filtroActivo === 'false' ? 'active' : ''}`}
-            onClick={() => { setFiltroActivo('false'); setPage(1); }}
-          >
-            Inactivos
-          </button>
+        <div className="admin-filter-group">
+          <Filter size={18} className="admin-filter-icon" />
+          <div className="admin-filter-buttons">
+            <button
+              className={`admin-filter-btn ${filtroActivo === 'todos' ? 'admin-filter-btn--active' : ''}`}
+              onClick={() => { setFiltroActivo('todos'); setPage(1); }}
+            >
+              Todos
+            </button>
+            <button
+              className={`admin-filter-btn ${filtroActivo === 'true' ? 'admin-filter-btn--active' : ''}`}
+              onClick={() => { setFiltroActivo('true'); setPage(1); }}
+            >
+              Activos
+            </button>
+            <button
+              className={`admin-filter-btn ${filtroActivo === 'false' ? 'admin-filter-btn--active' : ''}`}
+              onClick={() => { setFiltroActivo('false'); setPage(1); }}
+            >
+              Inactivos
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Lista de Operadores */}
-      <div className="list-section">
-        <h2>
+      <div className="admin-section">
+        <h2 className="admin-section-title">
           <FileText size={20} />
           Listado de Operadores
         </h2>
 
         {loading ? (
-          <div className="loading">Cargando...</div>
+          <div className="admin-loading">
+            <RefreshCw className="admin-loading-spinner" size={24} />
+            <span>Cargando...</span>
+          </div>
         ) : (
-          <div className="transportistas-list">
-            {operadores.map((o) => (
-              <div key={o.id} className="transportista-card">
-                <div className="card-header">
-                  <div className="card-title">
-                    <h3>{o.razonSocial}</h3>
-                    <span className="cuit">CUIT: {o.cuit}</span>
+          <>
+            {/* Mobile Cards View */}
+            <div className="admin-mobile-cards admin-show-mobile">
+              {operadores.map((o) => (
+                <div key={o.id} className="admin-mobile-card">
+                  <div className="admin-mobile-card__header">
+                    <div className="admin-mobile-card__avatar">
+                      <Factory size={20} />
+                    </div>
+                    <div className="admin-mobile-card__title">
+                      <h3>{o.razonSocial}</h3>
+                      <span className="admin-mobile-card__subtitle">CUIT: {o.cuit}</span>
+                    </div>
                   </div>
-                  <div className="card-badges">
-                    <span className={`badge ${o.activo ? 'badge-active' : 'badge-inactive'}`}>
+
+                  <div className="admin-mobile-card__badges">
+                    <AdminBadge variant={o.activo ? 'success' : 'danger'} size="sm">
                       {o.activo ? 'Activo' : 'Inactivo'}
-                    </span>
-                    <span className="badge badge-category">{o.categoria}</span>
+                    </AdminBadge>
+                    <AdminBadge variant={getCategoriaVariant(o.categoria)} size="sm">
+                      {o.categoria || 'Sin categoría'}
+                    </AdminBadge>
                     {!o.usuario.aprobado && (
-                      <span className="badge badge-pending">Pendiente Aprobacion</span>
+                      <AdminBadge variant="warning" size="sm">
+                        Pendiente
+                      </AdminBadge>
                     )}
                   </div>
-                </div>
 
-                <div className="card-body">
-                  <div className="card-info">
-                    <div className="info-item">
-                      <span className="label">Contacto:</span>
-                      <span>{o.usuario.nombre} {o.usuario.apellido}</span>
-                    </div>
-                    <div className="info-item">
-                      <span className="label">Email:</span>
-                      <span>{o.usuario.email}</span>
-                    </div>
-                    <div className="info-item">
-                      <span className="label">Telefono:</span>
-                      <span>{o.telefono}</span>
-                    </div>
-                    <div className="info-item">
-                      <span className="label">Domicilio:</span>
-                      <span>{o.domicilio}</span>
-                    </div>
-                  </div>
-
-                  <div className="card-stats">
-                    <div className="mini-stat">
-                      <Recycle size={16} />
-                      <span>{o.tratamientos?.length || 0} tratamientos</span>
-                    </div>
-                    <div className="mini-stat">
-                      <FileText size={16} />
-                      <span>{o._count.manifiestos} manifiestos</span>
-                    </div>
-                  </div>
-
-                  {/* Tratamientos autorizados */}
-                  {o.tratamientos && o.tratamientos.length > 0 && (
-                    <div className="tratamientos-list">
-                      <h4>Tratamientos Autorizados:</h4>
-                      <div className="tratamientos-grid">
-                        {o.tratamientos.slice(0, 4).map((t) => (
-                          <div key={t.id} className="tratamiento-item">
-                            <span className="tratamiento-codigo">{t.tipoResiduo?.codigo || 'N/A'}</span>
-                            <span className="tratamiento-metodo">{t.metodo}</span>
-                            <span className="tratamiento-capacidad">{t.capacidad} kg/mes</span>
-                          </div>
-                        ))}
-                        {o.tratamientos.length > 4 && (
-                          <div className="tratamiento-item more">
-                            +{o.tratamientos.length - 4} mas
-                          </div>
-                        )}
+                  <div className="admin-mobile-card__body">
+                    <div className="admin-mobile-card__grid">
+                      <div className="admin-mobile-card__detail">
+                        <User size={14} />
+                        <span>{o.usuario.nombre} {o.usuario.apellido}</span>
                       </div>
+                      <div className="admin-mobile-card__detail">
+                        <Mail size={14} />
+                        <span>{o.usuario.email}</span>
+                      </div>
+                      <div className="admin-mobile-card__detail">
+                        <Phone size={14} />
+                        <span>{o.telefono}</span>
+                      </div>
+                      <div className="admin-mobile-card__detail">
+                        <MapPin size={14} />
+                        <span>{o.domicilio}</span>
+                      </div>
+                    </div>
+
+                    <div className="admin-mobile-card__stats">
+                      <div className="admin-mobile-card__stat">
+                        <Recycle size={14} />
+                        <span>{o.tratamientos?.length || 0} tratamientos</span>
+                      </div>
+                      <div className="admin-mobile-card__stat">
+                        <FileText size={14} />
+                        <span>{o._count.manifiestos} manifiestos</span>
+                      </div>
+                    </div>
+
+                    {/* Tratamientos (mobile simplified) */}
+                    {o.tratamientos && o.tratamientos.length > 0 && (
+                      <div className="admin-mobile-card__extra">
+                        <span className="admin-mobile-card__extra-label">Tratamientos:</span>
+                        <div className="admin-mobile-card__tags">
+                          {o.tratamientos.slice(0, 3).map((t) => (
+                            <span key={t.id} className="admin-mobile-card__tag">
+                              {t.tipoResiduo?.codigo || 'N/A'}
+                            </span>
+                          ))}
+                          {o.tratamientos.length > 3 && (
+                            <span className="admin-mobile-card__tag admin-mobile-card__tag--more">
+                              +{o.tratamientos.length - 3}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {!o.usuario.aprobado && (
+                    <div className="admin-mobile-card__actions">
+                      <button
+                        className="admin-mobile-card__action admin-mobile-card__action--success"
+                        onClick={() => aprobarOperador(o.id)}
+                      >
+                        <CheckCircle size={16} />
+                        Aprobar Operador
+                      </button>
                     </div>
                   )}
                 </div>
+              ))}
+            </div>
 
-                {!o.usuario.aprobado && (
-                  <div className="card-actions">
-                    <button
-                      className="btn-aprobar"
-                      onClick={() => aprobarOperador(o.id)}
-                    >
-                      <CheckCircle size={16} />
-                      Aprobar Operador
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
+            {/* Desktop Table View */}
+            <div className="admin-table-container admin-hide-mobile">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Razón Social</th>
+                    <th>CUIT</th>
+                    <th>Contacto</th>
+                    <th>Categoría</th>
+                    <th>Tratamientos</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {operadores.map((o) => (
+                    <tr key={o.id}>
+                      <td>
+                        <div className="admin-table-cell-main">
+                          <span className="admin-table-cell-title">{o.razonSocial}</span>
+                          <span className="admin-table-cell-subtitle">{o.domicilio}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <code className="admin-code">{o.cuit}</code>
+                      </td>
+                      <td>
+                        <div className="admin-table-cell-main">
+                          <span>{o.usuario.nombre} {o.usuario.apellido}</span>
+                          <span className="admin-table-cell-subtitle">{o.usuario.email}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <AdminBadge variant={getCategoriaVariant(o.categoria)} size="sm">
+                          {o.categoria || 'Sin categoría'}
+                        </AdminBadge>
+                      </td>
+                      <td>
+                        <div className="admin-table-treatments">
+                          <span className="admin-table-count">
+                            <Recycle size={14} />
+                            {o.tratamientos?.length || 0}
+                          </span>
+                          {o.tratamientos && o.tratamientos.length > 0 && (
+                            <div className="admin-table-treatment-codes">
+                              {o.tratamientos.slice(0, 2).map((t) => (
+                                <span key={t.id} className="admin-code admin-code--sm">
+                                  {t.tipoResiduo?.codigo || 'N/A'}
+                                </span>
+                              ))}
+                              {o.tratamientos.length > 2 && (
+                                <span className="admin-text-muted">+{o.tratamientos.length - 2}</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="admin-badge-stack">
+                          <AdminBadge variant={o.activo ? 'success' : 'danger'} size="sm">
+                            {o.activo ? 'Activo' : 'Inactivo'}
+                          </AdminBadge>
+                          {!o.usuario.aprobado && (
+                            <AdminBadge variant="warning" size="sm">
+                              Pendiente
+                            </AdminBadge>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        {!o.usuario.aprobado ? (
+                          <button
+                            className="admin-btn admin-btn--success admin-btn--sm"
+                            onClick={() => aprobarOperador(o.id)}
+                          >
+                            <CheckCircle size={14} />
+                            Aprobar
+                          </button>
+                        ) : (
+                          <span className="admin-text-muted">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
             {operadores.length === 0 && (
-              <div className="empty-state">
+              <div className="admin-empty-state">
                 <Factory size={48} />
                 <p>No se encontraron operadores</p>
               </div>
             )}
-          </div>
+          </>
         )}
 
-        {/* Paginacion */}
-        {totalPages > 1 && (
-          <div className="pagination">
-            <button
-              disabled={page === 1}
-              onClick={() => setPage(page - 1)}
-            >
-              Anterior
-            </button>
-            <span>Pagina {page} de {totalPages}</span>
-            <button
-              disabled={page === totalPages}
-              onClick={() => setPage(page + 1)}
-            >
-              Siguiente
-            </button>
-          </div>
-        )}
+        {/* Paginación */}
+        <AdminPagination
+          page={page}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          itemsPerPage={ITEMS_PER_PAGE}
+          onPageChange={setPage}
+        />
       </div>
     </div>
   );

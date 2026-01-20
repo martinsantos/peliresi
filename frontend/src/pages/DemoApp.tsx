@@ -3,12 +3,12 @@ import MobileApp from './MobileApp';
 import {
     ArrowLeft, Smartphone, Zap, WifiOff, QrCode, MapPin, Bell, Users,
     FileText, Truck, Factory, Building2, Plus, Eye, Navigation, UserCircle,
-    ListChecks, Settings, ChevronRight, ChevronDown, HelpCircle
+    ListChecks, Settings, ChevronRight, ChevronDown
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import InstallPWAButton from '../components/InstallPWAButton';
 import ConnectivityIndicator from '../components/ConnectivityIndicator';
-import DemoAppOnboarding from '../components/DemoAppOnboarding';
+// import DemoAppOnboarding from '../components/DemoAppOnboarding'; // COMENTADO: Bloquea interacción
 import './DemoApp.css';
 
 // Pantallas por rol con casos de uso
@@ -69,26 +69,25 @@ const roleScreens = {
 
 const DemoApp: React.FC = () => {
     const [expandedRole, setExpandedRole] = useState<string | null>(null);
-    // Onboarding solo si no se ha completado antes (opcional)
-    const [showOnboarding, setShowOnboarding] = useState(() => {
-        return localStorage.getItem('demoAppOnboardingCompleted') !== 'true';
-    });
-
-    const handleOnboardingComplete = () => {
-        setShowOnboarding(false);
-    };
-
-    const handleShowOnboarding = () => {
-        setShowOnboarding(true);
-    };
+    // COMENTADO: Onboarding bloquea interacción con overlay
+    // const [showOnboarding, setShowOnboarding] = useState(() => {
+    //     return localStorage.getItem('demoAppOnboardingCompleted') !== 'true';
+    // });
+    // const handleOnboardingComplete = () => {
+    //     setShowOnboarding(false);
+    // };
+    // const handleShowOnboarding = () => {
+    //     setShowOnboarding(true);
+    // };
 
     return (
         <div className="demo-page">
-            {/* Demo App Onboarding */}
+            {/* COMENTADO: Demo App Onboarding - bloquea interacción
             <DemoAppOnboarding
                 isOpen={showOnboarding}
                 onComplete={handleOnboardingComplete}
             />
+            */}
 
             {/* Top Bar */}
             <div className="demo-topbar">
@@ -97,6 +96,7 @@ const DemoApp: React.FC = () => {
                     <span>Volver al Dashboard Web</span>
                 </Link>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {/* COMENTADO: Botón de tour - onboarding deshabilitado
                     <button
                         onClick={handleShowOnboarding}
                         className="help-tour-btn"
@@ -119,6 +119,7 @@ const DemoApp: React.FC = () => {
                         <HelpCircle size={16} />
                         Ver Tour
                     </button>
+                    */}
                     <ConnectivityIndicator size="small" showLabel={true} />
                 </div>
             </div>

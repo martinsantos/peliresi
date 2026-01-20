@@ -1,532 +1,40 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { manifiestoService } from '../services/manifiesto.service';
-import { usuarioService } from '../services/admin.service';
-import { offlineStorage } from '../services/offlineStorage';
-import { viajesService } from '../services/viajes.service';
 import { demoStats } from '../data/demoDashboard';
-import { demoService } from '../services/demo.service';
 import type { DashboardStats } from '../types';
 import {
     FileText,
-    TrendingUp,
     Truck,
     CheckCircle,
     Clock,
-    AlertTriangle,
     ArrowRight,
     MapPin,
-    Activity,
-    Smartphone,
-    Users,
-    UserCheck,
-    Shield,
-    Factory,
-    Building2,
-    Edit,
-    Award,
-    Package,
-    Recycle,
-    Navigation,
-    QrCode,
-    History,
-    BarChart3
+    Activity
 } from 'lucide-react';
-import {
-    AreaChart,
-    Area,
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    ResponsiveContainer
-} from 'recharts';
-import type { ChartDataPoint } from '../components/ui';
-import ActiveTripBanner from '../components/ActiveTripBanner';
-import ViajeEnCursoCard from '../components/ViajeEnCursoCard';
 import './Dashboard.css';
 
-// ============================================
-// CONFIGURACIÓN UNIFICADA POR ROL
-// ============================================
-
-interface StatCardConfig {
-    label: string;
-    value: number;
-    icon: React.ComponentType<{ size?: number; className?: string }>;
-    color: string;
-    bgColor: string;
-    borderColor: string;
-}
-
-interface QuickActionConfig {
-    label: string;
-    icon: React.ComponentType<{ size: number }>;
-    to: string;
-    color: string;
-}
-
-// Función para obtener estadísticas específicas por rol
-const getStatCardsByRole = (
-    role: string | undefined,
-    stats: DashboardStats['estadisticas']
-): StatCardConfig[] => {
-    const s = stats || demoStats.estadisticas;
-
-    switch (role) {
-        case 'ADMIN':
-            return [
-                {
-                    label: 'TOTAL SISTEMA',
-                    value: s.total ?? 0,
-                    icon: FileText,
-                    color: '#10b981',
-                    bgColor: 'rgba(16, 185, 129, 0.15)',
-                    borderColor: 'rgba(16, 185, 129, 0.3)'
-                },
-                {
-                    label: 'PENDIENTES DGFA',
-                    value: s.pendientesAprobacion ?? s.borradores ?? 0,
-                    icon: Clock,
-                    color: '#f59e0b',
-                    bgColor: 'rgba(245, 158, 11, 0.15)',
-                    borderColor: 'rgba(245, 158, 11, 0.3)'
-                },
-                {
-                    label: 'EN PROCESO',
-                    value: (s.aprobados ?? 0) + (s.enTransito ?? 0) + (s.entregados ?? 0) + (s.recibidos ?? 0),
-                    icon: TrendingUp,
-                    color: '#3b82f6',
-                    bgColor: 'rgba(59, 130, 246, 0.15)',
-                    borderColor: 'rgba(59, 130, 246, 0.3)'
-                },
-                {
-                    label: 'COMPLETADOS',
-                    value: s.tratados ?? 0,
-                    icon: CheckCircle,
-                    color: '#22c55e',
-                    bgColor: 'rgba(34, 197, 94, 0.15)',
-                    borderColor: 'rgba(34, 197, 94, 0.3)'
-                }
-            ];
-
-        case 'GENERADOR':
-            return [
-                {
-                    label: 'MIS MANIFIESTOS',
-                    value: s.total ?? 0,
-                    icon: FileText,
-                    color: '#3b82f6',
-                    bgColor: 'rgba(59, 130, 246, 0.15)',
-                    borderColor: 'rgba(59, 130, 246, 0.3)'
-                },
-                {
-                    label: 'POR FIRMAR',
-                    value: s.borradores ?? 0,
-                    icon: Edit,
-                    color: '#f59e0b',
-                    bgColor: 'rgba(245, 158, 11, 0.15)',
-                    borderColor: 'rgba(245, 158, 11, 0.3)'
-                },
-                {
-                    label: 'EN PROCESO',
-                    // Sincronizado con APP: incluye pendientesAprobacion y enTratamiento
-                    value: (s.pendientesAprobacion ?? 0) + (s.aprobados ?? 0) + (s.enTransito ?? 0) + (s.entregados ?? 0) + (s.recibidos ?? 0) + (s.enTratamiento ?? 0),
-                    icon: Truck,
-                    color: '#f97316',
-                    bgColor: 'rgba(249, 115, 22, 0.15)',
-                    borderColor: 'rgba(249, 115, 22, 0.3)'
-                },
-                {
-                    label: 'COMPLETADOS',
-                    value: s.tratados ?? 0,
-                    icon: Award,
-                    color: '#22c55e',
-                    bgColor: 'rgba(34, 197, 94, 0.15)',
-                    borderColor: 'rgba(34, 197, 94, 0.3)'
-                }
-            ];
-
-        case 'TRANSPORTISTA':
-            return [
-                {
-                    label: 'ASIGNADOS',
-                    value: s.total ?? 0,
-                    icon: FileText,
-                    color: '#06b6d4',
-                    bgColor: 'rgba(6, 182, 212, 0.15)',
-                    borderColor: 'rgba(6, 182, 212, 0.3)'
-                },
-                {
-                    label: 'POR RETIRAR',
-                    value: s.aprobados ?? 0,
-                    icon: Clock,
-                    color: '#f59e0b',
-                    bgColor: 'rgba(245, 158, 11, 0.15)',
-                    borderColor: 'rgba(245, 158, 11, 0.3)'
-                },
-                {
-                    label: 'EN RUTA',
-                    value: s.enTransito ?? 0,
-                    icon: Truck,
-                    color: '#f97316',
-                    bgColor: 'rgba(249, 115, 22, 0.15)',
-                    borderColor: 'rgba(249, 115, 22, 0.3)'
-                },
-                {
-                    label: 'ENTREGADOS',
-                    // Sincronizado con APP: incluye enTratamiento
-                    value: (s.entregados ?? 0) + (s.recibidos ?? 0) + (s.enTratamiento ?? 0) + (s.tratados ?? 0),
-                    icon: CheckCircle,
-                    color: '#22c55e',
-                    bgColor: 'rgba(34, 197, 94, 0.15)',
-                    borderColor: 'rgba(34, 197, 94, 0.3)'
-                }
-            ];
-
-        case 'OPERADOR':
-            return [
-                {
-                    label: 'ENTRANTES',
-                    value: s.total ?? 0,
-                    icon: FileText,
-                    color: '#8b5cf6',
-                    bgColor: 'rgba(139, 92, 246, 0.15)',
-                    borderColor: 'rgba(139, 92, 246, 0.3)'
-                },
-                {
-                    label: 'POR RECIBIR',
-                    value: s.entregados ?? 0,
-                    icon: Package,
-                    color: '#f59e0b',
-                    bgColor: 'rgba(245, 158, 11, 0.15)',
-                    borderColor: 'rgba(245, 158, 11, 0.3)'
-                },
-                {
-                    label: 'EN TRATAMIENTO',
-                    value: (s.recibidos ?? 0) + (s.enTratamiento ?? 0),
-                    icon: Recycle,
-                    color: '#f97316',
-                    bgColor: 'rgba(249, 115, 22, 0.15)',
-                    borderColor: 'rgba(249, 115, 22, 0.3)'
-                },
-                {
-                    label: 'PROCESADOS',
-                    value: s.tratados ?? 0,
-                    icon: Award,
-                    color: '#22c55e',
-                    bgColor: 'rgba(34, 197, 94, 0.15)',
-                    borderColor: 'rgba(34, 197, 94, 0.3)'
-                }
-            ];
-
-        default:
-            return [
-                {
-                    label: 'TOTAL',
-                    value: s.total ?? 0,
-                    icon: FileText,
-                    color: '#10b981',
-                    bgColor: 'rgba(16, 185, 129, 0.15)',
-                    borderColor: 'rgba(16, 185, 129, 0.3)'
-                },
-                {
-                    label: 'PENDIENTES',
-                    value: s.borradores ?? 0,
-                    icon: Clock,
-                    color: '#f59e0b',
-                    bgColor: 'rgba(245, 158, 11, 0.15)',
-                    borderColor: 'rgba(245, 158, 11, 0.3)'
-                },
-                {
-                    label: 'EN CURSO',
-                    value: s.enTransito ?? 0,
-                    icon: Truck,
-                    color: '#3b82f6',
-                    bgColor: 'rgba(59, 130, 246, 0.15)',
-                    borderColor: 'rgba(59, 130, 246, 0.3)'
-                },
-                {
-                    label: 'COMPLETADOS',
-                    value: s.tratados ?? 0,
-                    icon: CheckCircle,
-                    color: '#22c55e',
-                    bgColor: 'rgba(34, 197, 94, 0.15)',
-                    borderColor: 'rgba(34, 197, 94, 0.3)'
-                }
-            ];
-    }
-};
-
-// Función para obtener acciones rápidas por rol
-const getQuickActionsByRole = (role: string | undefined): QuickActionConfig[] => {
-    switch (role) {
-        case 'ADMIN':
-            return [
-                { label: 'Cola de Aprobación', icon: Clock, to: '/admin/aprobaciones', color: '#f59e0b' },
-                { label: 'Centro de Control', icon: Activity, to: '/admin/centro-control', color: '#10b981' },
-                { label: 'Gestión Usuarios', icon: Users, to: '/usuarios', color: '#3b82f6' }
-            ];
-        case 'GENERADOR':
-            return [
-                { label: 'Nuevo Manifiesto', icon: FileText, to: '/manifiestos/nuevo', color: '#3b82f6' },
-                { label: 'Mis Manifiestos', icon: FileText, to: '/manifiestos', color: '#8b5cf6' },
-                { label: 'Seguimiento', icon: MapPin, to: '/seguimiento', color: '#06b6d4' }
-            ];
-        case 'TRANSPORTISTA':
-            return [
-                { label: 'Iniciar Viaje', icon: Navigation, to: '/tracking', color: '#f59e0b' },
-                { label: 'Escanear QR', icon: QrCode, to: '/escanear', color: '#06b6d4' },
-                { label: 'Historial Viajes', icon: History, to: '/historial-viajes', color: '#8b5cf6' }
-            ];
-        case 'OPERADOR':
-            return [
-                { label: 'Ver Llegadas', icon: Package, to: '/manifiestos', color: '#8b5cf6' },
-                { label: 'Escanear QR', icon: QrCode, to: '/escanear', color: '#06b6d4' },
-                { label: 'Reportes Planta', icon: BarChart3, to: '/reportes', color: '#10b981' }
-            ];
-        default:
-            return [];
-    }
-};
-
-// Demo data fallback - ahora importado de ../data/demoDashboard
-
-// Sample chart data for activity visualization
-const generateActivityData = (): ChartDataPoint[] => {
-    const days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-    return days.map((name) => ({
-        name,
-        value: Math.floor(Math.random() * 50) + 10,
-    }));
-};
-
-const generateStatusDistribution = (stats: DashboardStats['estadisticas']): ChartDataPoint[] => {
-    const s = stats || demoStats.estadisticas;
-    return [
-        { name: 'Borradores', value: s.borradores ?? 0 },
-        { name: 'Aprobados', value: s.aprobados ?? 0 },
-        { name: 'En Tránsito', value: s.enTransito ?? 0 },
-        { name: 'Entregados', value: s.entregados ?? 0 },
-        { name: 'Tratados', value: s.tratados ?? 0 },
-    ].filter(item => item.value > 0);
-};
-
-interface AdminStats {
-    usuarios: {
-        total: number;
-        activos: number;
-        pendientes: number;
-        porRol: Record<string, number>;
-    };
-    manifiestos: {
-        total: number;
-        porEstado: Record<string, number>;
-    };
-}
-
-// Interfaz para viaje activo
-interface ViajeActivo {
-    manifiesto: {
-        id: string;
-        numero: string;
-        generador?: { razonSocial: string };
-        operador?: { razonSocial: string };
-    };
-    startTime: number;
-    ubicacionActual?: { lat: number; lng: number };
-}
+// ==============================================
+// VERSIÓN DE EMERGENCIA - SIN RECHARTS/MOTION
+// Para diagnosticar crash RESULT_CODE_KILLED_BAD_MESSAGE
+// ==============================================
 
 const Dashboard: React.FC = () => {
-    const { user } = useAuth();
-    const navigate = useNavigate();
-
-    // Obtener perfil demo activo para mostrar rol correcto (memoizado para evitar re-renders)
-    const activeDemoProfile = useMemo(() => demoService.getActiveProfile(), []);
-    const effectiveRole = useMemo(() => activeDemoProfile?.role || user?.rol, [activeDemoProfile, user?.rol]);
+    const { user, effectiveRole } = useAuth();
     const [stats, setStats] = useState<DashboardStats>(demoStats);
-    const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
     const [loading, setLoading] = useState(true);
-    const [error] = useState('');
-    const [viajeActivo, setViajeActivo] = useState<ViajeActivo | null>(null);
-    const [selectedManifiestoId, setSelectedManifiestoId] = useState<string | null>(null);
 
     useEffect(() => {
         loadDashboard();
-        if (effectiveRole === 'ADMIN') {
-            loadAdminStats();
-        }
-        // Cargar viaje activo para TRANSPORTISTA
-        if (effectiveRole === 'TRANSPORTISTA') {
-            loadViajeActivo();
-        }
-    }, [effectiveRole]);
-
-    // Cargar viaje activo desde backend usando TIEMPO CALCULADO POR SERVIDOR
-    // CRÍTICO: Usar elapsedSeconds del servidor para sincronizar APP ↔ WEB
-    const loadViajeActivo = async () => {
-        try {
-            // 1. PRIMERO: Consultar endpoint de viaje activo del backend
-            try {
-                const { viajeActivo: viajeBackend } = await viajesService.getViajeActivo();
-                if (viajeBackend) {
-                    // Obtener tiempo calculado por el servidor incluyendo pausas
-                    const viajeEnCurso = await viajesService.getViajeEnCurso(viajeBackend.manifiestoId);
-
-                    // CRÍTICO: Calcular startTime basado en elapsedSeconds del servidor
-                    // startTime = ahora - (segundosTranscurridos * 1000)
-                    // Esto asegura que WEB muestre el mismo tiempo que APP
-                    const ahora = Date.now();
-                    const elapsedSeconds = viajeEnCurso?.elapsedSeconds ?? 0;
-                    const startTimeCalculado = ahora - (elapsedSeconds * 1000);
-
-                    const tripData: ViajeActivo = {
-                        manifiesto: {
-                            id: viajeBackend.manifiestoId,
-                            numero: viajeBackend.manifiesto?.numero || 'N/A',
-                            generador: viajeBackend.manifiesto?.generador as { razonSocial: string } | undefined,
-                            operador: viajeBackend.manifiesto?.operador as { razonSocial: string } | undefined
-                        },
-                        startTime: startTimeCalculado,
-                        ubicacionActual: viajeEnCurso?.ultimaUbicacion
-                            ? { lat: viajeEnCurso.ultimaUbicacion.lat, lng: viajeEnCurso.ultimaUbicacion.lng }
-                            : undefined
-                    };
-                    setViajeActivo(tripData);
-                    console.log('[Dashboard] v8.0 Viaje activo sincronizado - elapsed:', elapsedSeconds, 'seg');
-                    return;
-                }
-            } catch (backendErr) {
-                console.warn('[Dashboard] Error consultando viaje activo del backend:', backendErr);
-            }
-
-            // 2. SEGUNDO: Intentar cargar de IndexedDB (sincronizado con APP móvil local)
-            const activeTrip = await offlineStorage.getActiveTrip();
-            if (activeTrip) {
-                try {
-                    const manifiestoData = await manifiestoService.getManifiesto(activeTrip.manifiestoId);
-                    if (manifiestoData) {
-                        // También intentar sincronizar con servidor para IndexedDB
-                        const viajeEnCurso = await viajesService.getViajeEnCurso(activeTrip.manifiestoId);
-                        const ahora = Date.now();
-                        const elapsedSeconds = viajeEnCurso?.elapsedSeconds;
-
-                        // Usar tiempo del servidor si disponible, sino fallback a IndexedDB
-                        const startTimeCalculado = elapsedSeconds !== undefined
-                            ? ahora - (elapsedSeconds * 1000)
-                            : activeTrip.startTimestamp;
-
-                        const tripData: ViajeActivo = {
-                            manifiesto: {
-                                id: manifiestoData.id,
-                                numero: manifiestoData.numero,
-                                generador: manifiestoData.generador,
-                                operador: manifiestoData.operador
-                            },
-                            startTime: startTimeCalculado,
-                            ubicacionActual: viajeEnCurso?.ultimaUbicacion
-                                ? { lat: viajeEnCurso.ultimaUbicacion.lat, lng: viajeEnCurso.ultimaUbicacion.lng }
-                                : activeTrip.routePoints?.length > 0
-                                    ? {
-                                        lat: activeTrip.routePoints[activeTrip.routePoints.length - 1].lat,
-                                        lng: activeTrip.routePoints[activeTrip.routePoints.length - 1].lng
-                                    }
-                                    : undefined
-                        };
-                        setViajeActivo(tripData);
-                        console.log('[Dashboard] Viaje activo cargado desde IndexedDB con sync servidor');
-                        return;
-                    }
-                } catch (e) {
-                    console.warn('[Dashboard] Error obteniendo detalles del manifiesto desde IndexedDB:', e);
-                }
-            }
-
-            // 3. TERCERO: Buscar manifiestos EN_TRANSITO del transportista actual
-            const response = await manifiestoService.getManifiestos({ estado: 'EN_TRANSITO', limit: 1 });
-            if (response?.manifiestos && response.manifiestos.length > 0) {
-                const manifiesto = response.manifiestos[0];
-
-                // Intentar obtener tiempo del servidor
-                const viajeEnCurso = await viajesService.getViajeEnCurso(manifiesto.id);
-                const ahora = Date.now();
-                const elapsedSeconds = viajeEnCurso?.elapsedSeconds;
-
-                // Usar tiempo del servidor si disponible
-                const startTimeCalculado = elapsedSeconds !== undefined
-                    ? ahora - (elapsedSeconds * 1000)
-                    : new Date(manifiesto.fechaRetiro || manifiesto.updatedAt).getTime();
-
-                const tripData: ViajeActivo = {
-                    manifiesto: {
-                        id: manifiesto.id,
-                        numero: manifiesto.numero,
-                        generador: manifiesto.generador,
-                        operador: manifiesto.operador
-                    },
-                    startTime: startTimeCalculado,
-                    ubicacionActual: viajeEnCurso?.ultimaUbicacion
-                        ? { lat: viajeEnCurso.ultimaUbicacion.lat, lng: viajeEnCurso.ultimaUbicacion.lng }
-                        : undefined
-                };
-                setViajeActivo(tripData);
-                console.log('[Dashboard] Viaje activo desde API manifiestos con sync servidor');
-            }
-        } catch (err) {
-            console.error('Error cargando viaje activo:', err);
-        }
-    };
-
-    // Handlers para el banner de viaje activo
-    const handleVerMapa = () => {
-        navigate('/tracking');
-    };
-
-    const handleFinalizarViaje = async () => {
-        if (!viajeActivo) return;
-        try {
-            await manifiestoService.confirmarEntrega(viajeActivo.manifiesto.id, {
-                latitud: viajeActivo.ubicacionActual?.lat,
-                longitud: viajeActivo.ubicacionActual?.lng
-            });
-            // Limpiar viaje activo de IndexedDB
-            await offlineStorage.clearActiveTrip();
-            setViajeActivo(null);
-            loadDashboard(); // Recargar stats
-        } catch (err) {
-            console.error('Error finalizando viaje:', err);
-            alert('Error al finalizar el viaje. Intente nuevamente.');
-        }
-    };
-
-    const handleCerrarBanner = () => {
-        setViajeActivo(null);
-    };
-
-    const loadAdminStats = async () => {
-        try {
-            const data = await usuarioService.getEstadisticas();
-            setAdminStats(data);
-        } catch (err) {
-            console.error('Error loading admin stats:', err);
-        }
-    };
+    }, []);
 
     const loadDashboard = async () => {
         try {
             setLoading(true);
             const data = await manifiestoService.getDashboard();
-
-            // Handle both nested and flat response structures
             if (data) {
-                // Verificar si estadisticas existe y tiene valores válidos
-                const hasValidEstadisticas = data.estadisticas &&
-                    typeof data.estadisticas.total === 'number';
-
+                const hasValidEstadisticas = data.estadisticas && typeof data.estadisticas.total === 'number';
                 const normalizedStats: DashboardStats = {
                     estadisticas: hasValidEstadisticas
                         ? data.estadisticas
@@ -546,47 +54,12 @@ const Dashboard: React.FC = () => {
                 };
                 setStats(normalizedStats);
             }
-            // Si no hay data, mantener demoStats (ya está inicializado)
         } catch (err: any) {
             console.error('Dashboard error:', err);
-            // En caso de error, FORZAR uso de demoStats
-            console.log('Usando datos demo por error:', demoStats);
             setStats(demoStats);
         } finally {
             setLoading(false);
         }
-    };
-
-    const getEstadoColor = (estado: string) => {
-        switch (estado) {
-            case 'BORRADOR':
-                return 'badge-info';
-            case 'APROBADO':
-                return 'badge-success';
-            case 'EN_TRANSITO':
-                return 'badge-warning';
-            case 'ENTREGADO':
-                return 'badge-primary';
-            case 'RECIBIDO':
-                return 'badge-info';
-            case 'TRATADO':
-                return 'badge-success';
-            case 'RECHAZADO':
-            case 'CANCELADO':
-                return 'badge-error';
-            default:
-                return 'badge-info';
-        }
-    };
-
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('es-AR', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
     };
 
     if (loading) {
@@ -598,691 +71,216 @@ const Dashboard: React.FC = () => {
         );
     }
 
-    if (error) {
-        return (
-            <div className="dashboard-error">
-                <AlertTriangle size={48} />
-                <h2>Error al cargar el dashboard</h2>
-                <p>{error}</p>
-                <button className="btn btn-primary" onClick={loadDashboard}>
-                    Reintentar
-                </button>
-            </div>
-        );
-    }
-
-    // Mensajes personalizados por rol
-    const getRolMessage = () => {
-        switch (effectiveRole) {
-            case 'ADMIN':
-                return 'Panel de administración - Control total del sistema de trazabilidad.';
-            case 'GENERADOR':
-                return 'Gestione sus manifiestos de residuos peligrosos.';
-            case 'TRANSPORTISTA':
-                return 'Consulte sus viajes asignados y active el GPS para seguimiento.';
-            case 'OPERADOR':
-                return 'Gestione las recepciones y tratamiento de residuos en planta.';
-            default:
-                return 'Aquí tienes un resumen de la actividad del sistema.';
-        }
-    };
+    const s = stats?.estadisticas || demoStats.estadisticas;
 
     return (
-        <div className="dashboard animate-fadeIn">
-            {/* Banner de Viaje Activo - Solo para TRANSPORTISTA */}
-            {effectiveRole === 'TRANSPORTISTA' && viajeActivo && (
-                <ActiveTripBanner
-                    manifiesto={viajeActivo.manifiesto}
-                    startTime={viajeActivo.startTime}
-                    ubicacionActual={viajeActivo.ubicacionActual}
-                    onVerMapa={handleVerMapa}
-                    onFinalizarViaje={handleFinalizarViaje}
-                    onCerrar={handleCerrarBanner}
-                />
-            )}
-
-            {/* Welcome Section - Personalizado por rol */}
+        <div className="dashboard">
+            {/* Welcome Section */}
             <div className="dashboard-welcome" style={{
-                background: effectiveRole === 'ADMIN' ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(59, 130, 246, 0.1))' :
-                    effectiveRole === 'GENERADOR' ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(99, 102, 241, 0.1))' :
-                        effectiveRole === 'TRANSPORTISTA' ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(234, 88, 12, 0.1))' :
-                            'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(168, 85, 247, 0.1))',
-                border: `1px solid ${effectiveRole === 'ADMIN' ? 'rgba(16, 185, 129, 0.2)' :
-                    effectiveRole === 'GENERADOR' ? 'rgba(59, 130, 246, 0.2)' :
-                        effectiveRole === 'TRANSPORTISTA' ? 'rgba(245, 158, 11, 0.2)' :
-                            'rgba(139, 92, 246, 0.2)'}`,
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(59, 130, 246, 0.1))',
+                border: '1px solid rgba(16, 185, 129, 0.2)',
                 borderRadius: '16px',
-                padding: '20px 24px'
+                padding: '20px 24px',
+                marginBottom: '24px'
             }}>
-                <div>
-                    <h2>Bienvenido, {activeDemoProfile?.actorName || user?.nombre}!</h2>
-                    <p style={{ color: '#94a3b8', marginTop: '4px' }}>{getRolMessage()}</p>
-                    <span style={{
-                        display: 'inline-block',
-                        marginTop: '8px',
-                        padding: '4px 12px',
-                        borderRadius: '20px',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        background: effectiveRole === 'ADMIN' ? 'rgba(16, 185, 129, 0.2)' :
-                            effectiveRole === 'GENERADOR' ? 'rgba(59, 130, 246, 0.2)' :
-                                effectiveRole === 'TRANSPORTISTA' ? 'rgba(245, 158, 11, 0.2)' :
-                                    'rgba(139, 92, 246, 0.2)',
-                        color: effectiveRole === 'ADMIN' ? '#10b981' :
-                            effectiveRole === 'GENERADOR' ? '#3b82f6' :
-                                effectiveRole === 'TRANSPORTISTA' ? '#f59e0b' :
-                                    '#8b5cf6'
-                    }}>
-                        {activeDemoProfile?.actorName || (effectiveRole === 'ADMIN' ? '🛡️ Administrador SITREP' :
-                            effectiveRole === 'GENERADOR' ? '🏭 Generador de Residuos' :
-                                effectiveRole === 'TRANSPORTISTA' ? '🚛 Transportista' :
-                                    '🏢 Operador de Tratamiento')}
-                    </span>
-                    {activeDemoProfile && (
-                        <span style={{
-                            display: 'inline-block',
-                            marginLeft: '8px',
-                            padding: '4px 8px',
-                            borderRadius: '4px',
-                            fontSize: '10px',
-                            fontWeight: 600,
-                            background: 'rgba(245, 158, 11, 0.2)',
-                            color: '#f59e0b'
-                        }}>
-                            MODO DEMO
-                        </span>
-                    )}
+                <h2>Bienvenido, {user?.nombre}!</h2>
+                <p style={{ color: '#94a3b8', marginTop: '4px' }}>
+                    Panel de {effectiveRole || 'Usuario'}
+                </p>
+            </div>
+
+            {/* Stats Grid - SIN MOTION */}
+            <div className="stats-grid" style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '16px',
+                marginBottom: '24px'
+            }}>
+                <div className="stat-card" style={{
+                    background: 'rgba(16, 185, 129, 0.15)',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    borderRadius: '12px',
+                    padding: '20px'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <FileText size={24} style={{ color: '#10b981' }} />
+                        <div>
+                            <div style={{ fontSize: '28px', fontWeight: 700, color: '#f8fafc' }}>
+                                {s.total}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#94a3b8' }}>TOTAL</div>
+                        </div>
+                    </div>
                 </div>
-                <div className="dashboard-welcome-actions">
-                    {effectiveRole === 'GENERADOR' && (
-                        <Link to="/manifiestos/nuevo" className="btn btn-primary btn-nuevo-manifiesto">
-                            <FileText size={18} />
-                            Nuevo Manifiesto
-                        </Link>
-                    )}
-                    {effectiveRole === 'TRANSPORTISTA' && (
-                        <Link to="/tracking" className="btn btn-primary" style={{ background: '#f59e0b' }}>
-                            <MapPin size={18} />
-                            Activar GPS
-                        </Link>
-                    )}
-                    {effectiveRole === 'OPERADOR' && (
-                        <Link to="/manifiestos" className="btn btn-primary" style={{ background: '#8b5cf6' }}>
-                            <Truck size={18} />
-                            Ver Llegadas
-                        </Link>
-                    )}
+
+                <div className="stat-card" style={{
+                    background: 'rgba(245, 158, 11, 0.15)',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    borderRadius: '12px',
+                    padding: '20px'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <Clock size={24} style={{ color: '#f59e0b' }} />
+                        <div>
+                            <div style={{ fontSize: '28px', fontWeight: 700, color: '#f8fafc' }}>
+                                {s.borradores}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#94a3b8' }}>PENDIENTES</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="stat-card" style={{
+                    background: 'rgba(59, 130, 246, 0.15)',
+                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                    borderRadius: '12px',
+                    padding: '20px'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <Truck size={24} style={{ color: '#3b82f6' }} />
+                        <div>
+                            <div style={{ fontSize: '28px', fontWeight: 700, color: '#f8fafc' }}>
+                                {s.enTransito}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#94a3b8' }}>EN TRÁNSITO</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="stat-card" style={{
+                    background: 'rgba(34, 197, 94, 0.15)',
+                    border: '1px solid rgba(34, 197, 94, 0.3)',
+                    borderRadius: '12px',
+                    padding: '20px'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <CheckCircle size={24} style={{ color: '#22c55e' }} />
+                        <div>
+                            <div style={{ fontSize: '28px', fontWeight: 700, color: '#f8fafc' }}>
+                                {s.tratados}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#94a3b8' }}>COMPLETADOS</div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-
-            {/* Mobile App Promo */}
+            {/* Quick Actions */}
             <div style={{
-                background: 'linear-gradient(135deg, #0f766e 0%, #115e59 50%, #134e4a 100%)',
-                borderRadius: '20px',
-                padding: '24px 32px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '24px',
-                boxShadow: '0 10px 40px -10px rgba(13, 148, 136, 0.5)',
-                border: '1px solid rgba(94, 234, 212, 0.2)',
-                position: 'relative',
-                overflow: 'hidden'
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '16px',
+                marginBottom: '24px'
             }}>
-                {/* Background decoration */}
-                <div style={{
-                    position: 'absolute',
-                    top: '-50%',
-                    right: '-10%',
-                    width: '300px',
-                    height: '300px',
-                    background: 'radial-gradient(circle, rgba(94, 234, 212, 0.15) 0%, transparent 70%)',
-                    borderRadius: '50%'
-                }} />
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '20px', position: 'relative', zIndex: 1 }}>
-                    <div style={{
-                        width: '52px',
-                        height: '52px',
-                        borderRadius: '14px',
-                        background: 'rgba(255, 255, 255, 0.15)',
-                        backdropFilter: 'blur(10px)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#5eead4'
-                    }}>
-                        <Smartphone size={26} />
-                    </div>
-                    <div>
-                        <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'white', margin: 0 }}>
-                            Versión Móvil Disponible
-                        </h3>
-                        <p style={{ fontSize: '14px', color: '#99f6e4', margin: '4px 0 0 0', opacity: 0.9 }}>
-                            Prueba la experiencia optimizada para transportistas y operadores.
-                        </p>
-                    </div>
-                </div>
-
-                <Link to="/demo-app" style={{
-                    display: 'inline-flex',
+                <Link to="/manifiestos" style={{
+                    display: 'flex',
                     alignItems: 'center',
-                    gap: '8px',
-                    padding: '12px 24px',
-                    background: 'white',
-                    color: '#0f766e',
+                    gap: '12px',
+                    padding: '16px 20px',
+                    background: 'rgba(59, 130, 246, 0.15)',
+                    border: '1px solid rgba(59, 130, 246, 0.3)',
                     borderRadius: '12px',
-                    fontWeight: 600,
-                    fontSize: '14px',
                     textDecoration: 'none',
-                    boxShadow: '0 4px 14px rgba(0, 0, 0, 0.15)',
-                    transition: 'transform 0.2s, box-shadow 0.2s',
-                    position: 'relative',
-                    zIndex: 1
+                    color: '#f8fafc'
                 }}>
-                    Ver Demo App
-                    <ArrowRight size={18} />
+                    <FileText size={20} style={{ color: '#3b82f6' }} />
+                    <span>Ver Manifiestos</span>
+                    <ArrowRight size={16} style={{ marginLeft: 'auto' }} />
+                </Link>
+
+                <Link to="/tracking" style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '16px 20px',
+                    background: 'rgba(245, 158, 11, 0.15)',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    borderRadius: '12px',
+                    textDecoration: 'none',
+                    color: '#f8fafc'
+                }}>
+                    <MapPin size={20} style={{ color: '#f59e0b' }} />
+                    <span>Tracking GPS</span>
+                    <ArrowRight size={16} style={{ marginLeft: 'auto' }} />
                 </Link>
             </div>
 
-            {/* Stats Grid - Professional Style */}
-            <motion.div
-                className="stats-grid"
-                initial="hidden"
-                animate="show"
-                variants={{
-                    hidden: { opacity: 0 },
-                    show: {
-                        opacity: 1,
-                        transition: { staggerChildren: 0.08 }
-                    }
-                }}
-            >
-                {getStatCardsByRole(effectiveRole, stats?.estadisticas).map((card, index) => {
-                    const IconComponent = card.icon;
-                    return (
-                        <motion.div
-                            key={index}
-                            className="stat-card"
-                            style={{
-                                background: card.bgColor,
-                                border: `1px solid ${card.borderColor}`,
-                            }}
-                            variants={{
-                                hidden: { y: 15, opacity: 0 },
-                                show: { y: 0, opacity: 1, transition: { duration: 0.3 } }
-                            }}
-                        >
-                            <div className="stat-icon" style={{
-                                background: `${card.color}20`,
-                                color: card.color
-                            }}>
-                                <IconComponent size={24} />
-                            </div>
-                            <div className="stat-content">
-                                <div className="stat-value">
-                                    {card.value.toLocaleString('es-AR')}
-                                </div>
-                                <div className="stat-label">
-                                    {card.label}
-                                </div>
-                            </div>
-                        </motion.div>
-                    );
-                })}
-            </motion.div>
-
-            {/* Activity Charts Section - Professional Style */}
-            <motion.div
-                className="charts-section"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2, duration: 0.4 }}
-                style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
-                    gap: '20px',
-                    marginBottom: '24px'
-                }}
-            >
-                {/* Area Chart - Actividad Semanal */}
-                <div style={{
-                    background: 'var(--bg-secondary, #1e293b)',
-                    border: '1px solid var(--border-color, rgba(148, 163, 184, 0.1))',
-                    borderRadius: '16px',
-                    padding: '20px'
-                }}>
-                    <div style={{ marginBottom: '16px' }}>
-                        <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#f8fafc' }}>
-                            Actividad Semanal
-                        </h4>
-                        <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#94a3b8' }}>
-                            Manifiestos procesados por día
-                        </p>
-                    </div>
-                    <ResponsiveContainer width="100%" height={160}>
-                        <AreaChart data={generateActivityData()} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                            <defs>
-                                <linearGradient id="colorActivity" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" vertical={false} />
-                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
-                            <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
-                            <Tooltip
-                                contentStyle={{
-                                    background: '#1e293b',
-                                    border: '1px solid rgba(148, 163, 184, 0.2)',
-                                    borderRadius: '8px',
-                                    fontSize: '12px'
-                                }}
-                            />
-                            <Area
-                                type="monotone"
-                                dataKey="value"
-                                stroke="#10b981"
-                                strokeWidth={2}
-                                fill="url(#colorActivity)"
-                            />
-                        </AreaChart>
-                    </ResponsiveContainer>
+            {/* Actividad Reciente - SIMPLIFICADA */}
+            <div className="card" style={{
+                background: 'var(--bg-secondary, #1e293b)',
+                border: '1px solid var(--border-color, rgba(148, 163, 184, 0.1))',
+                borderRadius: '16px',
+                padding: '20px'
+            }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: '#f8fafc' }}>
+                        <Activity size={20} />
+                        Actividad Reciente
+                    </h3>
+                    <Link to="/manifiestos" style={{ color: '#3b82f6', textDecoration: 'none', fontSize: '14px' }}>
+                        Ver todos
+                    </Link>
                 </div>
 
-                {/* Bar Chart - Distribución por Estado */}
-                <div style={{
-                    background: 'var(--bg-secondary, #1e293b)',
-                    border: '1px solid var(--border-color, rgba(148, 163, 184, 0.1))',
-                    borderRadius: '16px',
-                    padding: '20px'
-                }}>
-                    <div style={{ marginBottom: '16px' }}>
-                        <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#f8fafc' }}>
-                            Distribución por Estado
-                        </h4>
-                        <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#94a3b8' }}>
-                            Manifiestos actuales en el sistema
-                        </p>
-                    </div>
-                    <ResponsiveContainer width="100%" height={160}>
-                        <BarChart data={generateStatusDistribution(stats?.estadisticas)} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" vertical={false} />
-                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10 }} />
-                            <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
-                            <Tooltip
-                                contentStyle={{
-                                    background: '#1e293b',
-                                    border: '1px solid rgba(148, 163, 184, 0.2)',
-                                    borderRadius: '8px',
-                                    fontSize: '12px'
-                                }}
-                            />
-                            <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </motion.div>
-
-            {/* Acciones Rápidas - Dinámico por rol */}
-            {getQuickActionsByRole(effectiveRole).length > 0 && (
-                <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(3, 1fr)',
-                    gap: '16px',
-                    marginBottom: '24px'
-                }}>
-                    {getQuickActionsByRole(effectiveRole).map((action, index) => {
-                        const IconComponent = action.icon;
-                        return (
+                {stats?.recientes && stats.recientes.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {stats.recientes.slice(0, 5).map((m) => (
                             <Link
-                                key={index}
-                                to={action.to}
+                                key={m.id}
+                                to={`/manifiestos/${m.id}`}
                                 style={{
                                     display: 'flex',
+                                    justifyContent: 'space-between',
                                     alignItems: 'center',
-                                    gap: '12px',
-                                    padding: '16px 20px',
-                                    background: `linear-gradient(135deg, ${action.color}20, ${action.color}10)`,
-                                    border: `1px solid ${action.color}40`,
-                                    borderRadius: '12px',
+                                    padding: '12px',
+                                    background: 'rgba(148, 163, 184, 0.05)',
+                                    borderRadius: '8px',
                                     textDecoration: 'none',
-                                    color: '#f8fafc',
-                                    transition: 'transform 0.2s, box-shadow 0.2s'
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.transform = 'translateY(-2px)';
-                                    e.currentTarget.style.boxShadow = `0 8px 25px ${action.color}30`;
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.transform = 'translateY(0)';
-                                    e.currentTarget.style.boxShadow = 'none';
+                                    color: '#f8fafc'
                                 }}
                             >
-                                <div style={{
-                                    width: '40px',
-                                    height: '40px',
-                                    borderRadius: '10px',
-                                    background: `${action.color}30`,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: action.color
-                                }}>
-                                    <IconComponent size={20} />
+                                <div>
+                                    <strong>{m.numero}</strong>
+                                    <span style={{ color: '#94a3b8', marginLeft: '8px', fontSize: '13px' }}>
+                                        {m.generador?.razonSocial}
+                                    </span>
                                 </div>
-                                <span style={{ fontWeight: 600, fontSize: '14px' }}>{action.label}</span>
+                                <span style={{
+                                    padding: '4px 8px',
+                                    borderRadius: '4px',
+                                    fontSize: '11px',
+                                    fontWeight: 600,
+                                    background: m.estado === 'TRATADO' ? 'rgba(34, 197, 94, 0.2)' :
+                                              m.estado === 'EN_TRANSITO' ? 'rgba(245, 158, 11, 0.2)' :
+                                              'rgba(59, 130, 246, 0.2)',
+                                    color: m.estado === 'TRATADO' ? '#22c55e' :
+                                           m.estado === 'EN_TRANSITO' ? '#f59e0b' : '#3b82f6'
+                                }}>
+                                    {m.estado.replace('_', ' ')}
+                                </span>
                             </Link>
-                        );
-                    })}
-                </div>
-            )}
-
-            {/* Main Content Grid */}
-            <div className="dashboard-grid">
-                {/* Manifiestos Recientes */}
-                <div className="card dashboard-section">
-                    <div className="section-header">
-                        <h3>
-                            <Activity size={20} />
-                            Actividad Reciente
-                        </h3>
-                        <Link to="/manifiestos" className="btn btn-ghost">
-                            Ver todos <ArrowRight size={16} />
-                        </Link>
+                        ))}
                     </div>
-
-                    <div className="recent-list">
-                        {stats?.recientes && stats.recientes.length > 0 ? (
-                            stats.recientes.map((manifiesto) => (
-                                <Link
-                                    key={manifiesto.id}
-                                    to={`/manifiestos/${manifiesto.id}`}
-                                    className="recent-item"
-                                >
-                                    <div className="recent-item-info">
-                                        <strong>{manifiesto.numero}</strong>
-                                        <span>{manifiesto.generador?.razonSocial}</span>
-                                    </div>
-                                    <div className="recent-item-meta">
-                                        <span className={`badge ${getEstadoColor(manifiesto.estado)}`}>
-                                            {manifiesto.estado.replace('_', ' ')}
-                                        </span>
-                                        <span className="recent-item-date">
-                                            {formatDate(manifiesto.updatedAt)}
-                                        </span>
-                                    </div>
-                                </Link>
-                            ))
-                        ) : (
-                            <div className="empty-state">
-                                <FileText size={40} />
-                                <p>No hay manifiestos registrados</p>
-                            </div>
-                        )}
+                ) : (
+                    <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                        <FileText size={40} style={{ marginBottom: '8px', opacity: 0.5 }} />
+                        <p>No hay manifiestos registrados</p>
                     </div>
-                </div>
-
-                {/* Manifiestos en Tránsito con Mapa */}
-                <div className="card dashboard-section">
-                    <div className="section-header">
-                        <h3>
-                            <MapPin size={20} />
-                            En Tránsito
-                        </h3>
-                        <Link to="/tracking" className="btn btn-ghost">
-                            Ver mapa <ArrowRight size={16} />
-                        </Link>
-                    </div>
-
-                    {/* Mini Mapa */}
-                    <div className="dashboard-map-container">
-                        <iframe
-                            title="Mapa de Monitoreo"
-                            src="https://www.openstreetmap.org/export/embed.html?bbox=-69.2%2C-33.2%2C-68.5%2C-32.6&amp;layer=mapnik&amp;marker=-32.8895%2C-68.8458"
-                            className="dashboard-map-iframe"
-                        />
-                        <div className="dashboard-map-overlay">
-                            <span className="map-badge">{stats?.enTransitoList?.length || 0} vehículos activos</span>
-                        </div>
-                    </div>
-
-                    {/* Viaje seleccionado con controles sincronizados */}
-                    {selectedManifiestoId && (
-                        <div style={{ marginBottom: '16px' }}>
-                            <ViajeEnCursoCard
-                                manifiestoId={selectedManifiestoId}
-                                onClose={() => setSelectedManifiestoId(null)}
-                            />
-                        </div>
-                    )}
-
-                    <div className="transit-list">
-                        {stats?.enTransitoList && stats.enTransitoList.length > 0 ? (
-                            stats.enTransitoList.map((manifiesto) => (
-                                <div
-                                    key={manifiesto.id}
-                                    className={`transit-item ${selectedManifiestoId === manifiesto.id ? 'transit-item-selected' : ''}`}
-                                    onClick={() => setSelectedManifiestoId(
-                                        selectedManifiestoId === manifiesto.id ? null : manifiesto.id
-                                    )}
-                                    style={{ cursor: 'pointer' }}
-                                >
-                                    <div className="transit-indicator">
-                                        <Truck size={20} />
-                                        <span className="transit-pulse" />
-                                    </div>
-                                    <div className="transit-info">
-                                        <strong>{manifiesto.numero}</strong>
-                                        <span>{manifiesto.transportista?.razonSocial}</span>
-                                        <span className="transit-route">
-                                            {manifiesto.generador?.domicilio?.split(',')[0]} → {manifiesto.operador?.domicilio?.split(',')[0]}
-                                        </span>
-                                    </div>
-                                    <Link
-                                        to={`/manifiestos/${manifiesto.id}`}
-                                        className="btn btn-icon btn-ghost"
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        <ArrowRight size={18} />
-                                    </Link>
-                                </div>
-                            ))
-                        ) : (
-                            <div className="empty-state">
-                                <Truck size={40} />
-                                <p>No hay transportes activos</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                )}
             </div>
 
-            {/* Quick Stats */}
-            <div className="quick-stats">
-                <div className="quick-stat">
-                    <div className="quick-stat-icon approved">
-                        <TrendingUp size={20} />
-                    </div>
-                    <div className="quick-stat-content">
-                        <span className="quick-stat-value">{stats?.estadisticas?.aprobados || 0}</span>
-                        <span className="quick-stat-label">Aprobados</span>
-                    </div>
-                </div>
-                <div className="quick-stat">
-                    <div className="quick-stat-icon delivered">
-                        <CheckCircle size={20} />
-                    </div>
-                    <div className="quick-stat-content">
-                        <span className="quick-stat-value">{stats?.estadisticas?.entregados || 0}</span>
-                        <span className="quick-stat-label">Entregados</span>
-                    </div>
-                </div>
-                <div className="quick-stat">
-                    <div className="quick-stat-icon received">
-                        <Activity size={20} />
-                    </div>
-                    <div className="quick-stat-content">
-                        <span className="quick-stat-value">{stats?.estadisticas?.recibidos || 0}</span>
-                        <span className="quick-stat-label">Recibidos</span>
-                    </div>
-                </div>
+            {/* Debug info */}
+            <div style={{
+                marginTop: '24px',
+                padding: '12px',
+                background: 'rgba(0,0,0,0.3)',
+                borderRadius: '8px',
+                fontSize: '11px',
+                color: '#64748b'
+            }}>
+                <strong>DEBUG:</strong> Dashboard v9.0 EMERGENCY - Sin Recharts/Motion/WebSocket
             </div>
-
-            {/* Admin Panel - Solo visible para ADMIN */}
-            {effectiveRole === 'ADMIN' && adminStats && (
-                <div className="admin-panel" style={{ marginTop: '24px' }}>
-                    <div className="section-header" style={{ marginBottom: '16px' }}>
-                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: '#f8fafc' }}>
-                            <Users size={20} />
-                            Panel de Administración
-                        </h3>
-                        <Link to="/admin/usuarios-panel" className="btn btn-ghost">
-                            Gestionar Usuarios <ArrowRight size={16} />
-                        </Link>
-                    </div>
-
-                    <div className="admin-stats-grid" style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                        gap: '16px',
-                        marginBottom: '24px'
-                    }}>
-                        {/* Total Usuarios */}
-                        <div style={{
-                            display: 'flex', alignItems: 'center', gap: '16px', padding: '20px',
-                            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05))',
-                            border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '16px'
-                        }}>
-                            <div style={{
-                                width: '48px', height: '48px', borderRadius: '12px',
-                                background: 'rgba(16, 185, 129, 0.2)', display: 'flex',
-                                alignItems: 'center', justifyContent: 'center', color: '#10b981'
-                            }}>
-                                <Users size={24} />
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <div style={{ fontSize: '28px', fontWeight: 800, color: '#f8fafc' }}>
-                                    {adminStats.usuarios.total}
-                                </div>
-                                <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase' }}>
-                                    Total Usuarios
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Usuarios Activos */}
-                        <div style={{
-                            display: 'flex', alignItems: 'center', gap: '16px', padding: '20px',
-                            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.05))',
-                            border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '16px'
-                        }}>
-                            <div style={{
-                                width: '48px', height: '48px', borderRadius: '12px',
-                                background: 'rgba(59, 130, 246, 0.2)', display: 'flex',
-                                alignItems: 'center', justifyContent: 'center', color: '#3b82f6'
-                            }}>
-                                <UserCheck size={24} />
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <div style={{ fontSize: '28px', fontWeight: 800, color: '#f8fafc' }}>
-                                    {adminStats.usuarios.activos}
-                                </div>
-                                <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase' }}>
-                                    Activos
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Pendientes */}
-                        <div style={{
-                            display: 'flex', alignItems: 'center', gap: '16px', padding: '20px',
-                            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(245, 158, 11, 0.05))',
-                            border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '16px'
-                        }}>
-                            <div style={{
-                                width: '48px', height: '48px', borderRadius: '12px',
-                                background: 'rgba(245, 158, 11, 0.2)', display: 'flex',
-                                alignItems: 'center', justifyContent: 'center', color: '#f59e0b'
-                            }}>
-                                <Clock size={24} />
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <div style={{ fontSize: '28px', fontWeight: 800, color: '#f8fafc' }}>
-                                    {adminStats.usuarios.pendientes}
-                                </div>
-                                <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase' }}>
-                                    Pendientes
-                                </div>
-                            </div>
-                            {adminStats.usuarios.pendientes > 0 && (
-                                <Link to="/admin/usuarios" style={{
-                                    marginLeft: 'auto', padding: '6px 12px', background: '#f59e0b',
-                                    color: '#000', borderRadius: '8px', fontSize: '12px', fontWeight: 600
-                                }}>
-                                    Aprobar
-                                </Link>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Distribución por Rol */}
-                    <div style={{
-                        background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
-                        borderRadius: '16px', padding: '20px'
-                    }}>
-                        <h4 style={{ margin: '0 0 16px', color: '#f8fafc', fontSize: '14px' }}>
-                            Usuarios por Rol
-                        </h4>
-                        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Shield size={16} style={{ color: '#10b981' }} />
-                                <span style={{ color: '#94a3b8', fontSize: '13px' }}>Admin:</span>
-                                <span style={{ color: '#f8fafc', fontWeight: 600 }}>
-                                    {adminStats.usuarios.porRol['ADMIN'] || 0}
-                                </span>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Factory size={16} style={{ color: '#3b82f6' }} />
-                                <span style={{ color: '#94a3b8', fontSize: '13px' }}>Generadores:</span>
-                                <span style={{ color: '#f8fafc', fontWeight: 600 }}>
-                                    {adminStats.usuarios.porRol['GENERADOR'] || 0}
-                                </span>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Truck size={16} style={{ color: '#f59e0b' }} />
-                                <span style={{ color: '#94a3b8', fontSize: '13px' }}>Transportistas:</span>
-                                <span style={{ color: '#f8fafc', fontWeight: 600 }}>
-                                    {adminStats.usuarios.porRol['TRANSPORTISTA'] || 0}
-                                </span>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Building2 size={16} style={{ color: '#8b5cf6' }} />
-                                <span style={{ color: '#94a3b8', fontSize: '13px' }}>Operadores:</span>
-                                <span style={{ color: '#f8fafc', fontWeight: 600 }}>
-                                    {adminStats.usuarios.porRol['OPERADOR'] || 0}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Link a Actividad Global */}
-                    <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end' }}>
-                        <Link to="/admin/actividad" style={{
-                            display: 'flex', alignItems: 'center', gap: '8px',
-                            padding: '10px 20px', background: 'var(--bg-secondary)',
-                            border: '1px solid var(--border-color)', borderRadius: '10px',
-                            color: '#10b981', textDecoration: 'none', fontSize: '14px', fontWeight: 500
-                        }}>
-                            <Activity size={18} />
-                            Ver Actividad Global
-                            <ArrowRight size={16} />
-                        </Link>
-                    </div>
-                </div>
-            )}
-        </div >
+        </div>
     );
 };
 

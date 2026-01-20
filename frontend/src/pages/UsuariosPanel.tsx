@@ -20,8 +20,6 @@ import {
     Factory,
     Building2,
     RefreshCw,
-    ChevronLeft,
-    ChevronRight,
     Mail,
     Phone,
     Calendar,
@@ -35,6 +33,15 @@ import {
 import { usuarioService } from '../services/admin.service';
 import type { Usuario, UsuariosResponse } from '../services/admin.service';
 import { useSorting } from '../hooks/useSorting';
+import {
+    AdminStatCard,
+    AdminStatsGrid,
+    AdminPageHeader,
+    AdminBadge,
+    AdminPagination,
+    AdminButton,
+    getRoleVariant
+} from '../components/admin';
 import './UsuariosPanel.css';
 
 const ROLES = [
@@ -63,6 +70,16 @@ const getRoleIcon = (rol: string) => {
         OPERADOR: <Factory size={16} />
     };
     return icons[rol] || <Users size={16} />;
+};
+
+const getRoleVariantForStats = (rol: string): 'primary' | 'success' | 'warning' | 'danger' | 'info' | 'neutral' => {
+    const variants: Record<string, 'primary' | 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = {
+        ADMIN: 'info',
+        GENERADOR: 'primary',
+        TRANSPORTISTA: 'warning',
+        OPERADOR: 'success'
+    };
+    return variants[rol] || 'neutral';
 };
 
 const UsuariosPanel: React.FC = () => {
@@ -173,56 +190,55 @@ const UsuariosPanel: React.FC = () => {
     };
 
     return (
-        <div className="usuarios-panel">
+        <div className="usuarios-panel admin-page">
             {/* Header */}
-            <div className="panel-header">
-                <div className="header-title">
-                    <Users size={28} />
-                    <div>
-                        <h1>Gestión de Usuarios</h1>
-                        <p>Administra todos los usuarios del sistema</p>
-                    </div>
-                </div>
-                <button className="btn-refresh" onClick={fetchUsuarios} disabled={loading}>
-                    <RefreshCw size={18} className={loading ? 'spinning' : ''} />
-                    Actualizar
-                </button>
-            </div>
+            <AdminPageHeader
+                icon={<Users size={28} />}
+                title="Gestión de Usuarios"
+                subtitle="Administra todos los usuarios del sistema"
+                actions={
+                    <AdminButton
+                        variant="ghost"
+                        icon={<RefreshCw size={16} className={loading ? 'spinning' : ''} />}
+                        onClick={fetchUsuarios}
+                        disabled={loading}
+                    >
+                        Actualizar
+                    </AdminButton>
+                }
+            />
 
             {/* Stats Cards */}
             {data?.stats && (
-                <div className="stats-grid">
-                    <div className="stat-card total">
-                        <Users size={24} />
-                        <div className="stat-info">
-                            <span className="stat-value">{data.stats.total}</span>
-                            <span className="stat-label">Total Usuarios</span>
-                        </div>
-                    </div>
-                    <div className="stat-card activos">
-                        <UserCheck size={24} />
-                        <div className="stat-info">
-                            <span className="stat-value">{data.stats.activos}</span>
-                            <span className="stat-label">Activos</span>
-                        </div>
-                    </div>
-                    <div className="stat-card inactivos">
-                        <UserX size={24} />
-                        <div className="stat-info">
-                            <span className="stat-value">{data.stats.inactivos}</span>
-                            <span className="stat-label">Pendientes</span>
-                        </div>
-                    </div>
+                <AdminStatsGrid columns="auto">
+                    <AdminStatCard
+                        icon={<Users size={24} />}
+                        value={data.stats.total}
+                        label="Total Usuarios"
+                        variant="primary"
+                    />
+                    <AdminStatCard
+                        icon={<UserCheck size={24} />}
+                        value={data.stats.activos}
+                        label="Activos"
+                        variant="success"
+                    />
+                    <AdminStatCard
+                        icon={<UserX size={24} />}
+                        value={data.stats.inactivos}
+                        label="Pendientes"
+                        variant="warning"
+                    />
                     {Object.entries(data.stats.porRol).map(([rol, count]) => (
-                        <div key={rol} className="stat-card role" style={{ borderColor: getRoleColor(rol) }}>
-                            {getRoleIcon(rol)}
-                            <div className="stat-info">
-                                <span className="stat-value">{count}</span>
-                                <span className="stat-label">{rol}</span>
-                            </div>
-                        </div>
+                        <AdminStatCard
+                            key={rol}
+                            icon={getRoleIcon(rol)}
+                            value={count as number}
+                            label={rol}
+                            variant={getRoleVariantForStats(rol)}
+                        />
                     ))}
-                </div>
+                </AdminStatsGrid>
             )}
 
             {/* Filtros */}
@@ -286,10 +302,10 @@ const UsuariosPanel: React.FC = () => {
                                         <span className="user-name">{usuario.nombre} {usuario.apellido}</span>
                                         <span className="user-email">{usuario.email}</span>
                                     </div>
-                                    <span className="role-badge" style={{ background: getRoleColor(usuario.rol) + '20', color: getRoleColor(usuario.rol) }}>
+                                    <AdminBadge variant={getRoleVariant(usuario.rol)} size="sm">
                                         {getRoleIcon(usuario.rol)}
                                         {usuario.rol}
-                                    </span>
+                                    </AdminBadge>
                                 </div>
                                 <div className="user-card-body">
                                     <div className="card-detail-grid">
@@ -306,9 +322,9 @@ const UsuariosPanel: React.FC = () => {
                                             <span>{formatDate(usuario.createdAt)}</span>
                                         </div>
                                         <div className="card-detail">
-                                            <span className={`status-badge ${usuario.activo ? 'active' : 'pending'}`}>
+                                            <AdminBadge variant={usuario.activo ? 'success' : 'warning'} size="sm">
                                                 {usuario.activo ? 'Activo' : 'Pendiente'}
-                                            </span>
+                                            </AdminBadge>
                                         </div>
                                     </div>
                                 </div>
@@ -389,10 +405,10 @@ const UsuariosPanel: React.FC = () => {
                                             </div>
                                         </td>
                                         <td>
-                                            <span className="role-badge" style={{ background: getRoleColor(usuario.rol) + '20', color: getRoleColor(usuario.rol) }}>
+                                            <AdminBadge variant={getRoleVariant(usuario.rol)} size="sm">
                                                 {getRoleIcon(usuario.rol)}
                                                 {usuario.rol}
-                                            </span>
+                                            </AdminBadge>
                                         </td>
                                         <td>{usuario.empresa || '-'}</td>
                                         <td className="contact-cell">
@@ -401,9 +417,9 @@ const UsuariosPanel: React.FC = () => {
                                             )}
                                         </td>
                                         <td>
-                                            <span className={`status-badge ${usuario.activo ? 'active' : 'pending'}`}>
+                                            <AdminBadge variant={usuario.activo ? 'success' : 'warning'} size="sm">
                                                 {usuario.activo ? 'Activo' : 'Pendiente'}
-                                            </span>
+                                            </AdminBadge>
                                         </td>
                                         <td>
                                             <span className="date-cell">
@@ -457,25 +473,13 @@ const UsuariosPanel: React.FC = () => {
 
                     {/* Pagination */}
                     {data.pagination.pages > 1 && (
-                        <div className="pagination">
-                            <button
-                                disabled={page === 1}
-                                onClick={() => setPage(p => p - 1)}
-                            >
-                                <ChevronLeft size={18} />
-                                Anterior
-                            </button>
-                            <span className="page-info">
-                                Página {page} de {data.pagination.pages}
-                            </span>
-                            <button
-                                disabled={page >= data.pagination.pages}
-                                onClick={() => setPage(p => p + 1)}
-                            >
-                                Siguiente
-                                <ChevronRight size={18} />
-                            </button>
-                        </div>
+                        <AdminPagination
+                            page={page}
+                            totalPages={data.pagination.pages}
+                            totalItems={data.pagination.total}
+                            itemsPerPage={data.pagination.limit}
+                            onPageChange={setPage}
+                        />
                     )}
                 </>
             )}
@@ -490,9 +494,9 @@ const UsuariosPanel: React.FC = () => {
                             </div>
                             <div>
                                 <h3>{selectedUser.nombre} {selectedUser.apellido}</h3>
-                                <span className="role-badge" style={{ background: getRoleColor(selectedUser.rol) + '20', color: getRoleColor(selectedUser.rol) }}>
+                                <AdminBadge variant={getRoleVariant(selectedUser.rol)} size="sm">
                                     {getRoleIcon(selectedUser.rol)} {selectedUser.rol}
-                                </span>
+                                </AdminBadge>
                             </div>
                             <button className="close-btn" onClick={() => setShowModal(false)}>
                                 <X size={20} />
@@ -521,9 +525,9 @@ const UsuariosPanel: React.FC = () => {
                                 <span>Registrado: {formatDate(selectedUser.createdAt)}</span>
                             </div>
                             <div className="detail-row">
-                                <span className={`status-badge ${selectedUser.activo ? 'active' : 'pending'}`}>
-                                    {selectedUser.activo ? 'Usuario Activo' : 'Pendiente de Aprobación'}
-                                </span>
+                                <AdminBadge variant={selectedUser.activo ? 'success' : 'warning'} size="md">
+                                    {selectedUser.activo ? 'Usuario Activo' : 'Pendiente de Aprobacion'}
+                                </AdminBadge>
                             </div>
                         </div>
 

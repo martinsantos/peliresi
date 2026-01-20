@@ -1,14 +1,27 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
-import { config, isProduction } from '../config/config';
+import { config, isProduction, isDemoEnvironment } from '../config/config';
 import { AppError } from './errorHandler';
 import { redisService, CACHE_TTL, CACHE_PREFIX } from '../lib/redis';
+import {
+  ERROR_CODES,
+  AppErrorWithCode,
+  createRoleMismatchError,
+  getRoleName
+} from '../utils/errors';
 
 const prisma = new PrismaClient();
 
 export interface AuthRequest extends Request {
   user?: any;
+  demoProfile?: {
+    enabled: boolean;
+    originalRole: string;
+    impersonatedRole: string;
+    impersonatedActorId?: string;
+    impersonatedActorName?: string;
+  };
 }
 
 export const isAuthenticated = async (
@@ -20,13 +33,21 @@ export const isAuthenticated = async (
     // Obtener el token del encabezado
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new AppError('No autorizado - Token no proporcionado', 401);
+      throw new AppErrorWithCode(ERROR_CODES.AUTH_TOKEN_MISSING);
     }
 
     const token = authHeader.split(' ')[1];
 
     // Verificar el token
-    const decoded = jwt.verify(token, config.JWT_SECRET as string) as { id: string };
+    let decoded: { id: string };
+    try {
+      decoded = jwt.verify(token, config.JWT_SECRET as string) as { id: string };
+    } catch (jwtError) {
+      if (jwtError instanceof jwt.TokenExpiredError) {
+        throw new AppErrorWithCode(ERROR_CODES.AUTH_TOKEN_EXPIRED);
+      }
+      throw new AppErrorWithCode(ERROR_CODES.AUTH_TOKEN_INVALID);
+    }
 
     // OPTIMIZACIÓN: Intentar obtener usuario de caché Redis
     const cacheKey = `${CACHE_PREFIX.USER}${decoded.id}`;
@@ -39,6 +60,8 @@ export const isAuthenticated = async (
         select: {
           id: true,
           email: true,
+          nombre: true,
+          apellido: true,
           rol: true,
           activo: true,
           generador: true,
@@ -54,26 +77,103 @@ export const isAuthenticated = async (
     }
 
     if (!user || !user.activo) {
-      throw new AppError('Usuario no autorizado o inactivo', 401);
+      throw new AppErrorWithCode(ERROR_CODES.AUTH_SESSION_EXPIRED);
     }
 
     // Adjuntar el usuario al objeto de solicitud
     req.user = user;
+
+    // Procesar Demo Profile si está habilitado
+    await processDemoProfile(req);
+
     next();
   } catch (error) {
-    if (error instanceof jwt.JsonWebTokenError) {
-      next(new AppError('No autorizado - Token inválido', 401));
-    } else {
-      next(error);
+    if (error instanceof AppErrorWithCode) {
+      return res.status(error.httpStatus).json(error.toJSON());
     }
+    if (error instanceof jwt.JsonWebTokenError) {
+      const appError = new AppErrorWithCode(ERROR_CODES.AUTH_TOKEN_INVALID);
+      return res.status(appError.httpStatus).json(appError.toJSON());
+    }
+    next(error);
   }
 };
 
-// Middleware para verificar roles
+/**
+ * Procesar perfil de demo si está habilitado
+ * Permite cambiar de rol/actor en ambiente de desarrollo
+ */
+async function processDemoProfile(req: AuthRequest) {
+  const demoProfileHeader = req.headers['x-demo-profile'] as string;
+
+  if (!demoProfileHeader) return;
+
+  // Solo permitir en ambiente DEMO (no producción estricta)
+  if (isProduction() && !isDemoEnvironment()) {
+    console.warn(`[AUTH] BLOCKED: Demo profile en producción por ${req.user.email}`);
+    return;
+  }
+
+  try {
+    const demoProfile = JSON.parse(demoProfileHeader);
+    const { role, actorId } = demoProfile;
+
+    if (!role) return;
+
+    // Cargar actor si se especificó
+    let impersonatedActor: any = null;
+    if (actorId) {
+      if (role === 'GENERADOR') {
+        impersonatedActor = await prisma.generador.findUnique({
+          where: { id: actorId },
+          select: { id: true, razonSocial: true, usuarioId: true }
+        });
+      } else if (role === 'TRANSPORTISTA') {
+        impersonatedActor = await prisma.transportista.findUnique({
+          where: { id: actorId },
+          select: { id: true, razonSocial: true, usuarioId: true }
+        });
+      } else if (role === 'OPERADOR') {
+        impersonatedActor = await prisma.operador.findUnique({
+          where: { id: actorId },
+          select: { id: true, razonSocial: true, usuarioId: true }
+        });
+      }
+    }
+
+    // Guardar info del demo profile
+    req.demoProfile = {
+      enabled: true,
+      originalRole: req.user.rol,
+      impersonatedRole: role,
+      impersonatedActorId: impersonatedActor?.id,
+      impersonatedActorName: impersonatedActor?.razonSocial
+    };
+
+    // Modificar el usuario para el contexto de la request
+    req.user.rol = role;
+    if (impersonatedActor) {
+      if (role === 'GENERADOR') {
+        req.user.generador = impersonatedActor;
+      } else if (role === 'TRANSPORTISTA') {
+        req.user.transportista = impersonatedActor;
+      } else if (role === 'OPERADOR') {
+        req.user.operador = impersonatedActor;
+      }
+    }
+
+    console.log(`[DEMO] ${req.user.email} actuando como ${role}${impersonatedActor ? ` (${impersonatedActor.razonSocial})` : ''}`);
+  } catch (e) {
+    console.error('[AUTH] Error parsing demo profile:', e);
+  }
+}
+
+// Middleware para verificar roles con errores descriptivos
 export const hasRole = (...roles: string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
-      return next(new AppError('No autorizado', 401));
+      const error = new AppErrorWithCode(ERROR_CODES.AUTH_TOKEN_MISSING);
+      return res.status(error.httpStatus).json(error.toJSON());
     }
 
     // El Super Administrador (ADMIN) siempre tiene acceso
@@ -82,33 +182,56 @@ export const hasRole = (...roles: string[]) => {
       return next();
     }
 
-    // DEMO MODE: Permitir override de rol SOLO en development
-    // En producción, demo mode se bloquea automáticamente
-    const demoModeRequested = req.headers['x-demo-mode'] === 'true';
-    const isDemoMode = !isProduction() && demoModeRequested;
-    const demoRole = req.headers['x-demo-role'] as string;
-    const effectiveRole = (isDemoMode && demoRole) ? demoRole : req.user.rol;
+    const effectiveRole = req.user.rol;
 
-    // Log de advertencia si intentan usar demo mode en producción
-    if (isProduction() && demoModeRequested) {
-      console.warn(`[AUTH] BLOCKED: Intento de usar Demo Mode en producción por ${req.user.email}`);
+    // Verificar si el demo profile está activo
+    if (req.demoProfile?.enabled) {
+      console.log(`[AUTH] Demo profile activo: ${req.user.email} como ${effectiveRole}`);
     }
 
-    if (isDemoMode && demoRole) {
-      console.log(`[AUTH] DEMO MODE: Usuario ${req.user.email} usando rol simulado "${demoRole}" (rol real: ${req.user.rol})`);
-    }
+    console.log(`[AUTH] Verificando rol. Usuario: ${req.user.email}, Rol: "${effectiveRole}", Requeridos: ${JSON.stringify(roles)}`);
 
-    console.log(`[AUTH] Verificando rol. Usuario: ${req.user.email}, Rol efectivo: "${effectiveRole}", Roles requeridos: ${JSON.stringify(roles)}`);
     if (!roles.includes(effectiveRole)) {
-      console.log(`[AUTH] 403 Forbidden para ${req.user.email}. El rol "${effectiveRole}" no está en ${JSON.stringify(roles)}`);
-      return next(
-        new AppError('No tiene permisos para realizar esta acción', 403)
+      console.log(`[AUTH] 403 Forbidden para ${req.user.email}. Rol "${effectiveRole}" no está en ${JSON.stringify(roles)}`);
+
+      // Crear error descriptivo con contexto
+      const error = createRoleMismatchError(
+        getRoleName(effectiveRole),
+        roles.map(getRoleName),
+        getActionNameFromPath(req.path)
       );
+
+      return res.status(error.httpStatus).json(error.toJSON());
     }
 
     next();
   };
 };
+
+/**
+ * Obtener nombre de acción legible desde la ruta
+ */
+function getActionNameFromPath(path: string): string {
+  const actionMap: Record<string, string> = {
+    'confirmar-recepcion': 'Confirmar Recepción',
+    'confirmar-retiro': 'Confirmar Retiro',
+    'confirmar-entrega': 'Confirmar Entrega',
+    'pesaje': 'Registrar Pesaje',
+    'tratamiento': 'Registrar Tratamiento',
+    'cerrar': 'Cerrar Manifiesto',
+    'firmar': 'Firmar Manifiesto',
+    'aprobar': 'Aprobar Manifiesto',
+    'rechazar': 'Rechazar Carga',
+    'enviar-aprobacion': 'Enviar a Aprobación',
+    'revertir': 'Revertir Estado'
+  };
+
+  for (const [key, value] of Object.entries(actionMap)) {
+    if (path.includes(key)) return value;
+  }
+
+  return 'esta acción';
+}
 
 // Alias para compatibilidad
 export const authMiddleware = isAuthenticated;

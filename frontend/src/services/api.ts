@@ -19,9 +19,15 @@ api.interceptors.request.use(
             config.headers.Authorization = `Bearer ${token}`;
         }
 
-        // DEMO MODE: Agregar headers para simular rol en app móvil
+        // DEMO MODE: Agregar header X-Demo-Profile para cambio de perfil
+        const demoProfile = localStorage.getItem('sitrep_demo_profile');
+        if (demoProfile && config.headers) {
+            config.headers['X-Demo-Profile'] = demoProfile;
+        }
+
+        // Legacy: Soporte para app móvil (mantener compatibilidad)
         const mobileRole = localStorage.getItem('sitrep_mobile_role');
-        if (mobileRole && config.headers) {
+        if (mobileRole && config.headers && !demoProfile) {
             config.headers['X-Demo-Mode'] = 'true';
             config.headers['X-Demo-Role'] = mobileRole;
         }

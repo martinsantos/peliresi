@@ -592,3 +592,251 @@
     animation: none;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* ACTOR SELECTION - Secondary Screen                                          */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+.role-selection.actor-selection {
+  justify-content: flex-start;
+  padding-top: var(--space-6);
+}
+
+/* Back Button */
+.actor-back-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  align-self: flex-start;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  margin-bottom: var(--space-6);
+}
+
+.actor-back-btn:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-strong);
+  color: var(--color-text-primary);
+}
+
+.actor-back-btn:active {
+  transform: scale(0.97);
+}
+
+/* Actor Header - Role Info */
+.actor-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  max-width: 360px;
+  padding: var(--space-6);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-xl);
+  margin-bottom: var(--space-6);
+  text-align: center;
+  animation: slideUp var(--duration-normal) var(--ease-out);
+}
+
+.actor-header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-lg);
+  color: #ffffff;
+}
+
+/* Actor Header Color Variants */
+.actor-header.role-admin .actor-header-icon {
+  background: var(--role-admin-gradient);
+  box-shadow: 0 4px 16px var(--role-admin-glow);
+}
+
+.actor-header.role-generador .actor-header-icon {
+  background: var(--role-generador-gradient);
+  box-shadow: 0 4px 16px var(--role-generador-glow);
+}
+
+.actor-header.role-transportista .actor-header-icon {
+  background: var(--role-transportista-gradient);
+  box-shadow: 0 4px 16px var(--role-transportista-glow);
+}
+
+.actor-header.role-operador .actor-header-icon {
+  background: var(--role-operador-gradient);
+  box-shadow: 0 4px 16px var(--role-operador-glow);
+}
+
+.actor-header h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  color: var(--color-text-bright);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+.actor-header p {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+/* Actor List */
+.actor-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  max-width: 360px;
+}
+
+.actor-list-hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-2) 0;
+  text-align: center;
+}
+
+/* Actor Button */
+.actor-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--space-4);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--duration-fast) var(--ease-out);
+  animation: slideUp var(--duration-normal) var(--ease-out);
+  animation-fill-mode: backwards;
+}
+
+.actor-btn:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  border-color: var(--color-primary-dim);
+  transform: translateX(4px);
+  box-shadow: var(--shadow-card-hover);
+}
+
+.actor-btn:active:not(:disabled) {
+  transform: scale(0.98) translateX(2px);
+}
+
+.actor-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.actor-btn-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.actor-btn-name {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-bright);
+}
+
+.actor-btn-detail {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.actor-btn svg {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.actor-btn:hover:not(:disabled) svg {
+  color: var(--color-primary);
+  transform: translateX(2px);
+}
+
+/* Animate spin for loader */
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Actor Selection Responsive */
+@media (max-width: 375px) {
+  .role-selection.actor-selection {
+    padding: var(--space-4);
+    padding-top: var(--space-4);
+  }
+
+  .actor-header {
+    padding: var(--space-4);
+  }
+
+  .actor-header-icon {
+    width: 52px;
+    height: 52px;
+  }
+
+  .actor-header h2 {
+    font-size: var(--text-lg);
+  }
+
+  .actor-btn {
+    padding: var(--space-3);
+  }
+
+  .actor-btn-name {
+    font-size: var(--text-sm);
+  }
+}
+
+/* Light theme overrides for actor selection */
+[data-theme="light"] .actor-back-btn,
+.theme-light .actor-back-btn {
+  background: var(--color-bg-card);
+  box-shadow: var(--shadow-card);
+}
+
+[data-theme="light"] .actor-header,
+.theme-light .actor-header {
+  background: var(--color-bg-card);
+  box-shadow: var(--shadow-card);
+}
+
+[data-theme="light"] .actor-btn,
+.theme-light .actor-btn {
+  background: var(--color-bg-card);
+  box-shadow: var(--shadow-card);
+}
+
+[data-theme="light"] .actor-btn:hover:not(:disabled),
+.theme-light .actor-btn:hover:not(:disabled) {
+  box-shadow: var(--shadow-card-hover);
+}

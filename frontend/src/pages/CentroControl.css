@@ -1389,20 +1389,134 @@
         text-align: center;
     }
 
+    .ranking-controls {
+        flex-direction: column;
+        gap: 10px;
+        width: 100%;
+    }
+
+    .filtro-tiempo-select {
+        width: 100%;
+        min-height: 44px; /* WCAG touch target */
+        font-size: 1rem;
+    }
+
+    .ranking-total {
+        justify-content: center;
+    }
+
     .ranking-item {
-        padding: 10px 12px;
+        padding: 14px 16px;
+        min-height: 64px; /* Better touch target */
+        gap: 14px;
+    }
+
+    .ranking-position {
+        width: 36px;
+        height: 36px;
+        min-width: 36px;
     }
 
     .ranking-name {
-        font-size: 0.8rem;
+        font-size: 0.85rem;
     }
 
     .ranking-value {
-        font-size: 0.9rem;
+        font-size: 1rem;
+    }
+
+    .ranking-bar-container {
+        height: 8px;
+    }
+
+    .ranking-pending {
+        font-size: 0.8rem;
     }
 
     .ranking-others {
         display: none;
+    }
+
+    /* Ocultar mapa en mobile para dar espacio a la lista */
+    .ranking-map {
+        display: none;
+    }
+
+    .ranking-content {
+        grid-template-columns: 1fr;
+    }
+
+    .ranking-list {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    /* Mejorar viajes activos en mobile */
+    .viajes-activos-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .viaje-activo-card {
+        min-height: 64px;
+        padding: 14px 16px;
+    }
+
+    .viaje-icon-wrapper {
+        width: 44px;
+        height: 44px;
+    }
+
+    .viaje-estado-badge {
+        padding: 6px 14px;
+        font-size: 11px;
+    }
+
+    /* Mejorar pipeline en mobile */
+    .mega-pipeline {
+        padding: 16px;
+    }
+
+    .pipeline-flow {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .pipeline-stage {
+        min-width: 65px;
+        padding: 12px 6px;
+    }
+
+    .stage-count {
+        font-size: 1.25rem;
+    }
+
+    .stage-label {
+        font-size: 0.6rem;
+    }
+
+    .pipeline-arrow {
+        font-size: 1rem;
+    }
+
+    /* Mejorar charts en mobile */
+    .mega-charts {
+        grid-template-columns: 1fr !important;
+    }
+
+    .chart-card {
+        padding: 16px;
+    }
+
+    /* Mejorar footer actions */
+    .mega-footer {
+        padding: 12px;
+        gap: 8px;
+    }
+
+    .quick-action-btn {
+        padding: 14px;
+        min-height: 48px;
+        border-radius: 12px;
     }
 }
 

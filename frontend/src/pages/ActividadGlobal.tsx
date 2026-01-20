@@ -5,12 +5,20 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-    Activity, Calendar, Filter, RefreshCw, FileText, User, Settings,
+    Activity, Calendar, RefreshCw, FileText, User, Settings,
     Truck, CheckCircle, XCircle, AlertTriangle, Clock, MapPin,
     ChevronDown, ChevronUp, Users, Shield, Package
 } from 'lucide-react';
 import { usuarioService } from '../services/admin.service';
 import type { Actividad, ActividadResponse } from '../services/admin.service';
+import {
+    AdminStatCard,
+    AdminStatsGrid,
+    AdminPageHeader,
+    AdminBadge,
+    AdminFilterPanel,
+    AdminButton
+} from '../components/admin';
 import './ActividadGlobal.css';
 
 type FilterTipo = 'TODOS' | 'MANIFIESTO' | 'SISTEMA';
@@ -42,6 +50,20 @@ const TIPO_COLORS: Record<string, string> = {
     'APPROVE_USER': 'var(--color-success)',
     'REJECT_USER': 'var(--color-danger)',
     'CONFIG': 'var(--color-text-muted)',
+};
+
+const getEstadoVariant = (estado: string): 'primary' | 'success' | 'warning' | 'danger' | 'info' | 'neutral' => {
+    const variants: Record<string, 'primary' | 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = {
+        'BORRADOR': 'neutral',
+        'PENDIENTE': 'warning',
+        'APROBADO': 'success',
+        'EN_TRANSITO': 'info',
+        'ENTREGADO': 'success',
+        'RECIBIDO': 'primary',
+        'RECHAZADO': 'danger',
+        'CANCELADO': 'danger'
+    };
+    return variants[estado] || 'neutral';
 };
 
 const ActividadGlobal: React.FC = () => {
@@ -174,72 +196,59 @@ const ActividadGlobal: React.FC = () => {
     const groupedActividades = groupByDate(actividades);
 
     return (
-        <div className="actividad-global-page">
+        <div className="actividad-global-page admin-page">
             {/* Header */}
-            <div className="page-header">
-                <div className="header-content">
-                    <h1><Activity size={28} /> Actividad del Sistema</h1>
-                    <p>Timeline de eventos y actividad en tiempo real</p>
-                </div>
-                <div className="header-actions">
-                    <button
-                        className="btn btn-secondary"
-                        onClick={() => setShowFilters(!showFilters)}
-                    >
-                        <Filter size={16} />
-                        Filtros
-                        {showFilters ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                    </button>
-                    <button
-                        className="btn btn-primary"
+            <AdminPageHeader
+                icon={<Activity size={28} />}
+                title="Actividad del Sistema"
+                subtitle="Timeline de eventos y actividad en tiempo real"
+                actions={
+                    <AdminButton
+                        variant="ghost"
+                        icon={<RefreshCw size={16} className={loading ? 'spinning' : ''} />}
                         onClick={loadActividad}
                         disabled={loading}
                     >
-                        <RefreshCw size={16} className={loading ? 'spinning' : ''} />
                         Actualizar
-                    </button>
-                </div>
-            </div>
+                    </AdminButton>
+                }
+            />
 
             {/* Stats */}
             {stats && (
-                <div className="stats-row">
-                    <div className="stat-card">
-                        <div className="stat-icon" style={{ color: 'var(--color-primary)' }}>
-                            <Activity size={24} />
-                        </div>
-                        <div className="stat-info">
-                            <span className="stat-value">{stats.eventosHoy}</span>
-                            <span className="stat-label">Eventos Hoy</span>
-                        </div>
-                    </div>
-                    <div className="stat-card">
-                        <div className="stat-icon" style={{ color: 'var(--color-warning)' }}>
-                            <Truck size={24} />
-                        </div>
-                        <div className="stat-info">
-                            <span className="stat-value">{stats.manifestosActivos}</span>
-                            <span className="stat-label">Manifiestos Activos</span>
-                        </div>
-                    </div>
-                    <div className="stat-card">
-                        <div className="stat-icon" style={{ color: 'var(--color-success)' }}>
-                            <Users size={24} />
-                        </div>
-                        <div className="stat-info">
-                            <span className="stat-value">{stats.usuariosActivos}</span>
-                            <span className="stat-label">Usuarios Activos</span>
-                        </div>
-                    </div>
-                </div>
+                <AdminStatsGrid columns={3}>
+                    <AdminStatCard
+                        icon={<Activity size={24} />}
+                        value={stats.eventosHoy}
+                        label="Eventos Hoy"
+                        variant="primary"
+                    />
+                    <AdminStatCard
+                        icon={<Truck size={24} />}
+                        value={stats.manifestosActivos}
+                        label="Manifiestos Activos"
+                        variant="warning"
+                    />
+                    <AdminStatCard
+                        icon={<Users size={24} />}
+                        value={stats.usuariosActivos}
+                        label="Usuarios Activos"
+                        variant="success"
+                    />
+                </AdminStatsGrid>
             )}
 
             {/* Filters Panel */}
-            {showFilters && (
-                <div className="filters-panel">
-                    <div className="filter-group">
-                        <label>Tipo de Evento</label>
+            <AdminFilterPanel
+                isOpen={showFilters}
+                onToggle={() => setShowFilters(!showFilters)}
+                title="Filtros de Actividad"
+            >
+                <div className="admin-filter-grid">
+                    <div className="admin-form-group">
+                        <label className="admin-label">Tipo de Evento</label>
                         <select
+                            className="admin-select"
                             value={filterTipo}
                             onChange={(e) => setFilterTipo(e.target.value as FilterTipo)}
                         >
@@ -248,32 +257,35 @@ const ActividadGlobal: React.FC = () => {
                             <option value="SISTEMA">Eventos del Sistema</option>
                         </select>
                     </div>
-                    <div className="filter-group">
-                        <label>Período</label>
+                    <div className="admin-form-group">
+                        <label className="admin-label">Periodo</label>
                         <select
+                            className="admin-select"
                             value={filterPeriodo}
                             onChange={(e) => setFilterPeriodo(e.target.value as FilterPeriodo)}
                         >
                             <option value="HOY">Hoy</option>
-                            <option value="SEMANA">Última semana</option>
-                            <option value="MES">Último mes</option>
+                            <option value="SEMANA">Ultima semana</option>
+                            <option value="MES">Ultimo mes</option>
                             <option value="CUSTOM">Personalizado</option>
                         </select>
                     </div>
                     {filterPeriodo === 'CUSTOM' && (
                         <>
-                            <div className="filter-group">
-                                <label>Desde</label>
+                            <div className="admin-form-group">
+                                <label className="admin-label">Desde</label>
                                 <input
                                     type="date"
+                                    className="admin-input"
                                     value={fechaDesde}
                                     onChange={(e) => setFechaDesde(e.target.value)}
                                 />
                             </div>
-                            <div className="filter-group">
-                                <label>Hasta</label>
+                            <div className="admin-form-group">
+                                <label className="admin-label">Hasta</label>
                                 <input
                                     type="date"
+                                    className="admin-input"
                                     value={fechaHasta}
                                     onChange={(e) => setFechaHasta(e.target.value)}
                                 />
@@ -281,7 +293,7 @@ const ActividadGlobal: React.FC = () => {
                         </>
                     )}
                 </div>
-            )}
+            </AdminFilterPanel>
 
             {/* Error */}
             {error && (
@@ -352,9 +364,9 @@ const ActividadGlobal: React.FC = () => {
                                                     <div className="timeline-manifiesto">
                                                         <FileText size={12} />
                                                         <span>#{actividad.manifiesto.numero}</span>
-                                                        <span className={`estado-badge ${actividad.manifiesto.estado.toLowerCase()}`}>
+                                                        <AdminBadge variant={getEstadoVariant(actividad.manifiesto.estado)} size="sm">
                                                             {actividad.manifiesto.estado}
-                                                        </span>
+                                                        </AdminBadge>
                                                     </div>
                                                 )}
 

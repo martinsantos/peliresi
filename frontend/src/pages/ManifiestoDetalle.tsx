@@ -891,7 +891,50 @@ const ManifiestoDetalle: React.FC = () => {
             {/* Residuos - CORRECCIÓN 3: Agregar columnas descripción y observaciones */}
             <div className="card detalle-section">
                 <h3>Residuos Declarados</h3>
-                <div className="residuos-table">
+
+                {/* Mobile Cards - Visible solo en móvil */}
+                <div className="residuos-mobile-cards">
+                    {manifiesto.residuos?.map((residuo) => (
+                        <div key={residuo.id} className="residuo-mobile-card">
+                            <div className="residuo-card-header">
+                                <span className="residuo-code">{residuo.tipoResiduo?.codigo}</span>
+                                <span className={`badge badge-${residuo.tipoResiduo?.peligrosidad === 'ALTA' ? 'danger' : residuo.tipoResiduo?.peligrosidad === 'MEDIA' ? 'warning' : 'info'}`}>
+                                    {residuo.tipoResiduo?.peligrosidad}
+                                </span>
+                            </div>
+                            <div className="residuo-card-title">{residuo.tipoResiduo?.nombre}</div>
+                            <div className="residuo-card-body">
+                                <div className="residuo-card-detail">
+                                    <span className="detail-label">Categoría</span>
+                                    <span className="detail-value">{residuo.tipoResiduo?.categoria}</span>
+                                </div>
+                                <div className="residuo-card-detail highlight">
+                                    <span className="detail-label">Cantidad</span>
+                                    <span className="detail-value"><strong>{residuo.cantidad}</strong> {residuo.unidad}</span>
+                                </div>
+                            </div>
+                            {(residuo.descripcion || residuo.observaciones) && (
+                                <div className="residuo-card-extra">
+                                    {residuo.descripcion && (
+                                        <div className="residuo-card-detail">
+                                            <span className="detail-label">Descripción</span>
+                                            <span className="detail-value text-small">{residuo.descripcion}</span>
+                                        </div>
+                                    )}
+                                    {residuo.observaciones && (
+                                        <div className="residuo-card-detail">
+                                            <span className="detail-label">Observaciones</span>
+                                            <span className="detail-value text-small">{residuo.observaciones}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+
+                {/* Desktop Table - Hidden en móvil */}
+                <div className="residuos-table residuos-desktop-table">
                     <div className="table-container">
                         <table>
                             <thead>

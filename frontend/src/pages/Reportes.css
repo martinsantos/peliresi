@@ -626,3 +626,200 @@
         font-size: 0.75rem;
     }
 }
+
+/* ============================================
+   MOBILE CARDS FOR REPORTES
+   ============================================ */
+
+/* Desktop: show table, hide cards */
+.reporte-desktop-table {
+    display: block;
+}
+
+.reporte-mobile-cards {
+    display: none;
+}
+
+/* Mobile: show cards, hide table */
+@media (max-width: 768px) {
+    .reporte-desktop-table {
+        display: none !important;
+    }
+
+    .reporte-mobile-cards {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    /* Volumen por Tipo de Residuo Card */
+    .reporte-mobile-card {
+        background: rgba(28, 36, 47, 0.95);
+        border: 1px solid rgba(148, 163, 184, 0.15);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .reporte-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.875rem 1rem;
+        background: rgba(15, 23, 42, 0.6);
+        border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+    }
+
+    .reporte-card-title {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #f8fafc;
+    }
+
+    .reporte-card-badge {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #10b981;
+        background: rgba(16, 185, 129, 0.15);
+        padding: 4px 10px;
+        border-radius: 20px;
+    }
+
+    .reporte-card-body {
+        padding: 1rem;
+    }
+
+    .reporte-card-stat {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        margin-bottom: 0.75rem;
+    }
+
+    .reporte-card-stat .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #f8fafc;
+    }
+
+    .reporte-card-stat .stat-unit {
+        font-size: 0.8rem;
+        color: #64748b;
+    }
+
+    .reporte-card-bar {
+        height: 8px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .reporte-card-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #10b981, #059669);
+        border-radius: 4px;
+        transition: width 0.5s ease;
+    }
+
+    /* Transportista Card */
+    .transportista-mobile-card {
+        background: rgba(28, 36, 47, 0.95);
+        border: 1px solid rgba(148, 163, 184, 0.15);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .transportista-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 1rem;
+        background: rgba(15, 23, 42, 0.6);
+        border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+    }
+
+    .transportista-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .transportista-name {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #f8fafc;
+    }
+
+    .transportista-cuit {
+        font-size: 0.75rem;
+        color: #64748b;
+        font-family: monospace;
+    }
+
+    .transportista-badge {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #10b981;
+        background: rgba(16, 185, 129, 0.2);
+        padding: 4px 12px;
+        border-radius: 20px;
+    }
+
+    .transportista-card-body {
+        padding: 1rem;
+    }
+
+    .transportista-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .transportista-stat {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 0.75rem;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 8px;
+    }
+
+    .transportista-stat .stat-value {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #f8fafc;
+    }
+
+    .transportista-stat .stat-label {
+        font-size: 0.65rem;
+        font-weight: 600;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        margin-top: 2px;
+    }
+
+    .transportista-stat.success .stat-value {
+        color: #10b981;
+    }
+
+    .transportista-stat.warning .stat-value {
+        color: #f59e0b;
+    }
+
+    .transportista-flota {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding-top: 0.75rem;
+        border-top: 1px solid rgba(148, 163, 184, 0.1);
+        font-size: 0.8rem;
+        color: #94a3b8;
+    }
+
+    .transportista-flota .separator {
+        color: #475569;
+    }
+}
