@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { authService } from '../services/auth.service';
 import { preferenciasService, type PreferenciasUsuario } from '../services/preferencias.service';
 import {
     LayoutDashboard,
@@ -27,8 +26,11 @@ import {
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import QRScanner from './QRScanner';
-import OnboardingTour from './OnboardingTour';
-import ContextualHelp from './ContextualHelp';
+// COMENTADO: Componentes deshabilitados por overlay bloqueante
+// import OnboardingTour from './OnboardingTour';
+// import ContextualHelp from './ContextualHelp';
+import ProfileSwitcher from './ProfileSwitcher';
+import { demoService } from '../services/demo.service';
 import './Layout.css';
 
 interface LayoutProps {
@@ -42,103 +44,77 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [userMenuOpen, setUserMenuOpen] = useState(false);
     const [qrScannerOpen, setQrScannerOpen] = useState(false);
-    const [showTour, setShowTour] = useState(false);
-    const [showContextualHelp, setShowContextualHelp] = useState(false);
-    const [switchingProfile, setSwitchingProfile] = useState(false);
-    const [preferencias, setPreferencias] = useState<PreferenciasUsuario | null>(null);
-    const [prefsLoaded, setPrefsLoaded] = useState(false);
+    // COMENTADO: Estados de componentes deshabilitados
+    const [_showTour, _setShowTour] = useState(false);
+    const [_showContextualHelp, _setShowContextualHelp] = useState(false);
+    const [profileSwitcherOpen, setProfileSwitcherOpen] = useState(false);
+    const [demoProfileActive, setDemoProfileActive] = useState(!!demoService.getActiveProfile());
+    const [_preferencias, _setPreferencias] = useState<PreferenciasUsuario | null>(null);
+    const [_prefsLoaded, _setPrefsLoaded] = useState(false);
 
-    // Usuarios de prueba para cambio rápido de perfil
-    const PROFILE_USERS = [
-        { email: 'admin@dgfa.mendoza.gov.ar', label: 'Administrador SITREP', icon: Shield, rol: 'ADMIN' },
-        { email: 'quimica.mendoza@industria.com', label: 'Generador', icon: Factory, rol: 'GENERADOR' },
-        { email: 'transportes.andes@logistica.com', label: 'Transportista', icon: Truck, rol: 'TRANSPORTISTA' },
-        { email: 'tratamiento.residuos@planta.com', label: 'Operador', icon: Building2, rol: 'OPERADOR' }
-    ];
-
-    // Cambiar perfil haciendo login real con el backend
-    const handleSwitchProfile = useCallback(async (email: string) => {
-        setSwitchingProfile(true);
-        setUserMenuOpen(false);
-        try {
-            await authService.login(email, 'password');
-            window.location.href = '/dashboard';
-        } catch (err) {
-            console.error('Error cambiando perfil:', err);
-            alert('Error al cambiar perfil. Verifique las credenciales.');
-        } finally {
-            setSwitchingProfile(false);
-        }
-    }, []);
-
-    // Cargar preferencias del usuario al iniciar
+    // COMENTADO: Cargar preferencias del usuario al iniciar (no se usa por ahora)
     useEffect(() => {
         const loadPreferencias = async () => {
             if (user?.id) {
                 try {
                     const prefs = await preferenciasService.getMisPreferencias();
-                    setPreferencias(prefs);
+                    _setPreferencias(prefs);
                 } catch (error) {
                     console.error('Error cargando preferencias:', error);
-                    setPreferencias({ mostrarTourInicio: false, ultimaVersionTour: null });
+                    _setPreferencias({ mostrarTourInicio: false, ultimaVersionTour: null });
                 }
-                setPrefsLoaded(true);
+                _setPrefsLoaded(true);
             }
         };
         loadPreferencias();
     }, [user?.id]);
 
-    // TOUR: Solo se muestra si el usuario tiene habilitada la preferencia
-    useEffect(() => {
-        if (location.pathname === '/dashboard' && prefsLoaded && preferencias?.mostrarTourInicio) {
-            const timer = setTimeout(() => setShowTour(true), 800);
-            return () => clearTimeout(timer);
-        }
-    }, [location.pathname, prefsLoaded, preferencias?.mostrarTourInicio]);
+    // COMENTADO: TOUR - Puede bloquear interacción
+    // useEffect(() => {
+    //     if (location.pathname === '/dashboard' && prefsLoaded && preferencias?.mostrarTourInicio) {
+    //         const timer = setTimeout(() => setShowTour(true), 800);
+    //         return () => clearTimeout(timer);
+    //     }
+    // }, [location.pathname, prefsLoaded, preferencias?.mostrarTourInicio]);
 
-    // AYUDA CONTEXTUAL: Solo la primera vez
-    useEffect(() => {
-        const helpShown = localStorage.getItem('contextualHelpShown');
-        if (!helpShown && location.pathname === '/dashboard') {
-            const timer = setTimeout(() => {
-                setShowContextualHelp(true);
-                localStorage.setItem('contextualHelpShown', 'true');
-            }, 2000);
-            return () => clearTimeout(timer);
-        }
-    }, [location.pathname]);
+    // COMENTADO: AYUDA CONTEXTUAL - Bloquea interacción con overlay
+    // useEffect(() => {
+    //     const helpShown = localStorage.getItem('contextualHelpShown');
+    //     if (!helpShown && location.pathname === '/dashboard') {
+    //         const timer = setTimeout(() => {
+    //             setShowContextualHelp(true);
+    //             localStorage.setItem('contextualHelpShown', 'true');
+    //         }, 2000);
+    //         return () => clearTimeout(timer);
+    //     }
+    // }, [location.pathname]);
 
-    const handleStartTour = async () => {
+    // COMENTADO: Funciones de tour deshabilitadas
+    const _handleStartTour = async () => {
         localStorage.removeItem('tourCompleted');
-        // Reactivar el tour en preferencias si estaba desactivado
         try {
             await preferenciasService.reactivarTour();
-            setPreferencias(prev => prev ? { ...prev, mostrarTourInicio: true } : null);
+            _setPreferencias(prev => prev ? { ...prev, mostrarTourInicio: true } : null);
         } catch (error) {
             console.error('Error reactivando tour:', error);
         }
         navigate('/dashboard');
-        setTimeout(() => setShowTour(true), 300);
+        setTimeout(() => _setShowTour(true), 300);
     };
 
-    const handleCompleteTour = async () => {
-        setShowTour(false);
-        // Desactivar el tour en preferencias al completarlo
-        try {
-            await preferenciasService.skipTour('1.0.0');
-            setPreferencias(prev => prev ? { ...prev, mostrarTourInicio: false } : null);
-        } catch (error) {
-            console.error('Error desactivando tour:', error);
-        }
-    };
+    // Función _handleCompleteTour eliminada - no se usa
 
     const handleLogout = async () => {
         await logout();
         navigate('/login');
     };
 
+    // Obtener el perfil demo activo
+    const activeDemoProfile = demoService.getActiveProfile();
+    const effectiveRole = activeDemoProfile?.role || user?.rol;
+
     const getRolIcon = () => {
-        switch (user?.rol) {
+        switch (effectiveRole) {
             case 'ADMIN':
                 return <Shield size={20} />;
             case 'GENERADOR':
@@ -153,7 +129,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     };
 
     const getRolLabel = () => {
-        switch (user?.rol) {
+        // Si hay perfil demo con nombre de actor, mostrarlo
+        if (activeDemoProfile?.actorName) {
+            return activeDemoProfile.actorName;
+        }
+        if (activeDemoProfile?.roleName) {
+            return activeDemoProfile.roleName;
+        }
+        switch (effectiveRole) {
             case 'ADMIN':
                 return 'Administrador SITREP';
             case 'ADMIN_TRANSPORTISTAS':
@@ -173,9 +156,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         }
     };
 
+    // Nombre a mostrar (demo o real)
+    const getDisplayName = () => {
+        if (activeDemoProfile?.actorName) {
+            return activeDemoProfile.actorName;
+        }
+        return `${user?.nombre} ${user?.apellido}`;
+    };
+
     // Título Dashboard dinámico por rol (SINCRONIZADO con APP)
     const getDashboardLabel = (): string => {
-        switch (user?.rol) {
+        switch (effectiveRole) {
             case 'ADMIN': return 'Dashboard';
             case 'GENERADOR': return 'Mis Manifiestos';
             case 'TRANSPORTISTA': return 'Mis Viajes';
@@ -184,13 +175,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         }
     };
 
-    // Menú diferenciado por rol
+    // Menú diferenciado por rol (usa effectiveRole para demo)
     const getNavItems = () => {
         const baseItems = [
             { path: '/dashboard', icon: <LayoutDashboard size={20} />, label: getDashboardLabel() },
         ];
 
-        switch (user?.rol) {
+        switch (effectiveRole) {
             case 'ADMIN':
                 return [
                     ...baseItems,
@@ -319,8 +310,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                             {getRolIcon()}
                         </div>
                         <div className="user-details">
-                            <span className="user-name">{user?.nombre} {user?.apellido}</span>
+                            <span className="user-name">{getDisplayName()}</span>
                             <span className="user-role">{getRolLabel()}</span>
+                            {activeDemoProfile && (
+                                <span className="demo-indicator" style={{ fontSize: '10px', color: '#f59e0b' }}>MODO DEMO</span>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -344,7 +338,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         {/* Contextual Help Button */}
                         <button
                             className="header-icon-btn"
-                            onClick={() => setShowContextualHelp(true)}
+                            onClick={() => _setShowContextualHelp(true)}
                             title="Ayuda contextual"
                         >
                             <HelpCircle size={20} />
@@ -353,7 +347,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         {/* Tour Button */}
                         <button
                             className="header-icon-btn help-btn"
-                            onClick={handleStartTour}
+                            onClick={_handleStartTour}
                             title="Ver tour guiado"
                         >
                             ??
@@ -392,23 +386,32 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                     </div>
                                     <div className="user-menu-divider" />
                                     <div className="user-menu-section">
-                                        <span className="user-menu-section-title">Cambiar perfil:</span>
-                                        {PROFILE_USERS.map((profile) => {
-                                            const IconComponent = profile.icon;
-                                            const isCurrentUser = user?.email === profile.email;
-                                            return (
-                                                <button
-                                                    key={profile.email}
-                                                    className={`user-menu-item ${isCurrentUser ? 'active' : ''}`}
-                                                    onClick={() => !isCurrentUser && handleSwitchProfile(profile.email)}
-                                                    disabled={isCurrentUser || switchingProfile}
-                                                >
-                                                    <IconComponent size={16} />
-                                                    <span>{profile.label}</span>
-                                                    {isCurrentUser && <span className="current-badge">Actual</span>}
-                                                </button>
-                                            );
-                                        })}
+                                        <span className="user-menu-section-title">Modo Demo:</span>
+                                        <button
+                                            className={`user-menu-item demo-profile-btn ${demoProfileActive ? 'active' : ''}`}
+                                            onClick={() => {
+                                                setUserMenuOpen(false);
+                                                setProfileSwitcherOpen(true);
+                                            }}
+                                        >
+                                            <Users size={16} />
+                                            <span>Cambiar Perfil</span>
+                                            {demoProfileActive && <span className="demo-badge">DEMO</span>}
+                                        </button>
+                                        {demoProfileActive && (
+                                            <button
+                                                className="user-menu-item"
+                                                onClick={() => {
+                                                    demoService.clearProfile();
+                                                    setDemoProfileActive(false);
+                                                    setUserMenuOpen(false);
+                                                    window.location.reload();
+                                                }}
+                                            >
+                                                <X size={16} />
+                                                <span>Volver a mi perfil</span>
+                                            </button>
+                                        )}
                                     </div>
                                     <div className="user-menu-divider" />
                                     <button className="user-menu-item" onClick={handleLogout}>
@@ -437,17 +440,26 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <QRScanner onClose={() => setQrScannerOpen(false)} />
             )}
 
-            {/* Onboarding Tour */}
+            {/* COMENTADO: Onboarding Tour - puede causar overlay
             <OnboardingTour
                 userRole={user?.rol as 'ADMIN' | 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR'}
                 isOpen={showTour}
                 onComplete={handleCompleteTour}
             />
+            */}
 
-            {/* Contextual Help */}
+            {/* COMENTADO: Contextual Help - puede causar overlay
             <ContextualHelp
                 isActive={showContextualHelp}
-                onClose={() => setShowContextualHelp(false)}
+                onClose={() => _setShowContextualHelp(false)}
+            />
+            */}
+
+            {/* Profile Switcher - Restaurado */}
+            <ProfileSwitcher
+                isOpen={profileSwitcherOpen}
+                onClose={() => setProfileSwitcherOpen(false)}
+                onProfileChanged={() => setDemoProfileActive(!!demoService.getActiveProfile())}
             />
         </div>
     );

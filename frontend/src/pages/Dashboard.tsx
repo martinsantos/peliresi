@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
@@ -7,6 +7,7 @@ import { usuarioService } from '../services/admin.service';
 import { offlineStorage } from '../services/offlineStorage';
 import { viajesService } from '../services/viajes.service';
 import { demoStats } from '../data/demoDashboard';
+import { demoService } from '../services/demo.service';
 import type { DashboardStats } from '../types';
 import {
     FileText,
@@ -343,6 +344,10 @@ interface ViajeActivo {
 const Dashboard: React.FC = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
+
+    // Obtener perfil demo activo para mostrar rol correcto (memoizado para evitar re-renders)
+    const activeDemoProfile = useMemo(() => demoService.getActiveProfile(), []);
+    const effectiveRole = useMemo(() => activeDemoProfile?.role || user?.rol, [activeDemoProfile, user?.rol]);
     const [stats, setStats] = useState<DashboardStats>(demoStats);
     const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
     const [loading, setLoading] = useState(true);
@@ -352,14 +357,14 @@ const Dashboard: React.FC = () => {
 
     useEffect(() => {
         loadDashboard();
-        if (user?.rol === 'ADMIN') {
+        if (effectiveRole === 'ADMIN') {
             loadAdminStats();
         }
         // Cargar viaje activo para TRANSPORTISTA
-        if (user?.rol === 'TRANSPORTISTA') {
+        if (effectiveRole === 'TRANSPORTISTA') {
             loadViajeActivo();
         }
-    }, [user?.rol]);
+    }, [effectiveRole]);
 
     // Cargar viaje activo desde backend usando TIEMPO CALCULADO POR SERVIDOR
     // CRÍTICO: Usar elapsedSeconds del servidor para sincronizar APP ↔ WEB
@@ -608,7 +613,7 @@ const Dashboard: React.FC = () => {
 
     // Mensajes personalizados por rol
     const getRolMessage = () => {
-        switch (user?.rol) {
+        switch (effectiveRole) {
             case 'ADMIN':
                 return 'Panel de administración - Control total del sistema de trazabilidad.';
             case 'GENERADOR':
@@ -625,7 +630,7 @@ const Dashboard: React.FC = () => {
     return (
         <div className="dashboard animate-fadeIn">
             {/* Banner de Viaje Activo - Solo para TRANSPORTISTA */}
-            {user?.rol === 'TRANSPORTISTA' && viajeActivo && (
+            {effectiveRole === 'TRANSPORTISTA' && viajeActivo && (
                 <ActiveTripBanner
                     manifiesto={viajeActivo.manifiesto}
                     startTime={viajeActivo.startTime}
@@ -638,19 +643,19 @@ const Dashboard: React.FC = () => {
 
             {/* Welcome Section - Personalizado por rol */}
             <div className="dashboard-welcome" style={{
-                background: user?.rol === 'ADMIN' ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(59, 130, 246, 0.1))' :
-                    user?.rol === 'GENERADOR' ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(99, 102, 241, 0.1))' :
-                        user?.rol === 'TRANSPORTISTA' ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(234, 88, 12, 0.1))' :
+                background: effectiveRole === 'ADMIN' ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(59, 130, 246, 0.1))' :
+                    effectiveRole === 'GENERADOR' ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(99, 102, 241, 0.1))' :
+                        effectiveRole === 'TRANSPORTISTA' ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(234, 88, 12, 0.1))' :
                             'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(168, 85, 247, 0.1))',
-                border: `1px solid ${user?.rol === 'ADMIN' ? 'rgba(16, 185, 129, 0.2)' :
-                    user?.rol === 'GENERADOR' ? 'rgba(59, 130, 246, 0.2)' :
-                        user?.rol === 'TRANSPORTISTA' ? 'rgba(245, 158, 11, 0.2)' :
+                border: `1px solid ${effectiveRole === 'ADMIN' ? 'rgba(16, 185, 129, 0.2)' :
+                    effectiveRole === 'GENERADOR' ? 'rgba(59, 130, 246, 0.2)' :
+                        effectiveRole === 'TRANSPORTISTA' ? 'rgba(245, 158, 11, 0.2)' :
                             'rgba(139, 92, 246, 0.2)'}`,
                 borderRadius: '16px',
                 padding: '20px 24px'
             }}>
                 <div>
-                    <h2>Bienvenido, {user?.nombre}!</h2>
+                    <h2>Bienvenido, {activeDemoProfile?.actorName || user?.nombre}!</h2>
                     <p style={{ color: '#94a3b8', marginTop: '4px' }}>{getRolMessage()}</p>
                     <span style={{
                         display: 'inline-block',
@@ -659,35 +664,49 @@ const Dashboard: React.FC = () => {
                         borderRadius: '20px',
                         fontSize: '12px',
                         fontWeight: 600,
-                        background: user?.rol === 'ADMIN' ? 'rgba(16, 185, 129, 0.2)' :
-                            user?.rol === 'GENERADOR' ? 'rgba(59, 130, 246, 0.2)' :
-                                user?.rol === 'TRANSPORTISTA' ? 'rgba(245, 158, 11, 0.2)' :
+                        background: effectiveRole === 'ADMIN' ? 'rgba(16, 185, 129, 0.2)' :
+                            effectiveRole === 'GENERADOR' ? 'rgba(59, 130, 246, 0.2)' :
+                                effectiveRole === 'TRANSPORTISTA' ? 'rgba(245, 158, 11, 0.2)' :
                                     'rgba(139, 92, 246, 0.2)',
-                        color: user?.rol === 'ADMIN' ? '#10b981' :
-                            user?.rol === 'GENERADOR' ? '#3b82f6' :
-                                user?.rol === 'TRANSPORTISTA' ? '#f59e0b' :
+                        color: effectiveRole === 'ADMIN' ? '#10b981' :
+                            effectiveRole === 'GENERADOR' ? '#3b82f6' :
+                                effectiveRole === 'TRANSPORTISTA' ? '#f59e0b' :
                                     '#8b5cf6'
                     }}>
-                        {user?.rol === 'ADMIN' ? '🛡️ Administrador SITREP' :
-                            user?.rol === 'GENERADOR' ? '🏭 Generador de Residuos' :
-                                user?.rol === 'TRANSPORTISTA' ? '🚛 Transportista' :
-                                    '🏢 Operador de Tratamiento'}
+                        {activeDemoProfile?.actorName || (effectiveRole === 'ADMIN' ? '🛡️ Administrador SITREP' :
+                            effectiveRole === 'GENERADOR' ? '🏭 Generador de Residuos' :
+                                effectiveRole === 'TRANSPORTISTA' ? '🚛 Transportista' :
+                                    '🏢 Operador de Tratamiento')}
                     </span>
+                    {activeDemoProfile && (
+                        <span style={{
+                            display: 'inline-block',
+                            marginLeft: '8px',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            fontSize: '10px',
+                            fontWeight: 600,
+                            background: 'rgba(245, 158, 11, 0.2)',
+                            color: '#f59e0b'
+                        }}>
+                            MODO DEMO
+                        </span>
+                    )}
                 </div>
                 <div className="dashboard-welcome-actions">
-                    {user?.rol === 'GENERADOR' && (
+                    {effectiveRole === 'GENERADOR' && (
                         <Link to="/manifiestos/nuevo" className="btn btn-primary btn-nuevo-manifiesto">
                             <FileText size={18} />
                             Nuevo Manifiesto
                         </Link>
                     )}
-                    {user?.rol === 'TRANSPORTISTA' && (
+                    {effectiveRole === 'TRANSPORTISTA' && (
                         <Link to="/tracking" className="btn btn-primary" style={{ background: '#f59e0b' }}>
                             <MapPin size={18} />
                             Activar GPS
                         </Link>
                     )}
-                    {user?.rol === 'OPERADOR' && (
+                    {effectiveRole === 'OPERADOR' && (
                         <Link to="/manifiestos" className="btn btn-primary" style={{ background: '#8b5cf6' }}>
                             <Truck size={18} />
                             Ver Llegadas
@@ -780,7 +799,7 @@ const Dashboard: React.FC = () => {
                     }
                 }}
             >
-                {getStatCardsByRole(user?.rol, stats?.estadisticas).map((card, index) => {
+                {getStatCardsByRole(effectiveRole, stats?.estadisticas).map((card, index) => {
                     const IconComponent = card.icon;
                     return (
                         <motion.div
@@ -907,14 +926,14 @@ const Dashboard: React.FC = () => {
             </motion.div>
 
             {/* Acciones Rápidas - Dinámico por rol */}
-            {getQuickActionsByRole(user?.rol).length > 0 && (
+            {getQuickActionsByRole(effectiveRole).length > 0 && (
                 <div style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(3, 1fr)',
                     gap: '16px',
                     marginBottom: '24px'
                 }}>
-                    {getQuickActionsByRole(user?.rol).map((action, index) => {
+                    {getQuickActionsByRole(effectiveRole).map((action, index) => {
                         const IconComponent = action.icon;
                         return (
                             <Link
@@ -1112,7 +1131,7 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Admin Panel - Solo visible para ADMIN */}
-            {user?.rol === 'ADMIN' && adminStats && (
+            {effectiveRole === 'ADMIN' && adminStats && (
                 <div className="admin-panel" style={{ marginTop: '24px' }}>
                     <div className="section-header" style={{ marginBottom: '16px' }}>
                         <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: '#f8fafc' }}>

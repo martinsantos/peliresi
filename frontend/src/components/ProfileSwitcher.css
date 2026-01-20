@@ -1,0 +1,320 @@
+/* ProfileSwitcher Styles */
+
+.profile-switcher-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: fadeIn 0.2s ease;
+}
+
+.profile-switcher-modal {
+  background: #1a1a2e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 420px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Header */
+.profile-switcher-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.profile-switcher-header .back-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.profile-switcher-header .back-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.profile-switcher-header .header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+/* Content */
+.profile-switcher-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+/* Loading & Error States */
+.loading-state,
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 3rem 1rem;
+  color: #94a3b8;
+  text-align: center;
+}
+
+.loading-state .spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.error-state {
+  color: #f87171;
+}
+
+.error-state button {
+  background: rgba(248, 113, 113, 0.2);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  color: #f87171;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.error-state button:hover {
+  background: rgba(248, 113, 113, 0.3);
+}
+
+/* Current Profile Banner */
+.current-profile-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  color: #10b981;
+  font-size: 0.875rem;
+}
+
+.current-profile-banner button {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #fff;
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.current-profile-banner button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Hints */
+.roles-hint,
+.actors-hint {
+  color: #94a3b8;
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+/* Roles List */
+.roles-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.role-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  width: 100%;
+}
+
+.role-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--role-color, rgba(255, 255, 255, 0.2));
+}
+
+.role-item.active {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: #10b981;
+}
+
+.role-item .role-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  color: var(--role-color, #fff);
+}
+
+.role-item .role-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.role-item .role-name {
+  font-weight: 600;
+  color: #fff;
+  font-size: 1rem;
+}
+
+.role-item .role-desc {
+  color: #94a3b8;
+  font-size: 0.8rem;
+}
+
+.role-item .role-count {
+  color: var(--role-color, #94a3b8);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.role-item .arrow-icon {
+  color: #64748b;
+}
+
+.role-item .check-icon {
+  color: #10b981;
+}
+
+/* Actors List */
+.actors-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.actor-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  width: 100%;
+}
+
+.actor-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.actor-item.active {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: #10b981;
+}
+
+.actor-item .actor-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.actor-item .actor-name {
+  font-weight: 500;
+  color: #fff;
+  font-size: 0.95rem;
+}
+
+.actor-item .actor-detail {
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.actor-item .check-icon {
+  color: #10b981;
+}
+
+/* Footer */
+.profile-switcher-footer {
+  padding: 0.875rem 1.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.profile-switcher-footer .footer-note {
+  color: #64748b;
+  font-size: 0.75rem;
+  text-align: center;
+  display: block;
+}
+
+/* Mobile Responsive */
+@media (max-width: 480px) {
+  .profile-switcher-modal {
+    max-height: 90vh;
+    border-radius: 16px 16px 0 0;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-width: 100%;
+  }
+
+  .profile-switcher-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+}
