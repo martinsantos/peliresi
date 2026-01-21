@@ -4,7 +4,7 @@
  * SINCRONIZADO con WEB: usa getMisAlertas() igual que Notificaciones.tsx
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { notificationService, type Notificacion } from '../services/notification.service';
 import { authService } from '../services/auth.service';
 
@@ -30,6 +30,9 @@ export function useNotificaciones({
 }: UseNotificacionesOptions): UseNotificacionesReturn {
     const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
     const [noLeidas, setNoLeidas] = useState(0);
+
+    // FIX MEMORY LEAK: AbortController para cancelar polling al cambiar de perfil
+    const abortControllerRef = useRef<AbortController | null>(null);
 
     // Obtener el actorId según el rol del usuario (igual que WEB Notificaciones.tsx)
     const getActorId = useCallback((): string | undefined => {
@@ -102,13 +105,48 @@ export function useNotificaciones({
     }, []);
 
     // Cargar notificaciones y configurar polling
+    // FIX MEMORY LEAK: Usar AbortController para cancelar requests pendientes
     useEffect(() => {
-        if (enabled && isOnline) {
-            loadNotificaciones();
-            const interval = setInterval(loadNotificaciones, pollingInterval);
-            return () => clearInterval(interval);
-        }
-    }, [enabled, isOnline, loadNotificaciones, pollingInterval]);
+        if (!enabled || !isOnline) return;
+
+        const loadWithAbort = async () => {
+            // Cancelar request anterior si existe
+            abortControllerRef.current?.abort();
+            abortControllerRef.current = new AbortController();
+
+            try {
+                const user = authService.getStoredUser();
+                if (!user) return;
+
+                // SINCRONIZADO con WEB: usa getMisAlertas() con limit: 100
+                const data = await notificationService.getMisAlertas({
+                    rol: user.rol,
+                    actorId: getActorId(),
+                    limit: 100 // Mismo limit que WEB
+                });
+
+                // Solo actualizar si no fue abortado
+                if (!abortControllerRef.current?.signal.aborted) {
+                    setNotificaciones(data.notificaciones || []);
+                    setNoLeidas(data.noLeidas || 0);
+                }
+            } catch (err) {
+                if (err instanceof Error && err.name === 'AbortError') {
+                    console.log('[useNotificaciones] Request cancelado - cambio de perfil');
+                    return;
+                }
+                console.warn('[useNotificaciones] Error loading notifications:', err);
+            }
+        };
+
+        loadWithAbort();
+        const interval = setInterval(loadWithAbort, pollingInterval);
+
+        return () => {
+            clearInterval(interval);
+            abortControllerRef.current?.abort();
+        };
+    }, [enabled, isOnline, pollingInterval, getActorId]);
 
     return {
         notificaciones,

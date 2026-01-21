@@ -29,57 +29,88 @@
   <div id="root"></div>
   <script type="module" src="/src/main.tsx"></script>
 
-  <!-- EMERGENCY v9.0: Forzar limpieza de cache INCONDICIONAL -->
+  <!-- EMERGENCY v9.2: Limpieza con AWAIT correcto -->
   <script>
-    (function() {
-      var EMERGENCY_VERSION = 'v9.0.0-EMERGENCY-CACHE-CLEAR';
+    (async function() {
+      var EMERGENCY_VERSION = 'v9.2.0-REFACTOR';
       var lastVersion = localStorage.getItem('sitrep_app_version');
-      var emergencyCleared = sessionStorage.getItem('emergency_cache_cleared');
 
-      console.log('[EMERGENCY] Version actual:', EMERGENCY_VERSION, '| Anterior:', lastVersion);
+      console.log('[EMERGENCY v9.2] Version:', EMERGENCY_VERSION, '| Anterior:', lastVersion);
 
-      // SIEMPRE limpiar en esta versión de emergencia (una vez por sesión)
-      if (!emergencyCleared || lastVersion !== EMERGENCY_VERSION) {
-        console.log('[EMERGENCY] Forzando limpieza de cache...');
+      // FORZAR limpieza si la versión es diferente
+      if (lastVersion !== EMERGENCY_VERSION) {
+        console.log('[EMERGENCY v9.2] Ejecutando limpieza TOTAL...');
 
-        // Marcar que ya limpiamos en esta sesión
-        sessionStorage.setItem('emergency_cache_cleared', 'true');
+        var cleanupPromises = [];
+
+        // 1. Eliminar TODOS los Service Workers
+        if ('serviceWorker' in navigator) {
+          var swPromise = navigator.serviceWorker.getRegistrations()
+            .then(function(registrations) {
+              console.log('[EMERGENCY v9.2] Eliminando', registrations.length, 'Service Workers');
+              return Promise.all(registrations.map(function(reg) {
+                return reg.unregister();
+              }));
+            })
+            .then(function() {
+              console.log('[EMERGENCY v9.2] Todos los SW eliminados');
+            })
+            .catch(function(e) {
+              console.warn('[EMERGENCY v9.2] Error eliminando SW:', e);
+            });
+          cleanupPromises.push(swPromise);
+        }
+
+        // 2. Eliminar TODOS los caches
+        if ('caches' in window) {
+          var cachePromise = caches.keys()
+            .then(function(keys) {
+              console.log('[EMERGENCY v9.2] Eliminando', keys.length, 'caches');
+              return Promise.all(keys.map(function(key) {
+                return caches.delete(key);
+              }));
+            })
+            .then(function() {
+              console.log('[EMERGENCY v9.2] Caches eliminados');
+            })
+            .catch(function(e) {
+              console.warn('[EMERGENCY v9.2] Error eliminando caches:', e);
+            });
+          cleanupPromises.push(cachePromise);
+        }
+
+        // 3. Limpiar IndexedDB de workbox
+        if ('indexedDB' in window) {
+          var idbPromise = new Promise(function(resolve) {
+            try {
+              var req1 = indexedDB.deleteDatabase('workbox-expiration');
+              var req2 = indexedDB.deleteDatabase('workbox-precache-v2');
+              req1.onsuccess = req1.onerror = function() {
+                req2.onsuccess = req2.onerror = function() {
+                  console.log('[EMERGENCY v9.2] IndexedDB limpiado');
+                  resolve();
+                };
+              };
+            } catch(e) {
+              console.warn('[EMERGENCY v9.2] Error limpiando IndexedDB:', e);
+              resolve();
+            }
+          });
+          cleanupPromises.push(idbPromise);
+        }
+
+        // 4. ESPERAR a que TODO termine antes de continuar
+        await Promise.all(cleanupPromises);
+        console.log('[EMERGENCY v9.2] Limpieza completa');
+
+        // 5. Marcar versión DESPUÉS de limpiar
         localStorage.setItem('sitrep_app_version', EMERGENCY_VERSION);
 
-        // SIEMPRE limpiar Service Workers
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistrations().then(function(registrations) {
-            if (registrations.length > 0) {
-              console.log('[EMERGENCY] Eliminando', registrations.length, 'Service Workers...');
-              registrations.forEach(function(reg) {
-                console.log('[EMERGENCY] Eliminando SW:', reg.scope);
-                reg.unregister();
-              });
-            }
-          });
-        }
-
-        // SIEMPRE limpiar caches
-        if ('caches' in window) {
-          caches.keys().then(function(keys) {
-            if (keys.length > 0) {
-              console.log('[EMERGENCY] Eliminando', keys.length, 'caches:', keys);
-              keys.forEach(function(key) {
-                caches.delete(key);
-              });
-            }
-          });
-        }
-
-        // Si es primera vez con esta versión, recargar para aplicar
-        if (lastVersion !== EMERGENCY_VERSION) {
-          console.log('[EMERGENCY] Recargando para aplicar limpieza...');
-          setTimeout(function() {
-            window.location.reload(true);
-          }, 500);
-        }
+        // 6. Recargar para aplicar
+        console.log('[EMERGENCY v9.2] Recargando...');
+        window.location.reload(true);
       } else {
-        console.log('[EMERGENCY] Cache ya limpiado en esta sesión');
+        console.log('[EMERGENCY v9.2] Ya limpiado, continuando...');
       }
     })();
   </script>

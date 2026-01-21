@@ -21,7 +21,7 @@ import './Dashboard.css';
 // ==============================================
 
 const Dashboard: React.FC = () => {
-    const { user, effectiveRole } = useAuth();
+    const { user, effectiveRole, effectiveUserName } = useAuth();
     const [stats, setStats] = useState<DashboardStats>(demoStats);
     const [loading, setLoading] = useState(true);
 
@@ -83,7 +83,7 @@ const Dashboard: React.FC = () => {
                 padding: '20px 24px',
                 marginBottom: '24px'
             }}>
-                <h2>Bienvenido, {user?.nombre}!</h2>
+                <h2>Bienvenido, {effectiveUserName || user?.nombre}!</h2>
                 <p style={{ color: '#94a3b8', marginTop: '4px' }}>
                     Panel de {effectiveRole || 'Usuario'}
                 </p>

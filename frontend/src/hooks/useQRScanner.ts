@@ -109,13 +109,20 @@ export function useQRScanner({ onScan, onToast, autoOpenUrl = false }: UseQRScan
     const scanStartTimeRef = useRef<number>(0);
     const SCAN_TIMEOUT_MS = 15000; // 15 seconds timeout
 
+    // FIX MEMORY LEAK: Ref para el ID del requestAnimationFrame
+    const rafIdRef = useRef<number | null>(null);
+
     const showToast = useCallback((msg: string) => {
         onToast?.(msg);
     }, [onToast]);
 
     // Scan QR from video frame
+    // FIX MEMORY LEAK: Usar rafIdRef para tracking del loop
     const scanQRFromVideo = useCallback(() => {
-        if (!scanningRef.current || !videoRef.current || !canvasRef.current) return;
+        if (!scanningRef.current || !videoRef.current || !canvasRef.current) {
+            rafIdRef.current = null;
+            return;
+        }
         
         const video = videoRef.current;
         const canvas = canvasRef.current;
@@ -201,10 +208,12 @@ export function useQRScanner({ onScan, onToast, autoOpenUrl = false }: UseQRScan
             if (elapsed > SCAN_TIMEOUT_MS) {
                 console.log('⏰ QR scan timeout after 15s');
                 scanningRef.current = false;
+                rafIdRef.current = null;
                 showToast('⏰ Tiempo agotado. Intente de nuevo o ingrese el código manualmente.');
                 return;
             }
-            requestAnimationFrame(scanQRFromVideo);
+            // FIX MEMORY LEAK: Guardar ID del RAF para cancelación
+            rafIdRef.current = requestAnimationFrame(scanQRFromVideo);
         }
     }, [cameraStream, onScan, showToast]);
 
@@ -215,15 +224,22 @@ export function useQRScanner({ onScan, onToast, autoOpenUrl = false }: UseQRScan
             videoRef.current.play().catch(err => console.warn('Video play error:', err));
             videoRef.current.onloadedmetadata = () => {
                 scanningRef.current = true;
-                requestAnimationFrame(scanQRFromVideo);
+                // FIX MEMORY LEAK: Guardar ID del RAF inicial
+                rafIdRef.current = requestAnimationFrame(scanQRFromVideo);
             };
         }
     }, [cameraActive, cameraStream, scanQRFromVideo]);
 
     // Cleanup on unmount
+    // FIX MEMORY LEAK: Cleanup robusto con cancelación de RAF
     useEffect(() => {
         return () => {
             scanningRef.current = false;
+            // Cancelar RAF pendiente
+            if (rafIdRef.current !== null) {
+                cancelAnimationFrame(rafIdRef.current);
+                rafIdRef.current = null;
+            }
             if (cameraStream) {
                 cameraStream.getTracks().forEach(track => track.stop());
             }
@@ -249,6 +265,11 @@ export function useQRScanner({ onScan, onToast, autoOpenUrl = false }: UseQRScan
 
     const stopCamera = useCallback(() => {
         scanningRef.current = false;
+        // FIX MEMORY LEAK: Cancelar RAF al detener cámara
+        if (rafIdRef.current !== null) {
+            cancelAnimationFrame(rafIdRef.current);
+            rafIdRef.current = null;
+        }
         if (cameraStream) {
             cameraStream.getTracks().forEach(track => track.stop());
             setCameraStream(null);

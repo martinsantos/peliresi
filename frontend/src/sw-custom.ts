@@ -2,26 +2,29 @@
 /**
  * SITREP Custom Service Worker
  * Implements Background Sync + Workbox Precaching
- * v9.0.0 - EMERGENCY FIX: Force cache invalidation
+ * v9.2.1 - FIX: Preserve workbox-precache in activate to prevent crash loop
  */
 
 import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
 
 // CRITICAL: Force immediate activation to clear old caches
 self.addEventListener('install', () => {
-    console.log('[SW] v9.0 Installing - skipWaiting');
+    console.log('[SW] v9.2.1 Installing - skipWaiting');
     self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-    console.log('[SW] v9.0 Activating - claiming clients');
+    console.log('[SW] v9.2.1 Activating - claiming clients');
     event.waitUntil(
         caches.keys().then((cacheNames) => {
             return Promise.all(
-                cacheNames.map((cacheName) => {
-                    console.log('[SW] Deleting old cache:', cacheName);
-                    return caches.delete(cacheName);
-                })
+                cacheNames
+                    // IMPORTANT: Preserve workbox-precache to avoid precaching loop
+                    .filter(name => !name.includes('workbox-precache'))
+                    .map((cacheName) => {
+                        console.log('[SW] Deleting old cache:', cacheName);
+                        return caches.delete(cacheName);
+                    })
             );
         }).then(() => {
             return self.clients.claim();
@@ -329,9 +332,6 @@ self.addEventListener('message', (event: ExtendableMessageEvent) => {
     }
 });
 
-// Claim clients immediately on activation
-self.addEventListener('activate', (event) => {
-    event.waitUntil(self.clients.claim());
-});
+// NOTE: activate listener removed - already handled at line 16-30
 
-console.log('[SW] SITREP Custom Service Worker v7.2.0 loaded');
+console.log('[SW] SITREP Custom Service Worker v9.2.1-FIX loaded');

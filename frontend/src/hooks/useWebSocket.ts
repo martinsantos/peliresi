@@ -146,9 +146,18 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     setSocket(newSocket);
   }, [getToken, reconnection, reconnectionAttempts, reconnectionDelay]);
 
-  // Desconectar
+  // Desconectar - FIX MEMORY LEAK: Limpiar todos los listeners antes de cerrar
   const disconnect = useCallback(() => {
     if (socketRef.current) {
+      // CRÍTICO: Remover todos los listeners registrados del socket
+      listenersRef.current.forEach((callbacks, event) => {
+        callbacks.forEach(callback => {
+          socketRef.current?.off(event, callback);
+        });
+      });
+      // CRÍTICO: Vaciar el Map para evitar acumulación
+      listenersRef.current.clear();
+
       socketRef.current.disconnect();
       socketRef.current = null;
       setSocket(null);

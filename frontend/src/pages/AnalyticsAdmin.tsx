@@ -32,7 +32,8 @@ const AnalyticsAdmin: React.FC = () => {
     useEffect(() => {
         if (isAuthenticated) {
             loadStats();
-            const interval = autoRefresh ? setInterval(loadStats, 3000) : null;
+            // REFACTOR v9.2: Aumentado de 3s a 30s para reducir carga
+            const interval = autoRefresh ? setInterval(loadStats, 30000) : null;
             return () => {
                 if (interval) clearInterval(interval);
             };

@@ -2,18 +2,20 @@
  * CentroControl.tsx - MEGA Dashboard para Monitor Grande
  * Dashboard premium con métricas en vivo, mapa animado y efectos visuales impactantes
  * Control Room 2077 Design System
+ *
+ * Refactored: Components extracted to src/components/centro-control/
  */
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-    Activity, Users, FileText, Truck, Bell, AlertTriangle,
+    Activity, FileText, Truck, AlertTriangle,
     CheckCircle, Clock, MapPin, RefreshCw,
     ChevronRight, Package, Radio,
     Factory, Building2, BarChart3,
     Wifi, WifiOff, ArrowRightLeft, Navigation,
-    Trophy, TrendingUp, Recycle, Phone, Gauge, User, Pause
+    Trophy, TrendingUp, Recycle, Phone, Gauge, User, Pause, Users, Bell
 } from 'lucide-react';
 import {
     AreaChart,
@@ -28,9 +30,7 @@ import {
     ResponsiveContainer,
     Legend
 } from 'recharts';
-import type { ChartDataPoint } from '../components/ui';
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
-import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { usuarioService } from '../services/admin.service';
 import type { Actividad } from '../services/admin.service';
@@ -40,7 +40,32 @@ import { viajesService } from '../services/viajes.service';
 import { useWebSocket, WS_EVENTS } from '../hooks/useWebSocket';
 import './CentroControl.css';
 
-// Componente para invalidar el tamaño del mapa cuando cambia el contenedor
+// Import extracted components
+import {
+    LiveClock,
+    ViajeTimer,
+    KPICards,
+    MendozaMapSVG,
+    truckIcon,
+    truckPausedIcon,
+    truckIncidentIcon,
+    generadorIcon,
+    operadorIcon,
+    DEPT_COLORS,
+    DEPT_CODES,
+    generateActivityChartData,
+    generatePipelineChartData,
+    formatRelativeTime,
+} from '../components/centro-control';
+import type {
+    ViajeActivo,
+    ManifiestoEnTransito,
+    SystemStats,
+    DepartamentoStats,
+    FiltroTiempo,
+} from '../components/centro-control';
+
+// Component to invalidate map size when container changes
 const MapResizer: React.FC = () => {
     const map = useMap();
     useEffect(() => {
@@ -49,439 +74,6 @@ const MapResizer: React.FC = () => {
         }, 100);
     }, [map]);
     return null;
-};
-
-// Icono de camión para el mapa - EN CURSO (verde)
-const truckIcon = new L.Icon({
-    iconUrl: 'data:image/svg+xml;base64,' + btoa(`
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="#10b981">
-            <circle cx="16" cy="16" r="14" fill="#10b981" stroke="#fff" stroke-width="2"/>
-            <path d="M10 11h8v6h4l-2 4h-2v-2h-6v2h-2l-2-4h2v-6z" fill="#fff"/>
-        </svg>
-    `),
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-    popupAnchor: [0, -16]
-});
-
-// Icono de camión PAUSADO (amarillo)
-const truckPausedIcon = new L.Icon({
-    iconUrl: 'data:image/svg+xml;base64,' + btoa(`
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-            <circle cx="16" cy="16" r="14" fill="#f59e0b" stroke="#fff" stroke-width="2"/>
-            <rect x="11" y="10" width="4" height="12" fill="#fff"/>
-            <rect x="17" y="10" width="4" height="12" fill="#fff"/>
-        </svg>
-    `),
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-    popupAnchor: [0, -16]
-});
-
-// Icono de camión INCIDENTE (rojo)
-const truckIncidentIcon = new L.Icon({
-    iconUrl: 'data:image/svg+xml;base64,' + btoa(`
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-            <circle cx="16" cy="16" r="14" fill="#ef4444" stroke="#fff" stroke-width="2"/>
-            <text x="16" y="22" text-anchor="middle" fill="#fff" font-size="18" font-weight="bold">!</text>
-        </svg>
-    `),
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-    popupAnchor: [0, -16]
-});
-
-// Icono de GENERADOR (origen) - Fábrica verde
-const generadorIcon = new L.Icon({
-    iconUrl: 'data:image/svg+xml;base64,' + btoa(`
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28">
-            <rect x="2" y="8" width="24" height="18" rx="2" fill="#059669" stroke="#fff" stroke-width="1.5"/>
-            <rect x="5" y="2" width="6" height="10" fill="#059669" stroke="#fff" stroke-width="1"/>
-            <rect x="17" y="4" width="4" height="8" fill="#059669" stroke="#fff" stroke-width="1"/>
-            <rect x="6" y="14" width="4" height="4" fill="#fff"/>
-            <rect x="12" y="14" width="4" height="4" fill="#fff"/>
-            <rect x="18" y="14" width="4" height="4" fill="#fff"/>
-            <rect x="10" y="20" width="8" height="6" fill="#fff"/>
-        </svg>
-    `),
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
-    popupAnchor: [0, -14]
-});
-
-// Icono de OPERADOR (destino) - Edificio rojo
-const operadorIcon = new L.Icon({
-    iconUrl: 'data:image/svg+xml;base64,' + btoa(`
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28">
-            <rect x="4" y="4" width="20" height="22" rx="2" fill="#dc2626" stroke="#fff" stroke-width="1.5"/>
-            <rect x="7" y="7" width="4" height="4" fill="#fff"/>
-            <rect x="12" y="7" width="4" height="4" fill="#fff"/>
-            <rect x="17" y="7" width="4" height="4" fill="#fff"/>
-            <rect x="7" y="13" width="4" height="4" fill="#fff"/>
-            <rect x="12" y="13" width="4" height="4" fill="#fff"/>
-            <rect x="17" y="13" width="4" height="4" fill="#fff"/>
-            <rect x="11" y="19" width="6" height="7" fill="#fff"/>
-        </svg>
-    `),
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
-    popupAnchor: [0, -14]
-});
-
-// Interfaz para viajes activos en tiempo real
-interface ViajeActivo {
-    id: string;
-    manifiestoId: string;
-    manifiestoNumero: string;
-    transportistaRazonSocial: string;
-    estado: 'EN_CURSO' | 'PAUSADO' | 'INCIDENTE';
-    elapsedSeconds: number;
-    ultimaUbicacion: { lat: number; lng: number } | null;
-    isPaused: boolean;
-}
-
-interface ManifiestoEnTransito {
-    id: string;
-    numero: string;
-    lat: number;
-    lng: number;
-    generador: string;
-    operador: string;
-    estado: string;
-    tiempoEnRuta?: string;
-    // Coordenadas de origen (Generador) y destino (Operador)
-    origenLat?: number;
-    origenLng?: number;
-    destinoLat?: number;
-    destinoLng?: number;
-    // Info adicional para popups expandidos
-    generadorDomicilio?: string;
-    generadorTelefono?: string;
-    operadorDomicilio?: string;
-    operadorTelefono?: string;
-    transportista?: string;
-    vehiculoPatente?: string;
-    chofer?: string;
-    velocidad?: number;
-}
-
-interface SystemStats {
-    manifiestos: {
-        total: number;
-        borradores: number;
-        aprobados: number;
-        enTransito: number;
-        entregados: number;
-        recibidos: number;
-        tratados: number;
-    };
-    usuarios: {
-        total: number;
-        activos: number;
-        pendientes: number;
-        porRol: Record<string, number>;
-    };
-    alertasActivas: number;
-    eventosHoy: number;
-}
-
-// Interfaz para departamentos de Mendoza con estadísticas reales
-interface DepartamentoStats {
-    nombre: string;
-    codigo: string;
-    tratados: number;
-    enProceso: number;
-    color: string;
-}
-
-// Colores para departamentos
-const DEPT_COLORS: Record<string, string> = {
-    'Capital': '#3b82f6',
-    'Ciudad': '#3b82f6',
-    'Godoy Cruz': '#10b981',
-    'Guaymallén': '#8b5cf6',
-    'Las Heras': '#f59e0b',
-    'Maipú': '#ef4444',
-    'Luján de Cuyo': '#06b6d4',
-    'San Martín': '#84cc16',
-    'San Rafael': '#f97316',
-    'Rivadavia': '#ec4899',
-    'Tunuyán': '#14b8a6',
-    'Tupungato': '#a855f7',
-    'General Alvear': '#22c55e',
-    'San Carlos': '#0ea5e9',
-    'Lavalle': '#eab308',
-    'Malargüe': '#f43f5e',
-    'Santa Rosa': '#6366f1',
-    'La Paz': '#d946ef',
-    'Junín': '#78716c',
-};
-
-// Códigos abreviados para departamentos
-const DEPT_CODES: Record<string, string> = {
-    'Capital': 'CD',
-    'Ciudad': 'CD',
-    'Godoy Cruz': 'GC',
-    'Guaymallén': 'GY',
-    'Las Heras': 'LH',
-    'Maipú': 'MP',
-    'Luján de Cuyo': 'LJ',
-    'San Martín': 'SM',
-    'San Rafael': 'SR',
-    'Rivadavia': 'RV',
-    'Tunuyán': 'TN',
-    'Tupungato': 'TP',
-    'General Alvear': 'GA',
-    'San Carlos': 'SC',
-    'Lavalle': 'LV',
-    'Malargüe': 'MG',
-    'Santa Rosa': 'SRo',
-    'La Paz': 'LP',
-    'Junín': 'JN',
-};
-
-// Tipo de filtro de tiempo
-type FiltroTiempo = 'hoy' | 'semana' | 'mes' | 'trimestre';
-
-// Mapa esquemático de Mendoza SVG
-const MendozaMapSVG: React.FC<{ departamentos: DepartamentoStats[], selectedDept: string | null, onSelect: (codigo: string) => void }> = ({ departamentos, selectedDept, onSelect }) => {
-    const getDeptByCode = (code: string) => departamentos.find(d => d.codigo === code);
-
-    return (
-        <svg viewBox="0 0 200 300" className="mendoza-map-svg">
-            {/* Malargüe - Sur */}
-            <path d="M20 220 L80 200 L100 280 L30 290 Z"
-                className={`dept-path ${selectedDept === 'MG' ? 'selected' : ''}`}
-                fill={getDeptByCode('MG')?.color || '#374151'}
-                onClick={() => onSelect('MG')}
-            />
-            <text x="55" y="250" className="dept-label">MG</text>
-
-            {/* San Rafael */}
-            <path d="M80 140 L140 130 L150 200 L80 200 Z"
-                className={`dept-path ${selectedDept === 'SR' ? 'selected' : ''}`}
-                fill={getDeptByCode('SR')?.color || '#374151'}
-                onClick={() => onSelect('SR')}
-            />
-            <text x="110" y="170" className="dept-label">SR</text>
-
-            {/* General Alvear */}
-            <path d="M140 130 L180 140 L180 200 L150 200 Z"
-                className={`dept-path ${selectedDept === 'GA' ? 'selected' : ''}`}
-                fill={getDeptByCode('GA')?.color || '#374151'}
-                onClick={() => onSelect('GA')}
-            />
-            <text x="160" y="170" className="dept-label">GA</text>
-
-            {/* San Carlos */}
-            <path d="M60 100 L90 95 L90 130 L60 140 Z"
-                className={`dept-path ${selectedDept === 'SC' ? 'selected' : ''}`}
-                fill={getDeptByCode('SC')?.color || '#374151'}
-                onClick={() => onSelect('SC')}
-            />
-            <text x="72" y="118" className="dept-label">SC</text>
-
-            {/* Tunuyán */}
-            <path d="M40 70 L70 65 L70 100 L40 100 Z"
-                className={`dept-path ${selectedDept === 'TN' ? 'selected' : ''}`}
-                fill={getDeptByCode('TN')?.color || '#374151'}
-                onClick={() => onSelect('TN')}
-            />
-            <text x="52" y="85" className="dept-label">TN</text>
-
-            {/* Tupungato */}
-            <path d="M20 50 L50 45 L50 75 L20 80 Z"
-                className={`dept-path ${selectedDept === 'TP' ? 'selected' : ''}`}
-                fill={getDeptByCode('TP')?.color || '#374151'}
-                onClick={() => onSelect('TP')}
-            />
-            <text x="32" y="65" className="dept-label">TP</text>
-
-            {/* Luján de Cuyo */}
-            <path d="M50 40 L80 35 L85 65 L55 70 Z"
-                className={`dept-path ${selectedDept === 'LJ' ? 'selected' : ''}`}
-                fill={getDeptByCode('LJ')?.color || '#374151'}
-                onClick={() => onSelect('LJ')}
-            />
-            <text x="65" y="52" className="dept-label">LJ</text>
-
-            {/* Maipú */}
-            <path d="M80 30 L110 28 L115 55 L85 60 Z"
-                className={`dept-path ${selectedDept === 'MP' ? 'selected' : ''}`}
-                fill={getDeptByCode('MP')?.color || '#374151'}
-                onClick={() => onSelect('MP')}
-            />
-            <text x="95" y="45" className="dept-label">MP</text>
-
-            {/* Godoy Cruz */}
-            <path d="M85 15 L105 12 L108 35 L88 38 Z"
-                className={`dept-path ${selectedDept === 'GC' ? 'selected' : ''}`}
-                fill={getDeptByCode('GC')?.color || '#374151'}
-                onClick={() => onSelect('GC')}
-            />
-            <text x="94" y="26" className="dept-label">GC</text>
-
-            {/* Ciudad */}
-            <path d="M95 5 L115 3 L118 25 L98 28 Z"
-                className={`dept-path ${selectedDept === 'CD' ? 'selected' : ''}`}
-                fill={getDeptByCode('CD')?.color || '#374151'}
-                onClick={() => onSelect('CD')}
-            />
-            <text x="105" y="16" className="dept-label">CD</text>
-
-            {/* Guaymallén */}
-            <path d="M110 5 L135 8 L138 40 L112 35 Z"
-                className={`dept-path ${selectedDept === 'GY' ? 'selected' : ''}`}
-                fill={getDeptByCode('GY')?.color || '#374151'}
-                onClick={() => onSelect('GY')}
-            />
-            <text x="122" y="24" className="dept-label">GY</text>
-
-            {/* Las Heras */}
-            <path d="M70 5 L100 2 L100 20 L72 22 Z"
-                className={`dept-path ${selectedDept === 'LH' ? 'selected' : ''}`}
-                fill={getDeptByCode('LH')?.color || '#374151'}
-                onClick={() => onSelect('LH')}
-            />
-            <text x="82" y="14" className="dept-label">LH</text>
-
-            {/* Lavalle */}
-            <path d="M130 5 L170 10 L175 60 L135 50 Z"
-                className={`dept-path ${selectedDept === 'LV' ? 'selected' : ''}`}
-                fill={getDeptByCode('LV')?.color || '#374151'}
-                onClick={() => onSelect('LV')}
-            />
-            <text x="150" y="35" className="dept-label">LV</text>
-
-            {/* San Martín */}
-            <path d="M115 50 L150 45 L155 90 L120 95 Z"
-                className={`dept-path ${selectedDept === 'SM' ? 'selected' : ''}`}
-                fill={getDeptByCode('SM')?.color || '#374151'}
-                onClick={() => onSelect('SM')}
-            />
-            <text x="132" y="72" className="dept-label">SM</text>
-
-            {/* Rivadavia */}
-            <path d="M150 45 L180 50 L185 95 L155 90 Z"
-                className={`dept-path ${selectedDept === 'RV' ? 'selected' : ''}`}
-                fill={getDeptByCode('RV')?.color || '#374151'}
-                onClick={() => onSelect('RV')}
-            />
-            <text x="165" y="72" className="dept-label">RV</text>
-
-            {/* Junín */}
-            <path d="M120 90 L150 85 L155 120 L125 125 Z"
-                className={`dept-path ${selectedDept === 'JN' ? 'selected' : ''}`}
-                fill={getDeptByCode('JN')?.color || '#374151'}
-                onClick={() => onSelect('JN')}
-            />
-            <text x="135" y="105" className="dept-label">JN</text>
-
-            {/* Santa Rosa */}
-            <path d="M150 85 L185 90 L190 130 L155 120 Z"
-                className={`dept-path ${selectedDept === 'SRo' ? 'selected' : ''}`}
-                fill={getDeptByCode('SRo')?.color || '#374151'}
-                onClick={() => onSelect('SRo')}
-            />
-            <text x="168" y="108" className="dept-label">SRo</text>
-
-            {/* La Paz */}
-            <path d="M155 120 L190 125 L195 170 L160 160 Z"
-                className={`dept-path ${selectedDept === 'LP' ? 'selected' : ''}`}
-                fill={getDeptByCode('LP')?.color || '#374151'}
-                onClick={() => onSelect('LP')}
-            />
-            <text x="172" y="145" className="dept-label">LP</text>
-        </svg>
-    );
-};
-
-// Generate chart data for activity visualization
-const generateActivityChartData = (actividades: Actividad[]): ChartDataPoint[] => {
-    const hours: Record<string, number> = {};
-    const now = new Date();
-
-    // Initialize last 8 hours
-    for (let i = 7; i >= 0; i--) {
-        const hour = new Date(now.getTime() - i * 3600000);
-        const key = hour.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-        hours[key] = 0;
-    }
-
-    // Count activities per hour
-    actividades.forEach(act => {
-        const actDate = new Date(act.fecha);
-        const diffHours = (now.getTime() - actDate.getTime()) / 3600000;
-        if (diffHours <= 8) {
-            const key = actDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-            if (hours[key] !== undefined) {
-                hours[key]++;
-            }
-        }
-    });
-
-    return Object.entries(hours).map(([name, value]) => ({ name, value }));
-};
-
-const generatePipelineChartData = (stats: SystemStats): ChartDataPoint[] => {
-    return [
-        { name: 'Borradores', value: stats.manifiestos.borradores },
-        { name: 'Aprobados', value: stats.manifiestos.aprobados },
-        { name: 'En Tránsito', value: stats.manifiestos.enTransito },
-        { name: 'Entregados', value: stats.manifiestos.entregados },
-        { name: 'Recibidos', value: stats.manifiestos.recibidos },
-        { name: 'Tratados', value: stats.manifiestos.tratados },
-    ].filter(item => item.value > 0);
-};
-
-// Reloj en tiempo real
-const LiveClock: React.FC = () => {
-    const [time, setTime] = useState(new Date());
-
-    useEffect(() => {
-        const timer = setInterval(() => setTime(new Date()), 1000);
-        return () => clearInterval(timer);
-    }, []);
-
-    return (
-        <div className="live-clock">
-            <span className="clock-time">
-                {time.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-            </span>
-            <span className="clock-date">
-                {time.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' })}
-            </span>
-        </div>
-    );
-};
-
-// Timer para viajes activos
-const ViajeTimer: React.FC<{ initialSeconds: number; isPaused: boolean }> = ({ initialSeconds, isPaused }) => {
-    const [seconds, setSeconds] = useState(initialSeconds);
-
-    useEffect(() => {
-        if (isPaused) return;
-
-        const interval = setInterval(() => {
-            setSeconds(s => s + 1);
-        }, 1000);
-
-        return () => clearInterval(interval);
-    }, [isPaused]);
-
-    // Sync con servidor cuando cambia initialSeconds
-    useEffect(() => {
-        setSeconds(initialSeconds);
-    }, [initialSeconds]);
-
-    const formatTime = (secs: number) => {
-        const h = Math.floor(secs / 3600);
-        const m = Math.floor((secs % 3600) / 60);
-        const s = secs % 60;
-        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    };
-
-    return <span className="viaje-timer-value">{formatTime(seconds)}</span>;
 };
 
 const CentroControl: React.FC = () => {
@@ -806,16 +398,6 @@ const CentroControl: React.FC = () => {
         }
     }, [actividades]);
 
-    const formatRelativeTime = (dateStr: string): string => {
-        const diffMs = Date.now() - new Date(dateStr).getTime();
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMs / 3600000);
-        if (diffMins < 1) return 'Ahora';
-        if (diffMins < 60) return `${diffMins}m`;
-        if (diffHours < 24) return `${diffHours}h`;
-        return new Date(dateStr).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
-    };
-
     const getActionIcon = (accion: string) => {
         if (accion.includes('CREAR') || accion.includes('NUEVO')) return <FileText size={14} />;
         if (accion.includes('APROBAR')) return <CheckCircle size={14} />;
@@ -862,101 +444,7 @@ const CentroControl: React.FC = () => {
             </header>
 
             {/* KPIs - Professional Style */}
-            {stats && (
-                <motion.div
-                    className="mega-kpis"
-                    initial="hidden"
-                    animate="show"
-                    variants={{
-                        hidden: { opacity: 0 },
-                        show: { opacity: 1, transition: { staggerChildren: 0.08 } }
-                    }}
-                >
-                    <motion.div
-                        className="kpi-card"
-                        style={{ background: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }}
-                        variants={{ hidden: { y: 15, opacity: 0 }, show: { y: 0, opacity: 1 } }}
-                    >
-                        <div className="kpi-icon" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#10b981' }}>
-                            <FileText size={24} />
-                        </div>
-                        <div className="kpi-content">
-                            <div className="kpi-value" style={{ color: '#f8fafc' }}>
-                                {stats.manifiestos.total.toLocaleString('es-AR')}
-                            </div>
-                            <span className="kpi-label">MANIFIESTOS</span>
-                            <div className="kpi-trend" style={{ color: (tendencia?.manifiestos ?? 0) >= 0 ? '#10b981' : '#ef4444' }}>
-                                <TrendingUp size={14} style={{ transform: (tendencia?.manifiestos ?? 0) < 0 ? 'rotate(180deg)' : 'none' }} />
-                                <span>{(tendencia?.manifiestos ?? 0) >= 0 ? '+' : ''}{(tendencia?.manifiestos ?? 0).toFixed(1)}% vs período anterior</span>
-                            </div>
-                        </div>
-                    </motion.div>
-
-                    <motion.div
-                        className="kpi-card"
-                        style={{ background: 'rgba(6, 182, 212, 0.1)', borderColor: 'rgba(6, 182, 212, 0.3)' }}
-                        variants={{ hidden: { y: 15, opacity: 0 }, show: { y: 0, opacity: 1 } }}
-                    >
-                        <div className="kpi-icon" style={{ background: 'rgba(6, 182, 212, 0.2)', color: '#06b6d4' }}>
-                            <Truck size={24} />
-                        </div>
-                        <div className="kpi-content">
-                            <div className="kpi-value" style={{ color: '#f8fafc' }}>
-                                {stats.manifiestos.enTransito.toLocaleString('es-AR')}
-                            </div>
-                            <span className="kpi-label">EN RUTA</span>
-                            <div className="kpi-live">
-                                <span className="live-dot"></span>
-                                <span>En vivo</span>
-                            </div>
-                        </div>
-                    </motion.div>
-
-                    <motion.div
-                        className="kpi-card"
-                        style={{ background: 'rgba(245, 158, 11, 0.1)', borderColor: 'rgba(245, 158, 11, 0.3)' }}
-                        variants={{ hidden: { y: 15, opacity: 0 }, show: { y: 0, opacity: 1 } }}
-                    >
-                        <div className="kpi-icon" style={{ background: 'rgba(245, 158, 11, 0.2)', color: '#f59e0b' }}>
-                            <Bell size={24} />
-                        </div>
-                        <div className="kpi-content">
-                            <div className="kpi-value" style={{ color: '#f8fafc' }}>
-                                {stats.alertasActivas.toLocaleString('es-AR')}
-                            </div>
-                            <span className="kpi-label">ALERTAS</span>
-                            {stats.alertasActivas > 0 && (
-                                <div className="kpi-alert">
-                                    <AlertTriangle size={14} />
-                                    <span>Revisar</span>
-                                </div>
-                            )}
-                        </div>
-                    </motion.div>
-
-                    <motion.div
-                        className="kpi-card"
-                        style={{ background: 'rgba(139, 92, 246, 0.1)', borderColor: 'rgba(139, 92, 246, 0.3)' }}
-                        variants={{ hidden: { y: 15, opacity: 0 }, show: { y: 0, opacity: 1 } }}
-                    >
-                        <div className="kpi-icon" style={{ background: 'rgba(139, 92, 246, 0.2)', color: '#8b5cf6' }}>
-                            <Users size={24} />
-                        </div>
-                        <div className="kpi-content">
-                            <div className="kpi-value" style={{ color: '#f8fafc' }}>
-                                {stats.usuarios.activos.toLocaleString('es-AR')}
-                            </div>
-                            <span className="kpi-label">USUARIOS</span>
-                            {stats.usuarios.pendientes > 0 && (
-                                <div className="kpi-pending">
-                                    <Clock size={14} />
-                                    <span>{stats.usuarios.pendientes} pendientes</span>
-                                </div>
-                            )}
-                        </div>
-                    </motion.div>
-                </motion.div>
-            )}
+            {stats && <KPICards stats={stats} tendencia={tendencia} />}
 
             {/* Main Content Grid */}
             <div className="mega-grid">

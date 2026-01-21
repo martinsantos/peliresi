@@ -40,7 +40,7 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-    const { user, logout, loading, effectiveRole, effectiveRoleName, demoProfile } = useAuth();
+    const { user, logout, loading, effectiveRole, effectiveRoleName, effectiveUserName, demoProfile } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -322,15 +322,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                 <div className="user-menu-avatar">
                                     {rolIcon}
                                 </div>
-                                <span className="user-menu-name">{user?.nombre}</span>
+                                <span className="user-menu-name">{effectiveUserName}</span>
                                 <ChevronDown size={16} />
                             </button>
 
                             {userMenuOpen && (
                                 <div className="user-menu-dropdown">
                                     <div className="user-menu-header">
-                                        <strong>{user?.nombre} {user?.apellido}</strong>
-                                        <span>{user?.email}</span>
+                                        <strong>{effectiveUserName}</strong>
+                                        <span>{effectiveRoleName}</span>
+                                        {demoProfile && <span className="demo-indicator">MODO DEMO</span>}
                                     </div>
                                     <div className="user-menu-divider" />
                                     <div className="user-menu-section">

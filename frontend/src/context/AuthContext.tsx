@@ -28,6 +28,7 @@ interface AuthContextType {
     demoProfile: DemoProfile | null;
     effectiveRole: string | undefined;
     effectiveRoleName: string | undefined;
+    effectiveUserName: string | undefined;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -76,6 +77,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return demoProfile?.roleName ?? getRolLabel(user?.rol);
     }, [demoProfile?.roleName, user?.rol]);
 
+    // Nombre efectivo: usa el nombre del actor demo si está activo
+    const effectiveUserName = useMemo(() => {
+        if (demoProfile?.actorName) return demoProfile.actorName;
+        const fullName = `${user?.nombre || ''} ${user?.apellido || ''}`.trim();
+        return fullName || user?.nombre;
+    }, [demoProfile?.actorName, user?.nombre, user?.apellido]);
+
     // Estabilizar funciones con useCallback
     const login = useCallback(async (email: string, password: string) => {
         const response = await authService.login(email, password);
@@ -99,7 +107,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         demoProfile,
         effectiveRole,
         effectiveRoleName,
-    }), [user, loading, login, logout, demoProfile, effectiveRole, effectiveRoleName]);
+        effectiveUserName,
+    }), [user, loading, login, logout, demoProfile, effectiveRole, effectiveRoleName, effectiveUserName]);
 
     return (
         <AuthContext.Provider value={contextValue}>

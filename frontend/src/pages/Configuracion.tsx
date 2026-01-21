@@ -1,3 +1,9 @@
+/**
+ * Configuracion.tsx - System Configuration Page
+ *
+ * Refactored: Components extracted to src/components/configuracion/
+ */
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { catalogoService } from '../services/manifiesto.service';
 import { usuarioService, configService, cronService, type Usuario, type CronTask } from '../services/admin.service';
@@ -12,7 +18,6 @@ import {
     Edit2,
     Trash2,
     Save,
-    X,
     Check,
     Sun,
     Moon,
@@ -28,91 +33,22 @@ import {
 } from 'lucide-react';
 import './Configuracion.css';
 
-// ===== Constants =====
-const DEFAULT_RESIDUO_FORM = {
-    codigo: '',
-    nombre: '',
-    descripcion: '',
-    categoria: 'A',
-    caracteristicas: '',
-    peligrosidad: 'Alta'
-};
-
-const DEFAULT_USUARIO_FORM = {
-    nombre: '',
-    apellido: '',
-    email: '',
-    telefono: '',
-    rol: 'GENERADOR',
-    activo: true
-};
-
-const DEFAULT_PARAMETROS = {
-    vencimientoManifiestos: 30,
-    alertaDesvioGPS: 5,
-    tiempoMaxTransito: 48,
-    emailNotificaciones: 'alertas@dgfa.mendoza.gov.ar',
-    toleranciaPeso: 5,
-    tiempoSesion: 60
-};
-
-const ROL_BADGE_CLASSES: Record<string, string> = {
-    ADMIN: 'badge-admin',
-    GENERADOR: 'badge-generador',
-    TRANSPORTISTA: 'badge-transportista',
-    OPERADOR: 'badge-operador'
-};
-
-const PELIGROSIDAD_BADGE_CLASSES: Record<string, string> = {
-    Alta: 'badge-danger',
-    Media: 'badge-warning',
-    Baja: 'badge-success'
-};
-
-type TabType = 'usuarios' | 'residuos' | 'parametros' | 'tareas';
-type ThemeType = 'dark' | 'light' | 'system';
-
-// ===== Modal Component =====
-interface ModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    title: string;
-    children: React.ReactNode;
-    size?: 'sm' | 'md' | 'lg';
-}
-
-function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps): React.ReactElement | null {
-    if (!isOpen) return null;
-
-    return (
-        <div className="config-modal-overlay" onClick={onClose}>
-            <div className={`config-modal config-modal-${size}`} onClick={e => e.stopPropagation()}>
-                <div className="config-modal-header">
-                    <h3>{title}</h3>
-                    <button className="btn-close" onClick={onClose}>
-                        <X size={20} />
-                    </button>
-                </div>
-                <div className="config-modal-body">
-                    {children}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// ===== Toast Types =====
-interface Toast {
-    id: number;
-    message: string;
-    type: 'success' | 'error' | 'info';
-}
-
-interface DeleteConfirmation {
-    type: 'residuo' | 'usuario';
-    id: string;
-    nombre: string;
-}
+// Import extracted components
+import {
+    ConfigModal,
+    ToastContainer,
+    DEFAULT_RESIDUO_FORM,
+    DEFAULT_USUARIO_FORM,
+    DEFAULT_PARAMETROS,
+    ROL_BADGE_CLASSES,
+    PELIGROSIDAD_BADGE_CLASSES,
+} from '../components/configuracion';
+import type {
+    TabType,
+    ThemeType,
+    Toast,
+    DeleteConfirmation,
+} from '../components/configuracion';
 
 // ===== Main Component =====
 function Configuracion(): React.ReactElement {
@@ -150,14 +86,6 @@ function Configuracion(): React.ReactElement {
             setToasts(prev => prev.filter(t => t.id !== id));
         }, 3000);
     }, []);
-
-    function getToastIcon(type: Toast['type']): React.ReactElement {
-        switch (type) {
-            case 'success': return <Check size={18} />;
-            case 'error': return <X size={18} />;
-            case 'info': return <AlertTriangle size={18} />;
-        }
-    }
 
     function getRolBadgeClass(rol: string): string {
         return ROL_BADGE_CLASSES[rol] || 'badge-info';
@@ -399,18 +327,6 @@ function Configuracion(): React.ReactElement {
     );
 
     // ===== Render Functions =====
-    function renderToasts(): React.ReactElement {
-        return (
-            <div className="toast-container">
-                {toasts.map(toast => (
-                    <div key={toast.id} className={`toast toast-${toast.type}`}>
-                        {getToastIcon(toast.type)}
-                        <span>{toast.message}</span>
-                    </div>
-                ))}
-            </div>
-        );
-    }
 
     function renderSidebar(): React.ReactElement {
         const tabs: Array<{ id: TabType; icon: React.ReactElement; label: string }> = [
@@ -980,7 +896,7 @@ function Configuracion(): React.ReactElement {
 
     function renderResiduoModal(): React.ReactElement {
         return (
-            <Modal
+            <ConfigModal
                 isOpen={showResiduoModal}
                 onClose={() => setShowResiduoModal(false)}
                 title={editingResiduo ? 'Editar Residuo' : 'Nuevo Residuo'}
@@ -1064,13 +980,13 @@ function Configuracion(): React.ReactElement {
                         </button>
                     </div>
                 </form>
-            </Modal>
+            </ConfigModal>
         );
     }
 
     function renderUsuarioModal(): React.ReactElement {
         return (
-            <Modal
+            <ConfigModal
                 isOpen={showUsuarioModal}
                 onClose={() => setShowUsuarioModal(false)}
                 title={editingUsuario ? 'Editar Usuario' : 'Nuevo Usuario'}
@@ -1155,13 +1071,13 @@ function Configuracion(): React.ReactElement {
                         </button>
                     </div>
                 </form>
-            </Modal>
+            </ConfigModal>
         );
     }
 
     function renderDeleteConfirmModal(): React.ReactElement {
         return (
-            <Modal
+            <ConfigModal
                 isOpen={showDeleteConfirm !== null}
                 onClose={() => setShowDeleteConfirm(null)}
                 title="Confirmar Eliminacion"
@@ -1188,7 +1104,7 @@ function Configuracion(): React.ReactElement {
                         </button>
                     </div>
                 </div>
-            </Modal>
+            </ConfigModal>
         );
     }
 
@@ -1203,7 +1119,7 @@ function Configuracion(): React.ReactElement {
 
     return (
         <div className="configuracion-page animate-fadeIn">
-            {renderToasts()}
+            <ToastContainer toasts={toasts} />
 
             <div className="config-header">
                 <div className="header-title">

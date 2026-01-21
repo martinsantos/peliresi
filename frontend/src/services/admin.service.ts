@@ -1,46 +1,67 @@
-import api from './api';
-import type { ApiResponse } from '../types';
-import { defaults } from '../utils/safeResponse';
+/**
+ * Admin Service - Unified export for admin functionality
+ * Re-exports types, API clients, and high-level services
+ *
+ * Architecture:
+ * - admin.types.ts: Type definitions
+ * - admin.api.ts: Raw HTTP API calls
+ * - admin.transformers.ts: Data transformation and defaults
+ * - admin.service.ts: High-level service layer (this file)
+ */
+
+// Re-export types for backward compatibility
+export type {
+    Actor,
+    Generador,
+    Transportista,
+    Operador,
+    Usuario,
+    UsuariosResponse,
+    Actividad,
+    ActividadResponse,
+    SystemConfig,
+    CronTask,
+    EstadisticasDepartamento,
+    EstadisticasHistoricas,
+} from './admin.types';
+
+// Import API clients and transformers
+import { pdfApi, reporteApi, actorApi, usuarioApi, configApi, cronApi } from './admin.api';
+import {
+    defaults,
+    transformUsuariosResponse,
+    transformActividadResponse,
+    transformEstadisticasDepartamento,
+    transformEstadisticasHistoricas,
+    transformSystemConfig,
+    downloadBlob,
+    generateFilename,
+} from './admin.transformers';
+import type {
+    Generador,
+    Transportista,
+    Operador,
+    Usuario,
+    UsuariosResponse,
+    ActividadResponse,
+    SystemConfig,
+    CronTask,
+} from './admin.types';
 
 // ===== PDFs =====
 export const pdfService = {
     getManifiestoPDFUrl(id: string): string {
-        return `${api.defaults.baseURL}/manifiestos/${id}/pdf`;
+        return pdfApi.getManifiestoPDFUrl(id);
     },
 
     getCertificadoPDFUrl(id: string): string {
-        return `${api.defaults.baseURL}/manifiestos/${id}/certificado`;
+        return pdfApi.getCertificadoPDFUrl(id);
     },
 
     async descargarManifiestoPDF(id: string): Promise<void> {
-        const token = localStorage.getItem('accessToken');
-        const baseURL = api.defaults.baseURL || '/api';
-
         try {
-            const response = await fetch(`${baseURL}/manifiestos/${id}/pdf`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('[PDFService] Error descargando PDF:', response.status, errorText);
-                throw new Error(`Error al descargar PDF: ${response.status}`);
-            }
-
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/pdf')) {
-                console.warn('[PDFService] Respuesta no es PDF, tipo:', contentType);
-            }
-
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `manifiesto_${id}.pdf`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
+            const blob = await pdfApi.fetchManifiestoPDF(id);
+            downloadBlob(blob, `manifiesto_${id}.pdf`);
         } catch (error) {
             console.error('[PDFService] Error en descargarManifiestoPDF:', error);
             throw error;
@@ -48,29 +69,9 @@ export const pdfService = {
     },
 
     async descargarCertificadoPDF(id: string): Promise<void> {
-        const token = localStorage.getItem('accessToken');
-        const baseURL = api.defaults.baseURL || '/api';
-
         try {
-            const response = await fetch(`${baseURL}/manifiestos/${id}/certificado`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('[PDFService] Error descargando certificado:', response.status, errorText);
-                throw new Error(`Error al descargar certificado: ${response.status}`);
-            }
-
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `certificado_${id}.pdf`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
+            const blob = await pdfApi.fetchCertificadoPDF(id);
+            downloadBlob(blob, `certificado_${id}.pdf`);
         } catch (error) {
             console.error('[PDFService] Error en descargarCertificadoPDF:', error);
             throw error;
@@ -87,7 +88,7 @@ export const reporteService = {
         tipoResiduoId?: string;
     }): Promise<any> {
         try {
-            const response = await api.get<ApiResponse<any>>('/reportes/manifiestos', { params });
+            const response = await reporteApi.getReporteManifiestos(params);
             return response.data?.data || { manifiestos: [], resumen: {}, porEstado: {}, porTipoResiduo: {} };
         } catch (error) {
             console.error('[ReporteService] Error getReporteManifiestos:', error);
@@ -100,7 +101,7 @@ export const reporteService = {
         fechaFin?: string;
     }): Promise<any> {
         try {
-            const response = await api.get<ApiResponse<any>>('/reportes/tratados', { params });
+            const response = await reporteApi.getReporteTratados(params);
             return response.data?.data || { tratados: [], resumen: {} };
         } catch (error) {
             console.error('[ReporteService] Error getReporteTratados:', error);
@@ -113,7 +114,7 @@ export const reporteService = {
         fechaFin?: string;
     }): Promise<any> {
         try {
-            const response = await api.get<ApiResponse<any>>('/reportes/transporte', { params });
+            const response = await reporteApi.getReporteTransporte(params);
             return response.data?.data || { viajes: [], resumen: {} };
         } catch (error) {
             console.error('[ReporteService] Error getReporteTransporte:', error);
@@ -130,7 +131,7 @@ export const reporteService = {
         limit?: number;
     }): Promise<any> {
         try {
-            const response = await api.get<ApiResponse<any>>('/reportes/auditoria', { params });
+            const response = await reporteApi.getLogAuditoria(params);
             return response.data?.data || { logs: [], pagination: defaults.pagination };
         } catch (error) {
             console.error('[ReporteService] Error getLogAuditoria:', error);
@@ -143,21 +144,8 @@ export const reporteService = {
         fechaFin?: string;
     }): Promise<void> {
         try {
-            const token = localStorage.getItem('accessToken');
-            const queryString = params ? new URLSearchParams(params as Record<string, string>).toString() : '';
-            const response = await fetch(`${api.defaults.baseURL}/reportes/exportar/${tipo}?${queryString}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            if (!response.ok) throw new Error('Error al exportar');
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `${tipo}_${new Date().toISOString().split('T')[0]}.csv`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
+            const blob = await reporteApi.fetchCSVExport(tipo, params);
+            downloadBlob(blob, generateFilename(tipo, 'csv'));
         } catch (error) {
             console.error('[ReporteService] Error exportarCSV:', error);
             throw error;
@@ -166,39 +154,11 @@ export const reporteService = {
 };
 
 // ===== GESTIÓN DE ACTORES =====
-export interface Actor {
-    id: string;
-    razonSocial: string;
-    cuit: string;
-    domicilio: string;
-    telefono: string;
-    email: string;
-    activo: boolean;
-    _count?: { manifiestos: number };
-}
-
-export interface Generador extends Actor {
-    numeroInscripcion: string;
-    categoria: string;
-}
-
-export interface Transportista extends Actor {
-    numeroHabilitacion: string;
-    vehiculos?: any[];
-    choferes?: any[];
-}
-
-export interface Operador extends Actor {
-    numeroHabilitacion: string;
-    categoria: string;
-    tratamientos?: any[];
-}
-
 export const actorService = {
     // Generadores
     async getGeneradores(params?: { search?: string; activo?: boolean; page?: number; limit?: number }): Promise<{ generadores: Generador[]; pagination: any }> {
         try {
-            const response = await api.get<ApiResponse<{ generadores: Generador[]; pagination: any }>>('/actores/generadores', { params });
+            const response = await actorApi.getGeneradores(params);
             return response.data?.data || { generadores: [], pagination: defaults.pagination };
         } catch (error) {
             console.error('[ActorService] Error getGeneradores:', error);
@@ -208,7 +168,7 @@ export const actorService = {
 
     async createGenerador(data: Omit<Generador, 'id' | 'activo' | '_count'>): Promise<{ generador: Generador; message: string }> {
         try {
-            const response = await api.post<ApiResponse<{ generador: Generador; message?: string }>>('/actores/generadores', data);
+            const response = await actorApi.createGenerador(data);
             return { generador: response.data?.data?.generador, message: (response.data as any).message || 'Generador creado' };
         } catch (error) {
             console.error('[ActorService] Error createGenerador:', error);
@@ -218,7 +178,7 @@ export const actorService = {
 
     async updateGenerador(id: string, data: Partial<Generador>): Promise<Generador> {
         try {
-            const response = await api.put<ApiResponse<{ generador: Generador }>>(`/actores/generadores/${id}`, data);
+            const response = await actorApi.updateGenerador(id, data);
             return response.data?.data?.generador;
         } catch (error) {
             console.error('[ActorService] Error updateGenerador:', error);
@@ -228,7 +188,7 @@ export const actorService = {
 
     async deleteGenerador(id: string): Promise<void> {
         try {
-            await api.delete(`/actores/generadores/${id}`);
+            await actorApi.deleteGenerador(id);
         } catch (error) {
             console.error('[ActorService] Error deleteGenerador:', error);
             throw error;
@@ -238,7 +198,7 @@ export const actorService = {
     // Transportistas
     async getTransportistas(params?: { search?: string; activo?: boolean; page?: number; limit?: number }): Promise<{ transportistas: Transportista[]; pagination: any }> {
         try {
-            const response = await api.get<ApiResponse<{ transportistas: Transportista[]; pagination: any }>>('/actores/transportistas', { params });
+            const response = await actorApi.getTransportistas(params);
             return response.data?.data || { transportistas: [], pagination: defaults.pagination };
         } catch (error) {
             console.error('[ActorService] Error getTransportistas:', error);
@@ -248,7 +208,7 @@ export const actorService = {
 
     async createTransportista(data: any): Promise<{ transportista: Transportista; message: string }> {
         try {
-            const response = await api.post<ApiResponse<{ transportista: Transportista }>>('/actores/transportistas', data);
+            const response = await actorApi.createTransportista(data);
             return { transportista: response.data?.data?.transportista, message: (response.data as any).message || 'Transportista creado' };
         } catch (error) {
             console.error('[ActorService] Error createTransportista:', error);
@@ -258,7 +218,7 @@ export const actorService = {
 
     async updateTransportista(id: string, data: Partial<Transportista>): Promise<Transportista> {
         try {
-            const response = await api.put<ApiResponse<{ transportista: Transportista }>>(`/actores/transportistas/${id}`, data);
+            const response = await actorApi.updateTransportista(id, data);
             return response.data?.data?.transportista;
         } catch (error) {
             console.error('[ActorService] Error updateTransportista:', error);
@@ -268,7 +228,7 @@ export const actorService = {
 
     async addVehiculo(transportistaId: string, data: any): Promise<any> {
         try {
-            const response = await api.post<ApiResponse<{ vehiculo: any }>>(`/actores/transportistas/${transportistaId}/vehiculos`, data);
+            const response = await actorApi.addVehiculo(transportistaId, data);
             return response.data?.data?.vehiculo;
         } catch (error) {
             console.error('[ActorService] Error addVehiculo:', error);
@@ -278,7 +238,7 @@ export const actorService = {
 
     async addChofer(transportistaId: string, data: any): Promise<any> {
         try {
-            const response = await api.post<ApiResponse<{ chofer: any }>>(`/actores/transportistas/${transportistaId}/choferes`, data);
+            const response = await actorApi.addChofer(transportistaId, data);
             return response.data?.data?.chofer;
         } catch (error) {
             console.error('[ActorService] Error addChofer:', error);
@@ -289,7 +249,7 @@ export const actorService = {
     // Operadores
     async getOperadores(params?: { search?: string; activo?: boolean; page?: number; limit?: number }): Promise<{ operadores: Operador[]; pagination: any }> {
         try {
-            const response = await api.get<ApiResponse<{ operadores: Operador[]; pagination: any }>>('/actores/operadores', { params });
+            const response = await actorApi.getOperadores(params);
             return response.data?.data || { operadores: [], pagination: defaults.pagination };
         } catch (error) {
             console.error('[ActorService] Error getOperadores:', error);
@@ -299,7 +259,7 @@ export const actorService = {
 
     async createOperador(data: any): Promise<{ operador: Operador; message: string }> {
         try {
-            const response = await api.post<ApiResponse<{ operador: Operador }>>('/actores/operadores', data);
+            const response = await actorApi.createOperador(data);
             return { operador: response.data?.data?.operador, message: (response.data as any).message || 'Operador creado' };
         } catch (error) {
             console.error('[ActorService] Error createOperador:', error);
@@ -309,7 +269,7 @@ export const actorService = {
 
     async updateOperador(id: string, data: Partial<Operador>): Promise<Operador> {
         try {
-            const response = await api.put<ApiResponse<{ operador: Operador }>>(`/actores/operadores/${id}`, data);
+            const response = await actorApi.updateOperador(id, data);
             return response.data?.data?.operador;
         } catch (error) {
             console.error('[ActorService] Error updateOperador:', error);
@@ -319,7 +279,7 @@ export const actorService = {
 
     async deleteOperador(id: string): Promise<void> {
         try {
-            await api.delete(`/actores/operadores/${id}`);
+            await actorApi.deleteOperador(id);
         } catch (error) {
             console.error('[ActorService] Error deleteOperador:', error);
             throw error;
@@ -328,66 +288,7 @@ export const actorService = {
 };
 
 // ===== GESTIÓN DE USUARIOS =====
-export interface Usuario {
-    id: string;
-    email: string;
-    rol: string;
-    nombre: string;
-    apellido: string;
-    empresa?: string;
-    telefono?: string;
-    activo: boolean;
-    createdAt: string;
-    updatedAt?: string;
-    generador?: { id: string; razonSocial: string };
-    transportista?: { id: string; razonSocial: string };
-    operador?: { id: string; razonSocial: string };
-}
-
-export interface UsuariosResponse {
-    usuarios: Usuario[];
-    stats: {
-        total: number;
-        activos: number;
-        inactivos: number;
-        porRol: Record<string, number>;
-    };
-    pagination: {
-        page: number;
-        limit: number;
-        total: number;
-        pages: number;
-    };
-}
-
-export interface Actividad {
-    id: string;
-    tipo: 'MANIFIESTO' | 'SISTEMA';
-    accion: string;
-    descripcion: string;
-    fecha: string;
-    usuario: { nombre: string; apellido: string; rol: string } | null;
-    manifiesto: { numero: string; estado: string } | null;
-    metadata?: any;
-}
-
-export interface ActividadResponse {
-    actividades: Actividad[];
-    stats: {
-        eventosHoy: number;
-        manifestosActivos: number;
-        usuariosActivos: number;
-    };
-    pagination: {
-        page: number;
-        limit: number;
-    };
-}
-
 export const usuarioService = {
-    /**
-     * Obtener todos los usuarios con estadísticas
-     */
     async getUsuarios(params?: {
         page?: number;
         limit?: number;
@@ -396,20 +297,17 @@ export const usuarioService = {
         busqueda?: string;
     }): Promise<UsuariosResponse> {
         try {
-            const response = await api.get<ApiResponse<UsuariosResponse>>('/admin/usuarios', { params });
-            return response.data?.data || { usuarios: [], stats: defaults.emptyStats, pagination: defaults.pagination };
+            const response = await usuarioApi.getUsuarios(params);
+            return transformUsuariosResponse(response.data?.data);
         } catch (error) {
             console.error('[UsuarioService] Error getUsuarios:', error);
-            return { usuarios: [], stats: defaults.emptyStats, pagination: defaults.pagination };
+            return transformUsuariosResponse(null);
         }
     },
 
-    /**
-     * Obtener usuarios pendientes de aprobación
-     */
     async getUsuariosPendientes(): Promise<{ usuarios: Usuario[]; total: number }> {
         try {
-            const response = await api.get<ApiResponse<{ usuarios: Usuario[]; total: number }>>('/admin/usuarios/pendientes');
+            const response = await usuarioApi.getUsuariosPendientes();
             return response.data?.data || { usuarios: [], total: 0 };
         } catch (error) {
             console.error('[UsuarioService] Error getUsuariosPendientes:', error);
@@ -417,12 +315,9 @@ export const usuarioService = {
         }
     },
 
-    /**
-     * Obtener detalle de un usuario
-     */
     async getUsuario(id: string): Promise<{ usuario: Usuario | null; actividadReciente: any[] }> {
         try {
-            const response = await api.get<ApiResponse<{ usuario: Usuario; actividadReciente: any[] }>>(`/admin/usuarios/${id}`);
+            const response = await usuarioApi.getUsuario(id);
             return response.data?.data || { usuario: null, actividadReciente: [] };
         } catch (error) {
             console.error('[UsuarioService] Error getUsuario:', error);
@@ -430,12 +325,9 @@ export const usuarioService = {
         }
     },
 
-    /**
-     * Actualizar usuario
-     */
     async updateUsuario(id: string, data: Partial<Usuario>): Promise<Usuario | null> {
         try {
-            const response = await api.put<ApiResponse<{ usuario: Usuario }>>(`/admin/usuarios/${id}`, data);
+            const response = await usuarioApi.updateUsuario(id, data);
             return response.data?.data?.usuario || null;
         } catch (error) {
             console.error('[UsuarioService] Error updateUsuario:', error);
@@ -443,12 +335,9 @@ export const usuarioService = {
         }
     },
 
-    /**
-     * Aprobar usuario pendiente
-     */
     async aprobarUsuario(id: string): Promise<Usuario | null> {
         try {
-            const response = await api.post<ApiResponse<{ usuario: Usuario }>>(`/admin/usuarios/${id}/aprobar`);
+            const response = await usuarioApi.aprobarUsuario(id);
             return response.data?.data?.usuario || null;
         } catch (error) {
             console.error('[UsuarioService] Error aprobarUsuario:', error);
@@ -456,21 +345,15 @@ export const usuarioService = {
         }
     },
 
-    /**
-     * Rechazar usuario pendiente
-     */
     async rechazarUsuario(id: string, motivo?: string): Promise<void> {
         try {
-            await api.post(`/admin/usuarios/${id}/rechazar`, { motivo });
+            await usuarioApi.rechazarUsuario(id, motivo);
         } catch (error) {
             console.error('[UsuarioService] Error rechazarUsuario:', error);
             throw error;
         }
     },
 
-    /**
-     * Obtener actividad global del sistema
-     */
     async getActividad(params?: {
         page?: number;
         limit?: number;
@@ -479,26 +362,20 @@ export const usuarioService = {
         hasta?: string;
     }): Promise<ActividadResponse> {
         try {
-            const response = await api.get<ApiResponse<ActividadResponse>>('/admin/actividad', { params });
-            return response.data?.data || { actividades: [], stats: { eventosHoy: 0, manifestosActivos: 0, usuariosActivos: 0 }, pagination: defaults.pagination };
+            const response = await usuarioApi.getActividad(params);
+            return transformActividadResponse(response.data?.data);
         } catch (error) {
             console.error('[UsuarioService] Error getActividad:', error);
-            return { actividades: [], stats: { eventosHoy: 0, manifestosActivos: 0, usuariosActivos: 0 }, pagination: defaults.pagination };
+            return transformActividadResponse(null);
         }
     },
 
-    /**
-     * Obtener estadísticas generales
-     */
     async getEstadisticas(): Promise<{
         usuarios: { total: number; activos: number; pendientes: number; porRol: Record<string, number> };
         manifiestos: { total: number; porEstado: Record<string, number> };
     }> {
         try {
-            const response = await api.get<ApiResponse<{
-                usuarios: { total: number; activos: number; pendientes: number; porRol: Record<string, number> };
-                manifiestos: { total: number; porEstado: Record<string, number> };
-            }>>('/admin/estadisticas');
+            const response = await usuarioApi.getEstadisticas();
             return response.data?.data || {
                 usuarios: { total: 0, activos: 0, pendientes: 0, porRol: {} },
                 manifiestos: { total: 0, porEstado: {} }
@@ -512,137 +389,46 @@ export const usuarioService = {
         }
     },
 
-    /**
-     * Obtener estadísticas por departamento de Mendoza
-     */
-    async getEstadisticasDepartamento(): Promise<{
-        departamentos: Array<{
-            nombre: string;
-            manifiestos: { total: number; enTransito: number; entregados: number; tratados: number };
-            residuosTratados: number;
-            enProceso: number;
-            ultimaActividad: string | null;
-        }>;
-        totales: {
-            manifiestos: number;
-            residuosTratados: number;
-            departamentosActivos: number;
-        };
-    }> {
+    async getEstadisticasDepartamento() {
         try {
-            const response = await api.get<ApiResponse<any>>('/admin/estadisticas-departamento');
-            return response.data?.data || {
-                departamentos: [],
-                totales: { manifiestos: 0, residuosTratados: 0, departamentosActivos: 0 }
-            };
+            const response = await usuarioApi.getEstadisticasDepartamento();
+            return transformEstadisticasDepartamento(response.data?.data);
         } catch (error) {
             console.error('[UsuarioService] Error getEstadisticasDepartamento:', error);
-            return {
-                departamentos: [],
-                totales: { manifiestos: 0, residuosTratados: 0, departamentosActivos: 0 }
-            };
+            return transformEstadisticasDepartamento(null);
         }
     },
 
-    /**
-     * Obtener estadísticas históricas con filtros de tiempo
-     */
     async getEstadisticasHistoricas(params?: {
         desde?: string;
         hasta?: string;
         agrupacion?: 'dia' | 'semana' | 'mes';
-    }): Promise<{
-        periodo: { desde: string; hasta: string };
-        agrupacion: string;
-        datos: Array<{
-            fecha: string;
-            manifiestos: number;
-            residuos: number;
-            alertas: number;
-        }>;
-        totales: {
-            manifiestos: number;
-            residuos: number;
-            alertas: number;
-        };
-        tendencia: {
-            manifiestos: number;
-            residuos: number;
-        };
-    }> {
+    }) {
         try {
-            const response = await api.get<ApiResponse<any>>('/admin/estadisticas-historicas', { params });
-            return response.data?.data || {
-                periodo: { desde: '', hasta: '' },
-                agrupacion: 'dia',
-                datos: [],
-                totales: { manifiestos: 0, residuos: 0, alertas: 0 },
-                tendencia: { manifiestos: 0, residuos: 0 }
-            };
+            const response = await usuarioApi.getEstadisticasHistoricas(params);
+            return transformEstadisticasHistoricas(response.data?.data);
         } catch (error) {
             console.error('[UsuarioService] Error getEstadisticasHistoricas:', error);
-            return {
-                periodo: { desde: '', hasta: '' },
-                agrupacion: 'dia',
-                datos: [],
-                totales: { manifiestos: 0, residuos: 0, alertas: 0 },
-                tendencia: { manifiestos: 0, residuos: 0 }
-            };
+            return transformEstadisticasHistoricas(null);
         }
     }
 };
 
 // ===== System Configuration =====
-export interface SystemConfig {
-    vencimientoManifiestos: number;
-    alertaDesvioGPS: number;
-    tiempoMaxTransito: number;
-    emailNotificaciones: string;
-    toleranciaPeso: number;
-    tiempoSesion: number;
-    notificacionesPush: boolean;
-    notificacionesEmail: boolean;
-    notificacionesSMS: boolean;
-    backupAutomatico: boolean;
-    frecuenciaBackup: number;
-    retencionLogs: number;
-    maxArchivoCarga: number;
-    maxManifiestosPorPagina: number;
-    alertaTiempoExcesivo: boolean;
-    alertaVencimientoProximo: boolean;
-    diasAlertaVencimiento: number;
-}
-
 export const configService = {
-    /**
-     * Obtener configuración del sistema
-     */
     async getConfig(): Promise<SystemConfig> {
         try {
-            const response = await api.get<ApiResponse<{ config: SystemConfig }>>('/config');
-            return response.data?.data?.config || this.getDefaults();
+            const response = await configApi.getConfig();
+            return transformSystemConfig(response.data?.data);
         } catch (error) {
             console.error('[ConfigService] Error getConfig:', error);
-            // Fallback to localStorage for offline/demo mode
-            const saved = localStorage.getItem('sitrep_parametros');
-            if (saved) {
-                try {
-                    return { ...this.getDefaults(), ...JSON.parse(saved) };
-                } catch {
-                    // ignore
-                }
-            }
-            return this.getDefaults();
+            return transformSystemConfig(null);
         }
     },
 
-    /**
-     * Actualizar configuración del sistema
-     */
     async updateConfig(updates: Partial<SystemConfig>): Promise<SystemConfig> {
         try {
-            const response = await api.put<ApiResponse<{ config: SystemConfig }>>('/config', updates);
-            // Also save to localStorage for offline access
+            const response = await configApi.updateConfig(updates);
             const config = response.data?.data?.config;
             if (config) {
                 localStorage.setItem('sitrep_parametros', JSON.stringify(config));
@@ -658,12 +444,9 @@ export const configService = {
         }
     },
 
-    /**
-     * Resetear configuración a valores por defecto
-     */
     async resetConfig(): Promise<SystemConfig> {
         try {
-            const response = await api.post<ApiResponse<{ config: SystemConfig }>>('/config/reset');
+            const response = await configApi.resetConfig();
             localStorage.removeItem('sitrep_parametros');
             return response.data?.data?.config || this.getDefaults();
         } catch (error) {
@@ -673,37 +456,13 @@ export const configService = {
         }
     },
 
-    /**
-     * Obtener valores por defecto
-     */
     getDefaults(): SystemConfig {
-        return {
-            vencimientoManifiestos: 30,
-            alertaDesvioGPS: 5,
-            tiempoMaxTransito: 48,
-            emailNotificaciones: 'alertas@dgfa.mendoza.gov.ar',
-            toleranciaPeso: 5,
-            tiempoSesion: 60,
-            notificacionesPush: true,
-            notificacionesEmail: true,
-            notificacionesSMS: false,
-            backupAutomatico: true,
-            frecuenciaBackup: 24,
-            retencionLogs: 90,
-            maxArchivoCarga: 10,
-            maxManifiestosPorPagina: 50,
-            alertaTiempoExcesivo: true,
-            alertaVencimientoProximo: true,
-            diasAlertaVencimiento: 7,
-        };
+        return defaults.systemConfig();
     },
 
-    /**
-     * Obtener tolerancia de peso (para usar en PesajeModal)
-     */
     async getToleranciaPeso(): Promise<number> {
         try {
-            const response = await api.get<ApiResponse<{ toleranciaPeso: number }>>('/config/public/tolerancia-peso');
+            const response = await configApi.getToleranciaPeso();
             return response.data?.data?.toleranciaPeso || 5;
         } catch {
             return 5;
@@ -712,19 +471,10 @@ export const configService = {
 };
 
 // ===== CRON Service =====
-export interface CronTask {
-    name: string;
-    schedule: string;
-    description: string;
-}
-
 export const cronService = {
-    /**
-     * Obtener estado de tareas programadas
-     */
     async getStatus(): Promise<{ tasks: CronTask[] }> {
         try {
-            const response = await api.get<ApiResponse<{ tasks: CronTask[] }>>('/cron/status');
+            const response = await cronApi.getStatus();
             return response.data?.data || { tasks: [] };
         } catch (error) {
             console.error('[CronService] Error getStatus:', error);
@@ -732,12 +482,9 @@ export const cronService = {
         }
     },
 
-    /**
-     * Ejecutar tarea manualmente
-     */
     async runTask(taskName: string): Promise<{ success: boolean; message: string }> {
         try {
-            const response = await api.post<ApiResponse<{ success: boolean; message: string }>>(`/cron/run/${taskName}`);
+            const response = await cronApi.runTask(taskName);
             return { success: true, message: response.data?.message || 'Tarea ejecutada' };
         } catch (error: any) {
             console.error('[CronService] Error runTask:', error);
@@ -745,12 +492,9 @@ export const cronService = {
         }
     },
 
-    /**
-     * Ejecutar backup manual
-     */
     async runBackup(tipo: 'daily' | 'weekly' = 'daily'): Promise<{ success: boolean; message: string }> {
         try {
-            const response = await api.post<ApiResponse<{ success: boolean; message: string }>>('/cron/backup', { tipo });
+            const response = await cronApi.runBackup(tipo);
             return { success: true, message: response.data?.message || 'Backup ejecutado' };
         } catch (error: any) {
             console.error('[CronService] Error runBackup:', error);

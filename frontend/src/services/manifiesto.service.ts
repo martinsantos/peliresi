@@ -1,84 +1,102 @@
-import api from './api';
+/**
+ * Manifiesto Service - Unified export for manifiesto functionality
+ * Re-exports types, API clients, and high-level services
+ *
+ * Architecture:
+ * - manifiesto.types.ts: Type definitions
+ * - manifiesto.api.ts: Raw HTTP API calls
+ * - manifiesto.transformers.ts: Data transformation and defaults
+ * - manifiesto.service.ts: High-level service layer (this file)
+ */
+
+// Re-export types for backward compatibility
+export type {
+    DashboardEstadisticas,
+    Pagination,
+    PaginatedResponse,
+    GetManifiestosParams,
+    CreateManifiestoData,
+    ConfirmarRetiroData,
+    ActualizarUbicacionData,
+    ConfirmarEntregaData,
+    ConfirmarRecepcionData,
+    RechazarCargaData,
+    RegistrarIncidenteData,
+    RegistrarTratamientoData,
+    RegistrarPesajeData,
+    PesajeResult,
+    CerrarManifiestoData,
+    CerrarManifiestoResult,
+    MetodoFirma,
+    FirmarConTokenData,
+    FirmarConTokenResult,
+    SolicitarCodigoSMSResult,
+} from './manifiesto.types';
+
+// Import API clients and transformers
+import { dashboardApi, manifiestoApi, pdfApi, firmaApi, catalogoApi } from './manifiesto.api';
+import {
+    defaults,
+    transformDashboardResponse,
+    transformManifiestosResponse,
+    transformPesajeResponse,
+    transformCerrarResponse,
+    transformFirmarConTokenResponse,
+    validateArrayData,
+} from './manifiesto.transformers';
 import type {
-    Manifiesto,
-    DashboardStats,
-    ApiResponse,
-    TipoResiduo,
-    Generador,
-    Transportista,
-    Operador
-} from '../types';
+    GetManifiestosParams,
+    CreateManifiestoData,
+    ConfirmarRetiroData,
+    ActualizarUbicacionData,
+    ConfirmarEntregaData,
+    ConfirmarRecepcionData,
+    RechazarCargaData,
+    RegistrarIncidenteData,
+    RegistrarTratamientoData,
+    RegistrarPesajeData,
+    CerrarManifiestoData,
+    FirmarConTokenData,
+    PesajeResult,
+    Pagination,
+} from './manifiesto.types';
+import type { Manifiesto, TipoResiduo, Generador, Transportista, Operador, DashboardStats } from '../types';
 
-const DEFAULT_DASHBOARD_STATS: DashboardStats = {
-    estadisticas: {
-        borradores: 0,
-        aprobados: 0,
-        enTransito: 0,
-        entregados: 0,
-        recibidos: 0,
-        tratados: 0,
-        total: 0
-    },
-    recientes: [],
-    enTransitoList: []
-};
+// Import demo data for fallback
+import {
+    tiposResiduosDemo,
+    transportistasDemo,
+    operadoresDemo,
+    generadoresDemo,
+} from '../data/catalogos-demo';
 
+// ===== Manifiesto Service =====
 export const manifiestoService = {
     // Dashboard
-    // IMPORTANTE: Backend devuelve "stats", frontend usa "estadisticas"
     async getDashboard(): Promise<DashboardStats> {
         try {
-            const response = await api.get<ApiResponse<any>>('/manifiestos/dashboard');
-            const data = response.data?.data;
-
-            if (!data) return DEFAULT_DASHBOARD_STATS;
-
-            // Normalizar respuesta: backend usa "stats", frontend usa "estadisticas"
-            const estadisticas = data.estadisticas || data.stats || {};
-
-            return {
-                estadisticas: {
-                    total: estadisticas.total ?? 0,
-                    borradores: estadisticas.borradores ?? 0,
-                    pendientesAprobacion: estadisticas.pendientesAprobacion ?? 0,
-                    aprobados: estadisticas.aprobados ?? 0,
-                    enTransito: estadisticas.enTransito ?? 0,
-                    entregados: estadisticas.entregados ?? 0,
-                    recibidos: estadisticas.recibidos ?? 0,
-                    enTratamiento: estadisticas.enTratamiento ?? 0,
-                    tratados: estadisticas.tratados ?? 0
-                },
-                recientes: data.recientes || [],
-                enTransitoList: data.enTransitoList || []
-            };
+            const response = await dashboardApi.getDashboard();
+            return transformDashboardResponse(response.data?.data);
         } catch (error) {
             console.error('[ManifiestoService] Error getDashboard:', error);
-            return DEFAULT_DASHBOARD_STATS;
+            return defaults.dashboardStats();
         }
     },
 
-    // Manifiestos
-    // FASE 1: Agregado filtro por transportistaId
-    async getManifiestos(params?: {
-        estado?: string;
-        page?: number;
-        limit?: number;
-        transportistaId?: string;  // P1: Filtrar por transportista asignado
-        generadorId?: string;
-        operadorId?: string;
-    }): Promise<{ manifiestos: Manifiesto[]; pagination: any }> {
+    // CRUD Operations
+    async getManifiestos(params?: GetManifiestosParams): Promise<{ manifiestos: Manifiesto[]; pagination: Pagination }> {
         try {
-            const response = await api.get<ApiResponse<{ manifiestos: Manifiesto[]; pagination: any }>>('/manifiestos', { params });
-            return response.data?.data || { manifiestos: [], pagination: { page: 1, limit: 10, total: 0, pages: 1 } };
+            const response = await manifiestoApi.getAll(params);
+            return transformManifiestosResponse(response.data?.data);
         } catch (error) {
             console.error('[ManifiestoService] Error getManifiestos:', error);
-            return { manifiestos: [], pagination: { page: 1, limit: 10, total: 0, pages: 1 } };
+            return { manifiestos: [], pagination: defaults.pagination() };
         }
     },
 
     async getManifiesto(id: string): Promise<Manifiesto | null> {
         try {
-            const response = await api.get<ApiResponse<{ manifiesto: Manifiesto }>>(`/manifiestos/${id}`);
+            const response = await manifiestoApi.getById(id);
             return response.data?.data?.manifiesto || null;
         } catch (error) {
             console.error('[ManifiestoService] Error getManifiesto:', error);
@@ -86,19 +104,9 @@ export const manifiestoService = {
         }
     },
 
-    async createManifiesto(data: {
-        transportistaId: string;
-        operadorId: string;
-        observaciones?: string;
-        residuos: Array<{
-            tipoResiduoId: string;
-            cantidad: number;
-            unidad: string;
-            descripcion?: string;
-        }>;
-    }): Promise<Manifiesto | null> {
+    async createManifiesto(data: CreateManifiestoData): Promise<Manifiesto | null> {
         try {
-            const response = await api.post<ApiResponse<{ manifiesto: Manifiesto }>>('/manifiestos', data);
+            const response = await manifiestoApi.create(data);
             return response.data?.data?.manifiesto || null;
         } catch (error) {
             console.error('[ManifiestoService] Error createManifiesto:', error);
@@ -106,9 +114,10 @@ export const manifiestoService = {
         }
     },
 
+    // Workflow Operations
     async firmarManifiesto(id: string): Promise<Manifiesto | null> {
         try {
-            const response = await api.post<ApiResponse<{ manifiesto: Manifiesto }>>(`/manifiestos/${id}/firmar`);
+            const response = await manifiestoApi.firmar(id);
             return response.data?.data?.manifiesto || null;
         } catch (error) {
             console.error('[ManifiestoService] Error firmarManifiesto:', error);
@@ -116,14 +125,9 @@ export const manifiestoService = {
         }
     },
 
-    async confirmarRetiro(id: string, data: {
-        latitud?: number;
-        longitud?: number;
-        observaciones?: string;
-        firmaRetiro?: string; // base64
-    }): Promise<Manifiesto | null> {
+    async confirmarRetiro(id: string, data: ConfirmarRetiroData): Promise<Manifiesto | null> {
         try {
-            const response = await api.post<ApiResponse<{ manifiesto: Manifiesto }>>(`/manifiestos/${id}/confirmar-retiro`, data);
+            const response = await manifiestoApi.confirmarRetiro(id, data);
             return response.data?.data?.manifiesto || null;
         } catch (error) {
             console.error('[ManifiestoService] Error confirmarRetiro:', error);
@@ -131,28 +135,18 @@ export const manifiestoService = {
         }
     },
 
-    async actualizarUbicacion(id: string, data: {
-        latitud: number;
-        longitud: number;
-        velocidad?: number;
-        direccion?: number;
-    }): Promise<void> {
+    async actualizarUbicacion(id: string, data: ActualizarUbicacionData): Promise<void> {
         try {
-            await api.post(`/manifiestos/${id}/ubicacion`, data);
+            await manifiestoApi.actualizarUbicacion(id, data);
         } catch (error) {
             console.error('[ManifiestoService] Error actualizarUbicacion:', error);
             // No throw - non-critical operation
         }
     },
 
-    async confirmarEntrega(id: string, data: {
-        latitud?: number;
-        longitud?: number;
-        observaciones?: string;
-        firmaEntrega?: string; // base64
-    }): Promise<Manifiesto | null> {
+    async confirmarEntrega(id: string, data: ConfirmarEntregaData): Promise<Manifiesto | null> {
         try {
-            const response = await api.post<ApiResponse<{ manifiesto: Manifiesto }>>(`/manifiestos/${id}/confirmar-entrega`, data);
+            const response = await manifiestoApi.confirmarEntrega(id, data);
             return response.data?.data?.manifiesto || null;
         } catch (error) {
             console.error('[ManifiestoService] Error confirmarEntrega:', error);
@@ -160,14 +154,9 @@ export const manifiestoService = {
         }
     },
 
-    async confirmarRecepcion(id: string, data: {
-        observaciones?: string;
-        pesoReal?: number;
-        pesoRecibido?: number; // alias
-        firmaRecepcion?: string; // base64
-    }): Promise<Manifiesto | null> {
+    async confirmarRecepcion(id: string, data: ConfirmarRecepcionData): Promise<Manifiesto | null> {
         try {
-            const response = await api.post<ApiResponse<{ manifiesto: Manifiesto }>>(`/manifiestos/${id}/confirmar-recepcion`, data);
+            const response = await manifiestoApi.confirmarRecepcion(id, data);
             return response.data?.data?.manifiesto || null;
         } catch (error) {
             console.error('[ManifiestoService] Error confirmarRecepcion:', error);
@@ -175,14 +164,9 @@ export const manifiestoService = {
         }
     },
 
-    // Nuevos endpoints para casos de uso completos
-    async rechazarCarga(id: string, data: {
-        motivo: string;
-        descripcion?: string;
-        cantidadRechazada?: number;
-    }): Promise<Manifiesto | null> {
+    async rechazarCarga(id: string, data: RechazarCargaData): Promise<Manifiesto | null> {
         try {
-            const response = await api.post<ApiResponse<{ manifiesto: Manifiesto }>>(`/manifiestos/${id}/rechazar`, data);
+            const response = await manifiestoApi.rechazarCarga(id, data);
             return response.data?.data?.manifiesto || null;
         } catch (error) {
             console.error('[ManifiestoService] Error rechazarCarga:', error);
@@ -190,27 +174,18 @@ export const manifiestoService = {
         }
     },
 
-    async registrarIncidente(id: string, data: {
-        tipoIncidente: string;
-        descripcion: string;
-        latitud?: number;
-        longitud?: number;
-    }): Promise<void> {
+    async registrarIncidente(id: string, data: RegistrarIncidenteData): Promise<void> {
         try {
-            await api.post(`/manifiestos/${id}/incidente`, data);
+            await manifiestoApi.registrarIncidente(id, data);
         } catch (error) {
             console.error('[ManifiestoService] Error registrarIncidente:', error);
             throw error;
         }
     },
 
-    async registrarTratamiento(id: string, data: {
-        metodoTratamiento: string;
-        fechaTratamiento?: string;
-        observaciones?: string;
-    }): Promise<Manifiesto | null> {
+    async registrarTratamiento(id: string, data: RegistrarTratamientoData): Promise<Manifiesto | null> {
         try {
-            const response = await api.post<ApiResponse<{ manifiesto: Manifiesto }>>(`/manifiestos/${id}/tratamiento`, data);
+            const response = await manifiestoApi.registrarTratamiento(id, data);
             return response.data?.data?.manifiesto || null;
         } catch (error) {
             console.error('[ManifiestoService] Error registrarTratamiento:', error);
@@ -218,48 +193,30 @@ export const manifiestoService = {
         }
     },
 
-    async registrarPesaje(id: string, data: {
-        residuosPesados: Array<{ id: string; pesoReal: number }>;
-        observaciones?: string;
-    }): Promise<{
-        pesoDeclarado: number;
-        pesoReal: number;
-        diferencia: number;
-        porcentajeDif: number;
-    }> {
+    async registrarPesaje(id: string, data: RegistrarPesajeData): Promise<PesajeResult> {
         try {
-            const response = await api.post<ApiResponse<{
-                pesoDeclarado: number;
-                pesoReal: number;
-                diferencia: number;
-                porcentajeDif: number;
-            }>>(`/manifiestos/${id}/pesaje`, data);
-            return response.data?.data || { pesoDeclarado: 0, pesoReal: 0, diferencia: 0, porcentajeDif: 0 };
+            const response = await manifiestoApi.registrarPesaje(id, data);
+            return transformPesajeResponse(response.data?.data);
         } catch (error) {
             console.error('[ManifiestoService] Error registrarPesaje:', error);
             throw error;
         }
     },
 
-    // ===== NUEVOS ENDPOINTS v3.1 =====
-
-    // CU-O09: Cerrar manifiesto (estado final)
-    async cerrarManifiesto(id: string, data?: {
-        observaciones?: string;
-    }): Promise<{ manifiesto: Manifiesto | null; certificado: string }> {
+    // v3.1 Operations
+    async cerrarManifiesto(id: string, data?: CerrarManifiestoData): Promise<{ manifiesto: Manifiesto | null; certificado: string }> {
         try {
-            const response = await api.post<ApiResponse<{ manifiesto: Manifiesto; certificado: string }>>(`/manifiestos/${id}/cerrar`, data);
-            return response.data?.data || { manifiesto: null, certificado: '' };
+            const response = await manifiestoApi.cerrar(id, data);
+            return transformCerrarResponse(response.data?.data);
         } catch (error) {
             console.error('[ManifiestoService] Error cerrarManifiesto:', error);
             throw error;
         }
     },
 
-    // CU-G10: Obtener datos para generar PDF con QR
     async getPDFData(id: string): Promise<any> {
         try {
-            const response = await api.get<ApiResponse<any>>(`/manifiestos/${id}/pdf`);
+            const response = await pdfApi.getPDFData(id);
             return response.data?.data || null;
         } catch (error) {
             console.error('[ManifiestoService] Error getPDFData:', error);
@@ -267,10 +224,9 @@ export const manifiestoService = {
         }
     },
 
-    // CU-O10: Obtener certificado de disposición final
     async getCertificado(id: string): Promise<any> {
         try {
-            const response = await api.get<ApiResponse<any>>(`/manifiestos/${id}/certificado`);
+            const response = await pdfApi.getCertificado(id);
             return response.data?.data || null;
         } catch (error) {
             console.error('[ManifiestoService] Error getCertificado:', error);
@@ -278,25 +234,20 @@ export const manifiestoService = {
         }
     },
 
-    // CU-G07: Firmar con método alternativo (Token/PIN/SMS)
-    async firmarConToken(id: string, data: {
-        metodoFirma: 'USUARIO_PASSWORD' | 'TOKEN_PIN' | 'CODIGO_SMS' | 'CERTIFICADO_DIGITAL';
-        tokenPin?: string;
-        codigoSMS?: string;
-    }): Promise<{ manifiesto: Manifiesto | null; firma: any }> {
+    // Firma Operations
+    async firmarConToken(id: string, data: FirmarConTokenData): Promise<{ manifiesto: Manifiesto | null; firma: any }> {
         try {
-            const response = await api.post<ApiResponse<any>>(`/manifiestos/${id}/firmar-con-token`, data);
-            return response.data?.data || { manifiesto: null, firma: null };
+            const response = await manifiestoApi.firmarConToken(id, data);
+            return transformFirmarConTokenResponse(response.data?.data);
         } catch (error) {
             console.error('[ManifiestoService] Error firmarConToken:', error);
             throw error;
         }
     },
 
-    // Obtener métodos de firma disponibles
     async getMetodosFirma(): Promise<{ metodos: any[] }> {
         try {
-            const response = await api.get<ApiResponse<any>>('/firma/metodos-disponibles');
+            const response = await firmaApi.getMetodosDisponibles();
             return response.data?.data || { metodos: [] };
         } catch (error) {
             console.error('[ManifiestoService] Error getMetodosFirma:', error);
@@ -304,10 +255,9 @@ export const manifiestoService = {
         }
     },
 
-    // Solicitar código SMS para firma
     async solicitarCodigoSMS(telefono: string): Promise<{ success: boolean; message: string; hint?: string; expiraEn?: number }> {
         try {
-            const response = await api.post<{ success: boolean; message: string; hint?: string; expiraEn?: number }>('/auth/enviar-codigo-sms', { telefono });
+            const response = await firmaApi.solicitarCodigoSMS(telefono);
             return response.data || { success: false, message: 'Error al enviar código' };
         } catch (error) {
             console.error('[ManifiestoService] Error solicitarCodigoSMS:', error);
@@ -316,27 +266,14 @@ export const manifiestoService = {
     },
 };
 
-// Importar datos demo para fallback
-import {
-    tiposResiduosDemo,
-    transportistasDemo,
-    operadoresDemo,
-    generadoresDemo
-} from '../data/catalogos-demo';
-
+// ===== Catalogo Service =====
 export const catalogoService = {
     async getTiposResiduos(): Promise<TipoResiduo[]> {
         try {
-            const response = await api.get<ApiResponse<{ tiposResiduos: TipoResiduo[] }>>('/catalogos/tipos-residuos');
+            const response = await catalogoApi.getTiposResiduos();
             const data = response.data?.data?.tiposResiduos;
-            if (data && Array.isArray(data) && data.length > 0) {
-                return data;
-            }
-            // Si la respuesta está vacía o es inválida, usar datos demo
-            console.log('[CatalogoService] Respuesta vacía, usando datos demo para tipos de residuos');
-            return tiposResiduosDemo;
+            return validateArrayData(data, tiposResiduosDemo);
         } catch (error) {
-            // Fallback a datos demo
             console.log('[CatalogoService] Error en API, usando datos demo para tipos de residuos:', error);
             return tiposResiduosDemo;
         }
@@ -344,13 +281,9 @@ export const catalogoService = {
 
     async getGeneradores(): Promise<Generador[]> {
         try {
-            const response = await api.get<ApiResponse<{ generadores: Generador[] }>>('/catalogos/generadores');
+            const response = await catalogoApi.getGeneradores();
             const data = response.data?.data?.generadores;
-            if (data && Array.isArray(data) && data.length > 0) {
-                return data;
-            }
-            console.log('[CatalogoService] Respuesta vacía, usando datos demo para generadores');
-            return generadoresDemo;
+            return validateArrayData(data, generadoresDemo);
         } catch (error) {
             console.log('[CatalogoService] Error en API, usando datos demo para generadores:', error);
             return generadoresDemo;
@@ -359,13 +292,9 @@ export const catalogoService = {
 
     async getTransportistas(): Promise<Transportista[]> {
         try {
-            const response = await api.get<ApiResponse<{ transportistas: Transportista[] }>>('/catalogos/transportistas');
+            const response = await catalogoApi.getTransportistas();
             const data = response.data?.data?.transportistas;
-            if (data && Array.isArray(data) && data.length > 0) {
-                return data;
-            }
-            console.log('[CatalogoService] Respuesta vacía, usando datos demo para transportistas');
-            return transportistasDemo;
+            return validateArrayData(data, transportistasDemo);
         } catch (error) {
             console.log('[CatalogoService] Error en API, usando datos demo para transportistas:', error);
             return transportistasDemo;
@@ -374,14 +303,9 @@ export const catalogoService = {
 
     async getOperadores(tipoResiduoId?: string): Promise<Operador[]> {
         try {
-            const params = tipoResiduoId ? { tipoResiduoId } : {};
-            const response = await api.get<ApiResponse<{ operadores: Operador[] }>>('/catalogos/operadores', { params });
+            const response = await catalogoApi.getOperadores(tipoResiduoId);
             const data = response.data?.data?.operadores;
-            if (data && Array.isArray(data) && data.length > 0) {
-                return data;
-            }
-            console.log('[CatalogoService] Respuesta vacía, usando datos demo para operadores');
-            return operadoresDemo;
+            return validateArrayData(data, operadoresDemo);
         } catch (error) {
             console.log('[CatalogoService] Error en API, usando datos demo para operadores:', error);
             return operadoresDemo;

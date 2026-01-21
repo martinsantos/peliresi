@@ -56,6 +56,14 @@ export const useConnectivity = () => {
     const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+    // REFACTOR v9.2: Refs estables para evitar recreación de efectos
+    const syncAllPendingRef = useRef<(() => Promise<SyncResult>) | undefined>(undefined);
+    const checkRealConnectivityRef = useRef<(() => Promise<boolean>) | undefined>(undefined);
+    const wasOfflineRef = useRef(false);
+
+    // FIX MEMORY LEAK: Flag para evitar registrar listeners duplicados
+    const listenersRegisteredRef = useRef(false);
+
     /**
      * FASE 4: Heartbeat check para verificar conectividad real
      * navigator.onLine solo detecta si hay interfaz de red, no si hay internet
@@ -88,14 +96,27 @@ export const useConnectivity = () => {
             return isReallyOnline;
         } catch (err) {
             // Si el fetch falla, aún podríamos tener conexión pero el backend está caído
-            // Intentamos con un ping alternativo
+            // Intentamos con un ping alternativo usando Image con cleanup adecuado
             try {
                 const testImg = new Image();
+                let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+                const cleanup = () => {
+                    testImg.onload = null;
+                    testImg.onerror = null;
+                    testImg.src = ''; // Cancela la request pendiente
+                    if (timeoutId) {
+                        clearTimeout(timeoutId);
+                        timeoutId = null;
+                    }
+                };
+
                 const imgPromise = new Promise<boolean>((resolve) => {
-                    testImg.onload = () => resolve(true);
-                    testImg.onerror = () => resolve(false);
-                    setTimeout(() => resolve(false), HEARTBEAT_TIMEOUT_MS);
+                    testImg.onload = () => { cleanup(); resolve(true); };
+                    testImg.onerror = () => { cleanup(); resolve(false); };
+                    timeoutId = setTimeout(() => { cleanup(); resolve(false); }, HEARTBEAT_TIMEOUT_MS);
                 });
+
                 testImg.src = `https://www.google.com/favicon.ico?t=${Date.now()}`;
                 const result = await imgPromise;
 
@@ -288,8 +309,19 @@ export const useConnectivity = () => {
         return syncAllPending();
     }, [syncAllPending]);
 
-    // Handle online/offline events
+    // REFACTOR v9.2: Actualizar refs cuando cambian los callbacks
+    syncAllPendingRef.current = syncAllPending;
+    checkRealConnectivityRef.current = checkRealConnectivity;
+    wasOfflineRef.current = state.wasOffline;
+
+    // Handle online/offline events - REFACTOR v9.2: Dependencias estables via refs
+    // FIX MEMORY LEAK: Evitar registrar listeners duplicados
     useEffect(() => {
+        if (listenersRegisteredRef.current) {
+            return; // Listeners ya registrados, evitar duplicación
+        }
+        listenersRegisteredRef.current = true;
+
         const handleOnline = async () => {
             console.log('[Connectivity] navigator.onLine: true - verificando conexión real...');
             setState(prev => ({
@@ -299,14 +331,14 @@ export const useConnectivity = () => {
             }));
 
             // Verificar conexión real antes de sincronizar
-            const isReallyOnline = await checkRealConnectivity();
+            const isReallyOnline = await checkRealConnectivityRef.current?.();
 
             if (isReallyOnline) {
                 console.log('[Connectivity] Conexión verificada - iniciando sync');
                 setState(prev => ({ ...prev, lastOnlineAt: new Date() }));
                 // Delay para asegurar estabilidad de red
                 setTimeout(() => {
-                    syncAllPending();
+                    syncAllPendingRef.current?.();
                 }, 1500);
             } else {
                 console.log('[Connectivity] navigator.onLine true pero sin conexión real');
@@ -331,16 +363,16 @@ export const useConnectivity = () => {
         window.addEventListener('online', handleOnline);
         window.addEventListener('offline', handleOffline);
 
-        // Heartbeat interval para detectar cambios de conexión
+        // Heartbeat interval para detectar cambios de conexión - REFACTOR v9.2: Usa refs
         heartbeatIntervalRef.current = setInterval(() => {
             if (navigator.onLine) {
-                checkRealConnectivity().then(isOnline => {
+                checkRealConnectivityRef.current?.().then(isOnline => {
                     // Si recuperamos conexión real y teníamos datos pendientes, sincronizar
-                    if (isOnline && state.wasOffline) {
+                    if (isOnline && wasOfflineRef.current) {
                         offlineStorage.hasPendingData().then(hasPending => {
                             if (hasPending && !syncInProgressRef.current) {
                                 console.log('[Heartbeat] Conexión recuperada con datos pendientes - syncing');
-                                syncAllPending();
+                                syncAllPendingRef.current?.();
                             }
                         });
                     }
@@ -352,13 +384,13 @@ export const useConnectivity = () => {
         if (navigator.onLine) {
             setState(prev => ({ ...prev, isOnline: true }));
             // Verificar conexión real al iniciar
-            checkRealConnectivity().then(isReallyOnline => {
+            checkRealConnectivityRef.current?.().then(isReallyOnline => {
                 if (isReallyOnline) {
                     setState(prev => ({ ...prev, lastOnlineAt: new Date() }));
                     offlineStorage.hasPendingData().then(hasPending => {
                         if (hasPending) {
                             console.log('[Connectivity] Found pending data on load - syncing');
-                            syncAllPending();
+                            syncAllPendingRef.current?.();
                         }
                     });
                 }
@@ -374,8 +406,10 @@ export const useConnectivity = () => {
             if (heartbeatIntervalRef.current) {
                 clearInterval(heartbeatIntervalRef.current);
             }
+            // FIX MEMORY LEAK: Reset flag en cleanup para permitir re-registro si se remonta
+            listenersRegisteredRef.current = false;
         };
-    }, [syncAllPending, checkRealConnectivity, state.wasOffline]);
+    }, []); // REFACTOR v9.2: Array vacío - callbacks via refs
 
     return {
         ...state,

@@ -3,6 +3,7 @@
  * Permite seleccionar rol y actor específico sin re-login
  */
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Shield,
   Factory,
@@ -43,6 +44,7 @@ const ProfileSwitcher: React.FC<ProfileSwitcherProps> = ({
   onClose,
   onProfileChanged
 }) => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<DemoProfilesResponse | null>(null);
@@ -103,11 +105,11 @@ const ProfileSwitcher: React.FC<ProfileSwitcherProps> = ({
       onProfileChanged();
 
       // Cerrar después de un momento para mostrar feedback
+      // NO reload - el evento demoProfileChanged ya actualiza AuthContext via React
       setTimeout(() => {
         onClose();
-        // Recargar página para aplicar cambios
-        window.location.reload();
-      }, 500);
+        navigate('/dashboard');
+      }, 300);
     } catch (err: any) {
       console.error('Error aplicando perfil:', err);
       setError(err.response?.data?.error?.message || 'Error al aplicar perfil');
@@ -118,9 +120,10 @@ const ProfileSwitcher: React.FC<ProfileSwitcherProps> = ({
     demoService.clearProfile();
     setActiveProfile(null);
     onProfileChanged();
+    // NO reload - React actualiza automáticamente
     setTimeout(() => {
       onClose();
-      window.location.reload();
+      navigate('/dashboard');
     }, 300);
   };
 
@@ -194,7 +197,7 @@ const ProfileSwitcher: React.FC<ProfileSwitcherProps> = ({
             <div className="roles-list">
               {activeProfile && (
                 <div className="current-profile-banner">
-                  <span>Perfil activo: <strong>{activeProfile.role}</strong></span>
+                  <span>Perfil activo: <strong>{activeProfile.roleName || activeProfile.role}</strong></span>
                   <button onClick={handleClearProfile}>Volver a mi perfil</button>
                 </div>
               )}

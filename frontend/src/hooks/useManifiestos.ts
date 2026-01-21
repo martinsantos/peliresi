@@ -3,7 +3,7 @@
  * Encapsula la logica de carga, cache, filtrado y notificaciones
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { UserRole } from '../types/mobile.types';
 import { manifiestoService } from '../services/manifiesto.service';
 import { authService } from '../services/auth.service';
@@ -30,6 +30,9 @@ export function useManifiestos({ role, isOnline }: UseManifiestosOptions): UseMa
     const [manifiestos, setManifiestos] = useState<BackendManifiesto[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // FIX MEMORY LEAK: AbortController para cancelar requests al cambiar de perfil
+    const abortControllerRef = useRef<AbortController | null>(null);
 
     const getActorIds = useCallback(() => {
         const currentUser = authService.getStoredUser();
@@ -74,6 +77,10 @@ export function useManifiestos({ role, isOnline }: UseManifiestosOptions): UseMa
     const loadManifiestos = useCallback(async () => {
         if (!role) return;
 
+        // FIX MEMORY LEAK: Cancelar request anterior si existe
+        abortControllerRef.current?.abort();
+        abortControllerRef.current = new AbortController();
+
         setLoading(true);
         setError(null);
 
@@ -117,6 +124,12 @@ export function useManifiestos({ role, isOnline }: UseManifiestosOptions): UseMa
                 console.log('[useManifiestos] Cacheados', allManifiestos.length, 'manifiestos');
             }
         } catch (err) {
+            // FIX MEMORY LEAK: Ignorar errores de cancelación
+            if (err instanceof Error && err.name === 'AbortError') {
+                console.log('[useManifiestos] Request cancelado - cambio de perfil');
+                return;
+            }
+
             console.error('[useManifiestos] Error loading manifiestos:', err);
             setError('Error al cargar manifiestos');
 
@@ -138,6 +151,11 @@ export function useManifiestos({ role, isOnline }: UseManifiestosOptions): UseMa
         if (role && isOnline) {
             loadManifiestos();
         }
+
+        // FIX MEMORY LEAK: Cancelar request pendiente al desmontar o cambiar de rol
+        return () => {
+            abortControllerRef.current?.abort();
+        };
     }, [role, isOnline, loadManifiestos]);
 
     return {

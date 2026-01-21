@@ -61,12 +61,19 @@ const NotificationBell: React.FC = () => {
         }
     }, [user, getActorId]);
 
+    // REFACTOR v9.2: Ref estable para evitar recreación de interval
+    const cargarNotificacionesRef = useRef(cargarNotificaciones);
+    cargarNotificacionesRef.current = cargarNotificaciones;
+
     useEffect(() => {
-        cargarNotificaciones();
-        // Polling cada 30 segundos
-        const interval = setInterval(cargarNotificaciones, 30000);
+        // Carga inicial
+        cargarNotificacionesRef.current();
+        // Polling cada 30 segundos - REFACTOR v9.2: Usa ref para callback estable
+        const interval = setInterval(() => {
+            cargarNotificacionesRef.current();
+        }, 30000);
         return () => clearInterval(interval);
-    }, [cargarNotificaciones]);
+    }, []); // REFACTOR v9.2: Array vacío - callback via ref
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {

@@ -156,6 +156,34 @@ export function useTripTracking({ role, manifiestoId, onToast }: UseTripTracking
         onToast?.(msg);
     }, [onToast]);
 
+    // ============ FIX MEMORY LEAK: Cleanup global al cambiar de rol ============
+    // Si el rol cambia de TRANSPORTISTA a otro, limpiar TODOS los recursos
+    useEffect(() => {
+        if (role !== 'TRANSPORTISTA') {
+            // Limpiar timer interval
+            if (timerIntervalRef.current) {
+                clearInterval(timerIntervalRef.current);
+                timerIntervalRef.current = null;
+            }
+            // Limpiar auto-save interval
+            if (autoSaveIntervalRef.current) {
+                clearInterval(autoSaveIntervalRef.current);
+                autoSaveIntervalRef.current = null;
+            }
+            // Limpiar GPS watch
+            if (watchIdRef.current !== null) {
+                navigator.geolocation.clearWatch(watchIdRef.current);
+                watchIdRef.current = null;
+            }
+            // Limpiar GPS retry timeout
+            if (gpsRetryTimeoutRef.current) {
+                clearTimeout(gpsRetryTimeoutRef.current);
+                gpsRetryTimeoutRef.current = null;
+            }
+            console.log('[Trip] Cleanup completo - rol cambió de TRANSPORTISTA');
+        }
+    }, [role]);
+
     // ============ TIMER CALCULADO (no contador) ============
     // tick se incluye en dependencias para forzar recálculo cada segundo
     // FIX: Nunca puede ser negativo
