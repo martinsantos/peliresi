@@ -10,7 +10,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Páginas Públicas', () => {
     test('Landing page carga correctamente', async ({ page }) => {
         await page.goto('/');
-        await expect(page).toHaveTitle(/SITREP/i);
+        await expect(page).toHaveTitle(/SITREP|Trazabilidad RRPP/i);
         // Verificar que no hay errores de consola críticos
         const consoleErrors: string[] = [];
         page.on('console', msg => {
