@@ -805,6 +805,13 @@ export const getReporteFiltrosDisponibles = async (req: AuthRequest, res: Respon
             categoriasRaw.map(c => c.categoria).filter(Boolean)
         )].sort() as string[];
 
+        // Obtener tipos de residuo (Y-codes Basel)
+        const tiposResiduo = await prisma.tipoResiduo.findMany({
+            where: { activo: true },
+            select: { id: true, codigo: true, nombre: true, peligrosidad: true },
+            orderBy: { codigo: 'asc' }
+        });
+
         res.json({
             success: true,
             data: {
@@ -816,7 +823,8 @@ export const getReporteFiltrosDisponibles = async (req: AuthRequest, res: Respon
                 rubros: rubrosNormalizados,
                 rubrosCanonicos: RUBROS_CANONICOS,
                 categorias,
-                clasificaciones: ['MINIMA', 'INDIVIDUAL']
+                clasificaciones: ['MINIMA', 'INDIVIDUAL'],
+                tiposResiduo
             }
         });
     } catch (error) {
