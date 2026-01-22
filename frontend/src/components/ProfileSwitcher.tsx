@@ -2,7 +2,7 @@
  * ProfileSwitcher - Componente para cambio de perfil en modo DEMO
  * Permite seleccionar rol y actor específico sin re-login
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Shield,
@@ -13,7 +13,9 @@ import {
   ChevronLeft,
   Check,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Search,
+  X
 } from 'lucide-react';
 import { demoService, type DemoRole, type DemoActor, type DemoProfilesResponse } from '../services/demo.service';
 import './ProfileSwitcher.css';
@@ -51,6 +53,15 @@ const ProfileSwitcher: React.FC<ProfileSwitcherProps> = ({
   const [selectedRole, setSelectedRole] = useState<DemoRole | null>(null);
   const [activeProfile, setActiveProfile] = useState(demoService.getActiveProfile());
 
+  // Search state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchedActors, setSearchedActors] = useState<DemoActor[] | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchTotal, setSearchTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Cargar perfiles al abrir
   useEffect(() => {
     if (isOpen) {
@@ -75,6 +86,74 @@ const ProfileSwitcher: React.FC<ProfileSwitcherProps> = ({
       setLoading(false);
     }
   };
+
+  // Debounced search function
+  const performSearch = useCallback(async (term: string, role: string) => {
+    if (!term.trim()) {
+      setSearchedActors(null);
+      setSearchTotal(0);
+      setHasMore(false);
+      return;
+    }
+
+    setSearchLoading(true);
+    try {
+      const result = await demoService.searchActors(role, term, 50);
+      setSearchedActors(result.actors);
+      setSearchTotal(result.total);
+      setHasMore(result.hasMore);
+    } catch (err) {
+      console.error('Error buscando actores:', err);
+      setSearchedActors([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, []);
+
+  // Handle search input change with debounce
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+
+    // Clear previous timeout
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    // Debounce search
+    debounceRef.current = setTimeout(() => {
+      if (selectedRole) {
+        performSearch(value, selectedRole.role);
+      }
+    }, 300);
+  };
+
+  // Clear search
+  const handleClearSearch = () => {
+    setSearchTerm('');
+    setSearchedActors(null);
+    setSearchTotal(0);
+    setHasMore(false);
+    searchInputRef.current?.focus();
+  };
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, []);
+
+  // Focus search input when selecting a role with actors
+  useEffect(() => {
+    if (selectedRole && selectedRole.actors.length > 0) {
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 100);
+    }
+  }, [selectedRole]);
 
   const handleSelectRole = (role: DemoRole) => {
     if (role.actors.length === 0) {
@@ -129,6 +208,11 @@ const ProfileSwitcher: React.FC<ProfileSwitcherProps> = ({
 
   const handleBack = () => {
     setSelectedRole(null);
+    // Reset search state
+    setSearchTerm('');
+    setSearchedActors(null);
+    setSearchTotal(0);
+    setHasMore(false);
   };
 
   if (!isOpen) return null;
@@ -171,26 +255,69 @@ const ProfileSwitcher: React.FC<ProfileSwitcherProps> = ({
               <button onClick={loadProfiles}>Reintentar</button>
             </div>
           ) : selectedRole ? (
-            // Lista de actores
+            // Lista de actores con búsqueda
             <div className="actors-list">
               <p className="actors-hint">{selectedRole.description}</p>
-              {selectedRole.actors.map(actor => {
-                const isActive = activeProfile?.role === selectedRole.role &&
-                                 activeProfile?.actorId === actor.id;
-                return (
-                  <button
-                    key={actor.id}
-                    className={`actor-item ${isActive ? 'active' : ''}`}
-                    onClick={() => handleSelectActor(actor)}
-                  >
-                    <div className="actor-info">
-                      <span className="actor-name">{actor.name}</span>
-                      <span className="actor-detail">{actor.cuit} - {actor.detail}</span>
-                    </div>
-                    {isActive && <Check size={18} className="check-icon" />}
-                  </button>
-                );
-              })}
+
+              {/* Search Input */}
+              <div className="actors-search">
+                <div className="actors-search-input-wrapper">
+                  <Search size={16} className="actors-search-icon" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Buscar por nombre o CUIT..."
+                    value={searchTerm}
+                    onChange={handleSearchChange}
+                    className="actors-search-input"
+                  />
+                  {searchTerm && (
+                    <button className="actors-search-clear" onClick={handleClearSearch}>
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+                {searchLoading && (
+                  <RefreshCw size={16} className="actors-search-loading spin" />
+                )}
+              </div>
+
+              {/* Search Results Info */}
+              {searchTerm && !searchLoading && searchedActors !== null && (
+                <div className="actors-search-info">
+                  {searchedActors.length === 0 ? (
+                    <span className="actors-search-no-results">
+                      No se encontraron resultados para "{searchTerm}"
+                    </span>
+                  ) : (
+                    <span className="actors-search-count">
+                      {searchTotal} resultado{searchTotal !== 1 ? 's' : ''}
+                      {hasMore && ' (mostrando primeros 50)'}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Actors List - Scrollable */}
+              <div className="actors-list-scrollable">
+                {(searchedActors ?? selectedRole.actors).map(actor => {
+                  const isActive = activeProfile?.role === selectedRole.role &&
+                                   activeProfile?.actorId === actor.id;
+                  return (
+                    <button
+                      key={actor.id}
+                      className={`actor-item ${isActive ? 'active' : ''}`}
+                      onClick={() => handleSelectActor(actor)}
+                    >
+                      <div className="actor-info">
+                        <span className="actor-name">{actor.name}</span>
+                        <span className="actor-detail">{actor.cuit} - {actor.detail}</span>
+                      </div>
+                      {isActive && <Check size={18} className="check-icon" />}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           ) : (
             // Lista de roles

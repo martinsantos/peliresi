@@ -71,6 +71,20 @@ class DemoService {
   }
 
   /**
+   * Buscar actores por rol con texto de búsqueda
+   */
+  async searchActors(role: string, query: string = '', limit: number = 50): Promise<{
+    actors: DemoActor[];
+    total: number;
+    hasMore: boolean;
+    searchTerm: string | null;
+  }> {
+    const params = new URLSearchParams({ role, q: query, limit: String(limit) });
+    const response = await api.get(`/demo/profiles/search?${params}`);
+    return response.data.data;
+  }
+
+  /**
    * Establecer perfil demo activo
    * Se guarda en localStorage y se envía en cada request
    */

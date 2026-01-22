@@ -148,6 +148,119 @@ export const getAvailableProfiles = async (req: AuthRequest, res: Response, next
 };
 
 /**
+ * Buscar actores por rol con búsqueda de texto
+ * Permite buscar en todos los actores sin límite de 50
+ */
+export const searchActors = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!isDemoEnvironment()) {
+      throw new AppErrorWithCode(ERROR_CODES.FORBIDDEN_DEMO_MODE_PROD);
+    }
+
+    const { role, q = '', limit = '50' } = req.query;
+    const searchTerm = (q as string).trim();
+    const take = Math.min(parseInt(limit as string) || 50, 100); // Max 100 por request
+
+    if (!role || !['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(role as string)) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'Rol requerido: GENERADOR, TRANSPORTISTA u OPERADOR' }
+      });
+    }
+
+    let actors: any[] = [];
+
+    const whereClause = {
+      activo: true,
+      ...(searchTerm ? {
+        OR: [
+          { razonSocial: { contains: searchTerm, mode: 'insensitive' as const } },
+          { cuit: { contains: searchTerm } }
+        ]
+      } : {})
+    };
+
+    if (role === 'GENERADOR') {
+      const results = await prisma.generador.findMany({
+        where: whereClause,
+        select: {
+          id: true,
+          razonSocial: true,
+          cuit: true,
+          categoria: true
+        },
+        orderBy: { razonSocial: 'asc' },
+        take
+      });
+      actors = results.map(g => ({
+        id: g.id,
+        name: g.razonSocial,
+        cuit: g.cuit,
+        detail: g.categoria || 'Sin categoría'
+      }));
+    } else if (role === 'TRANSPORTISTA') {
+      const results = await prisma.transportista.findMany({
+        where: whereClause,
+        select: {
+          id: true,
+          razonSocial: true,
+          cuit: true,
+          numeroHabilitacion: true
+        },
+        orderBy: { razonSocial: 'asc' },
+        take
+      });
+      actors = results.map(t => ({
+        id: t.id,
+        name: t.razonSocial,
+        cuit: t.cuit,
+        detail: t.numeroHabilitacion || 'Sin habilitación'
+      }));
+    } else if (role === 'OPERADOR') {
+      const results = await prisma.operador.findMany({
+        where: whereClause,
+        select: {
+          id: true,
+          razonSocial: true,
+          cuit: true,
+          categoria: true
+        },
+        orderBy: { razonSocial: 'asc' },
+        take
+      });
+      actors = results.map(o => ({
+        id: o.id,
+        name: o.razonSocial,
+        cuit: o.cuit,
+        detail: o.categoria || 'Sin categoría'
+      }));
+    }
+
+    // Obtener total para mostrar si hay más resultados
+    let total = 0;
+    if (role === 'GENERADOR') {
+      total = await prisma.generador.count({ where: whereClause });
+    } else if (role === 'TRANSPORTISTA') {
+      total = await prisma.transportista.count({ where: whereClause });
+    } else if (role === 'OPERADOR') {
+      total = await prisma.operador.count({ where: whereClause });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        actors,
+        total,
+        hasMore: total > take,
+        searchTerm: searchTerm || null
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Validar un perfil demo antes de usarlo
  */
 export const validateDemoProfile = async (req: AuthRequest, res: Response, next: NextFunction) => {

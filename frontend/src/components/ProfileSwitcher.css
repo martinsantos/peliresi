@@ -239,7 +239,116 @@
 .actors-list {
   display: flex;
   flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Actors Search */
+.actors-search {
+  display: flex;
+  align-items: center;
   gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.actors-search-input-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 0 0.75rem;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.actors-search-input-wrapper:focus-within {
+  border-color: rgba(59, 130, 246, 0.5);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.actors-search-icon {
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.actors-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #fff;
+  padding: 0.625rem 0.5rem;
+  font-size: 0.875rem;
+  outline: none;
+}
+
+.actors-search-input::placeholder {
+  color: #64748b;
+}
+
+.actors-search-clear {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 4px;
+  padding: 0.25rem;
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s;
+}
+
+.actors-search-clear:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.actors-search-loading {
+  color: #3b82f6;
+  flex-shrink: 0;
+}
+
+/* Search Results Info */
+.actors-search-info {
+  font-size: 0.75rem;
+  padding: 0.25rem 0;
+}
+
+.actors-search-count {
+  color: #94a3b8;
+}
+
+.actors-search-no-results {
+  color: #f59e0b;
+}
+
+/* Scrollable Actors List */
+.actors-list-scrollable {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+/* Custom Scrollbar */
+.actors-list-scrollable::-webkit-scrollbar {
+  width: 6px;
+}
+
+.actors-list-scrollable::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+.actors-list-scrollable::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+.actors-list-scrollable::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
 }
 
 .actor-item {
