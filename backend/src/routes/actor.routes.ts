@@ -2,6 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { isAuthenticated, hasRole } from '../middlewares/auth.middleware';
 import {
+    getMiPerfil,
     getGeneradores,
     createGenerador,
     updateGenerador,
@@ -26,6 +27,9 @@ const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
 
 router.use(isAuthenticated);
+
+// ===== MI PERFIL (Actor del usuario logueado) =====
+router.get('/mi-perfil', getMiPerfil);
 
 // ===== GENERADORES =====
 router.get('/generadores', getGeneradores);

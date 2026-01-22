@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { manifiestoService } from '../services/manifiesto.service';
 import type { Manifiesto } from '../types';
@@ -32,6 +32,7 @@ const ESTADO_OPTIONS = [
 
 const Manifiestos: React.FC = () => {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const [manifiestos, setManifiestos] = useState<Manifiesto[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -179,7 +180,12 @@ const Manifiestos: React.FC = () => {
                         {sortedData.map((manifiesto) => {
                             const badge = getEstadoBadge(manifiesto.estado);
                             return (
-                                <div key={manifiesto.id} className="manifest-card">
+                                <div
+                                    key={manifiesto.id}
+                                    className="manifest-card"
+                                    onClick={() => navigate(`/manifiestos/${manifiesto.id}`)}
+                                    style={{ cursor: 'pointer' }}
+                                >
                                     <div className="manifest-card-header">
                                         <div className="manifest-card-id">
                                             <span className="manifest-number">{manifiesto.numero}</span>
@@ -190,6 +196,7 @@ const Manifiestos: React.FC = () => {
                                             to={`/manifiestos/${manifiesto.id}`}
                                             className="manifest-card-action"
                                             title="Ver detalle"
+                                            onClick={(e) => e.stopPropagation()}
                                         >
                                             <Eye size={20} />
                                         </Link>
@@ -246,7 +253,11 @@ const Manifiestos: React.FC = () => {
                                 {sortedData.map((manifiesto) => {
                                     const badge = getEstadoBadge(manifiesto.estado);
                                     return (
-                                        <tr key={manifiesto.id}>
+                                        <tr
+                                            key={manifiesto.id}
+                                            onClick={() => navigate(`/manifiestos/${manifiesto.id}`)}
+                                            style={{ cursor: 'pointer' }}
+                                        >
                                             <td>
                                                 <span className="manifest-number">{manifiesto.numero}</span>
                                             </td>
@@ -272,7 +283,7 @@ const Manifiestos: React.FC = () => {
                                                 <span className={`badge ${badge.class}`}>{badge.label}</span>
                                             </td>
                                             <td>{formatDate(manifiesto.createdAt)}</td>
-                                            <td>
+                                            <td onClick={(e) => e.stopPropagation()}>
                                                 <Link
                                                     to={`/manifiestos/${manifiesto.id}`}
                                                     className="btn btn-icon btn-ghost"

@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,46 +8,41 @@ datasource db {
 }
 
 model Usuario {
-  id              String      @id @default(cuid())
-  email           String      @unique
-  password        String
-  rol             Rol
-  cuit            String?     @unique
-  nombre          String
-  apellido        String?
-  empresa         String?
-  telefono        String?
-  activo          Boolean     @default(true)
-  dosFaSecret     String?
-  dosFaVerificado Boolean     @default(false)
-  
-  // Campos de aprobación de usuarios
-  aprobado        Boolean     @default(true)  // true para usuarios existentes
-  fechaSolicitud  DateTime?
-  motivoSolicitud String?
-  aprobadoPorId   String?
-  fechaAprobacion DateTime?
-  motivoRechazo   String?
-  
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-
-  // Relaciones
-  generador       Generador?
-  transportista   Transportista?
-  operador        Operador?
-  refreshTokens   RefreshToken[]
-  manifiestosCreados Manifiesto[]    @relation("UsuarioManifiestos")
-  eventos         EventoManifiesto[]
-  auditorias      Auditoria[]         @relation("UsuarioAuditorias")
-  notificaciones  Notificacion[]
-  reglasCreadas   ReglaAlerta[]       @relation("ReglasCreadas")
-  pushSubscriptions PushSubscription[]
-  logsActividad   LogActividad[]
-  preferencias    PreferenciaUsuario?
+  id                    String              @id @default(cuid())
+  email                 String              @unique
+  password              String
+  rol                   Rol
+  cuit                  String?             @unique
+  nombre                String
+  apellido              String?
+  empresa               String?
+  telefono              String?
+  activo                Boolean             @default(true)
+  dosFaSecret           String?
+  dosFaVerificado       Boolean             @default(false)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  aprobado              Boolean             @default(true)
+  aprobadoPorId         String?
+  fechaAprobacion       DateTime?
+  fechaSolicitud        DateTime?
+  motivoRechazo         String?
+  motivoSolicitud       String?
+  alertasResueltas      AlertaSeguridad[]   @relation("AlertasResueltas")
+  alertasSeguridad      AlertaSeguridad[]   @relation("AlertasUsuario")
+  auditorias            Auditoria[]         @relation("UsuarioAuditorias")
+  eventos               EventoManifiesto[]
+  generador             Generador?
+  logsActividad         LogActividad[]
+  manifiestosCreados    Manifiesto[]        @relation("UsuarioManifiestos")
+  notificaciones        Notificacion[]
+  operador              Operador?
+  preferencias          PreferenciaUsuario?
+  pushSubscriptions     PushSubscription[]
+  refreshTokens         RefreshToken[]
+  reglasCreadas         ReglaAlerta[]       @relation("ReglasCreadas")
   reversionesRealizadas ReversionEstado[]
-  alertasSeguridad AlertaSeguridad[] @relation("AlertasUsuario")
-  alertasResueltas AlertaSeguridad[] @relation("AlertasResueltas")
+  transportista         Transportista?
 
   @@index([rol])
   @@index([activo])
@@ -59,96 +51,136 @@ model Usuario {
 }
 
 model Generador {
-  id                String      @id @default(cuid())
-  usuarioId         String      @unique
+  id                String       @id @default(cuid())
+  usuarioId         String       @unique
   razonSocial       String
-  cuit              String      @unique
+  cuit              String       @unique
   domicilio         String
-  latitud           Float?      // Coordenada GPS para mapa
-  longitud          Float?      // Coordenada GPS para mapa
   telefono          String
   email             String
   numeroInscripcion String
   categoria         String
-  activo            Boolean     @default(true)
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  activo            Boolean      @default(true)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  latitud           Float?
+  longitud          Float?
 
-  // Relaciones
-  usuario     Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  manifiestos Manifiesto[]
+  // Nuevos campos de inscripción
+  certificado              String?    // Número de certificado (G - 000001)
+  expedienteInscripcion    String?    // Expediente electrónico (EX-2018-...)
+  resolucionInscripcion    String?    // Número de resolución (262/2008)
 
+  // Datos de actividad
+  actividad                String?    // Descripción de actividad económica
+  rubro                    String?    // Sector industrial
+
+  // Domicilio Legal (separado)
+  domicilioLegalCalle      String?
+  domicilioLegalLocalidad  String?
+  domicilioLegalDepartamento String?
+
+  // Domicilio Real (separado)
+  domicilioRealCalle       String?
+  domicilioRealLocalidad   String?
+  domicilioRealDepartamento String?
+
+  // Certificaciones y clasificación
+  certificacionIso         String?    // Número de certificación ISO
+  clasificacion            String?    // MINIMA, INDIVIDUAL, etc.
+
+  // Datos de cumplimiento
+  informeTecnico           String?
+  tef                      String?    // Registro TEF
+  libroOperatoria          Boolean?   // SI/NO
+
+  // Referencias a DDJJ por año
+  ddjj2021                 String?
+  ddjj2022                 String?
+  ddjj2023                 String?
+  ddjj2024                 String?
+  ddjjAbril2024            String?
+  ddjj2025                 String?
+  ddjj2026                 String?
+
+  // Métricas de residuos
+  residuosR                String?    // R
+  residuosMxR              String?    // M x R
+
+  // Control de calidad de datos
+  cuitValido               Boolean    @default(true)  // false si CUIT fue reemplazado por @@@@@@
+
+  usuario           Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  manifiestos       Manifiesto[]
+
+  @@index([certificado])
+  @@index([rubro])
+  @@index([clasificacion])
   @@map("generadores")
 }
 
 model Transportista {
-  id                  String    @id @default(cuid())
-  usuarioId           String    @unique
-  razonSocial         String
-  cuit                String    @unique
-  domicilio           String
-  telefono            String
-  email               String
-  numeroHabilitacion  String
-  activo              Boolean   @default(true)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-
-  // Relaciones
-  usuario       Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  vehiculos     Vehiculo[]
-  choferes      Chofer[]
-  manifiestos   Manifiesto[]
+  id                 String       @id @default(cuid())
+  usuarioId          String       @unique
+  razonSocial        String
+  cuit               String       @unique
+  domicilio          String
+  telefono           String
+  email              String
+  numeroHabilitacion String
+  activo             Boolean      @default(true)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  choferes           Chofer[]
+  manifiestos        Manifiesto[]
+  usuario            Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  vehiculos          Vehiculo[]
 
   @@map("transportistas")
 }
 
 model Operador {
-  id                  String    @id @default(cuid())
-  usuarioId           String    @unique
-  razonSocial         String
-  cuit                String    @unique
-  domicilio           String
-  latitud             Float?    // Coordenada GPS para mapa
-  longitud            Float?    // Coordenada GPS para mapa
-  telefono            String
-  email               String
-  numeroHabilitacion  String
-  categoria           String
-  activo              Boolean   @default(true)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-
-  // Relaciones
-  usuario       Usuario              @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  tratamientos  TratamientoAutorizado[]
-  manifiestos   Manifiesto[]
+  id                 String                  @id @default(cuid())
+  usuarioId          String                  @unique
+  razonSocial        String
+  cuit               String                  @unique
+  domicilio          String
+  telefono           String
+  email              String
+  numeroHabilitacion String
+  categoria          String
+  activo             Boolean                 @default(true)
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  latitud            Float?
+  longitud           Float?
+  manifiestos        Manifiesto[]
+  usuario            Usuario                 @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  tratamientos       TratamientoAutorizado[]
 
   @@map("operadores")
 }
 
 model Vehiculo {
-  id              String      @id @default(cuid())
-  transportistaId String
-  patente         String
-  marca           String
-  modelo          String
-  anio            Int
-  capacidad       Float
+  id                 String        @id @default(cuid())
+  transportistaId    String
+  patente            String
+  marca              String
+  modelo             String
+  anio               Int
+  capacidad          Float
   numeroHabilitacion String
-  vencimiento     DateTime
-  activo          Boolean     @default(true)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-
-  // Relaciones
-  transportista Transportista @relation(fields: [transportistaId], references: [id], onDelete: Cascade)
+  vencimiento        DateTime
+  activo             Boolean       @default(true)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  transportista      Transportista @relation(fields: [transportistaId], references: [id], onDelete: Cascade)
 
   @@map("vehiculos")
 }
 
 model Chofer {
-  id              String      @id @default(cuid())
+  id              String        @id @default(cuid())
   transportistaId String
   nombre          String
   apellido        String
@@ -156,29 +188,25 @@ model Chofer {
   licencia        String
   vencimiento     DateTime
   telefono        String
-  activo          Boolean     @default(true)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-
-  // Relaciones
-  transportista Transportista @relation(fields: [transportistaId], references: [id], onDelete: Cascade)
+  activo          Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  transportista   Transportista @relation(fields: [transportistaId], references: [id], onDelete: Cascade)
 
   @@map("choferes")
 }
 
 model TipoResiduo {
-  id              String      @id @default(cuid())
-  codigo          String      @unique
+  id              String                  @id @default(cuid())
+  codigo          String                  @unique
   nombre          String
   descripcion     String?
   categoria       String
   caracteristicas String?
   peligrosidad    String
-  activo          Boolean     @default(true)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-
-  // Relaciones
+  activo          Boolean                 @default(true)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
   manifiestos     ManifiestoResiduo[]
   tratamientos    TratamientoAutorizado[]
 
@@ -186,39 +214,37 @@ model TipoResiduo {
 }
 
 model Manifiesto {
-  id              String      @id @default(cuid())
-  numero          String      @unique
+  id              String               @id @default(cuid())
+  numero          String               @unique
   generadorId     String
   transportistaId String
   operadorId      String
-  estado          EstadoManifiesto @default(BORRADOR)
+  estado          EstadoManifiesto     @default(BORRADOR)
   observaciones   String?
-  fechaCreacion   DateTime    @default(now())
+  fechaCreacion   DateTime             @default(now())
   fechaFirma      DateTime?
   fechaRetiro     DateTime?
   fechaEntrega    DateTime?
   fechaRecepcion  DateTime?
   fechaCierre     DateTime?
   qrCode          String?
-  firmaDigital    Json?       // Datos de firma PKI simulada
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-
-  // Relaciones
-  generador       Generador           @relation(fields: [generadorId], references: [id])
-  transportista   Transportista       @relation(fields: [transportistaId], references: [id])
-  operador        Operador            @relation(fields: [operadorId], references: [id])
-  creadoPor       Usuario             @relation("UsuarioManifiestos", fields: [creadoPorId], references: [id])
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
   creadoPorId     String
-  residuos        ManifiestoResiduo[]
-  eventos         EventoManifiesto[]
-  tracking        TrackingGPS[]
-  auditorias      Auditoria[]
-  notificaciones  Notificacion[]
+  firmaDigital    Json?
   alertas         AlertaGenerada[]
   anomalias       AnomaliaTransporte[]
-  viajes          Viaje[]
+  auditorias      Auditoria[]
+  eventos         EventoManifiesto[]
+  creadoPor       Usuario              @relation("UsuarioManifiestos", fields: [creadoPorId], references: [id])
+  generador       Generador            @relation(fields: [generadorId], references: [id])
+  operador        Operador             @relation(fields: [operadorId], references: [id])
+  transportista   Transportista        @relation(fields: [transportistaId], references: [id])
+  residuos        ManifiestoResiduo[]
+  notificaciones  Notificacion[]
   reversiones     ReversionEstado[]
+  tracking        TrackingGPS[]
+  viajes          Viaje[]
 
   @@index([estado])
   @@index([estado, createdAt])
@@ -226,55 +252,41 @@ model Manifiesto {
   @@index([transportistaId])
   @@index([operadorId])
   @@index([createdAt])
-  // OPTIMIZADO: Índices compuestos para queries frecuentes por actor + estado + fecha
-  @@index([generadorId, estado, createdAt])
-  @@index([transportistaId, estado, createdAt])
-  @@index([operadorId, estado, createdAt])
   @@map("manifiestos")
 }
 
 model ManifiestoResiduo {
-  id              String      @id @default(cuid())
-  manifiestoId    String
-  tipoResiduoId   String
-  cantidad        Float
-  unidad          String
+  id               String          @id @default(cuid())
+  manifiestoId     String
+  tipoResiduoId    String
+  cantidad         Float
+  unidad           String
+  descripcion      String?
+  estado           String
+  createdAt        DateTime        @default(now())
   cantidadRecibida Float?
-  tipoDiferencia  TipoDiferencia?
-  observaciones   String?
-  descripcion     String?
-  estado          String
-  createdAt       DateTime    @default(now())
-
-  // Relaciones
-  manifiesto    Manifiesto    @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
-  tipoResiduo   TipoResiduo   @relation(fields: [tipoResiduoId], references: [id])
+  observaciones    String?
+  tipoDiferencia   TipoDiferencia?
+  manifiesto       Manifiesto      @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
+  tipoResiduo      TipoResiduo     @relation(fields: [tipoResiduoId], references: [id])
 
   @@index([manifiestoId])
   @@index([tipoResiduoId])
   @@map("manifiestos_residuos")
 }
 
-enum TipoDiferencia {
-  FALTANTE
-  EXCEDENTE
-  NINGUNA
-}
-
 model EventoManifiesto {
-  id              String      @id @default(cuid())
-  manifiestoId    String
-  tipo            String
-  descripcion     String
-  ubicacion       String?
-  latitud         Float?
-  longitud        Float?
-  usuarioId       String
-  createdAt       DateTime    @default(now())
-
-  // Relaciones
-  manifiesto    Manifiesto    @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
-  usuario       Usuario       @relation(fields: [usuarioId], references: [id])
+  id           String     @id @default(cuid())
+  manifiestoId String
+  tipo         String
+  descripcion  String
+  ubicacion    String?
+  latitud      Float?
+  longitud     Float?
+  usuarioId    String
+  createdAt    DateTime   @default(now())
+  manifiesto   Manifiesto @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
+  usuario      Usuario    @relation(fields: [usuarioId], references: [id])
 
   @@index([manifiestoId])
   @@index([tipo])
@@ -283,17 +295,15 @@ model EventoManifiesto {
 }
 
 model TrackingGPS {
-  id              String      @id @default(cuid())
-  manifiestoId    String
-  latitud         Float
-  longitud        Float
-  velocidad       Float?
-  direccion       Float?
-  precision       Float?
-  timestamp       DateTime    @default(now())
-
-  // Relaciones
-  manifiesto    Manifiesto    @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
+  id           String     @id @default(cuid())
+  manifiestoId String
+  latitud      Float
+  longitud     Float
+  velocidad    Float?
+  direccion    Float?
+  precision    Float?
+  timestamp    DateTime   @default(now())
+  manifiesto   Manifiesto @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
 
   @@index([manifiestoId])
   @@index([manifiestoId, timestamp])
@@ -302,19 +312,17 @@ model TrackingGPS {
 }
 
 model TratamientoAutorizado {
-  id              String      @id @default(cuid())
-  operadorId      String
-  tipoResiduoId   String
-  metodo          String
-  descripcion     String?
-  capacidad       Float
-  activo          Boolean     @default(true)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-
-  // Relaciones
-  operador      Operador      @relation(fields: [operadorId], references: [id], onDelete: Cascade)
-  tipoResiduo   TipoResiduo   @relation(fields: [tipoResiduoId], references: [id])
+  id            String      @id @default(cuid())
+  operadorId    String
+  tipoResiduoId String
+  metodo        String
+  descripcion   String?
+  capacidad     Float
+  activo        Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  operador      Operador    @relation(fields: [operadorId], references: [id], onDelete: Cascade)
+  tipoResiduo   TipoResiduo @relation(fields: [tipoResiduoId], references: [id])
 
   @@unique([operadorId, tipoResiduoId, metodo])
   @@map("tratamientos_autorizados")
@@ -328,41 +336,267 @@ model RefreshToken {
   expiresAt DateTime
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  // Relaciones
-  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   @@map("refresh_tokens")
 }
 
 model Auditoria {
-  id              String      @id @default(cuid())
-  accion          String
-  modulo          String
-  datosAntes      String?
-  datosDespues    String?
-  ip              String?
-  userAgent       String?
-  usuarioId       String
-  manifiestoId    String?
-  createdAt       DateTime    @default(now())
-
-  // Relaciones
-  usuario     Usuario     @relation("UsuarioAuditorias", fields: [usuarioId], references: [id])
-  manifiesto  Manifiesto? @relation(fields: [manifiestoId], references: [id])
+  id           String      @id @default(cuid())
+  accion       String
+  modulo       String
+  datosAntes   String?
+  datosDespues String?
+  ip           String?
+  userAgent    String?
+  usuarioId    String
+  manifiestoId String?
+  createdAt    DateTime    @default(now())
+  manifiesto   Manifiesto? @relation(fields: [manifiestoId], references: [id])
+  usuario      Usuario     @relation("UsuarioAuditorias", fields: [usuarioId], references: [id])
 
   @@map("auditorias")
 }
 
-// Enumeraciones
+model Notificacion {
+  id           String                @id @default(cuid())
+  usuarioId    String
+  tipo         TipoNotificacion
+  titulo       String
+  mensaje      String
+  datos        String?
+  manifiestoId String?
+  leida        Boolean               @default(false)
+  fechaLeida   DateTime?
+  prioridad    PrioridadNotificacion @default(NORMAL)
+  createdAt    DateTime              @default(now())
+  manifiesto   Manifiesto?           @relation(fields: [manifiestoId], references: [id])
+  usuario      Usuario               @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, leida])
+  @@map("notificaciones")
+}
+
+model ReglaAlerta {
+  id               String           @id @default(cuid())
+  nombre           String
+  descripcion      String?
+  evento           EventoAlerta
+  condicion        String
+  destinatarios    String
+  activa           Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  creadoPorId      String
+  alertasGeneradas AlertaGenerada[]
+  creadoPor        Usuario          @relation("ReglasCreadas", fields: [creadoPorId], references: [id])
+
+  @@map("reglas_alertas")
+}
+
+model AlertaGenerada {
+  id              String       @id @default(cuid())
+  reglaId         String
+  manifiestoId    String?
+  datos           String
+  estado          EstadoAlerta @default(PENDIENTE)
+  resueltaPor     String?
+  fechaResolucion DateTime?
+  notas           String?
+  createdAt       DateTime     @default(now())
+  manifiesto      Manifiesto?  @relation(fields: [manifiestoId], references: [id])
+  regla           ReglaAlerta  @relation(fields: [reglaId], references: [id])
+
+  @@map("alertas_generadas")
+}
+
+model AnomaliaTransporte {
+  id              String            @id @default(cuid())
+  manifiestoId    String
+  tipo            TipoAnomalia
+  descripcion     String
+  latitud         Float
+  longitud        Float
+  valorDetectado  Float?
+  valorEsperado   Float?
+  severidad       SeveridadAnomalia @default(MEDIA)
+  resuelta        Boolean           @default(false)
+  resueltaPor     String?
+  fechaResolucion DateTime?
+  notas           String?
+  createdAt       DateTime          @default(now())
+  manifiesto      Manifiesto        @relation(fields: [manifiestoId], references: [id])
+
+  @@map("anomalias_transporte")
+}
+
+model AnalyticsLog {
+  id             String   @id @default(cuid())
+  timestamp      DateTime @default(now())
+  method         String
+  path           String
+  userAgent      String?
+  ipAddress      String?
+  userId         String?
+  userEmail      String?
+  statusCode     Int
+  responseTimeMs Int
+  queryParams    String?
+  requestBody    String?
+
+  @@index([timestamp])
+  @@index([userId])
+  @@index([path])
+  @@map("analytics_logs")
+}
+
+model DemoAccess {
+  id            String   @id @default(cuid())
+  sessionId     String   @unique
+  ipAddress     String?
+  userAgent     String?
+  accessGranted DateTime @default(now())
+  lastActivity  DateTime @default(now())
+
+  @@index([sessionId])
+  @@map("demo_access")
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  usuarioId String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@map("push_subscriptions")
+}
+
+model LogActividad {
+  id             String       @id @default(cuid())
+  usuarioId      String
+  accion         String
+  modulo         String
+  entidadId      String?
+  detalles       Json?
+  ip             String?
+  userAgent      String?
+  timestamp      DateTime     @default(now())
+  datosAntes     Json?
+  datosDespues   Json?
+  duracionMs     Int?
+  resultadoExito Boolean      @default(true)
+  severidad      SeveridadLog @default(INFO)
+  usuario        Usuario      @relation(fields: [usuarioId], references: [id])
+
+  @@index([usuarioId])
+  @@index([accion])
+  @@index([modulo])
+  @@index([timestamp])
+  @@index([severidad])
+  @@index([usuarioId, timestamp])
+  @@map("log_actividad")
+}
+
+model Viaje {
+  id              String      @id @default(cuid())
+  manifiestoId    String
+  transportistaId String
+  usuarioId       String
+  inicio          DateTime
+  fin             DateTime?
+  duracion        Int?
+  distancia       Float?
+  estado          EstadoViaje @default(EN_CURSO)
+  ruta            Json?
+  eventos         Json?
+  dispositivoId   String?
+  appVersion      String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  pausas          Int         @default(0)
+  ultimaPausa     DateTime?
+  manifiesto      Manifiesto  @relation(fields: [manifiestoId], references: [id])
+
+  @@index([manifiestoId])
+  @@index([transportistaId])
+  @@index([usuarioId])
+  @@index([estado])
+  @@index([inicio])
+  @@map("viajes")
+}
+
+model PreferenciaUsuario {
+  id                String   @id @default(cuid())
+  usuarioId         String   @unique
+  mostrarTourInicio Boolean  @default(true)
+  ultimaVersionTour String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  usuario           Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@map("preferencias_usuario")
+}
+
+model ReversionEstado {
+  id             String           @id @default(cuid())
+  manifiestoId   String
+  estadoAnterior EstadoManifiesto
+  estadoNuevo    EstadoManifiesto
+  motivo         String
+  tipoReversion  TipoReversion
+  usuarioId      String
+  rolUsuario     Rol
+  ip             String?
+  userAgent      String?
+  createdAt      DateTime         @default(now())
+  manifiesto     Manifiesto       @relation(fields: [manifiestoId], references: [id])
+  usuario        Usuario          @relation(fields: [usuarioId], references: [id])
+
+  @@index([manifiestoId])
+  @@index([usuarioId])
+  @@index([createdAt])
+  @@map("reversiones_estado")
+}
+
+model AlertaSeguridad {
+  id                String              @id @default(cuid())
+  tipo              TipoAlertaSeguridad
+  descripcion       String
+  usuarioAfectadoId String?
+  datos             Json?
+  severidad         SeveridadLog        @default(WARNING)
+  resuelta          Boolean             @default(false)
+  resueltaPorId     String?
+  fechaResolucion   DateTime?
+  notas             String?
+  createdAt         DateTime            @default(now())
+  resueltaPor       Usuario?            @relation("AlertasResueltas", fields: [resueltaPorId], references: [id])
+  usuarioAfectado   Usuario?            @relation("AlertasUsuario", fields: [usuarioAfectadoId], references: [id])
+
+  @@index([tipo])
+  @@index([createdAt])
+  @@index([resuelta])
+  @@map("alertas_seguridad")
+}
+
+enum TipoDiferencia {
+  FALTANTE
+  EXCEDENTE
+  NINGUNA
+}
+
 enum Rol {
   ADMIN
-  ADMIN_TRANSPORTISTAS
-  ADMIN_OPERADORES
-  ADMIN_GENERADORES
   GENERADOR
   TRANSPORTISTA
   OPERADOR
+  ADMIN_TRANSPORTISTAS
+  ADMIN_OPERADORES
+  ADMIN_GENERADORES
 }
 
 enum EstadoManifiesto {
@@ -378,93 +612,8 @@ enum EstadoManifiesto {
   CANCELADO
 }
 
-// ========== SISTEMA DE NOTIFICACIONES IN-APP ==========
-
-model Notificacion {
-  id              String              @id @default(cuid())
-  usuarioId       String
-  tipo            TipoNotificacion
-  titulo          String
-  mensaje         String
-  datos           String?             // JSON con datos adicionales
-  manifiestoId    String?
-  leida           Boolean             @default(false)
-  fechaLeida      DateTime?
-  prioridad       PrioridadNotificacion @default(NORMAL)
-  createdAt       DateTime            @default(now())
-
-  // Relaciones
-  usuario         Usuario             @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  manifiesto      Manifiesto?         @relation(fields: [manifiestoId], references: [id])
-
-  @@index([usuarioId, leida])
-  @@map("notificaciones")
-}
-
-model ReglaAlerta {
-  id              String              @id @default(cuid())
-  nombre          String
-  descripcion     String?
-  evento          EventoAlerta
-  condicion       String              // JSON con condiciones
-  destinatarios   String              // JSON con roles/usuarios
-  activa          Boolean             @default(true)
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-  creadoPorId     String
-
-  // Relaciones
-  creadoPor       Usuario             @relation("ReglasCreadas", fields: [creadoPorId], references: [id])
-  alertasGeneradas AlertaGenerada[]
-
-  @@map("reglas_alertas")
-}
-
-model AlertaGenerada {
-  id              String              @id @default(cuid())
-  reglaId         String
-  manifiestoId    String?
-  datos           String              // JSON con datos del evento
-  estado          EstadoAlerta        @default(PENDIENTE)
-  resueltaPor     String?
-  fechaResolucion DateTime?
-  notas           String?
-  createdAt       DateTime            @default(now())
-
-  // Relaciones
-  regla           ReglaAlerta         @relation(fields: [reglaId], references: [id])
-  manifiesto      Manifiesto?         @relation(fields: [manifiestoId], references: [id])
-
-  @@map("alertas_generadas")
-}
-
-model AnomaliaTransporte {
-  id              String              @id @default(cuid())
-  manifiestoId    String
-  tipo            TipoAnomalia
-  descripcion     String
-  latitud         Float
-  longitud        Float
-  valorDetectado  Float?
-  valorEsperado   Float?
-  severidad       SeveridadAnomalia   @default(MEDIA)
-  resuelta        Boolean             @default(false)
-  resueltaPor     String?
-  fechaResolucion DateTime?
-  notas           String?
-  createdAt       DateTime            @default(now())
-
-  // Relaciones
-  manifiesto      Manifiesto          @relation(fields: [manifiestoId], references: [id])
-
-  @@map("anomalias_transporte")
-}
-
-// Enumeraciones adicionales
 enum TipoNotificacion {
   MANIFIESTO_FIRMADO
-  MANIFIESTO_PENDIENTE
-  MANIFIESTO_APROBADO
   MANIFIESTO_EN_TRANSITO
   MANIFIESTO_ENTREGADO
   MANIFIESTO_RECIBIDO
@@ -475,6 +624,8 @@ enum TipoNotificacion {
   VENCIMIENTO_PROXIMO
   ALERTA_SISTEMA
   INFO_GENERAL
+  MANIFIESTO_PENDIENTE
+  MANIFIESTO_APROBADO
 }
 
 enum PrioridadNotificacion {
@@ -518,186 +669,20 @@ enum SeveridadAnomalia {
   CRITICA
 }
 
-// ========== ANALYTICS & LOGGING ==========
-
-model AnalyticsLog {
-  id              String      @id @default(cuid())
-  timestamp       DateTime    @default(now())
-  method          String
-  path            String
-  userAgent       String?
-  ipAddress       String?
-  userId          String?
-  userEmail       String?
-  statusCode      Int
-  responseTimeMs  Int
-  queryParams     String?
-  requestBody     String?
-  
-  @@index([timestamp])
-  @@index([userId])
-  @@index([path])
-  @@map("analytics_logs")
-}
-
-// ========== DEMO ACCESS CONTROL ==========
-
-model DemoAccess {
-  id              String      @id @default(cuid())
-  sessionId       String      @unique
-  ipAddress       String?
-  userAgent       String?
-  accessGranted   DateTime    @default(now())
-  lastActivity    DateTime    @default(now())
-  
-  @@index([sessionId])
-  @@map("demo_access")
-}
-
-// ========== PUSH NOTIFICATIONS ==========
-
-model PushSubscription {
-  id        String   @id @default(cuid())
-  usuarioId String
-  endpoint  String   @unique
-  p256dh    String   // Keys
-  auth      String   // Keys
-  createdAt DateTime @default(now())
-  
-  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  
-  @@index([usuarioId])
-  @@map("push_subscriptions")
-}
-
-// ========== LOG DE ACTIVIDAD (AUDITORÍA COMPLETA) ==========
-
-model LogActividad {
-  id             String        @id @default(cuid())
-  usuarioId      String
-  accion         String        // LOGIN, LOGOUT, CREAR_MANIFIESTO, FIRMAR, REVERSION, etc.
-  modulo         String        // MANIFIESTOS, USUARIOS, SISTEMA, AUTH, REVERSIONES
-  entidadId      String?       // ID del manifiesto, usuario, etc.
-  detalles       Json?         // Datos adicionales
-  ip             String?
-  userAgent      String?
-  timestamp      DateTime      @default(now())
-
-  // Campos mejorados para LOG avanzado
-  severidad      SeveridadLog  @default(INFO)
-  duracionMs     Int?          // Tiempo de operación en ms
-  resultadoExito Boolean       @default(true)
-  datosAntes     Json?         // Estado antes del cambio
-  datosDespues   Json?         // Estado después del cambio
-
-  usuario        Usuario       @relation(fields: [usuarioId], references: [id])
-
-  @@index([usuarioId])
-  @@index([accion])
-  @@index([modulo])
-  @@index([timestamp])
-  @@index([severidad])
-  @@index([usuarioId, timestamp])
-  @@map("log_actividad")
-}
-
-// ========== VIAJES (TRACKING MÓVIL) ==========
-
-model Viaje {
-  id              String        @id @default(cuid())
-  manifiestoId    String
-  transportistaId String
-  usuarioId       String
-
-  inicio          DateTime
-  fin             DateTime?
-  duracion        Int?          // segundos totales
-  distancia       Float?        // km calculados
-
-  estado          EstadoViaje   @default(EN_CURSO)
-
-  // Campos para control de pausas (sincronización APP ↔ WEB)
-  pausas          Int           @default(0)   // Segundos totales pausados
-  ultimaPausa     DateTime?                   // Inicio de pausa actual (null = no pausado)
-
-  // Ruta completa como JSON: [{lat, lng, timestamp, velocidad}]
-  ruta            Json?
-  // Eventos del viaje como JSON: [{tipo, timestamp, descripcion, lat, lng}]
-  eventos         Json?
-
-  // Metadatos del dispositivo
-  dispositivoId   String?
-  appVersion      String?
-
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-
-  // Relaciones
-  manifiesto      Manifiesto    @relation(fields: [manifiestoId], references: [id])
-
-  @@index([manifiestoId])
-  @@index([transportistaId])
-  @@index([usuarioId])
-  @@index([estado])
-  @@index([inicio])
-  @@map("viajes")
-}
-
 enum EstadoViaje {
   EN_CURSO
-  PAUSADO
   COMPLETADO
   CANCELADO
   INCIDENTE
-}
-
-// ========== PREFERENCIAS DE USUARIO ==========
-
-model PreferenciaUsuario {
-  id                  String    @id @default(cuid())
-  usuarioId           String    @unique
-  mostrarTourInicio   Boolean   @default(true)
-  ultimaVersionTour   String?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-
-  usuario             Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-
-  @@map("preferencias_usuario")
-}
-
-// ========== REVERSIONES DE ESTADO ==========
-
-model ReversionEstado {
-  id              String           @id @default(cuid())
-  manifiestoId    String
-  estadoAnterior  EstadoManifiesto
-  estadoNuevo     EstadoManifiesto
-  motivo          String           // Obligatorio, min 20 chars
-  tipoReversion   TipoReversion
-  usuarioId       String
-  rolUsuario      Rol              // Registrar el rol del usuario que hizo la reversión
-  ip              String?
-  userAgent       String?
-  createdAt       DateTime         @default(now())
-
-  manifiesto      Manifiesto       @relation(fields: [manifiestoId], references: [id])
-  usuario         Usuario          @relation(fields: [usuarioId], references: [id])
-
-  @@index([manifiestoId])
-  @@index([usuarioId])
-  @@index([createdAt])
-  @@map("reversiones_estado")
+  PAUSADO
 }
 
 enum TipoReversion {
-  RECHAZO_ENTREGA        // Operador rechaza la entrega
-  ERROR_TRANSPORTISTA    // Transportista corrige error
-  REVISION_CERTIFICADO   // Corrección de certificado
-  CORRECCION_ADMIN       // Admin/Admin sectorial corrige estado
+  RECHAZO_ENTREGA
+  ERROR_TRANSPORTISTA
+  REVISION_CERTIFICADO
+  CORRECCION_ADMIN
 }
-
-// ========== LOG MEJORADO ==========
 
 enum SeveridadLog {
   DEBUG
@@ -705,30 +690,6 @@ enum SeveridadLog {
   WARNING
   ERROR
   CRITICAL
-}
-
-// ========== ALERTAS DE SEGURIDAD (Patrones Inusuales) ==========
-
-model AlertaSeguridad {
-  id              String              @id @default(cuid())
-  tipo            TipoAlertaSeguridad
-  descripcion     String
-  usuarioAfectadoId String?
-  datos           Json?               // Datos adicionales del patrón detectado
-  severidad       SeveridadLog        @default(WARNING)
-  resuelta        Boolean             @default(false)
-  resueltaPorId   String?
-  fechaResolucion DateTime?
-  notas           String?
-  createdAt       DateTime            @default(now())
-
-  usuarioAfectado Usuario?            @relation("AlertasUsuario", fields: [usuarioAfectadoId], references: [id])
-  resueltaPor     Usuario?            @relation("AlertasResueltas", fields: [resueltaPorId], references: [id])
-
-  @@index([tipo])
-  @@index([createdAt])
-  @@index([resuelta])
-  @@map("alertas_seguridad")
 }
 
 enum TipoAlertaSeguridad {

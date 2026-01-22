@@ -361,16 +361,18 @@ a:hover {
   color: var(--primary-400);
 }
 
-/* Tables */
+/* Tables - Global Styles */
 .table-container {
   overflow-x: auto;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-color);
+  background: var(--bg-card);
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: auto;
 }
 
 th,
@@ -387,14 +389,31 @@ th {
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  white-space: nowrap;
 }
 
-tr:hover {
-  background: rgba(255, 255, 255, 0.02);
+/* GLOBAL TABLE ROW HOVER - More visible */
+tbody tr {
+  transition: background-color 0.15s ease, transform 0.1s ease;
+  cursor: pointer;
+}
+
+tbody tr:hover {
+  background: rgba(16, 185, 129, 0.08) !important;
 }
 
 tr:last-child td {
   border-bottom: none;
+}
+
+/* Fixed table layout helper class */
+table.table-fixed {
+  table-layout: fixed;
+}
+
+/* Table display fix for responsive classes */
+table.admin-hide-mobile {
+  display: table !important;
 }
 
 /* Utilities */

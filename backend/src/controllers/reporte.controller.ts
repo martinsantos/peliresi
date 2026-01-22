@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { normalizeRubro, normalizarDepartamento, DEPARTAMENTOS_MENDOZA, RUBROS_CANONICOS } from '../utils/normalization';
 
 const prisma = new PrismaClient();
 
@@ -442,6 +443,506 @@ export const exportarCSV = async (req: AuthRequest, res: Response, next: NextFun
         res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
         res.send('\ufeff' + csvContent); // BOM para Excel
 
+    } catch (error) {
+        next(error);
+    }
+};
+
+// ============================================================
+// REPORTES DE GENERADORES POR DEPARTAMENTO Y VOLUMEN
+// ============================================================
+
+// Reporte de generadores agrupados por departamento
+export const getReporteGeneradoresDepartamento = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { fechaInicio, fechaFin, departamento, rubro } = req.query;
+
+        // Construir filtro base para generadores
+        const whereGenerador: any = {
+            domicilioLegalDepartamento: { not: null }
+        };
+
+        // Filtrar por departamento si se especifica
+        if (departamento) {
+            whereGenerador.domicilioLegalDepartamento = String(departamento);
+        }
+
+        // Filtrar por rubro si se especifica
+        if (rubro) {
+            whereGenerador.rubro = String(rubro);
+        }
+
+        // Agrupar generadores por departamento
+        const generadoresPorDepto = await prisma.generador.groupBy({
+            by: ['domicilioLegalDepartamento'],
+            _count: { id: true },
+            where: whereGenerador
+        });
+
+        // Enriquecer con conteo de activos/inactivos y volúmenes
+        const resultado = await Promise.all(
+            generadoresPorDepto.map(async (grupo) => {
+                const depto = grupo.domicilioLegalDepartamento;
+
+                const whereManifiesto: any = {
+                    generador: { domicilioLegalDepartamento: depto }
+                };
+
+                // Filtrar manifiestos por rubro del generador si se especifica
+                if (rubro) {
+                    whereManifiesto.generador.rubro = String(rubro);
+                }
+
+                // Filtro de fechas para manifiestos
+                if (fechaInicio || fechaFin) {
+                    whereManifiesto.createdAt = {};
+                    if (fechaInicio) whereManifiesto.createdAt.gte = new Date(fechaInicio as string);
+                    if (fechaFin) whereManifiesto.createdAt.lte = new Date(fechaFin as string);
+                }
+
+                // Filtro base para conteos de este departamento
+                const whereDeptoBase: any = { domicilioLegalDepartamento: depto };
+                if (rubro) whereDeptoBase.rubro = String(rubro);
+
+                const [activos, inactivos, volumen, totalManifiestos] = await Promise.all([
+                    prisma.generador.count({
+                        where: { ...whereDeptoBase, activo: true }
+                    }),
+                    prisma.generador.count({
+                        where: { ...whereDeptoBase, activo: false }
+                    }),
+                    prisma.manifiestoResiduo.aggregate({
+                        _sum: { cantidad: true },
+                        where: {
+                            manifiesto: whereManifiesto
+                        }
+                    }),
+                    prisma.manifiesto.count({
+                        where: whereManifiesto
+                    })
+                ]);
+
+                return {
+                    departamento: depto,
+                    totalGeneradores: grupo._count.id,
+                    activos,
+                    inactivos,
+                    volumenKg: volumen._sum.cantidad || 0,
+                    totalManifiestos
+                };
+            })
+        );
+
+        // Calcular totales
+        const totales = resultado.reduce(
+            (acc, item) => ({
+                totalGeneradores: acc.totalGeneradores + item.totalGeneradores,
+                totalActivos: acc.totalActivos + item.activos,
+                totalInactivos: acc.totalInactivos + item.inactivos,
+                totalVolumen: acc.totalVolumen + item.volumenKg,
+                totalManifiestos: acc.totalManifiestos + item.totalManifiestos
+            }),
+            { totalGeneradores: 0, totalActivos: 0, totalInactivos: 0, totalVolumen: 0, totalManifiestos: 0 }
+        );
+
+        res.json({
+            success: true,
+            data: {
+                departamentos: resultado.sort((a, b) => b.totalGeneradores - a.totalGeneradores),
+                totales,
+                periodo: {
+                    desde: fechaInicio || null,
+                    hasta: fechaFin || null
+                }
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Top generadores por volumen de residuos
+export const getReporteGeneradoresVolumen = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { fechaInicio, fechaFin, departamento, rubro, limit = '20' } = req.query;
+
+        const whereManifiesto: any = {
+            estado: { in: ['TRATADO', 'RECIBIDO', 'ENTREGADO', 'EN_TRATAMIENTO'] }
+        };
+
+        // Filtrar por departamento del generador
+        if (departamento) {
+            whereManifiesto.generador = {
+                ...whereManifiesto.generador,
+                domicilioLegalDepartamento: String(departamento)
+            };
+        }
+
+        // Filtrar por rubro del generador
+        if (rubro) {
+            whereManifiesto.generador = {
+                ...whereManifiesto.generador,
+                rubro: String(rubro)
+            };
+        }
+
+        // Filtro de fechas
+        if (fechaInicio || fechaFin) {
+            whereManifiesto.createdAt = {};
+            if (fechaInicio) whereManifiesto.createdAt.gte = new Date(fechaInicio as string);
+            if (fechaFin) whereManifiesto.createdAt.lte = new Date(fechaFin as string);
+        }
+
+        // Obtener manifiestos con residuos agrupados por generador
+        const manifiestos = await prisma.manifiesto.findMany({
+            where: whereManifiesto,
+            include: {
+                generador: {
+                    select: {
+                        id: true,
+                        razonSocial: true,
+                        cuit: true,
+                        domicilioLegalDepartamento: true,
+                        rubro: true,
+                        activo: true
+                    }
+                },
+                residuos: {
+                    select: { cantidad: true, tipoResiduoId: true }
+                }
+            }
+        });
+
+        // Agrupar por generador y sumar volúmenes
+        const volumenesPorGenerador = new Map<string, {
+            generador: any;
+            volumenTotal: number;
+            manifiestos: number;
+            tiposResiduo: Set<string>;
+        }>();
+
+        manifiestos.forEach(m => {
+            const genId = m.generadorId;
+            const volumen = m.residuos.reduce((sum, r) => sum + (r.cantidad || 0), 0);
+            const tiposEnManifiesto = m.residuos.map(r => r.tipoResiduoId);
+
+            if (volumenesPorGenerador.has(genId)) {
+                const existing = volumenesPorGenerador.get(genId)!;
+                existing.volumenTotal += volumen;
+                existing.manifiestos += 1;
+                tiposEnManifiesto.forEach(t => existing.tiposResiduo.add(t));
+            } else {
+                volumenesPorGenerador.set(genId, {
+                    generador: m.generador,
+                    volumenTotal: volumen,
+                    manifiestos: 1,
+                    tiposResiduo: new Set(tiposEnManifiesto)
+                });
+            }
+        });
+
+        // Convertir a array y ordenar
+        const ranking = Array.from(volumenesPorGenerador.values())
+            .sort((a, b) => b.volumenTotal - a.volumenTotal)
+            .slice(0, parseInt(limit as string))
+            .map((item, index) => ({
+                ranking: index + 1,
+                id: item.generador.id,
+                razonSocial: item.generador.razonSocial,
+                cuit: item.generador.cuit,
+                departamento: item.generador.domicilioLegalDepartamento || 'Sin datos',
+                rubro: item.generador.rubro || 'Sin rubro',
+                activo: item.generador.activo,
+                volumenKg: item.volumenTotal,
+                manifiestos: item.manifiestos,
+                tiposResiduoUnicos: item.tiposResiduo.size
+            }));
+
+        // Calcular totales
+        const totalVolumen = Array.from(volumenesPorGenerador.values())
+            .reduce((sum, g) => sum + g.volumenTotal, 0);
+
+        res.json({
+            success: true,
+            data: {
+                topGeneradores: ranking,
+                resumen: {
+                    totalVolumen,
+                    totalGeneradoresConMovimiento: volumenesPorGenerador.size,
+                    promedioVolumenPorGenerador: volumenesPorGenerador.size > 0
+                        ? Math.round(totalVolumen / volumenesPorGenerador.size)
+                        : 0
+                },
+                periodo: {
+                    desde: fechaInicio || null,
+                    hasta: fechaFin || null
+                }
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Reporte de tipos de residuos más frecuentes
+export const getReporteTiposResiduos = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { fechaInicio, fechaFin, limit = '15' } = req.query;
+
+        const whereManifiesto: any = {};
+
+        if (fechaInicio || fechaFin) {
+            whereManifiesto.fechaCreacion = {};
+            if (fechaInicio) whereManifiesto.fechaCreacion.gte = new Date(fechaInicio as string);
+            if (fechaFin) whereManifiesto.fechaCreacion.lte = new Date(fechaFin as string);
+        }
+
+        // Agrupar residuos por tipo
+        const residuosPorTipo = await prisma.manifiestoResiduo.groupBy({
+            by: ['tipoResiduoId'],
+            _sum: { cantidad: true },
+            _count: { id: true },
+            where: {
+                manifiesto: whereManifiesto
+            },
+            orderBy: {
+                _sum: { cantidad: 'desc' }
+            },
+            take: parseInt(limit as string)
+        });
+
+        // Obtener info de tipos de residuo
+        const tiposIds = residuosPorTipo.map(r => r.tipoResiduoId);
+        const tiposResiduo = await prisma.tipoResiduo.findMany({
+            where: { id: { in: tiposIds } },
+            select: {
+                id: true,
+                codigo: true,
+                nombre: true,
+                peligrosidad: true,
+                categoria: true
+            }
+        });
+
+        const tiposMap = new Map(tiposResiduo.map(t => [t.id, t]));
+
+        const resultado = residuosPorTipo.map((r, index) => {
+            const tipo = tiposMap.get(r.tipoResiduoId);
+            return {
+                ranking: index + 1,
+                tipoResiduoId: r.tipoResiduoId,
+                codigo: tipo?.codigo || 'N/A',
+                nombre: tipo?.nombre || 'Desconocido',
+                peligrosidad: tipo?.peligrosidad || 'N/A',
+                categoria: tipo?.categoria || 'N/A',
+                volumenTotal: r._sum.cantidad || 0,
+                cantidadManifiestos: r._count.id
+            };
+        });
+
+        res.json({
+            success: true,
+            data: {
+                tiposResiduos: resultado,
+                periodo: {
+                    desde: fechaInicio || null,
+                    hasta: fechaFin || null
+                }
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// ============================================================
+// FILTROS DISPONIBLES PARA REPORTES
+// ============================================================
+
+// Obtener filtros disponibles para reportes de generadores
+export const getReporteFiltrosDisponibles = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        // Obtener rubros únicos de la base de datos
+        const rubrosRaw = await prisma.generador.findMany({
+            select: { rubro: true },
+            distinct: ['rubro'],
+            where: { rubro: { not: null } }
+        });
+
+        // Normalizar rubros y eliminar duplicados
+        const rubrosNormalizados = [...new Set(
+            rubrosRaw
+                .map(r => normalizeRubro(r.rubro))
+                .filter(r => r && r !== 'SIN ESPECIFICAR')
+        )].sort();
+
+        // Obtener departamentos únicos de la base de datos
+        const deptosRaw = await prisma.generador.findMany({
+            select: { domicilioLegalDepartamento: true },
+            distinct: ['domicilioLegalDepartamento'],
+            where: { domicilioLegalDepartamento: { not: null } }
+        });
+
+        // Normalizar departamentos y eliminar duplicados
+        const deptosNormalizados = [...new Set(
+            deptosRaw
+                .map(d => normalizarDepartamento(d.domicilioLegalDepartamento))
+                .filter(Boolean)
+        )].sort() as string[];
+
+        // Separar departamentos de Mendoza de otros
+        const deptosMendoza = deptosNormalizados.filter(d => DEPARTAMENTOS_MENDOZA.includes(d));
+        const deptosOtros = deptosNormalizados.filter(d => !DEPARTAMENTOS_MENDOZA.includes(d));
+
+        // Obtener categorías únicas
+        const categoriasRaw = await prisma.generador.findMany({
+            select: { categoria: true },
+            distinct: ['categoria'],
+            where: { categoria: { not: '' } }
+        });
+
+        const categorias = [...new Set(
+            categoriasRaw.map(c => c.categoria).filter(Boolean)
+        )].sort() as string[];
+
+        res.json({
+            success: true,
+            data: {
+                departamentos: {
+                    mendoza: deptosMendoza,
+                    otros: deptosOtros,
+                    todos: [...deptosMendoza, ...deptosOtros]
+                },
+                rubros: rubrosNormalizados,
+                rubrosCanonicos: RUBROS_CANONICOS,
+                categorias,
+                clasificaciones: ['MINIMA', 'INDIVIDUAL']
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Reporte de generadores con filtros avanzados
+export const getReporteGeneradoresFiltrado = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const {
+            departamento,
+            rubro,
+            categoria,
+            activo,
+            fechaInicio,
+            fechaFin,
+            page = '1',
+            limit = '50'
+        } = req.query;
+
+        const skip = (Number(page) - 1) * Number(limit);
+
+        const where: any = {};
+
+        // Filtro por departamento (normalizado)
+        if (departamento) {
+            const deptoNorm = normalizarDepartamento(departamento as string);
+            where.domicilioLegalDepartamento = deptoNorm;
+        }
+
+        // Filtro por rubro
+        if (rubro) {
+            where.rubro = rubro;
+        }
+
+        // Filtro por categoría
+        if (categoria) {
+            where.categoria = categoria;
+        }
+
+        // Filtro por estado activo/inactivo
+        if (activo !== undefined && activo !== '') {
+            where.activo = activo === 'true';
+        }
+
+        // NOTA: Las fechas se usan solo para calcular volumen/manifiestos en el período,
+        // pero NO filtran la lista de generadores (para mostrar todos los del departamento/rubro)
+
+        const [generadores, total] = await Promise.all([
+            prisma.generador.findMany({
+                where,
+                skip,
+                take: Number(limit),
+                orderBy: { razonSocial: 'asc' },
+                include: {
+                    _count: {
+                        select: { manifiestos: true }
+                    }
+                }
+            }),
+            prisma.generador.count({ where })
+        ]);
+
+        // Construir filtro de manifiestos para el período (si hay fechas)
+        const buildManifiestoWhere = (generadorId: string) => {
+            const mWhere: any = { generadorId };
+            if (fechaInicio || fechaFin) {
+                mWhere.createdAt = {};
+                if (fechaInicio) mWhere.createdAt.gte = new Date(fechaInicio as string);
+                if (fechaFin) {
+                    const fechaFinDate = new Date(fechaFin as string);
+                    fechaFinDate.setHours(23, 59, 59, 999);
+                    mWhere.createdAt.lte = fechaFinDate;
+                }
+            }
+            return mWhere;
+        };
+
+        // Calcular volumen total por generador (en el período si hay fechas)
+        const generadoresConVolumen = await Promise.all(
+            generadores.map(async (gen) => {
+                const manifiestoWhere = buildManifiestoWhere(gen.id);
+
+                const [volumen, countManifiestos] = await Promise.all([
+                    prisma.manifiestoResiduo.aggregate({
+                        _sum: { cantidad: true },
+                        where: { manifiesto: manifiestoWhere }
+                    }),
+                    prisma.manifiesto.count({ where: manifiestoWhere })
+                ]);
+
+                return {
+                    id: gen.id,
+                    razonSocial: gen.razonSocial,
+                    cuit: gen.cuit,
+                    departamento: gen.domicilioLegalDepartamento,
+                    rubro: gen.rubro,
+                    categoria: gen.categoria,
+                    activo: gen.activo,
+                    manifiestos: countManifiestos,
+                    volumenKg: volumen._sum.cantidad || 0,
+                    latitud: gen.latitud,
+                    longitud: gen.longitud
+                };
+            })
+        );
+
+        res.json({
+            success: true,
+            data: {
+                generadores: generadoresConVolumen,
+                pagination: {
+                    page: Number(page),
+                    limit: Number(limit),
+                    total,
+                    pages: Math.ceil(total / Number(limit))
+                },
+                filtrosAplicados: {
+                    departamento: departamento || null,
+                    rubro: rubro || null,
+                    categoria: categoria || null,
+                    activo: activo !== undefined ? activo === 'true' : null
+                }
+            }
+        });
     } catch (error) {
         next(error);
     }

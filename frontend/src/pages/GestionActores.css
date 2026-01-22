@@ -384,12 +384,14 @@
         color: rgba(255, 255, 255, 0.5);
     }
 
+    /* Row hover - More visible */
     .table-card tbody tr {
-        transition: background 0.2s;
+        cursor: pointer;
+        transition: background-color 0.15s ease;
     }
 
     .table-card tbody tr:hover {
-        background: rgba(255, 255, 255, 0.05);
+        background: rgba(16, 185, 129, 0.12) !important;
     }
 }
 

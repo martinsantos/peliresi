@@ -542,8 +542,14 @@
         text-overflow: ellipsis;
     }
 
-    tr:hover {
-        background: rgba(59, 130, 246, 0.05);
+    /* Row hover - More visible */
+    tbody tr {
+        cursor: pointer;
+        transition: background-color 0.15s ease;
+    }
+
+    tbody tr:hover {
+        background: rgba(16, 185, 129, 0.12) !important;
     }
 }
 

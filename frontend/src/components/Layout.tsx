@@ -334,6 +334,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                         {demoProfile && <span className="demo-indicator">MODO DEMO</span>}
                                     </div>
                                     <div className="user-menu-divider" />
+                                    <Link
+                                        to="/mi-perfil"
+                                        className="user-menu-item"
+                                        onClick={() => setUserMenuOpen(false)}
+                                    >
+                                        <User size={16} />
+                                        <span>Mi Perfil</span>
+                                    </Link>
+                                    <div className="user-menu-divider" />
                                     <div className="user-menu-section">
                                         <span className="user-menu-section-title">Modo Demo:</span>
                                         <button

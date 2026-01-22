@@ -323,8 +323,14 @@
     color: rgba(255, 255, 255, 0.5);
 }
 
+/* Row hover - More visible */
+.reporte-section tbody tr {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
 .reporte-section tbody tr:hover {
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(16, 185, 129, 0.12) !important;
 }
 
 .text-success {

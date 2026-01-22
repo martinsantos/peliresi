@@ -571,8 +571,14 @@
         white-space: nowrap;
     }
 
+    /* Row hover - More visible */
+    .audit-table tbody tr {
+        cursor: pointer;
+        transition: background-color 0.15s ease;
+    }
+
     .audit-table tbody tr:hover {
-        background: rgba(16, 185, 129, 0.05);
+        background: rgba(16, 185, 129, 0.12) !important;
     }
 
     .audit-table tbody tr:last-child td {

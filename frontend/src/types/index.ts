@@ -30,6 +30,50 @@ export interface Generador {
     activo: boolean;
     latitud?: number;
     longitud?: number;
+
+    // Campos extendidos de inscripción
+    certificado?: string;
+    expedienteInscripcion?: string;
+    resolucionInscripcion?: string;
+
+    // Datos de actividad
+    actividad?: string;
+    rubro?: string;
+
+    // Domicilio Legal separado
+    domicilioLegalCalle?: string;
+    domicilioLegalLocalidad?: string;
+    domicilioLegalDepartamento?: string;
+
+    // Domicilio Real separado
+    domicilioRealCalle?: string;
+    domicilioRealLocalidad?: string;
+    domicilioRealDepartamento?: string;
+
+    // Certificaciones y clasificación
+    certificacionIso?: string;
+    clasificacion?: string;
+
+    // Datos de cumplimiento
+    informeTecnico?: string;
+    tef?: string;
+    libroOperatoria?: boolean;
+
+    // Referencias a DDJJ por año
+    ddjj2021?: string;
+    ddjj2022?: string;
+    ddjj2023?: string;
+    ddjj2024?: string;
+    ddjjAbril2024?: string;
+    ddjj2025?: string;
+    ddjj2026?: string;
+
+    // Métricas de residuos
+    residuosR?: string;
+    residuosMxR?: string;
+
+    // Control de calidad de datos
+    cuitValido?: boolean;
 }
 
 export interface Transportista {

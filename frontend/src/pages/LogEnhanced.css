@@ -300,13 +300,14 @@
   color: var(--color-text-secondary);
 }
 
-.log-table tr {
+/* Row hover - More visible */
+.log-table tbody tr {
   cursor: pointer;
-  transition: background var(--transition-fast);
+  transition: background-color 0.15s ease;
 }
 
-.log-table tr:hover {
-  background: var(--color-bg-surface);
+.log-table tbody tr:hover {
+  background: rgba(16, 185, 129, 0.12) !important;
 }
 
 .log-table tr.row-error {

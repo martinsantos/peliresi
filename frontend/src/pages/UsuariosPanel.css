@@ -607,8 +607,14 @@
         border-bottom: none;
     }
 
-    .users-table tr:hover {
-        background: var(--color-bg-surface);
+    /* Row hover - More visible */
+    .users-table tbody tr {
+        cursor: pointer;
+        transition: background-color 0.15s ease;
+    }
+
+    .users-table tbody tr:hover {
+        background: rgba(16, 185, 129, 0.12) !important;
     }
 
     .users-table tr.inactive {

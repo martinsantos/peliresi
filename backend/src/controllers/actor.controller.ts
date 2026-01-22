@@ -8,6 +8,183 @@ import { parsePagination, buildPaginationResult } from '../utils/pagination';
 
 const prisma = new PrismaClient();
 
+// ============== MI PERFIL (Actor del usuario logueado) ==============
+
+export const getMiPerfil = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const userId = req.user.id;
+        const userRol = req.user.rol;
+        const demoProfile = (req as any).demoProfile;
+
+        let actor = null;
+        let stats = null;
+        let actorId: string | null = null;
+
+        // Si está en modo demo con actor impersonado, usar ese actor
+        if (demoProfile?.enabled && demoProfile.impersonatedActorId) {
+            actorId = demoProfile.impersonatedActorId;
+        }
+
+        // Cargar actor según rol
+        if (userRol === 'GENERADOR') {
+            // En modo demo usar actorId, sino buscar por usuarioId
+            const whereClause = actorId
+                ? { id: actorId }
+                : { usuarioId: userId };
+
+            actor = await prisma.generador.findFirst({
+                where: whereClause,
+                include: {
+                    _count: { select: { manifiestos: true } }
+                }
+            });
+
+            if (actor) {
+                // Calcular estadísticas
+                const now = new Date();
+                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+                const [manifestosMes, manifestosActivos] = await Promise.all([
+                    prisma.manifiesto.count({
+                        where: {
+                            generadorId: actor.id,
+                            createdAt: { gte: startOfMonth }
+                        }
+                    }),
+                    prisma.manifiesto.count({
+                        where: {
+                            generadorId: actor.id,
+                            estado: { in: ['BORRADOR', 'PENDIENTE_APROBACION', 'APROBADO', 'EN_TRANSITO', 'ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO'] }
+                        }
+                    })
+                ]);
+
+                stats = {
+                    manifiestosTotales: actor._count.manifiestos,
+                    manifestosMes,
+                    manifestosActivos
+                };
+            }
+        } else if (userRol === 'TRANSPORTISTA') {
+            const whereClause = actorId
+                ? { id: actorId }
+                : { usuarioId: userId };
+
+            actor = await prisma.transportista.findFirst({
+                where: whereClause,
+                include: {
+                    vehiculos: true,
+                    choferes: true,
+                    _count: { select: { manifiestos: true } }
+                }
+            });
+
+            if (actor) {
+                const now = new Date();
+                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+                const [manifestosMes, manifestosActivos] = await Promise.all([
+                    prisma.manifiesto.count({
+                        where: {
+                            transportistaId: actor.id,
+                            createdAt: { gte: startOfMonth }
+                        }
+                    }),
+                    prisma.manifiesto.count({
+                        where: {
+                            transportistaId: actor.id,
+                            estado: { in: ['EN_TRANSITO', 'ENTREGADO'] }
+                        }
+                    })
+                ]);
+
+                stats = {
+                    manifiestosTotales: actor._count.manifiestos,
+                    manifestosMes,
+                    manifestosActivos
+                };
+            }
+        } else if (userRol === 'OPERADOR') {
+            const whereClause = actorId
+                ? { id: actorId }
+                : { usuarioId: userId };
+
+            actor = await prisma.operador.findFirst({
+                where: whereClause,
+                include: {
+                    tratamientos: {
+                        include: {
+                            tipoResiduo: { select: { id: true, codigo: true, nombre: true } }
+                        }
+                    },
+                    _count: { select: { manifiestos: true } }
+                }
+            });
+
+            if (actor) {
+                const now = new Date();
+                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+                const [manifestosMes, manifestosActivos] = await Promise.all([
+                    prisma.manifiesto.count({
+                        where: {
+                            operadorId: actor.id,
+                            createdAt: { gte: startOfMonth }
+                        }
+                    }),
+                    prisma.manifiesto.count({
+                        where: {
+                            operadorId: actor.id,
+                            estado: { in: ['RECIBIDO', 'EN_TRATAMIENTO'] }
+                        }
+                    })
+                ]);
+
+                stats = {
+                    manifiestosTotales: actor._count.manifiestos,
+                    manifestosMes,
+                    manifestosActivos
+                };
+            }
+        } else if (userRol === 'ADMIN') {
+            // Para admin sin demo mode, mostrar estadísticas globales
+            const now = new Date();
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+            const [totalManifiestos, manifestosMes, manifestosActivos] = await Promise.all([
+                prisma.manifiesto.count(),
+                prisma.manifiesto.count({ where: { createdAt: { gte: startOfMonth } } }),
+                prisma.manifiesto.count({
+                    where: {
+                        estado: { in: ['BORRADOR', 'PENDIENTE_APROBACION', 'APROBADO', 'EN_TRANSITO', 'ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO'] }
+                    }
+                })
+            ]);
+
+            stats = {
+                manifiestosTotales: totalManifiestos,
+                manifestosMes,
+                manifestosActivos
+            };
+        }
+
+        res.json({
+            success: true,
+            data: {
+                actor,
+                stats,
+                tipoActor: userRol === 'GENERADOR' ? 'generador' :
+                           userRol === 'TRANSPORTISTA' ? 'transportista' :
+                           userRol === 'OPERADOR' ? 'operador' :
+                           userRol === 'ADMIN' ? 'admin' : null,
+                demoMode: demoProfile?.enabled || false
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
 // ============== GENERADORES (CU-A06) ==============
 
 export const getGeneradores = async (req: AuthRequest, res: Response, next: NextFunction) => {

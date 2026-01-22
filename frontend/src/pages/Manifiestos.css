@@ -539,8 +539,14 @@
         border-bottom: none;
     }
 
-    tr:hover {
-        background: rgba(16, 185, 129, 0.05);
+    /* Row hover effect - More visible and clickable */
+    tbody tr {
+        cursor: pointer;
+        transition: background-color 0.15s ease, transform 0.1s ease;
+    }
+
+    tbody tr:hover {
+        background: rgba(16, 185, 129, 0.12) !important;
     }
 
     .manifest-number {

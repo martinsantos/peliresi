@@ -763,12 +763,14 @@
   overflow: hidden;
 }
 
+/* Table row hover - More visible green tint */
 .admin-table tbody tr {
-  transition: background var(--duration-fast) var(--ease-out);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
 }
 
 .admin-table tbody tr:hover {
-  background: var(--color-bg-hover, #232c3a);
+  background: rgba(16, 185, 129, 0.12) !important;
 }
 
 .admin-table tbody tr:last-child td {
@@ -1865,7 +1867,7 @@
 }
 
 .admin-table-row--clickable:hover {
-  background: var(--color-bg-hover, #232c3a) !important;
+  background: rgba(16, 185, 129, 0.12) !important;
 }
 
 .admin-table-row--clickable:hover .admin-table-cell-title {
