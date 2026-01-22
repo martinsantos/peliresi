@@ -51,6 +51,11 @@ const Preferencias = lazy(() => import('./pages/Preferencias'));
 const AdminTransportistasPanel = lazy(() => import('./pages/admin/AdminTransportistasPanel'));
 const AdminOperadoresPanel = lazy(() => import('./pages/admin/AdminOperadoresPanel'));
 const AdminGeneradoresPanel = lazy(() => import('./pages/admin/AdminGeneradoresPanel'));
+const GeneradorDetalle = lazy(() => import('./pages/admin/GeneradorDetalle'));
+const TransportistaDetalle = lazy(() => import('./pages/admin/TransportistaDetalle'));
+const OperadorDetalle = lazy(() => import('./pages/admin/OperadorDetalle'));
+// Mi Perfil
+const MiPerfil = lazy(() => import('./pages/MiPerfil'));
 import './index.css';
 import './pages/DemoApp.css';
 
@@ -87,6 +92,7 @@ const App: React.FC = () => {
             <Route path="/configuracion" element={<PasswordGate><Layout><Configuracion /></Layout></PasswordGate>} />
             <Route path="/notificaciones" element={<PasswordGate><Layout><Notificaciones /></Layout></PasswordGate>} />
             <Route path="/preferencias" element={<PasswordGate><Layout><Preferencias /></Layout></PasswordGate>} />
+            <Route path="/mi-perfil" element={<PasswordGate><Layout><MiPerfil /></Layout></PasswordGate>} />
 
             {/* Administración */}
             <Route path="/admin/centro-control" element={<PasswordGate><Layout><CentroControl /></Layout></PasswordGate>} />
@@ -99,8 +105,11 @@ const App: React.FC = () => {
 
             {/* Admin Sectoriales */}
             <Route path="/admin/transportistas" element={<PasswordGate><Layout><AdminTransportistasPanel /></Layout></PasswordGate>} />
+            <Route path="/admin/transportistas/:id" element={<PasswordGate><Layout><TransportistaDetalle /></Layout></PasswordGate>} />
             <Route path="/admin/operadores" element={<PasswordGate><Layout><AdminOperadoresPanel /></Layout></PasswordGate>} />
+            <Route path="/admin/operadores/:id" element={<PasswordGate><Layout><OperadorDetalle /></Layout></PasswordGate>} />
             <Route path="/admin/generadores" element={<PasswordGate><Layout><AdminGeneradoresPanel /></Layout></PasswordGate>} />
+            <Route path="/admin/generadores/:id" element={<PasswordGate><Layout><GeneradorDetalle /></Layout></PasswordGate>} />
 
             {/* Redirecciones */}
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
