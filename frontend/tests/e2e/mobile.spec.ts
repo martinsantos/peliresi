@@ -60,7 +60,7 @@ test.describe('Mobile App - Responsive Design', () => {
 });
 
 test.describe('Mobile App - Interacciones Touch', () => {
-    test.use({ viewport: { width: 390, height: 844 } });
+    test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 
     test('Navegación touch funciona', async ({ page }) => {
         await page.goto('/demo-app');

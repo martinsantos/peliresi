@@ -56,6 +56,7 @@ import ReversionModal from '../components/ReversionModal';
 import TripRecoveryModal from '../components/mobile/TripRecoveryModal';
 import ActiveTripOverlay from '../components/mobile/ActiveTripOverlay';
 import SyncIndicator from '../components/mobile/SyncIndicator';
+import NuevoManifiestoScreen from '../components/mobile/NuevoManifiestoScreen';
 
 // Screens
 import { AlertasScreen, PerfilScreen, ManifiestosScreen, AdminDashboard, AdminUsuariosScreen, CentroControlScreen } from '../screens';
@@ -873,53 +874,14 @@ const MobileApp: React.FC = () => {
 
             case 'nuevo':
                 return (
-                    <div className="section">
-                        <h3>Nuevo Manifiesto</h3>
-                        <div className="form-card">
-                            <div className="form-group">
-                                <label>Tipo de Residuo</label>
-                                <select className="form-select">
-                                    <option value="">Seleccione...</option>
-                                    <option value="Y1">Y1 - Desechos clinicos</option>
-                                    <option value="Y2">Y2 - Desechos farmaceuticos</option>
-                                    <option value="Y3">Y3 - Desechos medicamentos</option>
-                                    <option value="Y8">Y8 - Aceites usados</option>
-                                    <option value="Y9">Y9 - Mezclas de aceite/agua</option>
-                                </select>
-                            </div>
-                            <div className="form-group">
-                                <label>Cantidad (kg)</label>
-                                <input type="number" className="form-input" placeholder="0.00" />
-                            </div>
-                            <div className="form-group">
-                                <label>Transportista</label>
-                                <select className="form-select">
-                                    <option value="">Seleccione...</option>
-                                    <option value="t1">Transporte Ecologico S.A.</option>
-                                    <option value="t2">LogiResiduos Ltda.</option>
-                                </select>
-                            </div>
-                            <div className="form-group">
-                                <label>Operador de Destino</label>
-                                <select className="form-select">
-                                    <option value="">Seleccione...</option>
-                                    <option value="o1">Planta Tratamiento Norte</option>
-                                    <option value="o2">Centro Disposicion Final</option>
-                                </select>
-                            </div>
-                            <div className="form-actions">
-                                <button className="btn btn-secondary" onClick={() => setCurrentScreen('home')}>
-                                    Cancelar
-                                </button>
-                                <button className="btn btn-primary" onClick={() => {
-                                    showToastMessage('Manifiesto creado exitosamente');
-                                    setCurrentScreen('manifiestos');
-                                }}>
-                                    Crear Manifiesto
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                    <NuevoManifiestoScreen
+                        onBack={() => setCurrentScreen('home')}
+                        onSuccess={() => {
+                            loadManifiestosFromBackend();
+                            setCurrentScreen('manifiestos');
+                        }}
+                        onToast={showToastMessage}
+                    />
                 );
 
             case 'actores':

@@ -1,4 +1,4 @@
-# 🔧 Deployment - Sistema de Trazabilidad RRPP
+# 🔧 Deployment - Sistema de Trazabilidad RRPP (SITREP)
 
 ## Arquitectura de Producción
 
@@ -6,11 +6,11 @@
 Servidor: 23.105.176.45 (VPS 1.7GB RAM, 1 vCPU)
 │
 ├── Nginx (SSL/443)
-│   ├── /demoambiente/ → /var/www/demoambiente/ (frontend estático)
-│   └── /api/ → http://127.0.0.1:3010 (backend Node.js)
+│   ├── sitrep.ultimamilla.com.ar/ → /var/www/sitrep-prod/ (frontend estático)
+│   └── sitrep.ultimamilla.com.ar/api/ → http://127.0.0.1:3010 (backend Node.js)
 │
 ├── PM2
-│   └── demo-backend (puerto 3010, max 150MB RAM)
+│   └── sitrep-backend (puerto 3010, max 150MB RAM)
 │
 └── Docker
     └── directus-admin-database-1 (PostgreSQL)
@@ -23,9 +23,10 @@ Servidor: 23.105.176.45 (VPS 1.7GB RAM, 1 vCPU)
 
 | Componente | URL |
 |------------|-----|
-| **Frontend** | https://www.ultimamilla.com.ar/demoambiente/ |
-| **API** | https://www.ultimamilla.com.ar/api/ |
-| **Health Check** | https://www.ultimamilla.com.ar/api/health |
+| **Frontend Web** | https://sitrep.ultimamilla.com.ar/ |
+| **App Móvil** | https://sitrep.ultimamilla.com.ar/app |
+| **API** | https://sitrep.ultimamilla.com.ar/api/ |
+| **Health Check** | https://sitrep.ultimamilla.com.ar/api/health |
 
 ---
 
@@ -45,7 +46,7 @@ npm run build
 cd frontend/dist
 tar czf /tmp/frontend.tar.gz .
 scp /tmp/frontend.tar.gz root@23.105.176.45:/tmp/
-ssh root@23.105.176.45 "cd /var/www/demoambiente && rm -rf * && tar xzf /tmp/frontend.tar.gz && chmod -R 755 ."
+ssh root@23.105.176.45 "cd /var/www/sitrep-prod && rm -rf * && tar xzf /tmp/frontend.tar.gz && chmod -R 755 ."
 ```
 
 ### 3. Compilar Backend
@@ -59,64 +60,63 @@ npm run build
 ### 4. Subir Backend al Servidor
 
 ```bash
-scp -r dist package.json package-lock.json prisma root@23.105.176.45:/home/demoambiente/
-ssh root@23.105.176.45 "cd /home/demoambiente && npm ci --production"
+scp -r dist package.json package-lock.json prisma root@23.105.176.45:/var/www/sitrep-backend/
+ssh root@23.105.176.45 "cd /var/www/sitrep-backend && npm ci --production"
 ```
 
 ### 5. Reiniciar Backend
 
 ```bash
-ssh root@23.105.176.45 "pm2 restart demo-backend"
+ssh root@23.105.176.45 "pm2 restart sitrep-backend"
 ```
 
 ---
 
 ## Variables de Entorno (Servidor)
 
-Archivo: `/home/demoambiente/.env`
+Archivo: `/var/www/sitrep-backend/.env`
 
 ```env
 NODE_ENV=production
 PORT=3010
-DATABASE_URL="postgresql://directus:umbot_directus_2025!@localhost:5432/trazabilidad_demo?schema=public"
-JWT_SECRET=demo-secret-dgfa-mendoza-2025
-JWT_REFRESH_SECRET=demo-refresh-dgfa-2025
-FRONTEND_URL=https://www.ultimamilla.com.ar
+DATABASE_URL="postgresql://directus:***@localhost:5432/trazabilidad_demo?schema=public"
+JWT_SECRET=***
+JWT_REFRESH_SECRET=***
+FRONTEND_URL=https://sitrep.ultimamilla.com.ar
 SUPER_ADMIN_EMAIL=santosma@gmail.com
 ENABLE_ANALYTICS=true
-CORS_ORIGIN=https://ultimamilla.com.ar,https://www.ultimamilla.com.ar
+CORS_ORIGIN=https://sitrep.ultimamilla.com.ar
 ```
 
 ---
 
 ## Configuración Nginx
 
-Archivo: `/etc/nginx/sites-available/ultimamilla.com.ar`
+Archivo: `/etc/nginx/sites-available/sitrep.ultimamilla.com.ar`
 
 ```nginx
-# Frontend Demo (archivos estáticos)
-location /demoambiente/ {
-    alias /var/www/demoambiente/;
-    index index.html;
-    try_files $uri $uri/ /demoambiente/index.html;
-    add_header X-Robots-Tag "noindex, nofollow" always;
-}
+server {
+    listen 443 ssl http2;
+    server_name sitrep.ultimamilla.com.ar;
 
-# Redirección sin slash
-location = /demoambiente {
-    return 301 /demoambiente/;
-}
+    # Frontend SITREP (archivos estáticos)
+    location / {
+        root /var/www/sitrep-prod;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+    }
 
-# Backend API
-location /api/ {
-    proxy_pass http://127.0.0.1:3010;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection 'upgrade';
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
+    # Backend API
+    location /api/ {
+        proxy_pass http://127.0.0.1:3010;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
 }
 ```
 
@@ -133,7 +133,7 @@ docker exec -it directus-admin-database-1 psql -U directus -d trazabilidad_demo
 ### Seed de Datos
 
 ```bash
-cd /home/demoambiente
+cd /var/www/sitrep-backend
 node prisma/seed.js        # Seed básico
 node prisma/seed-demo.js   # Datos de demo (manifiestos)
 ```
@@ -141,7 +141,7 @@ node prisma/seed-demo.js   # Datos de demo (manifiestos)
 ### Verificar Datos
 
 ```sql
-SELECT 
+SELECT
   (SELECT COUNT(*) FROM usuarios) as usuarios,
   (SELECT COUNT(*) FROM generadores) as generadores,
   (SELECT COUNT(*) FROM manifiestos) as manifiestos;
@@ -153,8 +153,8 @@ SELECT
 
 ```bash
 pm2 list                    # Ver procesos
-pm2 restart demo-backend    # Reiniciar backend
-pm2 logs demo-backend       # Ver logs
+pm2 restart sitrep-backend  # Reiniciar backend
+pm2 logs sitrep-backend     # Ver logs
 pm2 monit                   # Monitor en tiempo real
 ```
 
@@ -166,11 +166,11 @@ pm2 monit                   # Monitor en tiempo real
 
 ```bash
 # PM2
-pm2 list
+pm2 list | grep sitrep
 
 # Servicios HTTP
-curl -s https://www.ultimamilla.com.ar/demoambiente/ | head -5
-curl -s https://www.ultimamilla.com.ar/api/health
+curl -s https://sitrep.ultimamilla.com.ar/ | head -5
+curl -s https://sitrep.ultimamilla.com.ar/api/health
 
 # Base de datos
 docker exec directus-admin-database-1 pg_isready -U directus -d trazabilidad_demo
@@ -192,10 +192,10 @@ pm2 monit        # CPU/RAM por proceso
 
 ```bash
 # Verificar CORS_ORIGIN en .env
-cat /home/demoambiente/.env | grep CORS
+cat /var/www/sitrep-backend/.env | grep CORS
 
 # Reiniciar backend
-pm2 restart demo-backend
+pm2 restart sitrep-backend
 ```
 
 ### Error 502 Bad Gateway
@@ -203,7 +203,7 @@ pm2 restart demo-backend
 ```bash
 # Verificar que el backend está corriendo
 pm2 list
-pm2 logs demo-backend --lines 50
+pm2 logs sitrep-backend --lines 50
 ```
 
 ### Error de Base de Datos
@@ -234,13 +234,11 @@ docker exec -i directus-admin-database-1 psql -U directus -d trazabilidad_demo <
 
 ---
 
-## Actualización
-
-### Script de Actualización Completo
+## Script de Actualización Completo
 
 ```bash
 #!/bin/bash
-# update-demo.sh
+# update-sitrep.sh
 
 # 1. Compilar localmente
 cd frontend && npm run build && cd ..
@@ -249,27 +247,21 @@ cd backend && npm run build && cd ..
 # 2. Subir archivos
 tar czf /tmp/frontend.tar.gz -C frontend/dist .
 scp /tmp/frontend.tar.gz root@23.105.176.45:/tmp/
-scp -r backend/dist backend/package*.json backend/prisma root@23.105.176.45:/home/demoambiente/
+scp -r backend/dist backend/package*.json backend/prisma root@23.105.176.45:/var/www/sitrep-backend/
 
 # 3. Aplicar en servidor
 ssh root@23.105.176.45 << 'EOF'
-  cd /var/www/demoambiente && rm -rf * && tar xzf /tmp/frontend.tar.gz
-  cd /home/demoambiente && npm ci --production
-  pm2 restart demo-backend
+  cd /var/www/sitrep-prod && rm -rf * && tar xzf /tmp/frontend.tar.gz
+  cd /var/www/sitrep-backend && npm ci --production
+  pm2 restart sitrep-backend
 EOF
 
-echo "✅ Actualización completada"
+echo "✅ SITREP actualizado"
 ```
 
 ---
 
 ## Seguridad
-
-### No-Indexación
-
-- ✅ Header `X-Robots-Tag: noindex, nofollow`
-- ✅ Meta tag `<meta name="robots" content="noindex, nofollow">`
-- ✅ Meta tag `<meta name="googlebot" content="noindex, nofollow">`
 
 ### Autenticación
 
@@ -285,4 +277,4 @@ echo "✅ Actualización completada"
 
 ---
 
-*Última actualización: 2025-12-07*
+*Última actualización: 2026-01-22*
