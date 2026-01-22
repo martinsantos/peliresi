@@ -11,7 +11,15 @@ import {
     getReporteTiposResiduos,
     getReporteFiltrosDisponibles,
     getReporteGeneradoresFiltrado,
-    getConteoGeneradoresPorTipoResiduo
+    getConteoGeneradoresPorTipoResiduo,
+    // Operadores
+    getOperadoresFiltrosReporte,
+    getReporteOperadoresFiltrado,
+    getConteoOperadoresPorTipoResiduo,
+    // Transportistas
+    getTransportistasFiltrosReporte,
+    getReporteTransportistasFiltrado,
+    getTransportistasPorViajes
 } from '../controllers/reporte.controller';
 
 const router = Router();
@@ -42,6 +50,16 @@ router.get('/tipos-residuos', hasRole('ADMIN', 'ADMIN_GENERADORES', 'ADMIN_OPERA
 router.get('/generadores-filtros', hasRole('ADMIN', 'ADMIN_GENERADORES'), getReporteFiltrosDisponibles);
 router.get('/generadores-filtrado', hasRole('ADMIN', 'ADMIN_GENERADORES'), getReporteGeneradoresFiltrado);
 router.get('/generadores-por-tipo-residuo', hasRole('ADMIN', 'ADMIN_GENERADORES'), getConteoGeneradoresPorTipoResiduo);
+
+// Filtros y reportes avanzados de operadores
+router.get('/operadores-filtros', hasRole('ADMIN', 'ADMIN_OPERADORES'), getOperadoresFiltrosReporte);
+router.get('/operadores-filtrado', hasRole('ADMIN', 'ADMIN_OPERADORES'), getReporteOperadoresFiltrado);
+router.get('/operadores-por-tipo-residuo', hasRole('ADMIN', 'ADMIN_OPERADORES'), getConteoOperadoresPorTipoResiduo);
+
+// Filtros y reportes avanzados de transportistas
+router.get('/transportistas-filtros', hasRole('ADMIN', 'ADMIN_TRANSPORTISTAS'), getTransportistasFiltrosReporte);
+router.get('/transportistas-filtrado', hasRole('ADMIN', 'ADMIN_TRANSPORTISTAS'), getReporteTransportistasFiltrado);
+router.get('/transportistas-por-viajes', hasRole('ADMIN', 'ADMIN_TRANSPORTISTAS'), getTransportistasPorViajes);
 
 // Exportación CSV (solo admin)
 router.get('/exportar/:tipo', hasRole('ADMIN'), exportarCSV);

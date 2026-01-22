@@ -873,14 +873,19 @@ export const getReporteGeneradoresFiltrado = async (req: AuthRequest, res: Respo
         }
 
         // Filtro por tipo de residuo (Y-codes Basel)
+        // Los Y-codes están en el campo 'categoria' del generador (ej: "Y8-Y9-Y12-Y48")
         if (tipoResiduoId) {
-            where.manifiestos = {
-                some: {
-                    residuos: {
-                        some: { tipoResiduoId: String(tipoResiduoId) }
-                    }
-                }
-            };
+            const tipoResiduo = await prisma.tipoResiduo.findUnique({
+                where: { id: String(tipoResiduoId) },
+                select: { codigo: true }
+            });
+            if (tipoResiduo) {
+                // Buscar generadores cuya categoria contenga el código Y
+                where.categoria = {
+                    contains: tipoResiduo.codigo,
+                    mode: 'insensitive'
+                };
+            }
         }
 
         // NOTA: Las fechas se usan solo para calcular volumen/manifiestos en el período,
@@ -975,7 +980,7 @@ export const getReporteGeneradoresFiltrado = async (req: AuthRequest, res: Respo
 
 export const getConteoGeneradoresPorTipoResiduo = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const { fechaInicio, fechaFin, departamento, rubro } = req.query;
+        const { departamento, rubro } = req.query;
 
         // Obtener todos los tipos de residuo activos
         const tiposResiduo = await prisma.tipoResiduo.findMany({
@@ -984,20 +989,10 @@ export const getConteoGeneradoresPorTipoResiduo = async (req: AuthRequest, res: 
             orderBy: { codigo: 'asc' }
         });
 
-        // Construir filtro base para manifiestos
-        const manifestoWhere: any = {};
-        if (fechaInicio || fechaFin) {
-            manifestoWhere.createdAt = {};
-            if (fechaInicio) manifestoWhere.createdAt.gte = new Date(fechaInicio as string);
-            if (fechaFin) {
-                const fechaFinDate = new Date(fechaFin as string);
-                fechaFinDate.setHours(23, 59, 59, 999);
-                manifestoWhere.createdAt.lte = fechaFinDate;
-            }
-        }
-
-        // Construir filtro para generador
-        const generadorWhere: any = {};
+        // Construir filtro base para generadores
+        const generadorWhere: any = {
+            categoria: { not: null }  // Solo generadores con Y-codes en categoria
+        };
         if (departamento) {
             generadorWhere.domicilioLegalDepartamento = normalizarDepartamento(departamento as string);
         }
@@ -1005,23 +1000,16 @@ export const getConteoGeneradoresPorTipoResiduo = async (req: AuthRequest, res: 
             generadorWhere.rubro = rubro;
         }
 
-        if (Object.keys(generadorWhere).length > 0) {
-            manifestoWhere.generador = generadorWhere;
-        }
-
-        // Contar generadores únicos por cada tipo de residuo
+        // Contar generadores por cada tipo de residuo
+        // Los Y-codes están en el campo 'categoria' del generador (ej: "Y8-Y9-Y12-Y48")
         const conteos = await Promise.all(
             tiposResiduo.map(async (tipo) => {
-                // Buscar generadores únicos que tienen manifiestos con este tipo de residuo
-                const generadoresConTipo = await prisma.manifiesto.findMany({
+                // Buscar generadores cuya categoria contenga el código Y
+                const count = await prisma.generador.count({
                     where: {
-                        ...manifestoWhere,
-                        residuos: {
-                            some: { tipoResiduoId: tipo.id }
-                        }
-                    },
-                    select: { generadorId: true },
-                    distinct: ['generadorId']
+                        ...generadorWhere,
+                        categoria: { contains: tipo.codigo, mode: 'insensitive' }
+                    }
                 });
 
                 return {
@@ -1029,7 +1017,7 @@ export const getConteoGeneradoresPorTipoResiduo = async (req: AuthRequest, res: 
                     codigo: tipo.codigo,
                     nombre: tipo.nombre,
                     peligrosidad: tipo.peligrosidad,
-                    cantidadGeneradores: generadoresConTipo.length
+                    cantidadGeneradores: count
                 };
             })
         );
@@ -1039,21 +1027,16 @@ export const getConteoGeneradoresPorTipoResiduo = async (req: AuthRequest, res: 
             .filter(c => c.cantidadGeneradores > 0)
             .sort((a, b) => b.cantidadGeneradores - a.cantidadGeneradores);
 
-        // Calcular totales
-        const totalGeneradoresUnicos = new Set<string>();
-        for (const conteo of conteos) {
-            if (conteo.cantidadGeneradores > 0) {
-                const gens = await prisma.manifiesto.findMany({
-                    where: {
-                        ...manifestoWhere,
-                        residuos: { some: { tipoResiduoId: conteo.tipoResiduoId } }
-                    },
-                    select: { generadorId: true },
-                    distinct: ['generadorId']
-                });
-                gens.forEach(g => totalGeneradoresUnicos.add(g.generadorId));
+        // Calcular total de generadores con Y-codes (sin duplicados)
+        const totalGeneradoresConYcodes = await prisma.generador.count({
+            where: {
+                ...generadorWhere,
+                categoria: {
+                    not: null,
+                    notIn: ['Categoría I', 'Categoría II', 'Categoría III', 'GRANDE', 'Sin categoría', '']
+                }
             }
-        }
+        });
 
         res.json({
             success: true,
@@ -1061,14 +1044,403 @@ export const getConteoGeneradoresPorTipoResiduo = async (req: AuthRequest, res: 
                 conteosPorTipo: conteosConDatos,
                 resumen: {
                     totalTiposConGeneradores: conteosConDatos.length,
-                    totalGeneradoresUnicos: totalGeneradoresUnicos.size
+                    totalGeneradoresConYcodes
                 },
                 filtrosAplicados: {
-                    fechaInicio: fechaInicio || null,
-                    fechaFin: fechaFin || null,
                     departamento: departamento || null,
                     rubro: rubro || null
                 }
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// OPERADORES - Reportes Filtrados
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Obtener filtros disponibles para reportes de operadores
+ */
+export const getOperadoresFiltrosReporte = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        // Obtener tipos de residuo que tienen tratamientos autorizados
+        const tiposResiduo = await prisma.tipoResiduo.findMany({
+            where: { activo: true },
+            select: {
+                id: true,
+                codigo: true,
+                nombre: true,
+                peligrosidad: true
+            },
+            orderBy: { codigo: 'asc' }
+        });
+
+        res.json({
+            success: true,
+            data: {
+                tiposResiduo
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Obtener lista filtrada de operadores para reportes
+ */
+export const getReporteOperadoresFiltrado = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { tipoResiduoId, activo, page = '1', limit = '15' } = req.query;
+        const pageNum = parseInt(page as string);
+        const limitNum = parseInt(limit as string);
+        const skip = (pageNum - 1) * limitNum;
+
+        // Construir filtro
+        const where: any = {};
+
+        if (activo !== undefined && activo !== '') {
+            where.activo = activo === 'true';
+        }
+
+        if (tipoResiduoId) {
+            where.tratamientos = {
+                some: { tipoResiduoId: String(tipoResiduoId) }
+            };
+        }
+
+        // Obtener operadores con conteos
+        const [operadores, total] = await Promise.all([
+            prisma.operador.findMany({
+                where,
+                include: {
+                    tratamientos: {
+                        include: {
+                            tipoResiduo: {
+                                select: { codigo: true, nombre: true }
+                            }
+                        }
+                    },
+                    _count: {
+                        select: { manifiestos: true }
+                    }
+                },
+                orderBy: { razonSocial: 'asc' },
+                skip,
+                take: limitNum
+            }),
+            prisma.operador.count({ where })
+        ]);
+
+        // Formatear respuesta
+        const operadoresFormateados = operadores.map(op => ({
+            id: op.id,
+            razonSocial: op.razonSocial,
+            cuit: op.cuit,
+            categoria: op.categoria,
+            activo: op.activo,
+            manifiestos: op._count.manifiestos,
+            latitud: op.latitud,
+            longitud: op.longitud,
+            tratamientos: op.tratamientos.map(t => ({
+                codigo: t.tipoResiduo?.codigo || '',
+                nombre: t.tipoResiduo?.nombre || '',
+                capacidad: t.capacidad || 0
+            }))
+        }));
+
+        // Calcular totales globales (sin filtros)
+        const [totalOperadores, totalActivos] = await Promise.all([
+            prisma.operador.count(),
+            prisma.operador.count({ where: { activo: true } })
+        ]);
+
+        // Contar tipos de residuo tratados (distinct)
+        const tratamientosUnicos = await prisma.tratamientoAutorizado.findMany({
+            where: { tipoResiduoId: { not: undefined } },
+            distinct: ['tipoResiduoId'],
+            select: { tipoResiduoId: true }
+        });
+
+        res.json({
+            success: true,
+            data: {
+                operadores: operadoresFormateados,
+                pagination: {
+                    page: pageNum,
+                    limit: limitNum,
+                    total,
+                    pages: Math.ceil(total / limitNum)
+                },
+                totalesGlobales: {
+                    totalOperadores,
+                    totalActivos,
+                    totalTiposTratados: tratamientosUnicos.length
+                },
+                filtrosAplicados: {
+                    tipoResiduoId: tipoResiduoId || null,
+                    activo: activo !== undefined && activo !== '' ? activo === 'true' : null
+                }
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Obtener conteo de operadores por tipo de residuo autorizado
+ */
+export const getConteoOperadoresPorTipoResiduo = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        // Obtener todos los tipos de residuo activos
+        const tiposResiduo = await prisma.tipoResiduo.findMany({
+            where: { activo: true },
+            select: {
+                id: true,
+                codigo: true,
+                nombre: true,
+                peligrosidad: true
+            },
+            orderBy: { codigo: 'asc' }
+        });
+
+        // Contar operadores por cada tipo de residuo (de tratamientos autorizados)
+        const conteos = await Promise.all(
+            tiposResiduo.map(async (tipo) => {
+                const count = await prisma.operador.count({
+                    where: {
+                        tratamientos: {
+                            some: { tipoResiduoId: tipo.id }
+                        }
+                    }
+                });
+
+                return {
+                    tipoResiduoId: tipo.id,
+                    codigo: tipo.codigo,
+                    nombre: tipo.nombre,
+                    peligrosidad: tipo.peligrosidad,
+                    cantidadOperadores: count
+                };
+            })
+        );
+
+        // Filtrar solo los que tienen operadores y ordenar por cantidad
+        const conteosConDatos = conteos
+            .filter(c => c.cantidadOperadores > 0)
+            .sort((a, b) => b.cantidadOperadores - a.cantidadOperadores);
+
+        res.json({
+            success: true,
+            data: {
+                conteosPorTipo: conteosConDatos,
+                resumen: {
+                    totalTiposConOperadores: conteosConDatos.length,
+                    totalOperadoresConTratamientos: await prisma.operador.count({
+                        where: { tratamientos: { some: {} } }
+                    })
+                }
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TRANSPORTISTAS - Reportes Filtrados
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Obtener filtros disponibles para reportes de transportistas
+ */
+export const getTransportistasFiltrosReporte = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        // Obtener tipos de residuo
+        const tiposResiduo = await prisma.tipoResiduo.findMany({
+            where: { activo: true },
+            select: {
+                id: true,
+                codigo: true,
+                nombre: true,
+                peligrosidad: true
+            },
+            orderBy: { codigo: 'asc' }
+        });
+
+        res.json({
+            success: true,
+            data: {
+                tiposResiduo
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Obtener lista filtrada de transportistas para reportes
+ */
+export const getReporteTransportistasFiltrado = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { tipoResiduoId, activo, page = '1', limit = '15' } = req.query;
+        const pageNum = parseInt(page as string);
+        const limitNum = parseInt(limit as string);
+        const skip = (pageNum - 1) * limitNum;
+
+        // Construir filtro
+        const where: any = {};
+
+        if (activo !== undefined && activo !== '') {
+            where.activo = activo === 'true';
+        }
+
+        if (tipoResiduoId) {
+            where.manifiestos = {
+                some: {
+                    residuos: {
+                        some: { tipoResiduoId: String(tipoResiduoId) }
+                    }
+                }
+            };
+        }
+
+        // Obtener transportistas con conteos
+        const [transportistas, total] = await Promise.all([
+            prisma.transportista.findMany({
+                where,
+                include: {
+                    _count: {
+                        select: {
+                            manifiestos: true,
+                            vehiculos: true,
+                            choferes: true
+                        }
+                    }
+                },
+                orderBy: { razonSocial: 'asc' },
+                skip,
+                take: limitNum
+            }),
+            prisma.transportista.count({ where })
+        ]);
+
+        // Calcular viajes completados para cada transportista
+        const transportistasFormateados = await Promise.all(
+            transportistas.map(async (tr) => {
+                const viajesCompletados = await prisma.manifiesto.count({
+                    where: {
+                        transportistaId: tr.id,
+                        estado: { in: ['RECIBIDO', 'TRATADO'] }
+                    }
+                });
+
+                const totalManifiestos = tr._count.manifiestos;
+                const tasaCompletitud = totalManifiestos > 0
+                    ? ((viajesCompletados / totalManifiestos) * 100).toFixed(1) + '%'
+                    : '0%';
+
+                return {
+                    id: tr.id,
+                    razonSocial: tr.razonSocial,
+                    cuit: tr.cuit,
+                    activo: tr.activo,
+                    latitud: null, // TODO: agregar campo al schema
+                    longitud: null,
+                    vehiculos: tr._count.vehiculos,
+                    choferes: tr._count.choferes,
+                    manifiestos: totalManifiestos,
+                    viajesCompletados,
+                    tasaCompletitud
+                };
+            })
+        );
+
+        // Calcular totales globales (sin filtros)
+        const [totalTransportistas, totalActivos, totalVehiculos, totalChoferes] = await Promise.all([
+            prisma.transportista.count(),
+            prisma.transportista.count({ where: { activo: true } }),
+            prisma.vehiculo.count(),
+            prisma.chofer.count()
+        ]);
+
+        res.json({
+            success: true,
+            data: {
+                transportistas: transportistasFormateados,
+                pagination: {
+                    page: pageNum,
+                    limit: limitNum,
+                    total,
+                    pages: Math.ceil(total / limitNum)
+                },
+                totalesGlobales: {
+                    totalTransportistas,
+                    totalActivos,
+                    totalVehiculos,
+                    totalChoferes
+                },
+                filtrosAplicados: {
+                    tipoResiduoId: tipoResiduoId || null,
+                    activo: activo !== undefined && activo !== '' ? activo === 'true' : null
+                }
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Obtener top transportistas por cantidad de viajes
+ */
+export const getTransportistasPorViajes = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { limit = '15' } = req.query;
+        const limitNum = parseInt(limit as string);
+
+        // Obtener transportistas con más manifiestos
+        const transportistas = await prisma.transportista.findMany({
+            include: {
+                _count: {
+                    select: {
+                        manifiestos: true,
+                        vehiculos: true,
+                        choferes: true
+                    }
+                }
+            },
+            orderBy: {
+                manifiestos: {
+                    _count: 'desc'
+                }
+            },
+            take: limitNum
+        });
+
+        // Formatear y agregar ranking
+        const topTransportistas = transportistas
+            .filter(tr => tr._count.manifiestos > 0)
+            .map((tr, index) => ({
+                ranking: index + 1,
+                id: tr.id,
+                razonSocial: tr.razonSocial,
+                cuit: tr.cuit,
+                activo: tr.activo,
+                manifiestos: tr._count.manifiestos,
+                vehiculos: tr._count.vehiculos,
+                choferes: tr._count.choferes
+            }));
+
+        res.json({
+            success: true,
+            data: {
+                topTransportistas
             }
         });
     } catch (error) {

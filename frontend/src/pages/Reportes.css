@@ -77,6 +77,89 @@
     background: rgba(255, 255, 255, 0.08);
 }
 
+/* Form Select para Operadores y Transportistas */
+.reportes-page .form-select,
+.reportes-page select {
+    padding: 0.75rem 2.5rem 0.75rem 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    font-size: 0.875rem;
+    background: rgba(255, 255, 255, 0.05);
+    color: white;
+    transition: all 0.2s;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23888888' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.75rem center;
+    background-repeat: no-repeat;
+    background-size: 1.25em 1.25em;
+}
+
+.reportes-page .form-select:hover,
+.reportes-page select:hover {
+    border-color: rgba(255, 255, 255, 0.25);
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.reportes-page .form-select:focus,
+.reportes-page select:focus {
+    outline: none;
+    border-color: #10b981;
+    background-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.reportes-page .form-select option,
+.reportes-page select option {
+    background: #1a1d21;
+    color: white;
+    padding: 0.5rem;
+}
+
+/* Filtro Group */
+.reportes-page .filtro-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.reportes-page .filtro-group label {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 500;
+}
+
+/* Generadores Filtros Section - mejorar responsive */
+.generadores-filtros-section {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 768px) {
+    .generadores-filtros-section {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .generadores-filtros-section .filtro-group {
+        width: 100%;
+    }
+
+    .generadores-filtros-section > div:last-child {
+        flex-direction: row;
+        justify-content: flex-end;
+    }
+}
+
 /* Tabs */
 .reportes-tabs {
     display: flex;

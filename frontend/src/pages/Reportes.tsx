@@ -16,7 +16,6 @@ import {
     Package,
     Activity,
     CheckCircle,
-    Clock,
     Building2,
     MapPin,
     Award,
@@ -24,7 +23,6 @@ import {
     ChevronRight,
     List,
     Eye,
-    Map as MapIcon,
     X
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -154,8 +152,6 @@ const Reportes: React.FC = () => {
     const [fechaInicio, setFechaInicio] = useState('');
     const [fechaFin, setFechaFin] = useState('');
     const [reporte, setReporte] = useState<ReporteManifiestos | null>(datosDemo.manifiestos);
-    const [reporteTratados, setReporteTratados] = useState<any>(datosDemo.tratados);
-    const [reporteTransporte, setReporteTransporte] = useState<any>(datosDemo.transporte);
     const [reporteGeneradores, setReporteGeneradores] = useState<ReporteGeneradores | null>(null);
     const [exportando, setExportando] = useState(false);
     const [usandoDemo, setUsandoDemo] = useState(true);
@@ -172,8 +168,41 @@ const Reportes: React.FC = () => {
     const [paginaActual, setPaginaActual] = useState(1);
     const [loadingLista, setLoadingLista] = useState(false);
 
-    // Vista de mapa o tabla
-    const [vistaActual, setVistaActual] = useState<'tabla' | 'mapa'>('tabla');
+    // Totales globales (no cambian con filtros)
+    const [totalesGlobales, setTotalesGlobales] = useState<{
+        totalGeneradores: number;
+        totalDepartamentos: number;
+        totalTiposResiduo: number;
+    } | null>(null);
+
+    // Indicador de filtros activos
+    const hayFiltrosActivos = filtroDepto || filtroRubro || filtroTipoResiduo;
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // OPERADORES - Estado y filtros
+    // ═══════════════════════════════════════════════════════════════════════════
+    const [filtrosOperadores, setFiltrosOperadores] = useState<any>(null);
+    const [filtroTipoResiduoOp, setFiltroTipoResiduoOp] = useState('');
+    const [filtroActivoOp, setFiltroActivoOp] = useState('');
+    const [listaOperadores, setListaOperadores] = useState<any>(null);
+    const [conteoTiposOperadores, setConteoTiposOperadores] = useState<any[]>([]);
+    const [totalesGlobalesOp, setTotalesGlobalesOp] = useState<any>(null);
+    const [paginaActualOp, setPaginaActualOp] = useState(1);
+    const [loadingListaOp, setLoadingListaOp] = useState(false);
+    const hayFiltrosActivosOp = filtroTipoResiduoOp || filtroActivoOp;
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // TRANSPORTISTAS - Estado y filtros
+    // ═══════════════════════════════════════════════════════════════════════════
+    const [filtrosTransportistas, setFiltrosTransportistas] = useState<any>(null);
+    const [filtroTipoResiduoTr, setFiltroTipoResiduoTr] = useState('');
+    const [filtroActivoTr, setFiltroActivoTr] = useState('');
+    const [listaTransportistas, setListaTransportistas] = useState<any>(null);
+    const [topTransportistas, setTopTransportistas] = useState<any[]>([]);
+    const [totalesGlobalesTr, setTotalesGlobalesTr] = useState<any>(null);
+    const [paginaActualTr, setPaginaActualTr] = useState(1);
+    const [loadingListaTr, setLoadingListaTr] = useState(false);
+    const hayFiltrosActivosTr = filtroTipoResiduoTr || filtroActivoTr;
 
     const getHeaders = () => {
         const token = localStorage.getItem('accessToken');
@@ -199,12 +228,53 @@ const Reportes: React.FC = () => {
             if (!filtrosDisponibles) {
                 cargarFiltrosDisponibles();
             }
+            if (!totalesGlobales) {
+                cargarTotalesGlobales();
+            }
             if (!reporteGeneradores) {
                 cargarReporteGeneradores();
             }
             cargarConteoTiposResiduo();
         }
     }, [activeTab]);
+
+    // Auto-cargar datos cuando cambia el tab a "tratados" (OPERADORES)
+    useEffect(() => {
+        if (activeTab === 'tratados') {
+            if (!filtrosOperadores) {
+                cargarFiltrosOperadores();
+            }
+            cargarReporteOperadores(1);
+            cargarConteoTiposOperadores();
+        }
+    }, [activeTab]);
+
+    // Auto-cargar datos cuando cambia el tab a "transporte" (TRANSPORTISTAS)
+    useEffect(() => {
+        if (activeTab === 'transporte') {
+            if (!filtrosTransportistas) {
+                cargarFiltrosTransportistas();
+            }
+            cargarReporteTransportistas(1);
+            cargarTopTransportistas();
+        }
+    }, [activeTab]);
+
+    // Cargar totales globales (solo una vez, no cambian con filtros)
+    const cargarTotalesGlobales = async () => {
+        try {
+            const response = await axios.get(`${API_URL}/reportes/generadores-departamento`, { headers: getHeaders() });
+            if (response.data.success) {
+                setTotalesGlobales({
+                    totalGeneradores: response.data.data.totales.totalGeneradores,
+                    totalDepartamentos: response.data.data.departamentos.length,
+                    totalTiposResiduo: filtrosDisponibles?.tiposResiduo?.length || 15
+                });
+            }
+        } catch (error) {
+            console.error('Error al cargar totales globales:', error);
+        }
+    };
 
     const cargarConteoTiposResiduo = async () => {
         try {
@@ -295,34 +365,139 @@ const Reportes: React.FC = () => {
         }
     };
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // OPERADORES - Funciones de carga
+    // ═══════════════════════════════════════════════════════════════════════════
+    const cargarFiltrosOperadores = async () => {
+        try {
+            const response = await axios.get(`${API_URL}/reportes/operadores-filtros`, { headers: getHeaders() });
+            if (response.data.success) {
+                setFiltrosOperadores(response.data.data);
+            }
+        } catch (error) {
+            console.error('Error al cargar filtros de operadores:', error);
+        }
+    };
+
+    const cargarConteoTiposOperadores = async () => {
+        try {
+            const response = await axios.get(`${API_URL}/reportes/operadores-por-tipo-residuo`, { headers: getHeaders() });
+            if (response.data.success) {
+                setConteoTiposOperadores(response.data.data.conteosPorTipo || []);
+            }
+        } catch (error) {
+            console.error('Error al cargar conteo operadores por tipo:', error);
+        }
+    };
+
+    const cargarReporteOperadores = async (page = 1) => {
+        setLoadingListaOp(true);
+        setPaginaActualOp(page);
+        try {
+            const queryParams = new URLSearchParams({ page: String(page), limit: '15' });
+            if (filtroTipoResiduoOp) queryParams.append('tipoResiduoId', filtroTipoResiduoOp);
+            if (filtroActivoOp) queryParams.append('activo', filtroActivoOp);
+
+            const response = await axios.get(`${API_URL}/reportes/operadores-filtrado?${queryParams}`, { headers: getHeaders() });
+            if (response.data.success) {
+                setListaOperadores(response.data.data);
+                if (!totalesGlobalesOp) {
+                    setTotalesGlobalesOp(response.data.data.totalesGlobales);
+                }
+            }
+        } catch (error) {
+            console.error('Error al cargar reporte de operadores:', error);
+        } finally {
+            setLoadingListaOp(false);
+        }
+    };
+
+    const limpiarFiltrosOperadores = () => {
+        setFiltroTipoResiduoOp('');
+        setFiltroActivoOp('');
+        cargarReporteOperadores(1);
+        cargarConteoTiposOperadores();
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // TRANSPORTISTAS - Funciones de carga
+    // ═══════════════════════════════════════════════════════════════════════════
+    const cargarFiltrosTransportistas = async () => {
+        try {
+            const response = await axios.get(`${API_URL}/reportes/transportistas-filtros`, { headers: getHeaders() });
+            if (response.data.success) {
+                setFiltrosTransportistas(response.data.data);
+            }
+        } catch (error) {
+            console.error('Error al cargar filtros de transportistas:', error);
+        }
+    };
+
+    const cargarTopTransportistas = async () => {
+        try {
+            const response = await axios.get(`${API_URL}/reportes/transportistas-por-viajes?limit=15`, { headers: getHeaders() });
+            if (response.data.success) {
+                setTopTransportistas(response.data.data.topTransportistas || []);
+            }
+        } catch (error) {
+            console.error('Error al cargar top transportistas:', error);
+        }
+    };
+
+    const cargarReporteTransportistas = async (page = 1) => {
+        setLoadingListaTr(true);
+        setPaginaActualTr(page);
+        try {
+            const queryParams = new URLSearchParams({ page: String(page), limit: '15' });
+            if (filtroTipoResiduoTr) queryParams.append('tipoResiduoId', filtroTipoResiduoTr);
+            if (filtroActivoTr) queryParams.append('activo', filtroActivoTr);
+
+            const response = await axios.get(`${API_URL}/reportes/transportistas-filtrado?${queryParams}`, { headers: getHeaders() });
+            if (response.data.success) {
+                setListaTransportistas(response.data.data);
+                if (!totalesGlobalesTr) {
+                    setTotalesGlobalesTr(response.data.data.totalesGlobales);
+                }
+            }
+        } catch (error) {
+            console.error('Error al cargar reporte de transportistas:', error);
+        } finally {
+            setLoadingListaTr(false);
+        }
+    };
+
+    const limpiarFiltrosTransportistas = () => {
+        setFiltroTipoResiduoTr('');
+        setFiltroActivoTr('');
+        cargarReporteTransportistas(1);
+        cargarTopTransportistas();
+    };
+
     const cargarReporte = async () => {
         if (activeTab === 'generadores') {
             await cargarReporteGeneradores();
             return;
         }
+        if (activeTab === 'tratados') {
+            await cargarReporteOperadores();
+            return;
+        }
+        if (activeTab === 'transporte') {
+            await cargarReporteTransportistas();
+            return;
+        }
 
+        // Solo para tab manifiestos - los demás se manejan arriba
         setLoading(true);
         setUsandoDemo(false);
         try {
             const params = { fechaInicio, fechaFin };
-
-            if (activeTab === 'manifiestos') {
-                const data = await reporteService.getReporteManifiestos(params);
-                setReporte(data);
-            } else if (activeTab === 'tratados') {
-                const data = await reporteService.getReporteTratados(params);
-                setReporteTratados(data);
-            } else if (activeTab === 'transporte') {
-                const data = await reporteService.getReporteTransporte(params);
-                setReporteTransporte(data);
-            }
+            const data = await reporteService.getReporteManifiestos(params);
+            setReporte(data);
         } catch (error) {
             console.error('Error al cargar reporte:', error);
-            // Si hay error, usar datos demo
             setUsandoDemo(true);
-            if (activeTab === 'manifiestos') setReporte(datosDemo.manifiestos);
-            if (activeTab === 'tratados') setReporteTratados(datosDemo.tratados);
-            if (activeTab === 'transporte') setReporteTransporte(datosDemo.transporte);
+            setReporte(datosDemo.manifiestos);
         } finally {
             setLoading(false);
         }
@@ -569,16 +744,150 @@ const Reportes: React.FC = () => {
                             </div>
                         </div>
                     </>
-                ) : activeTab === 'tratados' && reporteTratados ? (
+                ) : activeTab === 'tratados' ? (
                     <>
-                        <div className="stats-grid">
+                        {/* ═══════════════════════════════════════════════════════════════
+                            OPERADORES - SECCIÓN COMPLETA (siguiendo patrón de generadores)
+                           ═══════════════════════════════════════════════════════════════ */}
+
+                        {/* Header Global */}
+                        <div className="resumen-global-header" style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '0.75rem 1.25rem',
+                            marginBottom: '1rem',
+                            background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(168, 85, 247, 0.1))',
+                            borderRadius: '12px',
+                            border: '1px solid rgba(139, 92, 246, 0.2)'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <Factory size={18} style={{ color: '#a855f7' }} />
+                                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Resumen Global de Operadores</span>
+                            </div>
+                            <div style={{ display: 'flex', gap: '1.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <Factory size={16} style={{ color: '#a855f7' }} />
+                                    <span style={{ fontWeight: 700, color: '#a855f7', fontSize: '1.1rem' }}>
+                                        {totalesGlobalesOp?.totalOperadores || 0}
+                                    </span>
+                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Operadores</span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <CheckCircle size={16} style={{ color: '#22c55e' }} />
+                                    <span style={{ fontWeight: 700, color: '#22c55e', fontSize: '1.1rem' }}>
+                                        {totalesGlobalesOp?.totalActivos || 0}
+                                    </span>
+                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Activos</span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <Package size={16} style={{ color: '#f59e0b' }} />
+                                    <span style={{ fontWeight: 700, color: '#f59e0b', fontSize: '1.1rem' }}>
+                                        {totalesGlobalesOp?.totalTiposTratados || 0}
+                                    </span>
+                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Tipos Tratados</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Filtros */}
+                        <div className="generadores-filtros-section" style={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: '1rem',
+                            alignItems: 'center',
+                            padding: '1rem',
+                            background: 'var(--bg-secondary)',
+                            borderRadius: '12px',
+                            marginBottom: '1.5rem'
+                        }}>
+                            <div className="filtro-group" style={{ flex: '1', minWidth: '200px' }}>
+                                <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.25rem', display: 'block' }}>
+                                    Tipo de Residuo Autorizado
+                                </label>
+                                <select
+                                    value={filtroTipoResiduoOp}
+                                    onChange={(e) => setFiltroTipoResiduoOp(e.target.value)}
+                                    className="form-select"
+                                    style={{ width: '100%' }}
+                                >
+                                    <option value="">Todos los tipos</option>
+                                    {filtrosOperadores?.tiposResiduo?.map((tr: any) => (
+                                        <option key={tr.id} value={tr.id}>{tr.codigo} - {tr.nombre}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="filtro-group" style={{ flex: '1', minWidth: '150px' }}>
+                                <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.25rem', display: 'block' }}>
+                                    Estado
+                                </label>
+                                <select
+                                    value={filtroActivoOp}
+                                    onChange={(e) => setFiltroActivoOp(e.target.value)}
+                                    className="form-select"
+                                    style={{ width: '100%' }}
+                                >
+                                    <option value="">Todos</option>
+                                    <option value="true">Activos</option>
+                                    <option value="false">Inactivos</option>
+                                </select>
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', paddingTop: '1.25rem' }}>
+                                <button
+                                    className="btn btn-primary"
+                                    onClick={() => { cargarReporteOperadores(1); cargarConteoTiposOperadores(); }}
+                                    disabled={loadingListaOp}
+                                >
+                                    <Filter size={16} /> Filtrar
+                                </button>
+                                {hayFiltrosActivosOp && (
+                                    <button
+                                        className="btn btn-secondary"
+                                        onClick={limpiarFiltrosOperadores}
+                                    >
+                                        <X size={16} /> Limpiar
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Badges de filtros activos */}
+                        {hayFiltrosActivosOp && (
+                            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                                {filtroTipoResiduoOp && (
+                                    <span className="badge" style={{ background: '#8b5cf6', color: 'white', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.8rem' }}>
+                                        Tipo: {filtrosOperadores?.tiposResiduo?.find((t: any) => t.id === filtroTipoResiduoOp)?.codigo || filtroTipoResiduoOp}
+                                    </span>
+                                )}
+                                {filtroActivoOp && (
+                                    <span className="badge" style={{ background: filtroActivoOp === 'true' ? '#22c55e' : '#ef4444', color: 'white', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.8rem' }}>
+                                        {filtroActivoOp === 'true' ? 'Activos' : 'Inactivos'}
+                                    </span>
+                                )}
+                                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginLeft: '0.5rem' }}>
+                                    Mostrando {listaOperadores?.pagination?.total || 0} de {totalesGlobalesOp?.totalOperadores || 0}
+                                </span>
+                            </div>
+                        )}
+
+                        {/* Stats Cards */}
+                        <div className="stats-grid" style={{ marginBottom: '1.5rem' }}>
+                            <div className="stat-card" style={{ borderLeft: hayFiltrosActivosOp ? '3px solid #f59e0b' : 'none' }}>
+                                <div className="stat-icon purple">
+                                    <Factory size={28} />
+                                </div>
+                                <div className="stat-info">
+                                    <h3>{listaOperadores?.pagination?.total || totalesGlobalesOp?.totalOperadores || 0}</h3>
+                                    <span>{hayFiltrosActivosOp ? 'Operadores (Filtrado)' : 'Total Operadores'}</span>
+                                </div>
+                            </div>
                             <div className="stat-card">
                                 <div className="stat-icon green">
                                     <CheckCircle size={28} />
                                 </div>
                                 <div className="stat-info">
-                                    <h3>{reporteTratados.resumen.totalManifiestosTratados}</h3>
-                                    <span>Manifiestos Tratados</span>
+                                    <h3>{totalesGlobalesOp?.totalActivos || 0}</h3>
+                                    <span>Activos</span>
                                 </div>
                             </div>
                             <div className="stat-card">
@@ -586,78 +895,387 @@ const Reportes: React.FC = () => {
                                     <Package size={28} />
                                 </div>
                                 <div className="stat-info">
-                                    <h3>{reporteTratados.resumen.totalResiduosTratados.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</h3>
-                                    <span>Kg Tratados</span>
-                                </div>
-                            </div>
-                            <div className="stat-card">
-                                <div className="stat-icon purple">
-                                    <Factory size={28} />
-                                </div>
-                                <div className="stat-info">
-                                    <h3>{Object.keys(reporteTratados.porGenerador).length}</h3>
-                                    <span>Generadores Atendidos</span>
+                                    <h3>{totalesGlobalesOp?.totalTiposTratados || 0}</h3>
+                                    <span>Tipos Tratados</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="reporte-section">
-                            <h3><Factory size={20} /> Manifiestos por Generador</h3>
-                            <div className="estado-bars">
-                                {Object.entries(reporteTratados.porGenerador).map(([generador, cantidad], index) => {
-                                    const colors = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ec4899', '#6366f1'];
-                                    const color = colors[index % colors.length];
-                                    const total = Object.values(reporteTratados.porGenerador).reduce((a: number, b: unknown) => a + (b as number), 0);
-                                    return (
-                                        <div key={generador} className="estado-bar-item">
-                                            <div className="estado-label" style={{ minWidth: '200px' }}>
-                                                <span className="estado-dot" style={{ background: color }} />
-                                                {generador}
+                        {/* Gráfico de Operadores por Tipo de Residuo */}
+                        {conteoTiposOperadores.length > 0 && (
+                            <div className="reporte-section" style={{ marginBottom: '1.5rem' }}>
+                                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                                    <Package size={20} /> Operadores por Tipo de Residuo Autorizado (Y-codes Basel)
+                                </h3>
+                                <div className="estado-bars">
+                                    {conteoTiposOperadores.slice(0, 15).map((item: any) => {
+                                        const maxCount = conteoTiposOperadores[0]?.cantidadOperadores || 1;
+                                        const peligrosidadColor = item.peligrosidad === 'ALTA' ? '#ef4444' : item.peligrosidad === 'MEDIA' ? '#f59e0b' : '#22c55e';
+                                        return (
+                                            <div
+                                                key={item.tipoResiduoId}
+                                                className="estado-bar-item"
+                                                style={{ cursor: 'pointer' }}
+                                                onClick={() => {
+                                                    setFiltroTipoResiduoOp(item.tipoResiduoId);
+                                                    cargarReporteOperadores(1);
+                                                }}
+                                            >
+                                                <div className="estado-label" style={{ minWidth: '120px' }}>
+                                                    <span className="estado-dot" style={{ background: peligrosidadColor }} />
+                                                    <span style={{ fontWeight: 600 }}>{item.codigo}</span>
+                                                </div>
+                                                <div className="bar-container" style={{ flex: 1 }}>
+                                                    <div
+                                                        className="bar-fill"
+                                                        style={{
+                                                            width: `${(item.cantidadOperadores / maxCount) * 100}%`,
+                                                            background: `linear-gradient(90deg, ${peligrosidadColor}, ${peligrosidadColor}dd)`
+                                                        }}
+                                                    />
+                                                </div>
+                                                <span className="bar-value" style={{ minWidth: '50px', textAlign: 'right' }}>
+                                                    {item.cantidadOperadores}
+                                                </span>
                                             </div>
-                                            <div className="bar-container">
-                                                <div
-                                                    className="bar-fill"
-                                                    style={{
-                                                        width: `${((cantidad as number) / total) * 100}%`,
-                                                        background: `linear-gradient(90deg, ${color}, ${color}dd)`
-                                                    }}
-                                                />
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Lista de Operadores */}
+                        {listaOperadores && listaOperadores.operadores?.length > 0 && (
+                            <div className="reporte-section">
+                                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                                    <List size={20} /> Lista de Operadores
+                                    {loadingListaOp && <Loader2 size={16} className="spin" style={{ marginLeft: '0.5rem' }} />}
+                                </h3>
+
+                                {/* Mobile Cards */}
+                                <div className="reporte-mobile-cards">
+                                    {listaOperadores.operadores.map((op: any) => (
+                                        <div key={op.id} className="transportista-mobile-card" onClick={() => navigate(`/admin/operadores/${op.id}`)}>
+                                            <div className="transportista-card-header">
+                                                <div className="transportista-info">
+                                                    <span className="transportista-name">{op.razonSocial}</span>
+                                                    <span className="transportista-cuit">{op.cuit}</span>
+                                                </div>
+                                                <span className={`badge ${op.activo ? 'badge-success' : 'badge-danger'}`}>
+                                                    {op.activo ? 'Activo' : 'Inactivo'}
+                                                </span>
                                             </div>
-                                            <span className="bar-value">{cantidad as number}</span>
+                                            <div className="transportista-card-body">
+                                                <div className="transportista-stats-grid">
+                                                    <div className="transportista-stat">
+                                                        <span className="stat-value">{op.manifiestos}</span>
+                                                        <span className="stat-label">Manifiestos</span>
+                                                    </div>
+                                                    <div className="transportista-stat">
+                                                        <span className="stat-value">{op.tratamientos?.length || 0}</span>
+                                                        <span className="stat-label">Tratamientos</span>
+                                                    </div>
+                                                </div>
+                                                {op.tratamientos?.length > 0 && (
+                                                    <div className="transportista-flota" style={{ marginTop: '0.5rem' }}>
+                                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                                            {op.tratamientos.slice(0, 3).map((t: any) => t.codigo).join(', ')}
+                                                            {op.tratamientos.length > 3 && ` +${op.tratamientos.length - 3}`}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                    );
-                                })}
+                                    ))}
+                                </div>
+
+                                {/* Desktop Table */}
+                                <div className="table-container reporte-desktop-table">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Razón Social</th>
+                                                <th>CUIT</th>
+                                                <th>Categoría</th>
+                                                <th>Tratamientos</th>
+                                                <th>Manifiestos</th>
+                                                <th>Estado</th>
+                                                <th>Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {listaOperadores.operadores.map((op: any) => (
+                                                <tr key={op.id} onClick={() => navigate(`/admin/operadores/${op.id}`)} style={{ cursor: 'pointer' }}>
+                                                    <td><strong>{op.razonSocial}</strong></td>
+                                                    <td>{op.cuit}</td>
+                                                    <td>{op.categoria || '-'}</td>
+                                                    <td>
+                                                        <span style={{ fontSize: '0.8rem' }}>
+                                                            {op.tratamientos?.slice(0, 2).map((t: any) => t.codigo).join(', ')}
+                                                            {op.tratamientos?.length > 2 && ` +${op.tratamientos.length - 2}`}
+                                                        </span>
+                                                    </td>
+                                                    <td>{op.manifiestos}</td>
+                                                    <td>
+                                                        <span className={`badge ${op.activo ? 'badge-success' : 'badge-danger'}`}>
+                                                            {op.activo ? 'Activo' : 'Inactivo'}
+                                                        </span>
+                                                    </td>
+                                                    <td onClick={(e) => e.stopPropagation()}>
+                                                        <Link to={`/admin/operadores/${op.id}`} className="btn btn-icon btn-ghost" title="Ver detalle">
+                                                            <Eye size={16} />
+                                                        </Link>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* Paginación */}
+                                {listaOperadores.pagination?.pages > 1 && (
+                                    <div className="pagination" style={{ marginTop: '1rem' }}>
+                                        <span className="pagination-info">
+                                            Página {listaOperadores.pagination.page} de {listaOperadores.pagination.pages}
+                                            {' '}({listaOperadores.pagination.total} total)
+                                        </span>
+                                        <div className="pagination-controls">
+                                            <button
+                                                className="btn btn-icon btn-ghost"
+                                                disabled={paginaActualOp === 1 || loadingListaOp}
+                                                onClick={() => cargarReporteOperadores(paginaActualOp - 1)}
+                                            >
+                                                <ChevronLeft size={18} />
+                                            </button>
+                                            <span className="pagination-current">
+                                                {paginaActualOp} / {listaOperadores.pagination.pages}
+                                            </span>
+                                            <button
+                                                className="btn btn-icon btn-ghost"
+                                                disabled={paginaActualOp === listaOperadores.pagination.pages || loadingListaOp}
+                                                onClick={() => cargarReporteOperadores(paginaActualOp + 1)}
+                                            >
+                                                <ChevronRight size={18} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Empty state */}
+                        {(!listaOperadores || listaOperadores.operadores?.length === 0) && !loadingListaOp && (
+                            <div className="empty-state" style={{ textAlign: 'center', padding: '48px 24px', color: '#94a3b8' }}>
+                                <Factory size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
+                                <h3 style={{ margin: '0 0 8px', color: '#e2e8f0' }}>Sin datos de operadores</h3>
+                                <p style={{ margin: 0 }}>No se encontraron operadores con los filtros seleccionados.</p>
+                            </div>
+                        )}
+
+                        {loadingListaOp && (
+                            <div style={{ textAlign: 'center', padding: '2rem' }}>
+                                <Loader2 size={32} className="spin" />
+                                <p style={{ marginTop: '1rem', color: 'var(--text-muted)' }}>Cargando operadores...</p>
+                            </div>
+                        )}
+
+                        {/* Mapa de Operadores */}
+                        {listaOperadores && listaOperadores.operadores?.length > 0 && (
+                            <div className="reporte-section" style={{
+                                marginTop: '2rem',
+                                padding: '1.5rem',
+                                background: 'rgba(255, 255, 255, 0.02)',
+                                borderRadius: '12px',
+                                border: '1px solid rgba(255, 255, 255, 0.1)'
+                            }}>
+                                <h4 style={{
+                                    margin: '0 0 1rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    color: '#e2e8f0'
+                                }}>
+                                    <MapPin size={20} style={{ color: '#10b981' }} />
+                                    Mapa de Ubicación de Operadores
+                                    <span style={{
+                                        fontSize: '0.8rem',
+                                        color: '#94a3b8',
+                                        fontWeight: 'normal',
+                                        marginLeft: 'auto'
+                                    }}>
+                                        {listaOperadores.operadores.filter((op: any) => op.latitud && op.longitud).length} operadores con ubicación
+                                    </span>
+                                </h4>
+                                <div style={{
+                                    height: '400px',
+                                    borderRadius: '8px',
+                                    overflow: 'hidden',
+                                    border: '1px solid rgba(148, 163, 184, 0.2)'
+                                }}>
+                                    <MapContainer
+                                        center={[-32.89, -68.83]}
+                                        zoom={8}
+                                        style={{ height: '100%', width: '100%' }}
+                                    >
+                                        <TileLayer
+                                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                        />
+                                        {listaOperadores.operadores
+                                            .filter((op: any) => op.latitud && op.longitud)
+                                            .map((op: any) => (
+                                                <Marker
+                                                    key={op.id}
+                                                    position={[op.latitud, op.longitud]}
+                                                >
+                                                    <Popup>
+                                                        <strong>{op.razonSocial}</strong><br/>
+                                                        {op.categoria || 'Sin categoría'}<br/>
+                                                        <small>{op.manifiestos} manifiestos</small>
+                                                    </Popup>
+                                                </Marker>
+                                            ))
+                                        }
+                                    </MapContainer>
+                                </div>
+                            </div>
+                        )}
+                    </>
+                ) : activeTab === 'transporte' ? (
+                    <>
+                        {/* ═══════════════════════════════════════════════════════════════
+                            TRANSPORTISTAS - SECCIÓN COMPLETA (siguiendo patrón de generadores)
+                           ═══════════════════════════════════════════════════════════════ */}
+
+                        {/* Header Global */}
+                        <div className="resumen-global-header" style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '0.75rem 1.25rem',
+                            marginBottom: '1rem',
+                            background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.1), rgba(234, 88, 12, 0.1))',
+                            borderRadius: '12px',
+                            border: '1px solid rgba(249, 115, 22, 0.2)'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <Truck size={18} style={{ color: '#f97316' }} />
+                                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Resumen Global de Transportistas</span>
+                            </div>
+                            <div style={{ display: 'flex', gap: '1.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <Truck size={16} style={{ color: '#f97316' }} />
+                                    <span style={{ fontWeight: 700, color: '#f97316', fontSize: '1.1rem' }}>
+                                        {totalesGlobalesTr?.totalTransportistas || 0}
+                                    </span>
+                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Transportistas</span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <Package size={16} style={{ color: '#3b82f6' }} />
+                                    <span style={{ fontWeight: 700, color: '#3b82f6', fontSize: '1.1rem' }}>
+                                        {totalesGlobalesTr?.totalVehiculos || 0}
+                                    </span>
+                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Vehículos</span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <Award size={16} style={{ color: '#22c55e' }} />
+                                    <span style={{ fontWeight: 700, color: '#22c55e', fontSize: '1.1rem' }}>
+                                        {totalesGlobalesTr?.totalChoferes || 0}
+                                    </span>
+                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Choferes</span>
+                                </div>
                             </div>
                         </div>
-                    </>
-                ) : activeTab === 'transporte' && reporteTransporte ? (
-                    <>
-                        <div className="stats-grid">
-                            <div className="stat-card">
+
+                        {/* Filtros */}
+                        <div className="generadores-filtros-section" style={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: '1rem',
+                            alignItems: 'center',
+                            padding: '1rem',
+                            background: 'var(--bg-secondary)',
+                            borderRadius: '12px',
+                            marginBottom: '1.5rem'
+                        }}>
+                            <div className="filtro-group" style={{ flex: '1', minWidth: '200px' }}>
+                                <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.25rem', display: 'block' }}>
+                                    Tipo de Residuo Transportado
+                                </label>
+                                <select
+                                    value={filtroTipoResiduoTr}
+                                    onChange={(e) => setFiltroTipoResiduoTr(e.target.value)}
+                                    className="form-select"
+                                    style={{ width: '100%' }}
+                                >
+                                    <option value="">Todos los tipos</option>
+                                    {filtrosTransportistas?.tiposResiduo?.map((tr: any) => (
+                                        <option key={tr.id} value={tr.id}>{tr.codigo} - {tr.nombre}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="filtro-group" style={{ flex: '1', minWidth: '150px' }}>
+                                <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.25rem', display: 'block' }}>
+                                    Estado
+                                </label>
+                                <select
+                                    value={filtroActivoTr}
+                                    onChange={(e) => setFiltroActivoTr(e.target.value)}
+                                    className="form-select"
+                                    style={{ width: '100%' }}
+                                >
+                                    <option value="">Todos</option>
+                                    <option value="true">Activos</option>
+                                    <option value="false">Inactivos</option>
+                                </select>
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', paddingTop: '1.25rem' }}>
+                                <button
+                                    className="btn btn-primary"
+                                    onClick={() => { cargarReporteTransportistas(1); cargarTopTransportistas(); }}
+                                    disabled={loadingListaTr}
+                                >
+                                    <Filter size={16} /> Filtrar
+                                </button>
+                                {hayFiltrosActivosTr && (
+                                    <button
+                                        className="btn btn-secondary"
+                                        onClick={limpiarFiltrosTransportistas}
+                                    >
+                                        <X size={16} /> Limpiar
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Badges de filtros activos */}
+                        {hayFiltrosActivosTr && (
+                            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                                {filtroTipoResiduoTr && (
+                                    <span className="badge" style={{ background: '#f97316', color: 'white', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.8rem' }}>
+                                        Tipo: {filtrosTransportistas?.tiposResiduo?.find((t: any) => t.id === filtroTipoResiduoTr)?.codigo || filtroTipoResiduoTr}
+                                    </span>
+                                )}
+                                {filtroActivoTr && (
+                                    <span className="badge" style={{ background: filtroActivoTr === 'true' ? '#22c55e' : '#ef4444', color: 'white', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.8rem' }}>
+                                        {filtroActivoTr === 'true' ? 'Activos' : 'Inactivos'}
+                                    </span>
+                                )}
+                                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginLeft: '0.5rem' }}>
+                                    Mostrando {listaTransportistas?.pagination?.total || 0} de {totalesGlobalesTr?.totalTransportistas || 0}
+                                </span>
+                            </div>
+                        )}
+
+                        {/* Stats Cards */}
+                        <div className="stats-grid" style={{ marginBottom: '1.5rem' }}>
+                            <div className="stat-card" style={{ borderLeft: hayFiltrosActivosTr ? '3px solid #f59e0b' : 'none' }}>
                                 <div className="stat-icon orange">
                                     <Truck size={28} />
                                 </div>
                                 <div className="stat-info">
-                                    <h3>{reporteTransporte.resumen.totalTransportistas}</h3>
-                                    <span>Transportistas Activos</span>
-                                </div>
-                            </div>
-                            <div className="stat-card">
-                                <div className="stat-icon blue">
-                                    <FileText size={28} />
-                                </div>
-                                <div className="stat-info">
-                                    <h3>{reporteTransporte.resumen.totalViajes}</h3>
-                                    <span>Total Viajes</span>
-                                </div>
-                            </div>
-                            <div className="stat-card">
-                                <div className="stat-icon purple">
-                                    <Clock size={28} />
-                                </div>
-                                <div className="stat-info">
-                                    <h3>{reporteTransporte.resumen.viajesActivos}</h3>
-                                    <span>En Tránsito</span>
+                                    <h3>{listaTransportistas?.pagination?.total || totalesGlobalesTr?.totalTransportistas || 0}</h3>
+                                    <span>{hayFiltrosActivosTr ? 'Transportistas (Filtrado)' : 'Total Transportistas'}</span>
                                 </div>
                             </div>
                             <div className="stat-card">
@@ -665,169 +1283,409 @@ const Reportes: React.FC = () => {
                                     <CheckCircle size={28} />
                                 </div>
                                 <div className="stat-info">
-                                    <h3>{Math.round((reporteTransporte.resumen.viajesCompletados / reporteTransporte.resumen.totalViajes) * 100)}%</h3>
-                                    <span>Tasa Éxito</span>
+                                    <h3>{totalesGlobalesTr?.totalActivos || 0}</h3>
+                                    <span>Activos</span>
+                                </div>
+                            </div>
+                            <div className="stat-card">
+                                <div className="stat-icon blue">
+                                    <Package size={28} />
+                                </div>
+                                <div className="stat-info">
+                                    <h3>{totalesGlobalesTr?.totalVehiculos || 0}</h3>
+                                    <span>Vehículos</span>
+                                </div>
+                            </div>
+                            <div className="stat-card">
+                                <div className="stat-icon purple">
+                                    <Award size={28} />
+                                </div>
+                                <div className="stat-info">
+                                    <h3>{totalesGlobalesTr?.totalChoferes || 0}</h3>
+                                    <span>Choferes</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="reporte-section">
-                            <h3><Truck size={20} /> Rendimiento por Transportista</h3>
+                        {/* Gráfico Top Transportistas por Viajes */}
+                        {topTransportistas.length > 0 && (
+                            <div className="reporte-section" style={{ marginBottom: '1.5rem' }}>
+                                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                                    <TrendingUp size={20} /> Top Transportistas por Manifiestos
+                                </h3>
+                                <div className="estado-bars">
+                                    {topTransportistas.slice(0, 10).map((item: any, index: number) => {
+                                        const maxCount = topTransportistas[0]?.manifiestos || 1;
+                                        const colors = ['#f97316', '#fb923c', '#fdba74', '#fed7aa', '#ffedd5'];
+                                        const color = colors[Math.min(index, colors.length - 1)];
+                                        return (
+                                            <div
+                                                key={item.id}
+                                                className="estado-bar-item"
+                                                style={{ cursor: 'pointer' }}
+                                                onClick={() => navigate(`/admin/transportistas/${item.id}`)}
+                                            >
+                                                <div className="estado-label" style={{ minWidth: '200px' }}>
+                                                    <span style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        width: '24px',
+                                                        height: '24px',
+                                                        borderRadius: '50%',
+                                                        background: color,
+                                                        color: index < 3 ? 'white' : '#333',
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: 700,
+                                                        marginRight: '0.5rem'
+                                                    }}>
+                                                        {item.ranking}
+                                                    </span>
+                                                    <span style={{ fontWeight: 500 }}>{item.razonSocial?.substring(0, 30)}{item.razonSocial?.length > 30 ? '...' : ''}</span>
+                                                </div>
+                                                <div className="bar-container" style={{ flex: 1 }}>
+                                                    <div
+                                                        className="bar-fill"
+                                                        style={{
+                                                            width: `${(item.manifiestos / maxCount) * 100}%`,
+                                                            background: `linear-gradient(90deg, ${color}, ${color}dd)`
+                                                        }}
+                                                    />
+                                                </div>
+                                                <span className="bar-value" style={{ minWidth: '50px', textAlign: 'right' }}>
+                                                    {item.manifiestos}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
 
-                            {/* Mobile Cards */}
-                            <div className="reporte-mobile-cards">
-                                {reporteTransporte.transportistas.map((t: any) => (
-                                    <div key={t.cuit} className="transportista-mobile-card">
-                                        <div className="transportista-card-header">
-                                            <div className="transportista-info">
-                                                <span className="transportista-name">{t.transportista}</span>
-                                                <span className="transportista-cuit">{t.cuit}</span>
+                        {/* Lista de Transportistas */}
+                        {listaTransportistas && listaTransportistas.transportistas?.length > 0 && (
+                            <div className="reporte-section">
+                                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                                    <List size={20} /> Lista de Transportistas
+                                    {loadingListaTr && <Loader2 size={16} className="spin" style={{ marginLeft: '0.5rem' }} />}
+                                </h3>
+
+                                {/* Mobile Cards */}
+                                <div className="reporte-mobile-cards">
+                                    {listaTransportistas.transportistas.map((tr: any) => (
+                                        <div key={tr.id} className="transportista-mobile-card" onClick={() => navigate(`/admin/transportistas/${tr.id}`)}>
+                                            <div className="transportista-card-header">
+                                                <div className="transportista-info">
+                                                    <span className="transportista-name">{tr.razonSocial}</span>
+                                                    <span className="transportista-cuit">{tr.cuit}</span>
+                                                </div>
+                                                <span className={`badge ${tr.activo ? 'badge-success' : 'badge-danger'}`}>
+                                                    {tr.activo ? 'Activo' : 'Inactivo'}
+                                                </span>
                                             </div>
-                                            <span className="transportista-badge">{t.tasaCompletitud}</span>
+                                            <div className="transportista-card-body">
+                                                <div className="transportista-stats-grid">
+                                                    <div className="transportista-stat">
+                                                        <span className="stat-value">{tr.manifiestos}</span>
+                                                        <span className="stat-label">Manifiestos</span>
+                                                    </div>
+                                                    <div className="transportista-stat success">
+                                                        <span className="stat-value">{tr.viajesCompletados}</span>
+                                                        <span className="stat-label">Completados</span>
+                                                    </div>
+                                                    <div className="transportista-stat">
+                                                        <span className="stat-value">{tr.tasaCompletitud}</span>
+                                                        <span className="stat-label">Completitud</span>
+                                                    </div>
+                                                </div>
+                                                <div className="transportista-flota">
+                                                    <span>{tr.vehiculos} vehículos</span>
+                                                    <span className="separator">·</span>
+                                                    <span>{tr.choferes} choferes</span>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="transportista-card-body">
-                                            <div className="transportista-stats-grid">
-                                                <div className="transportista-stat">
-                                                    <span className="stat-value">{t.totalViajes}</span>
-                                                    <span className="stat-label">Total</span>
-                                                </div>
-                                                <div className="transportista-stat success">
-                                                    <span className="stat-value">{t.completados}</span>
-                                                    <span className="stat-label">Completados</span>
-                                                </div>
-                                                <div className="transportista-stat warning">
-                                                    <span className="stat-value">{t.enTransito}</span>
-                                                    <span className="stat-label">En Tránsito</span>
-                                                </div>
-                                            </div>
-                                            <div className="transportista-flota">
-                                                <span>{t.vehiculos} vehículos</span>
-                                                <span className="separator">·</span>
-                                                <span>{t.choferes} choferes</span>
-                                            </div>
+                                    ))}
+                                </div>
+
+                                {/* Desktop Table */}
+                                <div className="table-container reporte-desktop-table">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Razón Social</th>
+                                                <th>CUIT</th>
+                                                <th>Vehículos</th>
+                                                <th>Choferes</th>
+                                                <th>Manifiestos</th>
+                                                <th>Completitud</th>
+                                                <th>Estado</th>
+                                                <th>Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {listaTransportistas.transportistas.map((tr: any) => (
+                                                <tr key={tr.id} onClick={() => navigate(`/admin/transportistas/${tr.id}`)} style={{ cursor: 'pointer' }}>
+                                                    <td><strong>{tr.razonSocial}</strong></td>
+                                                    <td>{tr.cuit}</td>
+                                                    <td>{tr.vehiculos}</td>
+                                                    <td>{tr.choferes}</td>
+                                                    <td>{tr.manifiestos}</td>
+                                                    <td>
+                                                        <span className="badge badge-info">{tr.tasaCompletitud}</span>
+                                                    </td>
+                                                    <td>
+                                                        <span className={`badge ${tr.activo ? 'badge-success' : 'badge-danger'}`}>
+                                                            {tr.activo ? 'Activo' : 'Inactivo'}
+                                                        </span>
+                                                    </td>
+                                                    <td onClick={(e) => e.stopPropagation()}>
+                                                        <Link to={`/admin/transportistas/${tr.id}`} className="btn btn-icon btn-ghost" title="Ver detalle">
+                                                            <Eye size={16} />
+                                                        </Link>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* Paginación */}
+                                {listaTransportistas.pagination?.pages > 1 && (
+                                    <div className="pagination" style={{ marginTop: '1rem' }}>
+                                        <span className="pagination-info">
+                                            Página {listaTransportistas.pagination.page} de {listaTransportistas.pagination.pages}
+                                            {' '}({listaTransportistas.pagination.total} total)
+                                        </span>
+                                        <div className="pagination-controls">
+                                            <button
+                                                className="btn btn-icon btn-ghost"
+                                                disabled={paginaActualTr === 1 || loadingListaTr}
+                                                onClick={() => cargarReporteTransportistas(paginaActualTr - 1)}
+                                            >
+                                                <ChevronLeft size={18} />
+                                            </button>
+                                            <span className="pagination-current">
+                                                {paginaActualTr} / {listaTransportistas.pagination.pages}
+                                            </span>
+                                            <button
+                                                className="btn btn-icon btn-ghost"
+                                                disabled={paginaActualTr === listaTransportistas.pagination.pages || loadingListaTr}
+                                                onClick={() => cargarReporteTransportistas(paginaActualTr + 1)}
+                                            >
+                                                <ChevronRight size={18} />
+                                            </button>
                                         </div>
                                     </div>
-                                ))}
+                                )}
                             </div>
+                        )}
 
-                            {/* Desktop Table */}
-                            <div className="table-container reporte-desktop-table">
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>Transportista</th>
-                                            <th>Total</th>
-                                            <th>Completados</th>
-                                            <th>En Tránsito</th>
-                                            <th>Flota</th>
-                                            <th>Completitud</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {reporteTransporte.transportistas.map((t: any) => (
-                                            <tr key={t.cuit}>
-                                                <td>
-                                                    <strong>{t.transportista}</strong>
-                                                    <br />
-                                                    <small>{t.cuit}</small>
-                                                </td>
-                                                <td>{t.totalViajes}</td>
-                                                <td className="text-success">{t.completados}</td>
-                                                <td className="text-warning">{t.enTransito}</td>
-                                                <td>
-                                                    <small>{t.vehiculos} vehículos · {t.choferes} choferes</small>
-                                                </td>
-                                                <td>
-                                                    <span className="badge badge-success">{t.tasaCompletitud}</span>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                        {/* Empty state */}
+                        {(!listaTransportistas || listaTransportistas.transportistas?.length === 0) && !loadingListaTr && (
+                            <div className="empty-state" style={{ textAlign: 'center', padding: '48px 24px', color: '#94a3b8' }}>
+                                <Truck size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
+                                <h3 style={{ margin: '0 0 8px', color: '#e2e8f0' }}>Sin datos de transportistas</h3>
+                                <p style={{ margin: 0 }}>No se encontraron transportistas con los filtros seleccionados.</p>
                             </div>
-                        </div>
+                        )}
+
+                        {loadingListaTr && (
+                            <div style={{ textAlign: 'center', padding: '2rem' }}>
+                                <Loader2 size={32} className="spin" />
+                                <p style={{ marginTop: '1rem', color: 'var(--text-muted)' }}>Cargando transportistas...</p>
+                            </div>
+                        )}
+
+                        {/* Mapa de Transportistas */}
+                        {listaTransportistas && listaTransportistas.transportistas?.length > 0 && (
+                            <div className="reporte-section" style={{
+                                marginTop: '2rem',
+                                padding: '1.5rem',
+                                background: 'rgba(255, 255, 255, 0.02)',
+                                borderRadius: '12px',
+                                border: '1px solid rgba(255, 255, 255, 0.1)'
+                            }}>
+                                <h4 style={{
+                                    margin: '0 0 1rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    color: '#e2e8f0'
+                                }}>
+                                    <MapPin size={20} style={{ color: '#f97316' }} />
+                                    Mapa de Ubicación de Transportistas
+                                    <span style={{
+                                        fontSize: '0.8rem',
+                                        color: '#94a3b8',
+                                        fontWeight: 'normal',
+                                        marginLeft: 'auto'
+                                    }}>
+                                        {listaTransportistas.transportistas.filter((tr: any) => tr.latitud && tr.longitud).length} transportistas con ubicación
+                                    </span>
+                                </h4>
+                                <div style={{
+                                    height: '400px',
+                                    borderRadius: '8px',
+                                    overflow: 'hidden',
+                                    border: '1px solid rgba(148, 163, 184, 0.2)'
+                                }}>
+                                    <MapContainer
+                                        center={[-32.89, -68.83]}
+                                        zoom={8}
+                                        style={{ height: '100%', width: '100%' }}
+                                    >
+                                        <TileLayer
+                                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                        />
+                                        {listaTransportistas.transportistas
+                                            .filter((tr: any) => tr.latitud && tr.longitud)
+                                            .map((tr: any) => (
+                                                <Marker
+                                                    key={tr.id}
+                                                    position={[tr.latitud, tr.longitud]}
+                                                >
+                                                    <Popup>
+                                                        <strong>{tr.razonSocial}</strong><br/>
+                                                        {tr.vehiculos} vehículos · {tr.choferes} choferes<br/>
+                                                        <small>{tr.manifiestos} manifiestos</small>
+                                                    </Popup>
+                                                </Marker>
+                                            ))
+                                        }
+                                    </MapContainer>
+                                </div>
+                            </div>
+                        )}
                     </>
                 ) : activeTab === 'generadores' ? (
                     reporteGeneradores ? (
                         <>
-                            {/* Filtros específicos para Generadores */}
+                            {/* ═══════════════════════════════════════════════════════════════
+                                SECCIÓN 1: RESUMEN GLOBAL (datos constantes, no cambian con filtros)
+                               ═══════════════════════════════════════════════════════════════ */}
+                            <div className="resumen-global-header" style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '0.75rem 1.25rem',
+                                marginBottom: '1rem',
+                                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1))',
+                                borderRadius: '12px',
+                                border: '1px solid rgba(99, 102, 241, 0.2)'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <BarChart3 size={18} style={{ color: '#8b5cf6' }} />
+                                    <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Resumen Global del Sistema</span>
+                                </div>
+                                <div style={{ display: 'flex', gap: '1.5rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <Building2 size={16} style={{ color: '#8b5cf6' }} />
+                                        <span style={{ fontWeight: 700, color: '#8b5cf6', fontSize: '1.1rem' }}>
+                                            {totalesGlobales?.totalGeneradores || reporteGeneradores.totales.totalGeneradores}
+                                        </span>
+                                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Generadores</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <MapPin size={16} style={{ color: '#06b6d4' }} />
+                                        <span style={{ fontWeight: 700, color: '#06b6d4', fontSize: '1.1rem' }}>
+                                            {totalesGlobales?.totalDepartamentos || reporteGeneradores.departamentos.length}
+                                        </span>
+                                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Departamentos</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <Package size={16} style={{ color: '#10b981' }} />
+                                        <span style={{ fontWeight: 700, color: '#10b981', fontSize: '1.1rem' }}>
+                                            {filtrosDisponibles?.tiposResiduo?.length || 15}
+                                        </span>
+                                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Y-codes</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ═══════════════════════════════════════════════════════════════
+                                SECCIÓN 2: FILTROS
+                               ═══════════════════════════════════════════════════════════════ */}
                             {filtrosDisponibles && (
                                 <div className="generadores-filtros-section" style={{
-                                    display: 'flex',
-                                    flexWrap: 'wrap',
-                                    gap: '1rem',
                                     marginBottom: '1.5rem',
-                                    padding: '1rem',
+                                    padding: '1.25rem',
                                     background: 'rgba(30, 41, 59, 0.5)',
                                     borderRadius: '12px',
                                     border: '1px solid var(--border-color)'
                                 }}>
-                                    <div className="filtro-grupo" style={{ flex: '1', minWidth: '200px' }}>
-                                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                                            <MapPin size={14} /> Departamento
-                                        </label>
-                                        <select
-                                            value={filtroDepto}
-                                            onChange={(e) => setFiltroDepto(e.target.value)}
-                                            style={{
-                                                width: '100%',
-                                                padding: '0.75rem 1rem',
-                                                background: 'var(--bg-tertiary)',
-                                                border: '1px solid var(--border-color)',
-                                                borderRadius: '8px',
-                                                color: 'var(--text-primary)',
-                                                fontSize: '0.95rem'
-                                            }}
-                                        >
-                                            <option value="">Todos los departamentos</option>
-                                            <optgroup label="Mendoza">
-                                                {filtrosDisponibles.departamentos.mendoza.map(d => (
-                                                    <option key={d} value={d}>{d}</option>
-                                                ))}
-                                            </optgroup>
-                                            {filtrosDisponibles.departamentos.otros.length > 0 && (
-                                                <optgroup label="Otras provincias">
-                                                    {filtrosDisponibles.departamentos.otros.map(d => (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                                        <Filter size={16} style={{ color: 'var(--text-muted)' }} />
+                                        <span style={{ fontWeight: 500, color: 'var(--text-primary)', fontSize: '0.95rem' }}>Filtrar Generadores</span>
+                                    </div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+                                        <div className="filtro-grupo" style={{ flex: '1', minWidth: '200px' }}>
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                                <MapPin size={14} /> Departamento
+                                            </label>
+                                            <select
+                                                value={filtroDepto}
+                                                onChange={(e) => setFiltroDepto(e.target.value)}
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '0.75rem 1rem',
+                                                    background: 'var(--bg-tertiary)',
+                                                    border: '1px solid var(--border-color)',
+                                                    borderRadius: '8px',
+                                                    color: 'var(--text-primary)',
+                                                    fontSize: '0.95rem'
+                                                }}
+                                            >
+                                                <option value="">Todos los departamentos</option>
+                                                <optgroup label="Mendoza">
+                                                    {filtrosDisponibles.departamentos.mendoza.map(d => (
                                                         <option key={d} value={d}>{d}</option>
                                                     ))}
                                                 </optgroup>
-                                            )}
-                                        </select>
-                                    </div>
-                                    <div className="filtro-grupo" style={{ flex: '1', minWidth: '200px' }}>
-                                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                                            <Building2 size={14} /> Rubro
-                                        </label>
-                                        <select
-                                            value={filtroRubro}
-                                            onChange={(e) => setFiltroRubro(e.target.value)}
-                                            style={{
-                                                width: '100%',
-                                                padding: '0.75rem 1rem',
-                                                background: 'var(--bg-tertiary)',
-                                                border: '1px solid var(--border-color)',
-                                                borderRadius: '8px',
-                                                color: 'var(--text-primary)',
-                                                fontSize: '0.95rem'
-                                            }}
-                                        >
-                                            <option value="">Todos los rubros</option>
-                                            {filtrosDisponibles.rubros.map(r => (
-                                                <option key={r} value={r}>{r}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="filtro-grupo" style={{ flex: '1', minWidth: '200px' }}>
-                                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                                            <Package size={14} /> Tipo Residuo (Y-code)
-                                        </label>
-                                        <select
-                                            value={filtroTipoResiduo}
-                                            onChange={(e) => setFiltroTipoResiduo(e.target.value)}
-                                            style={{
-                                                width: '100%',
-                                                padding: '0.75rem 1rem',
-                                                background: 'var(--bg-tertiary)',
+                                                {filtrosDisponibles.departamentos.otros.length > 0 && (
+                                                    <optgroup label="Otras provincias">
+                                                        {filtrosDisponibles.departamentos.otros.map(d => (
+                                                            <option key={d} value={d}>{d}</option>
+                                                        ))}
+                                                    </optgroup>
+                                                )}
+                                            </select>
+                                        </div>
+                                        <div className="filtro-grupo" style={{ flex: '1', minWidth: '200px' }}>
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                                <Building2 size={14} /> Rubro
+                                            </label>
+                                            <select
+                                                value={filtroRubro}
+                                                onChange={(e) => setFiltroRubro(e.target.value)}
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '0.75rem 1rem',
+                                                    background: 'var(--bg-tertiary)',
+                                                    border: '1px solid var(--border-color)',
+                                                    borderRadius: '8px',
+                                                    color: 'var(--text-primary)',
+                                                    fontSize: '0.95rem'
+                                                }}
+                                            >
+                                                <option value="">Todos los rubros</option>
+                                                {filtrosDisponibles.rubros.map(r => (
+                                                    <option key={r} value={r}>{r}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="filtro-grupo" style={{ flex: '1', minWidth: '200px' }}>
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                                <Package size={14} /> Tipo Residuo (Y-code)
+                                            </label>
+                                            <select
+                                                value={filtroTipoResiduo}
+                                                onChange={(e) => setFiltroTipoResiduo(e.target.value)}
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '0.75rem 1rem',
+                                                    background: 'var(--bg-tertiary)',
                                                 border: '1px solid var(--border-color)',
                                                 borderRadius: '8px',
                                                 color: 'var(--text-primary)',
@@ -840,48 +1698,119 @@ const Reportes: React.FC = () => {
                                             ))}
                                         </select>
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem' }}>
-                                        <button
-                                            className="btn btn-primary"
-                                            onClick={() => cargarReporteGeneradores(1)}
-                                            disabled={loading}
-                                            style={{ padding: '0.75rem 1.5rem' }}
-                                        >
-                                            {loading ? <Loader2 size={16} className="spin" /> : <Filter size={16} />}
-                                            Filtrar
-                                        </button>
-                                        {(filtroDepto || filtroRubro || filtroTipoResiduo) && (
+                                        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem' }}>
                                             <button
-                                                className="btn btn-ghost"
-                                                onClick={() => {
-                                                    setFiltroDepto('');
-                                                    setFiltroRubro('');
-                                                    setFiltroTipoResiduo('');
-                                                    setTimeout(() => cargarReporteGeneradores(1), 0);
-                                                }}
-                                                style={{ padding: '0.75rem 1rem' }}
-                                                title="Limpiar filtros"
+                                                className="btn btn-primary"
+                                                onClick={() => cargarReporteGeneradores(1)}
+                                                disabled={loading}
+                                                style={{ padding: '0.75rem 1.5rem' }}
                                             >
-                                                <X size={16} />
-                                                Limpiar
+                                                {loading ? <Loader2 size={16} className="spin" /> : <Filter size={16} />}
+                                                Filtrar
                                             </button>
-                                        )}
+                                            {hayFiltrosActivos && (
+                                                <button
+                                                    className="btn btn-ghost"
+                                                    onClick={() => {
+                                                        setFiltroDepto('');
+                                                        setFiltroRubro('');
+                                                        setFiltroTipoResiduo('');
+                                                        setTimeout(() => cargarReporteGeneradores(1), 0);
+                                                    }}
+                                                    style={{ padding: '0.75rem 1rem' }}
+                                                    title="Limpiar filtros"
+                                                >
+                                                    <X size={16} />
+                                                    Limpiar
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
+
+                                    {/* Badges de filtros activos */}
+                                    {hayFiltrosActivos && (
+                                        <div style={{
+                                            display: 'flex',
+                                            flexWrap: 'wrap',
+                                            gap: '0.5rem',
+                                            marginTop: '1rem',
+                                            paddingTop: '1rem',
+                                            borderTop: '1px solid rgba(148, 163, 184, 0.1)'
+                                        }}>
+                                            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginRight: '0.5rem' }}>Filtros activos:</span>
+                                            {filtroDepto && (
+                                                <span style={{
+                                                    display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                                                    padding: '0.25rem 0.75rem', background: 'rgba(6, 182, 212, 0.15)',
+                                                    color: '#06b6d4', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 500
+                                                }}>
+                                                    <MapPin size={12} /> {filtroDepto}
+                                                </span>
+                                            )}
+                                            {filtroRubro && (
+                                                <span style={{
+                                                    display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                                                    padding: '0.25rem 0.75rem', background: 'rgba(139, 92, 246, 0.15)',
+                                                    color: '#8b5cf6', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 500
+                                                }}>
+                                                    <Building2 size={12} /> {filtroRubro.length > 25 ? filtroRubro.substring(0, 25) + '...' : filtroRubro}
+                                                </span>
+                                            )}
+                                            {filtroTipoResiduo && (
+                                                <span style={{
+                                                    display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                                                    padding: '0.25rem 0.75rem', background: 'rgba(16, 185, 129, 0.15)',
+                                                    color: '#10b981', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 500
+                                                }}>
+                                                    <Package size={12} /> {filtrosDisponibles?.tiposResiduo?.find(t => t.id === filtroTipoResiduo)?.codigo || ''}
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
-                            {/* Stats Cards */}
+                            {/* ═══════════════════════════════════════════════════════════════
+                                SECCIÓN 3: RESULTADOS DEL FILTRO (Stats Cards)
+                               ═══════════════════════════════════════════════════════════════ */}
+                            <div style={{ marginBottom: '1rem' }}>
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    marginBottom: '0.75rem'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <TrendingUp size={18} style={{ color: '#f59e0b' }} />
+                                        <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                                            {hayFiltrosActivos ? 'Resultados del Filtro' : 'Estadísticas Generales'}
+                                        </span>
+                                    </div>
+                                    {hayFiltrosActivos && (
+                                        <span style={{
+                                            padding: '0.35rem 0.75rem',
+                                            background: 'rgba(245, 158, 11, 0.15)',
+                                            color: '#f59e0b',
+                                            borderRadius: '20px',
+                                            fontSize: '0.8rem',
+                                            fontWeight: 500
+                                        }}>
+                                            Mostrando {reporteGeneradores.totales.totalGeneradores} de {totalesGlobales?.totalGeneradores || '—'} generadores
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
                             <div className="stats-grid">
-                                <div className="stat-card">
+                                <div className="stat-card" style={hayFiltrosActivos ? { borderLeft: '3px solid #f59e0b' } : {}}>
                                     <div className="stat-icon purple">
                                         <Building2 size={28} />
                                     </div>
                                     <div className="stat-info">
                                         <h3>{reporteGeneradores.totales.totalGeneradores}</h3>
-                                        <span>Total Generadores</span>
+                                        <span>{hayFiltrosActivos ? 'Encontrados' : 'Total Generadores'}</span>
                                     </div>
                                 </div>
-                                <div className="stat-card">
+                                <div className="stat-card" style={hayFiltrosActivos ? { borderLeft: '3px solid #f59e0b' } : {}}>
                                     <div className="stat-icon green">
                                         <CheckCircle size={28} />
                                     </div>
@@ -890,7 +1819,7 @@ const Reportes: React.FC = () => {
                                         <span>Activos</span>
                                     </div>
                                 </div>
-                                <div className="stat-card">
+                                <div className="stat-card" style={hayFiltrosActivos ? { borderLeft: '3px solid #f59e0b' } : {}}>
                                     <div className="stat-icon blue">
                                         <MapPin size={28} />
                                     </div>
@@ -899,7 +1828,7 @@ const Reportes: React.FC = () => {
                                         <span>Departamentos</span>
                                     </div>
                                 </div>
-                                <div className="stat-card">
+                                <div className="stat-card" style={hayFiltrosActivos ? { borderLeft: '3px solid #f59e0b' } : {}}>
                                     <div className="stat-icon orange">
                                         <Package size={28} />
                                     </div>
@@ -1081,43 +2010,24 @@ const Reportes: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* Lista Completa de Generadores Filtrados */}
+                            {/* ═══════════════════════════════════════════════════════════════
+                                SECCIÓN 5: LISTA DE GENERADORES (tabla paginada)
+                               ═══════════════════════════════════════════════════════════════ */}
                             {listaGeneradores && listaGeneradores.generadores.length > 0 && (
                                 <div className="reporte-section" style={{ marginTop: '2rem' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                                        <h3 style={{ margin: 0 }}>
+                                        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                             <List size={20} /> Lista de Generadores
-                                            {(filtroDepto || filtroRubro || filtroTipoResiduo) && (
-                                                <span style={{ fontSize: '0.8rem', fontWeight: 400, color: '#94a3b8', marginLeft: '0.5rem' }}>
-                                                    (Filtrado: {[
-                                                        filtroDepto,
-                                                        filtroRubro,
-                                                        filtroTipoResiduo && filtrosDisponibles?.tiposResiduo?.find(t => t.id === filtroTipoResiduo)?.codigo
-                                                    ].filter(Boolean).join(' / ')})
-                                                </span>
-                                            )}
                                         </h3>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <div className="vista-toggle" style={{ display: 'flex', gap: '0.25rem', background: 'rgba(100,116,139,0.1)', padding: '4px', borderRadius: '8px' }}>
-                                                <button
-                                                    className={`btn btn-icon btn-sm ${vistaActual === 'tabla' ? 'btn-primary' : 'btn-ghost'}`}
-                                                    onClick={() => setVistaActual('tabla')}
-                                                    title="Vista de tabla"
-                                                >
-                                                    <List size={16} />
-                                                </button>
-                                                <button
-                                                    className={`btn btn-icon btn-sm ${vistaActual === 'mapa' ? 'btn-primary' : 'btn-ghost'}`}
-                                                    onClick={() => setVistaActual('mapa')}
-                                                    title="Vista de mapa"
-                                                >
-                                                    <MapIcon size={16} />
-                                                </button>
-                                            </div>
-                                            <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>
-                                                {listaGeneradores.pagination.total} resultados
-                                            </span>
-                                        </div>
+                                        <span style={{
+                                            padding: '0.35rem 0.75rem',
+                                            background: 'rgba(100, 116, 139, 0.1)',
+                                            color: 'var(--text-muted)',
+                                            borderRadius: '20px',
+                                            fontSize: '0.85rem'
+                                        }}>
+                                            Página {listaGeneradores.pagination.page} de {listaGeneradores.pagination.pages} • {listaGeneradores.pagination.total} resultados
+                                        </span>
                                     </div>
 
                                     {loadingLista && (
@@ -1128,76 +2038,6 @@ const Reportes: React.FC = () => {
 
                                     {!loadingLista && (
                                         <>
-                                            {/* Vista de Mapa */}
-                                            {vistaActual === 'mapa' && (
-                                                <div className="mapa-generadores" style={{
-                                                    height: '500px',
-                                                    borderRadius: '12px',
-                                                    overflow: 'hidden',
-                                                    border: '1px solid rgba(148, 163, 184, 0.2)'
-                                                }}>
-                                                    <MapContainer
-                                                        center={[-32.89, -68.83]}
-                                                        zoom={9}
-                                                        style={{ height: '100%', width: '100%' }}
-                                                    >
-                                                        <TileLayer
-                                                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                                                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                                                        />
-                                                        {listaGeneradores.generadores
-                                                            .filter(g => g.latitud && g.longitud)
-                                                            .map(g => (
-                                                                <Marker
-                                                                    key={g.id}
-                                                                    position={[g.latitud!, g.longitud!]}
-                                                                >
-                                                                    <Popup>
-                                                                        <div style={{ minWidth: '200px' }}>
-                                                                            <strong style={{ fontSize: '1rem' }}>{g.razonSocial}</strong>
-                                                                            <br />
-                                                                            <span style={{ color: '#64748b', fontSize: '0.8rem' }}>{g.cuit}</span>
-                                                                            <hr style={{ margin: '8px 0', borderColor: 'rgba(148,163,184,0.2)' }} />
-                                                                            <div style={{ fontSize: '0.85rem' }}>
-                                                                                <p style={{ margin: '4px 0' }}><strong>Rubro:</strong> {g.rubro || 'Sin rubro'}</p>
-                                                                                <p style={{ margin: '4px 0' }}><strong>Departamento:</strong> {g.departamento || '—'}</p>
-                                                                                <p style={{ margin: '4px 0' }}><strong>Volumen:</strong> {g.volumenKg.toLocaleString('es-AR')} kg</p>
-                                                                                <p style={{ margin: '4px 0' }}><strong>Manifiestos:</strong> {g.manifiestos}</p>
-                                                                            </div>
-                                                                            <button
-                                                                                className="btn btn-primary btn-sm"
-                                                                                style={{ marginTop: '8px', width: '100%' }}
-                                                                                onClick={() => navigate(`/admin/generadores/${g.id}`)}
-                                                                            >
-                                                                                Ver detalle
-                                                                            </button>
-                                                                        </div>
-                                                                    </Popup>
-                                                                </Marker>
-                                                            ))
-                                                        }
-                                                    </MapContainer>
-                                                    {listaGeneradores.generadores.filter(g => g.latitud && g.longitud).length === 0 && (
-                                                        <div style={{
-                                                            position: 'absolute',
-                                                            top: '50%',
-                                                            left: '50%',
-                                                            transform: 'translate(-50%, -50%)',
-                                                            background: 'rgba(0,0,0,0.7)',
-                                                            color: 'white',
-                                                            padding: '1rem 2rem',
-                                                            borderRadius: '8px',
-                                                            zIndex: 1000
-                                                        }}>
-                                                            No hay generadores con geolocalización
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-
-                                            {/* Vista de Tabla/Cards */}
-                                            {vistaActual === 'tabla' && (
-                                            <>
                                             {/* Mobile Cards */}
                                             <div className="reporte-mobile-cards">
                                                 {listaGeneradores.generadores.map((g) => (
@@ -1336,10 +2176,72 @@ const Reportes: React.FC = () => {
                                                     </div>
                                                 </div>
                                             )}
-                                            </>
-                                            )}
                                         </>
                                     )}
+                                </div>
+                            )}
+
+                            {/* ═══════════════════════════════════════════════════════════════
+                                SECCIÓN: MAPA DE GENERADORES (al final, antes de Exportar)
+                               ═══════════════════════════════════════════════════════════════ */}
+                            {listaGeneradores && listaGeneradores.generadores.length > 0 && (
+                                <div className="mapa-section" style={{
+                                    marginTop: '2rem',
+                                    background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9))',
+                                    borderRadius: '12px',
+                                    padding: '1.5rem',
+                                    border: '1px solid rgba(148, 163, 184, 0.1)'
+                                }}>
+                                    <h4 style={{
+                                        margin: '0 0 1rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        color: '#e2e8f0'
+                                    }}>
+                                        <MapPin size={20} style={{ color: '#3b82f6' }} />
+                                        Mapa de Ubicación
+                                        <span style={{
+                                            fontSize: '0.8rem',
+                                            color: '#94a3b8',
+                                            fontWeight: 'normal',
+                                            marginLeft: 'auto'
+                                        }}>
+                                            {listaGeneradores.generadores.filter(g => g.latitud && g.longitud).length} generadores con ubicación
+                                        </span>
+                                    </h4>
+                                    <div style={{
+                                        height: '400px',
+                                        borderRadius: '8px',
+                                        overflow: 'hidden',
+                                        border: '1px solid rgba(148, 163, 184, 0.2)'
+                                    }}>
+                                        <MapContainer
+                                            center={[-32.0, -65.0]}
+                                            zoom={5}
+                                            style={{ height: '100%', width: '100%' }}
+                                        >
+                                            <TileLayer
+                                                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                            />
+                                            {listaGeneradores.generadores
+                                                .filter(g => g.latitud && g.longitud)
+                                                .map(g => (
+                                                    <Marker
+                                                        key={g.id}
+                                                        position={[g.latitud!, g.longitud!]}
+                                                    >
+                                                        <Popup>
+                                                            <strong>{g.razonSocial}</strong><br/>
+                                                            {typeof g.departamento === 'object' ? (g.departamento as any)?.nombre : g.departamento || 'Sin departamento'}<br/>
+                                                            <small>{g.categoria || 'Sin categoría'}</small>
+                                                        </Popup>
+                                                    </Marker>
+                                                ))
+                                            }
+                                        </MapContainer>
+                                    </div>
                                 </div>
                             )}
                         </>
@@ -1399,3 +2301,4 @@ const Reportes: React.FC = () => {
 };
 
 export default Reportes;
+// build Thu Jan 22 16:07:30 -03 2026
