@@ -6,6 +6,7 @@ import {
   getTransportistas,
   aprobarTransportista,
   getReportesTransportistas,
+  getTransportistasFiltrosDisponibles,
   getTransportistaById,
   updateTransportistaAdmin,
   // Operadores
@@ -13,6 +14,7 @@ import {
   getOperadores,
   aprobarOperador,
   getReportesOperadores,
+  getOperadoresFiltrosDisponibles,
   getOperadorById,
   updateOperadorAdmin,
   // Generadores
@@ -55,6 +57,11 @@ router.get(
   getReportesTransportistas
 );
 router.get(
+  '/transportistas/filtros-disponibles',
+  hasRole('ADMIN', 'ADMIN_TRANSPORTISTAS'),
+  getTransportistasFiltrosDisponibles
+);
+router.get(
   '/transportistas/:id',
   hasRole('ADMIN', 'ADMIN_TRANSPORTISTAS'),
   getTransportistaById
@@ -88,6 +95,11 @@ router.get(
   '/operadores/reportes',
   hasRole('ADMIN', 'ADMIN_OPERADORES'),
   getReportesOperadores
+);
+router.get(
+  '/operadores/filtros-disponibles',
+  hasRole('ADMIN', 'ADMIN_OPERADORES'),
+  getOperadoresFiltrosDisponibles
 );
 router.get(
   '/operadores/:id',

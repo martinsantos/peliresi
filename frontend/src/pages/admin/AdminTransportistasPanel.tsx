@@ -56,6 +56,17 @@ interface SortConfig {
   direction: 'asc' | 'desc';
 }
 
+interface TipoResiduo {
+  id: string;
+  codigo: string;
+  nombre: string;
+  peligrosidad: string;
+}
+
+interface FiltrosDisponibles {
+  tiposResiduo: TipoResiduo[];
+}
+
 const ITEMS_OPTIONS = [10, 15, 25, 50];
 
 const AdminTransportistasPanel: React.FC = () => {
@@ -65,6 +76,10 @@ const AdminTransportistasPanel: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [busqueda, setBusqueda] = useState('');
   const [filtroActivo, setFiltroActivo] = useState<string>('todos');
+  const [filtroTipoResiduo, setFiltroTipoResiduo] = useState<string>('');
+  const [filtrosDisponibles, setFiltrosDisponibles] = useState<FiltrosDisponibles>({
+    tiposResiduo: []
+  });
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: 'razonSocial',
     direction: 'asc'
@@ -99,6 +114,17 @@ const AdminTransportistasPanel: React.FC = () => {
     }
   };
 
+  const cargarFiltrosDisponibles = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/admin-sectorial/transportistas/filtros-disponibles`, {
+        headers: getHeaders()
+      });
+      setFiltrosDisponibles(response.data.data);
+    } catch (error) {
+      console.error('Error cargando filtros:', error);
+    }
+  };
+
   const cargarTransportistas = async () => {
     setLoading(true);
     try {
@@ -107,6 +133,7 @@ const AdminTransportistasPanel: React.FC = () => {
       params.append('limit', itemsPerPage.toString());
       if (busqueda) params.append('busqueda', busqueda);
       if (filtroActivo !== 'todos') params.append('activo', filtroActivo);
+      if (filtroTipoResiduo) params.append('tipoResiduoId', filtroTipoResiduo);
       params.append('sortBy', sortConfig.key);
       params.append('sortOrder', sortConfig.direction);
 
@@ -158,18 +185,20 @@ const AdminTransportistasPanel: React.FC = () => {
   const limpiarFiltros = () => {
     setBusqueda('');
     setFiltroActivo('todos');
+    setFiltroTipoResiduo('');
     setPage(1);
   };
 
-  const hayFiltrosActivos = busqueda || filtroActivo !== 'todos';
+  const hayFiltrosActivos = busqueda || filtroActivo !== 'todos' || filtroTipoResiduo;
 
   useEffect(() => {
     cargarDashboard();
+    cargarFiltrosDisponibles();
   }, []);
 
   useEffect(() => {
     cargarTransportistas();
-  }, [page, filtroActivo, sortConfig, itemsPerPage]);
+  }, [page, filtroActivo, filtroTipoResiduo, sortConfig, itemsPerPage]);
 
   useEffect(() => {
     const handleClickOutside = () => setOpenActionMenu(null);
@@ -275,6 +304,22 @@ const AdminTransportistasPanel: React.FC = () => {
                 Inactivos
               </button>
             </div>
+          </div>
+
+          {/* Row 2: Select filters */}
+          <div className="admin-filters-row">
+            <select
+              className="admin-select-compact"
+              value={filtroTipoResiduo}
+              onChange={(e) => { setFiltroTipoResiduo(e.target.value); setPage(1); }}
+            >
+              <option value="">Tipo Residuo Transportado (Y-code)</option>
+              {filtrosDisponibles.tiposResiduo?.map(tipo => (
+                <option key={tipo.id} value={tipo.id}>
+                  {tipo.codigo} - {tipo.nombre.length > 35 ? tipo.nombre.substring(0, 35) + '...' : tipo.nombre}
+                </option>
+              ))}
+            </select>
 
             {hayFiltrosActivos && (
               <button className="admin-btn-clear" onClick={limpiarFiltros} title="Limpiar filtros">

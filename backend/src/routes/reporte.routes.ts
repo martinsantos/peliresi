@@ -10,7 +10,8 @@ import {
     getReporteGeneradoresVolumen,
     getReporteTiposResiduos,
     getReporteFiltrosDisponibles,
-    getReporteGeneradoresFiltrado
+    getReporteGeneradoresFiltrado,
+    getConteoGeneradoresPorTipoResiduo
 } from '../controllers/reporte.controller';
 
 const router = Router();
@@ -40,6 +41,7 @@ router.get('/tipos-residuos', hasRole('ADMIN', 'ADMIN_GENERADORES', 'ADMIN_OPERA
 // Filtros y reportes avanzados de generadores
 router.get('/generadores-filtros', hasRole('ADMIN', 'ADMIN_GENERADORES'), getReporteFiltrosDisponibles);
 router.get('/generadores-filtrado', hasRole('ADMIN', 'ADMIN_GENERADORES'), getReporteGeneradoresFiltrado);
+router.get('/generadores-por-tipo-residuo', hasRole('ADMIN', 'ADMIN_GENERADORES'), getConteoGeneradoresPorTipoResiduo);
 
 // Exportación CSV (solo admin)
 router.get('/exportar/:tipo', hasRole('ADMIN'), exportarCSV);

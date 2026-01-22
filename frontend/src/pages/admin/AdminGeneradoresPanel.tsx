@@ -69,11 +69,19 @@ interface SortConfig {
   direction: 'asc' | 'desc';
 }
 
+interface TipoResiduo {
+  id: string;
+  codigo: string;
+  nombre: string;
+  peligrosidad: string;
+}
+
 interface FiltrosDisponibles {
   departamentos: string[];
   rubros: string[];
   clasificaciones: string[];
   actividades: string[];
+  tiposResiduo?: TipoResiduo[];
 }
 
 const ITEMS_OPTIONS = [10, 15, 25, 50];
@@ -89,6 +97,7 @@ const AdminGeneradoresPanel: React.FC = () => {
   const [filtroDepartamento, setFiltroDepartamento] = useState<string>('');
   const [filtroRubro, setFiltroRubro] = useState<string>('');
   const [filtroClasificacion, setFiltroClasificacion] = useState<string>('');
+  const [filtroTipoResiduo, setFiltroTipoResiduo] = useState<string>('');
   const [filtrosDisponibles, setFiltrosDisponibles] = useState<FiltrosDisponibles>({
     departamentos: [],
     rubros: [],
@@ -152,6 +161,7 @@ const AdminGeneradoresPanel: React.FC = () => {
       if (filtroDepartamento) params.append('departamento', filtroDepartamento);
       if (filtroRubro) params.append('rubro', filtroRubro);
       if (filtroClasificacion) params.append('clasificacion', filtroClasificacion);
+      if (filtroTipoResiduo) params.append('tipoResiduoId', filtroTipoResiduo);
       params.append('sortBy', sortConfig.key);
       params.append('sortOrder', sortConfig.direction);
 
@@ -207,11 +217,12 @@ const AdminGeneradoresPanel: React.FC = () => {
     setFiltroDepartamento('');
     setFiltroRubro('');
     setFiltroClasificacion('');
+    setFiltroTipoResiduo('');
     setPage(1);
   };
 
   const hayFiltrosActivos = busqueda || filtroActivo !== 'todos' || filtroCategoria !== 'todas' ||
-    filtroDepartamento || filtroRubro || filtroClasificacion;
+    filtroDepartamento || filtroRubro || filtroClasificacion || filtroTipoResiduo;
 
   useEffect(() => {
     cargarDashboard();
@@ -220,7 +231,7 @@ const AdminGeneradoresPanel: React.FC = () => {
 
   useEffect(() => {
     cargarGeneradores();
-  }, [page, filtroActivo, filtroCategoria, filtroDepartamento, filtroRubro, filtroClasificacion, sortConfig, itemsPerPage]);
+  }, [page, filtroActivo, filtroCategoria, filtroDepartamento, filtroRubro, filtroClasificacion, filtroTipoResiduo, sortConfig, itemsPerPage]);
 
   useEffect(() => {
     const handleClickOutside = () => setOpenActionMenu(null);
@@ -361,6 +372,19 @@ const AdminGeneradoresPanel: React.FC = () => {
               <option value="GRAN_GENERADOR">Gran Generador</option>
               <option value="MEDIANO_GENERADOR">Mediano</option>
               <option value="PEQUENO_GENERADOR">Pequeño</option>
+            </select>
+
+            <select
+              className="admin-select-compact"
+              value={filtroTipoResiduo}
+              onChange={(e) => { setFiltroTipoResiduo(e.target.value); setPage(1); }}
+            >
+              <option value="">Tipo Residuo (Y-code)</option>
+              {filtrosDisponibles.tiposResiduo?.map(tipo => (
+                <option key={tipo.id} value={tipo.id}>
+                  {tipo.codigo} - {tipo.nombre.length > 25 ? tipo.nombre.substring(0, 25) + '...' : tipo.nombre}
+                </option>
+              ))}
             </select>
 
             {hayFiltrosActivos && (

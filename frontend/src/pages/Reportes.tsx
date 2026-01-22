@@ -94,6 +94,21 @@ interface ReporteGeneradores {
     };
 }
 
+interface TipoResiduo {
+    id: string;
+    codigo: string;
+    nombre: string;
+    peligrosidad: string;
+}
+
+interface ConteoTipoResiduo {
+    tipoResiduoId: string;
+    codigo: string;
+    nombre: string;
+    peligrosidad: string;
+    cantidadGeneradores: number;
+}
+
 interface FiltrosDisponibles {
     departamentos: {
         mendoza: string[];
@@ -102,6 +117,7 @@ interface FiltrosDisponibles {
     };
     rubros: string[];
     categorias: string[];
+    tiposResiduo?: TipoResiduo[];
 }
 
 interface GeneradorFiltrado {
@@ -148,6 +164,8 @@ const Reportes: React.FC = () => {
     const [filtrosDisponibles, setFiltrosDisponibles] = useState<FiltrosDisponibles | null>(null);
     const [filtroDepto, setFiltroDepto] = useState('');
     const [filtroRubro, setFiltroRubro] = useState('');
+    const [filtroTipoResiduo, setFiltroTipoResiduo] = useState('');
+    const [conteoTiposResiduo, setConteoTiposResiduo] = useState<ConteoTipoResiduo[]>([]);
 
     // Lista paginada de generadores filtrados
     const [listaGeneradores, setListaGeneradores] = useState<ListaGeneradoresFiltrados | null>(null);
@@ -184,8 +202,26 @@ const Reportes: React.FC = () => {
             if (!reporteGeneradores) {
                 cargarReporteGeneradores();
             }
+            cargarConteoTiposResiduo();
         }
     }, [activeTab]);
+
+    const cargarConteoTiposResiduo = async () => {
+        try {
+            const queryParams = new URLSearchParams();
+            if (fechaInicio) queryParams.append('fechaInicio', fechaInicio);
+            if (fechaFin) queryParams.append('fechaFin', fechaFin);
+            if (filtroDepto) queryParams.append('departamento', filtroDepto);
+            if (filtroRubro) queryParams.append('rubro', filtroRubro);
+
+            const response = await axios.get(`${API_URL}/reportes/generadores-por-tipo-residuo?${queryParams}`, { headers: getHeaders() });
+            if (response.data.success) {
+                setConteoTiposResiduo(response.data.data.conteosPorTipo);
+            }
+        } catch (error) {
+            console.error('Error al cargar conteo por tipo de residuo:', error);
+        }
+    };
 
     const cargarFiltrosDisponibles = async () => {
         try {
@@ -208,6 +244,7 @@ const Reportes: React.FC = () => {
             if (fechaFin) queryParams.append('fechaFin', fechaFin);
             if (filtroDepto) queryParams.append('departamento', filtroDepto);
             if (filtroRubro) queryParams.append('rubro', filtroRubro);
+            if (filtroTipoResiduo) queryParams.append('tipoResiduoId', filtroTipoResiduo);
 
             const [deptoRes, volumenRes, listaRes] = await Promise.all([
                 axios.get(`${API_URL}/reportes/generadores-departamento?${queryParams}`, { headers: getHeaders() }),
@@ -244,6 +281,7 @@ const Reportes: React.FC = () => {
             if (fechaFin) queryParams.append('fechaFin', fechaFin);
             if (filtroDepto) queryParams.append('departamento', filtroDepto);
             if (filtroRubro) queryParams.append('rubro', filtroRubro);
+            if (filtroTipoResiduo) queryParams.append('tipoResiduoId', filtroTipoResiduo);
 
             const listaRes = await axios.get(
                 `${API_URL}/reportes/generadores-filtrado?${queryParams}&page=${nuevaPagina}&limit=15`,
@@ -779,6 +817,29 @@ const Reportes: React.FC = () => {
                                             ))}
                                         </select>
                                     </div>
+                                    <div className="filtro-grupo" style={{ flex: '1', minWidth: '200px' }}>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                            <Package size={14} /> Tipo Residuo (Y-code)
+                                        </label>
+                                        <select
+                                            value={filtroTipoResiduo}
+                                            onChange={(e) => setFiltroTipoResiduo(e.target.value)}
+                                            style={{
+                                                width: '100%',
+                                                padding: '0.75rem 1rem',
+                                                background: 'var(--bg-tertiary)',
+                                                border: '1px solid var(--border-color)',
+                                                borderRadius: '8px',
+                                                color: 'var(--text-primary)',
+                                                fontSize: '0.95rem'
+                                            }}
+                                        >
+                                            <option value="">Todos los tipos</option>
+                                            {filtrosDisponibles.tiposResiduo?.map(t => (
+                                                <option key={t.id} value={t.id}>{t.codigo} - {t.nombre.length > 30 ? t.nombre.substring(0, 30) + '...' : t.nombre}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                     <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem' }}>
                                         <button
                                             className="btn btn-primary"
@@ -789,12 +850,13 @@ const Reportes: React.FC = () => {
                                             {loading ? <Loader2 size={16} className="spin" /> : <Filter size={16} />}
                                             Filtrar
                                         </button>
-                                        {(filtroDepto || filtroRubro) && (
+                                        {(filtroDepto || filtroRubro || filtroTipoResiduo) && (
                                             <button
                                                 className="btn btn-ghost"
                                                 onClick={() => {
                                                     setFiltroDepto('');
                                                     setFiltroRubro('');
+                                                    setFiltroTipoResiduo('');
                                                     setTimeout(() => cargarReporteGeneradores(1), 0);
                                                 }}
                                                 style={{ padding: '0.75rem 1rem' }}
@@ -877,6 +939,62 @@ const Reportes: React.FC = () => {
                                     })}
                                 </div>
                             </div>
+
+                            {/* Generadores por Tipo de Residuo (Y-codes) */}
+                            {conteoTiposResiduo && conteoTiposResiduo.length > 0 && (
+                                <div className="reporte-section">
+                                    <h3><Package size={20} /> Generadores por Tipo de Residuo (Y-codes Basel)</h3>
+                                    <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                                        Cantidad de generadores que han declarado cada tipo de residuo en sus manifiestos
+                                    </p>
+                                    <div className="estado-bars">
+                                        {conteoTiposResiduo.slice(0, 15).map((item) => {
+                                            const getPeligrosidadColor = (p: string) => {
+                                                switch (p?.toUpperCase()) {
+                                                    case 'ALTA': return '#ef4444';
+                                                    case 'MEDIA': return '#f59e0b';
+                                                    case 'BAJA': return '#10b981';
+                                                    default: return '#6366f1';
+                                                }
+                                            };
+                                            const color = getPeligrosidadColor(item.peligrosidad);
+                                            const maxGen = Math.max(...conteoTiposResiduo.map(x => x.cantidadGeneradores));
+                                            return (
+                                                <div
+                                                    key={item.tipoResiduoId}
+                                                    className="estado-bar-item"
+                                                    style={{ cursor: 'pointer' }}
+                                                    onClick={() => {
+                                                        setFiltroTipoResiduo(item.tipoResiduoId);
+                                                        cargarReporteGeneradores(1);
+                                                    }}
+                                                    title={`Clic para filtrar por ${item.codigo}`}
+                                                >
+                                                    <div className="estado-label" style={{ minWidth: '80px' }}>
+                                                        <span className="estado-dot" style={{ background: color }} />
+                                                        <strong>{item.codigo}</strong>
+                                                    </div>
+                                                    <div className="bar-container" style={{ flex: 1 }}>
+                                                        <div
+                                                            className="bar-fill"
+                                                            style={{
+                                                                width: `${(item.cantidadGeneradores / maxGen) * 100}%`,
+                                                                background: `linear-gradient(90deg, ${color}, ${color}dd)`
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <span className="bar-value" style={{ minWidth: '40px', textAlign: 'right' }}>{item.cantidadGeneradores}</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    {conteoTiposResiduo.length > 15 && (
+                                        <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.5rem', textAlign: 'center' }}>
+                                            Mostrando top 15 de {conteoTiposResiduo.length} tipos de residuo con generadores
+                                        </p>
+                                    )}
+                                </div>
+                            )}
 
                             {/* Top Generadores por Volumen */}
                             <div className="reporte-section">
@@ -969,9 +1087,13 @@ const Reportes: React.FC = () => {
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                                         <h3 style={{ margin: 0 }}>
                                             <List size={20} /> Lista de Generadores
-                                            {(filtroDepto || filtroRubro) && (
+                                            {(filtroDepto || filtroRubro || filtroTipoResiduo) && (
                                                 <span style={{ fontSize: '0.8rem', fontWeight: 400, color: '#94a3b8', marginLeft: '0.5rem' }}>
-                                                    (Filtrado: {filtroDepto && `${filtroDepto}`}{filtroDepto && filtroRubro && ' / '}{filtroRubro && `${filtroRubro}`})
+                                                    (Filtrado: {[
+                                                        filtroDepto,
+                                                        filtroRubro,
+                                                        filtroTipoResiduo && filtrosDisponibles?.tiposResiduo?.find(t => t.id === filtroTipoResiduo)?.codigo
+                                                    ].filter(Boolean).join(' / ')})
                                                 </span>
                                             )}
                                         </h3>

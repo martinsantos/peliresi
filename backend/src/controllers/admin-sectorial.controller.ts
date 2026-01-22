@@ -176,7 +176,7 @@ const TRANSPORTISTAS_SORTABLE_FIELDS = ['razonSocial', 'cuit', 'createdAt', 'act
 
 export const getTransportistas = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { page = 1, limit = 15, activo, busqueda, sortBy, sortOrder } = req.query;
+    const { page = 1, limit = 15, activo, busqueda, sortBy, sortOrder, tipoResiduoId } = req.query;
 
     const where: any = {};
     if (activo !== undefined) {
@@ -187,6 +187,16 @@ export const getTransportistas = async (req: AuthRequest, res: Response, next: N
         { razonSocial: { contains: busqueda as string, mode: 'insensitive' } },
         { cuit: { contains: busqueda as string } }
       ];
+    }
+    // Filtro por tipo de residuo - transportistas que han transportado ese tipo
+    if (tipoResiduoId) {
+      where.manifiestos = {
+        some: {
+          residuos: {
+            some: { tipoResiduoId: String(tipoResiduoId) }
+          }
+        }
+      };
     }
 
     // Construir orderBy dinámico
@@ -475,7 +485,7 @@ const OPERADORES_SORTABLE_FIELDS = ['razonSocial', 'cuit', 'createdAt', 'activo'
 
 export const getOperadores = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { page = 1, limit = 15, activo, busqueda, sortBy, sortOrder } = req.query;
+    const { page = 1, limit = 15, activo, busqueda, sortBy, sortOrder, tipoResiduoId } = req.query;
 
     const where: any = {};
     if (activo !== undefined) {
@@ -486,6 +496,12 @@ export const getOperadores = async (req: AuthRequest, res: Response, next: NextF
         { razonSocial: { contains: busqueda as string, mode: 'insensitive' } },
         { cuit: { contains: busqueda as string } }
       ];
+    }
+    // Filtro por tipo de residuo - operadores autorizados a tratar ese tipo
+    if (tipoResiduoId) {
+      where.tratamientos = {
+        some: { tipoResiduoId: String(tipoResiduoId) }
+      };
     }
 
     // Construir orderBy dinámico
@@ -777,7 +793,8 @@ export const getGeneradores = async (req: AuthRequest, res: Response, next: Next
       departamento,
       categoria,
       rubro,
-      clasificacion
+      clasificacion,
+      tipoResiduoId
     } = req.query;
 
     // Construir filtros usando AND para combinar condiciones
@@ -838,6 +855,19 @@ export const getGeneradores = async (req: AuthRequest, res: Response, next: Next
     if (clasificacion) {
       andConditions.push({
         clasificacion: { equals: clasificacion as string, mode: 'insensitive' }
+      });
+    }
+
+    // Filtro por tipo de residuo (Y-codes Basel) - busca generadores con manifiestos que contengan ese tipo
+    if (tipoResiduoId) {
+      andConditions.push({
+        manifiestos: {
+          some: {
+            residuos: {
+              some: { tipoResiduoId: String(tipoResiduoId) }
+            }
+          }
+        }
       });
     }
 
@@ -963,7 +993,7 @@ export const getReportesGeneradores = async (req: AuthRequest, res: Response, ne
 export const getGeneradoresFiltrosDisponibles = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     // Obtener datos únicos de la BD
-    const [departamentosLegal, departamentosReal, rubros, clasificaciones, actividades] = await Promise.all([
+    const [departamentosLegal, departamentosReal, rubros, clasificaciones, actividades, tiposResiduo] = await Promise.all([
       prisma.generador.findMany({
         where: { domicilioLegalDepartamento: { not: null } },
         select: { domicilioLegalDepartamento: true },
@@ -988,6 +1018,12 @@ export const getGeneradoresFiltrosDisponibles = async (req: AuthRequest, res: Re
         where: { actividad: { not: null } },
         select: { actividad: true },
         distinct: ['actividad']
+      }),
+      // Obtener tipos de residuo (Y-codes Basel)
+      prisma.tipoResiduo.findMany({
+        where: { activo: true },
+        select: { id: true, codigo: true, nombre: true, peligrosidad: true },
+        orderBy: { codigo: 'asc' }
       })
     ]);
 
@@ -1015,7 +1051,56 @@ export const getGeneradoresFiltrosDisponibles = async (req: AuthRequest, res: Re
         rubros: rubros.map(r => r.rubro).filter(Boolean).sort(),
         clasificaciones: clasificaciones.map(c => c.clasificacion).filter(Boolean).sort(),
         actividades: actividades.map(a => a.actividad).filter(Boolean).sort(),
+        tiposResiduo: tiposResiduo,
         camposOrdenables: GENERADOR_SORTABLE_FIELDS
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================
+// FILTROS DISPONIBLES PARA TRANSPORTISTAS
+// ============================================================
+
+export const getTransportistasFiltrosDisponibles = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const tiposResiduo = await prisma.tipoResiduo.findMany({
+      where: { activo: true },
+      select: { id: true, codigo: true, nombre: true, peligrosidad: true },
+      orderBy: { codigo: 'asc' }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        tiposResiduo,
+        camposOrdenables: TRANSPORTISTAS_SORTABLE_FIELDS
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================
+// FILTROS DISPONIBLES PARA OPERADORES
+// ============================================================
+
+export const getOperadoresFiltrosDisponibles = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const tiposResiduo = await prisma.tipoResiduo.findMany({
+      where: { activo: true },
+      select: { id: true, codigo: true, nombre: true, peligrosidad: true },
+      orderBy: { codigo: 'asc' }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        tiposResiduo,
+        camposOrdenables: OPERADORES_SORTABLE_FIELDS
       }
     });
   } catch (error) {

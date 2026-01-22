@@ -832,6 +832,7 @@ export const getReporteGeneradoresFiltrado = async (req: AuthRequest, res: Respo
             rubro,
             categoria,
             activo,
+            tipoResiduoId,
             fechaInicio,
             fechaFin,
             page = '1',
@@ -861,6 +862,17 @@ export const getReporteGeneradoresFiltrado = async (req: AuthRequest, res: Respo
         // Filtro por estado activo/inactivo
         if (activo !== undefined && activo !== '') {
             where.activo = activo === 'true';
+        }
+
+        // Filtro por tipo de residuo (Y-codes Basel)
+        if (tipoResiduoId) {
+            where.manifiestos = {
+                some: {
+                    residuos: {
+                        some: { tipoResiduoId: String(tipoResiduoId) }
+                    }
+                }
+            };
         }
 
         // NOTA: Las fechas se usan solo para calcular volumen/manifiestos en el período,
@@ -939,7 +951,115 @@ export const getReporteGeneradoresFiltrado = async (req: AuthRequest, res: Respo
                     departamento: departamento || null,
                     rubro: rubro || null,
                     categoria: categoria || null,
-                    activo: activo !== undefined ? activo === 'true' : null
+                    activo: activo !== undefined ? activo === 'true' : null,
+                    tipoResiduoId: tipoResiduoId || null
+                }
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// ============================================================
+// CONTEO DE GENERADORES POR TIPO DE RESIDUO (Y-codes Basel)
+// ============================================================
+
+export const getConteoGeneradoresPorTipoResiduo = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { fechaInicio, fechaFin, departamento, rubro } = req.query;
+
+        // Obtener todos los tipos de residuo activos
+        const tiposResiduo = await prisma.tipoResiduo.findMany({
+            where: { activo: true },
+            select: { id: true, codigo: true, nombre: true, peligrosidad: true },
+            orderBy: { codigo: 'asc' }
+        });
+
+        // Construir filtro base para manifiestos
+        const manifestoWhere: any = {};
+        if (fechaInicio || fechaFin) {
+            manifestoWhere.createdAt = {};
+            if (fechaInicio) manifestoWhere.createdAt.gte = new Date(fechaInicio as string);
+            if (fechaFin) {
+                const fechaFinDate = new Date(fechaFin as string);
+                fechaFinDate.setHours(23, 59, 59, 999);
+                manifestoWhere.createdAt.lte = fechaFinDate;
+            }
+        }
+
+        // Construir filtro para generador
+        const generadorWhere: any = {};
+        if (departamento) {
+            generadorWhere.domicilioLegalDepartamento = normalizarDepartamento(departamento as string);
+        }
+        if (rubro) {
+            generadorWhere.rubro = rubro;
+        }
+
+        if (Object.keys(generadorWhere).length > 0) {
+            manifestoWhere.generador = generadorWhere;
+        }
+
+        // Contar generadores únicos por cada tipo de residuo
+        const conteos = await Promise.all(
+            tiposResiduo.map(async (tipo) => {
+                // Buscar generadores únicos que tienen manifiestos con este tipo de residuo
+                const generadoresConTipo = await prisma.manifiesto.findMany({
+                    where: {
+                        ...manifestoWhere,
+                        residuos: {
+                            some: { tipoResiduoId: tipo.id }
+                        }
+                    },
+                    select: { generadorId: true },
+                    distinct: ['generadorId']
+                });
+
+                return {
+                    tipoResiduoId: tipo.id,
+                    codigo: tipo.codigo,
+                    nombre: tipo.nombre,
+                    peligrosidad: tipo.peligrosidad,
+                    cantidadGeneradores: generadoresConTipo.length
+                };
+            })
+        );
+
+        // Filtrar solo los que tienen generadores y ordenar por cantidad descendente
+        const conteosConDatos = conteos
+            .filter(c => c.cantidadGeneradores > 0)
+            .sort((a, b) => b.cantidadGeneradores - a.cantidadGeneradores);
+
+        // Calcular totales
+        const totalGeneradoresUnicos = new Set<string>();
+        for (const conteo of conteos) {
+            if (conteo.cantidadGeneradores > 0) {
+                const gens = await prisma.manifiesto.findMany({
+                    where: {
+                        ...manifestoWhere,
+                        residuos: { some: { tipoResiduoId: conteo.tipoResiduoId } }
+                    },
+                    select: { generadorId: true },
+                    distinct: ['generadorId']
+                });
+                gens.forEach(g => totalGeneradoresUnicos.add(g.generadorId));
+            }
+        }
+
+        res.json({
+            success: true,
+            data: {
+                conteosPorTipo: conteosConDatos,
+                resumen: {
+                    totalTiposConGeneradores: conteosConDatos.length,
+                    totalGeneradoresUnicos: totalGeneradoresUnicos.size
+                },
+                filtrosAplicados: {
+                    fechaInicio: fechaInicio || null,
+                    fechaFin: fechaFin || null,
+                    departamento: departamento || null,
+                    rubro: rubro || null
                 }
             }
         });
