@@ -1028,13 +1028,14 @@ export const getConteoGeneradoresPorTipoResiduo = async (req: AuthRequest, res: 
             .sort((a, b) => b.cantidadGeneradores - a.cantidadGeneradores);
 
         // Calcular total de generadores con Y-codes (sin duplicados)
+        // Usamos AND para combinar condiciones: no null Y no en lista de categorías estándar
         const totalGeneradoresConYcodes = await prisma.generador.count({
             where: {
                 ...generadorWhere,
-                categoria: {
-                    not: null,
-                    notIn: ['Categoría I', 'Categoría II', 'Categoría III', 'GRANDE', 'Sin categoría', '']
-                }
+                AND: [
+                    { categoria: { not: null } },
+                    { categoria: { notIn: ['Categoría I', 'Categoría II', 'Categoría III', 'GRANDE', 'Sin categoría', ''] } }
+                ]
             }
         });
 
