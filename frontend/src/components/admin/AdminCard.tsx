@@ -1,6 +1,6 @@
 /**
  * AdminCard - Generic card component for admin pages
- * SITREP Design System v4.0 - NASA Control Room Aesthetic
+ * SITREP Design System v5.0 - Versión Humanista
  */
 
 import React from 'react';

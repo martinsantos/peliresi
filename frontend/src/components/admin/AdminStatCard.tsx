@@ -1,6 +1,6 @@
 /**
  * AdminStatCard - Unified stat card component for admin pages
- * SITREP Design System v4.0 - NASA Control Room Aesthetic
+ * SITREP Design System v5.0 - Versión Humanista
  */
 
 import React from 'react';
@@ -24,34 +24,34 @@ export interface AdminStatCardProps {
 
 const variantColors: Record<StatVariant, { border: string; iconBg: string; iconColor: string }> = {
   primary: {
-    border: 'var(--color-primary)',
-    iconBg: 'var(--color-primary-surface, rgba(6, 182, 212, 0.12))',
-    iconColor: 'var(--color-primary-bright, #22d3ee)',
+    border: 'var(--color-primary, #1B5E3C)',
+    iconBg: 'var(--color-primary-lightest, #E8F5E9)',
+    iconColor: 'var(--color-primary, #1B5E3C)',
   },
   success: {
-    border: 'var(--color-success)',
-    iconBg: 'var(--color-success-surface, rgba(16, 185, 129, 0.12))',
-    iconColor: 'var(--color-success-bright, #34d399)',
+    border: 'var(--color-success, #059669)',
+    iconBg: 'var(--color-success-lightest, #D1FAE5)',
+    iconColor: 'var(--color-success-dark, #047857)',
   },
   warning: {
-    border: 'var(--color-warning)',
-    iconBg: 'var(--color-warning-surface, rgba(245, 158, 11, 0.12))',
-    iconColor: 'var(--color-warning-bright, #fbbf24)',
+    border: 'var(--color-warning, #D97706)',
+    iconBg: 'var(--color-warning-lightest, #FEF3C7)',
+    iconColor: 'var(--color-warning-dark, #B45309)',
   },
   danger: {
-    border: 'var(--color-danger)',
-    iconBg: 'var(--color-danger-surface, rgba(239, 68, 68, 0.12))',
-    iconColor: 'var(--color-danger-bright, #f87171)',
+    border: 'var(--color-danger, #DC2626)',
+    iconBg: 'var(--color-danger-lightest, #FEE2E2)',
+    iconColor: 'var(--color-danger-dark, #B91C1C)',
   },
   info: {
-    border: 'var(--color-accent, #8b5cf6)',
-    iconBg: 'var(--color-accent-surface, rgba(139, 92, 246, 0.12))',
-    iconColor: 'var(--color-accent-bright, #a78bfa)',
+    border: 'var(--color-secondary, #2563EB)',
+    iconBg: 'var(--color-secondary-lightest, #EFF6FF)',
+    iconColor: 'var(--color-secondary-dark, #1D4ED8)',
   },
   neutral: {
-    border: 'var(--color-border-default, #334155)',
-    iconBg: 'var(--color-bg-hover, #232c3a)',
-    iconColor: 'var(--color-text-secondary, #cbd5e1)',
+    border: 'var(--color-border-default, #E0E0E0)',
+    iconBg: 'var(--color-bg-hover, #F5F5F3)',
+    iconColor: 'var(--color-text-muted, #606060)',
   },
 };
 

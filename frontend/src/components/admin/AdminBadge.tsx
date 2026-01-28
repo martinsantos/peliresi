@@ -1,6 +1,6 @@
 /**
  * AdminBadge - Unified badge/pill component for admin pages
- * SITREP Design System v4.0 - NASA Control Room Aesthetic
+ * SITREP Design System v5.0 - Versión Humanista
  */
 
 import React from 'react';
@@ -36,85 +36,85 @@ export interface AdminBadgeProps {
 }
 
 const variantStyles: Record<BadgeVariant, { bg: string; color: string; border: string }> = {
-  // Semantic variants
+  // Semantic variants - Humanist Light Theme
   primary: {
-    bg: 'var(--color-primary-surface, rgba(6, 182, 212, 0.15))',
-    color: 'var(--color-primary-bright, #22d3ee)',
-    border: 'var(--color-primary-dim, rgba(6, 182, 212, 0.3))',
+    bg: 'var(--color-primary-lightest, #E8F5E9)',
+    color: 'var(--color-primary, #1B5E3C)',
+    border: 'transparent',
   },
   success: {
-    bg: 'var(--color-success-surface, rgba(16, 185, 129, 0.15))',
-    color: 'var(--color-success-bright, #34d399)',
-    border: 'var(--color-success-dim, rgba(16, 185, 129, 0.3))',
+    bg: 'var(--color-success-lightest, #D1FAE5)',
+    color: 'var(--color-success-dark, #047857)',
+    border: 'transparent',
   },
   warning: {
-    bg: 'var(--color-warning-surface, rgba(245, 158, 11, 0.15))',
-    color: 'var(--color-warning-bright, #fbbf24)',
-    border: 'var(--color-warning-dim, rgba(245, 158, 11, 0.3))',
+    bg: 'var(--color-warning-lightest, #FEF3C7)',
+    color: 'var(--color-warning-dark, #B45309)',
+    border: 'transparent',
   },
   danger: {
-    bg: 'var(--color-danger-surface, rgba(239, 68, 68, 0.15))',
-    color: 'var(--color-danger-bright, #f87171)',
-    border: 'var(--color-danger-dim, rgba(239, 68, 68, 0.3))',
+    bg: 'var(--color-danger-lightest, #FEE2E2)',
+    color: 'var(--color-danger-dark, #B91C1C)',
+    border: 'transparent',
   },
   info: {
-    bg: 'var(--color-accent-surface, rgba(139, 92, 246, 0.15))',
-    color: 'var(--color-accent-bright, #a78bfa)',
-    border: 'var(--color-accent-dim, rgba(139, 92, 246, 0.3))',
+    bg: 'var(--color-secondary-lightest, #EFF6FF)',
+    color: 'var(--color-secondary-dark, #1D4ED8)',
+    border: 'transparent',
   },
   neutral: {
-    bg: 'var(--color-bg-hover, rgba(100, 116, 139, 0.15))',
-    color: 'var(--color-text-secondary, #cbd5e1)',
-    border: 'var(--color-border-subtle, rgba(100, 116, 139, 0.3))',
+    bg: 'var(--color-bg-hover, #F5F5F3)',
+    color: 'var(--color-text-muted, #606060)',
+    border: 'transparent',
   },
 
-  // Role-based variants
+  // Role-based variants - Humanist
   admin: {
-    bg: 'var(--role-admin-surface, rgba(77, 159, 255, 0.15))',
-    color: 'var(--role-admin, #4d9fff)',
-    border: 'rgba(77, 159, 255, 0.3)',
+    bg: 'var(--role-admin-surface, rgba(37, 99, 235, 0.08))',
+    color: 'var(--role-admin, #2563EB)',
+    border: 'transparent',
   },
   generador: {
-    bg: 'var(--role-generador-surface, rgba(167, 139, 250, 0.15))',
-    color: 'var(--role-generador, #a78bfa)',
-    border: 'rgba(167, 139, 250, 0.3)',
+    bg: 'var(--role-generador-surface, rgba(124, 58, 237, 0.08))',
+    color: 'var(--role-generador, #7C3AED)',
+    border: 'transparent',
   },
   transportista: {
-    bg: 'var(--role-transportista-surface, rgba(251, 191, 36, 0.15))',
-    color: 'var(--role-transportista, #fbbf24)',
-    border: 'rgba(251, 191, 36, 0.3)',
+    bg: 'var(--role-transportista-surface, rgba(217, 119, 6, 0.08))',
+    color: 'var(--role-transportista, #D97706)',
+    border: 'transparent',
   },
   operador: {
-    bg: 'var(--role-operador-surface, rgba(74, 222, 128, 0.15))',
-    color: 'var(--role-operador, #4ade80)',
-    border: 'rgba(74, 222, 128, 0.3)',
+    bg: 'var(--role-operador-surface, rgba(5, 150, 105, 0.08))',
+    color: 'var(--role-operador, #059669)',
+    border: 'transparent',
   },
 
   // Module-based variants (for audit logs)
   auth: {
-    bg: 'rgba(59, 130, 246, 0.15)',
-    color: '#60a5fa',
-    border: 'rgba(59, 130, 246, 0.3)',
+    bg: '#EFF6FF',
+    color: '#2563EB',
+    border: 'transparent',
   },
   manifiestos: {
-    bg: 'rgba(16, 185, 129, 0.15)',
-    color: '#34d399',
-    border: 'rgba(16, 185, 129, 0.3)',
+    bg: '#E8F5E9',
+    color: '#1B5E3C',
+    border: 'transparent',
   },
   reportes: {
-    bg: 'rgba(245, 158, 11, 0.15)',
-    color: '#fbbf24',
-    border: 'rgba(245, 158, 11, 0.3)',
+    bg: '#FEF3C7',
+    color: '#B45309',
+    border: 'transparent',
   },
   usuarios: {
-    bg: 'rgba(139, 92, 246, 0.15)',
-    color: '#a78bfa',
-    border: 'rgba(139, 92, 246, 0.3)',
+    bg: '#F3E8FF',
+    color: '#7C3AED',
+    border: 'transparent',
   },
   reversiones: {
-    bg: 'rgba(239, 68, 68, 0.15)',
-    color: '#f87171',
-    border: 'rgba(239, 68, 68, 0.3)',
+    bg: '#FEE2E2',
+    color: '#B91C1C',
+    border: 'transparent',
   },
 };
 
