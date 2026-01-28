@@ -1,9 +1,12 @@
+/**
+ * ManifiestoForm.css - Form Styles
+ * SITREP Design System v5.0 - Versión Humanista
+ */
+
 .form-page {
     padding: 2rem;
     max-width: 1000px;
     margin: 0 auto;
-
-    /* CRITICAL: Prevent horizontal scroll */
     width: 100%;
     overflow-x: hidden;
 }
@@ -18,13 +21,14 @@
 .form-header h2 {
     margin: 0;
     font-size: 1.8rem;
-    color: var(--text-primary);
+    color: var(--color-text-primary, #1A1A1A);
+    font-weight: 700;
 }
 
 .form-error {
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid #ef4444;
-    color: #ef4444;
+    background: rgba(220, 38, 38, 0.08);
+    border: 1px solid rgba(220, 38, 38, 0.3);
+    color: #DC2626;
     padding: 1rem;
     border-radius: 8px;
     margin-bottom: 1rem;
@@ -34,9 +38,9 @@
 }
 
 .form-warning {
-    background: rgba(245, 158, 11, 0.1);
-    border: 1px solid #f59e0b;
-    color: #f59e0b;
+    background: rgba(217, 119, 6, 0.08);
+    border: 1px solid rgba(217, 119, 6, 0.3);
+    color: #D97706;
     padding: 1rem;
     border-radius: 8px;
     margin-bottom: 2rem;
@@ -51,7 +55,7 @@
 }
 
 .form-warning strong {
-    color: #d97706;
+    color: #B45309;
 }
 
 .manifiesto-form {
@@ -62,13 +66,18 @@
 
 .form-section {
     padding: 1.5rem;
+    background: var(--color-bg-card, #FFFFFF);
+    border: 1px solid var(--color-border-light, #E8E8E8);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
 .form-section h3 {
     margin: 0 0 1.5rem;
-    font-size: 1.2rem;
-    color: var(--text-primary);
-    border-bottom: 1px solid var(--border-color);
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--color-primary, #1B5E3C);
+    border-bottom: 1px solid var(--color-border-light, #E8E8E8);
     padding-bottom: 0.75rem;
 }
 
@@ -77,7 +86,7 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 1.5rem;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--color-border-light, #E8E8E8);
     padding-bottom: 0.75rem;
 }
 
@@ -108,19 +117,21 @@
 }
 
 .form-group label {
-    font-size: 0.9rem;
-    color: var(--text-secondary);
-    font-weight: 500;
+    font-size: 0.85rem;
+    color: var(--color-text-secondary, #404040);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
 }
 
 .form-group select,
 .form-group input,
 .form-group textarea {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
+    background: var(--color-bg-card, #FFFFFF);
+    border: 1px solid var(--color-border-light, #E8E8E8);
     padding: 0.75rem;
     border-radius: 8px;
-    color: var(--text-primary);
+    color: var(--color-text-primary, #1A1A1A);
     font-size: 1rem;
     transition: all 0.2s;
 }
@@ -129,8 +140,8 @@
 .form-group input:focus,
 .form-group textarea:focus {
     outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
+    border-color: var(--color-primary, #1B5E3C);
+    box-shadow: 0 0 0 3px rgba(27, 94, 60, 0.1);
 }
 
 /* Residuos List */
@@ -141,9 +152,9 @@
 }
 
 .residuo-item {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    background: var(--color-bg-elevated, #FAFAF8);
+    border: 1px solid var(--color-border-light, #E8E8E8);
+    border-radius: 10px;
     padding: 1.5rem;
 }
 
@@ -156,7 +167,7 @@
 
 .residuo-header span {
     font-weight: 600;
-    color: var(--primary-color);
+    color: var(--color-primary, #1B5E3C);
 }
 
 /* Actions */
@@ -165,6 +176,8 @@
     justify-content: flex-end;
     gap: 1rem;
     margin-top: 1rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--color-border-light, #E8E8E8);
 }
 
 .form-loading {
@@ -174,51 +187,53 @@
     justify-content: center;
     min-height: 400px;
     gap: 1rem;
-    color: var(--text-secondary);
+    color: var(--color-text-secondary, #404040);
 }
 
 /* ==================== MOBILE-FIRST RESPONSIVE ==================== */
 
 /* Base mobile styles */
-.form-page {
-    padding: 1rem;
-}
+@media (max-width: 767px) {
+    .form-page {
+        padding: 1rem;
+    }
 
-.form-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
-}
+    .form-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
 
-.form-header h2 {
-    font-size: clamp(1.25rem, 5vw, 1.8rem);
-}
+    .form-header h2 {
+        font-size: clamp(1.25rem, 5vw, 1.8rem);
+    }
 
-.form-grid {
-    grid-template-columns: 1fr;
-}
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
 
-.form-group.span-2 {
-    grid-column: span 1;
-}
+    .form-group.span-2 {
+        grid-column: span 1;
+    }
 
-.form-section {
-    padding: 1rem;
-}
+    .form-section {
+        padding: 1rem;
+    }
 
-.section-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
-}
+    .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
 
-.form-actions {
-    flex-direction: column;
-}
+    .form-actions {
+        flex-direction: column;
+    }
 
-.form-actions .btn {
-    width: 100%;
-    justify-content: center;
+    .form-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
 }
 
 /* 480px+: Small improvements */
@@ -273,25 +288,25 @@
 .form-group.has-error input,
 .form-group.has-error textarea,
 .input-error {
-    border-color: #ef4444 !important;
-    background: rgba(239, 68, 68, 0.05);
+    border-color: #DC2626 !important;
+    background: rgba(220, 38, 38, 0.03);
 }
 
 .form-group.has-error select:focus,
 .form-group.has-error input:focus,
 .form-group.has-error textarea:focus,
 .input-error:focus {
-    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15) !important;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1) !important;
 }
 
 .form-group.has-error label {
-    color: #ef4444;
+    color: #DC2626;
 }
 
 .field-error {
     display: block;
     font-size: 0.75rem;
-    color: #ef4444;
+    color: #DC2626;
     margin-top: 0.25rem;
     padding-left: 0.25rem;
 }
@@ -304,14 +319,14 @@
 /* Warning state for compatibility issues */
 .form-group.has-warning select,
 .form-group.has-warning input {
-    border-color: #f59e0b !important;
-    background: rgba(245, 158, 11, 0.05);
+    border-color: #D97706 !important;
+    background: rgba(217, 119, 6, 0.03);
 }
 
 .field-warning {
     display: block;
     font-size: 0.75rem;
-    color: #f59e0b;
+    color: #D97706;
     margin-top: 0.25rem;
     padding-left: 0.25rem;
 }
@@ -319,11 +334,11 @@
 /* Success state after validation passes */
 .form-group.is-valid select,
 .form-group.is-valid input {
-    border-color: #22c55e !important;
+    border-color: var(--color-primary, #1B5E3C) !important;
 }
 
 .form-group.is-valid label {
-    color: var(--text-secondary);
+    color: var(--color-text-secondary, #404040);
 }
 
 /* Mobile adjustments for errors */
@@ -344,4 +359,84 @@
         height: 18px;
         flex-shrink: 0;
     }
+}
+
+/* ========== BUTTON STYLES FOR FORMS ========== */
+.form-actions .btn-primary {
+    background: var(--color-primary, #1B5E3C);
+    color: #FFFFFF;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.form-actions .btn-primary:hover {
+    background: #0F4028;
+    box-shadow: 0 2px 8px rgba(27, 94, 60, 0.3);
+}
+
+.form-actions .btn-secondary {
+    background: var(--color-bg-card, #FFFFFF);
+    color: var(--color-text-secondary, #404040);
+    border: 1px solid var(--color-border-light, #E8E8E8);
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.form-actions .btn-secondary:hover {
+    background: var(--color-bg-elevated, #FAFAF8);
+    border-color: var(--color-primary, #1B5E3C);
+    color: var(--color-primary, #1B5E3C);
+}
+
+/* Add residuo button */
+.btn-add-residuo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: rgba(27, 94, 60, 0.1);
+    border: 1px solid rgba(27, 94, 60, 0.2);
+    border-radius: 6px;
+    color: var(--color-primary, #1B5E3C);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-add-residuo:hover {
+    background: rgba(27, 94, 60, 0.15);
+    border-color: rgba(27, 94, 60, 0.3);
+}
+
+/* Remove residuo button */
+.btn-remove-residuo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+    background: rgba(220, 38, 38, 0.08);
+    border: 1px solid rgba(220, 38, 38, 0.2);
+    border-radius: 6px;
+    color: #DC2626;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-remove-residuo:hover {
+    background: rgba(220, 38, 38, 0.15);
+    border-color: rgba(220, 38, 38, 0.3);
 }

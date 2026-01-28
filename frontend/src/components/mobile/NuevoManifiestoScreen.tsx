@@ -1,7 +1,7 @@
 /**
  * NuevoManifiestoScreen - Formulario para crear manifiestos desde la app movil
  * Sincronizado con WEB: Usa los mismos servicios (manifiestoService, catalogoService)
- * Control Room 2077 Design System - Neon Mobile Edition
+ * SITREP Design System v5.0 - Versión Humanista
  */
 
 import React, { useState, useEffect } from 'react';
@@ -157,8 +157,8 @@ export default function NuevoManifiestoScreen({
     if (loading) {
         return (
             <div className="section" style={{ textAlign: 'center', padding: '40px 20px' }}>
-                <Loader2 size={40} className="spin" style={{ color: 'var(--neon-cyan)' }} />
-                <p style={{ marginTop: '16px', color: 'var(--text-muted)' }}>Cargando catalogos...</p>
+                <Loader2 size={40} className="spin" style={{ color: 'var(--color-primary, #1B5E3C)' }} />
+                <p style={{ marginTop: '16px', color: 'var(--color-text-muted, #606060)' }}>Cargando catalogos...</p>
             </div>
         );
     }
@@ -179,14 +179,14 @@ export default function NuevoManifiestoScreen({
                     gap: '12px',
                     marginBottom: '16px',
                     padding: '12px',
-                    background: 'linear-gradient(135deg, rgba(0, 255, 242, 0.1), rgba(0, 255, 242, 0.02))',
+                    background: 'var(--color-bg-elevated, #FAFAF8)',
                     borderRadius: '12px',
-                    border: '1px solid rgba(0, 255, 242, 0.2)'
+                    border: '1px solid var(--color-border-light, #E8E8E8)'
                 }}>
-                    <FileText size={24} style={{ color: 'var(--neon-cyan, #00fff2)' }} />
+                    <FileText size={24} style={{ color: 'var(--color-primary, #1B5E3C)' }} />
                     <div>
-                        <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--neon-cyan, #00fff2)' }}>Nuevo Manifiesto</h3>
-                        <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>Complete los datos del residuo a transportar</p>
+                        <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--color-primary, #1B5E3C)', fontWeight: 600 }}>Nuevo Manifiesto</h3>
+                        <p style={{ margin: 0, fontSize: '12px', color: 'var(--color-text-muted, #606060)' }}>Complete los datos del residuo a transportar</p>
                     </div>
                 </div>
             </div>
@@ -201,12 +201,12 @@ export default function NuevoManifiestoScreen({
                         gap: '8px',
                         fontSize: '12px',
                         fontWeight: 600,
-                        color: 'var(--text-secondary)',
+                        color: 'var(--color-text-secondary, #404040)',
                         marginBottom: '8px',
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em'
                     }}>
-                        <Truck size={16} style={{ color: 'var(--neon-amber, #ffb800)' }} />
+                        <Truck size={16} style={{ color: 'var(--color-accent-orange, #D97706)' }} />
                         Transportista *
                     </label>
                     <select
@@ -219,10 +219,10 @@ export default function NuevoManifiestoScreen({
                         style={{
                             width: '100%',
                             padding: '12px',
-                            background: 'var(--ind-panel, #1a1a2e)',
-                            border: errors.transportista ? '1px solid #ff3366' : '1px solid rgba(255,255,255,0.1)',
+                            background: 'var(--color-bg-card, #FFFFFF)',
+                            border: errors.transportista ? '1px solid #DC2626' : '1px solid var(--color-border-light, #E8E8E8)',
                             borderRadius: '8px',
-                            color: 'var(--text-primary)',
+                            color: 'var(--color-text-primary, #1A1A1A)',
                             fontSize: '14px'
                         }}
                     >
@@ -232,7 +232,7 @@ export default function NuevoManifiestoScreen({
                         ))}
                     </select>
                     {errors.transportista && (
-                        <span className="error-text" style={{ fontSize: '11px', color: '#ff3366', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span className="error-text" style={{ fontSize: '11px', color: '#DC2626', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <AlertCircle size={12} /> {errors.transportista}
                         </span>
                     )}
@@ -246,12 +246,12 @@ export default function NuevoManifiestoScreen({
                         gap: '8px',
                         fontSize: '12px',
                         fontWeight: 600,
-                        color: 'var(--text-secondary)',
+                        color: 'var(--color-text-secondary, #404040)',
                         marginBottom: '8px',
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em'
                     }}>
-                        <Building2 size={16} style={{ color: 'var(--neon-purple, #a855f7)' }} />
+                        <Building2 size={16} style={{ color: 'var(--color-accent-purple, #7C3AED)' }} />
                         Operador de Destino *
                     </label>
                     <select
@@ -264,10 +264,10 @@ export default function NuevoManifiestoScreen({
                         style={{
                             width: '100%',
                             padding: '12px',
-                            background: 'var(--ind-panel, #1a1a2e)',
-                            border: errors.operador ? '1px solid #ff3366' : '1px solid rgba(255,255,255,0.1)',
+                            background: 'var(--color-bg-card, #FFFFFF)',
+                            border: errors.operador ? '1px solid #DC2626' : '1px solid var(--color-border-light, #E8E8E8)',
                             borderRadius: '8px',
-                            color: 'var(--text-primary)',
+                            color: 'var(--color-text-primary, #1A1A1A)',
                             fontSize: '14px'
                         }}
                     >
@@ -277,7 +277,7 @@ export default function NuevoManifiestoScreen({
                         ))}
                     </select>
                     {errors.operador && (
-                        <span className="error-text" style={{ fontSize: '11px', color: '#ff3366', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span className="error-text" style={{ fontSize: '11px', color: '#DC2626', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <AlertCircle size={12} /> {errors.operador}
                         </span>
                     )}
@@ -291,13 +291,13 @@ export default function NuevoManifiestoScreen({
                         justifyContent: 'space-between',
                         fontSize: '12px',
                         fontWeight: 600,
-                        color: 'var(--text-secondary)',
+                        color: 'var(--color-text-secondary, #404040)',
                         marginBottom: '12px',
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em'
                     }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Package size={16} style={{ color: 'var(--neon-green, #22ff66)' }} />
+                            <Package size={16} style={{ color: 'var(--color-primary, #1B5E3C)' }} />
                             Residuos *
                         </span>
                         <button
@@ -308,11 +308,12 @@ export default function NuevoManifiestoScreen({
                                 alignItems: 'center',
                                 gap: '4px',
                                 padding: '6px 10px',
-                                background: 'rgba(34, 255, 102, 0.15)',
-                                border: '1px solid rgba(34, 255, 102, 0.3)',
+                                background: 'rgba(27, 94, 60, 0.1)',
+                                border: '1px solid rgba(27, 94, 60, 0.2)',
                                 borderRadius: '6px',
-                                color: 'var(--neon-green, #22ff66)',
+                                color: 'var(--color-primary, #1B5E3C)',
                                 fontSize: '11px',
+                                fontWeight: 600,
                                 cursor: 'pointer'
                             }}
                         >
@@ -327,15 +328,15 @@ export default function NuevoManifiestoScreen({
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             style={{
-                                background: 'rgba(255,255,255,0.02)',
-                                border: '1px solid rgba(255,255,255,0.08)',
+                                background: 'var(--color-bg-elevated, #FAFAF8)',
+                                border: '1px solid var(--color-border-light, #E8E8E8)',
                                 borderRadius: '10px',
                                 padding: '12px',
                                 marginBottom: '12px'
                             }}
                         >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                                <span style={{ fontSize: '11px', color: 'var(--color-text-muted, #606060)', fontWeight: 600 }}>
                                     RESIDUO #{index + 1}
                                 </span>
                                 {residuos.length > 1 && (
@@ -346,10 +347,10 @@ export default function NuevoManifiestoScreen({
                                             display: 'flex',
                                             alignItems: 'center',
                                             padding: '4px',
-                                            background: 'rgba(255, 51, 102, 0.15)',
+                                            background: 'rgba(220, 38, 38, 0.1)',
                                             border: 'none',
                                             borderRadius: '4px',
-                                            color: '#ff3366',
+                                            color: '#DC2626',
                                             cursor: 'pointer'
                                         }}
                                     >
@@ -365,10 +366,10 @@ export default function NuevoManifiestoScreen({
                                 style={{
                                     width: '100%',
                                     padding: '10px',
-                                    background: 'var(--ind-panel, #1a1a2e)',
-                                    border: errors[`residuo_${index}_tipo`] ? '1px solid #ff3366' : '1px solid rgba(255,255,255,0.1)',
+                                    background: 'var(--color-bg-card, #FFFFFF)',
+                                    border: errors[`residuo_${index}_tipo`] ? '1px solid #DC2626' : '1px solid var(--color-border-light, #E8E8E8)',
                                     borderRadius: '6px',
-                                    color: 'var(--text-primary)',
+                                    color: 'var(--color-text-primary, #1A1A1A)',
                                     fontSize: '13px',
                                     marginBottom: '8px'
                                 }}
@@ -387,7 +388,7 @@ export default function NuevoManifiestoScreen({
                                         left: '10px',
                                         top: '50%',
                                         transform: 'translateY(-50%)',
-                                        color: 'var(--text-muted)'
+                                        color: 'var(--color-text-muted, #606060)'
                                     }} />
                                     <input
                                         type="number"
@@ -397,10 +398,10 @@ export default function NuevoManifiestoScreen({
                                         style={{
                                             width: '100%',
                                             padding: '10px 10px 10px 32px',
-                                            background: 'var(--ind-panel, #1a1a2e)',
-                                            border: errors[`residuo_${index}_cantidad`] ? '1px solid #ff3366' : '1px solid rgba(255,255,255,0.1)',
+                                            background: 'var(--color-bg-card, #FFFFFF)',
+                                            border: errors[`residuo_${index}_cantidad`] ? '1px solid #DC2626' : '1px solid var(--color-border-light, #E8E8E8)',
                                             borderRadius: '6px',
-                                            color: 'var(--text-primary)',
+                                            color: 'var(--color-text-primary, #1A1A1A)',
                                             fontSize: '13px'
                                         }}
                                     />
@@ -410,10 +411,10 @@ export default function NuevoManifiestoScreen({
                                     onChange={(e) => updateResiduo(index, 'unidad', e.target.value)}
                                     style={{
                                         padding: '10px',
-                                        background: 'var(--ind-panel, #1a1a2e)',
-                                        border: '1px solid rgba(255,255,255,0.1)',
+                                        background: 'var(--color-bg-card, #FFFFFF)',
+                                        border: '1px solid var(--color-border-light, #E8E8E8)',
                                         borderRadius: '6px',
-                                        color: 'var(--text-primary)',
+                                        color: 'var(--color-text-primary, #1A1A1A)',
                                         fontSize: '13px'
                                     }}
                                 >
@@ -432,10 +433,10 @@ export default function NuevoManifiestoScreen({
                                 style={{
                                     width: '100%',
                                     padding: '10px',
-                                    background: 'var(--ind-panel, #1a1a2e)',
-                                    border: '1px solid rgba(255,255,255,0.1)',
+                                    background: 'var(--color-bg-card, #FFFFFF)',
+                                    border: '1px solid var(--color-border-light, #E8E8E8)',
                                     borderRadius: '6px',
-                                    color: 'var(--text-primary)',
+                                    color: 'var(--color-text-primary, #1A1A1A)',
                                     fontSize: '13px'
                                 }}
                             />
@@ -449,7 +450,7 @@ export default function NuevoManifiestoScreen({
                         display: 'block',
                         fontSize: '12px',
                         fontWeight: 600,
-                        color: 'var(--text-secondary)',
+                        color: 'var(--color-text-secondary, #404040)',
                         marginBottom: '8px',
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em'
@@ -464,10 +465,10 @@ export default function NuevoManifiestoScreen({
                         style={{
                             width: '100%',
                             padding: '12px',
-                            background: 'var(--ind-panel, #1a1a2e)',
-                            border: '1px solid rgba(255,255,255,0.1)',
+                            background: 'var(--color-bg-card, #FFFFFF)',
+                            border: '1px solid var(--color-border-light, #E8E8E8)',
                             borderRadius: '8px',
-                            color: 'var(--text-primary)',
+                            color: 'var(--color-text-primary, #1A1A1A)',
                             fontSize: '14px',
                             resize: 'none'
                         }}
@@ -483,10 +484,10 @@ export default function NuevoManifiestoScreen({
                         style={{
                             flex: 1,
                             padding: '14px',
-                            background: 'rgba(255,255,255,0.05)',
-                            border: '1px solid rgba(255,255,255,0.1)',
+                            background: 'var(--color-bg-card, #FFFFFF)',
+                            border: '1px solid var(--color-border-light, #E8E8E8)',
                             borderRadius: '10px',
-                            color: 'var(--text-secondary)',
+                            color: 'var(--color-text-secondary, #404040)',
                             fontSize: '14px',
                             fontWeight: 600,
                             cursor: 'pointer'
@@ -502,10 +503,10 @@ export default function NuevoManifiestoScreen({
                         style={{
                             flex: 2,
                             padding: '14px',
-                            background: 'linear-gradient(135deg, var(--neon-cyan, #00fff2), var(--neon-green, #22ff66))',
+                            background: 'var(--color-primary, #1B5E3C)',
                             border: 'none',
                             borderRadius: '10px',
-                            color: '#0a0a14',
+                            color: '#FFFFFF',
                             fontSize: '14px',
                             fontWeight: 700,
                             cursor: submitting ? 'not-allowed' : 'pointer',
@@ -513,7 +514,8 @@ export default function NuevoManifiestoScreen({
                             alignItems: 'center',
                             justifyContent: 'center',
                             gap: '8px',
-                            opacity: submitting ? 0.7 : 1
+                            opacity: submitting ? 0.7 : 1,
+                            boxShadow: '0 2px 8px rgba(27, 94, 60, 0.3)'
                         }}
                     >
                         {submitting ? (
