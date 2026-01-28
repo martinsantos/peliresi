@@ -1,7 +1,8 @@
 /**
- * MobileShell - LAYOUT PRINCIPAL MOBILE
+ * MobileShell - Mobile App Layout
+ * SITREP Design System v5.0 - Versión Humanista
  *
- * Shell unificado que envuelve toda la app móvil:
+ * Shell unificado para la app móvil:
  * - Header con título dinámico y navegación
  * - TripBanner colapsable (solo si hay viaje activo)
  * - Contenido principal (children)
@@ -183,19 +184,20 @@ const MobileShell: React.FC<MobileShellProps> = ({
                     display: flex;
                     flex-direction: column;
                     height: 100vh;
-                    background: var(--color-bg-base, #0a0e12);
-                    color: var(--color-text-primary, #e2e8f0);
+                    background: var(--color-bg-base, #F8F8F6);
+                    color: var(--color-text-primary, #1A1A1A);
                     position: relative;
                     overflow: hidden;
                 }
 
-                /* ========== HEADER ========== */
+                /* ========== HEADER - Humanist Theme ========== */
                 .app-header {
                     position: sticky;
                     top: 0;
                     z-index: var(--z-header, 200);
-                    background: var(--color-bg-elevated, #0f1318);
-                    box-shadow: 0 1px 0 var(--color-border-default, rgba(148, 163, 184, 0.2));
+                    background: var(--color-bg-card, #FFFFFF);
+                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+                    border-bottom: 1px solid var(--color-border-light, #E8E8E8);
                 }
 
                 .header-content {
@@ -215,21 +217,21 @@ const MobileShell: React.FC<MobileShellProps> = ({
                     background: transparent;
                     border: none;
                     border-radius: var(--radius-md, 8px);
-                    color: var(--color-text-secondary, #94a3b8);
+                    color: var(--color-text-secondary, #404040);
                     cursor: pointer;
                     transition: all var(--duration-fast, 150ms);
                 }
 
                 .header-btn:active {
-                    background: var(--color-bg-active, #252d3c);
+                    background: var(--color-bg-hover, #F5F5F3);
                     transform: scale(0.95);
                 }
 
                 .header-title {
-                    font-family: var(--font-sans);
+                    font-family: var(--font-sans, 'Inter', sans-serif);
                     font-size: var(--text-lg, 1.125rem);
                     font-weight: var(--font-bold, 700);
-                    color: var(--color-text-bright, #f8fafc);
+                    color: var(--color-text-primary, #1A1A1A);
                     margin: 0;
                     flex: 1;
                     text-align: center;
@@ -246,13 +248,14 @@ const MobileShell: React.FC<MobileShellProps> = ({
                     overflow-y: auto;
                     overflow-x: hidden;
                     -webkit-overflow-scrolling: touch;
+                    background: var(--color-bg-base, #F8F8F6);
                 }
 
-                /* ========== SIDE MENU ========== */
+                /* ========== SIDE MENU - Humanist Theme ========== */
                 .menu-overlay {
                     position: fixed;
                     inset: 0;
-                    background: var(--color-overlay, rgba(0, 0, 0, 0.7));
+                    background: rgba(0, 0, 0, 0.4);
                     z-index: var(--z-sidebar, 300);
                     animation: fadeIn var(--duration-fast, 150ms) ease-out;
                 }
@@ -268,8 +271,8 @@ const MobileShell: React.FC<MobileShellProps> = ({
                     left: 0;
                     bottom: 0;
                     width: min(80%, var(--sidebar-width, 280px));
-                    background: var(--color-bg-elevated, #0f1318);
-                    border-right: 1px solid var(--color-border-default, rgba(148, 163, 184, 0.15));
+                    background: var(--color-bg-card, #FFFFFF);
+                    border-right: 1px solid var(--color-border-light, #E8E8E8);
                     z-index: calc(var(--z-sidebar, 300) + 1);
                     display: flex;
                     flex-direction: column;
@@ -286,23 +289,24 @@ const MobileShell: React.FC<MobileShellProps> = ({
                     justify-content: space-between;
                     align-items: center;
                     padding: var(--space-4, 16px);
-                    border-bottom: 1px solid var(--color-border-default, rgba(148, 163, 184, 0.15));
+                    border-bottom: 1px solid var(--color-border-light, #E8E8E8);
+                    background: var(--color-bg-elevated, #FAFAF8);
                 }
 
                 .menu-title h2 {
-                    font-family: var(--font-display);
+                    font-family: var(--font-sans, 'Inter', sans-serif);
                     font-size: var(--text-xl, 1.25rem);
                     font-weight: var(--font-extrabold, 800);
-                    color: var(--color-primary, #06b6d4);
+                    color: var(--color-primary, #1B5E3C);
                     margin: 0 0 4px 0;
                     letter-spacing: 0.02em;
                 }
 
                 .menu-role {
-                    font-family: var(--font-mono, monospace);
+                    font-family: var(--font-body, 'Lato', sans-serif);
                     font-size: 10px;
                     font-weight: 600;
-                    color: var(--color-text-muted, #64748b);
+                    color: var(--color-text-muted, #606060);
                     letter-spacing: 0.05em;
                     text-transform: uppercase;
                 }
@@ -313,10 +317,10 @@ const MobileShell: React.FC<MobileShellProps> = ({
                     justify-content: center;
                     width: 40px;
                     height: 40px;
-                    background: var(--color-bg-surface, #151a21);
-                    border: 1px solid var(--color-border-default, rgba(148, 163, 184, 0.15));
+                    background: var(--color-bg-hover, #F5F5F3);
+                    border: 1px solid var(--color-border-light, #E8E8E8);
                     border-radius: var(--radius-md, 8px);
-                    color: var(--color-text-secondary, #94a3b8);
+                    color: var(--color-text-secondary, #404040);
                     cursor: pointer;
                 }
 
@@ -335,8 +339,8 @@ const MobileShell: React.FC<MobileShellProps> = ({
                     background: transparent;
                     border: none;
                     border-radius: var(--radius-md, 8px);
-                    color: var(--color-text-secondary, #94a3b8);
-                    font-family: var(--font-sans);
+                    color: var(--color-text-secondary, #404040);
+                    font-family: var(--font-sans, 'Inter', sans-serif);
                     font-size: var(--text-base, 1rem);
                     font-weight: var(--font-medium, 500);
                     text-align: left;
@@ -345,17 +349,17 @@ const MobileShell: React.FC<MobileShellProps> = ({
                 }
 
                 .menu-item:active {
-                    background: var(--color-bg-active, #252d3c);
-                    color: var(--color-text-bright, #f8fafc);
+                    background: var(--color-primary-lightest, #E8F5E9);
+                    color: var(--color-primary, #1B5E3C);
                 }
 
                 .menu-footer {
                     padding: var(--space-2, 8px);
-                    border-top: 1px solid var(--color-border-default, rgba(148, 163, 184, 0.15));
+                    border-top: 1px solid var(--color-border-light, #E8E8E8);
                 }
 
                 .menu-item.logout {
-                    color: var(--color-danger, #ef4444);
+                    color: var(--color-danger, #DC2626);
                 }
 
                 /* ========== TOAST ========== */
@@ -364,21 +368,21 @@ const MobileShell: React.FC<MobileShellProps> = ({
                     bottom: calc(var(--nav-height, 72px) + var(--space-4, 16px));
                     left: 50%;
                     transform: translateX(-50%);
-                    background: var(--color-bg-surface, #151a21);
-                    border: 1px solid var(--color-border-strong, rgba(148, 163, 184, 0.25));
+                    background: var(--color-bg-card, #FFFFFF);
+                    border: 1px solid var(--color-border-light, #E8E8E8);
                     border-radius: var(--radius-lg, 12px);
                     padding: var(--space-3, 12px) var(--space-5, 20px);
-                    box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.6));
+                    box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.12));
                     z-index: var(--z-toast, 600);
                     max-width: calc(100% - 32px);
                     animation: slideUp var(--duration-normal, 250ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));
                 }
 
                 .toast-notification span {
-                    font-family: var(--font-sans);
+                    font-family: var(--font-sans, 'Inter', sans-serif);
                     font-size: var(--text-sm, 0.875rem);
                     font-weight: var(--font-medium, 500);
-                    color: var(--color-text-primary, #e2e8f0);
+                    color: var(--color-text-primary, #1A1A1A);
                 }
 
                 @keyframes slideUp {

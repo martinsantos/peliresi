@@ -1,12 +1,12 @@
 /**
- * BottomNavigation - INDUSTRIAL NAV SYSTEM
+ * BottomNavigation - Mobile Navigation
+ * SITREP Design System v5.0 - Versión Humanista
  *
- * Navegación inferior con diseño industrial premium:
- * - Iconografía clara y técnica
- * - Indicadores de estado activo con glow
+ * Navegación inferior móvil:
+ * - Iconografía clara con verde institucional
+ * - Indicadores de estado activo
  * - Badge counters para notificaciones
- * - Animaciones de transición suaves
- * - Haptic feedback visual
+ * - Transiciones suaves
  */
 
 import React from 'react';
@@ -99,22 +99,21 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({
                     left: 0;
                     right: 0;
                     z-index: var(--z-bottom-nav, 100);
-                    background: var(--color-bg-elevated, #0f1318);
-                    border-top: 1px solid var(--color-border-default, rgba(148, 163, 184, 0.15));
+                    background: var(--color-bg-card, #FFFFFF);
+                    border-top: 1px solid var(--color-border-light, #E8E8E8);
                     padding: 0;
                     padding-bottom: env(safe-area-inset-bottom, 0);
-                    backdrop-filter: blur(12px);
-                    -webkit-backdrop-filter: blur(12px);
+                    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
                 }
 
-                /* ========== GLOW LINE ========== */
+                /* ========== INDICATOR LINE ========== */
                 .nav-glow-line {
                     position: absolute;
                     top: 0;
                     left: 0;
                     right: 0;
                     height: 2px;
-                    background: var(--color-bg-void, #050709);
+                    background: var(--color-border-light, #E8E8E8);
                     overflow: hidden;
                 }
 
@@ -123,10 +122,9 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({
                     top: 0;
                     height: 100%;
                     width: calc(100% / var(--nav-item-count, 4));
-                    background: linear-gradient(90deg, transparent, var(--color-primary, #06b6d4), transparent);
+                    background: var(--color-primary, #1B5E3C);
                     transform: translateX(calc(var(--active-index, 0) * 100%));
                     transition: transform var(--duration-normal, 250ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));
-                    box-shadow: 0 0 12px var(--color-primary-glow, rgba(6, 182, 212, 0.5));
                 }
 
                 /* ========== NAV ITEMS ========== */
@@ -173,7 +171,7 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({
                     width: 40px;
                     height: 40px;
                     border-radius: var(--radius-md, 8px);
-                    color: var(--color-text-muted, #64748b);
+                    color: var(--color-text-muted, #606060);
                     transition: all var(--duration-normal, 250ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));
                     position: relative;
                 }
@@ -183,26 +181,25 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({
                     background: transparent;
                 }
 
-                /* Estado activo */
+                /* Estado activo - Humanist Theme */
                 .nav-item.active .nav-icon {
-                    background: var(--color-bg-surface, #151a21);
-                    color: var(--color-primary, #06b6d4);
-                    box-shadow: 0 0 16px var(--color-primary-glow, rgba(6, 182, 212, 0.3));
+                    background: var(--color-primary-lightest, #E8F5E9);
+                    color: var(--color-primary, #1B5E3C);
                 }
 
                 /* Viaje activo - pulso especial */
                 .nav-item.trip-active .nav-icon {
-                    background: rgba(6, 182, 212, 0.15);
-                    color: var(--color-primary-bright, #22d3ee);
+                    background: var(--color-primary-lightest, #E8F5E9);
+                    color: var(--color-primary, #1B5E3C);
                     animation: trip-icon-pulse 2s infinite;
                 }
 
                 @keyframes trip-icon-pulse {
                     0%, 100% {
-                        box-shadow: 0 0 16px var(--color-primary-glow, rgba(6, 182, 212, 0.4));
+                        box-shadow: 0 0 8px rgba(27, 94, 60, 0.2);
                     }
                     50% {
-                        box-shadow: 0 0 24px var(--color-primary-glow, rgba(6, 182, 212, 0.6));
+                        box-shadow: 0 0 16px rgba(27, 94, 60, 0.35);
                     }
                 }
 
@@ -216,8 +213,8 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    background: var(--color-danger, #ef4444);
-                    border: 2px solid var(--color-bg-elevated, #0f1318);
+                    background: var(--color-danger, #DC2626);
+                    border: 2px solid var(--color-bg-card, #FFFFFF);
                     border-radius: var(--radius-full, 9999px);
                     animation: badge-appear 0.3s var(--ease-bounce, cubic-bezier(0.34, 1.56, 0.64, 1));
                 }
@@ -249,41 +246,41 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({
                     right: -4px;
                     width: 12px;
                     height: 12px;
-                    background: var(--color-primary-bright, #22d3ee);
-                    border: 2px solid var(--color-bg-elevated, #0f1318);
+                    background: var(--color-primary, #1B5E3C);
+                    border: 2px solid var(--color-bg-card, #FFFFFF);
                     border-radius: 50%;
                     animation: pulse-ring 2s infinite;
                 }
 
                 @keyframes pulse-ring {
                     0% {
-                        box-shadow: 0 0 0 0 var(--color-primary-glow, rgba(6, 182, 212, 0.7));
+                        box-shadow: 0 0 0 0 rgba(27, 94, 60, 0.5);
                     }
                     50% {
-                        box-shadow: 0 0 0 8px var(--color-primary-glow, rgba(6, 182, 212, 0));
+                        box-shadow: 0 0 0 8px rgba(27, 94, 60, 0);
                     }
                     100% {
-                        box-shadow: 0 0 0 0 var(--color-primary-glow, rgba(6, 182, 212, 0));
+                        box-shadow: 0 0 0 0 rgba(27, 94, 60, 0);
                     }
                 }
 
                 /* ========== LABEL ========== */
                 .nav-label {
-                    font-family: var(--font-mono, monospace);
+                    font-family: var(--font-body, 'Lato', sans-serif);
                     font-size: 10px;
                     font-weight: 600;
                     letter-spacing: 0.03em;
-                    color: var(--color-text-dim, #475569);
+                    color: var(--color-text-muted, #606060);
                     transition: color var(--duration-normal, 250ms);
                     text-transform: uppercase;
                 }
 
                 .nav-item.active .nav-label {
-                    color: var(--color-primary, #06b6d4);
+                    color: var(--color-primary, #1B5E3C);
                 }
 
                 .nav-item.trip-active .nav-label {
-                    color: var(--color-primary-bright, #22d3ee);
+                    color: var(--color-primary, #1B5E3C);
                 }
 
                 /* ========== RESPONSIVE ========== */

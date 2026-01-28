@@ -1,20 +1,21 @@
-/* Layout Styles */
+/* Layout Styles - SITREP Humanist Theme v5.0 */
 .layout {
     display: flex;
     min-height: 100vh;
     width: 100%;
     overflow-x: clip; /* Prevent horizontal scroll - better than hidden for flexbox */
+    background: var(--color-bg-base, #F8F8F6);
 }
 
-/* Sidebar */
+/* Sidebar - Humanist Light Theme */
 .sidebar {
     position: fixed;
     left: 0;
     top: 0;
     bottom: 0;
     width: 280px;
-    background: var(--bg-secondary);
-    border-right: 1px solid var(--border-color);
+    background: var(--color-bg-elevated, #FAFAF8);
+    border-right: 1px solid var(--color-border-light, #E8E8E8);
     display: flex;
     flex-direction: column;
     z-index: 9999;
@@ -23,10 +24,11 @@
 
 .sidebar-header {
     padding: var(--space-6);
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--color-border-light, #E8E8E8);
     display: flex;
     align-items: center;
     justify-content: space-between;
+    background: var(--color-bg-card, #FFFFFF);
 }
 
 .logo {
@@ -38,7 +40,7 @@
 .logo-icon {
     width: 40px;
     height: 40px;
-    color: var(--primary-400);
+    color: var(--color-primary, #1B5E3C);
 }
 
 .logo-icon svg {
@@ -54,28 +56,28 @@
 .logo-title {
     font-size: 1.25rem;
     font-weight: 700;
-    color: var(--text-primary);
+    color: var(--color-text-primary, #1A1A1A);
     line-height: 1.2;
 }
 
 .logo-subtitle {
     font-size: 0.75rem;
-    color: var(--text-muted);
+    color: var(--color-text-muted, #606060);
 }
 
 .sidebar-close {
     display: none;
     background: none;
     border: none;
-    color: var(--text-muted);
+    color: var(--color-text-muted, #606060);
     cursor: pointer;
     padding: var(--space-2);
     border-radius: var(--radius-md);
 }
 
 .sidebar-close:hover {
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
+    background: var(--color-bg-hover, #F5F5F3);
+    color: var(--color-text-primary, #1A1A1A);
 }
 
 .sidebar-nav {
@@ -89,7 +91,7 @@
     align-items: center;
     gap: var(--space-3);
     padding: var(--space-3) var(--space-4);
-    color: var(--text-secondary);
+    color: var(--color-text-secondary, #404040);
     border-radius: var(--radius-lg);
     margin-bottom: var(--space-1);
     transition: all var(--transition-fast);
@@ -97,19 +99,24 @@
 }
 
 .nav-item:hover {
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
+    background: var(--color-bg-hover, #F5F5F3);
+    color: var(--color-text-primary, #1A1A1A);
 }
 
 .nav-item.active {
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(59, 130, 246, 0.1));
-    color: var(--primary-400);
-    border: 1px solid rgba(16, 185, 129, 0.3);
+    background: var(--color-primary-lightest, #E8F5E9);
+    color: var(--color-primary, #1B5E3C);
+    border: 1px solid var(--color-primary-light, rgba(27, 94, 60, 0.3));
+    font-weight: 500;
+}
+
+.nav-item.active svg {
+    color: var(--color-primary, #1B5E3C);
 }
 
 .sidebar-footer {
     padding: var(--space-4);
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--color-border-light, #E8E8E8);
 }
 
 .user-info {
@@ -117,14 +124,15 @@
     align-items: center;
     gap: var(--space-3);
     padding: var(--space-3);
-    background: var(--bg-tertiary);
+    background: var(--color-bg-card, #FFFFFF);
     border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border-light, #E8E8E8);
 }
 
 .user-avatar {
     width: 40px;
     height: 40px;
-    background: linear-gradient(135deg, var(--primary-600), var(--accent-blue));
+    background: var(--color-primary, #1B5E3C);
     border-radius: var(--radius-full);
     display: flex;
     align-items: center;
@@ -140,7 +148,7 @@
 
 .user-name {
     font-weight: 600;
-    color: var(--text-primary);
+    color: var(--color-text-primary, #1A1A1A);
     font-size: 0.875rem;
     white-space: nowrap;
     overflow: hidden;
@@ -149,7 +157,7 @@
 
 .user-role {
     font-size: 0.75rem;
-    color: var(--text-muted);
+    color: var(--color-text-muted, #606060);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -164,16 +172,18 @@
     min-height: 100vh;
     position: relative;
     z-index: 1;
+    background: var(--color-bg-base, #F8F8F6);
 }
 
-/* Header */
+/* Header - Humanist Light Theme */
 .header {
     position: sticky;
     top: 0;
     height: 64px;
-    background: var(--bg-glass);
+    background: var(--color-bg-card, #FFFFFF);
     backdrop-filter: blur(10px);
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--color-border-light, #E8E8E8);
+    box-shadow: var(--shadow-card, 0 1px 3px rgba(0, 0, 0, 0.06));
     display: flex;
     align-items: center;
     padding: 0 var(--space-6);
@@ -184,7 +194,7 @@
     display: none;
     background: none;
     border: none;
-    color: var(--text-secondary);
+    color: var(--color-text-secondary, #404040);
     cursor: pointer;
     padding: var(--space-2);
     margin-right: var(--space-4);
@@ -192,8 +202,8 @@
 }
 
 .menu-button:hover {
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
+    background: var(--color-bg-hover, #F5F5F3);
+    color: var(--color-text-primary, #1A1A1A);
 }
 
 .header-content {
@@ -203,7 +213,7 @@
 .page-title {
     font-size: 1.25rem;
     font-weight: 600;
-    color: var(--text-primary);
+    color: var(--color-text-primary, #1A1A1A);
 }
 
 .header-actions {
@@ -218,18 +228,18 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: var(--color-bg-hover, #F5F5F3);
+    border: 1px solid var(--color-border-light, #E8E8E8);
     border-radius: 10px;
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--color-text-secondary, #404040);
     cursor: pointer;
     transition: all 0.2s ease;
 }
 
 .header-icon-btn:hover {
-    background: rgba(255, 255, 255, 0.12);
-    color: white;
-    border-color: rgba(255, 255, 255, 0.25);
+    background: var(--color-primary-lightest, #E8F5E9);
+    color: var(--color-primary, #1B5E3C);
+    border-color: var(--color-primary, #1B5E3C);
 }
 
 /* User menu */
@@ -242,23 +252,23 @@
     align-items: center;
     gap: var(--space-2);
     padding: var(--space-2) var(--space-3);
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
+    background: var(--color-bg-hover, #F5F5F3);
+    border: 1px solid var(--color-border-light, #E8E8E8);
     border-radius: var(--radius-lg);
-    color: var(--text-primary);
+    color: var(--color-text-primary, #1A1A1A);
     cursor: pointer;
     transition: all var(--transition-fast);
 }
 
 .user-menu-trigger:hover {
-    border-color: var(--primary-500);
-    background: var(--bg-secondary);
+    border-color: var(--color-primary, #1B5E3C);
+    background: var(--color-bg-card, #FFFFFF);
 }
 
 .user-menu-avatar {
     width: 32px;
     height: 32px;
-    background: linear-gradient(135deg, var(--primary-600), var(--accent-blue));
+    background: var(--color-primary, #1B5E3C);
     border-radius: var(--radius-full);
     display: flex;
     align-items: center;
@@ -281,10 +291,10 @@
     top: calc(100% + var(--space-2));
     right: 0;
     width: 240px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
+    background: var(--color-bg-card, #FFFFFF);
+    border: 1px solid var(--color-border-light, #E8E8E8);
     border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-xl);
+    box-shadow: var(--shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, 0.1));
     overflow: hidden;
     animation: slideUp 0.2s ease-out;
 }
@@ -294,15 +304,16 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-1);
+    background: var(--color-bg-elevated, #FAFAF8);
 }
 
 .user-menu-header strong {
-    color: var(--text-primary);
+    color: var(--color-text-primary, #1A1A1A);
     font-size: 0.875rem;
 }
 
 .user-menu-header span {
-    color: var(--text-muted);
+    color: var(--color-text-muted, #606060);
     font-size: 0.75rem;
 }
 
@@ -322,7 +333,7 @@
 
 .user-menu-divider {
     height: 1px;
-    background: var(--border-color);
+    background: var(--color-border-light, #E8E8E8);
 }
 
 .user-menu-item {
@@ -333,20 +344,21 @@
     padding: var(--space-3) var(--space-4);
     background: none;
     border: none;
-    color: var(--text-secondary);
+    color: var(--color-text-secondary, #404040);
     font-size: 0.875rem;
     cursor: pointer;
     transition: all var(--transition-fast);
+    text-decoration: none;
 }
 
 .user-menu-item:hover {
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
+    background: var(--color-bg-hover, #F5F5F3);
+    color: var(--color-text-primary, #1A1A1A);
 }
 
 .user-menu-item.active {
-    background: rgba(16, 185, 129, 0.1);
-    color: #10b981;
+    background: var(--color-primary-lightest, #E8F5E9);
+    color: var(--color-primary, #1B5E3C);
     cursor: default;
 }
 
@@ -358,8 +370,8 @@
 .current-badge {
     margin-left: auto;
     padding: 2px 8px;
-    background: rgba(16, 185, 129, 0.2);
-    color: #10b981;
+    background: var(--color-primary-lightest, #E8F5E9);
+    color: var(--color-primary, #1B5E3C);
     font-size: 0.65rem;
     font-weight: 600;
     border-radius: 4px;
@@ -396,17 +408,18 @@
     display: block;
     padding: var(--space-2) var(--space-4);
     font-size: 0.7rem;
-    color: var(--text-muted);
+    color: var(--color-text-muted, #606060);
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
 
 
-/* Main content */
+/* Main content - Humanist Light Theme */
 .main-content {
     flex: 1;
     padding: var(--space-6);
     overflow-y: auto;
+    background: var(--color-bg-base, #F8F8F6);
 }
 
 /* Sidebar overlay */
@@ -414,7 +427,7 @@
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.4);
     z-index: 9998;
 }
 
@@ -426,7 +439,12 @@
     justify-content: center;
     min-height: 100vh;
     gap: var(--space-4);
-    color: var(--text-secondary);
+    color: var(--color-text-secondary, #404040);
+    background: var(--color-bg-base, #F8F8F6);
+}
+
+.loading-screen .logo-icon {
+    color: var(--color-primary, #1B5E3C) !important;
 }
 
 /* ==================== RESPONSIVE - CRITICAL FIXES ==================== */
