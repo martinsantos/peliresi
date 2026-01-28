@@ -2,7 +2,7 @@
  * HomeScreen - Pantalla principal de la app movil
  * Extraido de MobileApp.tsx para mejorar legibilidad
  * SINCRONIZADO con Dashboard.tsx (WEB) - Usa mismo endpoint /api/manifiestos/dashboard
- * Control Room 2077 Design System - Neon Mobile Edition
+ * SITREP Design System v5.0 - Versión Humanista Mobile
  */
 
 import React from 'react';
@@ -38,15 +38,15 @@ interface StatCardConfig {
     glowVariant: GlowVariant;
 }
 
-// Neon color mappings for glow effects
-const neonColors: Record<GlowVariant, { glow: string; gradient: string }> = {
-    cyan: { glow: 'rgba(0, 255, 242, 0.4)', gradient: 'linear-gradient(135deg, rgba(0, 255, 242, 0.2), rgba(0, 255, 242, 0.05))' },
-    green: { glow: 'rgba(34, 255, 102, 0.4)', gradient: 'linear-gradient(135deg, rgba(34, 255, 102, 0.2), rgba(34, 255, 102, 0.05))' },
-    amber: { glow: 'rgba(255, 184, 0, 0.4)', gradient: 'linear-gradient(135deg, rgba(255, 184, 0, 0.2), rgba(255, 184, 0, 0.05))' },
-    red: { glow: 'rgba(255, 51, 102, 0.4)', gradient: 'linear-gradient(135deg, rgba(255, 51, 102, 0.2), rgba(255, 51, 102, 0.05))' },
-    purple: { glow: 'rgba(168, 85, 247, 0.4)', gradient: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(168, 85, 247, 0.05))' },
-    blue: { glow: 'rgba(59, 130, 246, 0.4)', gradient: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.05))' },
-    default: { glow: 'rgba(16, 185, 129, 0.4)', gradient: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.05))' },
+// Humanist color mappings for stat cards (light theme)
+const humanistColors: Record<GlowVariant, { bg: string; border: string; iconBg: string }> = {
+    cyan: { bg: '#FFFFFF', border: '#2563EB', iconBg: 'rgba(37, 99, 235, 0.1)' },
+    green: { bg: '#FFFFFF', border: '#059669', iconBg: 'rgba(5, 150, 105, 0.1)' },
+    amber: { bg: '#FFFFFF', border: '#D97706', iconBg: 'rgba(217, 119, 6, 0.1)' },
+    red: { bg: '#FFFFFF', border: '#DC2626', iconBg: 'rgba(220, 38, 38, 0.1)' },
+    purple: { bg: '#FFFFFF', border: '#7C3AED', iconBg: 'rgba(124, 58, 237, 0.1)' },
+    blue: { bg: '#FFFFFF', border: '#2563EB', iconBg: 'rgba(37, 99, 235, 0.1)' },
+    default: { bg: '#FFFFFF', border: '#1B5E3C', iconBg: 'rgba(27, 94, 60, 0.1)' },
 };
 
 // Tipo para estadísticas del backend (mismo que DashboardStats.estadisticas)
@@ -190,7 +190,7 @@ export default function HomeScreen({
                 )}
             </div>
 
-            {/* Stats Grid - Premium Neon Cards (Control Room 2077 Mobile) */}
+            {/* Stats Grid - Humanist Theme Cards v5.0 */}
             <motion.div
                 className="stats-grid"
                 style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}
@@ -203,54 +203,49 @@ export default function HomeScreen({
             >
                 {statsCards.map((stat, index) => {
                     const IconComponent = stat.icon;
-                    const neonStyle = neonColors[stat.glowVariant];
+                    const humanistStyle = humanistColors[stat.glowVariant];
                     return (
                         <motion.div
                             key={index}
-                            className="stat-card neon-stat-card"
+                            className="stat-card humanist-stat-card"
                             variants={{
                                 hidden: { y: 15, opacity: 0, scale: 0.95 },
                                 show: { y: 0, opacity: 1, scale: 1, transition: { duration: 0.35 } }
                             }}
                             whileTap={{ scale: 0.97 }}
                             style={{
-                                background: neonStyle.gradient,
-                                borderColor: stat.color,
+                                background: humanistStyle.bg,
+                                borderColor: '#E8E8E8',
                                 borderWidth: '1px',
                                 borderStyle: 'solid',
                                 borderRadius: '12px',
                                 position: 'relative',
-                                overflow: 'hidden'
+                                overflow: 'hidden',
+                                borderLeft: `3px solid ${stat.color}`,
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
                             }}
                         >
-                            {/* Neon glow border effect */}
-                            <div style={{
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                height: '2px',
-                                background: `linear-gradient(90deg, transparent, ${stat.color}, transparent)`,
-                                opacity: 0.8
-                            }} />
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative', zIndex: 1 }}>
-                                <motion.span
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative', zIndex: 1 }}>
+                                <span
                                     style={{
                                         color: stat.color,
-                                        filter: `drop-shadow(0 0 6px ${neonStyle.glow})`
+                                        background: humanistStyle.iconBg,
+                                        padding: '8px',
+                                        borderRadius: '8px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
                                     }}
-                                    whileHover={{ scale: 1.1, rotate: 5 }}
                                 >
                                     <IconComponent size={18} />
-                                </motion.span>
+                                </span>
                                 <div
                                     className="stat-value"
                                     style={{
-                                        color: stat.color,
-                                        fontFamily: "'JetBrains Mono', monospace",
+                                        color: '#1A1A1A',
+                                        fontFamily: "'Inter', sans-serif",
                                         fontWeight: 700,
-                                        fontSize: '1.5rem',
-                                        textShadow: `0 0 10px ${neonStyle.glow}`
+                                        fontSize: '1.5rem'
                                     }}
                                 >
                                     {stat.value.toLocaleString()}
@@ -259,11 +254,11 @@ export default function HomeScreen({
                             <div
                                 className="stat-label"
                                 style={{
-                                    fontSize: '9px',
-                                    marginTop: '4px',
+                                    fontSize: '10px',
+                                    marginTop: '6px',
                                     fontWeight: 600,
-                                    letterSpacing: '0.08em',
-                                    color: 'rgba(255,255,255,0.7)',
+                                    letterSpacing: '0.04em',
+                                    color: '#606060',
                                     textTransform: 'uppercase',
                                     position: 'relative',
                                     zIndex: 1
@@ -316,9 +311,9 @@ export default function HomeScreen({
                                 <span>Escanear QR</span>
                             </button>
                             <button className="action-card" onClick={() => onNavigate('historial-viajes')}
-                                style={{ background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.15) 0%, var(--ind-panel) 100%)' }}>
-                                <Clock size={24} style={{ color: 'var(--ind-cyan)' }} />
-                                <span style={{ color: 'var(--ind-cyan)' }}>Historial</span>
+                                style={{ background: 'rgba(37, 99, 235, 0.08)', border: '1px solid rgba(37, 99, 235, 0.2)' }}>
+                                <Clock size={24} style={{ color: '#2563EB' }} />
+                                <span style={{ color: '#2563EB' }}>Historial</span>
                             </button>
                         </>
                     )}
@@ -395,32 +390,39 @@ export default function HomeScreen({
                                         show: { x: 0, opacity: 1, transition: { duration: 0.3 } }
                                     }}
                                     whileTap={{ scale: 0.98 }}
-                                    whileHover={{ x: 4, backgroundColor: 'rgba(0, 255, 242, 0.05)' }}
+                                    whileHover={{ x: 4, backgroundColor: 'rgba(27, 94, 60, 0.04)' }}
+                                    style={{
+                                        background: '#FFFFFF',
+                                        border: '1px solid #E8E8E8',
+                                        borderRadius: '12px',
+                                        marginBottom: '8px'
+                                    }}
                                 >
                                     <div className="list-icon" style={{
-                                        background: 'rgba(0, 255, 242, 0.1)',
+                                        background: 'rgba(27, 94, 60, 0.1)',
                                         borderRadius: '8px',
                                         padding: '8px'
                                     }}>
-                                        <FileText size={18} style={{ color: 'var(--neon-cyan, #00fff2)' }} />
+                                        <FileText size={18} style={{ color: '#1B5E3C' }} />
                                     </div>
                                     <div className="list-body">
                                         <div className="list-title" style={{
-                                            fontFamily: "'JetBrains Mono', monospace",
-                                            fontWeight: 600
+                                            fontFamily: "'Inter', sans-serif",
+                                            fontWeight: 600,
+                                            color: '#1A1A1A'
                                         }}>
                                             #{display.numero}
                                         </div>
-                                        <div className="list-sub">{display.generador} → {display.operador}</div>
+                                        <div className="list-sub" style={{ color: '#404040' }}>{display.generador} → {display.operador}</div>
                                         <div className="list-meta" style={{
                                             display: 'flex',
                                             gap: '8px',
                                             marginTop: '4px',
                                             fontSize: '11px',
-                                            color: 'var(--ind-text-mid)'
+                                            color: '#606060'
                                         }}>
-                                            <span style={{ color: 'var(--neon-cyan, #00fff2)' }}>{display.residuo}</span>
-                                            <span style={{ color: 'var(--neon-amber, #ffb800)' }}>{display.cantidad}</span>
+                                            <span style={{ color: '#1B5E3C', fontWeight: 500 }}>{display.residuo}</span>
+                                            <span style={{ color: '#D97706', fontWeight: 500 }}>{display.cantidad}</span>
                                             {display.fecha && <span>{display.fecha}</span>}
                                         </div>
                                     </div>
@@ -434,9 +436,16 @@ export default function HomeScreen({
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             transition={{ duration: 0.4 }}
+                            style={{
+                                background: '#FFFFFF',
+                                border: '1px solid #E8E8E8',
+                                borderRadius: '12px',
+                                padding: '32px 16px',
+                                textAlign: 'center'
+                            }}
                         >
-                            <FileText size={32} style={{ color: 'var(--neon-cyan, #00fff2)', opacity: 0.5 }} />
-                            <p>No hay manifiestos {
+                            <FileText size={32} style={{ color: '#1B5E3C', opacity: 0.5 }} />
+                            <p style={{ color: '#606060', marginTop: '8px' }}>No hay manifiestos {
                                 activeTab === 'pendientes' ? 'pendientes' :
                                 activeTab === 'en-curso' ? 'en curso' :
                                 'realizados'

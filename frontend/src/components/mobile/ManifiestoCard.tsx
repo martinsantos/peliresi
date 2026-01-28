@@ -1,10 +1,11 @@
 /**
- * ManifiestoCard - INDUSTRIAL HAZMAT CARD
+ * ManifiestoCard - Tarjeta de Manifiesto
+ * SITREP Design System v5.0 - Versión Humanista
  *
- * Tarjeta de manifiesto con diseño industrial premium:
- * - Badge de estado con códigos de color HAZMAT
- * - Tipografía dual (Sans + Mono)
- * - Iconografía técnica
+ * Tarjeta de manifiesto con diseño limpio institucional:
+ * - Badge de estado con colores semánticos
+ * - Tipografía Inter + Lato
+ * - Iconografía clara
  * - Micro-animaciones sutiles
  * - Indicadores de peligrosidad
  */
@@ -226,14 +227,15 @@ const ManifiestoCard: React.FC<ManifiestoCardProps> = ({
 
             <style>{`
                 .manifiesto-card {
-                    background: var(--color-bg-elevated, #0f1318);
-                    border: 1px solid var(--color-border-default, rgba(148, 163, 184, 0.15));
+                    background: var(--color-bg-card, #FFFFFF);
+                    border: 1px solid var(--color-border-light, #E8E8E8);
                     border-radius: var(--radius-lg, 12px);
                     padding: var(--space-4, 16px);
                     cursor: pointer;
                     transition: all var(--duration-normal, 250ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));
                     position: relative;
                     overflow: hidden;
+                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
                 }
 
                 .manifiesto-card::before {
@@ -241,16 +243,16 @@ const ManifiestoCard: React.FC<ManifiestoCardProps> = ({
                     position: absolute;
                     top: 0;
                     left: 0;
-                    right: 0;
-                    height: 3px;
+                    width: 3px;
+                    height: 100%;
                     background: var(--estado-color);
-                    opacity: 0.8;
+                    opacity: 1;
                 }
 
                 .manifiesto-card:active {
                     transform: scale(0.98);
                     border-color: var(--estado-color);
-                    background: var(--color-bg-hover, #1f2633);
+                    background: var(--color-bg-hover, #F5F5F3);
                 }
 
                 .manifiesto-card.compact {
@@ -272,14 +274,14 @@ const ManifiestoCard: React.FC<ManifiestoCardProps> = ({
                 }
 
                 .numero-icon {
-                    color: var(--color-primary, #06b6d4);
+                    color: var(--color-primary, #1B5E3C);
                 }
 
                 .numero-text {
-                    font-family: var(--font-mono, monospace);
+                    font-family: var(--font-sans, 'Inter', sans-serif);
                     font-size: var(--text-base, 1rem);
                     font-weight: var(--font-bold, 700);
-                    color: var(--color-text-bright, #f8fafc);
+                    color: var(--color-text-primary, #1A1A1A);
                     letter-spacing: -0.02em;
                 }
 
@@ -289,7 +291,7 @@ const ManifiestoCard: React.FC<ManifiestoCardProps> = ({
                     gap: var(--space-1, 4px);
                     padding: 4px var(--space-2, 8px);
                     border-radius: var(--radius-sm, 6px);
-                    font-family: var(--font-mono, monospace);
+                    font-family: var(--font-body, 'Lato', sans-serif);
                     font-size: 9px;
                     font-weight: 700;
                     letter-spacing: 0.05em;
@@ -299,9 +301,9 @@ const ManifiestoCard: React.FC<ManifiestoCardProps> = ({
                 .residuo-section {
                     margin-bottom: var(--space-3, 12px);
                     padding: var(--space-3, 12px);
-                    background: var(--color-bg-surface, #151a21);
+                    background: var(--color-bg-elevated, #FAFAF8);
                     border-radius: var(--radius-md, 8px);
-                    border-left: 3px solid var(--color-warning, #f59e0b);
+                    border-left: 3px solid var(--color-accent-orange, #D97706);
                 }
 
                 .residuo-header {
@@ -312,14 +314,14 @@ const ManifiestoCard: React.FC<ManifiestoCardProps> = ({
                 }
 
                 .section-icon {
-                    color: var(--color-warning, #f59e0b);
+                    color: var(--color-accent-orange, #D97706);
                 }
 
                 .residuo-nombre {
-                    font-family: var(--font-sans);
+                    font-family: var(--font-sans, 'Inter', sans-serif);
                     font-size: var(--text-sm, 0.875rem);
                     font-weight: var(--font-semibold, 600);
-                    color: var(--color-text-primary, #e2e8f0);
+                    color: var(--color-text-primary, #1A1A1A);
                     line-height: 1.3;
                 }
 
@@ -334,21 +336,21 @@ const ManifiestoCard: React.FC<ManifiestoCardProps> = ({
                     display: inline-flex;
                     align-items: center;
                     padding: 2px 6px;
-                    background: rgba(245, 158, 11, 0.2);
-                    border: 1px solid var(--color-warning, #f59e0b);
+                    background: rgba(217, 119, 6, 0.1);
+                    border: 1px solid var(--color-accent-orange, #D97706);
                     border-radius: 4px;
-                    font-family: var(--font-mono, monospace);
+                    font-family: var(--font-body, 'Lato', sans-serif);
                     font-size: 10px;
                     font-weight: 700;
-                    color: var(--color-warning, #f59e0b);
+                    color: var(--color-accent-orange, #D97706);
                     letter-spacing: 0.05em;
                 }
 
                 .cantidad-text {
-                    font-family: var(--font-mono, monospace);
+                    font-family: var(--font-body, 'Lato', sans-serif);
                     font-size: 12px;
                     font-weight: 600;
-                    color: var(--color-text-secondary, #94a3b8);
+                    color: var(--color-text-secondary, #404040);
                     letter-spacing: -0.01em;
                 }
 
@@ -356,7 +358,7 @@ const ManifiestoCard: React.FC<ManifiestoCardProps> = ({
                     display: flex;
                     align-items: center;
                     gap: 4px;
-                    font-family: var(--font-mono, monospace);
+                    font-family: var(--font-body, 'Lato', sans-serif);
                     font-size: 10px;
                     font-weight: 700;
                     letter-spacing: 0.05em;
@@ -377,24 +379,24 @@ const ManifiestoCard: React.FC<ManifiestoCardProps> = ({
                 }
 
                 .actor-icon {
-                    color: var(--color-text-dim, #475569);
+                    color: var(--color-text-muted, #606060);
                     flex-shrink: 0;
                 }
 
                 .actor-label {
-                    font-family: var(--font-mono, monospace);
+                    font-family: var(--font-body, 'Lato', sans-serif);
                     font-size: 10px;
                     font-weight: 700;
-                    color: var(--color-text-muted, #64748b);
+                    color: var(--color-text-muted, #606060);
                     letter-spacing: 0.05em;
                     min-width: 32px;
                 }
 
                 .actor-name {
-                    font-family: var(--font-sans);
+                    font-family: var(--font-sans, 'Inter', sans-serif);
                     font-size: var(--text-xs, 0.75rem);
                     font-weight: var(--font-medium, 500);
-                    color: var(--color-text-secondary, #94a3b8);
+                    color: var(--color-text-secondary, #404040);
                     overflow: hidden;
                     text-overflow: ellipsis;
                     white-space: nowrap;
@@ -406,13 +408,13 @@ const ManifiestoCard: React.FC<ManifiestoCardProps> = ({
                     align-items: center;
                     gap: var(--space-2, 8px);
                     padding: var(--space-2, 8px);
-                    background: rgba(6, 182, 212, 0.1);
+                    background: rgba(27, 94, 60, 0.08);
                     border-radius: var(--radius-md, 8px);
                     margin-bottom: var(--space-3, 12px);
                 }
 
                 .location-icon {
-                    color: var(--color-primary, #06b6d4);
+                    color: var(--color-primary, #1B5E3C);
                     flex-shrink: 0;
                 }
 
@@ -432,10 +434,10 @@ const ManifiestoCard: React.FC<ManifiestoCardProps> = ({
                 }
 
                 .location-text {
-                    font-family: var(--font-mono, monospace);
+                    font-family: var(--font-body, 'Lato', sans-serif);
                     font-size: 11px;
                     font-weight: 500;
-                    color: var(--color-primary, #06b6d4);
+                    color: var(--color-primary, #1B5E3C);
                     letter-spacing: 0.02em;
                 }
 
@@ -445,19 +447,19 @@ const ManifiestoCard: React.FC<ManifiestoCardProps> = ({
                     justify-content: space-between;
                     align-items: center;
                     padding-top: var(--space-3, 12px);
-                    border-top: 1px solid var(--color-border-subtle, rgba(148, 163, 184, 0.06));
+                    border-top: 1px solid var(--color-border-light, #E8E8E8);
                 }
 
                 .footer-date {
-                    font-family: var(--font-mono, monospace);
+                    font-family: var(--font-body, 'Lato', sans-serif);
                     font-size: 10px;
                     font-weight: 500;
-                    color: var(--color-text-dim, #475569);
+                    color: var(--color-text-muted, #606060);
                     letter-spacing: 0.02em;
                 }
 
                 .footer-arrow {
-                    color: var(--color-text-dim, #475569);
+                    color: var(--color-text-muted, #606060);
                 }
 
                 /* ========== COMPACT MODE ========== */
@@ -471,7 +473,7 @@ const ManifiestoCard: React.FC<ManifiestoCardProps> = ({
                 .compact-actor {
                     font-size: var(--text-xs, 0.75rem);
                     font-weight: var(--font-medium, 500);
-                    color: var(--color-text-secondary, #94a3b8);
+                    color: var(--color-text-secondary, #404040);
                     overflow: hidden;
                     text-overflow: ellipsis;
                     white-space: nowrap;

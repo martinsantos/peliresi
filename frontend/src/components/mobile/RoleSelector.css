@@ -1,9 +1,9 @@
 /**
- * RoleSelector - Industrial Control Room Design
- * SITREP v4.0 Design System
+ * RoleSelector - Selector de Roles
+ * SITREP Design System v5.0 - Versión Humanista
  *
- * Aesthetic: NASA Mission Control meets Modern Dashboard
- * Supports: Dark (default) + Light themes
+ * Diseño institucional limpio con verde primario
+ * Tema claro por defecto
  * WCAG: AA compliant
  */
 
@@ -341,9 +341,9 @@
 }
 
 .action-btn-primary:hover:not(:disabled) {
-  background: rgba(6, 182, 212, 0.15);
-  border-color: var(--color-primary);
-  box-shadow: 0 0 16px var(--color-primary-glow);
+  background: rgba(27, 94, 60, 0.15);
+  border-color: var(--color-primary, #1B5E3C);
+  box-shadow: 0 0 16px rgba(27, 94, 60, 0.2);
 }
 
 /* SECONDARY - Activate Notifications (Warning/Amber) */

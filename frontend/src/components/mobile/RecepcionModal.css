@@ -1,12 +1,14 @@
-/* RecepcionModal - Flujo de recepción para Operador */
-/* REDISEÑO v6.0 - Mobile-First Industrial Design */
+/**
+ * RecepcionModal - Flujo de recepción para Operador
+ * SITREP Design System v5.0 - Versión Humanista
+ */
 
 .recepcion-modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.92);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     display: flex;
     align-items: flex-end; /* Mobile: slide from bottom */
     justify-content: center;
@@ -28,9 +30,9 @@
 }
 
 .recepcion-modal {
-    background: linear-gradient(180deg, #12121f 0%, #0a0a12 100%);
+    background: var(--color-bg-card, #FFFFFF);
     border-radius: 24px 24px 0 0;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--color-border-light, #E8E8E8);
     border-bottom: none;
     width: 100%;
     max-width: 100%;
@@ -40,9 +42,7 @@
     display: flex;
     flex-direction: column;
     animation: slideUp 0.35s cubic-bezier(0.32, 0.72, 0, 1);
-    box-shadow:
-        0 -4px 32px rgba(0, 0, 0, 0.5),
-        0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+    box-shadow: 0 -4px 32px rgba(0, 0, 0, 0.15);
 }
 
 @media (min-width: 640px) {
@@ -50,7 +50,7 @@
         max-width: 480px;
         max-height: 90vh;
         border-radius: 24px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        border-bottom: 1px solid var(--color-border-light, #E8E8E8);
     }
 }
 
@@ -65,15 +65,15 @@
     }
 }
 
-/* Header - REDISEÑO v6.0 */
+/* Header - Humanist v5.0 */
 .recepcion-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
     padding: 16px 16px 16px 20px;
-    background: linear-gradient(180deg, rgba(6, 182, 212, 0.08) 0%, transparent 100%);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--color-bg-elevated, #FAFAF8);
+    border-bottom: 1px solid var(--color-border-light, #E8E8E8);
     flex-shrink: 0;
     min-height: 60px;
 }
@@ -82,7 +82,8 @@
     margin: 0;
     font-size: clamp(0.9rem, 4vw, 1.1rem);
     font-weight: 700;
-    color: #fff;
+    color: var(--color-text-primary, #1A1A1A);
+    font-family: var(--font-sans, 'Inter', sans-serif);
     letter-spacing: -0.02em;
     /* Mobile: Allow word wrap */
     white-space: normal;
@@ -102,12 +103,12 @@
 }
 
 .recepcion-header .close-btn {
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--color-bg-hover, #F5F5F3);
+    border: 1px solid var(--color-border-light, #E8E8E8);
     width: 40px;
     height: 40px;
     border-radius: 12px;
-    color: rgba(255, 255, 255, 0.6);
+    color: var(--color-text-muted, #606060);
     cursor: pointer;
     transition: all 0.2s ease;
     display: flex;
@@ -117,8 +118,8 @@
 }
 
 .recepcion-header .close-btn:hover {
-    background: rgba(255, 255, 255, 0.12);
-    color: #fff;
+    background: var(--color-bg-base, #F8F8F6);
+    color: var(--color-text-primary, #1A1A1A);
     transform: scale(1.05);
 }
 
@@ -132,15 +133,15 @@
     transform: none;
 }
 
-/* Steps Indicator - REDISEÑO v6.0 Mobile-First */
+/* Steps Indicator - Humanist v5.0 */
 .steps-indicator {
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 16px 12px;
     gap: 0;
-    background: rgba(15, 15, 25, 0.6);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    background: var(--color-bg-base, #F8F8F6);
+    border-bottom: 1px solid var(--color-border-light, #E8E8E8);
     flex-shrink: 0;
 }
 
@@ -167,50 +168,51 @@
     width: 44px;
     height: 44px;
     border-radius: 14px;
-    background: rgba(30, 30, 50, 0.8);
-    border: 2px solid rgba(255, 255, 255, 0.1);
+    background: var(--color-bg-card, #FFFFFF);
+    border: 2px solid var(--color-border-light, #E8E8E8);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: rgba(255, 255, 255, 0.4);
+    color: var(--color-text-muted, #606060);
     transition: all 0.3s ease;
     flex-shrink: 0;
 }
 
 .step.active .step-icon {
-    background: linear-gradient(135deg, #06b6d4, #0891b2);
-    border-color: rgba(6, 182, 212, 0.5);
+    background: var(--color-primary, #1B5E3C);
+    border-color: var(--color-primary, #1B5E3C);
     color: white;
-    box-shadow: 0 4px 16px rgba(6, 182, 212, 0.35);
+    box-shadow: 0 4px 16px rgba(27, 94, 60, 0.25);
 }
 
 .step.completed .step-icon {
-    background: rgba(34, 197, 94, 0.15);
-    border-color: rgba(34, 197, 94, 0.4);
-    color: #22c55e;
+    background: rgba(5, 150, 105, 0.1);
+    border-color: rgba(5, 150, 105, 0.4);
+    color: var(--color-success, #059669);
 }
 
 .step-label {
     font-size: 11px;
     font-weight: 600;
-    color: rgba(255, 255, 255, 0.4);
+    color: var(--color-text-muted, #606060);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     white-space: nowrap;
+    font-family: var(--font-body, 'Lato', sans-serif);
 }
 
 .step.active .step-label {
-    color: #06b6d4;
+    color: var(--color-primary, #1B5E3C);
 }
 
 .step.completed .step-label {
-    color: #22c55e;
+    color: var(--color-success, #059669);
 }
 
 .step-line {
     width: 28px;
     height: 2px;
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--color-border-light, #E8E8E8);
     margin: 0 4px;
     margin-bottom: 22px;
     flex-shrink: 0;
@@ -257,17 +259,19 @@
     margin: 0 0 16px;
     font-size: 16px;
     font-weight: 700;
-    color: #fff;
+    color: var(--color-text-primary, #1A1A1A);
     text-align: center;
     letter-spacing: -0.01em;
+    font-family: var(--font-sans, 'Inter', sans-serif);
 }
 
 /* Verificar Step */
 .manifiesto-card {
-    background: var(--ind-panel, rgba(26, 26, 46, 0.6));
+    background: var(--color-bg-card, #FFFFFF);
     border-radius: 16px;
-    border: 1px solid var(--ind-border, rgba(255, 255, 255, 0.1));
+    border: 1px solid var(--color-border-light, #E8E8E8);
     overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
 .manifiesto-card .card-header {
@@ -275,19 +279,19 @@
     align-items: center;
     gap: 12px;
     padding: 16px;
-    background: rgba(6, 182, 212, 0.1);
-    border-bottom: 1px solid var(--ind-border, rgba(255, 255, 255, 0.1));
+    background: rgba(27, 94, 60, 0.08);
+    border-bottom: 1px solid var(--color-border-light, #E8E8E8);
 }
 
 .manifiesto-card .card-header svg {
-    color: var(--ind-cyan, #06b6d4);
+    color: var(--color-primary, #1B5E3C);
 }
 
 .manifiesto-card .numero {
     font-size: 18px;
     font-weight: 600;
-    font-family: monospace;
-    color: var(--ind-text-primary, #fff);
+    font-family: var(--font-body, 'Lato', sans-serif);
+    color: var(--color-text-primary, #1A1A1A);
 }
 
 .manifiesto-card .card-details {
@@ -594,7 +598,8 @@
     display: flex;
     gap: 12px;
     padding: 20px;
-    border-top: 1px solid var(--ind-border, rgba(255, 255, 255, 0.1));
+    border-top: 1px solid var(--color-border-light, #E8E8E8);
+    background: var(--color-bg-card, #FFFFFF);
 }
 
 .recepcion-actions .btn {
@@ -609,38 +614,39 @@
     cursor: pointer;
     transition: all 0.2s;
     border: none;
+    font-family: var(--font-sans, 'Inter', sans-serif);
 }
 
 .recepcion-actions .btn-ghost {
     background: transparent;
-    border: 1px solid var(--ind-border, rgba(255, 255, 255, 0.2));
-    color: var(--ind-text-muted, rgba(255, 255, 255, 0.6));
+    border: 1px solid var(--color-border-light, #E8E8E8);
+    color: var(--color-text-muted, #606060);
 }
 
 .recepcion-actions .btn-ghost:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--ind-text-primary, #fff);
+    background: var(--color-bg-hover, #F5F5F3);
+    color: var(--color-text-primary, #1A1A1A);
 }
 
 .recepcion-actions .btn-primary {
     flex: 1;
-    background: linear-gradient(135deg, #06b6d4, #0891b2);
+    background: var(--color-primary, #1B5E3C);
     color: white;
 }
 
 .recepcion-actions .btn-primary:hover:not(:disabled) {
-    background: linear-gradient(135deg, #0891b2, #0e7490);
+    background: #155239;
     transform: translateY(-1px);
 }
 
 .recepcion-actions .btn-success {
     flex: 1;
-    background: linear-gradient(135deg, #10b981, #059669);
+    background: var(--color-success, #059669);
     color: white;
 }
 
 .recepcion-actions .btn-success:hover:not(:disabled) {
-    background: linear-gradient(135deg, #059669, #047857);
+    background: #047857;
     transform: translateY(-1px);
 }
 

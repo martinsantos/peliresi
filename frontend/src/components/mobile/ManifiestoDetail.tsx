@@ -1,6 +1,6 @@
 /**
  * ManifiestoDetail - Detalle de un manifiesto
- * Extraido de MobileApp.tsx para mejorar legibilidad
+ * SITREP Design System v5.0 - Versión Humanista
  */
 
 import React from 'react';
@@ -105,7 +105,7 @@ export default function ManifiestoDetail({
 
             {/* Residuos */}
             <div className="detail-card" style={{ marginTop: '12px' }}>
-                <h4 style={{ margin: '0 0 12px', color: 'var(--ind-cyan)' }}>
+                <h4 style={{ margin: '0 0 12px', color: '#1B5E3C', fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
                     Residuos ({allResiduos.length || 1})
                 </h4>
                 {allResiduos.length > 0 ? (
@@ -139,8 +139,8 @@ export default function ManifiestoDetail({
             {/* Observaciones generales */}
             {originalData?.observaciones && (
                 <div className="detail-card" style={{ marginTop: '12px' }}>
-                    <h4 style={{ margin: '0 0 8px', color: 'var(--ind-yellow)' }}>Observaciones</h4>
-                    <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                    <h4 style={{ margin: '0 0 8px', color: '#D97706', fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>Observaciones</h4>
+                    <p style={{ margin: 0, color: '#404040', fontSize: '0.9rem' }}>
                         {originalData.observaciones}
                     </p>
                 </div>
