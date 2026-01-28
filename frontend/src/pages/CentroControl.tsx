@@ -1,7 +1,7 @@
 /**
  * CentroControl.tsx - MEGA Dashboard para Monitor Grande
  * Dashboard premium con métricas en vivo, mapa animado y efectos visuales impactantes
- * Control Room 2077 Design System
+ * SITREP Design System v5.0 - Dual Theme (Dark/Light)
  *
  * Refactored: Components extracted to src/components/centro-control/
  */
@@ -15,7 +15,8 @@ import {
     ChevronRight, Package, Radio,
     Factory, Building2, BarChart3,
     Wifi, WifiOff, ArrowRightLeft, Navigation,
-    Trophy, TrendingUp, Recycle, Phone, Gauge, User, Pause, Users, Bell
+    Trophy, TrendingUp, Recycle, Phone, Gauge, User, Pause, Users, Bell,
+    Sun, Moon
 } from 'lucide-react';
 import {
     AreaChart,
@@ -86,6 +87,9 @@ const CentroControl: React.FC = () => {
     const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
     const [selectedDept, setSelectedDept] = useState<string | null>(null);
     const activityRef = useRef<HTMLDivElement>(null);
+
+    // Theme toggle - Dark (default for control monitors) / Light (humanist)
+    const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
     // Estado para departamentos (datos reales de API)
     const [departamentos, setDepartamentos] = useState<DepartamentoStats[]>([]);
@@ -422,7 +426,7 @@ const CentroControl: React.FC = () => {
     }
 
     return (
-        <div className="mega-dashboard">
+        <div className={`mega-dashboard ${theme === 'light' ? 'theme-light' : ''}`}>
             {/* MEGA Header */}
             <header className="mega-header">
                 <div className="mega-logo">
@@ -435,6 +439,17 @@ const CentroControl: React.FC = () => {
                 </div>
 
                 <LiveClock />
+
+                {/* Theme Toggle */}
+                <button
+                    className="theme-toggle"
+                    onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+                    aria-label={theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
+                    title={theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
+                >
+                    {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+                    <span>{theme === 'dark' ? 'CLARO' : 'OSCURO'}</span>
+                </button>
 
                 <div className={`status-indicator ${isOnline ? 'online' : 'offline'}`}>
                     {isOnline ? <Wifi size={18} /> : <WifiOff size={18} />}

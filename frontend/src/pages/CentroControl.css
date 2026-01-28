@@ -1552,6 +1552,104 @@
     font-size: 2rem;
     font-weight: 800;
     line-height: 1.1;
+    color: #f8fafc;
+}
+
+.kpi-label {
+    color: #94a3b8;
+}
+
+.kpi-trend {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+}
+
+.kpi-trend.up {
+    color: #10b981;
+}
+
+.kpi-trend.down {
+    color: #ef4444;
+}
+
+.kpi-live {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: #06b6d4;
+}
+
+.kpi-live .live-dot {
+    width: 8px;
+    height: 8px;
+    background: #06b6d4;
+    border-radius: 50%;
+    animation: pulse-live 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-live {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+.kpi-alert {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    color: #f59e0b;
+}
+
+.kpi-pending {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    color: #8b5cf6;
+}
+
+/* KPI Card Variants - Dark Theme (default) */
+.kpi-card--manifiestos {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: rgba(16, 185, 129, 0.3);
+}
+
+.kpi-card--manifiestos .kpi-icon {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+}
+
+.kpi-card--en-ruta {
+    background: rgba(6, 182, 212, 0.1);
+    border-color: rgba(6, 182, 212, 0.3);
+}
+
+.kpi-card--en-ruta .kpi-icon {
+    background: rgba(6, 182, 212, 0.2);
+    color: #06b6d4;
+}
+
+.kpi-card--alertas {
+    background: rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.3);
+}
+
+.kpi-card--alertas .kpi-icon {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+}
+
+.kpi-card--usuarios {
+    background: rgba(139, 92, 246, 0.1);
+    border-color: rgba(139, 92, 246, 0.3);
+}
+
+.kpi-card--usuarios .kpi-icon {
+    background: rgba(139, 92, 246, 0.2);
+    color: #8b5cf6;
 }
 
 /* ============================================
@@ -2092,4 +2190,540 @@
 
 .transporte-stats .stat:last-child {
     color: #3b82f6;
+}
+
+/* ============================================
+   THEME TOGGLE BUTTON
+   ============================================ */
+.theme-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 20px;
+    color: #94a3b8;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.theme-toggle:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: #f8fafc;
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.theme-toggle svg {
+    transition: transform 0.3s ease;
+}
+
+.theme-toggle:hover svg {
+    transform: rotate(15deg);
+}
+
+/* ============================================
+   LIGHT THEME - HUMANIST DESIGN
+   ============================================ */
+.mega-dashboard.theme-light {
+    background: linear-gradient(135deg, #F8F8F6 0%, #FAFAF8 50%, #F8F8F6 100%);
+}
+
+.mega-dashboard.theme-light::before {
+    background-image:
+        radial-gradient(circle at 20% 80%, rgba(27, 94, 60, 0.04) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(37, 99, 235, 0.04) 0%, transparent 50%);
+}
+
+/* Loading - Light */
+.mega-dashboard.theme-light .mega-loading,
+.theme-light .mega-loading {
+    background: #F8F8F6;
+}
+
+.mega-dashboard.theme-light .loader-ring {
+    border-top-color: #1B5E3C;
+}
+
+.mega-dashboard.theme-light .loader-ring:nth-child(2) {
+    border-top-color: #2563EB;
+}
+
+.mega-dashboard.theme-light .loader-ring:nth-child(3) {
+    border-top-color: #7C3AED;
+}
+
+.mega-dashboard.theme-light .mega-loading p {
+    color: #606060;
+}
+
+/* Header - Light */
+.mega-dashboard.theme-light .mega-header {
+    background: rgba(255, 255, 255, 0.95);
+    border-color: #E8E8E8;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.mega-dashboard.theme-light .logo-pulse {
+    background: rgba(27, 94, 60, 0.15);
+}
+
+.mega-dashboard.theme-light .logo-icon {
+    color: #1B5E3C;
+}
+
+@keyframes logo-glow-light {
+    0%, 100% { filter: drop-shadow(0 0 4px rgba(27, 94, 60, 0.3)); }
+    50% { filter: drop-shadow(0 0 12px rgba(27, 94, 60, 0.5)); }
+}
+
+.mega-dashboard.theme-light .logo-icon {
+    animation: logo-glow-light 3s ease-in-out infinite;
+}
+
+.mega-dashboard.theme-light .logo-title {
+    color: #1A1A1A;
+}
+
+.mega-dashboard.theme-light .logo-subtitle {
+    color: #1B5E3C;
+}
+
+.mega-dashboard.theme-light .clock-time {
+    color: #1A1A1A;
+    text-shadow: none;
+}
+
+.mega-dashboard.theme-light .clock-date {
+    color: #606060;
+}
+
+.mega-dashboard.theme-light .theme-toggle {
+    background: rgba(27, 94, 60, 0.1);
+    border-color: rgba(27, 94, 60, 0.2);
+    color: #1B5E3C;
+}
+
+.mega-dashboard.theme-light .theme-toggle:hover {
+    background: rgba(27, 94, 60, 0.15);
+    border-color: rgba(27, 94, 60, 0.3);
+    color: #0F4028;
+}
+
+.mega-dashboard.theme-light .status-indicator.online {
+    background: rgba(27, 94, 60, 0.1);
+    border-color: rgba(27, 94, 60, 0.3);
+    color: #1B5E3C;
+}
+
+.mega-dashboard.theme-light .status-indicator.online .status-dot {
+    background: #1B5E3C;
+    box-shadow: 0 0 8px rgba(27, 94, 60, 0.5);
+}
+
+/* KPIs - Light */
+.mega-dashboard.theme-light .mega-kpi {
+    background: #FFFFFF;
+    border-color: #E8E8E8;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.mega-dashboard.theme-light .mega-kpi:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-color: rgba(27, 94, 60, 0.3);
+}
+
+.mega-dashboard.theme-light .mega-kpi::before {
+    background: linear-gradient(135deg, rgba(27, 94, 60, 0.1), rgba(27, 94, 60, 0.02));
+}
+
+.mega-dashboard.theme-light .kpi-icon-bg {
+    background: rgba(27, 94, 60, 0.1);
+}
+
+.mega-dashboard.theme-light .mega-kpi svg {
+    color: #1B5E3C;
+}
+
+.mega-dashboard.theme-light .kpi-label {
+    color: #606060;
+}
+
+.mega-dashboard.theme-light .kpi-value {
+    color: #1A1A1A;
+}
+
+.mega-dashboard.theme-light .kpi-mini-label {
+    color: #808080;
+}
+
+.mega-dashboard.theme-light .kpi-mini-value {
+    color: #404040;
+}
+
+.mega-dashboard.theme-light .kpi-trend.up {
+    color: #1B5E3C;
+}
+
+.mega-dashboard.theme-light .kpi-trend.down {
+    color: #DC2626;
+}
+
+/* KPI Card Variants - Light Theme */
+.mega-dashboard.theme-light .kpi-card--manifiestos {
+    background: rgba(27, 94, 60, 0.08);
+    border-color: rgba(27, 94, 60, 0.2);
+}
+
+.mega-dashboard.theme-light .kpi-card--manifiestos .kpi-icon {
+    background: rgba(27, 94, 60, 0.15);
+    color: #1B5E3C;
+}
+
+.mega-dashboard.theme-light .kpi-card--en-ruta {
+    background: rgba(37, 99, 235, 0.08);
+    border-color: rgba(37, 99, 235, 0.2);
+}
+
+.mega-dashboard.theme-light .kpi-card--en-ruta .kpi-icon {
+    background: rgba(37, 99, 235, 0.15);
+    color: #2563EB;
+}
+
+.mega-dashboard.theme-light .kpi-live {
+    color: #2563EB;
+}
+
+.mega-dashboard.theme-light .kpi-live .live-dot {
+    background: #2563EB;
+}
+
+.mega-dashboard.theme-light .kpi-card--alertas {
+    background: rgba(217, 119, 6, 0.08);
+    border-color: rgba(217, 119, 6, 0.2);
+}
+
+.mega-dashboard.theme-light .kpi-card--alertas .kpi-icon {
+    background: rgba(217, 119, 6, 0.15);
+    color: #D97706;
+}
+
+.mega-dashboard.theme-light .kpi-alert {
+    color: #D97706;
+}
+
+.mega-dashboard.theme-light .kpi-card--usuarios {
+    background: rgba(124, 58, 237, 0.08);
+    border-color: rgba(124, 58, 237, 0.2);
+}
+
+.mega-dashboard.theme-light .kpi-card--usuarios .kpi-icon {
+    background: rgba(124, 58, 237, 0.15);
+    color: #7C3AED;
+}
+
+.mega-dashboard.theme-light .kpi-pending {
+    color: #7C3AED;
+}
+
+/* Panels - Light */
+.mega-dashboard.theme-light .mega-panel {
+    background: #FFFFFF;
+    border-color: #E8E8E8;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.mega-dashboard.theme-light .panel-header {
+    background: #FAFAF8;
+    border-bottom-color: #E8E8E8;
+}
+
+.mega-dashboard.theme-light .panel-header h3 {
+    color: #1A1A1A;
+}
+
+.mega-dashboard.theme-light .panel-header h3 svg {
+    color: #1B5E3C;
+}
+
+/* Map Panel - Light */
+.mega-dashboard.theme-light .tracking-count {
+    color: #606060;
+}
+
+.mega-dashboard.theme-light .map-overlay {
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.mega-dashboard.theme-light .map-legend {
+    background: #FFFFFF;
+    border: 1px solid #E8E8E8;
+}
+
+.mega-dashboard.theme-light .legend-item {
+    color: #404040;
+}
+
+/* Activity Panel - Light */
+.mega-dashboard.theme-light .activity-stats {
+    color: #606060;
+}
+
+.mega-dashboard.theme-light .view-more {
+    color: #1B5E3C;
+}
+
+.mega-dashboard.theme-light .view-more:hover {
+    color: #0F4028;
+}
+
+.mega-dashboard.theme-light .activity-item {
+    background: #FAFAF8;
+    border-color: #E8E8E8;
+}
+
+.mega-dashboard.theme-light .activity-item:hover {
+    background: #F5F5F3;
+    border-color: rgba(27, 94, 60, 0.3);
+}
+
+.mega-dashboard.theme-light .activity-item.newest {
+    border-color: rgba(27, 94, 60, 0.4);
+    background: rgba(27, 94, 60, 0.05);
+}
+
+.mega-dashboard.theme-light .activity-icon {
+    background: rgba(27, 94, 60, 0.1);
+    color: #1B5E3C;
+}
+
+.mega-dashboard.theme-light .activity-icon.error {
+    background: rgba(220, 38, 38, 0.1);
+    color: #DC2626;
+}
+
+.mega-dashboard.theme-light .activity-action {
+    color: #1A1A1A;
+}
+
+.mega-dashboard.theme-light .activity-desc {
+    color: #606060;
+}
+
+.mega-dashboard.theme-light .activity-time {
+    color: #808080;
+}
+
+.mega-dashboard.theme-light .activity-empty {
+    color: #808080;
+}
+
+/* Pipeline Panel - Light */
+.mega-dashboard.theme-light .pipeline-title {
+    color: #1A1A1A;
+}
+
+.mega-dashboard.theme-light .pipeline-stage {
+    background: #FAFAF8;
+    border-color: #E8E8E8;
+}
+
+.mega-dashboard.theme-light .pipeline-stage:hover {
+    border-color: rgba(27, 94, 60, 0.3);
+}
+
+.mega-dashboard.theme-light .stage-count {
+    color: #1A1A1A;
+}
+
+.mega-dashboard.theme-light .stage-label {
+    color: #606060;
+}
+
+/* Charts - Light */
+.mega-dashboard.theme-light .recharts-cartesian-grid line {
+    stroke: #E8E8E8;
+}
+
+.mega-dashboard.theme-light .recharts-text {
+    fill: #606060;
+}
+
+/* Rankings - Light */
+.mega-dashboard.theme-light .ranking-item {
+    background: #FAFAF8;
+    border-color: #E8E8E8;
+}
+
+.mega-dashboard.theme-light .ranking-item:hover {
+    background: #F5F5F3;
+    border-color: rgba(27, 94, 60, 0.3);
+}
+
+.mega-dashboard.theme-light .rank-position {
+    background: rgba(27, 94, 60, 0.1);
+    color: #1B5E3C;
+}
+
+.mega-dashboard.theme-light .rank-position.top-3 {
+    background: #1B5E3C;
+    color: white;
+}
+
+.mega-dashboard.theme-light .dept-name {
+    color: #1A1A1A;
+}
+
+.mega-dashboard.theme-light .dept-stats {
+    color: #606060;
+}
+
+.mega-dashboard.theme-light .progress-bar {
+    background: #E8E8E8;
+}
+
+/* Viajes Activos - Light */
+.mega-dashboard.theme-light .viaje-item {
+    background: #FAFAF8;
+    border-color: #E8E8E8;
+}
+
+.mega-dashboard.theme-light .viaje-item:hover {
+    background: #F5F5F3;
+    border-color: rgba(27, 94, 60, 0.3);
+}
+
+.mega-dashboard.theme-light .viaje-manifiesto {
+    color: #1A1A1A;
+}
+
+.mega-dashboard.theme-light .viaje-transportista {
+    color: #606060;
+}
+
+.mega-dashboard.theme-light .viaje-timer-display {
+    color: #1A1A1A;
+}
+
+.mega-dashboard.theme-light .viaje-icon {
+    background: rgba(27, 94, 60, 0.1);
+    color: #1B5E3C;
+}
+
+.mega-dashboard.theme-light .viaje-icon.paused {
+    background: rgba(245, 158, 11, 0.1);
+    color: #F59E0B;
+}
+
+.mega-dashboard.theme-light .viaje-icon.incident {
+    background: rgba(220, 38, 38, 0.1);
+    color: #DC2626;
+}
+
+/* Filtros - Light */
+.mega-dashboard.theme-light .filtro-tiempo {
+    background: #FAFAF8;
+    border-color: #E8E8E8;
+}
+
+.mega-dashboard.theme-light .filtro-btn {
+    color: #606060;
+}
+
+.mega-dashboard.theme-light .filtro-btn:hover {
+    background: rgba(27, 94, 60, 0.1);
+    color: #1B5E3C;
+}
+
+.mega-dashboard.theme-light .filtro-btn.active {
+    background: #1B5E3C;
+    color: white;
+}
+
+/* Stat Boxes in Panels - Light */
+.mega-dashboard.theme-light .stat-box {
+    background: #FAFAF8;
+    border-color: #E8E8E8;
+}
+
+.mega-dashboard.theme-light .stat-box strong {
+    color: #1A1A1A;
+}
+
+.mega-dashboard.theme-light .stat-box small {
+    color: #606060;
+}
+
+/* Map Popups - Light */
+.mega-dashboard.theme-light .mega-popup .leaflet-popup-content-wrapper {
+    background: #FFFFFF;
+    border-color: #E8E8E8;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.mega-dashboard.theme-light .popup-content {
+    color: #1A1A1A;
+}
+
+.mega-dashboard.theme-light .popup-label {
+    color: #606060;
+}
+
+.mega-dashboard.theme-light .popup-detail {
+    color: #808080;
+}
+
+/* Popup Viaje Sections - Light */
+.mega-dashboard.theme-light .popup-viaje-numero {
+    color: #1A1A1A;
+}
+
+.mega-dashboard.theme-light .popup-viaje-section strong {
+    color: #1A1A1A;
+}
+
+.mega-dashboard.theme-light .section-label {
+    color: #808080;
+}
+
+.mega-dashboard.theme-light .section-detail {
+    color: #606060;
+}
+
+.mega-dashboard.theme-light .detail-badge.patente {
+    background: rgba(37, 99, 235, 0.15);
+    border-color: rgba(37, 99, 235, 0.3);
+    color: #2563EB;
+}
+
+.mega-dashboard.theme-light .detail-item {
+    color: #606060;
+}
+
+.mega-dashboard.theme-light .transporte-stats {
+    border-top-color: #E8E8E8;
+}
+
+.mega-dashboard.theme-light .transporte-stats .stat:first-child {
+    color: #1B5E3C;
+}
+
+.mega-dashboard.theme-light .transporte-stats .stat:last-child {
+    color: #2563EB;
+}
+
+/* Mendoza Map SVG - Light */
+.mega-dashboard.theme-light .mendoza-map-container svg path {
+    stroke: #C8C8C8;
+}
+
+.mega-dashboard.theme-light .dept-tooltip {
+    background: #FFFFFF;
+    border-color: #E8E8E8;
+    color: #1A1A1A;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
