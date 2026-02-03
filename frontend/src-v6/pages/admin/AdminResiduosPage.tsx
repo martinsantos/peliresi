@@ -4,7 +4,7 @@
  * Catálogo de residuos y tipos
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   FlaskConical,
   Plus,
@@ -20,7 +20,8 @@ import {
   Edit,
   Tag,
   BarChart3,
-  Info
+  Info,
+  Loader2
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -29,25 +30,25 @@ import { Table, Pagination } from '../../components/ui/Table';
 import { SearchInput } from '../../components/ui/SearchInput';
 import { Modal } from '../../components/ui/Modal';
 import { Tabs, TabList, Tab, TabPanel } from '../../components/ui/Tabs';
+import { useTiposResiduo } from '../../hooks/useCatalogos';
+import { toast } from '../../components/ui/Toast';
 
-// Mock data
-const residuosData = [
-  { id: 'RES-001', codigo: '180103', descripcion: 'Residuos de procedencia hospitalaria', categoria: 'Anatomopatológico', tipo: 'Peligroso', tratamiento: 'Incineración', peligrosidad: 'alta', unidad: 'kg', activo: true, volumenAnual: 45000 },
-  { id: 'RES-002', codigo: '180106', descripcion: 'Objetos punzantes o cortantes', categoria: 'Cortopunzante', tipo: 'Peligroso', tratamiento: 'Incineración', peligrosidad: 'alta', unidad: 'kg', activo: true, volumenAnual: 12500 },
-  { id: 'RES-003', codigo: '180108', descripcion: 'Residuos biológicos', categoria: 'Biológico', tipo: 'Peligroso', tratamiento: 'Esterilización', peligrosidad: 'media', unidad: 'kg', activo: true, volumenAnual: 32000 },
-  { id: 'RES-004', codigo: '180202', descripcion: 'Residuos de animales infectados', categoria: 'Biológico', tipo: 'Peligroso', tratamiento: 'Incineración', peligrosidad: 'alta', unidad: 'kg', activo: true, volumenAnual: 8900 },
-  { id: 'RES-005', codigo: '200101', descripcion: 'Papel y cartón', categoria: 'Reciclable', tipo: 'No Peligroso', tratamiento: 'Reciclaje', peligrosidad: 'ninguna', unidad: 'kg', activo: true, volumenAnual: 56000 },
-  { id: 'RES-006', codigo: '200139', descripcion: 'Plásticos', categoria: 'Reciclable', tipo: 'No Peligroso', tratamiento: 'Reciclaje', peligrosidad: 'ninguna', unidad: 'kg', activo: true, volumenAnual: 34000 },
-  { id: 'RES-007', codigo: '200111', descripcion: 'Envases de productos químicos', categoria: 'Químico', tipo: 'Peligroso', tratamiento: 'Tratamiento especial', peligrosidad: 'media', unidad: 'kg', activo: false, volumenAnual: 0 },
-];
+interface ResiduoDisplay {
+  id: string;
+  codigo: string;
+  descripcion: string;
+  categoria: string;
+  tipo: string;
+  peligrosidad: string;
+  activo: boolean;
+}
 
-const categoriasData = [
-  { id: 1, nombre: 'Anatomopatológico', color: 'error', residuos: 3, volumen: 58000 },
-  { id: 2, nombre: 'Cortopunzante', color: 'error', residuos: 1, volumen: 12500 },
-  { id: 3, nombre: 'Biológico', color: 'warning', residuos: 2, volumen: 40900 },
-  { id: 4, nombre: 'Reciclable', color: 'success', residuos: 2, volumen: 90000 },
-  { id: 5, nombre: 'Químico', color: 'warning', residuos: 1, volumen: 5600 },
-];
+interface CategoriaDisplay {
+  id: number;
+  nombre: string;
+  color: string;
+  residuos: number;
+}
 
 export const AdminResiduosPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -55,18 +56,73 @@ export const AdminResiduosPage: React.FC = () => {
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('catalogo');
+  const [selectedResiduo, setSelectedResiduo] = useState<ResiduoDisplay | null>(null);
+  const [tipoFilter, setTipoFilter] = useState<string | null>(null);
+  const [categoriaFilter, setCategoriaFilter] = useState<string | null>(null);
 
-  const filteredData = residuosData.filter(r => 
-    r.codigo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    r.descripcion.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    r.categoria.toLowerCase().includes(searchQuery.toLowerCase())
+  const { data: tiposResiduoRaw, isLoading, isError, error } = useTiposResiduo();
+
+  const tiposResiduo = tiposResiduoRaw || [];
+
+  // Map API data to display format
+  const residuosData: ResiduoDisplay[] = useMemo(() =>
+    tiposResiduo.map(r => ({
+      id: r.id,
+      codigo: r.codigo,
+      descripcion: r.descripcion || r.nombre,
+      categoria: r.categoria || 'Sin categoría',
+      tipo: r.peligrosidad === 'alta' || r.peligrosidad === 'media' ? 'Peligroso' : 'No Peligroso',
+      peligrosidad: r.peligrosidad || 'ninguna',
+      activo: r.activo,
+    })),
+    [tiposResiduo]
   );
+
+  // Build categories from real data
+  const categoriasData: CategoriaDisplay[] = useMemo(() => {
+    const catMap = new Map<string, number>();
+    residuosData.forEach(r => {
+      catMap.set(r.categoria, (catMap.get(r.categoria) || 0) + 1);
+    });
+    return Array.from(catMap.entries()).map(([nombre, count], idx) => {
+      const isPeligroso = residuosData.some(r => r.categoria === nombre && (r.peligrosidad === 'alta'));
+      const isMedio = residuosData.some(r => r.categoria === nombre && (r.peligrosidad === 'media'));
+      return {
+        id: idx + 1,
+        nombre,
+        color: isPeligroso ? 'error' : isMedio ? 'warning' : 'success',
+        residuos: count,
+      };
+    });
+  }, [residuosData]);
+
+  // Computed stats
+  const statsPeligrosos = residuosData.filter(r => r.tipo === 'Peligroso').length;
+  const statsNoPeligrosos = residuosData.filter(r => r.tipo === 'No Peligroso').length;
+  const statsCategorias = categoriasData.length;
+  const statsTotal = residuosData.length;
+
+  const filteredData = residuosData.filter(r => {
+    if (tipoFilter && r.tipo !== tipoFilter) return false;
+    if (categoriaFilter && r.categoria !== categoriaFilter) return false;
+    return (
+      r.codigo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.descripcion.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.categoria.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  });
+
+  // Pagination
+  const itemsPerPage = 10;
+  const totalFilteredPages = Math.max(1, Math.ceil(filteredData.length / itemsPerPage));
+  const paginatedData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const columns = [
     {
       key: 'residuo',
+      width: '25%',
       header: 'Residuo',
-      render: (row: typeof residuosData[0]) => (
+      render: (row: ResiduoDisplay) => (
         <div className="flex items-center gap-3">
           <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
             row.peligrosidad === 'alta' ? 'bg-error-100' :
@@ -90,15 +146,18 @@ export const AdminResiduosPage: React.FC = () => {
     },
     {
       key: 'categoria',
+      width: '15%',
+      hiddenBelow: 'md' as const,
       header: 'Categoría',
-      render: (row: typeof residuosData[0]) => (
+      render: (row: ResiduoDisplay) => (
         <Badge variant="soft" color="neutral">{row.categoria}</Badge>
       ),
     },
     {
       key: 'tipo',
+      width: '15%',
       header: 'Tipo',
-      render: (row: typeof residuosData[0]) => (
+      render: (row: ResiduoDisplay) => (
         <Badge variant={row.tipo === 'Peligroso' ? 'solid' : 'soft'} color={row.tipo === 'Peligroso' ? 'error' : 'success'}>
           {row.tipo}
         </Badge>
@@ -106,8 +165,9 @@ export const AdminResiduosPage: React.FC = () => {
     },
     {
       key: 'peligrosidad',
+      width: '15%',
       header: 'Peligrosidad',
-      render: (row: typeof residuosData[0]) => {
+      render: (row: ResiduoDisplay) => {
         const colors: Record<string, string> = {
           alta: 'error',
           media: 'warning',
@@ -122,26 +182,10 @@ export const AdminResiduosPage: React.FC = () => {
       },
     },
     {
-      key: 'tratamiento',
-      header: 'Tratamiento',
-      render: (row: typeof residuosData[0]) => (
-        <span className="text-sm text-neutral-600">{row.tratamiento}</span>
-      ),
-    },
-    {
-      key: 'volumen',
-      header: 'Volumen Anual',
-      align: 'right' as const,
-      render: (row: typeof residuosData[0]) => (
-        <span className="text-sm font-medium text-neutral-900">
-          {row.volumenAnual.toLocaleString()} {row.unidad}
-        </span>
-      ),
-    },
-    {
       key: 'estado',
+      width: '12%',
       header: 'Estado',
-      render: (row: typeof residuosData[0]) => (
+      render: (row: ResiduoDisplay) => (
         <Badge variant="soft" color={row.activo ? 'success' : 'neutral'}>
           {row.activo ? 'Activo' : 'Inactivo'}
         </Badge>
@@ -149,14 +193,21 @@ export const AdminResiduosPage: React.FC = () => {
     },
     {
       key: 'acciones',
+      width: '18%',
       header: '',
       align: 'right' as const,
-      render: () => (
+      render: (row: ResiduoDisplay) => (
         <div className="flex items-center justify-end gap-1">
-          <button className="p-1.5 text-neutral-400 hover:text-info-600 hover:bg-info-50 rounded-lg transition-colors">
+          <button
+            className="p-1.5 text-neutral-400 hover:text-info-600 hover:bg-info-50 rounded-lg transition-colors"
+            onClick={() => { toast.info('Editar residuo', 'La edición de tipos de residuo estará disponible próximamente'); }}
+          >
             <Edit size={16} />
           </button>
-          <button className="p-1.5 text-neutral-400 hover:text-error-600 hover:bg-error-50 rounded-lg transition-colors">
+          <button
+            className="p-1.5 text-neutral-400 hover:text-error-600 hover:bg-error-50 rounded-lg transition-colors"
+            onClick={() => { if (window.confirm('¿Eliminar tipo de residuo ' + row.codigo + '?')) { toast.info('Eliminar residuo', 'La eliminación de tipos de residuo estará disponible próximamente'); } }}
+          >
             <Trash2 size={16} />
           </button>
         </div>
@@ -186,27 +237,33 @@ export const AdminResiduosPage: React.FC = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
+        <Card
+          className={`cursor-pointer transition-all hover:shadow-md ${tipoFilter === 'Peligroso' ? 'ring-2 ring-error-500 shadow-md' : ''}`}
+          onClick={() => { setTipoFilter(f => f === 'Peligroso' ? null : 'Peligroso'); setCategoriaFilter(null); setCurrentPage(1); }}
+        >
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-error-100 rounded-lg">
                 <AlertTriangle size={20} className="text-error-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-neutral-900">4</p>
+                <p className="text-2xl font-bold text-neutral-900">{statsPeligrosos}</p>
                 <p className="text-sm text-neutral-600">Tipos Peligrosos</p>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card
+          className={`cursor-pointer transition-all hover:shadow-md ${tipoFilter === 'No Peligroso' ? 'ring-2 ring-success-500 shadow-md' : ''}`}
+          onClick={() => { setTipoFilter(f => f === 'No Peligroso' ? null : 'No Peligroso'); setCategoriaFilter(null); setCurrentPage(1); }}
+        >
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-success-100 rounded-lg">
                 <Leaf size={20} className="text-success-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-neutral-900">3</p>
+                <p className="text-2xl font-bold text-neutral-900">{statsNoPeligrosos}</p>
                 <p className="text-sm text-neutral-600">No Peligrosos</p>
               </div>
             </div>
@@ -219,21 +276,24 @@ export const AdminResiduosPage: React.FC = () => {
                 <Tag size={20} className="text-primary-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-neutral-900">5</p>
+                <p className="text-2xl font-bold text-neutral-900">{statsCategorias}</p>
                 <p className="text-sm text-neutral-600">Categorías</p>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card
+          className={`cursor-pointer transition-all hover:shadow-md ${!tipoFilter && !categoriaFilter ? '' : 'opacity-75'}`}
+          onClick={() => { setTipoFilter(null); setCategoriaFilter(null); setCurrentPage(1); }}
+        >
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-info-100 rounded-lg">
                 <BarChart3 size={20} className="text-info-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-neutral-900">187tn</p>
-                <p className="text-sm text-neutral-600">Volumen Anual</p>
+                <p className="text-2xl font-bold text-neutral-900">{statsTotal}</p>
+                <p className="text-sm text-neutral-600">Total Tipos</p>
               </div>
             </div>
           </CardContent>
@@ -241,28 +301,38 @@ export const AdminResiduosPage: React.FC = () => {
       </div>
 
       {/* Categorías Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        {categoriasData.map(cat => (
-          <Card key={cat.id} className="cursor-pointer hover:shadow-md transition-shadow">
-            <CardContent className="p-4">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${
-                cat.color === 'error' ? 'bg-error-100' :
-                cat.color === 'warning' ? 'bg-warning-100' :
-                'bg-success-100'
-              }`}>
-                <FlaskConical size={20} className={
-                  cat.color === 'error' ? 'text-error-600' :
-                  cat.color === 'warning' ? 'text-warning-600' :
-                  'text-success-600'
-                } />
-              </div>
-              <h4 className="font-semibold text-neutral-900">{cat.nombre}</h4>
-              <p className="text-sm text-neutral-500">{cat.residuos} tipos</p>
-              <p className="text-xs text-neutral-400 mt-1">{cat.volumen.toLocaleString()} kg/año</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 size={24} className="animate-spin text-primary-500" />
+          <span className="ml-2 text-neutral-600">Cargando categorías...</span>
+        </div>
+      ) : categoriasData.length > 0 ? (
+        <div className={`grid grid-cols-1 md:grid-cols-${Math.min(categoriasData.length, 5)} gap-4`}>
+          {categoriasData.map(cat => (
+            <Card
+              key={cat.id}
+              className={`cursor-pointer hover:shadow-md transition-all ${categoriaFilter === cat.nombre ? 'ring-2 ring-primary-500 shadow-md' : ''}`}
+              onClick={() => { setCategoriaFilter(f => f === cat.nombre ? null : cat.nombre); setTipoFilter(null); setCurrentPage(1); }}
+            >
+              <CardContent className="p-4">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${
+                  cat.color === 'error' ? 'bg-error-100' :
+                  cat.color === 'warning' ? 'bg-warning-100' :
+                  'bg-success-100'
+                }`}>
+                  <FlaskConical size={20} className={
+                    cat.color === 'error' ? 'text-error-600' :
+                    cat.color === 'warning' ? 'text-warning-600' :
+                    'text-success-600'
+                  } />
+                </div>
+                <h4 className="font-semibold text-neutral-900">{cat.nombre}</h4>
+                <p className="text-sm text-neutral-500">{cat.residuos} tipos</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : null}
 
       {/* Tabs */}
       <Tabs activeTab={activeTab} onChange={setActiveTab}>
@@ -284,33 +354,72 @@ export const AdminResiduosPage: React.FC = () => {
                   />
                 </div>
                 <div className="flex gap-2">
-                  <select className="px-4 h-10 rounded-xl border border-neutral-200 bg-white text-sm">
-                    <option>Todas las categorías</option>
-                    <option>Anatomopatológico</option>
-                    <option>Cortopunzante</option>
-                    <option>Biológico</option>
-                    <option>Reciclable</option>
+                  <select
+                    className="px-4 h-10 rounded-xl border border-neutral-200 bg-white text-sm"
+                    value={categoriaFilter || ''}
+                    onChange={(e) => { setCategoriaFilter(e.target.value || null); setTipoFilter(null); setCurrentPage(1); }}
+                  >
+                    <option value="">Todas las categorías</option>
+                    {categoriasData.map(cat => (
+                      <option key={cat.id} value={cat.nombre}>{cat.nombre}</option>
+                    ))}
                   </select>
                   <Button variant="outline" leftIcon={<Filter size={18} />}>
                     Filtros
                   </Button>
                 </div>
               </div>
-              <Table
-                data={filteredData}
-                columns={columns}
-                keyExtractor={(row) => row.id}
-                selectable
-                selectedKeys={selectedRows}
-                onSelectionChange={setSelectedRows}
-              />
-              <Pagination
-                currentPage={currentPage}
-                totalPages={4}
-                totalItems={28}
-                itemsPerPage={10}
-                onPageChange={setCurrentPage}
-              />
+              {(tipoFilter || categoriaFilter) && (
+                <div className="flex items-center gap-2 mb-4 p-2 bg-primary-50 rounded-lg">
+                  <span className="text-sm text-primary-700">Filtro activo:</span>
+                  {tipoFilter && (
+                    <Badge variant="solid" color="primary">
+                      {tipoFilter}
+                      <button className="ml-1.5" onClick={() => { setTipoFilter(null); setCurrentPage(1); }}>&times;</button>
+                    </Badge>
+                  )}
+                  {categoriaFilter && (
+                    <Badge variant="solid" color="primary">
+                      {categoriaFilter}
+                      <button className="ml-1.5" onClick={() => { setCategoriaFilter(null); setCurrentPage(1); }}>&times;</button>
+                    </Badge>
+                  )}
+                  <button
+                    className="ml-auto text-sm text-primary-600 hover:text-primary-800 font-medium"
+                    onClick={() => { setTipoFilter(null); setCategoriaFilter(null); setCurrentPage(1); }}
+                  >
+                    Limpiar filtros
+                  </button>
+                </div>
+              )}
+              {isLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 size={32} className="animate-spin text-primary-500" />
+                  <span className="ml-3 text-neutral-600">Cargando residuos...</span>
+                </div>
+              ) : isError ? (
+                <div className="flex items-center justify-center py-16 text-error-600">
+                  <span>Error al cargar datos: {(error as Error)?.message || 'Error desconocido'}</span>
+                </div>
+              ) : (
+                <>
+                  <Table
+                    data={paginatedData}
+                    columns={columns}
+                    keyExtractor={(row) => row.id}
+                    selectable
+                    selectedKeys={selectedRows}
+                    onSelectionChange={setSelectedRows}
+                  />
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalFilteredPages}
+                    totalItems={filteredData.length}
+                    itemsPerPage={itemsPerPage}
+                    onPageChange={setCurrentPage}
+                  />
+                </>
+              )}
             </CardContent>
           </Card>
         </TabPanel>
@@ -336,7 +445,7 @@ export const AdminResiduosPage: React.FC = () => {
                       </div>
                       <div>
                         <h4 className="font-semibold text-neutral-900">{cat.nombre}</h4>
-                        <p className="text-sm text-neutral-500">{cat.residuos} tipos de residuos • {cat.volumen.toLocaleString()} kg/año</p>
+                        <p className="text-sm text-neutral-500">{cat.residuos} tipos de residuos</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -345,6 +454,9 @@ export const AdminResiduosPage: React.FC = () => {
                     </div>
                   </div>
                 ))}
+                {categoriasData.length === 0 && !isLoading && (
+                  <p className="text-center text-neutral-400 py-8">No hay categorías disponibles</p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -364,10 +476,6 @@ export const AdminResiduosPage: React.FC = () => {
                   <p className="text-sm text-neutral-600 mb-3">
                     Método de tratamiento para residuos según su clasificación.
                   </p>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-neutral-500">Operadores habilitados:</span>
-                    <Badge variant="soft" color="primary">{3 + i}</Badge>
-                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -386,7 +494,7 @@ export const AdminResiduosPage: React.FC = () => {
             <Button variant="outline" onClick={() => setIsModalOpen(false)}>
               Cancelar
             </Button>
-            <Button>Guardar Tipo</Button>
+            <Button onClick={() => { toast.info('Nuevo tipo', 'La creación de tipos de residuo estará disponible próximamente'); setIsModalOpen(false); }}>Guardar Tipo</Button>
           </div>
         }
       >
@@ -399,11 +507,10 @@ export const AdminResiduosPage: React.FC = () => {
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">Categoría *</label>
               <select className="w-full px-4 h-10 rounded-xl border border-neutral-200">
-                <option>Anatomopatológico</option>
-                <option>Cortopunzante</option>
-                <option>Biológico</option>
-                <option>Reciclable</option>
-                <option>Químico</option>
+                {categoriasData.map(cat => (
+                  <option key={cat.id}>{cat.nombre}</option>
+                ))}
+                <option>Otra</option>
               </select>
             </div>
           </div>

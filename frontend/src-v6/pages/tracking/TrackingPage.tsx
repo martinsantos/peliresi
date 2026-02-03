@@ -1,10 +1,10 @@
 /**
  * SITREP v6 - Tracking Page
  * =========================
- * Mapa de seguimiento GPS de manifiestos
+ * Mapa de seguimiento GPS de manifiestos con Leaflet real
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { MapPin, Truck, Clock, Navigation, Filter, Layers, Loader2 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -12,82 +12,82 @@ import { Badge } from '../../components/ui/BadgeV2';
 import { Input } from '../../components/ui/Input';
 import { useManifiestos } from '../../hooks/useManifiestos';
 import { EstadoManifiesto } from '../../types/models';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { useNavigate, useLocation } from 'react-router-dom';
 
-// Mock data para viajes activos
-const activeTrips = [
-  {
-    id: 'M-2025-089',
-    transportista: 'Transportes Andes S.A.',
-    chofer: 'Juan Pérez',
-    patente: 'AB-123-CD',
-    origen: 'Química Mendoza S.A.',
-    destino: 'Planta Las Heras',
-    estado: 'en_curso',
-    progreso: 65,
-    eta: '20:30',
-    ultimaActualizacion: 'Hace 5 min',
-    coordenadas: { lat: -32.8908, lng: -68.8272 },
-  },
-  {
-    id: 'M-2025-090',
-    transportista: 'Logística Sur',
-    chofer: 'María González',
-    patente: 'AC-456-EF',
-    origen: 'Industrias del Sur',
-    destino: 'Planta Godoy Cruz',
-    estado: 'en_curso',
-    progreso: 30,
-    eta: '21:15',
-    ultimaActualizacion: 'Hace 2 min',
-    coordenadas: { lat: -32.9167, lng: -68.85 },
-  },
-  {
-    id: 'M-2025-091',
-    transportista: 'Transportes Andes S.A.',
-    chofer: 'Carlos Rodríguez',
-    patente: 'AD-789-GH',
-    origen: 'Metalúrgica Argentina',
-    destino: 'Planta Las Heras',
-    estado: 'detenido',
-    progreso: 45,
-    eta: '22:00',
-    ultimaActualizacion: 'Hace 15 min',
-    coordenadas: { lat: -32.95, lng: -68.88 },
-  },
-];
+// Leaflet icon fix
+const DefaultIcon = L.icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34]
+});
+L.Marker.prototype.options.icon = DefaultIcon;
+
+const truckIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34]
+});
+
+// Component to fly to a selected marker
+function FlyToMarker({ position }: { position: [number, number] | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (position) {
+      map.flyTo(position, 14, { duration: 0.8 });
+    }
+  }, [position, map]);
+  return null;
+}
 
 const TrackingPage: React.FC = () => {
   const [selectedTrip, setSelectedTrip] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isMobile = location.pathname.startsWith('/mobile');
 
-  // Try real API - get manifiestos in transit
+  // Real API - get manifiestos in transit
   const { data: apiData } = useManifiestos({ estado: EstadoManifiesto.EN_TRANSITO, limit: 50 });
 
   const trips = useMemo(() => {
-    if (apiData?.items?.length) {
-      return apiData.items.map((m: any, i: number) => ({
-        id: m.numero,
+    if (!apiData?.items || !Array.isArray(apiData.items) || apiData.items.length === 0) return [];
+    const angles = [0, 60, 120, 180, 240, 300];
+    return apiData.items.map((m: any, i: number) => {
+      // Use real coords if available, otherwise deterministic spread around Mendoza
+      const hasCoords = m.ultimaUbicacion?.latitud && m.ultimaUbicacion?.longitud;
+      const angle = (angles[i % 6] * Math.PI) / 180;
+      const radius = 0.02 + (i % 3) * 0.01;
+      return {
+        id: m.numero || m.id,
+        manifiestoId: m.id,
         transportista: m.transportista?.razonSocial || 'Transportista',
-        chofer: 'En ruta',
-        patente: '',
         origen: m.generador?.razonSocial || 'Origen',
         destino: m.operador?.razonSocial || 'Destino',
         estado: 'en_curso',
-        progreso: Math.min(30 + i * 20, 90),
-        eta: '-',
-        ultimaActualizacion: 'Ahora',
-        coordenadas: { lat: -32.89 + i * 0.03, lng: -68.82 - i * 0.02 },
-      }));
-    }
-    return activeTrips;
+        lat: hasCoords ? m.ultimaUbicacion.latitud : -32.9287 + Math.cos(angle) * radius,
+        lng: hasCoords ? m.ultimaUbicacion.longitud : -68.8535 + Math.sin(angle) * radius,
+      };
+    });
   }, [apiData]);
 
   const filteredTrips = trips.filter(
     (trip) =>
-      trip.id.toLowerCase().includes(filter.toLowerCase()) ||
-      trip.transportista.toLowerCase().includes(filter.toLowerCase()) ||
-      trip.chofer.toLowerCase().includes(filter.toLowerCase())
+      String(trip.id || '').toLowerCase().includes(filter.toLowerCase()) ||
+      String(trip.transportista || '').toLowerCase().includes(filter.toLowerCase())
   );
+
+  const selectedTripData = trips.find(t => t.id === selectedTrip);
+  const flyToPosition: [number, number] | null = selectedTripData
+    ? [selectedTripData.lat, selectedTripData.lng]
+    : null;
+
+  // Default center: Mendoza or first trip
+  const mapCenter: [number, number] = trips.length > 0
+    ? [trips[0].lat, trips[0].lng]
+    : [-32.9287, -68.8535];
 
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col animate-fade-in">
@@ -96,16 +96,8 @@ const TrackingPage: React.FC = () => {
         <div>
           <h2 className="text-2xl font-bold text-neutral-900">Tracking GPS</h2>
           <p className="text-neutral-600 mt-1">
-            {activeTrips.length} viajes activos en este momento
+            {trips.length} viajes activos en este momento
           </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" leftIcon={<Layers size={18} />}>
-            Capas
-          </Button>
-          <Button variant="outline" leftIcon={<Filter size={18} />}>
-            Filtros
-          </Button>
         </div>
       </div>
 
@@ -121,9 +113,14 @@ const TrackingPage: React.FC = () => {
               leftIcon={<Navigation size={18} />}
             />
           </CardHeader>
-          
+
           <CardContent className="flex-1 overflow-auto p-0">
             <div className="divide-y divide-neutral-100">
+              {filteredTrips.length === 0 && (
+                <div className="p-8 text-center text-neutral-500 text-sm">
+                  No hay viajes en tránsito
+                </div>
+              )}
               {filteredTrips.map((trip) => (
                 <button
                   key={trip.id}
@@ -138,15 +135,9 @@ const TrackingPage: React.FC = () => {
                       <span className="font-mono font-semibold text-neutral-900">
                         {trip.id}
                       </span>
-                      {trip.estado === 'detenido' ? (
-                        <Badge variant="soft" color="warning" dot>
-                          Detenido
-                        </Badge>
-                      ) : (
-                        <Badge variant="soft" color="success" dot pulse>
-                          En curso
-                        </Badge>
-                      )}
+                      <Badge variant="soft" color="success" dot pulse>
+                        En tránsito
+                      </Badge>
                     </div>
                   </div>
 
@@ -161,118 +152,66 @@ const TrackingPage: React.FC = () => {
                         {trip.origen} → {trip.destino}
                       </span>
                     </div>
-                    
-                    {/* Progress bar */}
-                    <div className="mt-3">
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="text-neutral-500">Progreso</span>
-                        <span className="font-medium text-neutral-900">{trip.progreso}%</span>
-                      </div>
-                      <div className="h-2 bg-neutral-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${
-                            trip.estado === 'detenido'
-                              ? 'bg-warning-500'
-                              : 'bg-success-500'
-                          }`}
-                          style={{ width: `${trip.progreso}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2 text-xs">
-                      <div className="flex items-center gap-1 text-neutral-500">
-                        <Clock size={12} />
-                        <span>ETA: {trip.eta}</span>
-                      </div>
-                      <span className="text-neutral-400">
-                        {trip.ultimaActualizacion}
-                      </span>
-                    </div>
                   </div>
+
+                  {selectedTrip === trip.id && (
+                    <div className="mt-3 pt-3 border-t border-neutral-100">
+                      <Button
+                        size="sm"
+                        fullWidth
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(isMobile ? `/mobile/tracking/${trip.manifiestoId}` : `/tracking/${trip.manifiestoId}`);
+                        }}
+                      >
+                        Ver detalle del viaje
+                      </Button>
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
           </CardContent>
         </Card>
 
-        {/* Map placeholder */}
-        <div className="flex-1 bg-neutral-100 rounded-2xl border border-neutral-200 relative overflow-hidden">
-          {/* Mock map background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-neutral-50 to-neutral-100">
-            {/* Grid pattern */}
-            <div
-              className="absolute inset-0 opacity-30"
-              style={{
-                backgroundImage: `
-                  linear-gradient(to right, #e5e7eb 1px, transparent 1px),
-                  linear-gradient(to bottom, #e5e7eb 1px, transparent 1px)
-                `,
-                backgroundSize: '40px 40px',
-              }}
+        {/* Real Leaflet Map */}
+        <div className="flex-1 rounded-2xl border border-neutral-200 relative overflow-hidden isolate">
+          <MapContainer
+            center={mapCenter}
+            zoom={12}
+            style={{ height: '100%', width: '100%', zIndex: 0 }}
+            className="z-0"
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-
-            {/* Mock map markers */}
-            {activeTrips.map((trip, index) => {
-              const isSelected = selectedTrip === trip.id;
-              const top = 20 + index * 25;
-              const left = 30 + index * 20;
-
-              return (
-                <button
-                  key={trip.id}
-                  onClick={() => setSelectedTrip(trip.id)}
-                  className={`
-                    absolute transform -translate-x-1/2 -translate-y-1/2
-                    transition-all duration-300
-                    ${isSelected ? 'scale-125 z-10' : 'hover:scale-110'}
-                  `}
-                  style={{ top: `${top}%`, left: `${left}%` }}
-                >
-                  <div
-                    className={`
-                      w-10 h-10 rounded-full flex items-center justify-center shadow-2
-                      ${isSelected ? 'bg-primary-500 text-white' : 'bg-white text-primary-500'}
-                      ${trip.estado === 'detenido' && !isSelected ? 'text-warning-500' : ''}
-                    `}
-                  >
-                    <Truck size={20} />
+            <FlyToMarker position={flyToPosition} />
+            {trips.map((trip) => (
+              <Marker
+                key={trip.id}
+                position={[trip.lat, trip.lng]}
+                icon={truckIcon}
+                eventHandlers={{
+                  click: () => setSelectedTrip(trip.id),
+                }}
+              >
+                <Popup>
+                  <div className="min-w-[180px]">
+                    <p className="font-bold text-sm">{trip.id}</p>
+                    <p className="text-xs text-gray-600">{trip.transportista}</p>
+                    <p className="text-xs text-gray-500 mt-1">{trip.origen} → {trip.destino}</p>
                   </div>
-                  {isSelected && (
-                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-white px-3 py-2 rounded-lg shadow-3 whitespace-nowrap">
-                      <p className="font-semibold text-sm">{trip.id}</p>
-                      <p className="text-xs text-neutral-500">{trip.chofer}</p>
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+                </Popup>
+              </Marker>
+            ))}
+          </MapContainer>
 
-          {/* Map controls */}
-          <div className="absolute bottom-4 right-4 flex flex-col gap-2">
-            <button className="w-10 h-10 bg-white rounded-lg shadow-2 flex items-center justify-center text-neutral-600 hover:text-neutral-900">
-              <span className="text-xl font-bold">+</span>
-            </button>
-            <button className="w-10 h-10 bg-white rounded-lg shadow-2 flex items-center justify-center text-neutral-600 hover:text-neutral-900">
-              <span className="text-xl font-bold">−</span>
-            </button>
-          </div>
-
-          {/* Legend */}
-          <div className="absolute top-4 left-4 bg-white rounded-xl shadow-2 p-3">
-            <p className="text-xs font-semibold text-neutral-700 mb-2">Leyenda</p>
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2 text-xs text-neutral-600">
-                <div className="w-2 h-2 rounded-full bg-success-500" />
-                <span>En curso</span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-neutral-600">
-                <div className="w-2 h-2 rounded-full bg-warning-500" />
-                <span>Detenido</span>
-              </div>
+          {trips.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-[400]">
+              <p className="text-sm text-neutral-500">No hay viajes en tránsito para mostrar en el mapa</p>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

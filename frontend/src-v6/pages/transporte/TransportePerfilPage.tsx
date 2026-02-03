@@ -42,6 +42,7 @@ import {
 import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 
 // Importar Leaflet dinámicamente para evitar SSR issues
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle } from 'react-leaflet';
@@ -175,6 +176,7 @@ const historialViajes = [
 
 const TransportePerfilPage: React.FC = () => {
   const navigate = useNavigate();
+  const mp = useMobilePrefix();
   const [activeTab, setActiveTab] = useState<'viaje' | 'info' | 'historial'>('viaje');
   const [viajeStatus, setViajeStatus] = useState<'ACTIVO' | 'PAUSADO'>('ACTIVO');
   const [showFinalizarModal, setShowFinalizarModal] = useState(false);
@@ -233,7 +235,7 @@ const TransportePerfilPage: React.FC = () => {
     setShowFinalizarModal(false);
     // Aquí iría la lógica para finalizar
     alert('Viaje finalizado exitosamente');
-    navigate('/mobile/manifiestos');
+    navigate(mp('/manifiestos'));
   };
 
   return (

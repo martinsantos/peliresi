@@ -4,8 +4,8 @@
  * Detalle de manifiesto con timeline - Conectado a API
  */
 
-import React from 'react';
-import { useParams, Link, useLocation } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   FileText,
@@ -22,42 +22,40 @@ import {
   Download,
   Copy,
   Check,
+  PenTool,
+  ClipboardCheck,
+  Scale,
+  Beaker,
+  XCircle,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
+import { Input } from '../../components/ui/Input';
 import { Skeleton } from '../../components/ui/Skeleton';
-import { useManifiesto } from '../../hooks/useManifiestos';
+import { toast } from '../../components/ui/Toast';
+import {
+  useManifiesto,
+  useFirmarManifiesto,
+  useConfirmarRetiro,
+  useConfirmarEntrega,
+  useConfirmarRecepcion,
+  usePesaje,
+  useRegistrarTratamiento,
+  useCerrarManifiesto,
+  useRechazarManifiesto,
+  useRegistrarIncidente,
+} from '../../hooks/useManifiestos';
+import { useAuth } from '../../contexts/AuthContext';
+import { manifiestoService } from '../../services/manifiesto.service';
 import { formatDateTime, formatNumber, formatWeight, formatEstado, formatCuit } from '../../utils/formatters';
 import { ESTADO_COLORS } from '../../utils/constants';
 import type { Manifiesto, EventoManifiesto } from '../../types/models';
 import { EstadoManifiesto } from '../../types/models';
 
-// Fallback mock timeline
-const MOCK_TIMELINE = [
-  { id: '1', date: '31/01/2025 14:30', title: 'Manifiesto creado', description: 'Por: Juan Pérez (Admin)', status: 'completed' },
-  { id: '2', date: '31/01/2025 15:45', title: 'Aprobado por generador', description: 'Firma digital registrada', status: 'completed' },
-  { id: '3', date: '31/01/2025 16:00', title: 'Retiro por transportista', description: 'Transportes Andes S.A.', status: 'completed' },
-  { id: '4', date: '31/01/2025 18:30', title: 'En tránsito', description: 'Destino: Planta Las Heras', status: 'current' },
-  { id: '5', date: 'Pendiente', title: 'Entrega en planta', description: 'ETA: 31/01/2025 20:00', status: 'pending' },
-  { id: '6', date: 'Pendiente', title: 'Tratamiento', description: 'Método: Incineración', status: 'pending' },
-];
-
-// Fallback mock manifiesto
-const MOCK_MANIFIESTO: Partial<Manifiesto> = {
-  numero: 'M-2025-089',
-  estado: EstadoManifiesto.EN_TRANSITO,
-  fechaCreacion: '2025-01-31T14:30:00Z',
-  generador: { razonSocial: 'Química Mendoza S.A.', cuit: '30123456789' } as any,
-  transportista: { razonSocial: 'Transportes Andes S.A.' } as any,
-  operador: { razonSocial: 'Planta Las Heras' } as any,
-  residuos: [
-    { id: '1', tipoResiduo: { codigo: 'Y02', nombre: 'Residuos de aceites minerales' } as any, cantidad: 1200, unidad: 'kg' } as any,
-    { id: '2', tipoResiduo: { codigo: 'Y12', nombre: 'Residuos de solventes orgánicos' } as any, cantidad: 800, unidad: 'kg' } as any,
-    { id: '3', tipoResiduo: { codigo: 'Y45', nombre: 'Residuos de empaques contaminados' } as any, cantidad: 450, unidad: 'kg' } as any,
-  ],
-};
+// Timeline entry shape
+type TimelineEntry = { id: string; date: string; title: string; description: string; status: string };
 
 function getEstadoBadgeColor(estado: EstadoManifiesto): 'info' | 'success' | 'warning' | 'error' | 'neutral' {
   switch (estado) {
@@ -73,8 +71,8 @@ function getEstadoBadgeColor(estado: EstadoManifiesto): 'info' | 'success' | 'wa
   }
 }
 
-function buildTimeline(manifiesto: Partial<Manifiesto>): typeof MOCK_TIMELINE {
-  if (!manifiesto.eventos || manifiesto.eventos.length === 0) return MOCK_TIMELINE;
+function buildTimeline(manifiesto: Partial<Manifiesto>): TimelineEntry[] {
+  if (!manifiesto.eventos || !Array.isArray(manifiesto.eventos) || manifiesto.eventos.length === 0) return [];
 
   const estadoOrder = [
     EstadoManifiesto.BORRADOR,
@@ -92,8 +90,8 @@ function buildTimeline(manifiesto: Partial<Manifiesto>): typeof MOCK_TIMELINE {
   return manifiesto.eventos.map((ev, i) => ({
     id: ev.id,
     date: formatDateTime(ev.createdAt),
-    title: ev.tipo.replace(/_/g, ' '),
-    description: ev.descripcion + (ev.usuario ? ` - ${ev.usuario.nombre}` : ''),
+    title: String(ev.tipo || '').replace(/_/g, ' '),
+    description: String(ev.descripcion || '') + (ev.usuario ? ` - ${ev.usuario.nombre}` : ''),
     status: i < currentIdx ? 'completed' : i === currentIdx ? 'current' : 'pending',
   }));
 }
@@ -101,15 +99,168 @@ function buildTimeline(manifiesto: Partial<Manifiesto>): typeof MOCK_TIMELINE {
 const ManifiestoDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
+  const navigate = useNavigate();
   const isMobile = location.pathname.startsWith('/mobile');
   const { data: apiData, isLoading, isError } = useManifiesto(id || '');
   const [qrCopied, setQrCopied] = React.useState(false);
 
-  // Use API data or fallback
-  const manifiesto = apiData?.data || apiData || MOCK_MANIFIESTO;
-  const m = manifiesto as Partial<Manifiesto>;
+  // Auth context for role-based visibility
+  const { currentUser, isAdmin } = useAuth();
+  const userRol = currentUser?.rol || '';
+
+  // Action mutations
+  const firmar = useFirmarManifiesto();
+  const confirmarRetiro = useConfirmarRetiro();
+  const confirmarEntrega = useConfirmarEntrega();
+  const confirmarRecepcion = useConfirmarRecepcion();
+  const pesaje = usePesaje();
+  const registrarTratamiento = useRegistrarTratamiento();
+  const cerrar = useCerrarManifiesto();
+  const rechazar = useRechazarManifiesto();
+  const registrarIncidente = useRegistrarIncidente();
+
+  // Modal state for pesaje
+  const [showPesajeModal, setShowPesajeModal] = useState(false);
+  const [pesajeData, setPesajeData] = useState<Record<string, number>>({});
+  const [pesajeObs, setPesajeObs] = useState('');
+
+  // Modal state for tratamiento
+  const [showTratamientoModal, setShowTratamientoModal] = useState(false);
+  const [tratamientoMetodo, setTratamientoMetodo] = useState('');
+  const [tratamientoObs, setTratamientoObs] = useState('');
+
+  // Modal state for rechazar
+  const [showRechazarModal, setShowRechazarModal] = useState(false);
+  const [rechazarMotivo, setRechazarMotivo] = useState('');
+  const [rechazarDescripcion, setRechazarDescripcion] = useState('');
+
+  // Modal state for incidente
+  const [showIncidenteModal, setShowIncidenteModal] = useState(false);
+  const [incidenteTipo, setIncidenteTipo] = useState('');
+  const [incidenteDescripcion, setIncidenteDescripcion] = useState('');
+
+  // Cancel confirmation
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  // Track which action is in progress
+  const isActionPending = firmar.isPending || confirmarRetiro.isPending || confirmarEntrega.isPending
+    || confirmarRecepcion.isPending || pesaje.isPending || registrarTratamiento.isPending || cerrar.isPending
+    || rechazar.isPending || registrarIncidente.isPending;
+
+  // Use API data only
+  const manifiesto = (apiData as any)?.data || apiData;
+  const m = (manifiesto || {}) as Partial<Manifiesto>;
   const timeline = buildTimeline(m);
-  const totalPeso = m.residuos?.reduce((sum, r) => sum + (r.cantidad || 0), 0) || 2450;
+  const totalPeso = Array.isArray(m.residuos) ? m.residuos.reduce((sum, r) => sum + (typeof r.cantidad === 'number' ? r.cantidad : 0), 0) : 0;
+
+  // --- Action Handlers ---
+  const handleAction = async (
+    action: () => Promise<any>,
+    successMsg: string,
+  ) => {
+    try {
+      await action();
+      toast.success(successMsg);
+    } catch (err: any) {
+      toast.error('Error', err?.response?.data?.message || err?.message || 'Ocurrio un error');
+    }
+  };
+
+  const handleFirmar = () => handleAction(
+    () => firmar.mutateAsync({ id: id! }),
+    'Manifiesto firmado exitosamente',
+  );
+
+  const handleConfirmarRetiro = () => handleAction(
+    () => confirmarRetiro.mutateAsync({ id: id! }),
+    'Retiro confirmado exitosamente',
+  );
+
+  const handleConfirmarEntrega = () => handleAction(
+    () => confirmarEntrega.mutateAsync({ id: id! }),
+    'Entrega confirmada exitosamente',
+  );
+
+  const handleConfirmarRecepcion = () => handleAction(
+    () => confirmarRecepcion.mutateAsync({ id: id! }),
+    'Recepcion confirmada exitosamente',
+  );
+
+  const handlePesaje = () => {
+    const residuosData = Object.entries(pesajeData).map(([resId, cant]) => ({
+      id: resId,
+      cantidadRecibida: cant,
+    }));
+    if (residuosData.length === 0) {
+      toast.warning('Datos incompletos', 'Ingresa al menos un peso');
+      return;
+    }
+    handleAction(
+      () => pesaje.mutateAsync({ id: id!, residuos: residuosData, observaciones: pesajeObs || undefined }),
+      'Pesaje registrado exitosamente',
+    ).then(() => setShowPesajeModal(false));
+  };
+
+  const handleTratamiento = () => {
+    if (!tratamientoMetodo) {
+      toast.warning('Datos incompletos', 'Selecciona un metodo de tratamiento');
+      return;
+    }
+    handleAction(
+      () => registrarTratamiento.mutateAsync({ id: id!, metodo: tratamientoMetodo, observaciones: tratamientoObs || undefined }),
+      'Tratamiento registrado exitosamente',
+    ).then(() => setShowTratamientoModal(false));
+  };
+
+  const handleCancelar = async () => {
+    setIsCancelling(true);
+    try {
+      await manifiestoService.delete(id!);
+      toast.success('Manifiesto cancelado');
+      navigate(isMobile ? '/mobile/manifiestos' : '/manifiestos');
+    } catch (err: any) {
+      toast.error('Error al cancelar', err?.response?.data?.message || 'No se pudo cancelar el manifiesto');
+    } finally {
+      setIsCancelling(false);
+      setShowCancelModal(false);
+    }
+  };
+
+  const handleRechazar = () => {
+    if (!rechazarMotivo) {
+      toast.warning('Datos incompletos', 'Selecciona un motivo de rechazo');
+      return;
+    }
+    handleAction(
+      () => rechazar.mutateAsync({ id: id!, motivo: rechazarMotivo, descripcion: rechazarDescripcion || undefined }),
+      'Carga rechazada exitosamente',
+    ).then(() => {
+      setShowRechazarModal(false);
+      setRechazarMotivo('');
+      setRechazarDescripcion('');
+    });
+  };
+
+  const handleIncidente = () => {
+    if (!incidenteTipo) {
+      toast.warning('Datos incompletos', 'Selecciona un tipo de incidente');
+      return;
+    }
+    handleAction(
+      () => registrarIncidente.mutateAsync({ id: id!, tipo: incidenteTipo, descripcion: incidenteDescripcion || undefined }),
+      'Incidente registrado exitosamente',
+    ).then(() => {
+      setShowIncidenteModal(false);
+      setIncidenteTipo('');
+      setIncidenteDescripcion('');
+    });
+  };
+
+  const handleDescargarPDF = () => {
+    const apiUrl = import.meta.env.VITE_API_URL || '';
+    window.open(`${apiUrl}/pdf/manifiesto/${id}`, '_blank');
+  };
 
   if (isLoading) {
     return (
@@ -136,6 +287,25 @@ const ManifiestoDetailPage: React.FC = () => {
     );
   }
 
+  if (!manifiesto && (isError || !isLoading)) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center gap-4">
+          <Link to={isMobile ? "/mobile/manifiestos" : "/manifiestos"}>
+            <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />}>Volver</Button>
+          </Link>
+        </div>
+        <Card>
+          <CardContent className="py-16 text-center">
+            <AlertCircle size={48} className="mx-auto text-warning-400 mb-4" />
+            <h3 className="text-lg font-semibold text-neutral-900 mb-2">Manifiesto no encontrado</h3>
+            <p className="text-neutral-600">No se pudo cargar el manifiesto solicitado. Verifica que el ID sea correcto o intenta nuevamente.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -154,17 +324,21 @@ const ManifiestoDetailPage: React.FC = () => {
             {isError && (
               <Badge variant="soft" color="warning">
                 <AlertCircle size={12} className="mr-1" />
-                Datos de demo
+                Error al cargar
               </Badge>
             )}
           </div>
           <p className="text-neutral-600 mt-1">
-            Creado el {m.fechaCreacion ? formatDateTime(m.fechaCreacion) : '31/01/2025 14:30'}
+            Creado el {m.fechaCreacion ? formatDateTime(m.fechaCreacion) : '-'}
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">Descargar PDF</Button>
-          <Button>Editar</Button>
+          <Button variant="outline" leftIcon={<Download size={16} />} onClick={handleDescargarPDF}>
+            Descargar PDF
+          </Button>
+          <Button onClick={() => navigate(isMobile ? `/mobile/manifiestos/${id}/editar` : `/manifiestos/${id}/editar`)}>
+            Editar
+          </Button>
         </div>
       </div>
 
@@ -183,8 +357,8 @@ const ManifiestoDetailPage: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-sm text-neutral-500">Generador</p>
-                    <p className="font-medium text-neutral-900">{m.generador?.razonSocial || 'Química Mendoza S.A.'}</p>
-                    <p className="text-sm text-neutral-600">CUIT: {m.generador?.cuit ? formatCuit(m.generador.cuit) : '30-12345678-9'}</p>
+                    <p className="font-medium text-neutral-900">{m.generador?.razonSocial || '-'}</p>
+                    <p className="text-sm text-neutral-600">CUIT: {m.generador?.cuit ? formatCuit(m.generador.cuit) : '-'}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -193,8 +367,8 @@ const ManifiestoDetailPage: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-sm text-neutral-500">Transportista</p>
-                    <p className="font-medium text-neutral-900">{m.transportista?.razonSocial || 'Transportes Andes S.A.'}</p>
-                    <p className="text-sm text-neutral-600">Hab: {m.transportista?.numeroHabilitacion || 'AB-123-CD'}</p>
+                    <p className="font-medium text-neutral-900">{m.transportista?.razonSocial || '-'}</p>
+                    <p className="text-sm text-neutral-600">Hab: {m.transportista?.numeroHabilitacion || '-'}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -203,8 +377,8 @@ const ManifiestoDetailPage: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-sm text-neutral-500">Operador</p>
-                    <p className="font-medium text-neutral-900">{m.operador?.razonSocial || 'Planta Las Heras'}</p>
-                    <p className="text-sm text-neutral-600">Hab: {m.operador?.numeroHabilitacion || '001234'}</p>
+                    <p className="font-medium text-neutral-900">{m.operador?.razonSocial || '-'}</p>
+                    <p className="text-sm text-neutral-600">Hab: {m.operador?.numeroHabilitacion || '-'}</p>
                   </div>
                 </div>
               </div>
@@ -215,28 +389,28 @@ const ManifiestoDetailPage: React.FC = () => {
           <Card>
             <CardHeader title="Residuos transportados" icon={<Package size={20} />} />
             <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
+                <div className="overflow-x-auto">
+                <table className="w-full table-fixed min-w-[400px]">
                   <thead className="bg-neutral-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase">Código</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase">Descripción</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase">Cantidad</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase">Unidad</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '15%' }}>Código</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '45%' }}>Descripción</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Cantidad</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Unidad</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-100">
-                    {(m.residuos || MOCK_MANIFIESTO.residuos)?.map((residuo) => (
-                      <tr key={residuo.id}>
-                        <td className="px-4 py-3 font-mono text-sm">{residuo.tipoResiduo?.codigo || '-'}</td>
-                        <td className="px-4 py-3 text-neutral-700">{residuo.tipoResiduo?.nombre || residuo.descripcion || '-'}</td>
-                        <td className="px-4 py-3 font-medium">{formatNumber(residuo.cantidad)}</td>
-                        <td className="px-4 py-3 text-neutral-600">{residuo.unidad}</td>
+                    {(m.residuos || []).map((residuo) => (
+                      <tr key={residuo.id} className="hover:bg-neutral-50 transition-colors">
+                        <td className="px-3 py-2.5 font-mono text-sm">{residuo.tipoResiduo?.codigo || '-'}</td>
+                        <td className="px-3 py-2.5 text-neutral-700 truncate">{residuo.tipoResiduo?.nombre || residuo.descripcion || '-'}</td>
+                        <td className="px-3 py-2.5 font-medium">{formatNumber(residuo.cantidad)}</td>
+                        <td className="px-3 py-2.5 text-neutral-600">{residuo.unidad}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              </div>
+                </div>
               <div className="mt-4 p-4 bg-neutral-50 rounded-xl flex items-center justify-between">
                 <div className="flex items-center gap-2 text-neutral-600">
                   <Weight size={18} />
@@ -251,6 +425,9 @@ const ManifiestoDetailPage: React.FC = () => {
           <Card>
             <CardHeader title="Historial de estados" icon={<Calendar size={20} />} />
             <CardContent>
+              {timeline.length === 0 ? (
+                <div className="py-8 text-center text-neutral-500">No hay eventos registrados para este manifiesto</div>
+              ) : (
               <div className="relative">
                 {/* Line */}
                 <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-neutral-200" />
@@ -302,6 +479,7 @@ const ManifiestoDetailPage: React.FC = () => {
                   ))}
                 </div>
               </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -381,21 +559,122 @@ const ManifiestoDetailPage: React.FC = () => {
           </Card>
 
           <Card>
-            <CardHeader title="Acciones rápidas" />
+            <CardHeader title="Acciones" />
             <CardContent>
               <div className="space-y-2 animate-fade-in">
-                <Button variant="outline" fullWidth>
-                  Ver en mapa
+                {/* State-based action buttons with role guards */}
+                {m.estado === EstadoManifiesto.BORRADOR && (isAdmin || userRol === 'GENERADOR') && (
+                  <Button
+                    fullWidth
+                    leftIcon={firmar.isPending ? <Loader2 size={16} className="animate-spin" /> : <PenTool size={16} />}
+                    onClick={handleFirmar}
+                    disabled={isActionPending}
+                  >
+                    Firmar Manifiesto
+                  </Button>
+                )}
+
+                {m.estado === EstadoManifiesto.APROBADO && (isAdmin || userRol === 'TRANSPORTISTA') && (
+                  <Button
+                    fullWidth
+                    leftIcon={confirmarRetiro.isPending ? <Loader2 size={16} className="animate-spin" /> : <ClipboardCheck size={16} />}
+                    onClick={handleConfirmarRetiro}
+                    disabled={isActionPending}
+                  >
+                    Confirmar Retiro
+                  </Button>
+                )}
+
+                {m.estado === EstadoManifiesto.EN_TRANSITO && (isAdmin || userRol === 'TRANSPORTISTA') && (
+                  <Button
+                    fullWidth
+                    leftIcon={confirmarEntrega.isPending ? <Loader2 size={16} className="animate-spin" /> : <Truck size={16} />}
+                    onClick={handleConfirmarEntrega}
+                    disabled={isActionPending}
+                  >
+                    Confirmar Entrega
+                  </Button>
+                )}
+
+                {m.estado === EstadoManifiesto.EN_TRANSITO && (isAdmin || userRol === 'TRANSPORTISTA') && (
+                  <Button
+                    fullWidth
+                    variant="outline"
+                    leftIcon={registrarIncidente.isPending ? <Loader2 size={16} className="animate-spin" /> : <AlertCircle size={16} />}
+                    onClick={() => setShowIncidenteModal(true)}
+                    disabled={isActionPending}
+                  >
+                    Registrar Incidente
+                  </Button>
+                )}
+
+                {m.estado === EstadoManifiesto.ENTREGADO && (isAdmin || userRol === 'OPERADOR') && (
+                  <Button
+                    fullWidth
+                    leftIcon={confirmarRecepcion.isPending ? <Loader2 size={16} className="animate-spin" /> : <ClipboardCheck size={16} />}
+                    onClick={handleConfirmarRecepcion}
+                    disabled={isActionPending}
+                  >
+                    Confirmar Recepcion
+                  </Button>
+                )}
+
+                {m.estado === EstadoManifiesto.ENTREGADO && (isAdmin || userRol === 'OPERADOR') && (
+                  <Button
+                    fullWidth
+                    variant="outline"
+                    leftIcon={rechazar.isPending ? <Loader2 size={16} className="animate-spin" /> : <XCircle size={16} />}
+                    onClick={() => setShowRechazarModal(true)}
+                    disabled={isActionPending}
+                    className="!text-error-600 !border-error-200 hover:!bg-error-50"
+                  >
+                    Rechazar Carga
+                  </Button>
+                )}
+
+                {m.estado === EstadoManifiesto.RECIBIDO && (isAdmin || userRol === 'OPERADOR') && (
+                  <Button
+                    fullWidth
+                    leftIcon={<Scale size={16} />}
+                    onClick={() => setShowPesajeModal(true)}
+                    disabled={isActionPending}
+                  >
+                    Registrar Pesaje
+                  </Button>
+                )}
+
+                {m.estado === EstadoManifiesto.RECIBIDO && (isAdmin || userRol === 'OPERADOR') && (
+                  <Button
+                    fullWidth
+                    leftIcon={<Beaker size={16} />}
+                    onClick={() => setShowTratamientoModal(true)}
+                    disabled={isActionPending}
+                  >
+                    Registrar Tratamiento
+                  </Button>
+                )}
+
+                {(m.estado === EstadoManifiesto.EN_TRATAMIENTO || m.estado === EstadoManifiesto.RECIBIDO) && (isAdmin || userRol === 'OPERADOR') && (
+                  <Button
+                    fullWidth
+                    leftIcon={cerrar.isPending ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+                    onClick={() => handleAction(() => cerrar.mutateAsync(id!), 'Manifiesto cerrado exitosamente')}
+                    disabled={isActionPending}
+                    className="!bg-success-600 hover:!bg-success-700"
+                  >
+                    Cerrar Manifiesto
+                  </Button>
+                )}
+
+                <Button variant="outline" fullWidth leftIcon={<Download size={16} />} onClick={handleDescargarPDF}>
+                  Descargar PDF
                 </Button>
-                <Button variant="outline" fullWidth>
-                  Contactar transportista
-                </Button>
-                <Button variant="outline" fullWidth>
-                  Descargar certificado
-                </Button>
-                <Button variant="danger" fullWidth>
-                  Cancelar manifiesto
-                </Button>
+
+                {m.estado !== EstadoManifiesto.CANCELADO && m.estado !== EstadoManifiesto.TRATADO && (isAdmin || userRol === 'GENERADOR') && (
+                  <Button variant="danger" fullWidth leftIcon={<XCircle size={16} />} onClick={() => setShowCancelModal(true)}>
+                    Cancelar Manifiesto
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -429,6 +708,222 @@ const ManifiestoDetailPage: React.FC = () => {
           </Card>
         </div>
       </div>
+
+      {/* Pesaje Modal */}
+      {showPesajeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-lg w-full mx-4">
+            <h3 className="text-lg font-bold text-neutral-900 mb-4 flex items-center gap-2">
+              <Scale size={20} /> Registrar Pesaje
+            </h3>
+            <div className="space-y-3 max-h-64 overflow-y-auto">
+              {(m.residuos || []).map((r: any) => (
+                <div key={r.id} className="flex items-center gap-3 p-3 bg-neutral-50 rounded-lg">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-neutral-900">{r.tipoResiduo?.nombre || r.descripcion || 'Residuo'}</p>
+                    <p className="text-xs text-neutral-500">Declarado: {formatNumber(r.cantidad)} {r.unidad}</p>
+                  </div>
+                  <div className="w-32">
+                    <Input
+                      type="number"
+                      placeholder="Peso real"
+                      value={pesajeData[r.id] || ''}
+                      onChange={(e) => setPesajeData({ ...pesajeData, [r.id]: Number(e.target.value) })}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3">
+              <label className="block text-sm font-medium text-neutral-700 mb-1">Observaciones</label>
+              <textarea
+                value={pesajeObs}
+                onChange={(e) => setPesajeObs(e.target.value)}
+                placeholder="Observaciones del pesaje..."
+                rows={2}
+                className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none resize-none"
+              />
+            </div>
+            <div className="flex justify-end gap-3 mt-4">
+              <Button variant="outline" onClick={() => setShowPesajeModal(false)} disabled={pesaje.isPending}>
+                Cancelar
+              </Button>
+              <Button onClick={handlePesaje} disabled={pesaje.isPending}>
+                {pesaje.isPending ? 'Registrando...' : 'Confirmar Pesaje'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tratamiento Modal */}
+      {showTratamientoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-bold text-neutral-900 mb-4 flex items-center gap-2">
+              <Beaker size={20} /> Registrar Tratamiento
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Metodo de Tratamiento *</label>
+                <select
+                  value={tratamientoMetodo}
+                  onChange={(e) => setTratamientoMetodo(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none"
+                >
+                  <option value="">Seleccionar metodo</option>
+                  <option value="INCINERACION">Incineracion</option>
+                  <option value="TRATAMIENTO_FISICOQUIMICO">Tratamiento fisicoquimico</option>
+                  <option value="TRATAMIENTO_BIOLOGICO">Tratamiento biologico</option>
+                  <option value="RECICLADO">Reciclado</option>
+                  <option value="RELLENO_SEGURIDAD">Relleno de seguridad</option>
+                  <option value="OTRO">Otro</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Observaciones</label>
+                <textarea
+                  value={tratamientoObs}
+                  onChange={(e) => setTratamientoObs(e.target.value)}
+                  placeholder="Observaciones del tratamiento..."
+                  rows={2}
+                  className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none resize-none"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-4">
+              <Button variant="outline" onClick={() => setShowTratamientoModal(false)} disabled={registrarTratamiento.isPending}>
+                Cancelar
+              </Button>
+              <Button onClick={handleTratamiento} disabled={registrarTratamiento.isPending}>
+                {registrarTratamiento.isPending ? 'Registrando...' : 'Confirmar Tratamiento'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rechazar Modal */}
+      {showRechazarModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-bold text-neutral-900 mb-4 flex items-center gap-2">
+              <XCircle size={20} className="text-error-500" /> Rechazar Carga
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Motivo de rechazo *</label>
+                <select
+                  value={rechazarMotivo}
+                  onChange={(e) => setRechazarMotivo(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none"
+                >
+                  <option value="">Seleccionar motivo</option>
+                  <option value="documentacion_incompleta">Documentacion incompleta</option>
+                  <option value="carga_no_coincide">Carga no coincide con manifiesto</option>
+                  <option value="residuo_no_autorizado">Residuo no autorizado</option>
+                  <option value="capacidad_excedida">Capacidad excedida</option>
+                  <option value="condiciones_inseguras">Condiciones inseguras</option>
+                  <option value="otro">Otro</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Descripcion</label>
+                <textarea
+                  value={rechazarDescripcion}
+                  onChange={(e) => setRechazarDescripcion(e.target.value)}
+                  placeholder="Detalle del motivo de rechazo..."
+                  rows={3}
+                  className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none resize-none"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-4">
+              <Button variant="outline" onClick={() => setShowRechazarModal(false)} disabled={rechazar.isPending}>
+                Cancelar
+              </Button>
+              <Button variant="danger" onClick={handleRechazar} disabled={rechazar.isPending}>
+                {rechazar.isPending ? 'Rechazando...' : 'Confirmar Rechazo'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Incidente Modal */}
+      {showIncidenteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-bold text-neutral-900 mb-4 flex items-center gap-2">
+              <AlertCircle size={20} className="text-warning-500" /> Registrar Incidente
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Tipo de incidente *</label>
+                <select
+                  value={incidenteTipo}
+                  onChange={(e) => setIncidenteTipo(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none"
+                >
+                  <option value="">Seleccionar tipo</option>
+                  <option value="accidente">Accidente vehicular</option>
+                  <option value="derrame">Derrame de residuos</option>
+                  <option value="robo">Robo o asalto</option>
+                  <option value="desvio">Desvio de ruta</option>
+                  <option value="averia">Averia mecanica</option>
+                  <option value="otro">Otro</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Descripcion</label>
+                <textarea
+                  value={incidenteDescripcion}
+                  onChange={(e) => setIncidenteDescripcion(e.target.value)}
+                  placeholder="Describe el incidente..."
+                  rows={3}
+                  className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none resize-none"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-4">
+              <Button variant="outline" onClick={() => setShowIncidenteModal(false)} disabled={registrarIncidente.isPending}>
+                Cancelar
+              </Button>
+              <Button onClick={handleIncidente} disabled={registrarIncidente.isPending}>
+                {registrarIncidente.isPending ? 'Registrando...' : 'Registrar Incidente'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Confirmation Modal */}
+      {showCancelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-error-50 rounded-full flex items-center justify-center">
+                <XCircle size={20} className="text-error-500" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-neutral-900">Cancelar Manifiesto</h3>
+                <p className="text-sm text-neutral-500">Esta accion no se puede deshacer</p>
+              </div>
+            </div>
+            <p className="text-neutral-700 mb-6">
+              Estas seguro de que deseas cancelar el manifiesto <span className="font-mono font-semibold">{m.numero || id}</span>?
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setShowCancelModal(false)} disabled={isCancelling}>
+                Volver
+              </Button>
+              <Button variant="danger" onClick={handleCancelar} disabled={isCancelling}>
+                {isCancelling ? 'Cancelando...' : 'Cancelar Manifiesto'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -30,93 +30,18 @@ import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Tabs, TabList, Tab, TabPanel } from '../../components/ui/Tabs';
+import { useOperador } from '../../hooks/useActores';
 
-// Mock data
-const operadoresData: Record<string, any> = {
-  '1': {
-    id: 1,
-    nombre: 'Planta Norte',
-    razonSocial: 'Tratamiento de Residuos Norte S.A.',
-    cuit: '30-12345678-9',
-    direccion: 'Ruta 40 Km 1234, Guaymallén',
-    telefono: '+54 261 456-7890',
-    email: 'contacto@plantanorte.com',
-    estado: 'ACTIVO',
-    habilitacion: 'HAB-OP-2022-0189',
-    vencimientoHab: '2025-12-31',
-    metodosAutorizados: ['Incineración controlada', 'Neutralización química', 'Estabilización/solidificación', 'Landfarming'],
-    residuosAceptados: ['Líquidos', 'Sólidos', 'Pastosos'],
-    capacidadTotal: 5000,
-    capacidadUsada: 4250,
-    procesadoMes: 1240,
-    certificaciones: ['ISO 14001', 'ISO 9001'],
-    ultimaAuditoria: '2025-01-15',
-    proximaAuditoria: '2025-07-15',
-    capacidadPorTipo: [
-      { tipo: 'Líquidos', capacidad: 2000, usado: 1800 },
-      { tipo: 'Sólidos', capacidad: 2000, usado: 1650 },
-      { tipo: 'Pastosos', capacidad: 1000, usado: 800 },
-    ],
-    manifiestos: { recibidos: 234, enTratamiento: 12, cerrados: 218, rechazados: 4 },
-    ultimosManifiestos: [
-      { id: 'M-2025-089', fecha: '2025-01-31', estado: 'EN_TRATAMIENTO', peso: 2450, generador: 'Química Mendoza S.A.' },
-      { id: 'M-2025-087', fecha: '2025-01-30', estado: 'TRATADO', peso: 3200, generador: 'Metalúrgica Argentina' },
-      { id: 'M-2025-084', fecha: '2025-01-29', estado: 'TRATADO', peso: 2100, generador: 'Química Mendoza S.A.' },
-      { id: 'M-2025-080', fecha: '2025-01-27', estado: 'TRATADO', peso: 1500, generador: 'Industrias del Sur' },
-      { id: 'M-2025-076', fecha: '2025-01-24', estado: 'RECHAZADO', peso: 800, generador: 'Textil Cuyo' },
-    ],
-    tratamientos: [
-      { id: 'TRT-001', fecha: '2025-01-30', manifiesto: 'M-2025-087', metodo: 'Incineración controlada', peso: 3200, certificado: 'CD-2025-0145' },
-      { id: 'TRT-002', fecha: '2025-01-29', manifiesto: 'M-2025-084', metodo: 'Neutralización química', peso: 2100, certificado: 'CD-2025-0144' },
-      { id: 'TRT-003', fecha: '2025-01-27', manifiesto: 'M-2025-080', metodo: 'Estabilización/solidificación', peso: 1500, certificado: 'CD-2025-0143' },
-      { id: 'TRT-004', fecha: '2025-01-24', manifiesto: 'M-2025-073', metodo: 'Incineración controlada', peso: 1800, certificado: 'CD-2025-0142' },
-    ],
-    metodosMasUsados: [
-      { metodo: 'Incineración controlada', porcentaje: 45 },
-      { metodo: 'Neutralización química', porcentaje: 30 },
-      { metodo: 'Estabilización/solidificación', porcentaje: 15 },
-      { metodo: 'Landfarming', porcentaje: 10 },
-    ],
-  },
-  '2': {
-    id: 2,
-    nombre: 'EcoResiduos Sur',
-    razonSocial: 'EcoResiduos Mendoza S.A.',
-    cuit: '30-87654321-0',
-    direccion: 'Ruta 7 Km 985, San Rafael',
-    telefono: '+54 260 456-7890',
-    email: 'info@ecoresiduos.com',
-    estado: 'ACTIVO',
-    habilitacion: 'HAB-OP-2021-0098',
-    vencimientoHab: '2025-06-20',
-    metodosAutorizados: ['Neutralización química', 'Landfarming'],
-    residuosAceptados: ['Sólidos', 'Líquidos'],
-    capacidadTotal: 3500,
-    capacidadUsada: 2100,
-    procesadoMes: 890,
-    certificaciones: ['ISO 14001'],
-    ultimaAuditoria: '2024-12-20',
-    proximaAuditoria: '2025-06-20',
-    capacidadPorTipo: [
-      { tipo: 'Sólidos', capacidad: 2000, usado: 1400 },
-      { tipo: 'Líquidos', capacidad: 1500, usado: 700 },
-    ],
-    manifiestos: { recibidos: 156, enTratamiento: 5, cerrados: 148, rechazados: 3 },
-    ultimosManifiestos: [
-      { id: 'M-2025-085', fecha: '2025-01-29', estado: 'TRATADO', peso: 1500, generador: 'Textil Cuyo' },
-      { id: 'M-2025-079', fecha: '2025-01-26', estado: 'TRATADO', peso: 2100, generador: 'Industrias del Sur' },
-    ],
-    tratamientos: [
-      { id: 'TRT-010', fecha: '2025-01-29', manifiesto: 'M-2025-085', metodo: 'Landfarming', peso: 1500, certificado: 'CD-2025-0089' },
-    ],
-    metodosMasUsados: [
-      { metodo: 'Neutralización química', porcentaje: 55 },
-      { metodo: 'Landfarming', porcentaje: 45 },
-    ],
-  },
+const EMPTY_DEFAULTS = {
+  metodosAutorizados: [] as string[],
+  residuosAceptados: [] as string[],
+  certificaciones: [] as string[],
+  capacidadPorTipo: [] as any[],
+  manifiestos: { recibidos: 0, enTratamiento: 0, cerrados: 0, rechazados: 0 },
+  ultimosManifiestos: [] as any[],
+  tratamientos: [] as any[],
+  metodosMasUsados: [] as any[],
 };
-
-const defaultOperador = operadoresData['1'];
 
 const estadoConfig: Record<string, { label: string; color: string }> = {
   ACTIVO: { label: 'En línea', color: 'success' },
@@ -132,14 +57,14 @@ const estadoManifiestoColor: Record<string, string> = {
 };
 
 const getCapacidadColor = (usada: number, total: number) => {
-  const pct = (usada / total) * 100;
+  const pct = total > 0 ? (usada / total) * 100 : 0;
   if (pct > 90) return 'text-error-600';
   if (pct > 70) return 'text-warning-600';
   return 'text-success-600';
 };
 
 const getCapacidadBg = (usada: number, total: number) => {
-  const pct = (usada / total) * 100;
+  const pct = total > 0 ? (usada / total) * 100 : 0;
   if (pct > 90) return 'bg-error-500';
   if (pct > 70) return 'bg-warning-500';
   return 'bg-success-500';
@@ -151,8 +76,50 @@ const OperadorDetallePage: React.FC = () => {
   const location = useLocation();
   const isMobile = location.pathname.startsWith('/mobile');
 
-  const operador = operadoresData[id || ''] || defaultOperador;
+  const { data: apiOperador, isLoading, isError } = useOperador(id || '');
+
+  // Build operador from API data with safe defaults
+  const operador = apiOperador ? {
+    ...apiOperador,
+    nombre: (apiOperador as any).razonSocial || '-',
+    direccion: (apiOperador as any).domicilio || '-',
+    estado: (apiOperador as any).activo !== false ? 'ACTIVO' : 'INACTIVO',
+    habilitacion: (apiOperador as any).numeroHabilitacion || '-',
+    vencimientoHab: (apiOperador as any).vencimientoHab || '-',
+    metodosAutorizados: (apiOperador as any).metodosAutorizados || EMPTY_DEFAULTS.metodosAutorizados,
+    residuosAceptados: (apiOperador as any).residuosAceptados || EMPTY_DEFAULTS.residuosAceptados,
+    certificaciones: (apiOperador as any).certificaciones || EMPTY_DEFAULTS.certificaciones,
+    capacidadPorTipo: (apiOperador as any).capacidadPorTipo || EMPTY_DEFAULTS.capacidadPorTipo,
+    manifiestos: (apiOperador as any).manifiestos || EMPTY_DEFAULTS.manifiestos,
+    ultimosManifiestos: (apiOperador as any).ultimosManifiestos || EMPTY_DEFAULTS.ultimosManifiestos,
+    tratamientos: (apiOperador as any).tratamientos || EMPTY_DEFAULTS.tratamientos,
+    metodosMasUsados: (apiOperador as any).metodosMasUsados || EMPTY_DEFAULTS.metodosMasUsados,
+    capacidadTotal: (apiOperador as any).capacidadTotal || 1,
+    capacidadUsada: (apiOperador as any).capacidadUsada || 0,
+    procesadoMes: (apiOperador as any).procesadoMes || 0,
+    ultimaAuditoria: (apiOperador as any).ultimaAuditoria || '-',
+    proximaAuditoria: (apiOperador as any).proximaAuditoria || '-',
+  } : null;
+
   const backPath = isMobile ? '/mobile/actores/operadores' : '/actores/operadores';
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>Volver</Button>
+        </div>
+        <Card className="py-12">
+          <div className="text-center">
+            <div className="animate-spin w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full mx-auto mb-4" />
+            <p className="text-neutral-500">Cargando operador...</p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!operador) return null;
 
   const capacidadPct = (operador.capacidadUsada / operador.capacidadTotal) * 100;
   const est = estadoConfig[operador.estado] || estadoConfig.ACTIVO;
@@ -327,7 +294,7 @@ const OperadorDetallePage: React.FC = () => {
 
                 <div className="space-y-4">
                   {operador.capacidadPorTipo.map((ct: any) => {
-                    const pct = (ct.usado / ct.capacidad) * 100;
+                    const pct = ct.capacidad > 0 ? (ct.usado / ct.capacidad) * 100 : 0;
                     return (
                       <div key={ct.tipo}>
                         <div className="flex items-center justify-between text-sm mb-1">
@@ -374,25 +341,24 @@ const OperadorDetallePage: React.FC = () => {
         {/* Tab: Manifiestos */}
         <TabPanel id="manifiestos">
           <Card padding="none">
-            <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full table-fixed">
                 <thead className="bg-[#F5F5F3] border-b border-neutral-200">
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">Manifiesto</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">Fecha</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">Estado</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">Peso</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">Generador</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '20%' }}>Manifiesto</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '18%' }}>Fecha</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '20%' }}>Estado</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider hidden md:table-cell" style={{ width: '18%' }}>Peso</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider truncate hidden md:table-cell" style={{ width: '24%' }}>Generador</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
-                  {operador.ultimosManifiestos.map((m: any) => (
+                  {(operador.ultimosManifiestos || []).map((m: any) => (
                     <tr
                       key={m.id}
                       className="hover:bg-neutral-50 transition-colors cursor-pointer group"
                       onClick={() => navigate(isMobile ? `/mobile/manifiestos/${m.id}` : `/manifiestos/${m.id}`)}
                     >
-                      <td className="px-6 py-4">
+                      <td className="px-3 py-2.5">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-primary-50 rounded-lg flex items-center justify-center text-primary-600">
                             <FileText size={16} />
@@ -402,19 +368,18 @@ const OperadorDetallePage: React.FC = () => {
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-neutral-600">{m.fecha}</td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 py-2.5 text-neutral-600">{m.fecha || '-'}</td>
+                      <td className="px-3 py-2.5">
                         <Badge variant="soft" color={estadoManifiestoColor[m.estado] || 'neutral'}>
-                          {m.estado.replace(/_/g, ' ')}
+                          {String(m.estado || '').replace(/_/g, ' ')}
                         </Badge>
                       </td>
-                      <td className="px-6 py-4 font-medium text-neutral-700">{m.peso.toLocaleString('es-AR')} kg</td>
-                      <td className="px-6 py-4 text-neutral-600">{m.generador}</td>
+                      <td className="px-3 py-2.5 font-medium text-neutral-700 hidden md:table-cell">{(m.peso ?? 0).toLocaleString('es-AR')} kg</td>
+                      <td className="px-3 py-2.5 text-neutral-600 truncate hidden md:table-cell">{m.generador || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
           </Card>
         </TabPanel>
 
@@ -446,24 +411,23 @@ const OperadorDetallePage: React.FC = () => {
             <Card>
               <CardHeader title="Historial de Tratamientos" icon={<Beaker size={20} />} />
               <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full table-fixed">
                     <thead className="bg-neutral-50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase">ID</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase">Fecha</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase">Manifiesto</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase">Método</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase">Peso</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase">Certificado</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '10%' }}>ID</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '15%' }}>Fecha</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '18%' }}>Manifiesto</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '22%' }}>Método</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '15%' }}>Peso</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '20%' }}>Certificado</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-100">
-                      {operador.tratamientos.map((t: any) => (
-                        <tr key={t.id} className="hover:bg-neutral-50">
-                          <td className="px-4 py-3 font-mono text-sm text-neutral-900">{t.id}</td>
-                          <td className="px-4 py-3 text-neutral-600">{t.fecha}</td>
-                          <td className="px-4 py-3">
+                      {(operador.tratamientos || []).map((t: any) => (
+                        <tr key={t.id} className="hover:bg-neutral-50 transition-colors">
+                          <td className="px-3 py-2.5 font-mono text-sm text-neutral-900 hidden md:table-cell">{t.id}</td>
+                          <td className="px-3 py-2.5 text-neutral-600">{t.fecha || '-'}</td>
+                          <td className="px-3 py-2.5">
                             <span
                               className="font-mono text-primary-600 cursor-pointer hover:underline"
                               onClick={() => navigate(isMobile ? `/mobile/manifiestos/${t.manifiesto}` : `/manifiestos/${t.manifiesto}`)}
@@ -471,16 +435,15 @@ const OperadorDetallePage: React.FC = () => {
                               {t.manifiesto}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-neutral-700">{t.metodo}</td>
-                          <td className="px-4 py-3 font-medium text-neutral-700">{t.peso.toLocaleString('es-AR')} kg</td>
-                          <td className="px-4 py-3">
-                            <Badge variant="soft" color="success">{t.certificado}</Badge>
+                          <td className="px-3 py-2.5 text-neutral-700 truncate">{t.metodo}</td>
+                          <td className="px-3 py-2.5 font-medium text-neutral-700">{(t.peso ?? 0).toLocaleString('es-AR')} kg</td>
+                          <td className="px-3 py-2.5 hidden md:table-cell">
+                            <Badge variant="soft" color="success">{t.certificado || '-'}</Badge>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                </div>
               </CardContent>
             </Card>
           </div>

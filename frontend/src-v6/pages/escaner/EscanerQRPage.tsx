@@ -1,214 +1,195 @@
 /**
  * SITREP v6 - Escaner QR Page
  * ============================
- * Página para escanear códigos QR de manifiestos
+ * Pagina para escanear codigos QR de manifiestos.
+ * Uses the real camera-based QRScanner component with jsQR.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  QrCode, 
-  X, 
-  Flashlight, 
-  Image as ImageIcon, 
+import {
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  QrCode,
+  ScanLine,
 } from 'lucide-react';
 import { Button } from '../../components/ui/ButtonV2';
-import { CardContent } from '../../components/ui/CardV2';
+import QRScanner from '../../components/QRScanner';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Very simple heuristic: a manifiesto ID starts with "M-" */
+const isValidManifiestoId = (data: string): boolean => {
+  return /^M-\d{4}-\d{4,}$/i.test(data.trim());
+};
+
+/**
+ * Try to extract a manifiesto ID from the scanned data.
+ * Supports:
+ *   - Raw ID like "M-2025-0089"
+ *   - URL containing the ID as the last path segment, e.g.
+ *     https://sitrep.gob.ar/manifiestos/M-2025-0089
+ *   - JSON with an "id" or "manifiestoId" key
+ */
+const parseManifiestoId = (raw: string): string | null => {
+  const trimmed = raw.trim();
+
+  // 1. Direct ID
+  if (isValidManifiestoId(trimmed)) return trimmed;
+
+  // 2. URL with the ID as the last path segment
+  try {
+    const url = new URL(trimmed);
+    const segments = url.pathname.split('/').filter(Boolean);
+    const last = segments[segments.length - 1];
+    if (last && isValidManifiestoId(last)) return last;
+  } catch {
+    // not a URL, continue
+  }
+
+  // 3. JSON payload
+  try {
+    const json = JSON.parse(trimmed);
+    const candidate = json.id ?? json.manifiestoId ?? json.manifiesto_id;
+    if (candidate && isValidManifiestoId(String(candidate))) return String(candidate);
+  } catch {
+    // not JSON, continue
+  }
+
+  return null;
+};
+
+// ---------------------------------------------------------------------------
+// Page Component
+// ---------------------------------------------------------------------------
 
 const EscanerQRPage: React.FC = () => {
   const navigate = useNavigate();
-  const [isScanning, setIsScanning] = useState(true);
+
+  // "idle"       -> scanner is open
+  // "success"    -> valid manifiesto detected
+  // "error"      -> QR decoded but not a valid manifiesto
+  const [phase, setPhase] = useState<'idle' | 'success' | 'error'>('idle');
   const [scanResult, setScanResult] = useState<string | null>(null);
-  const [flashlight, setFlashlight] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [showError, setShowError] = useState(false);
+  const [rawData, setRawData] = useState<string>('');
 
-  // Simular escaneo después de 3 segundos
-  useEffect(() => {
-    if (isScanning) {
-      const timer = setTimeout(() => {
-        const mockResults = [
-          'M-2025-0089',
-          'M-2025-0090',
-          'M-2025-0091',
-          'INVALID-CODE',
-        ];
-        const randomResult = mockResults[Math.floor(Math.random() * mockResults.length)];
-        
-        setScanResult(randomResult);
-        setIsScanning(false);
-        
-        if (randomResult === 'INVALID-CODE') {
-          setShowError(true);
-        } else {
-          setShowSuccess(true);
-        }
-      }, 3000);
+  // -----------------------------------------------------------
+  // Handlers
+  // -----------------------------------------------------------
 
-      return () => clearTimeout(timer);
+  const handleScan = (data: string) => {
+    setRawData(data);
+    const id = parseManifiestoId(data);
+    if (id) {
+      setScanResult(id);
+      setPhase('success');
+    } else {
+      setScanResult(null);
+      setPhase('error');
     }
-  }, [isScanning]);
+  };
+
+  const handleClose = () => {
+    navigate(-1);
+  };
 
   const handleRetry = () => {
-    setIsScanning(true);
+    setPhase('idle');
     setScanResult(null);
-    setShowSuccess(false);
-    setShowError(false);
+    setRawData('');
   };
 
   const handleViewManifiesto = () => {
+    if (!scanResult) return;
     const isMobile = window.location.pathname.includes('/mobile');
     navigate(isMobile ? `/mobile/manifiestos/${scanResult}` : `/manifiestos/${scanResult}`);
   };
 
+  // -----------------------------------------------------------
+  // Render: active scanner
+  // -----------------------------------------------------------
+  if (phase === 'idle') {
+    return <QRScanner onScan={handleScan} onClose={handleClose} title="Escanear QR" />;
+  }
+
+  // -----------------------------------------------------------
+  // Render: result screen (success or error)
+  // -----------------------------------------------------------
   return (
     <div className="min-h-screen bg-neutral-900 flex flex-col">
       {/* Header */}
       <header className="flex items-center justify-between p-4 bg-neutral-900/90 backdrop-blur z-10">
-        <button 
-          onClick={() => navigate(-1)}
+        <button
+          onClick={handleClose}
           className="p-2 text-white hover:bg-white/10 rounded-full transition-colors"
+          aria-label="Cerrar"
         >
-          <X size={24} />
+          <QrCode size={24} className="text-white/60" />
         </button>
-        <h1 className="text-lg font-semibold text-white">Escanear QR</h1>
+        <h1 className="text-lg font-semibold text-white">Resultado del escaneo</h1>
         <div className="w-10" />
       </header>
 
-      {/* Scanner Area */}
-      <div className="flex-1 relative flex items-center justify-center">
-        {/* Camera Viewfinder */}
-        <div className="relative w-72 h-72">
-          {/* Corner markers */}
-          <div className="absolute top-0 left-0 w-8 h-8 border-l-4 border-t-4 border-primary-500" />
-          <div className="absolute top-0 right-0 w-8 h-8 border-r-4 border-t-4 border-primary-500" />
-          <div className="absolute bottom-0 left-0 w-8 h-8 border-l-4 border-b-4 border-primary-500" />
-          <div className="absolute bottom-0 right-0 w-8 h-8 border-r-4 border-b-4 border-primary-500" />
-
-          {/* Scanning animation */}
-          {isScanning && (
-            <div className="absolute inset-0 overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-0.5 bg-primary-500 shadow-[0_0_10px_rgba(13,138,79,0.8)] animate-scan" />
+      {/* Result area */}
+      <div className="flex-1 flex items-center justify-center px-6">
+        {phase === 'success' && (
+          <div className="text-center animate-fade-in">
+            <div className="w-20 h-20 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-green-600/30">
+              <CheckCircle2 size={40} className="text-white" />
             </div>
-          )}
-
-          {/* Center icon */}
-          {!isScanning && !showSuccess && !showError && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <QrCode size={64} className="text-white/30" />
-            </div>
-          )}
-
-          {/* Success state */}
-          {showSuccess && (
-            <div className="absolute inset-0 flex items-center justify-center bg-success-500/20 rounded-lg">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-success-500 rounded-full flex items-center justify-center mx-auto mb-2">
-                  <CheckCircle2 size={32} className="text-white" />
-                </div>
-                <p className="text-white font-medium">{scanResult}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Error state */}
-          {showError && (
-            <div className="absolute inset-0 flex items-center justify-center bg-error-500/20 rounded-lg">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-error-500 rounded-full flex items-center justify-center mx-auto mb-2">
-                  <AlertCircle size={32} className="text-white" />
-                </div>
-                <p className="text-white font-medium">Código no válido</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Instructions */}
-        <p className="absolute bottom-32 left-0 right-0 text-center text-white/70 text-sm px-8">
-          {isScanning 
-            ? 'Centra el código QR dentro del marco para escanearlo'
-            : showSuccess 
-              ? 'Manifiesto encontrado'
-              : showError
-                ? 'No se pudo reconocer el código'
-                : 'Escaneo completado'
-          }
-        </p>
-      </div>
-
-      {/* Controls */}
-      <div className="p-6 bg-neutral-900/90 backdrop-blur">
-        {isScanning ? (
-          <div className="flex items-center justify-center gap-8">
-            <button 
-              onClick={() => setFlashlight(!flashlight)}
-              className={`p-4 rounded-full transition-colors ${
-                flashlight ? 'bg-primary-500 text-white' : 'bg-white/10 text-white'
-              }`}
-            >
-              <Flashlight size={24} />
-            </button>
-            <button className="p-4 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors">
-              <ImageIcon size={24} />
-            </button>
+            <p className="text-white text-xl font-bold mb-1">{scanResult}</p>
+            <p className="text-white/60 text-sm">Manifiesto encontrado</p>
           </div>
-        ) : (
-          <div className="space-y-3 animate-fade-in">
-            {showSuccess ? (
-              <>
-                <Button 
-                  fullWidth 
-                  size="lg"
-                  onClick={handleViewManifiesto}
-                >
-                  Ver Manifiesto
-                </Button>
-                <Button 
-                  variant="outline" 
-                  fullWidth
-                  onClick={handleRetry}
-                  className="border-white/20 text-white hover:bg-white/10"
-                >
-                  Escanear otro
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button 
-                  fullWidth 
-                  size="lg"
-                  onClick={handleRetry}
-                >
-                  Intentar de nuevo
-                </Button>
-                <Button 
-                  variant="outline" 
-                  fullWidth
-                  onClick={() => navigate(-1)}
-                  className="border-white/20 text-white hover:bg-white/10"
-                >
-                  Cancelar
-                </Button>
-              </>
-            )}
+        )}
+
+        {phase === 'error' && (
+          <div className="text-center animate-fade-in">
+            <div className="w-20 h-20 bg-red-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-red-600/30">
+              <AlertCircle size={40} className="text-white" />
+            </div>
+            <p className="text-white text-lg font-semibold mb-1">Codigo no valido</p>
+            <p className="text-white/50 text-sm max-w-xs mx-auto break-all">
+              {rawData.length > 120 ? rawData.slice(0, 120) + '...' : rawData}
+            </p>
           </div>
         )}
       </div>
 
-      {/* CSS for scan animation */}
-      <style>{`
-        @keyframes scan {
-          0% { transform: translateY(0); }
-          50% { transform: translateY(288px); }
-          100% { transform: translateY(0); }
-        }
-        .animate-scan {
-          animation: scan 2s ease-in-out infinite;
-        }
-      `}</style>
+      {/* Actions */}
+      <div className="p-6 bg-neutral-900/90 backdrop-blur space-y-3">
+        {phase === 'success' ? (
+          <>
+            <Button fullWidth size="lg" onClick={handleViewManifiesto}>
+              Ver Manifiesto
+            </Button>
+            <Button
+              variant="outline"
+              fullWidth
+              onClick={handleRetry}
+              className="border-white/20 text-white hover:bg-white/10"
+              leftIcon={<ScanLine size={18} />}
+            >
+              Escanear otro
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button fullWidth size="lg" onClick={handleRetry} leftIcon={<ScanLine size={18} />}>
+              Intentar de nuevo
+            </Button>
+            <Button
+              variant="outline"
+              fullWidth
+              onClick={handleClose}
+              className="border-white/20 text-white hover:bg-white/10"
+            >
+              Cancelar
+            </Button>
+          </>
+        )}
+      </div>
     </div>
   );
 };

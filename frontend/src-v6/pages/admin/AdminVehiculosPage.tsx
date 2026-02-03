@@ -4,7 +4,8 @@
  * Gestión de vehículos de transporte
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Truck,
   Plus,
@@ -20,7 +21,8 @@ import {
   Trash2,
   Eye,
   AlertTriangle,
-  CheckCircle2
+  CheckCircle2,
+  Loader2
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -29,22 +31,23 @@ import { Table, Pagination } from '../../components/ui/Table';
 import { SearchInput } from '../../components/ui/SearchInput';
 import { Modal } from '../../components/ui/Modal';
 import { Tabs, TabList, Tab, TabPanel } from '../../components/ui/Tabs';
+import { useTransportistas } from '../../hooks/useActores';
+import { toast } from '../../components/ui/Toast';
 
-// Mock data
-const vehiculosData = [
-  { id: 'VH-001', patente: 'ABC123', tipo: 'Camión', marca: 'Mercedes-Benz', modelo: 'Actros 2545', ano: 2022, transportista: 'Transporte Rápido SRL', capacidad: '15.000 kg', estado: 'disponible', ultimaRevision: '15/01/2025', vencimientoVTV: '20/06/2025', kmRecorridos: 45230 },
-  { id: 'VH-002', patente: 'DEF456', tipo: 'Camión', marca: 'Volvo', modelo: 'FH 460', ano: 2021, transportista: 'EcoTransporte SA', capacidad: '18.000 kg', estado: 'en_viaje', ultimaRevision: '10/01/2025', vencimientoVTV: '15/08/2025', kmRecorridos: 67340 },
-  { id: 'VH-003', patente: 'GHI789', tipo: 'Furgón', marca: 'Iveco', modelo: 'Daily 70C18', ano: 2023, transportista: 'Transporte Rápido SRL', capacidad: '4.000 kg', estado: 'disponible', ultimaRevision: '05/01/2025', vencimientoVTV: '12/04/2025', kmRecorridos: 23100 },
-  { id: 'VH-004', patente: 'JKL012', tipo: 'Camión', marca: 'Scania', modelo: 'R 450', ano: 2020, transportista: 'Logística Sur', capacidad: '20.000 kg', estado: 'mantenimiento', ultimaRevision: '28/12/2024', vencimientoVTV: '30/03/2025', kmRecorridos: 89200 },
-  { id: 'VH-005', patente: 'MNO345', tipo: 'Furgón', marca: 'Mercedes-Benz', modelo: 'Sprinter 516', ano: 2023, transportista: 'EcoTransporte SA', capacidad: '3.500 kg', estado: 'disponible', ultimaRevision: '20/01/2025', vencimientoVTV: '18/09/2025', kmRecorridos: 18900 },
-  { id: 'VH-006', patente: 'PQR678', tipo: 'Camión', marca: 'Volvo', modelo: 'FM 410', ano: 2021, transportista: 'Transporte Rápido SRL', capacidad: '16.000 kg', estado: 'inactivo', ultimaRevision: '01/12/2024', vencimientoVTV: 'VENCIDO', kmRecorridos: 54300 },
-];
-
-const mantenimientosData = [
-  { id: 1, vehiculo: 'ABC123', tipo: 'Service Preventivo', fecha: '15/01/2025', km: 45000, costo: 125000, taller: 'Taller Mecánico Centro', proximo: '45.000 km / 15/04/2025' },
-  { id: 2, vehiculo: 'DEF456', tipo: 'Cambio de Neumáticos', fecha: '10/01/2025', km: 67000, costo: 380000, taller: 'Neumáticos Express', proximo: '90.000 km' },
-  { id: 3, vehiculo: 'GHI789', tipo: 'Service Completo', fecha: '05/01/2025', km: 23000, costo: 85000, taller: 'Taller Mecánico Centro', proximo: '30.000 km / 05/04/2025' },
-];
+interface VehiculoDisplay {
+  id: string;
+  transportistaId: string;
+  patente: string;
+  marca: string;
+  modelo: string;
+  anio: number;
+  capacidad: string;
+  transportista: string;
+  habilitacion: string;
+  estado: string;
+  vencimiento: string;
+  activo: boolean;
+}
 
 export const AdminVehiculosPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -53,60 +56,115 @@ export const AdminVehiculosPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('vehiculos');
 
-  const filteredData = vehiculosData.filter(v => 
-    v.patente.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    v.transportista.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    v.marca.toLowerCase().includes(searchQuery.toLowerCase())
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isMobile = location.pathname.startsWith('/mobile');
+
+  const { data: transportistasData, isLoading, isError, error } = useTransportistas({ limit: 100 });
+
+  const transportistas = Array.isArray(transportistasData?.items) ? transportistasData.items : [];
+
+  // Flatten all vehicles from all transportistas
+  const allVehicles: VehiculoDisplay[] = useMemo(() =>
+    transportistas.flatMap(t =>
+      (Array.isArray(t.vehiculos) ? t.vehiculos : []).map(v => ({
+        id: v.id,
+        transportistaId: t.id,
+        patente: v.patente,
+        marca: v.marca,
+        modelo: v.modelo,
+        anio: v.anio,
+        capacidad: typeof v.capacidad === 'number' ? `${v.capacidad.toLocaleString()} kg` : '',
+        transportista: t.razonSocial,
+        habilitacion: v.numeroHabilitacion || '',
+        estado: v.activo ? 'disponible' : 'inactivo',
+        vencimiento: v.vencimiento || '',
+        activo: v.activo,
+      }))
+    ),
+    [transportistas]
   );
+
+  // Computed stats
+  const statsTotal = allVehicles.length;
+  const statsDisponibles = allVehicles.filter(v => v.activo).length;
+  const statsInactivos = allVehicles.filter(v => !v.activo).length;
+  const statsVencidos = allVehicles.filter(v => {
+    if (!v.vencimiento) return false;
+    try {
+      return new Date(v.vencimiento) < new Date();
+    } catch {
+      return false;
+    }
+  }).length;
+
+  const filteredData = allVehicles.filter(v =>
+    String(v.patente || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    String(v.transportista || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    String(v.marca || '').toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Pagination for display
+  const itemsPerPage = 10;
+  const totalFilteredPages = Math.max(1, Math.ceil(filteredData.length / itemsPerPage));
+  const paginatedData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const columns = [
     {
       key: 'vehiculo',
+      width: '22%',
       header: 'Vehículo',
-      render: (row: typeof vehiculosData[0]) => (
+      render: (row: VehiculoDisplay) => (
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
             <Truck size={20} className="text-primary-600" />
           </div>
           <div>
             <p className="font-medium text-neutral-900">{row.patente}</p>
-            <p className="text-xs text-neutral-500">{row.tipo}</p>
+            <p className="text-xs text-neutral-500">{row.habilitacion || 'Sin habilitación'}</p>
           </div>
         </div>
       ),
     },
     {
       key: 'detalles',
+      width: '20%',
+      hiddenBelow: 'md' as const,
       header: 'Detalles',
-      render: (row: typeof vehiculosData[0]) => (
+      render: (row: VehiculoDisplay) => (
         <div className="text-sm">
           <p className="text-neutral-900">{row.marca} {row.modelo}</p>
-          <p className="text-neutral-500">Año {row.ano} • {row.capacidad}</p>
+          <p className="text-neutral-500">Año {row.anio} {row.capacidad ? `• ${row.capacidad}` : ''}</p>
         </div>
       ),
     },
     {
       key: 'transportista',
+      width: '20%',
+      hiddenBelow: 'md' as const,
       header: 'Transportista',
-      render: (row: typeof vehiculosData[0]) => (
+      render: (row: VehiculoDisplay) => (
         <span className="text-sm text-neutral-700">{row.transportista}</span>
       ),
     },
     {
-      key: 'km',
-      header: 'Kilometraje',
-      align: 'center' as const,
-      render: (row: typeof vehiculosData[0]) => (
-        <span className="text-sm font-medium text-neutral-900">
-          {row.kmRecorridos.toLocaleString()} km
-        </span>
-      ),
-    },
-    {
       key: 'vtv',
-      header: 'VTV',
-      render: (row: typeof vehiculosData[0]) => {
-        const isVencido = row.vencimientoVTV === 'VENCIDO';
+      width: '15%',
+      header: 'Vencimiento',
+      render: (row: VehiculoDisplay) => {
+        if (!row.vencimiento) {
+          return <span className="text-sm text-neutral-400">Sin datos</span>;
+        }
+        const isVencido = (() => {
+          try { return new Date(row.vencimiento) < new Date(); } catch { return false; }
+        })();
+        const formatted = (() => {
+          try {
+            return new Date(row.vencimiento).toLocaleDateString('es-AR');
+          } catch {
+            return row.vencimiento;
+          }
+        })();
         return (
           <div className="flex items-center gap-1">
             {isVencido ? (
@@ -117,7 +175,7 @@ export const AdminVehiculosPage: React.FC = () => {
             ) : (
               <>
                 <CheckCircle2 size={14} className="text-success-500" />
-                <span className="text-sm text-neutral-600">{row.vencimientoVTV}</span>
+                <span className="text-sm text-neutral-600">{formatted}</span>
               </>
             )}
           </div>
@@ -126,65 +184,52 @@ export const AdminVehiculosPage: React.FC = () => {
     },
     {
       key: 'estado',
+      width: '12%',
       header: 'Estado',
-      render: (row: typeof vehiculosData[0]) => {
+      render: (row: VehiculoDisplay) => {
         const estadoConfig: Record<string, { label: string; color: string }> = {
           disponible: { label: 'Disponible', color: 'success' },
           en_viaje: { label: 'En Viaje', color: 'info' },
           mantenimiento: { label: 'Mantenimiento', color: 'warning' },
           inactivo: { label: 'Inactivo', color: 'neutral' },
         };
-        const config = estadoConfig[row.estado];
+        const config = estadoConfig[row.estado] || estadoConfig.inactivo;
         return <Badge variant="soft" color={config.color as any}>{config.label}</Badge>;
       },
     },
     {
       key: 'acciones',
+      width: '11%',
       header: '',
       align: 'right' as const,
-      render: () => (
+      render: (row: VehiculoDisplay) => (
         <div className="flex items-center justify-end gap-1">
-          <button className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors">
+          <button
+            className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+            onClick={() => navigate(isMobile ? '/mobile/actores/transportistas/' + row.transportistaId : '/actores/transportistas/' + row.transportistaId)}
+            title="Ver transportista"
+          >
             <Eye size={16} />
           </button>
-          <button className="p-1.5 text-neutral-400 hover:text-info-600 hover:bg-info-50 rounded-lg transition-colors">
+          <button
+            className="p-1.5 text-neutral-400 hover:text-info-600 hover:bg-info-50 rounded-lg transition-colors"
+            onClick={() => navigate(isMobile ? '/mobile/actores/transportistas/' + row.transportistaId : '/actores/transportistas/' + row.transportistaId)}
+            title="Editar vehículo"
+          >
             <Edit size={16} />
           </button>
-          <button className="p-1.5 text-neutral-400 hover:text-error-600 hover:bg-error-50 rounded-lg transition-colors">
+          <button
+            className="p-1.5 text-neutral-400 hover:text-error-600 hover:bg-error-50 rounded-lg transition-colors"
+            onClick={() => {
+              if (window.confirm('La gestión de vehículos se realiza desde la ficha del transportista. ¿Desea ir a la ficha del transportista?')) {
+                navigate(isMobile ? '/mobile/actores/transportistas/' + row.transportistaId : '/actores/transportistas/' + row.transportistaId);
+              }
+            }}
+            title="Eliminar vehículo"
+          >
             <Trash2 size={16} />
           </button>
         </div>
-      ),
-    },
-  ];
-
-  const mantenimientoColumns = [
-    {
-      key: 'vehiculo',
-      header: 'Vehículo',
-      render: (row: typeof mantenimientosData[0]) => (
-        <div className="flex items-center gap-2">
-          <Truck size={16} className="text-neutral-400" />
-          <span className="font-medium text-neutral-900">{row.vehiculo}</span>
-        </div>
-      ),
-    },
-    { key: 'tipo', header: 'Tipo de Servicio' },
-    { key: 'fecha', header: 'Fecha' },
-    { key: 'km', header: 'Km', align: 'center' as const },
-    {
-      key: 'costo',
-      header: 'Costo',
-      render: (row: typeof mantenimientosData[0]) => (
-        <span className="font-medium text-neutral-900">${row.costo.toLocaleString()}</span>
-      ),
-    },
-    { key: 'taller', header: 'Taller' },
-    {
-      key: 'proximo',
-      header: 'Próximo Service',
-      render: (row: typeof mantenimientosData[0]) => (
-        <span className="text-sm text-neutral-600">{row.proximo}</span>
       ),
     },
   ];
@@ -210,7 +255,7 @@ export const AdminVehiculosPage: React.FC = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -218,7 +263,7 @@ export const AdminVehiculosPage: React.FC = () => {
                 <Truck size={20} className="text-primary-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-neutral-900">56</p>
+                <p className="text-2xl font-bold text-neutral-900">{statsTotal}</p>
                 <p className="text-sm text-neutral-600">Total Vehículos</p>
               </div>
             </div>
@@ -231,21 +276,8 @@ export const AdminVehiculosPage: React.FC = () => {
                 <CheckCircle2 size={20} className="text-success-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-neutral-900">42</p>
+                <p className="text-2xl font-bold text-neutral-900">{statsDisponibles}</p>
                 <p className="text-sm text-neutral-600">Disponibles</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-info-100 rounded-lg">
-                <MapPin size={20} className="text-info-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-neutral-900">8</p>
-                <p className="text-sm text-neutral-600">En Viaje</p>
               </div>
             </div>
           </CardContent>
@@ -257,8 +289,8 @@ export const AdminVehiculosPage: React.FC = () => {
                 <Wrench size={20} className="text-warning-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-neutral-900">4</p>
-                <p className="text-sm text-neutral-600">Mantenimiento</p>
+                <p className="text-2xl font-bold text-neutral-900">{statsInactivos}</p>
+                <p className="text-sm text-neutral-600">Inactivos</p>
               </div>
             </div>
           </CardContent>
@@ -270,8 +302,8 @@ export const AdminVehiculosPage: React.FC = () => {
                 <AlertTriangle size={20} className="text-error-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-neutral-900">2</p>
-                <p className="text-sm text-neutral-600">VTV Vencida</p>
+                <p className="text-2xl font-bold text-neutral-900">{statsVencidos}</p>
+                <p className="text-sm text-neutral-600">Hab. Vencida</p>
               </div>
             </div>
           </CardContent>
@@ -301,37 +333,50 @@ export const AdminVehiculosPage: React.FC = () => {
                   Filtros
                 </Button>
               </div>
-              <Table
-                data={filteredData}
-                columns={columns}
-                keyExtractor={(row) => row.id}
-                selectable
-                selectedKeys={selectedRows}
-                onSelectionChange={setSelectedRows}
-              />
-              <Pagination
-                currentPage={currentPage}
-                totalPages={6}
-                totalItems={56}
-                itemsPerPage={10}
-                onPageChange={setCurrentPage}
-              />
+              {isLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 size={32} className="animate-spin text-primary-500" />
+                  <span className="ml-3 text-neutral-600">Cargando vehículos...</span>
+                </div>
+              ) : isError ? (
+                <div className="flex items-center justify-center py-16 text-error-600">
+                  <span>Error al cargar datos: {(error as Error)?.message || 'Error desconocido'}</span>
+                </div>
+              ) : (
+                <>
+                  <Table
+                    data={paginatedData}
+                    columns={columns}
+                    keyExtractor={(row) => row.id}
+                    selectable
+                    selectedKeys={selectedRows}
+                    onSelectionChange={setSelectedRows}
+                  />
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalFilteredPages}
+                    totalItems={filteredData.length}
+                    itemsPerPage={itemsPerPage}
+                    onPageChange={setCurrentPage}
+                  />
+                </>
+              )}
             </CardContent>
           </Card>
         </TabPanel>
 
         <TabPanel id="mantenimiento">
           <Card>
-            <CardHeader 
+            <CardHeader
               title="Historial de Mantenimiento"
               action={<Button variant="outline" size="sm">+ Nuevo Service</Button>}
             />
-            <CardContent className="p-0">
-              <Table
-                data={mantenimientosData}
-                columns={mantenimientoColumns}
-                keyExtractor={(row) => row.id.toString()}
-              />
+            <CardContent className="p-6">
+              <div className="flex flex-col items-center justify-center py-8 text-neutral-400">
+                <Wrench size={40} className="mb-3" />
+                <p className="text-neutral-600 font-medium">Sin registros de mantenimiento</p>
+                <p className="text-sm text-neutral-400 mt-1">Los registros de mantenimiento aparecerán aquí</p>
+              </div>
             </CardContent>
           </Card>
         </TabPanel>
@@ -339,48 +384,82 @@ export const AdminVehiculosPage: React.FC = () => {
         <TabPanel id="documentacion">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
-              <CardHeader title="VTV - Vencimientos Próximos" />
+              <CardHeader title="Habilitaciones - Vencimientos Próximos" />
               <CardContent>
                 <div className="space-y-3 animate-fade-in">
-                  {vehiculosData.filter(v => v.vencimientoVTV !== 'VENCIDO').slice(0, 3).map(v => (
-                    <div key={v.id} className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Truck size={18} className="text-neutral-400" />
-                        <div>
-                          <p className="font-medium text-neutral-900">{v.patente}</p>
-                          <p className="text-xs text-neutral-500">{v.transportista}</p>
+                  {allVehicles
+                    .filter(v => {
+                      if (!v.vencimiento) return false;
+                      try {
+                        const venc = new Date(v.vencimiento);
+                        return venc >= new Date();
+                      } catch { return false; }
+                    })
+                    .sort((a, b) => {
+                      try {
+                        return new Date(a.vencimiento).getTime() - new Date(b.vencimiento).getTime();
+                      } catch {
+                        return 0;
+                      }
+                    })
+                    .slice(0, 5)
+                    .map(v => (
+                      <div key={v.id} className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Truck size={18} className="text-neutral-400" />
+                          <div>
+                            <p className="font-medium text-neutral-900">{v.patente}</p>
+                            <p className="text-xs text-neutral-500">{v.transportista}</p>
+                          </div>
                         </div>
+                        <Badge variant="outline">
+                          {(() => {
+                            try { return new Date(v.vencimiento).toLocaleDateString('es-AR'); } catch { return v.vencimiento; }
+                          })()}
+                        </Badge>
                       </div>
-                      <Badge variant="outline">{v.vencimientoVTV}</Badge>
-                    </div>
-                  ))}
+                    ))}
+                  {allVehicles.filter(v => {
+                    if (!v.vencimiento) return false;
+                    try { return new Date(v.vencimiento) >= new Date(); } catch { return false; }
+                  }).length === 0 && (
+                    <p className="text-sm text-neutral-400 text-center py-4">Sin vencimientos próximos</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
             <Card>
-              <CardHeader title="Seguros - Vencimientos" />
+              <CardHeader title="Habilitaciones Vencidas" />
               <CardContent>
                 <div className="space-y-3 animate-fade-in">
-                  <div className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <FileText size={18} className="text-neutral-400" />
-                      <div>
-                        <p className="font-medium text-neutral-900">ABC123</p>
-                        <p className="text-xs text-neutral-500">Transporte Rápido SRL</p>
+                  {allVehicles
+                    .filter(v => {
+                      if (!v.vencimiento) return false;
+                      try { return new Date(v.vencimiento) < new Date(); } catch { return false; }
+                    })
+                    .slice(0, 5)
+                    .map(v => (
+                      <div key={v.id} className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <FileText size={18} className="text-neutral-400" />
+                          <div>
+                            <p className="font-medium text-neutral-900">{v.patente}</p>
+                            <p className="text-xs text-neutral-500">{v.transportista}</p>
+                          </div>
+                        </div>
+                        <Badge variant="soft" color="error">
+                          {(() => {
+                            try { return new Date(v.vencimiento).toLocaleDateString('es-AR'); } catch { return v.vencimiento; }
+                          })()}
+                        </Badge>
                       </div>
-                    </div>
-                    <Badge variant="soft" color="warning">15/03/2025</Badge>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <FileText size={18} className="text-neutral-400" />
-                      <div>
-                        <p className="font-medium text-neutral-900">DEF456</p>
-                        <p className="text-xs text-neutral-500">EcoTransporte SA</p>
-                      </div>
-                    </div>
-                    <Badge variant="soft" color="success">20/08/2025</Badge>
-                  </div>
+                    ))}
+                  {allVehicles.filter(v => {
+                    if (!v.vencimiento) return false;
+                    try { return new Date(v.vencimiento) < new Date(); } catch { return false; }
+                  }).length === 0 && (
+                    <p className="text-sm text-neutral-400 text-center py-4">Sin habilitaciones vencidas</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -399,7 +478,7 @@ export const AdminVehiculosPage: React.FC = () => {
             <Button variant="outline" onClick={() => setIsModalOpen(false)}>
               Cancelar
             </Button>
-            <Button>Registrar Vehículo</Button>
+            <Button onClick={() => { toast.info('Los vehículos se gestionan desde la ficha del transportista'); setIsModalOpen(false); }}>Registrar Vehículo</Button>
           </div>
         }
       >
@@ -442,9 +521,10 @@ export const AdminVehiculosPage: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-neutral-700 mb-1">Transportista *</label>
             <select className="w-full px-4 h-10 rounded-xl border border-neutral-200">
-              <option>Transporte Rápido SRL</option>
-              <option>EcoTransporte SA</option>
-              <option>Logística Sur</option>
+              {transportistas.map(t => (
+                <option key={t.id} value={t.id}>{t.razonSocial}</option>
+              ))}
+              {transportistas.length === 0 && <option>Cargando transportistas...</option>}
             </select>
           </div>
         </div>

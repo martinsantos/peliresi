@@ -1,13 +1,13 @@
 /**
  * SITREP v6 - Login Page
  * ======================
- * Página de inicio de sesión - Demo mode
+ * Pagina de inicio de sesion - Real API + Demo fallback
  */
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, Leaf } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, Leaf, AlertCircle } from 'lucide-react';
+import { useAuth, DEMO_CREDENTIALS } from '../../contexts/AuthContext';
 
 const DEMO_USERS = [
   { label: 'Administrador', sublabel: 'DGFA', userId: 1, color: 'bg-primary-500' },
@@ -18,24 +18,50 @@ const DEMO_USERS = [
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { switchUser } = useAuth();
+  const { login, authError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Demo: any email/password logs in as admin
-    switchUser(1);
-    navigate('/dashboard');
+    if (!email || !password) {
+      setError('Ingresa email y contrasena');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      await login(email, password);
+      navigate('/dashboard');
+    } catch (err: any) {
+      setError(authError || err?.response?.data?.message || 'Error al iniciar sesion. Verifica tus credenciales.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDemoUser = (userId: number) => {
+  const handleDemoUser = async (userId: number) => {
     setLoading(true);
-    switchUser(userId);
-    // Small delay for visual feedback
-    setTimeout(() => navigate('/dashboard'), 150);
+    setError(null);
+    const creds = DEMO_CREDENTIALS[userId];
+    if (creds) {
+      try {
+        await login(creds.email, creds.password);
+        navigate('/dashboard');
+      } catch {
+        // login() already handles demo fallback internally,
+        // so if it didn't throw, the user is logged in.
+        // If it threw, the error was set by AuthContext.
+        // But switchUser in context handles demo fallback silently,
+        // so let's try that path.
+        navigate('/dashboard');
+      } finally {
+        setLoading(false);
+      }
+    }
   };
 
   return (
@@ -52,6 +78,14 @@ const LoginPage: React.FC = () => {
           Sistema de Trazabilidad de Residuos Peligrosos
         </p>
       </div>
+
+      {/* Error message */}
+      {error && (
+        <div className="mb-6 p-3 bg-error-50 border border-error-200 rounded-xl flex items-center gap-2 text-sm text-error-700 animate-fade-in">
+          <AlertCircle size={16} className="flex-shrink-0" />
+          {error}
+        </div>
+      )}
 
       {/* Demo users - PRINCIPAL */}
       <div className="mb-8">
@@ -86,7 +120,7 @@ const LoginPage: React.FC = () => {
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-neutral-700 mb-1.5">Correo electrónico</label>
+          <label className="block text-sm font-medium text-neutral-700 mb-1.5">Correo electronico</label>
           <div className="relative">
             <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
             <input
@@ -100,12 +134,12 @@ const LoginPage: React.FC = () => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-neutral-700 mb-1.5">Contraseña</label>
+          <label className="block text-sm font-medium text-neutral-700 mb-1.5">Contrasena</label>
           <div className="relative">
             <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
             <input
               type={showPassword ? 'text' : 'password'}
-              placeholder="••••••••"
+              placeholder="********"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full h-11 pl-10 pr-10 border border-neutral-200 rounded-xl text-sm focus:border-[#1B5E3C] focus:ring-4 focus:ring-[#1B5E3C]/15 outline-none transition-all"
@@ -122,10 +156,17 @@ const LoginPage: React.FC = () => {
 
         <button
           type="submit"
-          className="w-full h-11 bg-[#1B5E3C] hover:bg-[#164D32] text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] btn-glow"
+          disabled={loading}
+          className="w-full h-11 bg-[#1B5E3C] hover:bg-[#164D32] text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] btn-glow disabled:opacity-50"
         >
-          Ingresar
-          <ArrowRight size={18} />
+          {loading ? (
+            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            <>
+              Ingresar
+              <ArrowRight size={18} />
+            </>
+          )}
         </button>
       </form>
     </div>

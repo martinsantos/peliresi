@@ -19,7 +19,8 @@ import {
   Package,
   AlertTriangle,
   CheckCircle2,
-  QrCode
+  QrCode,
+  Loader2,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -27,35 +28,31 @@ import { Badge } from '../../components/ui/BadgeV2';
 import { Input } from '../../components/ui/Input';
 import { toast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCreateManifiesto } from '../../hooks/useManifiestos';
+import { useTiposResiduo, useCatalogoTransportistas, useCatalogoOperadores } from '../../hooks/useCatalogos';
 
-// Mock data
-const residuosDisponibles = [
-  { id: 'RES-001', codigo: '180103', descripcion: 'Residuos de procedencia hospitalaria', categoria: 'Anatomopatológico' },
-  { id: 'RES-002', codigo: '180106', descripcion: 'Objetos punzantes o cortantes', categoria: 'Cortopunzante' },
-  { id: 'RES-003', codigo: '180108', descripcion: 'Residuos biológicos', categoria: 'Biológico' },
-];
-
-const transportistas = [
-  { id: 1, nombre: 'Transportes Andes S.A.', cuit: '30-12345678-9' },
-  { id: 2, nombre: 'EcoTransporte AR', cuit: '30-87654321-0' },
-  { id: 3, nombre: 'Transporte Logístico', cuit: '30-11223344-5' },
-];
-
-const operadores = [
-  { id: 1, nombre: 'Planta Las Heras', direccion: 'Las Heras, Mendoza' },
-  { id: 2, nombre: 'Incineradora Eco', direccion: 'Godoy Cruz, Mendoza' },
-  { id: 3, nombre: 'Planta de Tratamiento Norte', direccion: 'Guaymallén, Mendoza' },
-];
 
 export const NuevoManifiestoPage: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser, isAdmin, isGenerador, isTransportista, isOperador } = useAuth();
   const [step, setStep] = useState(1);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+  // API hooks
+  const createManifiesto = useCreateManifiesto();
+  const { data: apiTiposResiduo } = useTiposResiduo();
+  const { data: apiTransportistas } = useCatalogoTransportistas();
+  const { data: apiOperadores } = useCatalogoOperadores();
+
+  // Use API catalogos only
+  const tiposResiduo = apiTiposResiduo || [];
+  const transportistasList = apiTransportistas || [];
+  const operadoresList = apiOperadores || [];
+
   // Form state
   const [formData, setFormData] = useState({
-    generador: currentUser.rol === 'GENERADOR' ? currentUser.sector : '',
+    generador: currentUser?.rol === 'GENERADOR' ? currentUser?.sector || '' : '',
+    generadorId: currentUser?.rol === 'GENERADOR' ? (currentUser as any).generadorId || '' : '',
     transportista: '',
     operador: '',
     fechaRetiro: new Date().toISOString().split('T')[0],
@@ -81,18 +78,59 @@ export const NuevoManifiestoPage: React.FC = () => {
     setFormData({ ...formData, residuos: newResiduos });
   };
 
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (!formData.generadorId && !formData.generador) {
+      errors.generador = 'El generador es requerido';
+    }
+    if (!formData.transportista) {
+      errors.transportista = 'El transportista es requerido';
+    }
+    if (!formData.operador) {
+      errors.operador = 'El operador es requerido';
+    }
+
+    const hasInvalidResiduos = formData.residuos.some(
+      (r) => !r.tipo || !r.cantidad || Number(r.cantidad) <= 0
+    );
+    if (hasInvalidResiduos) {
+      errors.residuos = 'Todos los residuos deben tener tipo y cantidad valida';
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSubmit = async () => {
-    setIsSubmitting(true);
-    // Simular API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsSubmitting(false);
-    
-    const newManifiestoId = 'M-2025-' + String(Math.floor(Math.random() * 1000)).padStart(4, '0');
-    toast.success('Manifiesto creado', `El manifiesto ${newManifiestoId} fue creado exitosamente`);
-    
-    // Redirigir según el contexto (mobile o desktop)
+    if (!validateForm()) {
+      toast.warning('Formulario incompleto', 'Por favor completa todos los campos requeridos');
+      return;
+    }
+
     const isMobile = window.location.pathname.includes('/mobile');
-    navigate(isMobile ? `/mobile/manifiestos` : `/manifiestos`);
+
+    try {
+      const result = await createManifiesto.mutateAsync({
+        generadorId: formData.generadorId || formData.generador,
+        transportistaId: formData.transportista,
+        operadorId: formData.operador,
+        observaciones: formData.observaciones || undefined,
+        residuos: formData.residuos.map((r) => ({
+          tipoResiduoId: r.tipo,
+          cantidad: Number(r.cantidad),
+          unidad: r.unidad,
+        })),
+      });
+
+      toast.success('Manifiesto creado', `El manifiesto ${result.numero || result.id} fue creado exitosamente`);
+      navigate(isMobile ? `/mobile/manifiestos/${result.id}` : `/manifiestos/${result.id}`);
+    } catch (err: any) {
+      toast.error(
+        'Error al crear manifiesto',
+        err?.response?.data?.message || err?.message || 'Ocurrio un error inesperado'
+      );
+    }
   };
 
   const isMobile = window.location.pathname.includes('/mobile');
@@ -148,7 +186,7 @@ export const NuevoManifiestoPage: React.FC = () => {
                   value={formData.generador}
                   onChange={(e) => setFormData({ ...formData, generador: e.target.value })}
                   placeholder="Nombre del establecimiento"
-                  disabled={currentUser.rol === 'GENERADOR'}
+                  disabled={currentUser?.rol === 'GENERADOR'}
                 />
               </div>
 
@@ -215,12 +253,12 @@ export const NuevoManifiestoPage: React.FC = () => {
                     <select
                       value={residuo.tipo}
                       onChange={(e) => handleResiduoChange(index, 'tipo', e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none"
+                      className={`w-full px-3 py-2 rounded-lg border focus:border-primary-500 focus:outline-none ${validationErrors.residuos ? 'border-error-300' : 'border-neutral-200'}`}
                     >
                       <option value="">Seleccionar tipo</option>
-                      {residuosDisponibles.map((r) => (
+                      {tiposResiduo.map((r: any) => (
                         <option key={r.id} value={r.id}>
-                          {r.codigo} - {r.descripcion}
+                          {r.codigo} - {r.nombre || r.descripcion}
                         </option>
                       ))}
                     </select>
@@ -294,15 +332,18 @@ export const NuevoManifiestoPage: React.FC = () => {
                 <select
                   value={formData.transportista}
                   onChange={(e) => setFormData({ ...formData, transportista: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none"
+                  className={`w-full px-3 py-2 rounded-lg border focus:border-primary-500 focus:outline-none ${validationErrors.transportista ? 'border-error-300' : 'border-neutral-200'}`}
                 >
                   <option value="">Seleccionar transportista</option>
-                  {transportistas.map((t) => (
+                  {transportistasList.map((t: any) => (
                     <option key={t.id} value={t.id}>
-                      {t.nombre} ({t.cuit})
+                      {t.nombre || t.label}
                     </option>
                   ))}
                 </select>
+                {validationErrors.transportista && (
+                  <p className="text-xs text-error-500 mt-1">{validationErrors.transportista}</p>
+                )}
               </div>
 
               <div>
@@ -312,15 +353,18 @@ export const NuevoManifiestoPage: React.FC = () => {
                 <select
                   value={formData.operador}
                   onChange={(e) => setFormData({ ...formData, operador: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none"
+                  className={`w-full px-3 py-2 rounded-lg border focus:border-primary-500 focus:outline-none ${validationErrors.operador ? 'border-error-300' : 'border-neutral-200'}`}
                 >
                   <option value="">Seleccionar operador</option>
-                  {operadores.map((o) => (
+                  {operadoresList.map((o: any) => (
                     <option key={o.id} value={o.id}>
-                      {o.nombre} - {o.direccion}
+                      {o.nombre || o.label}
                     </option>
                   ))}
                 </select>
+                {validationErrors.operador && (
+                  <p className="text-xs text-error-500 mt-1">{validationErrors.operador}</p>
+                )}
               </div>
 
               <div>
@@ -352,11 +396,11 @@ export const NuevoManifiestoPage: React.FC = () => {
                   Anterior
                 </Button>
                 <Button
-                  leftIcon={isSubmitting ? undefined : <Save size={18} />}
+                  leftIcon={createManifiesto.isPending ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
                   onClick={handleSubmit}
-                  disabled={isSubmitting}
+                  disabled={createManifiesto.isPending}
                 >
-                  {isSubmitting ? 'Guardando...' : 'Crear Manifiesto'}
+                  {createManifiesto.isPending ? 'Guardando...' : 'Crear Manifiesto'}
                 </Button>
               </div>
             </CardContent>

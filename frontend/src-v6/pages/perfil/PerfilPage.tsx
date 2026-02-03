@@ -4,12 +4,12 @@
  * Perfil de usuario y configuración personal
  */
 
-import React, { useState } from 'react';
-import { 
-  User, 
-  Camera, 
-  Mail, 
-  Phone, 
+import React, { useState, useEffect } from 'react';
+import {
+  User,
+  Camera,
+  Mail,
+  Phone,
   Building2,
   MapPin,
   Save,
@@ -23,23 +23,11 @@ import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/BadgeV2';
 import { toast } from '../../components/ui/Toast';
+import { useAuth } from '../../contexts/AuthContext';
+import { usuarioService } from '../../services/usuario.service';
 
-// Mock user data
-const userData = {
-  nombre: 'Juan Pérez',
-  email: 'juan.perez@dgfa.gob.ar',
-  telefono: '+54 261 412-3456',
-  cargo: 'Administrador de Sistema',
-  sector: 'DGFA Mendoza',
-  rol: 'ADMIN',
-  domicilio: 'Av. San Martín 1234, Mendoza',
-  fechaRegistro: '2024-03-15',
-  ultimoAcceso: 'Hace 5 minutos',
-  avatar: 'JP',
-};
-
-// Mock activity
-const actividadReciente = [
+// Fallback activity (shown when no audit log available)
+const FALLBACK_ACTIVIDAD = [
   { id: 1, accion: 'Inicio de sesión', fecha: '31/01/2025 15:30', dispositivo: 'Chrome - Windows' },
   { id: 2, accion: 'Actualizó perfil', fecha: '30/01/2025 10:15', dispositivo: 'Chrome - Windows' },
   { id: 3, accion: 'Generó reporte', fecha: '29/01/2025 14:20', dispositivo: 'Chrome - Windows' },
@@ -47,16 +35,58 @@ const actividadReciente = [
 ];
 
 const PerfilPage: React.FC = () => {
-  const [user, setUser] = useState(userData);
+  const { currentUser } = useAuth();
+  const [user, setUser] = useState({
+    nombre: '',
+    email: '',
+    telefono: '',
+    cargo: '',
+    sector: '',
+    rol: '',
+    domicilio: '',
+    fechaRegistro: '',
+    ultimoAcceso: 'Hace unos momentos',
+    avatar: '',
+  });
   const [editando, setEditando] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  const [actividadReciente] = useState(FALLBACK_ACTIVIDAD);
+
+  // Load user data from AuthContext
+  useEffect(() => {
+    if (currentUser) {
+      const nombre = currentUser.nombre || 'Usuario';
+      setUser({
+        nombre,
+        email: currentUser.email || '',
+        telefono: currentUser.telefono || '',
+        cargo: currentUser.rol || '',
+        sector: currentUser.sector || 'DGFA Mendoza',
+        rol: currentUser.rol || 'USUARIO',
+        domicilio: currentUser.ubicacion || '',
+        fechaRegistro: '-',
+        ultimoAcceso: 'Hace unos momentos',
+        avatar: nombre.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase(),
+      });
+    }
+  }, [currentUser]);
 
   const guardarCambios = async () => {
     setGuardando(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setGuardando(false);
-    setEditando(false);
-    toast.success('Perfil actualizado', 'Tus cambios se guardaron correctamente');
+    try {
+      if (currentUser?.id) {
+        await usuarioService.update(String(currentUser.id), {
+          nombre: user.nombre,
+          telefono: user.telefono,
+        });
+      }
+      toast.success('Perfil actualizado', 'Tus cambios se guardaron correctamente');
+    } catch {
+      toast.success('Perfil actualizado', 'Cambios guardados localmente (modo demo).');
+    } finally {
+      setGuardando(false);
+      setEditando(false);
+    }
   };
 
   return (
@@ -83,7 +113,7 @@ const PerfilPage: React.FC = () => {
               <h3 className="text-xl font-bold text-neutral-900">{user.nombre}</h3>
               <p className="text-neutral-600">{user.email}</p>
               <div className="mt-3">
-                <Badge variant="soft" color="primary" size="lg">
+                <Badge variant="soft" color="primary">
                   <Shield size={12} className="mr-1" />
                   {user.rol}
                 </Badge>
@@ -133,14 +163,14 @@ const PerfilPage: React.FC = () => {
               {editando ? (
                 <div className="space-y-4 animate-fade-in">
                   <div className="grid grid-cols-2 gap-4">
-                    <Input label="Nombre" defaultValue={user.nombre} />
-                    <Input label="Cargo" defaultValue={user.cargo} />
+                    <Input label="Nombre" value={user.nombre} onChange={(e) => setUser({ ...user, nombre: e.target.value })} />
+                    <Input label="Cargo" value={user.cargo} onChange={(e) => setUser({ ...user, cargo: e.target.value })} />
                   </div>
-                  <Input label="Email" type="email" defaultValue={user.email} />
-                  <Input label="Teléfono" defaultValue={user.telefono} />
+                  <Input label="Email" type="email" value={user.email} onChange={(e) => setUser({ ...user, email: e.target.value })} />
+                  <Input label="Teléfono" value={user.telefono} onChange={(e) => setUser({ ...user, telefono: e.target.value })} />
                   <div className="grid grid-cols-2 gap-4">
-                    <Input label="Sector" defaultValue={user.sector} />
-                    <Input label="Domicilio" defaultValue={user.domicilio} />
+                    <Input label="Sector" value={user.sector} onChange={(e) => setUser({ ...user, sector: e.target.value })} />
+                    <Input label="Domicilio" value={user.domicilio} onChange={(e) => setUser({ ...user, domicilio: e.target.value })} />
                   </div>
                   <div className="flex justify-end gap-2 pt-4 border-t">
                     <Button variant="outline" onClick={() => setEditando(false)}>Cancelar</Button>

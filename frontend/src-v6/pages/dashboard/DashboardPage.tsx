@@ -45,25 +45,29 @@ const AdminDashboard: React.FC = () => {
   const { data: dashStats } = useDashboardStats();
   const { data: recentManifiestos } = useManifiestos({ limit: 4 });
 
+  const est = dashStats?.estadisticas;
+  const totalM = est?.total ?? 0;
+  const enTransitoM = est?.enTransito ?? 0;
+  const tratadosM = est?.tratados ?? 0;
+  const complianceRate = totalM > 0 ? `${((tratadosM / totalM) * 100).toFixed(1)}%` : '-';
+
   const stats = [
-    { id: 1, label: 'Manifiestos Hoy', value: dashStats?.manifiestos?.total?.toString() || '24', change: '+12%', icon: FileText, color: 'primary' },
-    { id: 2, label: 'En Tránsito', value: dashStats?.manifiestos?.enTransito?.toString() || '18', change: '+5%', icon: Truck, color: 'info' },
-    { id: 3, label: 'Alertas Activas', value: dashStats?.alertas?.pendientes?.toString() || '7', icon: AlertCircle, color: 'warning' },
-    { id: 4, label: 'Tasa Cumplimiento', value: '97.2%', change: '+2.1%', icon: CheckCircle2, color: 'success' },
+    { id: 1, label: 'Manifiestos Total', value: String(totalM), icon: FileText, color: 'primary' },
+    { id: 2, label: 'En Tránsito', value: String(enTransitoM), icon: Truck, color: 'info' },
+    { id: 3, label: 'Alertas Activas', value: '0', icon: AlertCircle, color: 'warning' },
+    { id: 4, label: 'Tasa Cumplimiento', value: complianceRate, icon: CheckCircle2, color: 'success' },
   ];
 
-  const actividadReciente = recentManifiestos?.items?.slice(0, 4).map((m: any, i: number) => ({
+  const recientes = dashStats?.recientes || recentManifiestos?.items || [];
+  const actividadReciente = recientes.slice(0, 4).map((m: any, i: number) => ({
     id: i + 1,
-    titulo: `Manifiesto #${m.numero}`,
-    accion: m.generador?.razonSocial || 'Generador',
-    tiempo: new Date(m.updatedAt || m.createdAt).toLocaleString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+    titulo: `Manifiesto #${m.numero || m.id}`,
+    accion: m.generador?.razonSocial || m.generador || 'Generador',
+    tiempo: m.updatedAt || m.createdAt
+      ? new Date(m.updatedAt || m.createdAt).toLocaleString('es-AR', { hour: '2-digit', minute: '2-digit' })
+      : '-',
     estado: m.estado === 'EN_TRANSITO' ? 'alerta' : m.estado === 'TRATADO' ? 'exito' : 'nuevo',
-  })) || [
-    { id: 1, titulo: 'Manifiesto #2025-00184', accion: 'Creado por Hospital Central', tiempo: 'Hace 10 min', estado: 'nuevo' },
-    { id: 2, titulo: 'Retraso detectado', accion: 'Transporte MZA-234', tiempo: 'Hace 25 min', estado: 'alerta' },
-    { id: 3, titulo: 'Manifiesto #2025-00183', accion: 'Entregado en Planta Las Heras', tiempo: 'Hace 1 hora', estado: 'exito' },
-    { id: 4, titulo: 'Nuevo usuario registrado', accion: 'Clínica del Sol', tiempo: 'Hace 2 horas', estado: 'info' },
-  ];
+  }));
 
   return (
     <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
@@ -102,8 +106,8 @@ const AdminDashboard: React.FC = () => {
                       'text-success-600'
                     } />
                   </div>
-                  {stat.change && (
-                    <span className="text-xs font-semibold text-success-600 bg-success-50 px-2 py-0.5 rounded-full">{stat.change}</span>
+                  {(stat as any).change && (
+                    <span className="text-xs font-semibold text-success-600 bg-success-50 px-2 py-0.5 rounded-full">{(stat as any).change}</span>
                   )}
                 </div>
                 <p className="text-2xl font-bold text-neutral-900 animate-count-up">{stat.value}</p>
@@ -123,6 +127,9 @@ const AdminDashboard: React.FC = () => {
             action={<Button variant="ghost" size="sm">Ver todo</Button>}
           />
           <CardContent className="p-0">
+            {actividadReciente.length === 0 ? (
+              <div className="p-8 text-center text-neutral-500">No hay actividad reciente</div>
+            ) : (
             <div className="divide-y divide-neutral-100">
               {actividadReciente.map((item) => (
                 <div key={item.id} className="flex items-center justify-between p-4 row-hover transition-colors">
@@ -147,6 +154,7 @@ const AdminDashboard: React.FC = () => {
                 </div>
               ))}
             </div>
+            )}
           </CardContent>
         </Card>
 
@@ -175,19 +183,23 @@ const GeneradorDashboard: React.FC = () => {
   const isMobile = location.pathname.includes('/mobile');
   const route = (path: string) => isMobile ? `/mobile${path}` : path;
 
+  const { data: dashStats } = useDashboardStats();
+  const { data: recentManifiestos } = useManifiestos({ limit: 4 });
+
+  const est = dashStats?.estadisticas;
   const stats = [
-    { id: 1, label: 'Mis Manifiestos', value: '156', icon: FileText, color: 'purple' },
-    { id: 2, label: 'En Tránsito', value: '12', icon: Truck, color: 'info' },
-    { id: 3, label: 'Pendientes', value: '3', icon: Clock, color: 'warning' },
-    { id: 4, label: 'Residuos (kg)', value: '2,450', icon: Factory, color: 'success' },
+    { id: 1, label: 'Mis Manifiestos', value: String(est?.total ?? 0), icon: FileText, color: 'purple' },
+    { id: 2, label: 'En Tránsito', value: String(est?.enTransito ?? 0), icon: Truck, color: 'info' },
+    { id: 3, label: 'Pendientes', value: String(est?.borradores ?? 0), icon: Clock, color: 'warning' },
+    { id: 4, label: 'Tratados', value: String(est?.tratados ?? 0), icon: Factory, color: 'success' },
   ];
 
   return (
     <div className="space-y-6">
       {/* Welcome */}
       <div>
-        <h2 className="text-2xl font-bold text-neutral-900">¡Hola, {currentUser.nombre.split(' ')[0]}!</h2>
-        <p className="text-neutral-600">{currentUser.sector}</p>
+        <h2 className="text-2xl font-bold text-neutral-900">¡Hola, {currentUser?.nombre?.split(' ')[0] || 'Usuario'}!</h2>
+        <p className="text-neutral-600">{currentUser?.sector}</p>
       </div>
 
       {/* Stats Grid */}
@@ -244,26 +256,28 @@ const GeneradorDashboard: React.FC = () => {
           action={<Button variant="ghost" size="sm" onClick={() => navigate(route('/manifiestos'))}>Ver todo</Button>}
         />
         <CardContent className="p-0">
-          <div className="divide-y divide-neutral-100">
-            {[
-              { id: 'M-2025-0156', fecha: '31/01/2025', estado: 'en_transito', residuos: '45 kg' },
-              { id: 'M-2025-0155', fecha: '30/01/2025', estado: 'completado', residuos: '120 kg' },
-              { id: 'M-2025-0154', fecha: '29/01/2025', estado: 'completado', residuos: '85 kg' },
-            ].map((m) => (
-              <div key={m.id} className="flex items-center justify-between p-4 hover:bg-neutral-50" onClick={() => navigate(route(`/manifiestos/${m.id}`))}>
-                <div>
-                  <p className="font-medium text-neutral-900">{m.id}</p>
-                  <p className="text-sm text-neutral-500">{m.fecha}</p>
-                </div>
-                <div className="text-right">
-                  <Badge variant="soft" color={m.estado === 'completado' ? 'success' : 'info'}>
-                    {m.estado === 'completado' ? 'Completado' : 'En Tránsito'}
-                  </Badge>
-                  <p className="text-sm text-neutral-500 mt-1">{m.residuos}</p>
-                </div>
+          {(() => {
+            const recientes = dashStats?.recientes || recentManifiestos?.items || [];
+            return recientes.length === 0 ? (
+              <div className="p-8 text-center text-neutral-500">No hay manifiestos recientes</div>
+            ) : (
+              <div className="divide-y divide-neutral-100">
+                {recientes.slice(0, 3).map((m: any) => (
+                  <div key={m.id} className="flex items-center justify-between p-4">
+                    <div>
+                      <p className="font-medium text-neutral-900">{m.numero || m.id}</p>
+                      <p className="text-sm text-neutral-500">{m.createdAt ? new Date(m.createdAt).toLocaleDateString('es-AR') : '-'}</p>
+                    </div>
+                    <div className="text-right">
+                      <Badge variant="soft" color={m.estado === 'TRATADO' || m.estado === 'ENTREGADO' ? 'success' : 'info'}>
+                        {m.estado === 'EN_TRANSITO' ? 'En Tránsito' : m.estado?.replace(/_/g, ' ') || '-'}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            );
+          })()}
         </CardContent>
       </Card>
     </div>
@@ -280,19 +294,22 @@ const TransportistaDashboard: React.FC = () => {
   const isMobile = location.pathname.includes('/mobile');
   const route = (path: string) => isMobile ? `/mobile${path}` : path;
 
+  const { data: dashStats } = useDashboardStats();
+
+  const est = dashStats?.estadisticas;
   const stats = [
-    { id: 1, label: 'Entregas Hoy', value: '8', icon: CheckCircle2, color: 'orange' },
-    { id: 2, label: 'En Camino', value: '4', icon: Truck, color: 'info' },
-    { id: 3, label: 'Pendientes', value: '6', icon: Clock, color: 'warning' },
-    { id: 4, label: 'Km Recorridos', value: '234', icon: MapPin, color: 'success' },
+    { id: 1, label: 'Entregados', value: String(est?.entregados ?? 0), icon: CheckCircle2, color: 'orange' },
+    { id: 2, label: 'En Camino', value: String(est?.enTransito ?? 0), icon: Truck, color: 'info' },
+    { id: 3, label: 'Pendientes', value: String(est?.aprobados ?? 0), icon: Clock, color: 'warning' },
+    { id: 4, label: 'Recibidos', value: String(est?.recibidos ?? 0), icon: MapPin, color: 'success' },
   ];
 
   return (
     <div className="space-y-6">
       {/* Welcome */}
       <div>
-        <h2 className="text-2xl font-bold text-neutral-900">¡Hola, {currentUser.nombre.split(' ')[0]}!</h2>
-        <p className="text-neutral-600">{currentUser.sector}</p>
+        <h2 className="text-2xl font-bold text-neutral-900">¡Hola, {currentUser?.nombre?.split(' ')[0] || 'Usuario'}!</h2>
+        <p className="text-neutral-600">{currentUser?.sector}</p>
       </div>
 
       {/* Stats Grid */}
@@ -346,26 +363,28 @@ const TransportistaDashboard: React.FC = () => {
       <Card>
         <CardHeader title="Entregas Pendientes" />
         <CardContent className="p-0">
-          <div className="divide-y divide-neutral-100">
-            {[
-              { id: 'M-2025-0156', origen: 'Hospital Central', destino: 'Planta Las Heras', hora: '14:30' },
-              { id: 'M-2025-0155', origen: 'Clínica Mendoza', destino: 'Incineradora Eco', hora: '16:00' },
-              { id: 'M-2025-0154', origen: 'Hospital Pediátrico', destino: 'Planta Norte', hora: '17:30' },
-            ].map((m) => (
-              <div key={m.id} className="p-4 hover:bg-neutral-50">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="font-medium text-neutral-900">{m.id}</p>
-                  <Badge variant="soft" color="warning">Pendiente</Badge>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-neutral-600">
-                  <span>{m.origen}</span>
-                  <ArrowRight size={14} />
-                  <span>{m.destino}</span>
-                </div>
-                <p className="text-xs text-neutral-400 mt-1">Retiro: {m.hora}</p>
+          {(() => {
+            const enTransito = dashStats?.enTransitoList || [];
+            return enTransito.length === 0 ? (
+              <div className="p-8 text-center text-neutral-500">No hay entregas pendientes</div>
+            ) : (
+              <div className="divide-y divide-neutral-100">
+                {enTransito.slice(0, 5).map((m: any) => (
+                  <div key={m.id} className="p-4 hover:bg-neutral-50">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="font-medium text-neutral-900">{m.numero || m.id}</p>
+                      <Badge variant="soft" color="warning">{m.estado?.replace(/_/g, ' ') || 'En Tránsito'}</Badge>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-neutral-600">
+                      <span>{m.generador?.razonSocial || m.generador || '-'}</span>
+                      <ArrowRight size={14} />
+                      <span>{m.operador?.razonSocial || m.operador || '-'}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            );
+          })()}
         </CardContent>
       </Card>
     </div>
@@ -382,19 +401,22 @@ const OperadorDashboard: React.FC = () => {
   const isMobile = location.pathname.includes('/mobile');
   const route = (path: string) => isMobile ? `/mobile${path}` : path;
 
+  const { data: dashStats } = useDashboardStats();
+
+  const est = dashStats?.estadisticas;
   const stats = [
-    { id: 1, label: 'Recibidos Hoy', value: '24', icon: Building2, color: 'green' },
-    { id: 2, label: 'En Tratamiento', value: '18', icon: Factory, color: 'info' },
-    { id: 3, label: 'Pendientes', value: '12', icon: Clock, color: 'warning' },
-    { id: 4, label: 'Tratados', value: '156', icon: CheckCircle2, color: 'success' },
+    { id: 1, label: 'Recibidos', value: String(est?.recibidos ?? 0), icon: Building2, color: 'green' },
+    { id: 2, label: 'En Tránsito', value: String(est?.enTransito ?? 0), icon: Factory, color: 'info' },
+    { id: 3, label: 'Pendientes', value: String(est?.entregados ?? 0), icon: Clock, color: 'warning' },
+    { id: 4, label: 'Tratados', value: String(est?.tratados ?? 0), icon: CheckCircle2, color: 'success' },
   ];
 
   return (
     <div className="space-y-6">
       {/* Welcome */}
       <div>
-        <h2 className="text-2xl font-bold text-neutral-900">¡Hola, {currentUser.nombre.split(' ')[0]}!</h2>
-        <p className="text-neutral-600">{currentUser.sector}</p>
+        <h2 className="text-2xl font-bold text-neutral-900">¡Hola, {currentUser?.nombre?.split(' ')[0] || 'Usuario'}!</h2>
+        <p className="text-neutral-600">{currentUser?.sector}</p>
       </div>
 
       {/* Stats Grid */}
@@ -446,26 +468,28 @@ const OperadorDashboard: React.FC = () => {
 
       {/* Manifiestos por Recibir */}
       <Card>
-        <CardHeader title="Por Recibir Hoy" />
+        <CardHeader title="Recientes" />
         <CardContent className="p-0">
-          <div className="divide-y divide-neutral-100">
-            {[
-              { id: 'M-2025-0156', transportista: 'Transportes Andes', hora: '14:30', residuos: '45 kg' },
-              { id: 'M-2025-0155', transportista: 'EcoTransporte AR', hora: '15:00', residuos: '120 kg' },
-              { id: 'M-2025-0154', transportista: 'Transporte Logístico', hora: '16:30', residuos: '85 kg' },
-            ].map((m) => (
-              <div key={m.id} className="flex items-center justify-between p-4 hover:bg-neutral-50">
-                <div>
-                  <p className="font-medium text-neutral-900">{m.id}</p>
-                  <p className="text-sm text-neutral-500">{m.transportista}</p>
-                </div>
-                <div className="text-right">
-                  <Badge variant="soft" color="info">{m.hora}</Badge>
-                  <p className="text-sm text-neutral-500 mt-1">{m.residuos}</p>
-                </div>
+          {(() => {
+            const recientes = dashStats?.recientes || [];
+            return recientes.length === 0 ? (
+              <div className="p-8 text-center text-neutral-500">No hay manifiestos recientes</div>
+            ) : (
+              <div className="divide-y divide-neutral-100">
+                {recientes.slice(0, 5).map((m: any) => (
+                  <div key={m.id} className="flex items-center justify-between p-4 hover:bg-neutral-50">
+                    <div>
+                      <p className="font-medium text-neutral-900">{m.numero || m.id}</p>
+                      <p className="text-sm text-neutral-500">{m.transportista?.razonSocial || m.transportista || '-'}</p>
+                    </div>
+                    <div className="text-right">
+                      <Badge variant="soft" color="info">{m.estado?.replace(/_/g, ' ') || '-'}</Badge>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            );
+          })()}
         </CardContent>
       </Card>
     </div>

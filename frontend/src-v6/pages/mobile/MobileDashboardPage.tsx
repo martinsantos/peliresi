@@ -4,14 +4,12 @@
  * Dashboard optimizado para dispositivos móviles
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FileText,
   MapPin,
-  Users,
   TrendingUp,
-  AlertCircle,
   Clock,
   ChevronRight,
   Package,
@@ -20,6 +18,8 @@ import {
 import { Card, CardContent } from '../../components/ui/CardV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { useAuth } from '../../contexts/AuthContext';
+import { useDashboardStats } from '../../hooks/useDashboard';
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 
 const roleLabelMap: Record<string, string> = {
   ADMIN: 'Admin',
@@ -29,39 +29,35 @@ const roleLabelMap: Record<string, string> = {
   AUDITOR: 'Auditor',
 };
 
-const roleBadgeColor: Record<string, 'primary' | 'purple' | 'orange' | 'green' | 'info'> = {
+const roleBadgeColor: Record<string, 'primary' | 'info' | 'warning' | 'success'> = {
   ADMIN: 'primary',
-  GENERADOR: 'purple',
-  TRANSPORTISTA: 'orange',
-  OPERADOR: 'green',
+  GENERADOR: 'info',
+  TRANSPORTISTA: 'warning',
+  OPERADOR: 'success',
   AUDITOR: 'info',
 };
-
-// Mock data
-const stats = [
-  { id: 1, label: 'Manifiestos Hoy', value: '12', change: '+3', icon: FileText, color: 'primary' },
-  { id: 2, label: 'En Tránsito', value: '8', change: '+2', icon: MapPin, color: 'info' },
-  { id: 3, label: 'Pendientes', value: '5', icon: Clock, color: 'warning' },
-  { id: 4, label: 'Completados', value: '45', change: '+12', icon: CheckCircle2, color: 'success' },
-];
-
-const actividadReciente = [
-  { id: 1, tipo: 'manifiesto', titulo: 'Manifiesto #2025-00184', estado: 'en_transito', tiempo: 'Hace 10 min', icon: FileText },
-  { id: 2, tipo: 'alerta', titulo: 'Retraso en entrega', estado: 'warning', tiempo: 'Hace 25 min', icon: AlertCircle },
-  { id: 3, tipo: 'manifiesto', titulo: 'Manifiesto #2025-00183', estado: 'completado', tiempo: 'Hace 1 hora', icon: CheckCircle2 },
-  { id: 4, tipo: 'manifiesto', titulo: 'Manifiesto #2025-00182', estado: 'completado', tiempo: 'Hace 2 horas', icon: CheckCircle2 },
-];
-
-const accesosRapidos = [
-  { id: 1, label: 'Nuevo Manifiesto', icon: FileText, path: '/mobile/manifiestos/nuevo', color: 'primary' },
-  { id: 2, label: 'Escanear QR', icon: MapPin, path: '/mobile/scan', color: 'success' },
-  { id: 3, label: 'Ver Tracking', icon: Package, path: '/mobile/tracking', color: 'info' },
-  { id: 4, label: 'Reportes', icon: TrendingUp, path: '/mobile/reportes', color: 'purple' },
-];
 
 export const MobileDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
+  const { data: dashData, isLoading: dashLoading } = useDashboardStats();
+  const mp = useMobilePrefix();
+
+  const accesosRapidos = useMemo(() => [
+    { id: 1, label: 'Nuevo Manifiesto', icon: FileText, path: mp('/manifiestos/nuevo'), color: 'primary' },
+    { id: 2, label: 'Escanear QR', icon: MapPin, path: mp('/scan'), color: 'success' },
+    { id: 3, label: 'Ver Tracking', icon: Package, path: mp('/tracking'), color: 'info' },
+    { id: 4, label: 'Reportes', icon: TrendingUp, path: mp('/reportes'), color: 'purple' },
+  ], [mp]);
+
+  const dashStats = (dashData as any)?.data || dashData;
+
+  const stats = [
+    { id: 1, label: 'Manifiestos Total', value: String(dashStats?.manifiestos?.total ?? 0), change: undefined, icon: FileText, color: 'primary' },
+    { id: 2, label: 'En Tránsito', value: String(dashStats?.manifiestos?.enTransito ?? 0), change: undefined, icon: MapPin, color: 'info' },
+    { id: 3, label: 'Pendientes', value: String(dashStats?.manifiestos?.pendientes ?? 0), icon: Clock, color: 'warning' },
+    { id: 4, label: 'Completados', value: String(dashStats?.manifiestos?.completados ?? 0), change: undefined, icon: CheckCircle2, color: 'success' },
+  ];
 
   const greeting = () => {
     const h = new Date().getHours();
@@ -76,10 +72,10 @@ export const MobileDashboardPage: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-neutral-500">{greeting()},</p>
-          <h2 className="text-xl font-bold text-neutral-900">{currentUser.nombre}</h2>
+          <h2 className="text-xl font-bold text-neutral-900">{currentUser?.nombre || 'Usuario'}</h2>
         </div>
-        <Badge variant="soft" color={roleBadgeColor[currentUser.rol] || 'primary'}>
-          {roleLabelMap[currentUser.rol] || currentUser.rol}
+        <Badge variant="soft" color={roleBadgeColor[currentUser?.rol || 'ADMIN'] || 'primary'}>
+          {roleLabelMap[currentUser?.rol || 'ADMIN'] || currentUser?.rol || 'ADMIN'}
         </Badge>
       </div>
 
@@ -88,7 +84,7 @@ export const MobileDashboardPage: React.FC = () => {
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate('/mobile/manifiestos')}>
+            <Card key={stat.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(mp('/manifiestos'))}>
               <CardContent className="p-3">
                 <div className="flex items-start justify-between mb-2">
                   <div className={`p-2 rounded-lg ${
@@ -155,7 +151,7 @@ export const MobileDashboardPage: React.FC = () => {
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-neutral-900">Actividad Reciente</h3>
           <button 
-            onClick={() => navigate('/mobile/manifiestos')}
+            onClick={() => navigate(mp('/manifiestos'))}
             className="text-xs text-primary-600 font-medium flex items-center gap-0.5"
           >
             Ver todo
@@ -164,45 +160,24 @@ export const MobileDashboardPage: React.FC = () => {
         </div>
         
         <div className="space-y-2 animate-fade-in">
-          {actividadReciente.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Card key={item.id} className="active:bg-neutral-50 transition-colors">
-                <CardContent className="p-3">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                      item.estado === 'en_transito' ? 'bg-info-100' :
-                      item.estado === 'warning' ? 'bg-warning-100' :
-                      'bg-success-100'
-                    }`}>
-                      <Icon size={18} className={
-                        item.estado === 'en_transito' ? 'text-info-600' :
-                        item.estado === 'warning' ? 'text-warning-600' :
-                        'text-success-600'
-                      } />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-neutral-900 text-sm truncate">{item.titulo}</p>
-                      <p className="text-xs text-neutral-500">{item.tiempo}</p>
-                    </div>
-                    <Badge 
-                      variant="soft" 
-                      size="sm"
-                      color={
-                        item.estado === 'en_transito' ? 'info' :
-                        item.estado === 'warning' ? 'warning' :
-                        'success'
-                      }
-                    >
-                      {item.estado === 'en_transito' ? 'En tránsito' :
-                       item.estado === 'warning' ? 'Alerta' :
-                       'Completado'}
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+          {dashLoading ? (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <div className="animate-spin w-6 h-6 border-3 border-primary-200 border-t-primary-600 rounded-full mx-auto mb-2" />
+                <p className="text-xs text-neutral-400">Cargando...</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-4 text-center">
+                <p className="text-sm text-neutral-500">
+                  {(dashStats?.manifiestos?.enTransito ?? 0) > 0
+                    ? `${dashStats.manifiestos.enTransito} manifiestos en tránsito`
+                    : 'Sin actividad reciente'}
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 
@@ -212,8 +187,8 @@ export const MobileDashboardPage: React.FC = () => {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-primary-100 text-sm">Resumen del día</p>
-              <h3 className="text-xl font-bold mt-1">8 manifiestos activos</h3>
-              <p className="text-primary-100 text-sm mt-1">2 pendientes de recepción</p>
+              <h3 className="text-xl font-bold mt-1">{dashStats?.manifiestos?.enTransito ?? 0} manifiestos activos</h3>
+              <p className="text-primary-100 text-sm mt-1">{dashStats?.manifiestos?.pendientes ?? 0} pendientes</p>
             </div>
             <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
               <TrendingUp size={24} className="text-white" />
@@ -221,13 +196,13 @@ export const MobileDashboardPage: React.FC = () => {
           </div>
           <div className="mt-4 flex gap-2">
             <button 
-              onClick={() => navigate('/mobile/manifiestos')}
+              onClick={() => navigate(mp('/manifiestos'))}
               className="flex-1 py-2 bg-white text-primary-600 font-medium rounded-lg text-sm"
             >
               Ver manifiestos
             </button>
             <button 
-              onClick={() => navigate('/mobile/tracking')}
+              onClick={() => navigate(mp('/tracking'))}
               className="flex-1 py-2 bg-primary-400/50 text-white font-medium rounded-lg text-sm"
             >
               Ver tracking

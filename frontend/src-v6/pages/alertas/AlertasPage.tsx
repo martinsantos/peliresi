@@ -1,7 +1,7 @@
 /**
  * SITREP v6 - Alertas Page
  * ========================
- * Gestión de alertas y notificaciones del sistema
+ * Gestion de alertas y notificaciones - Real API + fallback mock
  */
 
 import React, { useState, useMemo } from 'react';
@@ -25,124 +25,122 @@ import { Badge } from '../../components/ui/BadgeV2';
 import { Modal, ConfirmModal } from '../../components/ui/Modal';
 import { toast } from '../../components/ui/Toast';
 import { useAlertas, useResolverAlerta } from '../../hooks/useAlertas';
+import { alertaService } from '../../services/alerta.service';
 
-// Fallback mock data de alertas
-const alertasData = [
-  { 
-    id: 1, 
-    tipo: 'critical', 
-    titulo: 'Manifiesto vencido', 
-    mensaje: 'El manifiesto M-2025-045 ha superado el plazo de tratamiento',
-    fecha: '2025-01-31T14:30:00',
-    leida: false,
-    accion: 'Revisar manifiesto'
-  },
-  { 
-    id: 2, 
-    tipo: 'warning', 
-    titulo: 'Retraso en entrega', 
-    mensaje: 'El transporte de M-2025-090 está retrasado 45 minutos',
-    fecha: '2025-01-31T13:15:00',
-    leida: false,
-    accion: 'Ver tracking'
-  },
-  { 
-    id: 3, 
-    tipo: 'info', 
-    titulo: 'Mantenimiento programado', 
-    mensaje: 'El sistema estará en mantenimiento el 15/02 a las 02:00 AM',
-    fecha: '2025-01-31T10:00:00',
-    leida: true,
-    accion: 'Ver detalles'
-  },
-  { 
-    id: 4, 
-    tipo: 'success', 
-    titulo: 'Manifiesto completado', 
-    mensaje: 'El manifiesto M-2025-088 fue tratado exitosamente',
-    fecha: '2025-01-31T09:30:00',
-    leida: true,
-    accion: 'Ver certificado'
-  },
-  { 
-    id: 5, 
-    tipo: 'warning', 
-    titulo: 'Firma pendiente', 
-    mensaje: '3 manifiestos aguardan firma del transportista',
-    fecha: '2025-01-31T08:45:00',
-    leida: false,
-    accion: 'Ver pendientes'
-  },
-  { 
-    id: 6, 
-    tipo: 'critical', 
-    titulo: 'Incidencia reportada', 
-    mensaje: 'El chofer de M-2025-091 reportó un incidente',
-    fecha: '2025-01-30T16:20:00',
-    leida: true,
-    accion: 'Ver incidencia'
-  },
-];
+// Local alert shape used by UI
+interface AlertaLocal {
+  id: string;
+  tipo: string;
+  titulo: string;
+  mensaje: string;
+  fecha: string;
+  leida: boolean;
+  accion: string;
+}
+
 
 const tipoConfig = {
-  critical: { label: 'Crítica', icon: AlertCircle, color: 'error', bgColor: 'bg-error-50', borderColor: 'border-error-200', textColor: 'text-error-800' },
+  critical: { label: 'Critica', icon: AlertCircle, color: 'error', bgColor: 'bg-error-50', borderColor: 'border-error-200', textColor: 'text-error-800' },
   warning: { label: 'Advertencia', icon: AlertTriangle, color: 'warning', bgColor: 'bg-warning-50', borderColor: 'border-warning-200', textColor: 'text-warning-800' },
-  info: { label: 'Información', icon: Info, color: 'info', bgColor: 'bg-info-50', borderColor: 'border-info-200', textColor: 'text-info-800' },
-  success: { label: 'Éxito', icon: CheckCircle, color: 'success', bgColor: 'bg-success-50', borderColor: 'border-success-200', textColor: 'text-success-800' },
+  info: { label: 'Informacion', icon: Info, color: 'info', bgColor: 'bg-info-50', borderColor: 'border-info-200', textColor: 'text-info-800' },
+  success: { label: 'Exito', icon: CheckCircle, color: 'success', bgColor: 'bg-success-50', borderColor: 'border-success-200', textColor: 'text-success-800' },
 };
 
 export const AlertasPage: React.FC = () => {
-  // Try real API
-  const { data: apiAlertas } = useAlertas();
+  // Real API data
+  const { data: apiAlertas, isLoading, isError } = useAlertas();
   const resolverMutation = useResolverAlerta();
 
-  // Merge API data with local state for optimistic UI
-  const [localAlertas, setLocalAlertas] = useState(alertasData);
-  const alertas = useMemo(() => {
-    if (apiAlertas?.items?.length) {
-      return apiAlertas.items.map((a: any, i: number) => ({
-        id: i + 1,
+  // Local state for optimistic updates
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+  const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
+
+  // Use only API data
+  const alertas: AlertaLocal[] = useMemo(() => {
+    const items = Array.isArray(apiAlertas?.items) ? apiAlertas.items : [];
+    return items
+      .filter((a: any) => !deletedIds.has(a.id))
+      .map((a: any) => ({
+        id: a.id,
         tipo: a.estado === 'PENDIENTE' ? 'critical' : a.estado === 'EN_REVISION' ? 'warning' : 'success',
         titulo: a.regla?.nombre || 'Alerta',
-        mensaje: typeof a.datos === 'string' ? (JSON.parse(a.datos)?.descripcion || a.datos) : 'Sin detalles',
+        mensaje: (() => {
+          try {
+            return typeof a.datos === 'string' ? (JSON.parse(a.datos)?.descripcion || a.datos) : 'Sin detalles';
+          } catch {
+            return String(a.datos || 'Sin detalles');
+          }
+        })(),
         fecha: a.createdAt,
-        leida: a.estado !== 'PENDIENTE',
+        leida: a.estado !== 'PENDIENTE' || resolvedIds.has(a.id),
         accion: 'Ver detalles',
       }));
-    }
-    return localAlertas;
-  }, [apiAlertas, localAlertas]);
-  const setAlertas = setLocalAlertas;
+  }, [apiAlertas, deletedIds, resolvedIds]);
+
   const [filtroTipo, setFiltroTipo] = useState<string>('todas');
   const [filtroLeidas, setFiltroLeidas] = useState<string>('todas');
   const [showClearModal, setShowClearModal] = useState(false);
 
   const alertasFiltradas = alertas.filter(alerta => {
     const matchTipo = filtroTipo === 'todas' || alerta.tipo === filtroTipo;
-    const matchLeidas = filtroLeidas === 'todas' || 
-      (filtroLeidas === 'leidas' && alerta.leida) || 
+    const matchLeidas = filtroLeidas === 'todas' ||
+      (filtroLeidas === 'leidas' && alerta.leida) ||
       (filtroLeidas === 'no-leidas' && !alerta.leida);
     return matchTipo && matchLeidas;
   });
 
   const noLeidasCount = alertas.filter(a => !a.leida).length;
 
-  const marcarComoLeida = (id: number) => {
-    setAlertas(alertas.map(a => a.id === id ? { ...a, leida: true } : a));
+  const marcarComoLeida = (id: string) => {
+    resolverMutation.mutate(
+      { id, notas: 'Marcada como leida' },
+      {
+        onSuccess: () => {
+          setResolvedIds(prev => new Set(prev).add(id));
+          toast.success('Alerta resuelta', 'La alerta fue marcada como leida');
+        },
+        onError: () => {
+          setResolvedIds(prev => new Set(prev).add(id));
+          toast.error('Error', 'No se pudo marcar la alerta como leida');
+        },
+      }
+    );
   };
 
   const marcarTodasComoLeidas = () => {
-    setAlertas(alertas.map(a => ({ ...a, leida: true })));
-    toast.success('Alertas marcadas', 'Todas las alertas fueron marcadas como leídas');
+    // For each unread alert, try to resolve via API
+    const noLeidas = alertas.filter(a => !a.leida);
+    let resolved = 0;
+    noLeidas.forEach(a => {
+      resolverMutation.mutate(
+        { id: a.id, notas: 'Marcada como leida (batch)' },
+        {
+          onSuccess: () => {
+            resolved++;
+            setResolvedIds(prev => new Set(prev).add(a.id));
+          },
+          onError: () => {
+            setResolvedIds(prev => new Set(prev).add(a.id));
+          },
+        }
+      );
+    });
+    toast.success('Alertas marcadas', 'Todas las alertas fueron marcadas como leidas');
   };
 
-  const eliminarAlerta = (id: number) => {
-    setAlertas(alertas.filter(a => a.id !== id));
-    toast.success('Alerta eliminada', 'La alerta fue eliminada correctamente');
+  const eliminarAlerta = (id: string) => {
+    alertaService.resolverAlerta(id, 'Eliminada por usuario').then(() => {
+      setDeletedIds(prev => new Set(prev).add(id));
+      toast.success('Alerta eliminada', 'La alerta fue eliminada correctamente');
+    }).catch(() => {
+      setDeletedIds(prev => new Set(prev).add(id));
+      toast.error('Error', 'No se pudo eliminar la alerta en el servidor');
+    });
   };
 
   const limpiarTodas = () => {
-    setAlertas([]);
+    const allIds = new Set(alertas.map(a => a.id));
+    setDeletedIds(allIds);
     setShowClearModal(false);
     toast.success('Alertas limpiadas', 'Todas las alertas fueron eliminadas');
   };
@@ -152,7 +150,7 @@ export const AlertasPage: React.FC = () => {
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const hours = Math.floor(diff / (1000 * 60 * 60));
-    
+
     if (hours < 1) return 'Hace minutos';
     if (hours < 24) return `Hace ${hours} hora${hours > 1 ? 's' : ''}`;
     return date.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
@@ -174,21 +172,25 @@ export const AlertasPage: React.FC = () => {
           <div>
             <h2 className="text-2xl font-bold text-neutral-900">Alertas</h2>
             <p className="text-neutral-600">
-              {noLeidasCount} alertas sin leer de {alertas.length} totales
+              {isLoading ? (
+                <span className="flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Cargando alertas...</span>
+              ) : (
+                <>{noLeidasCount} alertas sin leer de {alertas.length} totales {isError ? '(error al cargar)' : ''}</>
+              )}
             </p>
           </div>
         </div>
         <div className="flex gap-2">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             leftIcon={<Check size={18} />}
             onClick={marcarTodasComoLeidas}
             disabled={noLeidasCount === 0}
           >
             Marcar todas
           </Button>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             leftIcon={<Trash2 size={18} />}
             onClick={() => setShowClearModal(true)}
             disabled={alertas.length === 0}
@@ -212,10 +214,10 @@ export const AlertasPage: React.FC = () => {
               className="px-3 py-2 rounded-lg border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
             >
               <option value="todas">Todas las alertas</option>
-              <option value="critical">Críticas</option>
+              <option value="critical">Criticas</option>
               <option value="warning">Advertencias</option>
-              <option value="info">Información</option>
-              <option value="success">Éxito</option>
+              <option value="info">Informacion</option>
+              <option value="success">Exito</option>
             </select>
           </div>
           <select
@@ -224,8 +226,8 @@ export const AlertasPage: React.FC = () => {
             className="px-3 py-2 rounded-lg border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
           >
             <option value="todas">Todas</option>
-            <option value="no-leidas">No leídas</option>
-            <option value="leidas">Leídas</option>
+            <option value="no-leidas">No leidas</option>
+            <option value="leidas">Leidas</option>
           </select>
         </div>
       </Card>
@@ -245,33 +247,33 @@ export const AlertasPage: React.FC = () => {
         ) : (
           alertasFiltradas.map((alerta) => {
             const config = tipoConfig[alerta.tipo as keyof typeof tipoConfig];
-            const Icon = config.icon;
-            
+            const Icon = config?.icon || Info;
+
             return (
               <div
                 key={alerta.id}
                 className={`
                   relative p-4 rounded-xl border-l-4 transition-all
-                  ${config.bgColor} ${config.borderColor}
+                  ${config?.bgColor || 'bg-neutral-50'} ${config?.borderColor || 'border-neutral-200'}
                   ${!alerta.leida ? 'shadow-sm' : 'opacity-75'}
                 `}
               >
                 <div className="flex items-start gap-4">
-                  <div className={`p-2 rounded-lg bg-white ${config.textColor}`}>
+                  <div className={`p-2 rounded-lg bg-white ${config?.textColor || 'text-neutral-800'}`}>
                     <Icon size={20} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <h4 className={`font-semibold ${config.textColor}`}>{alerta.titulo}</h4>
+                          <h4 className={`font-semibold ${config?.textColor || 'text-neutral-800'}`}>{alerta.titulo}</h4>
                           {!alerta.leida && (
-                            <Badge variant="solid" color={config.color as any} size="sm">
+                            <Badge variant="solid" color={config?.color as any || 'neutral'} size="sm">
                               Nueva
                             </Badge>
                           )}
                         </div>
-                        <p className={`text-sm ${config.textColor} opacity-90`}>
+                        <p className={`text-sm ${config?.textColor || 'text-neutral-800'} opacity-90`}>
                           {alerta.mensaje}
                         </p>
                       </div>
@@ -281,27 +283,28 @@ export const AlertasPage: React.FC = () => {
                       </span>
                     </div>
                     <div className="flex items-center gap-3 mt-3">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         className="h-8"
                       >
                         {alerta.accion}
                       </Button>
                       {!alerta.leida && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           className="h-8"
                           onClick={() => marcarComoLeida(alerta.id)}
+                          disabled={resolverMutation.isPending}
                         >
                           <Check size={14} className="mr-1" />
-                          Marcar leída
+                          Marcar leida
                         </Button>
                       )}
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         className="h-8 text-neutral-400 hover:text-error-500 ml-auto"
                         onClick={() => eliminarAlerta(alerta.id)}
                       >
@@ -316,14 +319,14 @@ export const AlertasPage: React.FC = () => {
         )}
       </div>
 
-      {/* Modal de confirmación */}
+      {/* Modal de confirmacion */}
       <ConfirmModal
         isOpen={showClearModal}
         onClose={() => setShowClearModal(false)}
         onConfirm={limpiarTodas}
         title="Limpiar todas las alertas"
-        description="¿Estás seguro de que deseas eliminar todas las alertas? Esta acción no se puede deshacer."
-        confirmText="Sí, limpiar"
+        description="Estas seguro de que deseas eliminar todas las alertas? Esta accion no se puede deshacer."
+        confirmText="Si, limpiar"
         cancelText="Cancelar"
         variant="danger"
       />

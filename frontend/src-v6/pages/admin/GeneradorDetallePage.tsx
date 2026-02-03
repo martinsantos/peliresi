@@ -29,75 +29,17 @@ import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Tabs, TabList, Tab, TabPanel } from '../../components/ui/Tabs';
+import { useGenerador } from '../../hooks/useActores';
 
-// Mock data — se reemplazará por API real
-const generadoresData: Record<string, any> = {
-  '1': {
-    id: 1,
-    razonSocial: 'Química Mendoza S.A.',
-    cuit: '30-12345678-9',
-    domicilio: 'Av. San Martín 1234, Mendoza',
-    telefono: '+54 261 412-3456',
-    email: 'contacto@quimicamendoza.com',
-    estado: 'activo',
-    categoria: 'Grandes Generadores',
-    inscripcionDGFA: 'DGFA-2019-00145',
-    fechaAlta: '2019-03-15',
-    responsableAmbiental: { nombre: 'Ing. Carlos López', matricula: 'MP-4521', telefono: '+54 261 555-1234' },
-    manifiestos: { total: 145, activos: 8, completados: 132, rechazados: 5 },
-    residuosMensuales: [
-      { mes: 'Ago', valor: 180 }, { mes: 'Sep', valor: 210 }, { mes: 'Oct', valor: 195 },
-      { mes: 'Nov', valor: 240 }, { mes: 'Dic', valor: 220 }, { mes: 'Ene', valor: 260 },
-    ],
-    tiposResiduos: [
-      { tipo: 'Y02 - Aceites minerales', porcentaje: 35 },
-      { tipo: 'Y12 - Solventes orgánicos', porcentaje: 25 },
-      { tipo: 'Y45 - Empaques contaminados', porcentaje: 20 },
-      { tipo: 'Y18 - Residuos de laboratorio', porcentaje: 20 },
-    ],
-    transportistas: ['Transportes Rápidos S.A.', 'Logística EcoTrans', 'Mendoza Cargo Express'],
-    operadores: ['Planta Norte', 'Operador Sur'],
-    ultimosManifiestos: [
-      { id: 'M-2025-089', fecha: '2025-01-31', estado: 'EN_TRANSITO', peso: 2450, transportista: 'Transportes Rápidos S.A.' },
-      { id: 'M-2025-085', fecha: '2025-01-29', estado: 'TRATADO', peso: 1500, transportista: 'Logística EcoTrans' },
-      { id: 'M-2025-078', fecha: '2025-01-25', estado: 'TRATADO', peso: 3200, transportista: 'Mendoza Cargo Express' },
-      { id: 'M-2025-071', fecha: '2025-01-22', estado: 'TRATADO', peso: 1800, transportista: 'Transportes Rápidos S.A.' },
-      { id: 'M-2025-065', fecha: '2025-01-18', estado: 'RECHAZADO', peso: 950, transportista: 'Logística EcoTrans' },
-    ],
-  },
-  '2': {
-    id: 2,
-    razonSocial: 'Industrias del Sur',
-    cuit: '30-11111111-1',
-    domicilio: 'Parque Industrial, Luján',
-    telefono: '+54 261 234-5678',
-    email: 'info@industriasdelsur.com',
-    estado: 'activo',
-    categoria: 'Medianos Generadores',
-    inscripcionDGFA: 'DGFA-2020-00289',
-    fechaAlta: '2020-06-10',
-    responsableAmbiental: { nombre: 'Lic. María Fernández', matricula: 'MP-6732', telefono: '+54 261 555-5678' },
-    manifiestos: { total: 89, activos: 3, completados: 82, rechazados: 4 },
-    residuosMensuales: [
-      { mes: 'Ago', valor: 120 }, { mes: 'Sep', valor: 140 }, { mes: 'Oct', valor: 110 },
-      { mes: 'Nov', valor: 160 }, { mes: 'Dic', valor: 150 }, { mes: 'Ene', valor: 170 },
-    ],
-    tiposResiduos: [
-      { tipo: 'Y12 - Solventes orgánicos', porcentaje: 40 },
-      { tipo: 'Y45 - Empaques contaminados', porcentaje: 35 },
-      { tipo: 'Y02 - Aceites minerales', porcentaje: 25 },
-    ],
-    transportistas: ['Transportes Rápidos S.A.', 'Mendoza Cargo Express'],
-    operadores: ['Planta Norte'],
-    ultimosManifiestos: [
-      { id: 'M-2025-088', fecha: '2025-01-31', estado: 'APROBADO', peso: 1800, transportista: 'Transportes Rápidos S.A.' },
-      { id: 'M-2025-080', fecha: '2025-01-27', estado: 'TRATADO', peso: 2100, transportista: 'Mendoza Cargo Express' },
-    ],
-  },
+const EMPTY_DEFAULTS = {
+  responsableAmbiental: { nombre: '-', matricula: '-', telefono: '-' },
+  manifiestos: { total: 0, activos: 0, completados: 0, rechazados: 0 },
+  residuosMensuales: [] as any[],
+  tiposResiduos: [] as any[],
+  transportistas: [] as string[],
+  operadores: [] as string[],
+  ultimosManifiestos: [] as any[],
 };
-
-// Fallback for unknown IDs
-const defaultGenerador = generadoresData['1'];
 
 const estadoManifiestoColor: Record<string, string> = {
   EN_TRANSITO: 'info',
@@ -113,9 +55,42 @@ const GeneradorDetallePage: React.FC = () => {
   const location = useLocation();
   const isMobile = location.pathname.startsWith('/mobile');
 
-  const generador = generadoresData[id || ''] || defaultGenerador;
+  const { data: apiGenerador, isLoading, isError } = useGenerador(id || '');
+
+  // Build generador from API data with safe defaults
+  const generador = apiGenerador ? {
+    ...apiGenerador,
+    estado: (apiGenerador as any).activo !== false ? 'activo' : 'inactivo',
+    inscripcionDGFA: (apiGenerador as any).numeroInscripcion || '-',
+    fechaAlta: (apiGenerador as any).createdAt ? new Date((apiGenerador as any).createdAt).toISOString().split('T')[0] : '-',
+    responsableAmbiental: (apiGenerador as any).responsableAmbiental || EMPTY_DEFAULTS.responsableAmbiental,
+    manifiestos: (apiGenerador as any).manifiestos || EMPTY_DEFAULTS.manifiestos,
+    residuosMensuales: (apiGenerador as any).residuosMensuales || EMPTY_DEFAULTS.residuosMensuales,
+    tiposResiduos: (apiGenerador as any).tiposResiduos || EMPTY_DEFAULTS.tiposResiduos,
+    transportistas: (apiGenerador as any).transportistas || EMPTY_DEFAULTS.transportistas,
+    operadores: (apiGenerador as any).operadores || EMPTY_DEFAULTS.operadores,
+    ultimosManifiestos: (apiGenerador as any).ultimosManifiestos || EMPTY_DEFAULTS.ultimosManifiestos,
+  } : null;
 
   const backPath = isMobile ? '/mobile/admin/generadores' : '/admin/generadores';
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>Volver</Button>
+        </div>
+        <Card className="py-12">
+          <div className="text-center">
+            <div className="animate-spin w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full mx-auto mb-4" />
+            <p className="text-neutral-500">Cargando generador...</p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!generador) return null;
 
   return (
     <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
@@ -271,25 +246,24 @@ const GeneradorDetallePage: React.FC = () => {
         {/* Tab: Manifiestos */}
         <TabPanel id="manifiestos">
           <Card padding="none">
-            <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full table-fixed">
                 <thead className="bg-[#F5F5F3] border-b border-neutral-200">
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">Manifiesto</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">Fecha</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">Estado</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">Peso</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">Transportista</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '20%' }}>Manifiesto</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '18%' }}>Fecha</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '20%' }}>Estado</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider hidden md:table-cell" style={{ width: '18%' }}>Peso</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider truncate hidden md:table-cell" style={{ width: '24%' }}>Transportista</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
-                  {generador.ultimosManifiestos.map((m: any) => (
+                  {(generador.ultimosManifiestos || []).map((m: any) => (
                     <tr
                       key={m.id}
                       className="hover:bg-neutral-50 transition-colors cursor-pointer group"
                       onClick={() => navigate(isMobile ? `/mobile/manifiestos/${m.id}` : `/manifiestos/${m.id}`)}
                     >
-                      <td className="px-6 py-4">
+                      <td className="px-3 py-2.5">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-primary-50 rounded-lg flex items-center justify-center text-primary-600">
                             <FileText size={16} />
@@ -299,19 +273,18 @@ const GeneradorDetallePage: React.FC = () => {
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-neutral-600">{m.fecha}</td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 py-2.5 text-neutral-600">{m.fecha || '-'}</td>
+                      <td className="px-3 py-2.5">
                         <Badge variant="soft" color={estadoManifiestoColor[m.estado] || 'neutral'}>
-                          {m.estado.replace(/_/g, ' ')}
+                          {String(m.estado || '').replace(/_/g, ' ')}
                         </Badge>
                       </td>
-                      <td className="px-6 py-4 font-medium text-neutral-700">{m.peso.toLocaleString('es-AR')} kg</td>
-                      <td className="px-6 py-4 text-neutral-600">{m.transportista}</td>
+                      <td className="px-3 py-2.5 font-medium text-neutral-700 hidden md:table-cell">{(m.peso ?? 0).toLocaleString('es-AR')} kg</td>
+                      <td className="px-3 py-2.5 text-neutral-600 truncate hidden md:table-cell">{m.transportista || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
           </Card>
         </TabPanel>
 
@@ -322,9 +295,10 @@ const GeneradorDetallePage: React.FC = () => {
               <CardHeader title="Volumen Generado por Mes (Tn)" icon={<TrendingUp size={20} />} />
               <CardContent>
                 <div className="h-48 flex items-end gap-3">
-                  {generador.residuosMensuales.map((item: any) => {
-                    const maxVal = Math.max(...generador.residuosMensuales.map((r: any) => r.valor));
-                    const heightPct = (item.valor / maxVal) * 100;
+                  {(generador.residuosMensuales || []).map((item: any) => {
+                    const vals = (generador.residuosMensuales || []).map((r: any) => r.valor || 0);
+                    const maxVal = vals.length > 0 ? Math.max(...vals) : 1;
+                    const heightPct = maxVal > 0 ? (item.valor / maxVal) * 100 : 0;
                     return (
                       <div key={item.mes} className="flex-1 flex flex-col items-center gap-2">
                         <span className="text-xs font-medium text-neutral-700">{item.valor}</span>

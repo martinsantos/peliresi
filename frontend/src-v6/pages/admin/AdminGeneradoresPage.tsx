@@ -1,15 +1,15 @@
 /**
  * SITREP v6 - Admin Generadores Page
  * ==================================
- * Panel administrativo específico para generadores
+ * Panel administrativo especifico para generadores
  */
 
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  Factory, 
-  Plus, 
-  Search, 
+  Factory,
+  Plus,
+  Search,
   FileText,
   TrendingUp,
   AlertTriangle,
@@ -18,86 +18,160 @@ import {
   Phone,
   Mail,
   Edit,
-  Eye
+  Eye,
+  Trash2,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/BadgeV2';
+import { Modal, ConfirmModal } from '../../components/ui/Modal';
+import {
+  useGeneradores,
+  useCreateGenerador,
+  useUpdateGenerador,
+  useDeleteGenerador,
+} from '../../hooks/useActores';
 
-// Mock data
-const generadoresData = [
-  { 
-    id: 1, 
-    razonSocial: 'Química Mendoza S.A.', 
-    cuit: '30-12345678-9',
-    domicilio: 'Av. San Martín 1234, Mendoza',
-    telefono: '+54 261 412-3456',
-    email: 'contacto@quimicamendoza.com',
-    estado: 'activo',
-    manifiestos: 145,
-    residuos: 420,
-    ultimoManifiesto: '2025-01-31',
-    categoria: 'Grandes Generadores'
-  },
-  { 
-    id: 2, 
-    razonSocial: 'Industrias del Sur', 
-    cuit: '30-11111111-1',
-    domicilio: 'Parque Industrial, Luján',
-    telefono: '+54 261 234-5678',
-    email: 'info@industriasdelsur.com',
-    estado: 'activo',
-    manifiestos: 89,
-    residuos: 280,
-    ultimoManifiesto: '2025-01-30',
-    categoria: 'Medianos Generadores'
-  },
-  { 
-    id: 3, 
-    razonSocial: 'Metalúrgica Argentina', 
-    cuit: '30-22222222-2',
-    domicilio: 'Ruta 40 Km 15, Guaymallén',
-    telefono: '+54 261 345-6789',
-    email: 'admin@metalargentina.com',
-    estado: 'alerta',
-    manifiestos: 34,
-    residuos: 120,
-    ultimoManifiesto: '2025-01-15',
-    categoria: 'Medianos Generadores'
-  },
-  { 
-    id: 4, 
-    razonSocial: 'Textil Cuyo', 
-    cuit: '30-33333333-3',
-    domicilio: 'Av. España 567, Godoy Cruz',
-    telefono: '+54 261 456-7890',
-    email: 'info@textilcuyo.com',
-    estado: 'activo',
-    manifiestos: 67,
-    residuos: 195,
-    ultimoManifiesto: '2025-01-29',
-    categoria: 'Pequeños Generadores'
-  },
-];
+
+const INITIAL_FORM = {
+  razonSocial: '',
+  cuit: '',
+  domicilio: '',
+  telefono: '',
+  email: '',
+  password: '',
+  nombre: '',
+  numeroInscripcion: '',
+  categoria: '',
+};
 
 const AdminGeneradoresPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = location.pathname.startsWith('/mobile');
   const [busqueda, setBusqueda] = useState('');
+  const [modalCrear, setModalCrear] = useState(false);
+  const [modalEditar, setModalEditar] = useState(false);
+  const [modalEliminar, setModalEliminar] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; razonSocial: string } | null>(null);
+  const [form, setForm] = useState(INITIAL_FORM);
 
-  const generadoresFiltrados = generadoresData.filter(g => 
-    g.razonSocial.toLowerCase().includes(busqueda.toLowerCase()) ||
-    g.cuit.includes(busqueda)
+  // API hooks
+  const { data: apiData, isLoading, isError } = useGeneradores();
+  const createMutation = useCreateGenerador();
+  const updateMutation = useUpdateGenerador();
+  const deleteMutation = useDeleteGenerador();
+
+  const generadoresData = Array.isArray(apiData?.items) ? apiData.items : [];
+
+  const generadoresFiltrados = generadoresData.filter((g: any) =>
+    String(g.razonSocial || '').toLowerCase().includes(busqueda.toLowerCase()) ||
+    String(g.cuit || '').includes(busqueda)
   );
 
   const stats = {
-    total: generadoresData.length,
-    activos: generadoresData.filter(g => g.estado === 'activo').length,
-    alertas: generadoresData.filter(g => g.estado === 'alerta').length,
-    totalResiduos: generadoresData.reduce((acc, g) => acc + g.residuos, 0),
+    total: apiData?.total ?? generadoresData.length,
+    activos: generadoresData.filter((g: any) => g.activo !== false).length,
+    alertas: generadoresData.filter((g: any) => g.activo === false).length,
   };
+
+  const updateField = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }));
+
+  const handleCrear = async () => {
+    try {
+      await createMutation.mutateAsync({
+        email: form.email,
+        password: form.password || 'TempPass123!',
+        nombre: form.nombre || form.razonSocial,
+        razonSocial: form.razonSocial,
+        cuit: form.cuit,
+        domicilio: form.domicilio,
+        telefono: form.telefono,
+        numeroInscripcion: form.numeroInscripcion,
+        categoria: form.categoria,
+      });
+      setModalCrear(false);
+      setForm(INITIAL_FORM);
+    } catch (err) {
+      console.error('Error creando generador:', err);
+    }
+  };
+
+  const handleEditar = async () => {
+    if (!editId) return;
+    try {
+      await updateMutation.mutateAsync({
+        id: editId,
+        data: {
+          razonSocial: form.razonSocial,
+          cuit: form.cuit,
+          domicilio: form.domicilio,
+          telefono: form.telefono,
+          email: form.email,
+          numeroInscripcion: form.numeroInscripcion,
+          categoria: form.categoria,
+        },
+      });
+      setModalEditar(false);
+      setEditId(null);
+      setForm(INITIAL_FORM);
+    } catch (err) {
+      console.error('Error actualizando generador:', err);
+    }
+  };
+
+  const openEditar = (generador: any) => {
+    setEditId(generador.id);
+    setForm({
+      razonSocial: generador.razonSocial || '',
+      cuit: generador.cuit || '',
+      domicilio: generador.domicilio || '',
+      telefono: generador.telefono || '',
+      email: generador.email || '',
+      password: '',
+      nombre: '',
+      numeroInscripcion: generador.numeroInscripcion || '',
+      categoria: generador.categoria || '',
+    });
+    setModalEditar(true);
+  };
+
+  const handleEliminar = async () => {
+    if (!deleteTarget) return;
+    try {
+      await deleteMutation.mutateAsync(deleteTarget.id);
+      setModalEliminar(false);
+      setDeleteTarget(null);
+    } catch (err) {
+      console.error('Error eliminando generador:', err);
+    }
+  };
+
+  const renderForm = () => (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <Input label="Razon Social" value={form.razonSocial} onChange={(e) => updateField('razonSocial', e.target.value)} placeholder="Empresa S.A." />
+        <Input label="CUIT" value={form.cuit} onChange={(e) => updateField('cuit', e.target.value)} placeholder="30-12345678-9" />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <Input label="Email" type="email" value={form.email} onChange={(e) => updateField('email', e.target.value)} placeholder="contacto@empresa.com" />
+        <Input label="Telefono" value={form.telefono} onChange={(e) => updateField('telefono', e.target.value)} placeholder="+54 261 ..." />
+      </div>
+      <Input label="Domicilio" value={form.domicilio} onChange={(e) => updateField('domicilio', e.target.value)} placeholder="Av. San Martin 1234, Mendoza" />
+      <div className="grid grid-cols-2 gap-4">
+        <Input label="N. Inscripcion" value={form.numeroInscripcion} onChange={(e) => updateField('numeroInscripcion', e.target.value)} placeholder="DGFA-2024-XXXX" />
+        <Input label="Categoria" value={form.categoria} onChange={(e) => updateField('categoria', e.target.value)} placeholder="Grandes Generadores" />
+      </div>
+      {!editId && (
+        <div className="grid grid-cols-2 gap-4">
+          <Input label="Nombre Responsable" value={form.nombre} onChange={(e) => updateField('nombre', e.target.value)} placeholder="Juan Perez" />
+          <Input label="Password inicial" type="password" value={form.password} onChange={(e) => updateField('password', e.target.value)} placeholder="Min. 8 caracteres" />
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -109,10 +183,10 @@ const AdminGeneradoresPage: React.FC = () => {
           </div>
           <div>
             <h2 className="text-2xl font-bold text-neutral-900">Admin Generadores</h2>
-            <p className="text-neutral-600">Panel de gestión de generadores de residuos</p>
+            <p className="text-neutral-600">Panel de gestion de generadores de residuos</p>
           </div>
         </div>
-        <Button leftIcon={<Plus size={18} />}>
+        <Button leftIcon={<Plus size={18} />} onClick={() => { setForm(INITIAL_FORM); setModalCrear(true); }}>
           Nuevo Generador
         </Button>
       </div>
@@ -139,15 +213,15 @@ const AdminGeneradoresPage: React.FC = () => {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-neutral-600 mb-1">Total Residuos (tn)</p>
-            <p className="text-3xl font-bold text-neutral-900">{stats.totalResiduos}</p>
+            <p className="text-sm text-neutral-600 mb-1">Total Registros</p>
+            <p className="text-3xl font-bold text-neutral-900">{generadoresFiltrados.length}</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Gráfico de tendencia */}
+      {/* Grafico de tendencia */}
       <Card>
-        <CardHeader title="Generación de Residuos por Mes" icon={<TrendingUp size={20} />} />
+        <CardHeader title="Generacion de Residuos por Mes" icon={<TrendingUp size={20} />} />
         <CardContent>
           <div className="h-48 flex items-end gap-4">
             {['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'].map((mes, i) => (
@@ -169,90 +243,166 @@ const AdminGeneradoresPage: React.FC = () => {
         <div className="flex gap-4">
           <div className="flex-1">
             <Input
-              placeholder="Buscar por razón social o CUIT..."
+              placeholder="Buscar por razon social o CUIT..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               leftIcon={<Search size={18} />}
             />
           </div>
           <select className="px-4 py-2 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none">
-            <option value="">Todas las categorías</option>
+            <option value="">Todas las categorias</option>
             <option value="grandes">Grandes Generadores</option>
             <option value="medianos">Medianos Generadores</option>
-            <option value="pequenos">Pequeños Generadores</option>
+            <option value="pequenos">Pequenos Generadores</option>
           </select>
         </div>
       </Card>
 
+      {/* Loading */}
+      {isLoading && (
+        <Card className="py-12">
+          <div className="text-center">
+            <div className="animate-spin w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full mx-auto mb-4" />
+            <p className="text-neutral-500">Cargando generadores...</p>
+          </div>
+        </Card>
+      )}
+
       {/* Lista de generadores */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {generadoresFiltrados.map((generador) => (
-          <Card key={generador.id} className="hover:shadow-md transition-shadow">
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-                    <Factory size={24} className="text-purple-600" />
+      {!isLoading && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {generadoresFiltrados.map((generador: any) => (
+            <Card key={generador.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                      <Factory size={24} className="text-purple-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-neutral-900">{generador.razonSocial}</h4>
+                      <p className="text-sm text-neutral-500 font-mono">{generador.cuit}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-semibold text-neutral-900">{generador.razonSocial}</h4>
-                    <p className="text-sm text-neutral-500 font-mono">{generador.cuit}</p>
+                  <Badge
+                    variant="soft"
+                    color={generador.activo !== false ? 'success' : 'warning'}
+                  >
+                    {generador.activo !== false ? <CheckCircle size={12} className="mr-1" /> : <AlertTriangle size={12} className="mr-1" />}
+                    {generador.activo !== false ? 'Activo' : 'Inactivo'}
+                  </Badge>
+                </div>
+
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center gap-2 text-sm text-neutral-600">
+                    <MapPin size={14} />
+                    <span>{generador.domicilio}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-neutral-600">
+                    <Mail size={14} />
+                    <span>{generador.email}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-neutral-600">
+                    <Phone size={14} />
+                    <span>{generador.telefono}</span>
                   </div>
                 </div>
-                <Badge 
-                  variant="soft" 
-                  color={generador.estado === 'activo' ? 'success' : 'warning'}
-                >
-                  {generador.estado === 'activo' ? <CheckCircle size={12} className="mr-1" /> : <AlertTriangle size={12} className="mr-1" />}
-                  {generador.estado === 'activo' ? 'Activo' : 'Alerta'}
-                </Badge>
-              </div>
 
-              <div className="space-y-2 mb-4">
-                <div className="flex items-center gap-2 text-sm text-neutral-600">
-                  <MapPin size={14} />
-                  <span>{generador.domicilio}</span>
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  <div className="bg-neutral-50 rounded-lg p-2 text-center">
+                    <p className="text-sm font-bold text-neutral-900">{generador.categoria || '-'}</p>
+                    <p className="text-xs text-neutral-500">Categoria</p>
+                  </div>
+                  <div className="bg-neutral-50 rounded-lg p-2 text-center">
+                    <p className="text-sm font-bold text-neutral-900">{generador.numeroInscripcion || '-'}</p>
+                    <p className="text-xs text-neutral-500">Inscripcion</p>
+                  </div>
+                  <div className="bg-neutral-50 rounded-lg p-2 text-center">
+                    <p className="text-xs font-medium text-neutral-900">{generador.createdAt ? new Date(generador.createdAt).toLocaleDateString() : '-'}</p>
+                    <p className="text-xs text-neutral-500">Alta</p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-neutral-600">
-                  <Mail size={14} />
-                  <span>{generador.email}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-neutral-600">
-                  <Phone size={14} />
-                  <span>{generador.telefono}</span>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-3 gap-2 mb-4">
-                <div className="bg-neutral-50 rounded-lg p-2 text-center">
-                  <p className="text-lg font-bold text-neutral-900">{generador.manifiestos}</p>
-                  <p className="text-xs text-neutral-500">Manifiestos</p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="flex-1" leftIcon={<Eye size={14} />} onClick={() => navigate(isMobile ? `/mobile/admin/generadores/${generador.id}` : `/admin/generadores/${generador.id}`)}>
+                    Ver
+                  </Button>
+                  <Button variant="outline" size="sm" className="flex-1" leftIcon={<Edit size={14} />} onClick={() => openEditar(generador)}>
+                    Editar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="p-2 text-error-500 hover:text-error-600"
+                    onClick={() => { setDeleteTarget({ id: generador.id, razonSocial: generador.razonSocial }); setModalEliminar(true); }}
+                  >
+                    <Trash2 size={14} />
+                  </Button>
                 </div>
-                <div className="bg-neutral-50 rounded-lg p-2 text-center">
-                  <p className="text-lg font-bold text-neutral-900">{generador.residuos}</p>
-                  <p className="text-xs text-neutral-500">Tn Residuos</p>
-                </div>
-                <div className="bg-neutral-50 rounded-lg p-2 text-center">
-                  <p className="text-xs font-medium text-neutral-900">{generador.ultimoManifiesto}</p>
-                  <p className="text-xs text-neutral-500">Último</p>
-                </div>
-              </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1" leftIcon={<Eye size={14} />} onClick={() => navigate(isMobile ? `/mobile/admin/generadores/${generador.id}` : `/admin/generadores/${generador.id}`)}>
-                  Ver
-                </Button>
-                <Button variant="outline" size="sm" className="flex-1" leftIcon={<Edit size={14} />}>
-                  Editar
-                </Button>
-                <Button variant="outline" size="sm" className="flex-1" leftIcon={<FileText size={14} />} onClick={() => navigate(isMobile ? `/mobile/admin/generadores/${generador.id}` : `/admin/generadores/${generador.id}`)}>
-                  Manifiestos
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {/* Empty state */}
+      {!isLoading && generadoresFiltrados.length === 0 && (
+        <Card className="py-16">
+          <div className="text-center">
+            <Factory className="mx-auto text-neutral-300 mb-3" size={40} />
+            <h3 className="text-lg font-medium text-neutral-900 mb-1">No se encontraron generadores</h3>
+            <p className="text-neutral-500">Intenta con otros terminos de busqueda</p>
+          </div>
+        </Card>
+      )}
+
+      {/* Modal crear */}
+      <Modal
+        isOpen={modalCrear}
+        onClose={() => { setModalCrear(false); setForm(INITIAL_FORM); }}
+        title="Nuevo Generador"
+        size="lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => { setModalCrear(false); setForm(INITIAL_FORM); }}>Cancelar</Button>
+            <Button onClick={handleCrear} disabled={createMutation.isPending}>
+              {createMutation.isPending ? 'Guardando...' : 'Crear Generador'}
+            </Button>
+          </>
+        }
+      >
+        {renderForm()}
+      </Modal>
+
+      {/* Modal editar */}
+      <Modal
+        isOpen={modalEditar}
+        onClose={() => { setModalEditar(false); setEditId(null); setForm(INITIAL_FORM); }}
+        title="Editar Generador"
+        size="lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => { setModalEditar(false); setEditId(null); setForm(INITIAL_FORM); }}>Cancelar</Button>
+            <Button onClick={handleEditar} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? 'Guardando...' : 'Guardar Cambios'}
+            </Button>
+          </>
+        }
+      >
+        {renderForm()}
+      </Modal>
+
+      {/* Modal eliminar */}
+      <ConfirmModal
+        isOpen={modalEliminar}
+        onClose={() => { setModalEliminar(false); setDeleteTarget(null); }}
+        onConfirm={handleEliminar}
+        title="Eliminar Generador"
+        description={`Esta seguro que desea eliminar a "${deleteTarget?.razonSocial}"? Esta accion no se puede deshacer.`}
+        confirmText="Eliminar"
+        variant="danger"
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   );
 };

@@ -31,91 +31,20 @@ import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Tabs, TabList, Tab, TabPanel } from '../../components/ui/Tabs';
+import { useTransportista } from '../../hooks/useActores';
 
-// Mock data
-const transportistasData: Record<string, any> = {
-  '1': {
-    id: 1,
-    nombre: 'Transportes Rápidos S.A.',
-    cuit: '30-12345678-9',
-    direccion: 'Av. Libertador 1234, Mendoza',
-    telefono: '+54 261 456-7890',
-    email: 'contacto@transportesrapidos.com',
-    estado: 'ACTIVO',
-    habilitacion: 'HAB-TR-2023-0456',
-    vencimientoHab: '2025-12-31',
-    areasCobertura: ['Mendoza Capital', 'Godoy Cruz', 'Maipú', 'Guaymallén', 'Las Heras'],
-    certificaciones: ['SENASA', 'CNRT'],
-    rating: 4.8,
-    flota: [
-      { patente: 'AB 123 CD', tipo: 'Camión cisterna', capacidad: '15,000 lt', estado: 'Activo', vencimientoVTV: '2025-06-15' },
-      { patente: 'EF 456 GH', tipo: 'Camión volteo', capacidad: '12 tn', estado: 'Activo', vencimientoVTV: '2025-08-20' },
-      { patente: 'IJ 789 KL', tipo: 'Camión cerrado', capacidad: '8 tn', estado: 'En taller', vencimientoVTV: '2025-04-10' },
-      { patente: 'MN 012 OP', tipo: 'Camión cisterna', capacidad: '20,000 lt', estado: 'Activo', vencimientoVTV: '2025-11-30' },
-    ],
-    conductores: [
-      { nombre: 'Juan Pérez', dni: '28.456.789', licencia: 'A5', categoria: 'Profesional', vencimiento: '2026-03-15' },
-      { nombre: 'Carlos Gómez', dni: '31.234.567', licencia: 'A5', categoria: 'Profesional', vencimiento: '2025-09-20' },
-      { nombre: 'Roberto Sánchez', dni: '35.678.901', licencia: 'A4', categoria: 'Profesional', vencimiento: '2025-12-01' },
-    ],
-    manifiestos: {
-      completados: 132,
-      enTransito: 8,
-      incidencias: 2,
-    },
-    ultimosManifiestos: [
-      { id: 'M-2025-089', fecha: '2025-01-31', estado: 'EN_TRANSITO', peso: 2450, generador: 'Química Mendoza S.A.' },
-      { id: 'M-2025-086', fecha: '2025-01-30', estado: 'TRATADO', peso: 950, generador: 'Plásticos Argentinos' },
-      { id: 'M-2025-082', fecha: '2025-01-28', estado: 'TRATADO', peso: 3200, generador: 'Metalúrgica Argentina' },
-      { id: 'M-2025-075', fecha: '2025-01-24', estado: 'TRATADO', peso: 1800, generador: 'Industrias del Sur' },
-    ],
-    rendimiento: {
-      viajesMes: 45,
-      viajesTotal: 520,
-      incidenciasMes: 1,
-      incidenciasTotal: 12,
-      tiempoPromedioEntrega: '4.2 hrs',
-      satisfaccion: 96,
-    },
-  },
-  '2': {
-    id: 2,
-    nombre: 'Logística EcoTrans',
-    cuit: '30-87654321-0',
-    direccion: 'Ruta 40 Km 500, Luján de Cuyo',
-    telefono: '+54 261 234-5678',
-    email: 'info@ecotrans.com',
-    estado: 'ACTIVO',
-    habilitacion: 'HAB-TR-2022-0321',
-    vencimientoHab: '2025-06-30',
-    areasCobertura: ['Luján de Cuyo', 'Chacras de Coria'],
-    certificaciones: ['SENASA'],
-    rating: 4.5,
-    flota: [
-      { patente: 'QR 345 ST', tipo: 'Camión cisterna', capacidad: '10,000 lt', estado: 'Activo', vencimientoVTV: '2025-07-10' },
-      { patente: 'UV 678 WX', tipo: 'Camión cerrado', capacidad: '6 tn', estado: 'Activo', vencimientoVTV: '2025-09-05' },
-    ],
-    conductores: [
-      { nombre: 'Luis Martínez', dni: '29.123.456', licencia: 'A5', categoria: 'Profesional', vencimiento: '2026-01-10' },
-      { nombre: 'Diego Torres', dni: '33.789.012', licencia: 'A4', categoria: 'Profesional', vencimiento: '2025-07-15' },
-    ],
-    manifiestos: { completados: 88, enTransito: 5, incidencias: 5 },
-    ultimosManifiestos: [
-      { id: 'M-2025-085', fecha: '2025-01-29', estado: 'ENTREGADO', peso: 1500, generador: 'Textil Cuyo' },
-      { id: 'M-2025-079', fecha: '2025-01-26', estado: 'TRATADO', peso: 2100, generador: 'Industrias del Sur' },
-    ],
-    rendimiento: {
-      viajesMes: 28,
-      viajesTotal: 310,
-      incidenciasMes: 2,
-      incidenciasTotal: 18,
-      tiempoPromedioEntrega: '5.1 hrs',
-      satisfaccion: 89,
-    },
+const EMPTY_DEFAULTS = {
+  areasCobertura: [] as string[],
+  certificaciones: [] as string[],
+  flota: [] as any[],
+  conductores: [] as any[],
+  manifiestos: { completados: 0, enTransito: 0, incidencias: 0 },
+  ultimosManifiestos: [] as any[],
+  rendimiento: {
+    viajesMes: 0, viajesTotal: 0, incidenciasMes: 0, incidenciasTotal: 0,
+    tiempoPromedioEntrega: '-', satisfaccion: 0,
   },
 };
-
-const defaultTransportista = transportistasData['1'];
 
 const estadoManifiestoColor: Record<string, string> = {
   EN_TRANSITO: 'info',
@@ -136,8 +65,45 @@ const TransportistaDetallePage: React.FC = () => {
   const location = useLocation();
   const isMobile = location.pathname.startsWith('/mobile');
 
-  const transportista = transportistasData[id || ''] || defaultTransportista;
+  const { data: apiTransportista, isLoading, isError } = useTransportista(id || '');
+
+  // Build transportista from API data with safe defaults
+  const transportista = apiTransportista ? {
+    ...apiTransportista,
+    nombre: (apiTransportista as any).razonSocial || '-',
+    direccion: (apiTransportista as any).domicilio || '-',
+    estado: (apiTransportista as any).activo !== false ? 'ACTIVO' : 'SUSPENDIDO',
+    habilitacion: (apiTransportista as any).numeroHabilitacion || '-',
+    vencimientoHab: (apiTransportista as any).vencimientoHab || '2099-12-31',
+    areasCobertura: (apiTransportista as any).areasCobertura || EMPTY_DEFAULTS.areasCobertura,
+    certificaciones: (apiTransportista as any).certificaciones || EMPTY_DEFAULTS.certificaciones,
+    rating: (apiTransportista as any).rating || 0,
+    flota: (apiTransportista as any).vehiculos || (apiTransportista as any).flota || EMPTY_DEFAULTS.flota,
+    conductores: (apiTransportista as any).choferes || (apiTransportista as any).conductores || EMPTY_DEFAULTS.conductores,
+    manifiestos: (apiTransportista as any).manifiestos || EMPTY_DEFAULTS.manifiestos,
+    ultimosManifiestos: (apiTransportista as any).ultimosManifiestos || EMPTY_DEFAULTS.ultimosManifiestos,
+    rendimiento: (apiTransportista as any).rendimiento || EMPTY_DEFAULTS.rendimiento,
+  } : null;
+
   const backPath = isMobile ? '/mobile/actores/transportistas' : '/actores/transportistas';
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>Volver</Button>
+        </div>
+        <Card className="py-12">
+          <div className="text-center">
+            <div className="animate-spin w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full mx-auto mb-4" />
+            <p className="text-neutral-500">Cargando transportista...</p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!transportista) return null;
 
   const habVencimiento = new Date(transportista.vencimientoHab);
   const ahora = new Date();
@@ -299,64 +265,60 @@ const TransportistaDetallePage: React.FC = () => {
             <Card>
               <CardHeader title="Vehículos" icon={<Truck size={20} />} />
               <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full table-fixed">
                     <thead className="bg-neutral-50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase">Patente</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase">Tipo</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase">Capacidad</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase">Estado</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase">Vto. VTV</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Patente</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Tipo</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Capacidad</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Estado</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '20%' }}>Vto. VTV</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-100">
-                      {transportista.flota.map((v: any) => (
-                        <tr key={v.patente} className="hover:bg-neutral-50">
-                          <td className="px-4 py-3 font-mono font-semibold text-neutral-900">{v.patente}</td>
-                          <td className="px-4 py-3 text-neutral-700">{v.tipo}</td>
-                          <td className="px-4 py-3 text-neutral-700">{v.capacidad}</td>
-                          <td className="px-4 py-3">
+                      {(transportista.flota || []).map((v: any) => (
+                        <tr key={v.patente} className="hover:bg-neutral-50 transition-colors">
+                          <td className="px-3 py-2.5 font-mono font-semibold text-neutral-900">{v.patente}</td>
+                          <td className="px-3 py-2.5 text-neutral-700">{v.tipo}</td>
+                          <td className="px-3 py-2.5 text-neutral-700">{v.capacidad}</td>
+                          <td className="px-3 py-2.5">
                             <Badge variant="soft" color={v.estado === 'Activo' ? 'success' : 'warning'}>
                               {v.estado}
                             </Badge>
                           </td>
-                          <td className="px-4 py-3 text-neutral-600">{v.vencimientoVTV}</td>
+                          <td className="px-3 py-2.5 text-neutral-600 hidden md:table-cell">{v.vencimientoVTV}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader title="Conductores" icon={<Users size={20} />} />
               <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full table-fixed">
                     <thead className="bg-neutral-50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase">Nombre</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase">DNI</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase">Licencia</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase">Categoría</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase">Vto. Licencia</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '25%' }}>Nombre</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '18%' }}>DNI</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '18%' }}>Licencia</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '17%' }}>Categoría</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '22%' }}>Vto. Licencia</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-100">
-                      {transportista.conductores.map((c: any) => (
-                        <tr key={c.dni} className="hover:bg-neutral-50">
-                          <td className="px-4 py-3 font-medium text-neutral-900">{c.nombre}</td>
-                          <td className="px-4 py-3 font-mono text-neutral-700">{c.dni}</td>
-                          <td className="px-4 py-3 text-neutral-700">{c.licencia}</td>
-                          <td className="px-4 py-3 text-neutral-700">{c.categoria}</td>
-                          <td className="px-4 py-3 text-neutral-600">{c.vencimiento}</td>
+                      {(transportista.conductores || []).map((c: any) => (
+                        <tr key={c.dni} className="hover:bg-neutral-50 transition-colors">
+                          <td className="px-3 py-2.5 font-medium text-neutral-900">{c.nombre}</td>
+                          <td className="px-3 py-2.5 font-mono text-neutral-700">{c.dni}</td>
+                          <td className="px-3 py-2.5 text-neutral-700">{c.licencia}</td>
+                          <td className="px-3 py-2.5 text-neutral-700 hidden md:table-cell">{c.categoria}</td>
+                          <td className="px-3 py-2.5 text-neutral-600 hidden md:table-cell">{c.vencimiento}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                </div>
               </CardContent>
             </Card>
           </div>
@@ -365,25 +327,24 @@ const TransportistaDetallePage: React.FC = () => {
         {/* Tab: Manifiestos */}
         <TabPanel id="manifiestos">
           <Card padding="none">
-            <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full table-fixed">
                 <thead className="bg-[#F5F5F3] border-b border-neutral-200">
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">Manifiesto</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">Fecha</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">Estado</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">Peso</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">Generador</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '20%' }}>Manifiesto</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '18%' }}>Fecha</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '20%' }}>Estado</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider hidden md:table-cell" style={{ width: '18%' }}>Peso</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider truncate hidden md:table-cell" style={{ width: '24%' }}>Generador</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
-                  {transportista.ultimosManifiestos.map((m: any) => (
+                  {(transportista.ultimosManifiestos || []).map((m: any) => (
                     <tr
                       key={m.id}
                       className="hover:bg-neutral-50 transition-colors cursor-pointer group"
                       onClick={() => navigate(isMobile ? `/mobile/manifiestos/${m.id}` : `/manifiestos/${m.id}`)}
                     >
-                      <td className="px-6 py-4">
+                      <td className="px-3 py-2.5">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-primary-50 rounded-lg flex items-center justify-center text-primary-600">
                             <FileText size={16} />
@@ -393,19 +354,18 @@ const TransportistaDetallePage: React.FC = () => {
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-neutral-600">{m.fecha}</td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 py-2.5 text-neutral-600">{m.fecha || '-'}</td>
+                      <td className="px-3 py-2.5">
                         <Badge variant="soft" color={estadoManifiestoColor[m.estado] || 'neutral'}>
-                          {m.estado.replace(/_/g, ' ')}
+                          {String(m.estado || '').replace(/_/g, ' ')}
                         </Badge>
                       </td>
-                      <td className="px-6 py-4 font-medium text-neutral-700">{m.peso.toLocaleString('es-AR')} kg</td>
-                      <td className="px-6 py-4 text-neutral-600">{m.generador}</td>
+                      <td className="px-3 py-2.5 font-medium text-neutral-700 hidden md:table-cell">{(m.peso ?? 0).toLocaleString('es-AR')} kg</td>
+                      <td className="px-3 py-2.5 text-neutral-600 truncate hidden md:table-cell">{m.generador || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
           </Card>
         </TabPanel>
 
