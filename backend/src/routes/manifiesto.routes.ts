@@ -32,29 +32,29 @@ router.get('/dashboard', getDashboardStats);
 // Sincronización inicial - descarga tablas maestras para offline
 router.get('/sync-inicial', getSyncInicial);
 // Lista de manifiestos esperados para validación QR offline
-router.get('/esperados', hasRole('OPERADOR'), getManifiestosEsperados);
+router.get('/esperados', hasRole('OPERADOR', 'ADMIN'), getManifiestosEsperados);
 // Validar código QR de manifiesto
 router.post('/validar-qr', validarQR);
 
 // Manifiestos
 router.get('/', getManifiestos);
 router.get('/:id', getManifiestoById);
-router.post('/', hasRole('GENERADOR'), createManifiesto);
+router.post('/', hasRole('GENERADOR', 'ADMIN'), createManifiesto);
 
-// Flujo de manifiesto - Generador
-router.post('/:id/firmar', hasRole('GENERADOR'), firmarManifiesto);
+// Flujo de manifiesto - Generador (ADMIN puede ejecutar todas las acciones)
+router.post('/:id/firmar', hasRole('GENERADOR', 'ADMIN'), firmarManifiesto);
 
 // Flujo de manifiesto - Transportista
-router.post('/:id/confirmar-retiro', hasRole('TRANSPORTISTA'), confirmarRetiro);
-router.post('/:id/ubicacion', hasRole('TRANSPORTISTA'), actualizarUbicacion);
-router.post('/:id/confirmar-entrega', hasRole('TRANSPORTISTA'), confirmarEntrega);
-router.post('/:id/incidente', hasRole('TRANSPORTISTA'), registrarIncidente);
+router.post('/:id/confirmar-retiro', hasRole('TRANSPORTISTA', 'ADMIN'), confirmarRetiro);
+router.post('/:id/ubicacion', hasRole('TRANSPORTISTA', 'ADMIN'), actualizarUbicacion);
+router.post('/:id/confirmar-entrega', hasRole('TRANSPORTISTA', 'ADMIN'), confirmarEntrega);
+router.post('/:id/incidente', hasRole('TRANSPORTISTA', 'ADMIN'), registrarIncidente);
 
 // Flujo de manifiesto - Operador
-router.post('/:id/confirmar-recepcion', hasRole('OPERADOR'), confirmarRecepcion);
-router.post('/:id/pesaje', hasRole('OPERADOR'), registrarPesaje);
-router.post('/:id/rechazar', hasRole('OPERADOR'), rechazarCarga);
-router.post('/:id/tratamiento', hasRole('OPERADOR'), registrarTratamiento);
-router.post('/:id/cerrar', hasRole('OPERADOR'), cerrarManifiesto);
+router.post('/:id/confirmar-recepcion', hasRole('OPERADOR', 'ADMIN'), confirmarRecepcion);
+router.post('/:id/pesaje', hasRole('OPERADOR', 'ADMIN'), registrarPesaje);
+router.post('/:id/rechazar', hasRole('OPERADOR', 'ADMIN'), rechazarCarga);
+router.post('/:id/tratamiento', hasRole('OPERADOR', 'ADMIN'), registrarTratamiento);
+router.post('/:id/cerrar', hasRole('OPERADOR', 'ADMIN'), cerrarManifiesto);
 
 export default router;

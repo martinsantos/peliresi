@@ -152,7 +152,7 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
     const userId = req.user.id;
 
     // Verificar que el usuario es un generador
-    if (req.user.rol !== 'GENERADOR' || !req.user.generador) {
+    if (req.user.rol !== 'GENERADOR' && req.user.rol !== 'ADMIN') {
       throw new AppError('Solo los generadores pueden crear manifiestos', 403);
     }
 
@@ -284,7 +284,7 @@ export const confirmarRetiro = async (req: AuthRequest, res: Response, next: Nex
     const { latitud, longitud, observaciones } = req.body;
     const userId = req.user.id;
 
-    if (req.user.rol !== 'TRANSPORTISTA') {
+    if (req.user.rol !== 'TRANSPORTISTA' && req.user.rol !== 'ADMIN') {
       throw new AppError('Solo los transportistas pueden confirmar retiros', 403);
     }
 
@@ -391,7 +391,7 @@ export const confirmarEntrega = async (req: AuthRequest, res: Response, next: Ne
     const { latitud, longitud, observaciones } = req.body;
     const userId = req.user.id;
 
-    if (req.user.rol !== 'TRANSPORTISTA') {
+    if (req.user.rol !== 'TRANSPORTISTA' && req.user.rol !== 'ADMIN') {
       throw new AppError('Solo los transportistas pueden confirmar entregas', 403);
     }
 
@@ -449,7 +449,7 @@ export const confirmarRecepcion = async (req: AuthRequest, res: Response, next: 
     const { observaciones, pesoReal } = req.body;
     const userId = req.user.id;
 
-    if (req.user.rol !== 'OPERADOR') {
+    if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') {
       throw new AppError('Solo los operadores pueden confirmar recepciones', 403);
     }
 
@@ -505,7 +505,7 @@ export const cerrarManifiesto = async (req: AuthRequest, res: Response, next: Ne
     const { metodoTratamiento, observaciones } = req.body;
     const userId = req.user.id;
 
-    if (req.user.rol !== 'OPERADOR') {
+    if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') {
       throw new AppError('Solo los operadores pueden cerrar manifiestos', 403);
     }
 
@@ -566,7 +566,7 @@ export const rechazarCarga = async (req: AuthRequest, res: Response, next: NextF
     const { motivo, descripcion, cantidadRechazada } = req.body;
     const userId = req.user.id;
 
-    if (req.user.rol !== 'OPERADOR') {
+    if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') {
       throw new AppError('Solo los operadores pueden rechazar cargas', 403);
     }
 
@@ -622,7 +622,7 @@ export const registrarIncidente = async (req: AuthRequest, res: Response, next: 
     const { tipoIncidente, descripcion, latitud, longitud } = req.body;
     const userId = req.user.id;
 
-    if (req.user.rol !== 'TRANSPORTISTA') {
+    if (req.user.rol !== 'TRANSPORTISTA' && req.user.rol !== 'ADMIN') {
       throw new AppError('Solo los transportistas pueden registrar incidentes', 403);
     }
 
@@ -671,10 +671,11 @@ export const registrarIncidente = async (req: AuthRequest, res: Response, next: 
 export const registrarTratamiento = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { metodoTratamiento, fechaTratamiento, observaciones } = req.body;
+    const { metodoTratamiento, metodo, fechaTratamiento, observaciones } = req.body;
+    const metodoFinal = metodoTratamiento || metodo; // Accept both field names
     const userId = req.user.id;
 
-    if (req.user.rol !== 'OPERADOR') {
+    if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') {
       throw new AppError('Solo los operadores pueden registrar tratamientos', 403);
     }
 
@@ -708,7 +709,7 @@ export const registrarTratamiento = async (req: AuthRequest, res: Response, next
       data: {
         manifiestoId: id,
         tipo: 'TRATAMIENTO',
-        descripcion: `Tratamiento iniciado: ${metodoTratamiento}. Fecha: ${fechaTratamiento || new Date().toISOString()}. ${observaciones || ''}`,
+        descripcion: `Tratamiento iniciado: ${metodoFinal}. Fecha: ${fechaTratamiento || new Date().toISOString()}. ${observaciones || ''}`,
         usuarioId: userId
       }
     });
@@ -726,10 +727,10 @@ export const registrarTratamiento = async (req: AuthRequest, res: Response, next
 export const registrarPesaje = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { residuosPesados, observaciones } = req.body; // Array de { id: string, pesoReal: number }
+    const { residuosPesados, residuos, observaciones } = req.body; // Accept both formats
     const userId = req.user.id;
 
-    if (req.user.rol !== 'OPERADOR') {
+    if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') {
       throw new AppError('Solo los operadores pueden registrar pesajes', 403);
     }
 
@@ -744,12 +745,14 @@ export const registrarPesaje = async (req: AuthRequest, res: Response, next: Nex
       throw new AppError('Manifiesto no encontrado', 404);
     }
 
-    if (manifiesto.estado !== 'ENTREGADO') {
-      throw new AppError('El manifiesto debe estar entregado para registrar pesaje', 400);
+    // Accept pesaje in both ENTREGADO and RECIBIDO states
+    if (manifiesto.estado !== 'ENTREGADO' && manifiesto.estado !== 'RECIBIDO') {
+      throw new AppError('El manifiesto debe estar entregado o recibido para registrar pesaje', 400);
     }
 
-    // Validar input
-    if (!residuosPesados || !Array.isArray(residuosPesados)) {
+    // Normalize input: accept both {residuosPesados: [{id, pesoReal}]} and {residuos: [{id, cantidadRecibida}]}
+    const normalizedResiduos = residuosPesados || (residuos ? residuos.map((r: any) => ({ id: r.id, pesoReal: r.cantidadRecibida })) : null);
+    if (!normalizedResiduos || !Array.isArray(normalizedResiduos)) {
       throw new AppError('Formato de residuos incorrecto', 400);
     }
 
@@ -758,7 +761,7 @@ export const registrarPesaje = async (req: AuthRequest, res: Response, next: Nex
 
     // Actualizar cada residuo en una transacción
     await prisma.$transaction(
-      residuosPesados.map((item: any) => {
+      normalizedResiduos.map((item: any) => {
         const residuoOriginal = manifiesto.residuos.find(r => r.id === item.id);
         if (!residuoOriginal) return prisma.manifiestoResiduo.findMany({ where: { id: 'dummy' } }); // Skip invalid IDs safely? or throw.
 
@@ -898,7 +901,7 @@ export const getDashboardStats = async (req: AuthRequest, res: Response, next: N
 export const getSyncInicial = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     // Verificar que sea transportista u operador
-    if (req.user.rol !== 'TRANSPORTISTA' && req.user.rol !== 'OPERADOR') {
+    if (req.user.rol !== 'TRANSPORTISTA' && req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') {
       throw new AppError('Endpoint disponible solo para transportistas y operadores', 403);
     }
 
@@ -1021,7 +1024,7 @@ export const getSyncInicial = async (req: AuthRequest, res: Response, next: Next
 // Validación QR offline contra lista pre-descargada
 export const getManifiestosEsperados = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (req.user.rol !== 'OPERADOR' || !req.user.operador) {
+    if ((req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') || (req.user.rol === 'OPERADOR' && !req.user.operador)) {
       throw new AppError('Solo los operadores pueden acceder a esta función', 403);
     }
 

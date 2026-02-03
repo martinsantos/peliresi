@@ -50,6 +50,32 @@ export const getGeneradores = async (req: AuthRequest, res: Response, next: Next
     }
 };
 
+export const getGeneradorById = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { id } = req.params;
+
+        const generador = await prisma.generador.findUnique({
+            where: { id },
+            include: {
+                usuario: { select: { email: true, nombre: true, apellido: true } },
+                manifiestos: {
+                    take: 10,
+                    orderBy: { createdAt: 'desc' },
+                    select: { id: true, numero: true, estado: true, createdAt: true }
+                }
+            }
+        });
+
+        if (!generador) {
+            throw new AppError('Generador no encontrado', 404);
+        }
+
+        res.json({ success: true, data: { generador } });
+    } catch (error) {
+        next(error);
+    }
+};
+
 export const createGenerador = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const { razonSocial, cuit, domicilio, telefono, email, numeroInscripcion, categoria } = req.body;
@@ -189,6 +215,29 @@ export const getTransportistas = async (req: AuthRequest, res: Response, next: N
                 pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) }
             }
         });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getTransportistaById = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { id } = req.params;
+
+        const transportista = await prisma.transportista.findUnique({
+            where: { id },
+            include: {
+                usuario: { select: { email: true, nombre: true, apellido: true } },
+                vehiculos: true,
+                choferes: true
+            }
+        });
+
+        if (!transportista) {
+            throw new AppError('Transportista no encontrado', 404);
+        }
+
+        res.json({ success: true, data: { transportista } });
     } catch (error) {
         next(error);
     }
@@ -363,6 +412,28 @@ export const getOperadores = async (req: AuthRequest, res: Response, next: NextF
                 pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) }
             }
         });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getOperadorById = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { id } = req.params;
+
+        const operador = await prisma.operador.findUnique({
+            where: { id },
+            include: {
+                usuario: { select: { email: true, nombre: true, apellido: true } },
+                tratamientos: true
+            }
+        });
+
+        if (!operador) {
+            throw new AppError('Operador no encontrado', 404);
+        }
+
+        res.json({ success: true, data: { operador } });
     } catch (error) {
         next(error);
     }
