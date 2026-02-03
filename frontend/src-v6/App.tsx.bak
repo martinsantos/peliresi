@@ -1,0 +1,168 @@
+/**
+ * SITREP v6 - App Router
+ * ======================
+ * Routing principal con todas las páginas
+ */
+
+import React, { Suspense, lazy } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+
+// ========================================
+// CONTEXTS
+// ========================================
+import { AuthProvider } from './contexts/AuthContext';
+
+// ========================================
+// LAYOUTS
+// ========================================
+import { MainLayout } from './layouts/MainLayout';
+import { AuthLayout } from './layouts/AuthLayout';
+import { MobileLayout } from './layouts/MobileLayout';
+
+// ========================================
+// PAGES - Lazy loaded (32 páginas totales)
+// ========================================
+
+// Auth
+const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
+
+// Dashboard & Centro de Control
+const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'));
+const CentroControlPage = lazy(() => import('./pages/centro-control/CentroControlPage'));
+
+// Manifiestos
+const ManifiestosPage = lazy(() => import('./pages/manifiestos/ManifiestosPage'));
+const ManifiestoDetallePage = lazy(() => import('./pages/manifiestos/ManifiestoDetallePage'));
+
+// Tracking
+const TrackingPage = lazy(() => import('./pages/tracking/TrackingPage'));
+
+// Actores
+const ActoresPage = lazy(() => import('./pages/actores/ActoresPage'));
+
+// Reportes
+const ReportesPage = lazy(() => import('./pages/reportes/ReportesPage'));
+
+// Alertas
+const AlertasPage = lazy(() => import('./pages/alertas/AlertasPage'));
+
+// Configuración
+const ConfiguracionPage = lazy(() => import('./pages/configuracion/ConfiguracionPage'));
+
+// Admin - Usuarios
+const UsuariosPage = lazy(() => import('./pages/usuarios/UsuariosPage'));
+
+// Admin - Sectoriales
+const AdminGeneradoresPage = lazy(() => import('./pages/admin/AdminGeneradoresPage'));
+const AdminEstablecimientosPage = lazy(() => import('./pages/admin/AdminEstablecimientosPage'));
+const AdminVehiculosPage = lazy(() => import('./pages/admin/AdminVehiculosPage'));
+const AdminResiduosPage = lazy(() => import('./pages/admin/AdminResiduosPage'));
+
+// Auditoría
+const AuditoriaPage = lazy(() => import('./pages/auditoria/AuditoriaPage'));
+
+// Carga Masiva
+const CargaMasivaPage = lazy(() => import('./pages/carga-masiva/CargaMasivaPage'));
+
+// Perfil
+const PerfilPage = lazy(() => import('./pages/perfil/PerfilPage'));
+
+// Mobile
+const MobileDashboardPage = lazy(() => import('./pages/mobile/MobileDashboardPage'));
+
+// User Switcher
+const UserSwitcherPage = lazy(() => import('./pages/auth/UserSwitcherPage'));
+
+// 404
+const NotFoundPage = lazy(() => import('./pages/shared/NotFoundPage'));
+
+// ========================================
+// COMPONENTE DE CARGA
+// ========================================
+const PageLoader: React.FC = () => (
+  <div className="min-h-screen flex items-center justify-center bg-neutral-50">
+    <div className="flex flex-col items-center gap-4">
+      <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-500 rounded-full animate-spin" />
+      <p className="text-neutral-600 font-medium">Cargando SITREP v6...</p>
+    </div>
+  </div>
+);
+
+// ========================================
+// APP COMPONENT
+// ========================================
+function App() {
+  return (
+    <AuthProvider>
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        {/* Auth Routes */}
+        <Route element={<AuthLayout />}>
+          <Route path="/login" element={<LoginPage />} />
+        </Route>
+
+        {/* Mobile Routes */}
+        <Route element={<MobileLayout />}>
+          <Route path="/mobile" element={<MobileDashboardPage />} />
+          <Route path="/mobile/dashboard" element={<MobileDashboardPage />} />
+        </Route>
+
+        {/* Main Routes */}
+        <Route element={<MainLayout />}>
+          {/* Dashboard */}
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/centro-control" element={<CentroControlPage />} />
+          
+          {/* Manifiestos */}
+          <Route path="/manifiestos" element={<ManifiestosPage />} />
+          <Route path="/manifiestos/:id" element={<ManifiestoDetallePage />} />
+          
+          {/* Tracking */}
+          <Route path="/tracking" element={<TrackingPage />} />
+          
+          {/* Actores */}
+          <Route path="/actores" element={<ActoresPage />} />
+          
+          {/* Reportes */}
+          <Route path="/reportes" element={<ReportesPage />} />
+          
+          {/* Alertas */}
+          <Route path="/alertas" element={<AlertasPage />} />
+          
+          {/* Configuración */}
+          <Route path="/configuracion" element={<ConfiguracionPage />} />
+          
+          {/* Admin - Usuarios */}
+          <Route path="/admin/usuarios" element={<UsuariosPage />} />
+          
+          {/* Admin - Sectoriales */}
+          <Route path="/admin/generadores" element={<AdminGeneradoresPage />} />
+          <Route path="/admin/establecimientos" element={<AdminEstablecimientosPage />} />
+          <Route path="/admin/vehiculos" element={<AdminVehiculosPage />} />
+          <Route path="/admin/residuos" element={<AdminResiduosPage />} />
+          
+          {/* Auditoría */}
+          <Route path="/admin/auditoria" element={<AuditoriaPage />} />
+          
+          {/* Carga Masiva */}
+          <Route path="/admin/carga-masiva" element={<CargaMasivaPage />} />
+          
+          {/* Perfil */}
+          <Route path="/mi-perfil" element={<PerfilPage />} />
+        </Route>
+
+        {/* User Switcher */}
+        <Route path="/switch-user" element={<UserSwitcherPage />} />
+
+        {/* Redirects */}
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        
+        {/* 404 */}
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </Suspense>
+    </AuthProvider>
+  );
+}
+
+export default App;
