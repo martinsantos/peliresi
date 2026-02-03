@@ -42,16 +42,17 @@ const notifyListeners = () => {
 };
 
 export const toast = {
-  add: (toast: Omit<Toast, 'id'>) => {
+  add: (t: Omit<Toast, 'id'>) => {
     const id = Math.random().toString(36).substr(2, 9);
-    toasts = [...toasts, { ...toast, id }];
+    toasts = [...toasts, { ...t, id }];
     notifyListeners();
-    
+
     // Auto remove
+    const duration = t.duration || 5000;
     setTimeout(() => {
       toast.remove(id);
-    }, toast.duration || 5000);
-    
+    }, duration);
+
     return id;
   },
   

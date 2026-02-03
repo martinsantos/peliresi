@@ -41,6 +41,23 @@ export function useCreateGenerador() {
   });
 }
 
+export function useUpdateGenerador() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<CreateGeneradorRequest> }) =>
+      actoresService.updateGenerador(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['generadores'] }),
+  });
+}
+
+export function useDeleteGenerador() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => actoresService.deleteGenerador(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['generadores'] }),
+  });
+}
+
 // Transportistas
 export function useTransportistas(filters?: ActorFilters) {
   return useQuery({
@@ -65,6 +82,23 @@ export function useCreateTransportista() {
   });
 }
 
+export function useUpdateTransportista() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<CreateTransportistaRequest> }) =>
+      actoresService.updateTransportista(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['transportistas'] }),
+  });
+}
+
+export function useDeleteTransportista() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => actoresService.deleteTransportista(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['transportistas'] }),
+  });
+}
+
 // Operadores
 export function useOperadores(filters?: ActorFilters) {
   return useQuery({
@@ -85,6 +119,23 @@ export function useCreateOperador() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (req: CreateOperadorRequest) => actoresService.createOperador(req),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['operadores'] }),
+  });
+}
+
+export function useUpdateOperador() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<CreateOperadorRequest> }) =>
+      actoresService.updateOperador(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['operadores'] }),
+  });
+}
+
+export function useDeleteOperador() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => actoresService.deleteOperador(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['operadores'] }),
   });
 }

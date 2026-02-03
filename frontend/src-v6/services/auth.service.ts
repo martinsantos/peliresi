@@ -8,10 +8,10 @@ import type { Usuario } from '../types/models';
 
 export const authService = {
   async login(credentials: LoginRequest): Promise<LoginResponse> {
-    const { data } = await api.post<{ success: true; data: LoginResponse }>('/auth/login', credentials);
-    const { accessToken, refreshToken, user } = data.data;
-    setTokens(accessToken, refreshToken);
-    return data.data;
+    const { data } = await api.post<{ success: true; data: { user: any; tokens: { accessToken: string; refreshToken: string } } }>('/auth/login', credentials);
+    const { tokens, user } = data.data;
+    setTokens(tokens.accessToken, tokens.refreshToken);
+    return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, user };
   },
 
   async logout(): Promise<void> {
@@ -23,8 +23,8 @@ export const authService = {
   },
 
   async getMe(): Promise<Usuario> {
-    const { data } = await api.get<{ success: true; data: Usuario }>('/auth/me');
-    return data.data;
+    const { data } = await api.get<{ success: true; data: { user: Usuario } }>('/auth/profile');
+    return data.data.user;
   },
 
   async changePassword(req: ChangePasswordRequest): Promise<void> {

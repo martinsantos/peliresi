@@ -9,3 +9,4 @@ export { alertaService } from './alerta.service';
 export { reporteService } from './reporte.service';
 export { usuarioService } from './usuario.service';
 export { analyticsService } from './analytics.service';
+export * from './indexeddb';

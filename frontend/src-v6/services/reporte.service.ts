@@ -8,33 +8,50 @@ import type { ReporteFilters, ExportFormat } from '../types/api';
 export interface ReporteData {
   titulo: string;
   datos: Record<string, unknown>[];
-  resumen: Record<string, number>;
+  eventos?: Record<string, unknown>[];
+  resumen: Record<string, unknown> & {
+    total?: number;
+    porTipo?: Record<string, number>;
+  };
+}
+
+// Map frontend filter names to backend query param names
+function mapFilters(filters?: ReporteFilters): Record<string, string | undefined> {
+  if (!filters) return {};
+  return {
+    fechaInicio: filters.fechaDesde,
+    fechaFin: filters.fechaHasta,
+    generadorId: filters.generadorId,
+    transportistaId: filters.transportistaId,
+    operadorId: filters.operadorId,
+    tipo: filters.tipo,
+  };
 }
 
 export const reporteService = {
   async manifiestos(filters?: ReporteFilters): Promise<ReporteData> {
-    const { data } = await api.get('/reportes/manifiestos', { params: filters });
+    const { data } = await api.get('/reportes/manifiestos', { params: mapFilters(filters) });
     return data.data;
   },
 
   async tratados(filters?: ReporteFilters): Promise<ReporteData> {
-    const { data } = await api.get('/reportes/tratados', { params: filters });
+    const { data } = await api.get('/reportes/tratados', { params: mapFilters(filters) });
     return data.data;
   },
 
   async transporte(filters?: ReporteFilters): Promise<ReporteData> {
-    const { data } = await api.get('/reportes/transporte', { params: filters });
+    const { data } = await api.get('/reportes/transporte', { params: mapFilters(filters) });
     return data.data;
   },
 
   async auditoria(filters?: ReporteFilters): Promise<ReporteData> {
-    const { data } = await api.get('/reportes/auditoria', { params: filters });
+    const { data } = await api.get('/reportes/auditoria', { params: mapFilters(filters) });
     return data.data;
   },
 
   async exportar(tipo: string, formato: ExportFormat, filters?: ReporteFilters): Promise<Blob> {
     const { data } = await api.get(`/reportes/exportar/${tipo}`, {
-      params: { formato, ...filters },
+      params: { formato, ...mapFilters(filters) },
       responseType: 'blob',
     });
     return data;

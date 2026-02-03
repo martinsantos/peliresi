@@ -84,6 +84,8 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<UserRole | 'all'>('all');
 
+  if (!currentUser) return null;
+
   const currentConfig = roleConfig[currentUser.rol];
   const CurrentIcon = currentConfig.icon;
 
@@ -93,7 +95,7 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
 
   const [isSwitching, setIsSwitching] = useState(false);
 
-  const handleSwitch = (userId: number) => {
+  const handleSwitch = (userId: number | string) => {
     if (userId === currentUser.id) {
       setIsOpen(false);
       return;
@@ -102,7 +104,7 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
     setIsOpen(false);
     // Breve feedback visual antes del cambio
     setTimeout(() => {
-      switchUser(userId);
+      switchUser(Number(userId));
       setIsSwitching(false);
     }, 150);
   };

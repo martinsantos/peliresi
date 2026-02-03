@@ -11,7 +11,6 @@ import {
   FileText,
   MapPin,
   Settings,
-  Bell,
   Search,
   Menu,
   X,
@@ -30,11 +29,16 @@ import {
   FlaskConical,
   Factory,
   SwitchCamera,
-  QrCode
+  QrCode,
+  HelpCircle,
 } from 'lucide-react';
 import { Button } from '../components/ui/ButtonV2';
 import { Badge } from '../components/ui/BadgeV2';
 import { UserSwitcher } from '../components/ui/UserSwitcher';
+import { NotificationBell } from '../components/NotificationBell';
+import { ConnectivityIndicator } from '../components/ConnectivityIndicator';
+import { OnboardingTour, resetOnboardingTour } from '../components/OnboardingTour';
+import { DemoAppOnboarding } from '../components/DemoAppOnboarding';
 import { useAuth } from '../contexts/AuthContext';
 
 // ========================================
@@ -43,11 +47,29 @@ import { useAuth } from '../contexts/AuthContext';
 export const MainLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [showTour, setShowTour] = useState(false);
   const location = useLocation();
-  const { currentUser, isAdmin, isGenerador, isTransportista, isOperador, canAccess } = useAuth();
+  const { currentUser, isAdmin, isGenerador, isTransportista, isOperador, canAccess, isLoading } = useAuth();
+
+  // Guard: show loading or redirect if no user
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-neutral-50">
+        <div className="text-center">
+          <div className="w-10 h-10 border-3 border-primary-200 border-t-primary-600 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-neutral-600">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    // Will be handled by router redirect, but guard against null access
+    return null;
+  }
 
   // Configuración de colores según rol (para header badges)
-  const roleStyles = useMemo(() => {
+  const roleStyles = (() => {
     switch (currentUser.rol) {
       case 'ADMIN':
         return { badge: 'primary' as const };
@@ -60,10 +82,10 @@ export const MainLayout: React.FC = () => {
       default:
         return { badge: 'neutral' as const };
     }
-  }, [currentUser.rol]);
+  })();
 
-  // Items de navegación según rol
-  const navItems = useMemo(() => {
+  // Items de navegacion segun rol
+  const navItems = (() => {
     const items = [];
     
     // Dashboard para todos
@@ -94,12 +116,12 @@ export const MainLayout: React.FC = () => {
     items.push({ path: '/alertas', icon: AlertTriangle, label: 'Alertas' });
     
     return items;
-  }, [isAdmin, isGenerador, isTransportista, isOperador]);
+  })();
 
   // Items de administración según rol
   const adminItems = useMemo(() => {
     const items = [];
-    
+
     if (isAdmin) {
       items.push({ path: '/admin/usuarios', icon: User, label: 'Usuarios' });
       items.push({ path: '/admin/establecimientos', icon: Building2, label: 'Establecimientos' });
@@ -112,7 +134,7 @@ export const MainLayout: React.FC = () => {
       // Transportista ve sus vehículos
       items.push({ path: '/admin/vehiculos', icon: Truck, label: 'Mis Vehículos' });
     }
-    
+
     return items;
   }, [isAdmin, isTransportista]);
 
@@ -121,7 +143,11 @@ export const MainLayout: React.FC = () => {
     adminItems.find(item => item.path === location.pathname)?.label || 'SITREP';
 
   return (
-    <div className="min-h-screen bg-[#F8F8F6] flex">
+    <div className="min-h-screen bg-[#F8F8F6] flex flex-col">
+      {/* Connectivity indicator - always visible at top */}
+      <ConnectivityIndicator />
+
+      <div className="flex flex-1 min-h-0">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
@@ -345,11 +371,20 @@ export const MainLayout: React.FC = () => {
               />
             </div>
 
+            {/* Help / Tour restart */}
+            <button
+              onClick={() => {
+                resetOnboardingTour();
+                setShowTour(true);
+              }}
+              className="p-2 rounded-xl text-neutral-500 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+              title="Ver tour de ayuda"
+            >
+              <HelpCircle size={20} />
+            </button>
+
             {/* Notifications */}
-            <NavLink to="/alertas" className="relative p-2 rounded-xl hover:bg-neutral-100 transition-colors">
-              <Bell size={20} className="text-neutral-600" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-error-500 rounded-full" />
-            </NavLink>
+            <NotificationBell />
 
             {/* User Switcher Dropdown */}
             <UserSwitcher variant="dropdown" />
@@ -361,6 +396,16 @@ export const MainLayout: React.FC = () => {
           <Outlet />
         </main>
       </div>
+      </div>
+
+      {/* Onboarding Tour */}
+      <OnboardingTour
+        forceShow={showTour}
+        onComplete={() => setShowTour(false)}
+      />
+
+      {/* Role-specific welcome modal */}
+      <DemoAppOnboarding />
     </div>
   );
 };

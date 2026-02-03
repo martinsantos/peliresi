@@ -10,7 +10,8 @@ export const alertaService = {
   // Reglas
   async listReglas(): Promise<ReglaAlerta[]> {
     const { data } = await api.get('/alertas/reglas');
-    return data.data;
+    const raw = data.data;
+    return Array.isArray(raw) ? raw : raw.reglas || [];
   },
 
   async createRegla(req: CreateReglaAlertaRequest): Promise<ReglaAlerta> {
@@ -19,29 +20,32 @@ export const alertaService = {
   },
 
   async toggleRegla(id: string, activa: boolean): Promise<ReglaAlerta> {
-    const { data } = await api.patch(`/alertas/reglas/${id}`, { activa });
+    const { data } = await api.put(`/alertas/reglas/${id}`, { activa });
     return data.data;
   },
 
   // Alertas generadas
   async listAlertas(filters?: AlertaFilters): Promise<PaginatedData<AlertaGenerada>> {
     const { data } = await api.get('/alertas', { params: filters });
-    return data.data;
+    const raw = data.data;
+    return {
+      items: raw.alertas || [],
+      total: raw.total || 0,
+      page: raw.pagina || 1,
+      limit: 10,
+      totalPages: raw.totalPaginas || 1,
+    };
   },
 
   async resolverAlerta(id: string, notas?: string): Promise<AlertaGenerada> {
-    const { data } = await api.patch(`/alertas/${id}/resolver`, { notas });
-    return data.data;
-  },
-
-  async descartarAlerta(id: string, notas?: string): Promise<AlertaGenerada> {
-    const { data } = await api.patch(`/alertas/${id}/descartar`, { notas });
+    const { data } = await api.put(`/alertas/${id}/resolver`, { notas });
     return data.data;
   },
 
   // Anomalías
   async listAnomalias(manifiestoId?: string): Promise<AnomaliaTransporte[]> {
     const { data } = await api.get('/alertas/anomalias', { params: { manifiestoId } });
-    return data.data;
+    const raw = data.data;
+    return Array.isArray(raw) ? raw : raw.anomalias || [];
   },
 };

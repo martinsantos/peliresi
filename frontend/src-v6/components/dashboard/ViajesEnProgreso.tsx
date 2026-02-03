@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Card } from '../ui/CardV2';
 import { Badge } from '../ui/BadgeV2';
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 
 // Mock data de viajes en progreso
 const viajesMock = [
@@ -79,7 +80,7 @@ const viajesMock = [
   },
 ];
 
-const estadoConfig: Record<string, { label: string; color: Badge['color']; icon: React.ReactNode }> = {
+const estadoConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   EN_TRANSITO: { label: 'En tránsito', color: 'info', icon: <Navigation size={14} className="animate-pulse" /> },
   RECIBIDO: { label: 'Por entregar', color: 'warning', icon: <Package size={14} /> },
 };
@@ -90,6 +91,7 @@ interface ViajesEnProgresoProps {
 
 export const ViajesEnProgreso: React.FC<ViajesEnProgresoProps> = ({ compact = false }) => {
   const navigate = useNavigate();
+  const mp = useMobilePrefix();
   const [vista, setVista] = useState<'mapa' | 'lista'>('lista');
   const [viajeSeleccionado, setViajeSeleccionado] = useState<string | null>(null);
 
@@ -161,9 +163,8 @@ export const ViajesEnProgreso: React.FC<ViajesEnProgresoProps> = ({ compact = fa
                 const pos = positions[index];
                 
                 return (
-                  <button
+                  <div
                     key={viaje.id}
-                    onClick={() => navigate(`/mobile/manifiestos/${viaje.id}`)}
                     className="absolute transform -translate-x-1/2 -translate-y-1/2 group z-10"
                     style={{ left: pos.left, top: pos.top }}
                   >
@@ -175,7 +176,7 @@ export const ViajesEnProgreso: React.FC<ViajesEnProgresoProps> = ({ compact = fa
                     <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 bg-white px-2 py-1 rounded-lg shadow-md whitespace-nowrap">
                       <p className="text-xs font-medium text-neutral-900">{viaje.id}</p>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -185,9 +186,8 @@ export const ViajesEnProgreso: React.FC<ViajesEnProgresoProps> = ({ compact = fa
               {viajesMock.slice(0, 3).map((viaje) => {
                 const estado = estadoConfig[viaje.estado];
                 return (
-                  <button
+                  <div
                     key={viaje.id}
-                    onClick={() => navigate(`/mobile/manifiestos/${viaje.id}`)}
                     className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-neutral-50 transition-colors text-left group"
                   >
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
@@ -211,7 +211,7 @@ export const ViajesEnProgreso: React.FC<ViajesEnProgresoProps> = ({ compact = fa
                       <p className="text-xs text-neutral-500">ETA</p>
                     </div>
                     <ChevronRight size={16} className="text-neutral-400 group-hover:text-primary-500 transition-colors" />
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -221,7 +221,7 @@ export const ViajesEnProgreso: React.FC<ViajesEnProgresoProps> = ({ compact = fa
         {/* Footer */}
         <div className="px-4 py-3 border-t border-neutral-100">
           <button 
-            onClick={() => navigate('/mobile/tracking')}
+            onClick={() => navigate(mp('/tracking'))}
             className="w-full text-center text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors"
           >
             Ver todos los viajes
@@ -336,15 +336,11 @@ export const ViajesEnProgreso: React.FC<ViajesEnProgresoProps> = ({ compact = fa
                     <Phone size={16} />
                     Llamar
                   </button>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/mobile/manifiestos/${viaje.id}`);
-                    }}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-neutral-50 text-neutral-700 rounded-lg font-medium hover:bg-neutral-100 transition-colors"
+                  <div
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-neutral-100 text-neutral-400 rounded-lg font-medium cursor-default"
                   >
                     Ver Manifiesto
-                  </button>
+                  </div>
                 </div>
               )}
             </div>

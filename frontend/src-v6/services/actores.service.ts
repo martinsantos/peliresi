@@ -10,12 +10,19 @@ export const actoresService = {
   // Generadores
   async listGeneradores(filters?: ActorFilters): Promise<PaginatedData<Generador>> {
     const { data } = await api.get('/actores/generadores', { params: filters });
-    return data.data;
+    const raw = data.data;
+    return {
+      items: raw.generadores || [],
+      total: raw.pagination?.total || 0,
+      page: raw.pagination?.page || 1,
+      limit: raw.pagination?.limit || 10,
+      totalPages: raw.pagination?.pages || 1,
+    };
   },
 
   async getGenerador(id: string): Promise<Generador> {
     const { data } = await api.get(`/actores/generadores/${id}`);
-    return data.data;
+    return data.data.generador || data.data;
   },
 
   async createGenerador(req: CreateGeneradorRequest): Promise<Generador> {
@@ -35,12 +42,19 @@ export const actoresService = {
   // Transportistas
   async listTransportistas(filters?: ActorFilters): Promise<PaginatedData<Transportista>> {
     const { data } = await api.get('/actores/transportistas', { params: filters });
-    return data.data;
+    const raw = data.data;
+    return {
+      items: raw.transportistas || [],
+      total: raw.pagination?.total || 0,
+      page: raw.pagination?.page || 1,
+      limit: raw.pagination?.limit || 10,
+      totalPages: raw.pagination?.pages || 1,
+    };
   },
 
   async getTransportista(id: string): Promise<Transportista> {
     const { data } = await api.get(`/actores/transportistas/${id}`);
-    return data.data;
+    return data.data.transportista || data.data;
   },
 
   async createTransportista(req: CreateTransportistaRequest): Promise<Transportista> {
@@ -60,12 +74,19 @@ export const actoresService = {
   // Operadores
   async listOperadores(filters?: ActorFilters): Promise<PaginatedData<Operador>> {
     const { data } = await api.get('/actores/operadores', { params: filters });
-    return data.data;
+    const raw = data.data;
+    return {
+      items: raw.operadores || [],
+      total: raw.pagination?.total || 0,
+      page: raw.pagination?.page || 1,
+      limit: raw.pagination?.limit || 10,
+      totalPages: raw.pagination?.pages || 1,
+    };
   },
 
   async getOperador(id: string): Promise<Operador> {
     const { data } = await api.get(`/actores/operadores/${id}`);
-    return data.data;
+    return data.data.operador || data.data;
   },
 
   async createOperador(req: CreateOperadorRequest): Promise<Operador> {
@@ -84,23 +105,25 @@ export const actoresService = {
 
   // Vehículos
   async listVehiculos(transportistaId: string): Promise<Vehiculo[]> {
-    const { data } = await api.get(`/actores/transportistas/${transportistaId}/vehiculos`);
-    return data.data;
+    const { data } = await api.get(`/catalogos/transportistas/${transportistaId}/vehiculos`);
+    const raw = data.data;
+    return Array.isArray(raw) ? raw : raw.vehiculos || [];
   },
 
   async createVehiculo(transportistaId: string, req: Partial<Vehiculo>): Promise<Vehiculo> {
-    const { data } = await api.post(`/actores/transportistas/${transportistaId}/vehiculos`, req);
-    return data.data;
+    const { data } = await api.post(`/catalogos/transportistas/${transportistaId}/vehiculos`, req);
+    return data.data?.vehiculo || data.data;
   },
 
   // Choferes
   async listChoferes(transportistaId: string): Promise<Chofer[]> {
-    const { data } = await api.get(`/actores/transportistas/${transportistaId}/choferes`);
-    return data.data;
+    const { data } = await api.get(`/catalogos/transportistas/${transportistaId}/choferes`);
+    const raw = data.data;
+    return Array.isArray(raw) ? raw : raw.choferes || [];
   },
 
   async createChofer(transportistaId: string, req: Partial<Chofer>): Promise<Chofer> {
-    const { data } = await api.post(`/actores/transportistas/${transportistaId}/choferes`, req);
-    return data.data;
+    const { data } = await api.post(`/catalogos/transportistas/${transportistaId}/choferes`, req);
+    return data.data?.chofer || data.data;
   },
 };

@@ -22,6 +22,8 @@ export interface Column<T> {
   width?: string;
   align?: 'left' | 'center' | 'right';
   sortable?: boolean;
+  hiddenBelow?: 'sm' | 'md' | 'lg';
+  truncate?: boolean;
   render?: (row: T) => React.ReactNode;
 }
 
@@ -79,7 +81,7 @@ export function Table<T extends Record<string, any>>({
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!onSelectionChange) return;
     if (e.target.checked) {
-      onSelectionChange(data.map(keyExtractor));
+      onSelectionChange(safeData.map(keyExtractor));
     } else {
       onSelectionChange([]);
     }
@@ -94,16 +96,25 @@ export function Table<T extends Record<string, any>>({
     }
   };
 
-  const allSelected = data.length > 0 && selectedKeys.length === data.length;
-  const someSelected = selectedKeys.length > 0 && selectedKeys.length < data.length;
+  const safeData = Array.isArray(data) ? data : [];
 
-  const cellPadding = compact ? 'px-3 py-2' : 'px-4 py-3';
-  const headerPadding = compact ? 'px-3 py-2.5' : 'px-4 py-3.5';
+  const allSelected = safeData.length > 0 && selectedKeys.length === safeData.length;
+  const someSelected = selectedKeys.length > 0 && selectedKeys.length < safeData.length;
+
+  const cellPadding = compact ? 'px-3 py-2' : 'px-3 py-2.5';
+  const headerPadding = compact ? 'px-3 py-2' : 'px-3 py-2.5';
+
+  const hiddenClass = (col: Column<T>) => {
+    if (!col.hiddenBelow) return '';
+    if (col.hiddenBelow === 'sm') return 'hidden sm:table-cell';
+    if (col.hiddenBelow === 'md') return 'hidden md:table-cell';
+    if (col.hiddenBelow === 'lg') return 'hidden lg:table-cell';
+    return '';
+  };
 
   return (
-    <div className={cn('overflow-hidden rounded-xl border border-neutral-200 bg-white', className)}>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left">
+    <div className={cn('overflow-hidden overflow-x-auto rounded-xl border border-neutral-200 bg-white', className)}>
+        <table className="w-full table-fixed text-left min-w-[500px]">
           <thead className="bg-neutral-50 border-b border-neutral-200">
             <tr>
               {selectable && (
@@ -111,7 +122,7 @@ export function Table<T extends Record<string, any>>({
                   <input
                     type="checkbox"
                     checked={allSelected}
-                    ref={(el) => el && (el.indeterminate = someSelected)}
+                    ref={(el) => { if (el) el.indeterminate = someSelected; }}
                     onChange={handleSelectAll}
                     className="w-4 h-4 rounded border-neutral-300 text-primary-500 focus:ring-primary-500"
                   />
@@ -125,7 +136,8 @@ export function Table<T extends Record<string, any>>({
                     'text-xs font-semibold text-neutral-600 uppercase tracking-wider',
                     column.sortable && sortable && 'cursor-pointer select-none hover:text-neutral-900',
                     column.align === 'center' && 'text-center',
-                    column.align === 'right' && 'text-right'
+                    column.align === 'right' && 'text-right',
+                    hiddenClass(column)
                   )}
                   style={{ width: column.width }}
                   onClick={() => column.sortable && handleSort(column.key)}
@@ -158,7 +170,7 @@ export function Table<T extends Record<string, any>>({
                   ))}
                 </tr>
               ))
-            ) : data.length === 0 ? (
+            ) : safeData.length === 0 ? (
               <tr>
                 <td
                   colSpan={columns.length + (selectable ? 1 : 0)}
@@ -171,7 +183,7 @@ export function Table<T extends Record<string, any>>({
                 </td>
               </tr>
             ) : (
-              data.map((row, index) => {
+              safeData.map((row, index) => {
                 const rowKey = keyExtractor(row);
                 const isSelected = selectedKeys.includes(rowKey);
                 return (
@@ -201,9 +213,11 @@ export function Table<T extends Record<string, any>>({
                         key={column.key}
                         className={cn(
                           cellPadding,
-                          'text-sm text-neutral-900 whitespace-nowrap',
+                          'text-sm text-neutral-900',
                           column.align === 'center' && 'text-center',
-                          column.align === 'right' && 'text-right'
+                          column.align === 'right' && 'text-right',
+                          column.truncate && 'truncate max-w-0',
+                          hiddenClass(column)
                         )}
                       >
                         {column.render ? column.render(row) : row[column.key]}
@@ -215,7 +229,6 @@ export function Table<T extends Record<string, any>>({
             )}
           </tbody>
         </table>
-      </div>
     </div>
   );
 }

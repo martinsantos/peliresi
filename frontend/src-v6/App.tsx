@@ -11,6 +11,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 // CONTEXTS
 // ========================================
 import { AuthProvider } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 
 // ========================================
 // LAYOUTS
@@ -124,93 +125,106 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
         </Route>
 
-        {/* Mobile Routes */}
-        <Route element={<MobileLayout />}>
-          <Route path="/mobile" element={<MobileDashboardPage />} />
-          <Route path="/mobile/dashboard" element={<MobileDashboardPage />} />
-          <Route path="/mobile/centro-control" element={<CentroControlPage />} />
-          <Route path="/mobile/manifiestos" element={<ManifiestosPage />} />
-          <Route path="/mobile/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
-          <Route path="/mobile/manifiestos/:id" element={<ManifiestoDetallePage />} />
-          <Route path="/mobile/tracking" element={<TrackingPage />} />
-          <Route path="/mobile/tracking/viaje/:id" element={<ViajeEnCursoPage />} />
-          <Route path="/mobile/transporte/perfil" element={<ViajeEnCursoTransportista />} />
-          <Route path="/mobile/actores" element={<ActoresPage />} />
-          <Route path="/mobile/actores/operadores" element={<OperadoresPage />} />
-          <Route path="/mobile/actores/operadores/:id" element={<OperadorDetallePage />} />
-          <Route path="/mobile/actores/transportistas" element={<TransportistasPage />} />
-          <Route path="/mobile/actores/transportistas/:id" element={<TransportistaDetallePage />} />
-          <Route path="/mobile/reportes" element={<ReportesPage />} />
-          <Route path="/mobile/alertas" element={<AlertasPage />} />
-          <Route path="/mobile/notificaciones" element={<NotificacionesPage />} />
-          <Route path="/mobile/configuracion" element={<ConfiguracionPage />} />
-          <Route path="/mobile/mi-perfil" element={<PerfilPage />} />
-          <Route path="/mobile/ayuda" element={<AyudaPage />} />
-          <Route path="/mobile/switch-user" element={<UserSwitcherPage />} />
-          
-          {/* Admin Mobile Routes */}
-          <Route path="/mobile/admin/usuarios" element={<UsuariosPage />} />
-          <Route path="/mobile/admin/generadores" element={<AdminGeneradoresPage />} />
-          <Route path="/mobile/admin/generadores/:id" element={<GeneradorDetallePage />} />
-          <Route path="/mobile/admin/establecimientos" element={<AdminEstablecimientosPage />} />
-          <Route path="/mobile/admin/vehiculos" element={<AdminVehiculosPage />} />
-          <Route path="/mobile/admin/residuos" element={<AdminResiduosPage />} />
-          <Route path="/mobile/admin/auditoria" element={<AuditoriaPage />} />
-          <Route path="/mobile/admin/carga-masiva" element={<CargaMasivaPage />} />
-          
-          {/* Mobile Special Routes */}
-          <Route path="/mobile/escaner-qr" element={<EscanerQRPage />} />
-          <Route path="/mobile/estadisticas" element={<EstadisticasPage />} />
+        {/* Mobile Routes - Protected */}
+        <Route element={<ProtectedRoute />}>
+          <Route element={<MobileLayout />}>
+            <Route path="/mobile" element={<MobileDashboardPage />} />
+            <Route path="/mobile/dashboard" element={<MobileDashboardPage />} />
+            <Route path="/mobile/centro-control" element={<CentroControlPage />} />
+            <Route path="/mobile/manifiestos" element={<ManifiestosPage />} />
+            <Route path="/mobile/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
+            <Route path="/mobile/manifiestos/:id" element={<ManifiestoDetallePage />} />
+            <Route path="/mobile/tracking" element={<TrackingPage />} />
+            <Route path="/mobile/tracking/viaje/:id" element={<ViajeEnCursoPage />} />
+            <Route path="/mobile/transporte/perfil" element={<ViajeEnCursoTransportista />} />
+            <Route path="/mobile/actores" element={<ActoresPage />} />
+            <Route path="/mobile/actores/operadores" element={<OperadoresPage />} />
+            <Route path="/mobile/actores/operadores/:id" element={<OperadorDetallePage />} />
+            <Route path="/mobile/actores/transportistas" element={<TransportistasPage />} />
+            <Route path="/mobile/actores/transportistas/:id" element={<TransportistaDetallePage />} />
+            <Route path="/mobile/reportes" element={<ReportesPage />} />
+            <Route path="/mobile/alertas" element={<AlertasPage />} />
+            <Route path="/mobile/notificaciones" element={<NotificacionesPage />} />
+            <Route path="/mobile/configuracion" element={<ConfiguracionPage />} />
+            <Route path="/mobile/mi-perfil" element={<PerfilPage />} />
+            <Route path="/mobile/ayuda" element={<AyudaPage />} />
+            <Route path="/mobile/switch-user" element={<UserSwitcherPage />} />
+
+            {/* Mobile Special Routes */}
+            <Route path="/mobile/escaner-qr" element={<EscanerQRPage />} />
+            <Route path="/mobile/estadisticas" element={<EstadisticasPage />} />
+          </Route>
         </Route>
 
-        {/* Main Routes */}
-        <Route element={<MainLayout />}>
-          {/* Dashboard */}
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/centro-control" element={<CentroControlPage />} />
-          
-          {/* Manifiestos */}
-          <Route path="/manifiestos" element={<ManifiestosPage />} />
-          <Route path="/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
-          <Route path="/manifiestos/:id" element={<ManifiestoDetallePage />} />
-          
-          {/* Tracking */}
-          <Route path="/tracking" element={<TrackingPage />} />
-          
-          {/* Actores */}
-          <Route path="/actores" element={<ActoresPage />} />
-          <Route path="/actores/operadores" element={<OperadoresPage />} />
-          <Route path="/actores/operadores/:id" element={<OperadorDetallePage />} />
-          <Route path="/actores/transportistas" element={<TransportistasPage />} />
-          <Route path="/actores/transportistas/:id" element={<TransportistaDetallePage />} />
-          
-          {/* Reportes */}
-          <Route path="/reportes" element={<ReportesPage />} />
-          
-          {/* Alertas */}
-          <Route path="/alertas" element={<AlertasPage />} />
-          
-          {/* Configuración */}
-          <Route path="/configuracion" element={<ConfiguracionPage />} />
-          
-          {/* Admin - Usuarios */}
-          <Route path="/admin/usuarios" element={<UsuariosPage />} />
-          
-          {/* Admin - Sectoriales */}
-          <Route path="/admin/generadores" element={<AdminGeneradoresPage />} />
-          <Route path="/admin/generadores/:id" element={<GeneradorDetallePage />} />
-          <Route path="/admin/establecimientos" element={<AdminEstablecimientosPage />} />
-          <Route path="/admin/vehiculos" element={<AdminVehiculosPage />} />
-          <Route path="/admin/residuos" element={<AdminResiduosPage />} />
-          
-          {/* Auditoría */}
-          <Route path="/admin/auditoria" element={<AuditoriaPage />} />
-          
-          {/* Carga Masiva */}
-          <Route path="/admin/carga-masiva" element={<CargaMasivaPage />} />
-          
-          {/* Perfil */}
-          <Route path="/mi-perfil" element={<PerfilPage />} />
+        {/* Admin Mobile Routes - Protected (ADMIN only) */}
+        <Route element={<ProtectedRoute roles={['ADMIN']} />}>
+          <Route element={<MobileLayout />}>
+            <Route path="/mobile/admin/usuarios" element={<UsuariosPage />} />
+            <Route path="/mobile/admin/generadores" element={<AdminGeneradoresPage />} />
+            <Route path="/mobile/admin/generadores/:id" element={<GeneradorDetallePage />} />
+            <Route path="/mobile/admin/establecimientos" element={<AdminEstablecimientosPage />} />
+            <Route path="/mobile/admin/vehiculos" element={<AdminVehiculosPage />} />
+            <Route path="/mobile/admin/residuos" element={<AdminResiduosPage />} />
+            <Route path="/mobile/admin/auditoria" element={<AuditoriaPage />} />
+            <Route path="/mobile/admin/carga-masiva" element={<CargaMasivaPage />} />
+          </Route>
+        </Route>
+
+        {/* Main Routes - Protected */}
+        <Route element={<ProtectedRoute />}>
+          <Route element={<MainLayout />}>
+            {/* Dashboard */}
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/centro-control" element={<CentroControlPage />} />
+
+            {/* Manifiestos */}
+            <Route path="/manifiestos" element={<ManifiestosPage />} />
+            <Route path="/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
+            <Route path="/manifiestos/:id" element={<ManifiestoDetallePage />} />
+
+            {/* Tracking */}
+            <Route path="/tracking" element={<TrackingPage />} />
+
+            {/* Actores */}
+            <Route path="/actores" element={<ActoresPage />} />
+            <Route path="/actores/operadores" element={<OperadoresPage />} />
+            <Route path="/actores/operadores/:id" element={<OperadorDetallePage />} />
+            <Route path="/actores/transportistas" element={<TransportistasPage />} />
+            <Route path="/actores/transportistas/:id" element={<TransportistaDetallePage />} />
+
+            {/* Reportes */}
+            <Route path="/reportes" element={<ReportesPage />} />
+
+            {/* Alertas */}
+            <Route path="/alertas" element={<AlertasPage />} />
+
+            {/* Configuración */}
+            <Route path="/configuracion" element={<ConfiguracionPage />} />
+
+            {/* Perfil */}
+            <Route path="/mi-perfil" element={<PerfilPage />} />
+          </Route>
+        </Route>
+
+        {/* Admin Routes - Protected (ADMIN only) */}
+        <Route element={<ProtectedRoute roles={['ADMIN']} />}>
+          <Route element={<MainLayout />}>
+            {/* Admin - Usuarios */}
+            <Route path="/admin/usuarios" element={<UsuariosPage />} />
+
+            {/* Admin - Sectoriales */}
+            <Route path="/admin/generadores" element={<AdminGeneradoresPage />} />
+            <Route path="/admin/generadores/:id" element={<GeneradorDetallePage />} />
+            <Route path="/admin/establecimientos" element={<AdminEstablecimientosPage />} />
+            <Route path="/admin/vehiculos" element={<AdminVehiculosPage />} />
+            <Route path="/admin/residuos" element={<AdminResiduosPage />} />
+
+            {/* Auditoría */}
+            <Route path="/admin/auditoria" element={<AuditoriaPage />} />
+
+            {/* Carga Masiva */}
+            <Route path="/admin/carga-masiva" element={<CargaMasivaPage />} />
+          </Route>
         </Route>
 
         {/* User Switcher */}

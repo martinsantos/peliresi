@@ -114,6 +114,16 @@ export interface RegistrarTratamientoRequest {
   observaciones?: string;
 }
 
+export interface RechazarManifiestoRequest {
+  motivo: string;
+  descripcion?: string;
+}
+
+export interface RegistrarIncidenteRequest {
+  tipo: string;
+  descripcion?: string;
+}
+
 export interface ManifiestoFilters {
   estado?: EstadoManifiesto;
   generadorId?: string;
@@ -275,22 +285,35 @@ export interface UsuarioFilters {
 // ========================================
 
 export interface DashboardStats {
-  manifiestos: {
+  // Backend real format from GET /api/manifiestos/dashboard
+  estadisticas?: {
+    borradores: number;
+    aprobados: number;
+    enTransito: number;
+    entregados: number;
+    recibidos: number;
+    tratados: number;
+    total: number;
+  };
+  recientes?: Array<any>;
+  enTransitoList?: Array<any>;
+  // Legacy frontend format (kept for compatibility)
+  manifiestos?: {
     total: number;
     enTransito: number;
     completados: number;
     pendientes: number;
   };
-  actores: {
+  actores?: {
     generadores: number;
     transportistas: number;
     operadores: number;
   };
-  alertas: {
+  alertas?: {
     pendientes: number;
     criticas: number;
   };
-  residuos: {
+  residuos?: {
     totalKg: number;
     tratados: number;
   };

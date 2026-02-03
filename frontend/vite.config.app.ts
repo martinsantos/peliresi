@@ -1,6 +1,7 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import fs from 'fs'
 
 /**
  * Vite Config para PWA Mobile (/app)
@@ -9,8 +10,23 @@ import path from 'path'
  * Sirve en: sitrep.ultimamilla.com.ar/app/
  */
 
+// Plugin para renombrar app.html -> index.html en el output
+function renameAppHtml(): Plugin {
+  return {
+    name: 'rename-app-html',
+    closeBundle() {
+      const outDir = path.resolve(__dirname, 'dist-app')
+      const appHtml = path.join(outDir, 'app.html')
+      const indexHtml = path.join(outDir, 'index.html')
+      if (fs.existsSync(appHtml)) {
+        fs.copyFileSync(appHtml, indexHtml)
+      }
+    }
+  }
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), renameAppHtml()],
 
   base: '/app/',
 

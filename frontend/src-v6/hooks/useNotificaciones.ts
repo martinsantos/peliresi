@@ -4,6 +4,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { notificacionService } from '../services/notificacion.service';
+import { getAccessToken } from '../services/api';
 import type { NotificacionFilters } from '../types/api';
 
 const KEYS = {
@@ -20,10 +21,12 @@ export function useNotificaciones(filters?: NotificacionFilters) {
 }
 
 export function useNotificacionesNoLeidas() {
+  const hasToken = !!getAccessToken();
   return useQuery({
     queryKey: KEYS.noLeidas(),
     queryFn: () => notificacionService.getNoLeidas(),
-    refetchInterval: 30 * 1000,
+    refetchInterval: hasToken ? 30_000 : false,
+    enabled: hasToken,
   });
 }
 
