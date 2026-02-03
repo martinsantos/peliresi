@@ -1,0 +1,368 @@
+/**
+ * SITREP v6 - Main Layout
+ * =======================
+ * Layout principal con sidebar y header - Adaptado por rol
+ */
+
+import React, { useState, useMemo } from 'react';
+import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import {
+  LayoutDashboard,
+  FileText,
+  MapPin,
+  Settings,
+  Bell,
+  Search,
+  Menu,
+  X,
+  User,
+  ChevronDown,
+  LogOut,
+  Leaf,
+  Command,
+  Users,
+  BarChart3,
+  AlertTriangle,
+  Shield,
+  Upload,
+  Building2,
+  Truck,
+  FlaskConical,
+  Factory,
+  SwitchCamera,
+  QrCode
+} from 'lucide-react';
+import { Button } from '../components/ui/ButtonV2';
+import { Badge } from '../components/ui/BadgeV2';
+import { UserSwitcher } from '../components/ui/UserSwitcher';
+import { useAuth } from '../contexts/AuthContext';
+
+// ========================================
+// COMPONENT
+// ========================================
+export const MainLayout: React.FC = () => {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const location = useLocation();
+  const { currentUser, isAdmin, isGenerador, isTransportista, isOperador, canAccess } = useAuth();
+
+  // Configuración de colores según rol (para header badges)
+  const roleStyles = useMemo(() => {
+    switch (currentUser.rol) {
+      case 'ADMIN':
+        return { badge: 'primary' as const };
+      case 'GENERADOR':
+        return { badge: 'purple' as const };
+      case 'TRANSPORTISTA':
+        return { badge: 'orange' as const };
+      case 'OPERADOR':
+        return { badge: 'green' as const };
+      default:
+        return { badge: 'neutral' as const };
+    }
+  }, [currentUser.rol]);
+
+  // Items de navegación según rol
+  const navItems = useMemo(() => {
+    const items = [];
+    
+    // Dashboard para todos
+    items.push({ path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' });
+    
+    // Centro de Control solo para Admin
+    if (isAdmin) {
+      items.push({ path: '/centro-control', icon: Command, label: 'Centro de Control' });
+    }
+    
+    // Manifiestos para todos
+    items.push({ path: '/manifiestos', icon: FileText, label: 'Manifiestos' });
+    
+    // Tracking para Admin y Transportista
+    if (isAdmin || isTransportista) {
+      items.push({ path: '/tracking', icon: MapPin, label: 'Tracking' });
+    }
+    
+    // Actores solo para Admin
+    if (isAdmin) {
+      items.push({ path: '/actores', icon: Users, label: 'Actores' });
+    }
+    
+    // Reportes para todos excepto algunos casos
+    items.push({ path: '/reportes', icon: BarChart3, label: 'Reportes' });
+    
+    // Alertas para todos
+    items.push({ path: '/alertas', icon: AlertTriangle, label: 'Alertas' });
+    
+    return items;
+  }, [isAdmin, isGenerador, isTransportista, isOperador]);
+
+  // Items de administración según rol
+  const adminItems = useMemo(() => {
+    const items = [];
+    
+    if (isAdmin) {
+      items.push({ path: '/admin/usuarios', icon: User, label: 'Usuarios' });
+      items.push({ path: '/admin/establecimientos', icon: Building2, label: 'Establecimientos' });
+      items.push({ path: '/admin/vehiculos', icon: Truck, label: 'Vehículos' });
+      items.push({ path: '/admin/residuos', icon: FlaskConical, label: 'Catálogo Residuos' });
+      items.push({ path: '/admin/generadores', icon: Factory, label: 'Admin Generadores' });
+      items.push({ path: '/admin/auditoria', icon: Shield, label: 'Auditoría' });
+      items.push({ path: '/admin/carga-masiva', icon: Upload, label: 'Carga Masiva' });
+    } else if (isTransportista) {
+      // Transportista ve sus vehículos
+      items.push({ path: '/admin/vehiculos', icon: Truck, label: 'Mis Vehículos' });
+    }
+    
+    return items;
+  }, [isAdmin, isTransportista]);
+
+  // Get current page title
+  const currentPage = navItems.find(item => item.path === location.pathname)?.label || 
+    adminItems.find(item => item.path === location.pathname)?.label || 'SITREP';
+
+  return (
+    <div className="min-h-screen bg-[#F8F8F6] flex">
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden animate-fade-in"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={`
+          fixed lg:sticky top-0 left-0 z-50
+          w-64 h-screen sidebar-polished border-r border-[#164D32]
+          flex flex-col
+          transition-transform duration-300 ease-out
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        `}
+      >
+        {/* Logo */}
+        <div className="h-16 flex items-center px-6 border-b border-white/15">
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center text-[#1B5E3C] bg-white mr-3">
+            <Leaf size={20} />
+          </div>
+          <div>
+            <span className="font-bold text-lg text-white">SITREP</span>
+            <span className="text-xs font-medium ml-1 text-white/60">{currentUser.rol}</span>
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto sidebar-scrollbar">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                onClick={() => setSidebarOpen(false)}
+                className={({ isActive }) => `
+                  flex items-center gap-3 px-3 py-2.5 rounded-xl
+                  font-medium text-sm transition-all duration-200
+                  ${isActive
+                    ? 'bg-white/20 text-white'
+                    : 'text-white/70 hover:bg-white/10 hover:text-white'
+                  }
+                `}
+              >
+                <Icon size={20} />
+                {item.label}
+                {item.path === '/alertas' && (
+                  <Badge color="error" size="sm" className="ml-auto">3</Badge>
+                )}
+              </NavLink>
+            );
+          })}
+          
+          {/* Admin Section - Solo si hay items */}
+          {adminItems.length > 0 && (
+            <div className="mt-6 pt-6 border-t border-white/15">
+              <p className="px-3 text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">
+                {isAdmin ? 'Administración' : 'Opciones'}
+              </p>
+              {adminItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    onClick={() => setSidebarOpen(false)}
+                    className={({ isActive }) => `
+                      flex items-center gap-3 px-3 py-2.5 rounded-xl
+                      font-medium text-sm transition-all duration-200
+                      ${isActive
+                        ? 'bg-white/20 text-white'
+                        : 'text-white/70 hover:bg-white/10 hover:text-white'
+                      }
+                    `}
+                  >
+                    <Icon size={20} />
+                    {item.label}
+                  </NavLink>
+                );
+              })}
+            </div>
+          )}
+          
+          {/* User Switcher en Sidebar */}
+          <div className="mt-6 pt-6 border-t border-white/15">
+            <p className="px-3 text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">
+              Demo
+            </p>
+            <NavLink
+              to="/switch-user"
+              onClick={() => setSidebarOpen(false)}
+              className={({ isActive }) => `
+                flex items-center gap-3 px-3 py-2.5 rounded-xl
+                font-medium text-sm transition-all duration-200
+                ${isActive
+                  ? 'bg-white/20 text-white'
+                  : 'text-white/70 hover:bg-white/10 hover:text-white'
+                }
+              `}
+            >
+              <SwitchCamera size={20} />
+              Cambiar Usuario
+            </NavLink>
+          </div>
+          
+          {/* Configuración al final */}
+          <div className="mt-2">
+            <NavLink
+              to="/configuracion"
+              onClick={() => setSidebarOpen(false)}
+              className={({ isActive }) => `
+                flex items-center gap-3 px-3 py-2.5 rounded-xl
+                font-medium text-sm transition-all duration-200
+                ${isActive
+                  ? 'bg-white/20 text-white'
+                  : 'text-white/70 hover:bg-white/10 hover:text-white'
+                }
+              `}
+            >
+              <Settings size={20} />
+              Configuración
+            </NavLink>
+          </div>
+        </nav>
+
+        {/* User section */}
+        <div className="p-4 border-t border-white/15">
+          {/* Indicador de rol actual */}
+          <div className="mb-3 px-3 py-2 rounded-xl bg-white/10 border border-white/15">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center font-semibold text-sm bg-white text-[#1B5E3C]">
+                {currentUser.avatar}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm text-white truncate">{currentUser.nombre}</p>
+                <p className="text-xs text-white/60">{currentUser.sector}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="relative">
+            <button
+              onClick={() => setUserMenuOpen(!userMenuOpen)}
+              className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-white/10 transition-colors"
+            >
+              <div className="w-10 h-10 rounded-full flex items-center justify-center bg-white/15 text-white">
+                <User size={20} />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="font-medium text-sm text-white">Mi Cuenta</p>
+                <p className="text-xs text-white/50">{currentUser.email}</p>
+              </div>
+              <ChevronDown
+                size={16}
+                className={`text-white/40 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+
+            {/* User dropdown - stays white since it floats */}
+            {userMenuOpen && (
+              <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-neutral-200 rounded-xl shadow-lg py-2 animate-scale-in">
+                <NavLink to="/mi-perfil" className="w-full flex items-center gap-2 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50">
+                  <User size={16} />
+                  Mi Perfil
+                </NavLink>
+                <NavLink to="/switch-user" className="w-full flex items-center gap-2 px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50">
+                  <SwitchCamera size={16} />
+                  Cambiar Usuario
+                </NavLink>
+                <button className="w-full flex items-center gap-2 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50">
+                  <Settings size={16} />
+                  Configuración
+                </button>
+                <div className="border-t border-neutral-100 my-2" />
+                <button className="w-full flex items-center gap-2 px-4 py-2 text-sm text-error-600 hover:bg-error-50">
+                  <LogOut size={16} />
+                  Cerrar sesión
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </aside>
+
+      {/* Main content */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header */}
+        <header className="h-16 header-polished flex items-center justify-between px-4 lg:px-8 sticky top-0 z-30">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="lg:hidden"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Menu size={20} />
+            </Button>
+            <h1 className="text-xl font-semibold text-neutral-900">{currentPage}</h1>
+            
+            {/* Badge de rol actual */}
+            <Badge 
+              variant="soft" 
+              color={roleStyles.badge}
+              className="hidden sm:inline-flex"
+            >
+              {currentUser.rol}
+            </Badge>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Search */}
+            <div className="hidden md:flex items-center bg-neutral-100 rounded-xl px-4 py-2 gap-2">
+              <Search size={18} className="text-neutral-400" />
+              <input
+                type="text"
+                placeholder="Buscar..."
+                className="bg-transparent border-none outline-none text-sm w-48 placeholder:text-neutral-400"
+              />
+            </div>
+
+            {/* Notifications */}
+            <NavLink to="/alertas" className="relative p-2 rounded-xl hover:bg-neutral-100 transition-colors">
+              <Bell size={20} className="text-neutral-600" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-error-500 rounded-full" />
+            </NavLink>
+
+            {/* User Switcher Dropdown */}
+            <UserSwitcher variant="dropdown" />
+          </div>
+        </header>
+
+        {/* Page content */}
+        <main className="flex-1 p-4 lg:p-8 overflow-auto bg-[#FAFAF8]">
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  );
+};
+
+export default MainLayout;

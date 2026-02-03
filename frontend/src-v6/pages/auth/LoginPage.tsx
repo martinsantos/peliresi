@@ -1,0 +1,135 @@
+/**
+ * SITREP v6 - Login Page
+ * ======================
+ * Página de inicio de sesión - Demo mode
+ */
+
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, Leaf } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+
+const DEMO_USERS = [
+  { label: 'Administrador', sublabel: 'DGFA', userId: 1, color: 'bg-primary-500' },
+  { label: 'Generador', sublabel: 'Hospital Central', userId: 5, color: 'bg-purple-500' },
+  { label: 'Transportista', sublabel: 'Transportes Andes', userId: 13, color: 'bg-orange-500' },
+  { label: 'Operador', sublabel: 'Planta Las Heras', userId: 19, color: 'bg-green-500' },
+];
+
+const LoginPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { switchUser } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Demo: any email/password logs in as admin
+    switchUser(1);
+    navigate('/dashboard');
+  };
+
+  const handleDemoUser = (userId: number) => {
+    setLoading(true);
+    switchUser(userId);
+    // Small delay for visual feedback
+    setTimeout(() => navigate('/dashboard'), 150);
+  };
+
+  return (
+    <div className="w-full max-w-md animate-fade-in-up">
+      {/* Header */}
+      <div className="text-center mb-8">
+        <div className="w-16 h-16 bg-[#1B5E3C] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg animate-scale-in-bounce hover-glow">
+          <Leaf size={32} className="text-white" />
+        </div>
+        <h2 className="text-3xl font-bold text-neutral-900 mb-2" style={{ fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: '-0.03em' }}>
+          SITREP v6
+        </h2>
+        <p className="text-neutral-600">
+          Sistema de Trazabilidad de Residuos Peligrosos
+        </p>
+      </div>
+
+      {/* Demo users - PRINCIPAL */}
+      <div className="mb-8">
+        <p className="text-sm text-neutral-500 text-center mb-4 font-medium">
+          Selecciona un perfil para ingresar
+        </p>
+        <div className="grid grid-cols-2 gap-3 stagger-children">
+          {DEMO_USERS.map((user) => (
+            <button
+              key={user.userId}
+              onClick={() => handleDemoUser(user.userId)}
+              disabled={loading}
+              className="p-4 text-left rounded-xl border-2 border-neutral-200 hover:border-primary-500 hover:bg-primary-50 transition-all active:scale-[0.97] disabled:opacity-50 hover-lift"
+            >
+              <div className={`w-8 h-8 ${user.color} rounded-lg flex items-center justify-center text-white text-xs font-bold mb-2`}>
+                {user.label[0]}
+              </div>
+              <p className="font-semibold text-sm text-neutral-900">{user.label}</p>
+              <p className="text-xs text-neutral-500">{user.sublabel}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div className="flex items-center gap-4 mb-6">
+        <div className="flex-1 h-px bg-neutral-200" />
+        <span className="text-xs text-neutral-400 font-medium">o ingresa con credenciales</span>
+        <div className="flex-1 h-px bg-neutral-200" />
+      </div>
+
+      {/* Form */}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 mb-1.5">Correo electrónico</label>
+          <div className="relative">
+            <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+            <input
+              type="email"
+              placeholder="tu@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full h-11 pl-10 pr-4 border border-neutral-200 rounded-xl text-sm focus:border-[#1B5E3C] focus:ring-4 focus:ring-[#1B5E3C]/15 outline-none transition-all"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 mb-1.5">Contraseña</label>
+          <div className="relative">
+            <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+            <input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full h-11 pl-10 pr-10 border border-neutral-200 rounded-xl text-sm focus:border-[#1B5E3C] focus:ring-4 focus:ring-[#1B5E3C]/15 outline-none transition-all"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          className="w-full h-11 bg-[#1B5E3C] hover:bg-[#164D32] text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] btn-glow"
+        >
+          Ingresar
+          <ArrowRight size={18} />
+        </button>
+      </form>
+    </div>
+  );
+};
+
+export default LoginPage;
