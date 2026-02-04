@@ -162,7 +162,7 @@ ssh root@23.105.176.45 "docker exec -it directus-admin-database-1 psql -U direct
 | `/api/catalogos/*` | catalogo.controller | Residuos, categorías, establecimientos, vehículos |
 | `/api/notificaciones/*` | notification.controller | Notificaciones push y alertas |
 | `/api/analytics/*` | analytics.controller | Dashboard stats (parcialmente implementado) |
-| `/api/pdf/*` | pdf.controller | Generación de PDF de manifiestos |
+| `/api/pdf/*` | pdf.controller | Generación de PDF de manifiestos y certificados de disposición |
 
 ### Key API Endpoints
 
@@ -176,7 +176,13 @@ POST /api/manifiestos/:id/aprobar    → Cambiar estado BORRADOR → APROBADO
 POST /api/manifiestos/:id/confirmar-retiro → APROBADO → EN_TRANSITO
 POST /api/manifiestos/:id/entregar   → EN_TRANSITO → ENTREGADO
 POST /api/manifiestos/:id/recibir    → ENTREGADO → RECIBIDO
-POST /api/manifiestos/:id/tratamiento → RECIBIDO → TRATADO
+POST /api/manifiestos/:id/tratamiento → RECIBIDO → EN_TRATAMIENTO
+POST /api/manifiestos/:id/cerrar      → EN_TRATAMIENTO/RECIBIDO → TRATADO
+POST /api/manifiestos/:id/rechazar    → ENTREGADO → RECHAZADO
+POST /api/manifiestos/:id/incidente   → Registra incidente en transito (acepta campo `tipo` o `tipoIncidente`)
+POST /api/manifiestos/:id/cancelar    → Cancela manifiesto (si no es CANCELADO ni TRATADO)
+GET  /api/pdf/manifiesto/:id          → PDF del manifiesto
+GET  /api/pdf/certificado/:id         → Certificado de Tratamiento y Disposición Final (solo estado TRATADO)
 ```
 
 ### Frontend Filter Mapping
@@ -213,8 +219,8 @@ La función `mapFilters()` en `reporte.service.ts` traduce entre ambos.
 | Página | Archivo | Descripción |
 |--------|---------|-------------|
 | Lista | `pages/manifiestos/ManifiestosPage.tsx` | Tabla con búsqueda, filtros por estado, paginación |
-| Detalle | `pages/manifiestos/ManifiestoDetallePage.tsx` | Workflow completo con acciones por estado, timeline |
-| Nuevo | `pages/manifiestos/NuevoManifiestoPage.tsx` | Formulario multi-paso |
+| Detalle | `pages/manifiestos/ManifiestoDetallePage.tsx` | Workflow completo con 10 acciones por estado/rol, timeline, descarga PDF y Certificado de Disposición (estado TRATADO) |
+| Nuevo | `pages/manifiestos/NuevoManifiestoPage.tsx` | Formulario multi-paso con auto-populate de datos del actor al seleccionar (CUIT, teléfono, domicilio, habilitación) |
 
 ### Actores
 | Página | Archivo | Descripción |
@@ -281,6 +287,74 @@ La función `mapFilters()` en `reporte.service.ts` traduce entre ambos.
 | `analyticsService` | `services/analytics.service.ts` | `/analytics/*` (parcial - algunas rutas no existen en backend) |
 | `manifiestoService` | `services/manifiesto.service.ts` | `/manifiestos/*` |
 | `actoresService` | `services/actores.service.ts` | `/actores/*` |
+| `catalogoService` | `services/catalogo.service.ts` | `/catalogos/*` (tipos residuos, generadores, transportistas, operadores, vehículos, choferes, tratamientos) |
+
+---
+
+## Manifest Workflow States
+
+```
+BORRADOR → APROBADO → EN_TRANSITO → ENTREGADO → RECIBIDO → EN_TRATAMIENTO → TRATADO
+                                   ↘ RECHAZADO
+                    ↗ INCIDENTE (evento, no cambia estado)
+CUALQUIERA (excepto CANCELADO/TRATADO) → CANCELADO
+```
+
+### Workflow Actions by Role (ManifiestoDetallePage)
+
+| Action | From State | To State | Allowed Roles |
+|--------|-----------|----------|---------------|
+| Firmar/Aprobar | BORRADOR | APROBADO | GENERADOR, ADMIN |
+| Confirmar Retiro | APROBADO | EN_TRANSITO | TRANSPORTISTA, ADMIN |
+| Confirmar Entrega | EN_TRANSITO | ENTREGADO | TRANSPORTISTA, ADMIN |
+| Registrar Incidente | EN_TRANSITO | _(event only)_ | TRANSPORTISTA, ADMIN |
+| Confirmar Recepción | ENTREGADO | RECIBIDO | OPERADOR, ADMIN |
+| Rechazar Carga | ENTREGADO | RECHAZADO | OPERADOR, ADMIN |
+| Registrar Pesaje | RECIBIDO | _(updates weights)_ | OPERADOR, ADMIN |
+| Registrar Tratamiento | RECIBIDO | EN_TRATAMIENTO | OPERADOR, ADMIN |
+| Cerrar Manifiesto | EN_TRATAMIENTO/RECIBIDO | TRATADO | OPERADOR, ADMIN |
+| Cancelar Manifiesto | _(any except CANCELADO/TRATADO)_ | CANCELADO | GENERADOR, ADMIN |
+| Descargar Certificado | TRATADO | _(PDF download)_ | ALL |
+
+---
+
+## PWA App
+
+### Configuration
+- **manifest.json** (main): scope `/`, start_url `/`
+- **manifest-app.json** (mobile): scope `/app/`, start_url `/app/`, orientation portrait
+- **Service Worker**: `public/sw.js` — network-first strategy, cache `trazabilidad-rrpp-v4`, API excluded from cache
+- **Offline**: Custom `/offline.html` fallback page
+- **Icons**: `icon-192.png`, `icon-512.png` (maskable)
+
+### PWA Components
+| Component | File | Description |
+|-----------|------|-------------|
+| Install Button | `components/InstallPWAButton.tsx` | Compact PWA install trigger (iOS + Android) |
+| Install Modal | `components/InstallPWAModal.tsx` | Auto-appears after 45s, 7-day dismiss grace |
+| Connectivity | `components/ConnectivityIndicator.tsx` | Online/offline status bar |
+| Onboarding | `components/DemoAppOnboarding.tsx` | Role-based feature tour |
+
+### PWA Hooks
+| Hook | File | Description |
+|------|------|-------------|
+| `usePWAInstall` | `hooks/usePWAInstall.ts` | `canInstall`, `isInstalled`, `isIOS`, `promptInstall()` |
+| `useConnectivity` | `hooks/useConnectivity.ts` | Health ping every 30s, sync queue on reconnect |
+
+---
+
+## Catalogs API (Data Shape)
+
+Backend `/api/catalogos/*` endpoints return full actor data via Prisma includes:
+
+```typescript
+// GET /api/catalogos/generadores → { id, razonSocial, cuit, telefono, domicilio, numeroInscripcion, categoria, usuario: { email, nombre } }
+// GET /api/catalogos/transportistas → { id, razonSocial, cuit, telefono, domicilio, numeroHabilitacion, vehiculos[], choferes[], usuario: { email, nombre } }
+// GET /api/catalogos/operadores → { id, razonSocial, cuit, telefono, domicilio, numeroHabilitacion, categoria, tratamientos[], usuario: { email, nombre } }
+```
+
+Frontend `CatalogoItem` type (types/api.ts) uses `[key: string]: any` to accommodate all fields.
+NuevoManifiestoPage auto-populates actor info cards (CUIT, teléfono, domicilio, habilitación) when selecting from dropdowns.
 
 ---
 
@@ -297,3 +371,6 @@ La función `mapFilters()` en `reporte.service.ts` traduce entre ambos.
 - `/analytics/*` endpoints are partially implemented - `getDashboardStats` works but `getManifiestosPorMes`, `getResiduosPorTipo`, etc. return empty via try/catch fallback
 - Centro de Control usa polling manual (countdown 30s + refetch) en lugar de WebSockets
 - Reportes usa Recharts para gráficos interactivos y jsPDF para exportación PDF client-side
+- `createManifiesto` backend acepta `generadorId` del body para ADMIN (no requiere relación generador en el user)
+- `registrarIncidente` acepta tanto `tipo` como `tipoIncidente` del frontend
+- Certificado de Disposición (CU-O10): PDF generado por `pdf.controller.ts:generarCertificado` con Ley 24.051, datos completos, firma operador

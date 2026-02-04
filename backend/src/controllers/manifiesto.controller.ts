@@ -148,15 +148,22 @@ export const getManifiestoById = async (req: AuthRequest, res: Response, next: N
 // Crear nuevo manifiesto
 export const createManifiesto = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { transportistaId, operadorId, residuos, observaciones } = req.body;
+    const { generadorId: bodyGeneradorId, transportistaId, operadorId, residuos, observaciones } = req.body;
     const userId = req.user.id;
 
-    // Verificar que el usuario es un generador
+    // Verificar que el usuario es un generador o admin
     if (req.user.rol !== 'GENERADOR' && req.user.rol !== 'ADMIN') {
       throw new AppError('Solo los generadores pueden crear manifiestos', 403);
     }
 
-    const generadorId = req.user.generador.id;
+    // ADMIN can specify generadorId in body; GENERADOR uses their own
+    const generadorId = req.user.rol === 'ADMIN'
+      ? (bodyGeneradorId || (req.user.generador && req.user.generador.id))
+      : req.user.generador?.id;
+
+    if (!generadorId) {
+      throw new AppError('Se requiere un generador para crear el manifiesto', 400);
+    }
 
     // Generar número de manifiesto
     const numero = await generarNumeroManifiesto();
@@ -545,7 +552,7 @@ export const cerrarManifiesto = async (req: AuthRequest, res: Response, next: Ne
       data: {
         manifiestoId: id,
         tipo: 'CIERRE',
-        descripcion: `Tratamiento aplicado: ${metodoTratamiento}. ${observaciones || ''}`,
+        descripcion: `Manifiesto cerrado${metodoTratamiento ? `. Tratamiento: ${metodoTratamiento}` : ''}${observaciones ? `. ${observaciones}` : ''}`,
         usuarioId: userId
       }
     });
@@ -619,7 +626,8 @@ export const rechazarCarga = async (req: AuthRequest, res: Response, next: NextF
 export const registrarIncidente = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { tipoIncidente, descripcion, latitud, longitud } = req.body;
+    const { tipoIncidente, tipo, descripcion, latitud, longitud } = req.body;
+    const tipoFinal = tipoIncidente || tipo; // Accept both field names
     const userId = req.user.id;
 
     if (req.user.rol !== 'TRANSPORTISTA' && req.user.rol !== 'ADMIN') {
@@ -643,7 +651,7 @@ export const registrarIncidente = async (req: AuthRequest, res: Response, next: 
       data: {
         manifiestoId: id,
         tipo: 'INCIDENTE',
-        descripcion: `INCIDENTE: ${tipoIncidente}. ${descripcion}`,
+        descripcion: `INCIDENTE: ${tipoFinal}. ${descripcion}`,
         latitud,
         longitud,
         usuarioId: userId
@@ -654,7 +662,7 @@ export const registrarIncidente = async (req: AuthRequest, res: Response, next: 
     await prisma.manifiesto.update({
       where: { id },
       data: {
-        observaciones: `${manifiesto.observaciones || ''} [INCIDENTE: ${tipoIncidente}]`
+        observaciones: `${manifiesto.observaciones || ''} [INCIDENTE: ${tipoFinal}]`
       }
     });
 
@@ -1028,12 +1036,17 @@ export const getManifiestosEsperados = async (req: AuthRequest, res: Response, n
       throw new AppError('Solo los operadores pueden acceder a esta función', 403);
     }
 
+    // Build where clause - ADMIN sees all, OPERADOR sees only their own
+    const whereClause: any = {
+      estado: { in: ['EN_TRANSITO', 'ENTREGADO'] }
+    };
+    if (req.user.rol === 'OPERADOR' && req.user.operador) {
+      whereClause.operadorId = req.user.operador.id;
+    }
+
     // Obtener manifiestos que están en camino o ya llegaron (pendientes de recepción)
     const esperados = await prisma.manifiesto.findMany({
-      where: {
-        operadorId: req.user.operador.id,
-        estado: { in: ['EN_TRANSITO', 'ENTREGADO'] }
-      },
+      where: whereClause,
       select: {
         id: true,
         numero: true,

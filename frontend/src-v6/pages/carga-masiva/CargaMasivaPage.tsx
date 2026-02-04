@@ -139,7 +139,8 @@ const CargaMasivaPage: React.FC = () => {
 
         // Add auth token
         const token = localStorage.getItem('sitrep_access_token');
-        xhr.open('POST', `/api/carga-masiva/${tipoSeleccionado}`);
+        const apiBase = import.meta.env.VITE_API_URL || '/api';
+        xhr.open('POST', `${apiBase}/carga-masiva/${tipoSeleccionado}`);
         if (token) {
           xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         }

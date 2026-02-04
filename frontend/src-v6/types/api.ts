@@ -330,8 +330,11 @@ export interface DashboardChart {
 
 export interface CatalogoItem {
   id: string;
-  nombre: string;
+  nombre?: string;
+  razonSocial?: string;
   label?: string;
+  cuit?: string;
+  [key: string]: any;
 }
 
 export interface CatalogosResponse {

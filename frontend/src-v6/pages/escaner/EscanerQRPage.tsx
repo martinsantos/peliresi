@@ -103,7 +103,7 @@ const EscanerQRPage: React.FC = () => {
 
   const handleViewManifiesto = () => {
     if (!scanResult) return;
-    const isMobile = window.location.pathname.includes('/mobile');
+    const isMobile = window.location.pathname.includes('/mobile') || window.location.pathname.includes('/app');
     navigate(isMobile ? `/mobile/manifiestos/${scanResult}` : `/manifiestos/${scanResult}`);
   };
 

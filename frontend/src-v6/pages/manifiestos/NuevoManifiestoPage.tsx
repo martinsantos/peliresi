@@ -29,7 +29,7 @@ import { Input } from '../../components/ui/Input';
 import { toast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCreateManifiesto } from '../../hooks/useManifiestos';
-import { useTiposResiduo, useCatalogoTransportistas, useCatalogoOperadores } from '../../hooks/useCatalogos';
+import { useTiposResiduo, useCatalogoGeneradores, useCatalogoTransportistas, useCatalogoOperadores } from '../../hooks/useCatalogos';
 
 
 export const NuevoManifiestoPage: React.FC = () => {
@@ -41,11 +41,13 @@ export const NuevoManifiestoPage: React.FC = () => {
   // API hooks
   const createManifiesto = useCreateManifiesto();
   const { data: apiTiposResiduo } = useTiposResiduo();
+  const { data: apiGeneradores } = useCatalogoGeneradores();
   const { data: apiTransportistas } = useCatalogoTransportistas();
   const { data: apiOperadores } = useCatalogoOperadores();
 
   // Use API catalogos only
   const tiposResiduo = apiTiposResiduo || [];
+  const generadoresList = apiGeneradores || [];
   const transportistasList = apiTransportistas || [];
   const operadoresList = apiOperadores || [];
 
@@ -59,6 +61,11 @@ export const NuevoManifiestoPage: React.FC = () => {
     observaciones: '',
     residuos: [{ tipo: '', cantidad: '', unidad: 'kg' }],
   });
+
+  // Selected actor details (auto-populated from catalogs)
+  const selectedGenerador = generadoresList.find((g: any) => g.id === formData.generadorId) as any;
+  const selectedTransportista = transportistasList.find((t: any) => t.id === formData.transportista) as any;
+  const selectedOperador = operadoresList.find((o: any) => o.id === formData.operador) as any;
 
   const handleAddResiduo = () => {
     setFormData({
@@ -182,35 +189,69 @@ export const NuevoManifiestoPage: React.FC = () => {
                 <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Establecimiento Generador *
                 </label>
-                <Input
-                  value={formData.generador}
-                  onChange={(e) => setFormData({ ...formData, generador: e.target.value })}
-                  placeholder="Nombre del establecimiento"
-                  disabled={currentUser?.rol === 'GENERADOR'}
-                />
+                {isAdmin ? (
+                  <select
+                    value={formData.generadorId}
+                    onChange={(e) => {
+                      const gen = generadoresList.find((g: any) => g.id === e.target.value);
+                      setFormData({ ...formData, generadorId: e.target.value, generador: gen?.razonSocial || gen?.nombre || '' });
+                    }}
+                    className={`w-full px-3 py-2 rounded-lg border focus:border-primary-500 focus:outline-none ${validationErrors.generador ? 'border-error-300' : 'border-neutral-200'}`}
+                  >
+                    <option value="">Seleccionar generador</option>
+                    {generadoresList.map((g: any) => (
+                      <option key={g.id} value={g.id}>
+                        {g.razonSocial || g.nombre || g.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <Input
+                    value={formData.generador}
+                    onChange={(e) => setFormData({ ...formData, generador: e.target.value })}
+                    placeholder="Nombre del establecimiento"
+                    disabled={currentUser?.rol === 'GENERADOR'}
+                  />
+                )}
+                {validationErrors.generador && (
+                  <p className="text-xs text-error-500 mt-1">{validationErrors.generador}</p>
+                )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">
-                    CUIT *
-                  </label>
-                  <Input placeholder="30-12345678-9" />
+              {selectedGenerador && (
+                <div className="p-4 bg-primary-50 rounded-xl border border-primary-100 space-y-3 animate-fade-in">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 mb-0.5">CUIT</label>
+                      <p className="text-sm font-semibold text-neutral-900">{selectedGenerador.cuit || '-'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 mb-0.5">Teléfono</label>
+                      <p className="text-sm font-semibold text-neutral-900">{selectedGenerador.telefono || '-'}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-neutral-500 mb-0.5">Domicilio</label>
+                    <p className="text-sm font-semibold text-neutral-900">{selectedGenerador.domicilio || '-'}</p>
+                  </div>
+                  {selectedGenerador.usuario?.email && (
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 mb-0.5">Email</label>
+                      <p className="text-sm font-semibold text-neutral-900">{selectedGenerador.usuario.email}</p>
+                    </div>
+                  )}
+                  {selectedGenerador.numeroInscripcion && (
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 mb-0.5">N° Inscripción</label>
+                      <p className="text-sm font-semibold text-neutral-900">{selectedGenerador.numeroInscripcion}</p>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">
-                    Teléfono
-                  </label>
-                  <Input placeholder="261-4123456" />
-                </div>
-              </div>
+              )}
 
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">
-                  Dirección de Retiro *
-                </label>
-                <Input placeholder="Calle, número, localidad" />
-              </div>
+              {!selectedGenerador && isAdmin && (
+                <p className="text-xs text-neutral-400 italic">Seleccioná un generador para ver sus datos</p>
+              )}
 
               <div className="flex justify-end pt-4">
                 <Button onClick={() => setStep(2)}>
@@ -337,7 +378,7 @@ export const NuevoManifiestoPage: React.FC = () => {
                   <option value="">Seleccionar transportista</option>
                   {transportistasList.map((t: any) => (
                     <option key={t.id} value={t.id}>
-                      {t.nombre || t.label}
+                      {t.razonSocial || t.nombre || t.label}
                     </option>
                   ))}
                 </select>
@@ -345,6 +386,31 @@ export const NuevoManifiestoPage: React.FC = () => {
                   <p className="text-xs text-error-500 mt-1">{validationErrors.transportista}</p>
                 )}
               </div>
+
+              {selectedTransportista && (
+                <div className="p-4 bg-orange-50 rounded-xl border border-orange-100 space-y-2 animate-fade-in">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 mb-0.5">CUIT</label>
+                      <p className="text-sm font-semibold text-neutral-900">{selectedTransportista.cuit || '-'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 mb-0.5">Teléfono</label>
+                      <p className="text-sm font-semibold text-neutral-900">{selectedTransportista.telefono || '-'}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-neutral-500 mb-0.5">Domicilio</label>
+                    <p className="text-sm font-semibold text-neutral-900">{selectedTransportista.domicilio || '-'}</p>
+                  </div>
+                  {selectedTransportista.numeroHabilitacion && (
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 mb-0.5">N° Habilitación</label>
+                      <p className="text-sm font-semibold text-neutral-900">{selectedTransportista.numeroHabilitacion}</p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">
@@ -358,7 +424,7 @@ export const NuevoManifiestoPage: React.FC = () => {
                   <option value="">Seleccionar operador</option>
                   {operadoresList.map((o: any) => (
                     <option key={o.id} value={o.id}>
-                      {o.nombre || o.label}
+                      {o.razonSocial || o.nombre || o.label}
                     </option>
                   ))}
                 </select>
@@ -366,6 +432,37 @@ export const NuevoManifiestoPage: React.FC = () => {
                   <p className="text-xs text-error-500 mt-1">{validationErrors.operador}</p>
                 )}
               </div>
+
+              {selectedOperador && (
+                <div className="p-4 bg-green-50 rounded-xl border border-green-100 space-y-2 animate-fade-in">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 mb-0.5">CUIT</label>
+                      <p className="text-sm font-semibold text-neutral-900">{selectedOperador.cuit || '-'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 mb-0.5">Teléfono</label>
+                      <p className="text-sm font-semibold text-neutral-900">{selectedOperador.telefono || '-'}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-neutral-500 mb-0.5">Domicilio</label>
+                    <p className="text-sm font-semibold text-neutral-900">{selectedOperador.domicilio || '-'}</p>
+                  </div>
+                  {selectedOperador.numeroHabilitacion && (
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 mb-0.5">N° Habilitación</label>
+                      <p className="text-sm font-semibold text-neutral-900">{selectedOperador.numeroHabilitacion}</p>
+                    </div>
+                  )}
+                  {selectedOperador.categoria && (
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 mb-0.5">Categoría</label>
+                      <p className="text-sm font-semibold text-neutral-900">{selectedOperador.categoria}</p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">

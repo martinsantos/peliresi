@@ -27,6 +27,7 @@ import {
   Scale,
   Beaker,
   XCircle,
+  Award,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
@@ -262,6 +263,11 @@ const ManifiestoDetailPage: React.FC = () => {
     window.open(`${apiUrl}/pdf/manifiesto/${id}`, '_blank');
   };
 
+  const handleDescargarCertificado = () => {
+    const apiUrl = import.meta.env.VITE_API_URL || '';
+    window.open(`${apiUrl}/pdf/certificado/${id}`, '_blank');
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6 animate-fade-in">
@@ -336,6 +342,11 @@ const ManifiestoDetailPage: React.FC = () => {
           <Button variant="outline" leftIcon={<Download size={16} />} onClick={handleDescargarPDF}>
             Descargar PDF
           </Button>
+          {m.estado === EstadoManifiesto.TRATADO && (
+            <Button variant="outline" leftIcon={<Award size={16} />} onClick={handleDescargarCertificado} className="!border-success-300 !text-success-700 hover:!bg-success-50">
+              Certificado
+            </Button>
+          )}
           <Button onClick={() => navigate(isMobile ? `/mobile/manifiestos/${id}/editar` : `/manifiestos/${id}/editar`)}>
             Editar
           </Button>
@@ -669,6 +680,12 @@ const ManifiestoDetailPage: React.FC = () => {
                 <Button variant="outline" fullWidth leftIcon={<Download size={16} />} onClick={handleDescargarPDF}>
                   Descargar PDF
                 </Button>
+
+                {m.estado === EstadoManifiesto.TRATADO && (
+                  <Button fullWidth leftIcon={<Award size={16} />} onClick={handleDescargarCertificado} className="!bg-success-600 hover:!bg-success-700">
+                    Descargar Certificado
+                  </Button>
+                )}
 
                 {m.estado !== EstadoManifiesto.CANCELADO && m.estado !== EstadoManifiesto.TRATADO && (isAdmin || userRol === 'GENERADOR') && (
                   <Button variant="danger" fullWidth leftIcon={<XCircle size={16} />} onClick={() => setShowCancelModal(true)}>
