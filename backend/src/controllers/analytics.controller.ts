@@ -1,8 +1,6 @@
 // Analytics Controller - Superadmin only stats and logs
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '../lib/prisma';
 
 // Get super admin email from env
 const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || 'santosma@gmail.com';

@@ -124,8 +124,8 @@ export const AdminEstablecimientosPage: React.FC = () => {
       });
       setIsModalOpen(false);
       resetForm();
-    } catch (err) {
-      console.error('Error al crear establecimiento:', err);
+    } catch {
+      // Error handled by React Query
     }
   };
 
@@ -135,8 +135,8 @@ export const AdminEstablecimientosPage: React.FC = () => {
       await deleteMutation.mutateAsync(deleteTarget.id);
       setModalEliminar(false);
       setDeleteTarget(null);
-    } catch (err) {
-      console.error('Error al eliminar establecimiento:', err);
+    } catch {
+      // Error handled by React Query
     }
   };
 

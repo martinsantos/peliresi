@@ -34,13 +34,7 @@ interface CargaResultado {
   estado: string;
 }
 
-// Mock data de historial (fallback)
-const historialMockData: CargaResultado[] = [
-  { id: 1, archivo: 'manifiestos_enero_2025.xlsx', fecha: '2025-01-31 14:30', registros: 45, exitosos: 45, fallidos: 0, estado: 'completado' },
-  { id: 2, archivo: 'generadores_nuevos.xlsx', fecha: '2025-01-30 10:15', registros: 12, exitosos: 10, fallidos: 2, estado: 'parcial' },
-  { id: 3, archivo: 'transportistas_q1.xlsx', fecha: '2025-01-28 16:45', registros: 8, exitosos: 0, fallidos: 8, estado: 'error' },
-  { id: 4, archivo: 'residuos_catalogo.xlsx', fecha: '2025-01-25 09:00', registros: 156, exitosos: 156, fallidos: 0, estado: 'completado' },
-];
+// Historial starts empty - populated by actual uploads
 
 // Template types for download
 const TEMPLATE_TYPES = [
@@ -55,7 +49,7 @@ const CargaMasivaPage: React.FC = () => {
   const [procesando, setProcesando] = useState(false);
   const [progreso, setProgreso] = useState(0);
   const [tipoSeleccionado, setTipoSeleccionado] = useState('manifiestos');
-  const [historial, setHistorial] = useState<CargaResultado[]>(historialMockData);
+  const [historial, setHistorial] = useState<CargaResultado[]>([]);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();

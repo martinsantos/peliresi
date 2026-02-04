@@ -29,4 +29,9 @@ if (!config.DATABASE_URL) {
   process.exit(1);
 }
 
+// Warn if JWT_SECRET is the default insecure value in production
+if (config.NODE_ENV === 'production' && config.JWT_SECRET === 'your-super-secret-jwt-key-change-in-production') {
+  console.error('WARNING: JWT_SECRET is using the default insecure value in production! Set a strong secret in .env');
+}
+
 export default config;

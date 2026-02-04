@@ -23,8 +23,13 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ) => {
-  console.error(err.stack);
-  
+  // Log full error internally
+  if (process.env.NODE_ENV === 'production') {
+    console.error(`[ERROR] ${req.method} ${req.path} - ${err.message}`);
+  } else {
+    console.error(err.stack);
+  }
+
   let statusCode = err.statusCode || 500;
   let message = err.message || 'Error interno del servidor';
   let details = err.details;
@@ -44,6 +49,12 @@ export const errorHandler = (
       statusCode = 404;
       message = 'Recurso no encontrado';
     }
+  }
+
+  // In production, don't expose internal error details for 500 errors
+  if (process.env.NODE_ENV === 'production' && statusCode === 500) {
+    message = 'Error interno del servidor';
+    details = undefined;
   }
 
   // Respuesta de error

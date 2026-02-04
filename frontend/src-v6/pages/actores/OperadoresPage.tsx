@@ -101,8 +101,8 @@ const OperadoresPage: React.FC = () => {
       });
       setModalCrear(false);
       setForm(INITIAL_FORM);
-    } catch (err) {
-      console.error('Error creando operador:', err);
+    } catch {
+      // Error handled by React Query
     }
   };
 
@@ -124,8 +124,8 @@ const OperadoresPage: React.FC = () => {
       setModalEditar(false);
       setEditId(null);
       setForm(INITIAL_FORM);
-    } catch (err) {
-      console.error('Error actualizando operador:', err);
+    } catch {
+      // Error handled by React Query
     }
   };
 
@@ -151,8 +151,8 @@ const OperadoresPage: React.FC = () => {
       await deleteMutation.mutateAsync(deleteTarget.id);
       setModalEliminar(false);
       setDeleteTarget(null);
-    } catch (err) {
-      console.error('Error eliminando operador:', err);
+    } catch {
+      // Error handled by React Query
     }
   };
 

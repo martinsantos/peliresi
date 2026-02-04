@@ -90,10 +90,8 @@ export function useConnectivity(options: UseConnectivityOptions = {}): Connectiv
       if (wasOffline.current) {
         wasOffline.current = false;
         checkApi();
-        processSyncQueue().then((count) => {
-          if (count > 0) {
-            console.log(`[Connectivity] ${count} acciones sincronizadas`);
-          }
+        processSyncQueue().then(() => {
+          // Sync queue processed on reconnect
         }).catch(() => {
           // Silently handle sync errors
         });

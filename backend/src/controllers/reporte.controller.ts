@@ -1,9 +1,16 @@
 import { Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import prisma from '../lib/prisma';
 
-const prisma = new PrismaClient();
+// Sanitize CSV cell to prevent CSV injection (formula injection via =, +, -, @, \t, \r)
+function sanitizeCsvCell(value: any): string {
+  const str = String(value ?? '');
+  if (/^[=+\-@\t\r]/.test(str)) {
+    return "'" + str;
+  }
+  return str;
+}
 
 // Reporte de manifiestos por período (CU-A11)
 export const reporteManifiestosPorPeriodo = async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -367,7 +374,7 @@ export const exportarCSV = async (req: AuthRequest, res: Response, next: NextFun
 
                 manifiestos.forEach(m => {
                     m.residuos.forEach(r => {
-                        csvContent += `"${m.numero}","${m.estado}","${m.generador.razonSocial}","${m.transportista.razonSocial}","${m.operador.razonSocial}","${m.createdAt.toISOString()}","${m.fechaFirma?.toISOString() || ''}","${m.fechaRetiro?.toISOString() || ''}","${m.fechaEntrega?.toISOString() || ''}","${m.fechaRecepcion?.toISOString() || ''}","${m.fechaCierre?.toISOString() || ''}","${r.tipoResiduo.nombre}","${r.cantidad}","${r.unidad}"\n`;
+                        csvContent += `"${sanitizeCsvCell(m.numero)}","${sanitizeCsvCell(m.estado)}","${sanitizeCsvCell(m.generador.razonSocial)}","${sanitizeCsvCell(m.transportista.razonSocial)}","${sanitizeCsvCell(m.operador.razonSocial)}","${m.createdAt.toISOString()}","${m.fechaFirma?.toISOString() || ''}","${m.fechaRetiro?.toISOString() || ''}","${m.fechaEntrega?.toISOString() || ''}","${m.fechaRecepcion?.toISOString() || ''}","${m.fechaCierre?.toISOString() || ''}","${sanitizeCsvCell(r.tipoResiduo.nombre)}","${r.cantidad}","${r.unidad}"\n`;
                     });
                 });
 
@@ -382,7 +389,7 @@ export const exportarCSV = async (req: AuthRequest, res: Response, next: NextFun
                 csvContent = 'RazonSocial,CUIT,Domicilio,Telefono,Email,NumeroInscripcion,Categoria,TotalManifiestos,Activo\n';
 
                 generadores.forEach(g => {
-                    csvContent += `"${g.razonSocial}","${g.cuit}","${g.domicilio}","${g.telefono}","${g.email}","${g.numeroInscripcion}","${g.categoria}","${g._count.manifiestos}","${g.activo}"\n`;
+                    csvContent += `"${sanitizeCsvCell(g.razonSocial)}","${sanitizeCsvCell(g.cuit)}","${sanitizeCsvCell(g.domicilio)}","${sanitizeCsvCell(g.telefono)}","${sanitizeCsvCell(g.email)}","${sanitizeCsvCell(g.numeroInscripcion)}","${sanitizeCsvCell(g.categoria)}","${g._count.manifiestos}","${g.activo}"\n`;
                 });
 
                 filename = `generadores_${new Date().toISOString().split('T')[0]}.csv`;
@@ -398,7 +405,7 @@ export const exportarCSV = async (req: AuthRequest, res: Response, next: NextFun
                 csvContent = 'RazonSocial,CUIT,NumeroHabilitacion,Telefono,Email,TotalManifiestos,Vehiculos,Choferes,Activo\n';
 
                 transportistas.forEach(t => {
-                    csvContent += `"${t.razonSocial}","${t.cuit}","${t.numeroHabilitacion}","${t.telefono}","${t.email}","${t._count.manifiestos}","${t._count.vehiculos}","${t._count.choferes}","${t.activo}"\n`;
+                    csvContent += `"${sanitizeCsvCell(t.razonSocial)}","${sanitizeCsvCell(t.cuit)}","${sanitizeCsvCell(t.numeroHabilitacion)}","${sanitizeCsvCell(t.telefono)}","${sanitizeCsvCell(t.email)}","${t._count.manifiestos}","${t._count.vehiculos}","${t._count.choferes}","${t.activo}"\n`;
                 });
 
                 filename = `transportistas_${new Date().toISOString().split('T')[0]}.csv`;
@@ -412,7 +419,7 @@ export const exportarCSV = async (req: AuthRequest, res: Response, next: NextFun
                 csvContent = 'RazonSocial,CUIT,NumeroHabilitacion,Domicilio,Telefono,Email,Categoria,TotalManifiestos,Activo\n';
 
                 operadores.forEach(o => {
-                    csvContent += `"${o.razonSocial}","${o.cuit}","${o.numeroHabilitacion}","${o.domicilio}","${o.telefono}","${o.email}","${o.categoria}","${o._count.manifiestos}","${o.activo}"\n`;
+                    csvContent += `"${sanitizeCsvCell(o.razonSocial)}","${sanitizeCsvCell(o.cuit)}","${sanitizeCsvCell(o.numeroHabilitacion)}","${sanitizeCsvCell(o.domicilio)}","${sanitizeCsvCell(o.telefono)}","${sanitizeCsvCell(o.email)}","${sanitizeCsvCell(o.categoria)}","${o._count.manifiestos}","${o.activo}"\n`;
                 });
 
                 filename = `operadores_${new Date().toISOString().split('T')[0]}.csv`;

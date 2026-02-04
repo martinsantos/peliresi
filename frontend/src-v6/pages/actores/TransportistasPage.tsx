@@ -101,8 +101,8 @@ const TransportistasPage: React.FC = () => {
       });
       setModalCrear(false);
       setForm(INITIAL_FORM);
-    } catch (err) {
-      console.error('Error creando transportista:', err);
+    } catch {
+      // Error handled by React Query
     }
   };
 
@@ -123,8 +123,8 @@ const TransportistasPage: React.FC = () => {
       setModalEditar(false);
       setEditId(null);
       setForm(INITIAL_FORM);
-    } catch (err) {
-      console.error('Error actualizando transportista:', err);
+    } catch {
+      // Error handled by React Query
     }
   };
 
@@ -149,8 +149,8 @@ const TransportistasPage: React.FC = () => {
       await deleteMutation.mutateAsync(deleteTarget.id);
       setModalEliminar(false);
       setDeleteTarget(null);
-    } catch (err) {
-      console.error('Error eliminando transportista:', err);
+    } catch {
+      // Error handled by React Query
     }
   };
 

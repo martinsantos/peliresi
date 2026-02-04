@@ -109,9 +109,8 @@ const ViajeEnCursoTransportista: React.FC = () => {
           setCurrentPosition(point);
           setTrackPoints(prev => [...prev, point]);
         },
-        (err) => {
-          console.warn('GPS error:', err.message);
-          // Fallback: use default position
+        (_err) => {
+          // GPS unavailable - fallback to default position
           if (!currentPosition) setCurrentPosition(defaultCenter);
         },
         { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }

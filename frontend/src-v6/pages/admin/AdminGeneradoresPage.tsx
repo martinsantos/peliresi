@@ -11,7 +11,6 @@ import {
   Plus,
   Search,
   FileText,
-  TrendingUp,
   AlertTriangle,
   CheckCircle,
   MapPin,
@@ -95,7 +94,7 @@ const AdminGeneradoresPage: React.FC = () => {
       setModalCrear(false);
       setForm(INITIAL_FORM);
     } catch (err) {
-      console.error('Error creando generador:', err);
+      // Error handled by React Query
     }
   };
 
@@ -118,7 +117,7 @@ const AdminGeneradoresPage: React.FC = () => {
       setEditId(null);
       setForm(INITIAL_FORM);
     } catch (err) {
-      console.error('Error actualizando generador:', err);
+      // Error handled by React Query
     }
   };
 
@@ -145,7 +144,7 @@ const AdminGeneradoresPage: React.FC = () => {
       setModalEliminar(false);
       setDeleteTarget(null);
     } catch (err) {
-      console.error('Error eliminando generador:', err);
+      // Error handled by React Query
     }
   };
 
@@ -218,25 +217,6 @@ const AdminGeneradoresPage: React.FC = () => {
           </CardContent>
         </Card>
       </div>
-
-      {/* Grafico de tendencia */}
-      <Card>
-        <CardHeader title="Generacion de Residuos por Mes" icon={<TrendingUp size={20} />} />
-        <CardContent>
-          <div className="h-48 flex items-end gap-4">
-            {['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'].map((mes, i) => (
-              <div key={mes} className="flex-1 flex flex-col items-center gap-2">
-                <div className="w-full bg-purple-200 rounded-t-md relative group" style={{ height: `${40 + i * 15}px` }}>
-                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-neutral-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                    {80 + i * 30}tn
-                  </div>
-                </div>
-                <span className="text-xs text-neutral-500">{mes}</span>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Filtros */}
       <Card padding="base">

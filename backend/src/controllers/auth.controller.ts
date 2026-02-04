@@ -2,11 +2,42 @@ import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { StringValue } from 'ms';
-import { PrismaClient } from '@prisma/client';
+import { z } from 'zod';
 import { config } from '../config/config';
 import { AppError } from '../middlewares/errorHandler';
+import prisma from '../lib/prisma';
 
-const prisma = new PrismaClient();
+// Demo mode accounts (relaxed password validation)
+const DEMO_EMAILS = [
+  'juan.perez@dgfa.gob.ar',
+  'm.gonzalez@hospitalcentral.gob.ar',
+  'c.rodriguez@transportesandes.com',
+  'ana.martinez@plantalasheras.com',
+];
+
+// Zod schemas
+const loginSchema = z.object({
+  email: z.string().email('Email inválido'),
+  password: z.string().min(1, 'La contraseña es requerida'),
+});
+
+const registerSchema = z.object({
+  email: z.string().email('Email inválido'),
+  password: z.string().min(1, 'La contraseña es requerida'),
+  rol: z.enum(['ADMIN', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR']),
+  nombre: z.string().min(1, 'El nombre es requerido').max(100),
+  apellido: z.string().optional(),
+  empresa: z.string().optional(),
+  telefono: z.string().optional(),
+});
+
+// Password strength validation for non-demo users
+function validatePasswordStrength(password: string): string | null {
+  if (password.length < 8) return 'La contraseña debe tener al menos 8 caracteres';
+  if (!/[A-Z]/.test(password)) return 'La contraseña debe contener al menos una mayúscula';
+  if (!/[0-9]/.test(password)) return 'La contraseña debe contener al menos un número';
+  return null;
+}
 
 // Generar tokens JWT
 const generateTokens = (userId: string) => {
@@ -22,7 +53,21 @@ const generateTokens = (userId: string) => {
 // Registrar nuevo usuario
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password, rol, nombre, apellido, empresa, telefono } = req.body;
+    const parsed = registerSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError(parsed.error.issues[0].message, 400);
+    }
+
+    const { email, password, rol, nombre, apellido, empresa, telefono } = parsed.data;
+
+    // Password strength check (skip for demo mode accounts)
+    const isDemoMode = process.env.DEMO_MODE === 'true';
+    if (!isDemoMode || !DEMO_EMAILS.includes(email)) {
+      const passwordError = validatePasswordStrength(password);
+      if (passwordError) {
+        throw new AppError(passwordError, 400);
+      }
+    }
 
     // Verificar si el usuario ya existe
     const existingUser = await prisma.usuario.findUnique({
@@ -78,7 +123,12 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
 // Iniciar sesión
 export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password } = req.body;
+    const parsed = loginSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError(parsed.error.issues[0].message, 400);
+    }
+
+    const { email, password } = parsed.data;
 
     // Buscar usuario
     const user = await prisma.usuario.findUnique({
@@ -195,8 +245,6 @@ export const getProfile = async (req: Request & { user?: any }, res: Response, n
 // Cerrar sesión
 export const logout = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // En una implementación real, aquí invalidaríamos el refresh token
-    // Por ahora, simplemente respondemos con éxito
     res.json({
       success: true,
       message: 'Sesión cerrada correctamente',

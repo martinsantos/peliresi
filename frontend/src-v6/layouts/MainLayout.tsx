@@ -197,9 +197,6 @@ export const MainLayout: React.FC = () => {
               >
                 <Icon size={20} />
                 {item.label}
-                {item.path === '/alertas' && (
-                  <Badge color="error" size="sm" className="ml-auto">3</Badge>
-                )}
               </NavLink>
             );
           })}

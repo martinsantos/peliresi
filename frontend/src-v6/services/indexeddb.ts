@@ -177,7 +177,7 @@ export async function processSyncQueue(): Promise<number> {
           await api.delete(action.endpoint);
           break;
         default:
-          console.warn(`[IndexedDB] Tipo de acción desconocido: ${action.type}`);
+          // Unknown action type - skip
       }
 
       // Eliminar la acción procesada individualmente
@@ -187,7 +187,7 @@ export async function processSyncQueue(): Promise<number> {
       processed++;
     } catch (err) {
       // Detenerse en el primer error para mantener el orden
-      console.error('[IndexedDB] Error procesando sync queue:', err);
+      // Sync queue error - stop processing to maintain order
       break;
     }
   }

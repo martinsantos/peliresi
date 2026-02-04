@@ -183,8 +183,7 @@ export const QRCodeModal: React.FC<QRCodeModalProps> = ({
   if (!isOpen) return null;
 
   const handleDownload = () => {
-    // Simular descarga
-    console.log('Descargando QR:', manifiestoId);
+    // TODO: implement QR download
   };
 
   const handleShare = async () => {
@@ -195,8 +194,8 @@ export const QRCodeModal: React.FC<QRCodeModalProps> = ({
           text: `Ver detalles del manifiesto ${manifiestoId}`,
           url: `${window.location.origin}/manifiestos/${manifiestoId}`,
         });
-      } catch (err) {
-        console.log('Error al compartir:', err);
+      } catch {
+        // Share cancelled or failed - no action needed
       }
     } else {
       // Fallback: copiar al portapapeles

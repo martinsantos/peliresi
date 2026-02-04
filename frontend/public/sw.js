@@ -1,12 +1,11 @@
 // Service Worker para modo Offline-First (CU-T09)
-const CACHE_NAME = 'trazabilidad-rrpp-v5';
-const RUNTIME_CACHE = 'runtime-cache-v5';
+const CACHE_NAME = 'trazabilidad-rrpp-v6';
+const RUNTIME_CACHE = 'runtime-cache-v6';
 
 // Recursos críticos para cachear en instalación
-// Paths relativos al scope del SW
 const PRECACHE_URLS = [
-    '/demoambiente/',
-    '/demoambiente/index.html'
+    '/',
+    '/index.html'
 ];
 
 // Instalación del Service Worker
@@ -117,8 +116,8 @@ self.addEventListener('push', (event) => {
     const title = data.title || 'Trazabilidad RRPP';
     const options = {
         body: data.body || 'Nueva notificación',
-        icon: '/demoambiente/icon-192.png',
-        badge: '/demoambiente/icon-192.png',
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
         data: data
     };
 

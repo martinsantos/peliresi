@@ -12,6 +12,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 // ========================================
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // ========================================
 // LAYOUTS
@@ -117,6 +118,7 @@ const PageLoader: React.FC = () => (
 // ========================================
 function App() {
   return (
+    <ErrorBoundary>
     <AuthProvider>
     <Suspense fallback={<PageLoader />}>
       <Routes>
@@ -238,6 +240,7 @@ function App() {
       </Routes>
     </Suspense>
     </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

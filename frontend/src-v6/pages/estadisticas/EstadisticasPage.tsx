@@ -1,7 +1,7 @@
 /**
  * SITREP v6 - Estadísticas Page
  * ==============================
- * Dashboard de estadísticas y KPIs
+ * Dashboard de estadísticas y KPIs - Connected to real API data
  */
 
 import React, { useState } from 'react';
@@ -15,52 +15,53 @@ import {
   Leaf,
   ArrowLeft,
   Download,
-  Calendar
+  Calendar,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { Card } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
-
-// Mock stats data
-const statsCards = [
-  {
-    title: 'Total Manifiestos',
-    value: '1,247',
-    change: '+12.5%',
-    trend: 'up',
-    icon: Package,
-    color: 'primary',
-  },
-  {
-    title: 'En Tránsito',
-    value: '48',
-    change: '+5.2%',
-    trend: 'up',
-    icon: Truck,
-    color: 'info',
-  },
-  {
-    title: 'Generadores Activos',
-    value: '156',
-    change: '+3.1%',
-    trend: 'up',
-    icon: Users,
-    color: 'secondary',
-  },
-  {
-    title: 'Residuos Tratados',
-    value: '45.2 Tn',
-    change: '-2.4%',
-    trend: 'down',
-    icon: Leaf,
-    color: 'success',
-  },
-];
+import { useDashboardStats } from '../../hooks/useDashboard';
+import { useGeneradores } from '../../hooks/useActores';
 
 const EstadisticasPage: React.FC = () => {
   const navigate = useNavigate();
   const [periodo, setPeriodo] = useState<'semana' | 'mes' | 'año'>('mes');
 
+  const { data: dashboardData, isLoading, isError } = useDashboardStats();
+  const { data: generadoresData } = useGeneradores();
+
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+
+  const stats = dashboardData?.estadisticas;
+  const generadoresList = Array.isArray(generadoresData?.items) ? generadoresData.items : [];
+
+  const statsCards = [
+    {
+      title: 'Total Manifiestos',
+      value: stats?.total ?? '-',
+      icon: Package,
+      color: 'primary',
+    },
+    {
+      title: 'En Tránsito',
+      value: stats?.enTransito ?? '-',
+      icon: Truck,
+      color: 'info',
+    },
+    {
+      title: 'Generadores Activos',
+      value: generadoresList.filter((g: any) => g.activo !== false).length || '-',
+      icon: Users,
+      color: 'secondary',
+    },
+    {
+      title: 'Residuos Tratados',
+      value: stats?.tratados ?? '-',
+      icon: Leaf,
+      color: 'success',
+    },
+  ];
 
   const getColorClasses = (color: string) => {
     const colors: Record<string, { bg: string; text: string }> = {
@@ -78,7 +79,7 @@ const EstadisticasPage: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-3">
           {isMobile && (
-            <button 
+            <button
               onClick={() => navigate(-1)}
               className="p-2 hover:bg-neutral-100 rounded-lg"
             >
@@ -88,7 +89,13 @@ const EstadisticasPage: React.FC = () => {
           <div>
             <h2 className="text-2xl font-bold text-neutral-900">Estadísticas</h2>
             <p className="text-neutral-600 mt-1">
-              Métricas y análisis del sistema
+              {isLoading ? (
+                <span className="flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Cargando métricas...</span>
+              ) : isError ? (
+                <span className="flex items-center gap-2 text-error-600"><AlertCircle size={14} /> Error al cargar datos</span>
+              ) : (
+                'Métricas y análisis del sistema'
+              )}
             </p>
           </div>
         </div>
@@ -124,26 +131,20 @@ const EstadisticasPage: React.FC = () => {
         {statsCards.map((stat) => {
           const colors = getColorClasses(stat.color);
           const Icon = stat.icon;
-          
+
           return (
             <Card key={stat.title} className="p-4">
               <div className="flex items-start justify-between">
                 <div className={`w-10 h-10 ${colors.bg} rounded-lg flex items-center justify-center`}>
                   <Icon className={colors.text} size={20} />
                 </div>
-                <div className={`flex items-center gap-1 text-xs font-medium ${
-                  stat.trend === 'up' ? 'text-success-600' : 'text-error-600'
-                }`}>
-                  {stat.trend === 'up' ? (
-                    <TrendingUp size={14} />
-                  ) : (
-                    <TrendingDown size={14} />
-                  )}
-                  {stat.change}
-                </div>
               </div>
               <div className="mt-3">
-                <p className="text-2xl font-bold text-neutral-900">{stat.value}</p>
+                {isLoading ? (
+                  <div className="h-8 w-16 bg-neutral-200 rounded animate-pulse" />
+                ) : (
+                  <p className="text-2xl font-bold text-neutral-900">{stat.value}</p>
+                )}
                 <p className="text-sm text-neutral-600">{stat.title}</p>
               </div>
             </Card>
@@ -151,76 +152,124 @@ const EstadisticasPage: React.FC = () => {
         })}
       </div>
 
-      {/* Charts placeholder */}
+      {/* Charts - Manifiestos por Estado */}
       <div className="grid lg:grid-cols-2 gap-6">
         <Card className="p-6">
           <h3 className="text-lg font-semibold text-neutral-900 mb-4">
             Manifiestos por Estado
           </h3>
-          <div className="h-64 flex items-center justify-center bg-neutral-50 rounded-xl">
-            <div className="text-center">
-              <div className="w-32 h-32 rounded-full border-8 border-neutral-200 border-t-primary-500 border-r-success-500 border-b-warning-500 border-l-info-500 animate-spin" style={{ animationDuration: '3s' }} />
-              <p className="text-neutral-500 mt-4 text-sm">Gráfico circular</p>
+          {isLoading ? (
+            <div className="h-64 flex items-center justify-center">
+              <Loader2 size={24} className="animate-spin text-neutral-400" />
             </div>
-          </div>
+          ) : stats ? (
+            <div className="space-y-3">
+              {[
+                { label: 'Borradores', count: stats.borradores, color: 'bg-neutral-400' },
+                { label: 'Aprobados', count: stats.aprobados, color: 'bg-primary-500' },
+                { label: 'En Tránsito', count: stats.enTransito, color: 'bg-info-500' },
+                { label: 'Entregados', count: stats.entregados, color: 'bg-warning-500' },
+                { label: 'Recibidos', count: stats.recibidos, color: 'bg-orange-500' },
+                { label: 'Tratados', count: stats.tratados, color: 'bg-success-500' },
+              ].map((item) => (
+                <div key={item.label} className="flex items-center gap-3">
+                  <span className="text-sm text-neutral-600 w-24">{item.label}</span>
+                  <div className="flex-1 h-6 bg-neutral-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${item.color} rounded-full transition-all`}
+                      style={{ width: `${stats.total > 0 ? (item.count / stats.total) * 100 : 0}%` }}
+                    />
+                  </div>
+                  <span className="text-sm font-medium text-neutral-900 w-8 text-right">{item.count}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-neutral-500">
+              Sin datos disponibles
+            </div>
+          )}
         </Card>
 
         <Card className="p-6">
           <h3 className="text-lg font-semibold text-neutral-900 mb-4">
-            Tendencia Mensual
+            Resumen General
           </h3>
-          <div className="h-64 flex items-end justify-center gap-2 bg-neutral-50 rounded-xl p-4">
-            {[40, 65, 45, 80, 55, 90, 70, 85, 60, 75, 95, 85].map((h, i) => (
-              <div
-                key={i}
-                className="flex-1 bg-primary-500 rounded-t-sm hover:bg-primary-600 transition-colors"
-                style={{ height: `${h}%` }}
-              />
-            ))}
-          </div>
-          <div className="flex justify-between mt-2 text-xs text-neutral-500">
-            <span>Ene</span>
-            <span>Jun</span>
-            <span>Dic</span>
-          </div>
+          {isLoading ? (
+            <div className="h-64 flex items-center justify-center">
+              <Loader2 size={24} className="animate-spin text-neutral-400" />
+            </div>
+          ) : stats ? (
+            <div className="space-y-4">
+              <div className="p-4 bg-primary-50 rounded-xl">
+                <p className="text-sm text-primary-700">Total Manifiestos</p>
+                <p className="text-3xl font-bold text-primary-900">{stats.total}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-info-50 rounded-lg text-center">
+                  <p className="text-2xl font-bold text-info-900">{stats.enTransito}</p>
+                  <p className="text-xs text-info-700">En tránsito</p>
+                </div>
+                <div className="p-3 bg-success-50 rounded-lg text-center">
+                  <p className="text-2xl font-bold text-success-900">{stats.tratados}</p>
+                  <p className="text-xs text-success-700">Completados</p>
+                </div>
+                <div className="p-3 bg-warning-50 rounded-lg text-center">
+                  <p className="text-2xl font-bold text-warning-900">{stats.borradores + stats.aprobados}</p>
+                  <p className="text-xs text-warning-700">Pendientes</p>
+                </div>
+                <div className="p-3 bg-neutral-50 rounded-lg text-center">
+                  <p className="text-2xl font-bold text-neutral-900">{stats.total > 0 ? ((stats.tratados / stats.total) * 100).toFixed(0) : 0}%</p>
+                  <p className="text-xs text-neutral-600">Tasa completitud</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-neutral-500">
+              Sin datos disponibles
+            </div>
+          )}
         </Card>
       </div>
 
-      {/* Top Generators */}
+      {/* Top Generators - from real data */}
       <Card className="p-6">
         <h3 className="text-lg font-semibold text-neutral-900 mb-4">
           Top Generadores
         </h3>
-        <div className="space-y-4 animate-fade-in">
-          {[
-            { name: 'Química Mendoza S.A.', manifiestos: 145, toneladas: '12.5 Tn' },
-            { name: 'Industrias del Sur', manifiestos: 98, toneladas: '8.3 Tn' },
-            { name: 'Metalúrgica Argentina', manifiestos: 87, toneladas: '24.1 Tn' },
-            { name: 'Plásticos Argentinos', manifiestos: 76, toneladas: '6.8 Tn' },
-            { name: 'Textil Cuyo', manifiestos: 54, toneladas: '4.2 Tn' },
-          ].map((gen, i) => (
-            <div key={gen.name} className="flex items-center gap-4">
-              <span className="w-6 text-center text-sm font-medium text-neutral-500">
-                {i + 1}
-              </span>
-              <div className="flex-1">
-                <p className="font-medium text-neutral-900">{gen.name}</p>
-                <div className="flex items-center gap-4 mt-1">
-                  <div className="flex-1 h-2 bg-neutral-100 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-primary-500 rounded-full"
-                      style={{ width: `${(gen.manifiestos / 145) * 100}%` }}
-                    />
+        {generadoresList.length === 0 ? (
+          <div className="py-8 text-center text-neutral-500">
+            {isLoading ? (
+              <Loader2 size={24} className="animate-spin mx-auto" />
+            ) : (
+              'No hay datos de generadores disponibles'
+            )}
+          </div>
+        ) : (
+          <div className="space-y-4 animate-fade-in">
+            {generadoresList.slice(0, 5).map((gen: any, i: number) => (
+              <div key={gen.id || gen.razonSocial} className="flex items-center gap-4">
+                <span className="w-6 text-center text-sm font-medium text-neutral-500">
+                  {i + 1}
+                </span>
+                <div className="flex-1">
+                  <p className="font-medium text-neutral-900">{gen.razonSocial}</p>
+                  <div className="flex items-center gap-4 mt-1">
+                    <div className="flex-1 h-2 bg-neutral-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary-500 rounded-full"
+                        style={{ width: `${100 - i * 15}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
+                <div className="text-right">
+                  <p className="text-xs text-neutral-500">{gen.categoria || '-'}</p>
+                </div>
               </div>
-              <div className="text-right">
-                <p className="font-medium text-neutral-900">{gen.manifiestos}</p>
-                <p className="text-xs text-neutral-500">{gen.toneladas}</p>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </Card>
     </div>
   );

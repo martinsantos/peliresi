@@ -697,29 +697,31 @@ const ManifiestoDetailPage: React.FC = () => {
           </Card>
 
           <Card>
-            <CardHeader title="Documentos adjuntos" />
+            <CardHeader title="Documentos" />
             <CardContent>
-              <div className="space-y-3 animate-fade-in">
-                <div className="flex items-center gap-3 p-3 bg-neutral-50 rounded-xl">
-                  <FileText size={20} className="text-neutral-400" />
+              <div className="space-y-2 animate-fade-in">
+                <button
+                  onClick={handleDescargarPDF}
+                  className="flex items-center gap-3 p-3 bg-neutral-50 rounded-xl w-full hover:bg-neutral-100 transition-colors text-left"
+                >
+                  <FileText size={20} className="text-primary-500" />
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm text-neutral-900 truncate">Manifiesto.pdf</p>
-                    <p className="text-xs text-neutral-500">2.4 MB</p>
+                    <p className="font-medium text-sm text-neutral-900 truncate">Manifiesto PDF</p>
+                    <p className="text-xs text-neutral-500">Descargar documento oficial</p>
                   </div>
-                  <Button variant="ghost" size="sm">
-                    Ver
-                  </Button>
-                </div>
-                <div className="flex items-center gap-3 p-3 bg-neutral-50 rounded-xl">
-                  <FileText size={20} className="text-neutral-400" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm text-neutral-900 truncate">Anexo_A.pdf</p>
-                    <p className="text-xs text-neutral-500">1.1 MB</p>
-                  </div>
-                  <Button variant="ghost" size="sm">
-                    Ver
-                  </Button>
-                </div>
+                </button>
+                {m.estado === EstadoManifiesto.TRATADO && (
+                  <button
+                    onClick={handleDescargarCertificado}
+                    className="flex items-center gap-3 p-3 bg-success-50 rounded-xl w-full hover:bg-success-100 transition-colors text-left"
+                  >
+                    <Award size={20} className="text-success-600" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm text-success-900 truncate">Certificado de Disposición</p>
+                      <p className="text-xs text-success-600">Certificado de tratamiento final</p>
+                    </div>
+                  </button>
+                )}
               </div>
             </CardContent>
           </Card>

@@ -1,10 +1,36 @@
 import { Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
 import QRCode from 'qrcode';
+import { z } from 'zod';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import prisma from '../lib/prisma';
 
-const prisma = new PrismaClient();
+// Zod schemas for input validation
+const createManifiestoSchema = z.object({
+  generadorId: z.string().min(1, 'El generador es requerido').optional(),
+  transportistaId: z.string().min(1, 'El transportista es requerido'),
+  operadorId: z.string().min(1, 'El operador es requerido'),
+  observaciones: z.string().max(1000).optional(),
+  residuos: z.array(z.object({
+    tipoResiduoId: z.string().min(1, 'El tipo de residuo es requerido'),
+    cantidad: z.number().positive('La cantidad debe ser mayor a 0'),
+    unidad: z.string().min(1, 'La unidad es requerida'),
+    descripcion: z.string().optional(),
+  })).min(1, 'Debe incluir al menos un residuo'),
+});
+
+const registrarIncidenteSchema = z.object({
+  tipoIncidente: z.string().optional(),
+  tipo: z.string().optional(),
+  descripcion: z.string().min(1, 'La descripción es requerida').max(1000),
+  latitud: z.number().optional(),
+  longitud: z.number().optional(),
+});
+
+const cerrarManifiestoSchema = z.object({
+  metodoTratamiento: z.string().optional(),
+  observaciones: z.string().max(1000).optional(),
+});
 
 // Generar número de manifiesto único
 const generarNumeroManifiesto = async (): Promise<string> => {
@@ -148,7 +174,12 @@ export const getManifiestoById = async (req: AuthRequest, res: Response, next: N
 // Crear nuevo manifiesto
 export const createManifiesto = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { generadorId: bodyGeneradorId, transportistaId, operadorId, residuos, observaciones } = req.body;
+    const parsed = createManifiestoSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError(parsed.error.issues[0].message, 400);
+    }
+
+    const { generadorId: bodyGeneradorId, transportistaId, operadorId, residuos, observaciones } = parsed.data;
     const userId = req.user.id;
 
     // Verificar que el usuario es un generador o admin
@@ -509,7 +540,11 @@ export const confirmarRecepcion = async (req: AuthRequest, res: Response, next: 
 export const cerrarManifiesto = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { metodoTratamiento, observaciones } = req.body;
+    const parsed = cerrarManifiestoSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError(parsed.error.issues[0].message, 400);
+    }
+    const { metodoTratamiento, observaciones } = parsed.data;
     const userId = req.user.id;
 
     if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') {
@@ -626,7 +661,11 @@ export const rechazarCarga = async (req: AuthRequest, res: Response, next: NextF
 export const registrarIncidente = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { tipoIncidente, tipo, descripcion, latitud, longitud } = req.body;
+    const parsed = registrarIncidenteSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError(parsed.error.issues[0].message, 400);
+    }
+    const { tipoIncidente, tipo, descripcion, latitud, longitud } = parsed.data;
     const tipoFinal = tipoIncidente || tipo; // Accept both field names
     const userId = req.user.id;
 

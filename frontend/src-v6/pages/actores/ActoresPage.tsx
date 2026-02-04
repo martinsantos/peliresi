@@ -142,8 +142,8 @@ export const ActoresPage: React.FC = () => {
       }
       setModalCrear(false);
       setForm(INITIAL_FORM);
-    } catch (err) {
-      console.error('Error creando actor:', err);
+    } catch {
+      // Error handled by React Query
     }
   };
 
@@ -155,8 +155,8 @@ export const ActoresPage: React.FC = () => {
       else await deleteOperador.mutateAsync(actorEliminar.id);
       setModalEliminar(false);
       setActorEliminar(null);
-    } catch (err) {
-      console.error('Error eliminando actor:', err);
+    } catch {
+      // Error handled by React Query
     }
   };
 
