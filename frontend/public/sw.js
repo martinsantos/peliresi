@@ -1,6 +1,6 @@
 // Service Worker para modo Offline-First (CU-T09)
-const CACHE_NAME = 'trazabilidad-rrpp-v4';
-const RUNTIME_CACHE = 'runtime-cache-v4';
+const CACHE_NAME = 'trazabilidad-rrpp-v5';
+const RUNTIME_CACHE = 'runtime-cache-v5';
 
 // Recursos críticos para cachear en instalación
 // Paths relativos al scope del SW
@@ -61,27 +61,28 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    // Navigation requests (HTML pages): network-first, never cache HTML to avoid stale asset references
+    if (request.mode === 'navigate') {
+        event.respondWith(
+            fetch(request).catch(() => {
+                return caches.match(request).then((cached) => cached || caches.match('/offline.html'));
+            })
+        );
+        return;
+    }
+
+    // Static assets: network-first with cache fallback
     event.respondWith(
         caches.open(RUNTIME_CACHE).then((cache) => {
             return fetch(request)
                 .then((response) => {
-                    // Cachear respuesta exitosa
                     if (response.status === 200) {
                         cache.put(request, response.clone());
                     }
                     return response;
                 })
                 .catch(() => {
-                    // Si falla la red, intentar desde caché
-                    return cache.match(request).then((cachedResponse) => {
-                        if (cachedResponse) {
-                            return cachedResponse;
-                        }
-                        // Si no hay caché, mostrar página offline
-                        if (request.mode === 'navigate') {
-                            return cache.match('/offline.html');
-                        }
-                    });
+                    return cache.match(request);
                 });
         })
     );
