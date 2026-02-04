@@ -32,12 +32,12 @@ export const manifiestoService = {
 
   async create(req: CreateManifiestoRequest): Promise<Manifiesto> {
     const { data } = await api.post('/manifiestos', req);
-    return data.data;
+    return data.data?.manifiesto || data.data;
   },
 
   async update(id: string, req: Partial<CreateManifiestoRequest>): Promise<Manifiesto> {
     const { data } = await api.put(`/manifiestos/${id}`, req);
-    return data.data;
+    return data.data?.manifiesto || data.data;
   },
 
   async delete(id: string): Promise<void> {
@@ -91,6 +91,11 @@ export const manifiestoService = {
   async cerrar(id: string): Promise<Manifiesto> {
     const { data } = await api.post(`/manifiestos/${id}/cerrar`);
     return data.data;
+  },
+
+  async revertirEstado(id: string, estadoNuevo: string, motivo?: string): Promise<Manifiesto> {
+    const { data } = await api.post(`/manifiestos/${id}/revertir-estado`, { estadoNuevo, motivo });
+    return data.data?.manifiesto || data.data;
   },
 
   async dashboard(): Promise<ManifiestoDashboard> {

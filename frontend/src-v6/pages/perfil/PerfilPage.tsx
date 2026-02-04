@@ -26,13 +26,6 @@ import { toast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { usuarioService } from '../../services/usuario.service';
 
-// Fallback activity (shown when no audit log available)
-const FALLBACK_ACTIVIDAD = [
-  { id: 1, accion: 'Inicio de sesión', fecha: '31/01/2025 15:30', dispositivo: 'Chrome - Windows' },
-  { id: 2, accion: 'Actualizó perfil', fecha: '30/01/2025 10:15', dispositivo: 'Chrome - Windows' },
-  { id: 3, accion: 'Generó reporte', fecha: '29/01/2025 14:20', dispositivo: 'Chrome - Windows' },
-  { id: 4, accion: 'Aprobó manifiesto M-2025-088', fecha: '28/01/2025 11:45', dispositivo: 'Safari - iPhone' },
-];
 
 const PerfilPage: React.FC = () => {
   const { currentUser } = useAuth();
@@ -50,7 +43,6 @@ const PerfilPage: React.FC = () => {
   });
   const [editando, setEditando] = useState(false);
   const [guardando, setGuardando] = useState(false);
-  const [actividadReciente] = useState(FALLBACK_ACTIVIDAD);
 
   // Load user data from AuthContext
   useEffect(() => {
@@ -82,7 +74,7 @@ const PerfilPage: React.FC = () => {
       }
       toast.success('Perfil actualizado', 'Tus cambios se guardaron correctamente');
     } catch {
-      toast.success('Perfil actualizado', 'Cambios guardados localmente (modo demo).');
+      toast.warning('Cambios locales', 'Los cambios se aplicaron localmente');
     } finally {
       setGuardando(false);
       setEditando(false);
@@ -234,22 +226,10 @@ const PerfilPage: React.FC = () => {
 
           <Card>
             <CardHeader title="Actividad Reciente" icon={<Activity size={18} />} />
-            <CardContent className="p-0">
-              <div className="divide-y divide-neutral-100">
-                {actividadReciente.map((actividad) => (
-                  <div key={actividad.id} className="p-4 flex items-center justify-between hover:bg-neutral-50 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center">
-                        <Activity size={18} className="text-primary-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-neutral-900">{actividad.accion}</p>
-                        <p className="text-sm text-neutral-500">{actividad.dispositivo}</p>
-                      </div>
-                    </div>
-                    <span className="text-sm text-neutral-400">{actividad.fecha}</span>
-                  </div>
-                ))}
+            <CardContent>
+              <div className="text-center py-8 text-neutral-500">
+                <Activity size={32} className="mx-auto mb-3 text-neutral-300" />
+                <p>Historial de actividad no disponible</p>
               </div>
             </CardContent>
           </Card>

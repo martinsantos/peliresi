@@ -118,7 +118,7 @@ export const MobileLayout: React.FC = () => {
     items.push({ to: mp('/manifiestos'), icon: <FileText size={22} />, label: 'Manifiestos' });
 
     if (isAdmin || isTransportista) {
-      items.push({ to: mp('/tracking'), icon: <MapPin size={22} />, label: 'Tracking' });
+      items.push({ to: mp('/centro-control'), icon: <MapPin size={22} />, label: 'Control' });
     } else {
       items.push({ to: mp('/reportes'), icon: <BarChart3 size={22} />, label: 'Reportes' });
     }
@@ -141,12 +141,11 @@ export const MobileLayout: React.FC = () => {
     items.push({ to: mp('/manifiestos'), icon: <FileText size={20} />, label: 'Manifiestos', section: 'main' });
 
     if (isAdmin || isTransportista) {
-      items.push({ to: mp('/tracking'), icon: <MapPin size={20} />, label: 'Tracking', section: 'main' });
+      items.push({ to: mp('/centro-control'), icon: <LayoutDashboard size={20} />, label: 'Centro de Control', section: 'main' });
     }
 
     if (isAdmin) {
       items.push({ to: mp('/actores'), icon: <Users size={20} />, label: 'Actores', section: 'main' });
-      items.push({ to: mp('/centro-control'), icon: <LayoutDashboard size={20} />, label: 'Centro de Control', section: 'main' });
     }
 
     items.push({ to: mp('/reportes'), icon: <BarChart3 size={20} />, label: 'Reportes', section: 'main' });

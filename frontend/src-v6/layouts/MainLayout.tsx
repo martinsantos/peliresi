@@ -91,18 +91,13 @@ export const MainLayout: React.FC = () => {
     // Dashboard para todos
     items.push({ path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' });
     
-    // Centro de Control solo para Admin
-    if (isAdmin) {
+    // Centro de Control para Admin y Transportista
+    if (isAdmin || isTransportista) {
       items.push({ path: '/centro-control', icon: Command, label: 'Centro de Control' });
     }
-    
+
     // Manifiestos para todos
     items.push({ path: '/manifiestos', icon: FileText, label: 'Manifiestos' });
-    
-    // Tracking para Admin y Transportista
-    if (isAdmin || isTransportista) {
-      items.push({ path: '/tracking', icon: MapPin, label: 'Tracking' });
-    }
     
     // Actores solo para Admin
     if (isAdmin) {
@@ -143,7 +138,7 @@ export const MainLayout: React.FC = () => {
     adminItems.find(item => item.path === location.pathname)?.label || 'SITREP';
 
   return (
-    <div className="min-h-screen bg-[#F8F8F6] flex flex-col">
+    <div className="h-screen bg-[#F8F8F6] flex flex-col overflow-hidden">
       {/* Connectivity indicator - always visible at top */}
       <ConnectivityIndicator />
 
@@ -399,7 +394,7 @@ export const MainLayout: React.FC = () => {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 p-4 lg:p-8 overflow-auto bg-[#FAFAF8]">
+        <main className="flex-1 px-4 lg:px-8 pb-4 lg:pb-8 overflow-auto bg-[#FAFAF8]">
           <Outlet />
         </main>
       </div>

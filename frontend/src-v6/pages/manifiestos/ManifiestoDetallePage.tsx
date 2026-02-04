@@ -28,6 +28,12 @@ import {
   Beaker,
   XCircle,
   Award,
+  RotateCcw,
+  Flame,
+  FlaskConical,
+  Leaf,
+  Recycle,
+  Microscope,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
@@ -47,6 +53,7 @@ import {
   useCerrarManifiesto,
   useRechazarManifiesto,
   useRegistrarIncidente,
+  useRevertirEstado,
 } from '../../hooks/useManifiestos';
 import { useAuth } from '../../contexts/AuthContext';
 import { manifiestoService } from '../../services/manifiesto.service';
@@ -54,6 +61,7 @@ import { formatDateTime, formatNumber, formatWeight, formatEstado, formatCuit } 
 import { ESTADO_COLORS } from '../../utils/constants';
 import type { Manifiesto, EventoManifiesto } from '../../types/models';
 import { EstadoManifiesto } from '../../types/models';
+import { SignaturePad } from '../../components/ui/SignaturePad';
 
 // Timeline entry shape
 type TimelineEntry = { id: string; date: string; title: string; description: string; status: string };
@@ -97,6 +105,26 @@ function buildTimeline(manifiesto: Partial<Manifiesto>): TimelineEntry[] {
   }));
 }
 
+const METODOS_TRATAMIENTO: { id: string; label: string; icon: React.ReactNode }[] = [
+  { id: 'INCINERACION', label: 'Incineración', icon: <Flame size={16} className="inline" /> },
+  { id: 'TRATAMIENTO_FISICOQUIMICO', label: 'Fisicoquímico', icon: <FlaskConical size={16} className="inline" /> },
+  { id: 'TRATAMIENTO_BIOLOGICO', label: 'Biológico', icon: <Leaf size={16} className="inline" /> },
+  { id: 'RECICLADO', label: 'Reciclaje', icon: <Recycle size={16} className="inline" /> },
+  { id: 'RELLENO_SEGURIDAD', label: 'Relleno seguridad', icon: <Package size={16} className="inline" /> },
+  { id: 'OTRO', label: 'Otro', icon: <Microscope size={16} className="inline" /> },
+];
+
+const ESTADOS_FLUJO = [
+  EstadoManifiesto.BORRADOR,
+  EstadoManifiesto.PENDIENTE_APROBACION,
+  EstadoManifiesto.APROBADO,
+  EstadoManifiesto.EN_TRANSITO,
+  EstadoManifiesto.ENTREGADO,
+  EstadoManifiesto.RECIBIDO,
+  EstadoManifiesto.EN_TRATAMIENTO,
+  EstadoManifiesto.TRATADO,
+];
+
 const ManifiestoDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
@@ -119,6 +147,7 @@ const ManifiestoDetailPage: React.FC = () => {
   const cerrar = useCerrarManifiesto();
   const rechazar = useRechazarManifiesto();
   const registrarIncidente = useRegistrarIncidente();
+  const revertir = useRevertirEstado();
 
   // Modal state for pesaje
   const [showPesajeModal, setShowPesajeModal] = useState(false);
@@ -144,10 +173,19 @@ const ManifiestoDetailPage: React.FC = () => {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
 
+  // Modal state for reversion
+  const [showReversionModal, setShowReversionModal] = useState(false);
+  const [reversionEstado, setReversionEstado] = useState('');
+  const [reversionMotivo, setReversionMotivo] = useState('');
+
+  // Modal state for firma digital
+  const [showFirmaModal, setShowFirmaModal] = useState(false);
+  const [firmaBase64, setFirmaBase64] = useState('');
+
   // Track which action is in progress
   const isActionPending = firmar.isPending || confirmarRetiro.isPending || confirmarEntrega.isPending
     || confirmarRecepcion.isPending || pesaje.isPending || registrarTratamiento.isPending || cerrar.isPending
-    || rechazar.isPending || registrarIncidente.isPending;
+    || rechazar.isPending || registrarIncidente.isPending || revertir.isPending;
 
   // Use API data only
   const manifiesto = (apiData as any)?.data || apiData;
@@ -258,14 +296,69 @@ const ManifiestoDetailPage: React.FC = () => {
     });
   };
 
-  const handleDescargarPDF = () => {
+  const handleDescargarPDF = async () => {
     const apiUrl = import.meta.env.VITE_API_URL || '';
-    window.open(`${apiUrl}/pdf/manifiesto/${id}`, '_blank');
+    const token = localStorage.getItem('sitrep_access_token');
+    try {
+      const res = await fetch(`${apiUrl}/pdf/manifiesto/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Error al descargar');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `manifiesto-${m.numero || id}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      toast.error('Error al descargar PDF', err?.message || '');
+    }
   };
 
-  const handleDescargarCertificado = () => {
+  const handleDescargarCertificado = async () => {
     const apiUrl = import.meta.env.VITE_API_URL || '';
-    window.open(`${apiUrl}/pdf/certificado/${id}`, '_blank');
+    const token = localStorage.getItem('sitrep_access_token');
+    try {
+      const res = await fetch(`${apiUrl}/pdf/certificado/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Error al descargar');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `certificado-${m.numero || id}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      toast.error('Error al descargar certificado', err?.message || '');
+    }
+  };
+
+  const handleRevertir = () => {
+    if (!reversionEstado) {
+      toast.warning('Datos incompletos', 'Selecciona un estado destino');
+      return;
+    }
+    handleAction(
+      () => revertir.mutateAsync({ id: id!, estadoNuevo: reversionEstado, motivo: reversionMotivo || undefined }),
+      'Estado revertido exitosamente',
+    ).then(() => {
+      setShowReversionModal(false);
+      setReversionEstado('');
+      setReversionMotivo('');
+    });
+  };
+
+  const handleFirmaConfirm = () => {
+    handleAction(
+      () => firmar.mutateAsync({ id: id! }),
+      'Manifiesto firmado exitosamente',
+    ).then(() => {
+      setShowFirmaModal(false);
+      setFirmaBase64('');
+    });
   };
 
   if (isLoading) {
@@ -578,7 +671,7 @@ const ManifiestoDetailPage: React.FC = () => {
                   <Button
                     fullWidth
                     leftIcon={firmar.isPending ? <Loader2 size={16} className="animate-spin" /> : <PenTool size={16} />}
-                    onClick={handleFirmar}
+                    onClick={() => setShowFirmaModal(true)}
                     disabled={isActionPending}
                   >
                     Firmar Manifiesto
@@ -692,6 +785,18 @@ const ManifiestoDetailPage: React.FC = () => {
                     Cancelar Manifiesto
                   </Button>
                 )}
+
+                {isAdmin && m.estado !== EstadoManifiesto.BORRADOR && (
+                  <Button
+                    variant="outline"
+                    fullWidth
+                    leftIcon={<RotateCcw size={16} />}
+                    onClick={() => setShowReversionModal(true)}
+                    className="!text-amber-600 !border-amber-200 hover:!bg-amber-50"
+                  >
+                    Revertir Estado
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -784,20 +889,26 @@ const ManifiestoDetailPage: React.FC = () => {
             </h3>
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Metodo de Tratamiento *</label>
-                <select
-                  value={tratamientoMetodo}
-                  onChange={(e) => setTratamientoMetodo(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none"
-                >
-                  <option value="">Seleccionar metodo</option>
-                  <option value="INCINERACION">Incineracion</option>
-                  <option value="TRATAMIENTO_FISICOQUIMICO">Tratamiento fisicoquimico</option>
-                  <option value="TRATAMIENTO_BIOLOGICO">Tratamiento biologico</option>
-                  <option value="RECICLADO">Reciclado</option>
-                  <option value="RELLENO_SEGURIDAD">Relleno de seguridad</option>
-                  <option value="OTRO">Otro</option>
-                </select>
+                <label className="block text-sm font-medium text-neutral-700 mb-2">Método de Tratamiento *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {METODOS_TRATAMIENTO.map((met) => (
+                    <button
+                      key={met.id}
+                      type="button"
+                      onClick={() => setTratamientoMetodo(met.id)}
+                      className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all ${
+                        tratamientoMetodo === met.id
+                          ? 'border-primary-500 bg-primary-50 shadow-sm'
+                          : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
+                      }`}
+                    >
+                      <span className="text-2xl">{met.icon}</span>
+                      <span className={`text-xs font-medium ${
+                        tratamientoMetodo === met.id ? 'text-primary-700' : 'text-neutral-600'
+                      }`}>{met.label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Observaciones</label>
@@ -938,6 +1049,126 @@ const ManifiestoDetailPage: React.FC = () => {
               </Button>
               <Button variant="danger" onClick={handleCancelar} disabled={isCancelling}>
                 {isCancelling ? 'Cancelando...' : 'Cancelar Manifiesto'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reversion Modal */}
+      {showReversionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-bold text-neutral-900 mb-4 flex items-center gap-2">
+              <RotateCcw size={20} className="text-amber-500" /> Revertir Estado
+            </h3>
+            <p className="text-sm text-neutral-600 mb-4">
+              Estado actual: <Badge variant="soft" color={getEstadoBadgeColor(m.estado || EstadoManifiesto.BORRADOR)}>{formatEstado(m.estado || EstadoManifiesto.BORRADOR)}</Badge>
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Estado destino *</label>
+                <select
+                  value={reversionEstado}
+                  onChange={(e) => setReversionEstado(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none"
+                >
+                  <option value="">Seleccionar estado</option>
+                  {ESTADOS_FLUJO
+                    .filter((est) => {
+                      const currentIdx = ESTADOS_FLUJO.indexOf(m.estado as EstadoManifiesto);
+                      const estIdx = ESTADOS_FLUJO.indexOf(est);
+                      return estIdx < currentIdx && estIdx >= 0;
+                    })
+                    .map((est) => (
+                      <option key={est} value={est}>{formatEstado(est)}</option>
+                    ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Motivo (opcional)</label>
+                <textarea
+                  value={reversionMotivo}
+                  onChange={(e) => setReversionMotivo(e.target.value)}
+                  placeholder="Motivo de la reversión..."
+                  rows={2}
+                  className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none resize-none"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-4">
+              <Button variant="outline" onClick={() => { setShowReversionModal(false); setReversionEstado(''); setReversionMotivo(''); }} disabled={revertir.isPending}>
+                Cancelar
+              </Button>
+              <Button onClick={handleRevertir} disabled={revertir.isPending} className="!bg-amber-600 hover:!bg-amber-700">
+                {revertir.isPending ? 'Revirtiendo...' : 'Confirmar Reversión'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Firma Digital Modal */}
+      {showFirmaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-lg w-full mx-4">
+            <h3 className="text-lg font-bold text-neutral-900 mb-4 flex items-center gap-2">
+              <PenTool size={20} className="text-primary-600" /> Firma Digital del Manifiesto
+            </h3>
+
+            {/* Resumen */}
+            <div className="bg-neutral-50 rounded-xl p-4 mb-4 space-y-1.5">
+              <div className="flex justify-between text-sm">
+                <span className="text-neutral-500">Manifiesto:</span>
+                <span className="font-mono font-semibold text-neutral-900">{m.numero || id}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-neutral-500">Generador:</span>
+                <span className="text-neutral-900">{m.generador?.razonSocial || '-'}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-neutral-500">Transportista:</span>
+                <span className="text-neutral-900">{m.transportista?.razonSocial || '-'}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-neutral-500">Operador:</span>
+                <span className="text-neutral-900">{m.operador?.razonSocial || '-'}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-neutral-500">Fecha/Hora:</span>
+                <span className="text-neutral-900">{new Date().toLocaleString('es-AR')}</span>
+              </div>
+            </div>
+
+            {/* Firma */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-neutral-700 mb-2">Firma del responsable</label>
+              {firmaBase64 ? (
+                <div className="flex flex-col items-center gap-2">
+                  <div className="rounded-xl border border-success-300 bg-success-50 p-2">
+                    <img src={firmaBase64} alt="Firma" className="max-h-32" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFirmaBase64('')}
+                    className="text-sm text-neutral-500 hover:text-neutral-700 underline"
+                  >
+                    Volver a firmar
+                  </button>
+                </div>
+              ) : (
+                <SignaturePad
+                  onConfirm={(dataUrl) => setFirmaBase64(dataUrl)}
+                />
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => { setShowFirmaModal(false); setFirmaBase64(''); }} disabled={firmar.isPending}>
+                Cancelar
+              </Button>
+              <Button onClick={handleFirmaConfirm} disabled={firmar.isPending || !firmaBase64}>
+                {firmar.isPending ? 'Firmando...' : 'Confirmar y Firmar'}
               </Button>
             </div>
           </div>

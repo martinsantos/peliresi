@@ -6,7 +6,7 @@
  */
 
 import React, { Suspense, lazy } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { MobileLayout } from './layouts/MobileLayout';
 
@@ -17,7 +17,6 @@ const CentroControlPage = lazy(() => import('./pages/centro-control/CentroContro
 const ManifiestosPage = lazy(() => import('./pages/manifiestos/ManifiestosPage'));
 const ManifiestoDetallePage = lazy(() => import('./pages/manifiestos/ManifiestoDetallePage'));
 const NuevoManifiestoPage = lazy(() => import('./pages/manifiestos/NuevoManifiestoPage'));
-const TrackingPage = lazy(() => import('./pages/tracking/TrackingPage'));
 const ViajeEnCursoPage = lazy(() => import('./pages/tracking/ViajeEnCursoPage'));
 const ViajeEnCursoTransportista = lazy(() => import('./pages/transporte/ViajeEnCursoTransportista'));
 const ActoresPage = lazy(() => import('./pages/actores/ActoresPage'));
@@ -53,6 +52,11 @@ const PageLoader: React.FC = () => (
   </div>
 );
 
+const TrackingRedirectMobile: React.FC = () => {
+  const { id } = useParams();
+  return <Navigate to={id ? `/centro-control/viaje/${id}` : `/centro-control`} replace />;
+};
+
 function AppMobile() {
   return (
     <AuthProvider>
@@ -65,11 +69,10 @@ function AppMobile() {
           <Route element={<MobileLayout />}>
             <Route path="/dashboard" element={<MobileDashboardPage />} />
             <Route path="/centro-control" element={<CentroControlPage />} />
+            <Route path="/centro-control/viaje/:id" element={<ViajeEnCursoPage />} />
             <Route path="/manifiestos" element={<ManifiestosPage />} />
             <Route path="/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
             <Route path="/manifiestos/:id" element={<ManifiestoDetallePage />} />
-            <Route path="/tracking" element={<TrackingPage />} />
-            <Route path="/tracking/viaje/:id" element={<ViajeEnCursoPage />} />
             <Route path="/transporte/perfil" element={<ViajeEnCursoTransportista />} />
             <Route path="/actores" element={<ActoresPage />} />
             <Route path="/actores/operadores" element={<OperadoresPage />} />
@@ -101,6 +104,10 @@ function AppMobile() {
 
           {/* Redirects */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
+          {/* Legacy tracking redirects */}
+          <Route path="/tracking" element={<Navigate to="/centro-control" replace />} />
+          <Route path="/tracking/viaje/:id" element={<TrackingRedirectMobile />} />
 
           {/* 404 */}
           <Route path="*" element={<NotFoundPage />} />

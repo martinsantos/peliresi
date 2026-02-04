@@ -5,7 +5,7 @@
  */
 
 import React, { Suspense, lazy } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
 
 // ========================================
 // CONTEXTS
@@ -37,8 +37,7 @@ const ManifiestosPage = lazy(() => import('./pages/manifiestos/ManifiestosPage')
 const ManifiestoDetallePage = lazy(() => import('./pages/manifiestos/ManifiestoDetallePage'));
 const NuevoManifiestoPage = lazy(() => import('./pages/manifiestos/NuevoManifiestoPage'));
 
-// Tracking
-const TrackingPage = lazy(() => import('./pages/tracking/TrackingPage'));
+// Tracking (TrackingPage eliminated — functionality merged into CentroControlPage)
 const ViajeEnCursoPage = lazy(() => import('./pages/tracking/ViajeEnCursoPage'));
 
 // Transporte
@@ -114,6 +113,16 @@ const PageLoader: React.FC = () => (
 );
 
 // ========================================
+// TRACKING REDIRECT (legacy routes → centro-control)
+// ========================================
+const TrackingRedirect: React.FC = () => {
+  const { id } = useParams();
+  const loc = useLocation();
+  const prefix = loc.pathname.startsWith('/mobile') ? '/mobile' : '';
+  return <Navigate to={id ? `${prefix}/centro-control/viaje/${id}` : `${prefix}/centro-control`} replace />;
+};
+
+// ========================================
 // APP COMPONENT
 // ========================================
 function App() {
@@ -133,11 +142,10 @@ function App() {
             <Route path="/mobile" element={<MobileDashboardPage />} />
             <Route path="/mobile/dashboard" element={<MobileDashboardPage />} />
             <Route path="/mobile/centro-control" element={<CentroControlPage />} />
+            <Route path="/mobile/centro-control/viaje/:id" element={<ViajeEnCursoPage />} />
             <Route path="/mobile/manifiestos" element={<ManifiestosPage />} />
             <Route path="/mobile/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
             <Route path="/mobile/manifiestos/:id" element={<ManifiestoDetallePage />} />
-            <Route path="/mobile/tracking" element={<TrackingPage />} />
-            <Route path="/mobile/tracking/viaje/:id" element={<ViajeEnCursoPage />} />
             <Route path="/mobile/transporte/perfil" element={<ViajeEnCursoTransportista />} />
             <Route path="/mobile/actores" element={<ActoresPage />} />
             <Route path="/mobile/actores/operadores" element={<OperadoresPage />} />
@@ -178,14 +186,12 @@ function App() {
             {/* Dashboard */}
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/centro-control" element={<CentroControlPage />} />
+            <Route path="/centro-control/viaje/:id" element={<ViajeEnCursoPage />} />
 
             {/* Manifiestos */}
             <Route path="/manifiestos" element={<ManifiestosPage />} />
             <Route path="/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
             <Route path="/manifiestos/:id" element={<ManifiestoDetallePage />} />
-
-            {/* Tracking */}
-            <Route path="/tracking" element={<TrackingPage />} />
 
             {/* Actores */}
             <Route path="/actores" element={<ActoresPage />} />
@@ -234,7 +240,13 @@ function App() {
 
         {/* Redirects */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        
+
+        {/* Legacy tracking redirects */}
+        <Route path="/tracking" element={<Navigate to="/centro-control" replace />} />
+        <Route path="/tracking/:id" element={<TrackingRedirect />} />
+        <Route path="/mobile/tracking" element={<Navigate to="/mobile/centro-control" replace />} />
+        <Route path="/mobile/tracking/viaje/:id" element={<TrackingRedirect />} />
+
         {/* 404 */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

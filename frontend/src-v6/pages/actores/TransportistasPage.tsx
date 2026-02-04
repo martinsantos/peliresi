@@ -67,20 +67,19 @@ const TransportistasPage: React.FC = () => {
   const [form, setForm] = useState(INITIAL_FORM);
 
   // API hooks
-  const { data: apiData, isLoading } = useTransportistas();
+  const { data: apiData, isLoading } = useTransportistas({ search: searchTerm || undefined });
   const createMutation = useCreateTransportista();
   const updateMutation = useUpdateTransportista();
   const deleteMutation = useDeleteTransportista();
 
   const transportistasData = Array.isArray(apiData?.items) ? apiData.items : [];
 
+  // Server handles search; client filters estado
   const transportistasFiltrados = transportistasData.filter((t: any) => {
-    const matchesSearch = String(t.razonSocial || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         String(t.cuit || '').includes(searchTerm);
     const matchesEstado = filtroEstado === '' ||
       (filtroEstado === 'ACTIVO' && t.activo !== false) ||
       (filtroEstado === 'INACTIVO' && t.activo === false);
-    return matchesSearch && matchesEstado;
+    return matchesEstado;
   });
 
   const isMobile = typeof window !== 'undefined' && window.location.pathname.includes('/mobile');

@@ -35,24 +35,25 @@ const cerrarManifiestoSchema = z.object({
 // Generar número de manifiesto único
 const generarNumeroManifiesto = async (): Promise<string> => {
   const año = new Date().getFullYear();
-  const ultimoManifiesto = await prisma.manifiesto.findFirst({
+  const manifiestos = await prisma.manifiesto.findMany({
     where: {
       numero: {
         startsWith: `${año}-`
       }
     },
-    orderBy: {
-      numero: 'desc'
-    }
+    select: { numero: true },
   });
 
-  let numero = 1;
-  if (ultimoManifiesto) {
-    const ultimoNumero = parseInt(ultimoManifiesto.numero.split('-')[1]);
-    numero = ultimoNumero + 1;
+  let maxNum = 0;
+  for (const m of manifiestos) {
+    const suffix = m.numero.replace(`${año}-`, '');
+    const parsed = parseInt(suffix, 10);
+    if (!isNaN(parsed) && parsed > maxNum) {
+      maxNum = parsed;
+    }
   }
 
-  return `${año}-${numero.toString().padStart(6, '0')}`;
+  return `${año}-${(maxNum + 1).toString().padStart(6, '0')}`;
 };
 
 // Obtener todos los manifiestos
@@ -1145,6 +1146,44 @@ export const getManifiestosEsperados = async (req: AuthRequest, res: Response, n
         syncTimestamp: new Date().toISOString()
       }
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Revertir estado (solo ADMIN)
+export const revertirEstado = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { estadoNuevo, motivo } = req.body;
+
+    const manifiesto = await prisma.manifiesto.findUnique({ where: { id } });
+    if (!manifiesto) {
+      throw new AppError('Manifiesto no encontrado', 404);
+    }
+
+    const estadosValidos = ['BORRADOR', 'PENDIENTE_APROBACION', 'APROBADO', 'EN_TRANSITO',
+                            'ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO', 'TRATADO'];
+    if (!estadosValidos.includes(estadoNuevo)) {
+      throw new AppError('Estado destino no válido', 400);
+    }
+
+    const estadoAnterior = manifiesto.estado;
+    const updated = await prisma.manifiesto.update({
+      where: { id },
+      data: { estado: estadoNuevo },
+    });
+
+    await prisma.eventoManifiesto.create({
+      data: {
+        manifiestoId: id,
+        tipo: 'REVERSION',
+        descripcion: `Reversión: ${estadoAnterior} → ${estadoNuevo}${motivo ? '. Motivo: ' + motivo : ''}`,
+        usuarioId: req.user!.id,
+      },
+    });
+
+    res.json({ success: true, data: { manifiesto: updated } });
   } catch (error) {
     next(error);
   }

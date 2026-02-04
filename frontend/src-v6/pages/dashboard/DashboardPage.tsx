@@ -27,6 +27,7 @@ import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { QuickActions } from '../../components/ui/QuickActions';
+import { SkeletonStats, SkeletonCard } from '../../components/ui/Skeleton';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDashboardStats } from '../../hooks/useDashboard';
 import { useManifiestos } from '../../hooks/useManifiestos';
@@ -42,8 +43,8 @@ const AdminDashboard: React.FC = () => {
   const route = (path: string) => isMobile ? `/mobile${path}` : path;
 
   // Try real API data
-  const { data: dashStats } = useDashboardStats();
-  const { data: recentManifiestos } = useManifiestos({ limit: 4 });
+  const { data: dashStats, isLoading: loadingStats, isError: errorStats } = useDashboardStats();
+  const { data: recentManifiestos, isLoading: loadingRecent } = useManifiestos({ limit: 4 });
 
   const est = dashStats?.estadisticas;
   const totalM = est?.total ?? 0;
@@ -68,6 +69,46 @@ const AdminDashboard: React.FC = () => {
       : '-',
     estado: m.estado === 'EN_TRANSITO' ? 'alerta' : m.estado === 'TRATADO' ? 'exito' : 'nuevo',
   }));
+
+  const isLoading = loadingStats || loadingRecent;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-neutral-900">Panel de Control</h2>
+            <p className="text-neutral-600">Vista general del sistema de trazabilidad</p>
+          </div>
+        </div>
+        <SkeletonStats count={4} />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <SkeletonCard className="lg:col-span-2" lines={4} />
+          <SkeletonCard lines={4} />
+        </div>
+      </div>
+    );
+  }
+
+  if (errorStats) {
+    return (
+      <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-neutral-900">Panel de Control</h2>
+            <p className="text-neutral-600">Vista general del sistema de trazabilidad</p>
+          </div>
+        </div>
+        <div className="flex flex-col items-center justify-center py-16">
+          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
+            <AlertCircle className="text-red-400" size={24} />
+          </div>
+          <p className="text-red-600 font-medium">Error al cargar datos del dashboard</p>
+          <p className="text-sm text-neutral-500 mt-1">Verifica tu conexión e intenta nuevamente</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
@@ -124,7 +165,7 @@ const AdminDashboard: React.FC = () => {
         <Card className="lg:col-span-2">
           <CardHeader 
             title="Actividad Reciente" 
-            action={<Button variant="ghost" size="sm">Ver todo</Button>}
+            action={<Button variant="ghost" size="sm" onClick={() => navigate(route('/manifiestos'))}>Ver todo</Button>}
           />
           <CardContent className="p-0">
             {actividadReciente.length === 0 ? (

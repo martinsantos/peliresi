@@ -76,9 +76,9 @@ export const ActoresPage: React.FC = () => {
   const [form, setForm] = useState(INITIAL_FORM);
 
   // API hooks
-  const { data: generadoresData, isLoading: loadingGen } = useGeneradores();
-  const { data: transportistasData, isLoading: loadingTrans } = useTransportistas();
-  const { data: operadoresData, isLoading: loadingOp } = useOperadores();
+  const { data: generadoresData, isLoading: loadingGen } = useGeneradores({ search: busqueda || undefined });
+  const { data: transportistasData, isLoading: loadingTrans } = useTransportistas({ search: busqueda || undefined });
+  const { data: operadoresData, isLoading: loadingOp } = useOperadores({ search: busqueda || undefined });
 
   const createGenerador = useCreateGenerador();
   const createTransportista = useCreateTransportista();
@@ -108,12 +108,10 @@ export const ActoresPage: React.FC = () => {
   const operadoresCount = operadoresData?.total ?? actoresData.filter(a => a.tipo === 'operador').length;
   const totalCount = generadoresCount + transportistasCount + operadoresCount;
 
+  // Server handles search; client filters by tipo
   const actoresFiltrados = actoresData.filter(actor => {
     const matchTipo = filtroTipo === 'todos' || actor.tipo === filtroTipo;
-    const matchBusqueda =
-      String(actor.razonSocial || '').toLowerCase().includes(busqueda.toLowerCase()) ||
-      String(actor.cuit || '').includes(busqueda);
-    return matchTipo && matchBusqueda;
+    return matchTipo;
   });
 
   const verDetalle = (actor: any) => {

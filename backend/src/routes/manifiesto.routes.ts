@@ -17,7 +17,8 @@ import {
     registrarPesaje,
     getSyncInicial,
     getManifiestosEsperados,
-    validarQR
+    validarQR,
+    revertirEstado
 } from '../controllers/manifiesto.controller';
 
 const router = Router();
@@ -56,5 +57,8 @@ router.post('/:id/pesaje', hasRole('OPERADOR', 'ADMIN'), registrarPesaje);
 router.post('/:id/rechazar', hasRole('OPERADOR', 'ADMIN'), rechazarCarga);
 router.post('/:id/tratamiento', hasRole('OPERADOR', 'ADMIN'), registrarTratamiento);
 router.post('/:id/cerrar', hasRole('OPERADOR', 'ADMIN'), cerrarManifiesto);
+
+// Reversión de estado (solo ADMIN)
+router.post('/:id/revertir-estado', hasRole('ADMIN'), revertirEstado);
 
 export default router;

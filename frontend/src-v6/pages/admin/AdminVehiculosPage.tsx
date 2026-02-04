@@ -33,6 +33,7 @@ import { Modal } from '../../components/ui/Modal';
 import { Tabs, TabList, Tab, TabPanel } from '../../components/ui/Tabs';
 import { useTransportistas } from '../../hooks/useActores';
 import { toast } from '../../components/ui/Toast';
+import { downloadCsv } from '../../utils/exportCsv';
 
 interface VehiculoDisplay {
   id: string;
@@ -60,7 +61,7 @@ export const AdminVehiculosPage: React.FC = () => {
   const location = useLocation();
   const isMobile = location.pathname.startsWith('/mobile');
 
-  const { data: transportistasData, isLoading, isError, error } = useTransportistas({ limit: 100 });
+  const { data: transportistasData, isLoading, isError, error } = useTransportistas({ limit: 100, search: searchQuery || undefined });
 
   const transportistas = Array.isArray(transportistasData?.items) ? transportistasData.items : [];
 
@@ -245,7 +246,7 @@ export const AdminVehiculosPage: React.FC = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" leftIcon={<Download size={18} />} disabled title="Próximamente">
+          <Button variant="outline" leftIcon={<Download size={18} />} onClick={() => downloadCsv(allVehicles.map(v => ({ Patente: v.patente, Marca: v.marca, Modelo: v.modelo, Año: v.anio, Capacidad: v.capacidad, Transportista: v.transportista, Habilitación: v.habilitacion, Estado: v.estado })), 'vehiculos')}>
             Exportar
           </Button>
           <Button leftIcon={<Plus size={18} />} onClick={() => setIsModalOpen(true)}>
@@ -351,6 +352,7 @@ export const AdminVehiculosPage: React.FC = () => {
                     selectable
                     selectedKeys={selectedRows}
                     onSelectionChange={setSelectedRows}
+                    onRowClick={(row) => navigate(isMobile ? `/mobile/actores/transportistas/${row.transportistaId}` : `/actores/transportistas/${row.transportistaId}`)}
                   />
                   <Pagination
                     currentPage={currentPage}

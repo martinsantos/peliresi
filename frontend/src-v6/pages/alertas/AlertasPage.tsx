@@ -5,13 +5,13 @@
  */
 
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Bell,
   AlertTriangle,
   CheckCircle,
   Clock,
   Filter,
-  Settings,
   Trash2,
   Check,
   AlertCircle,
@@ -26,6 +26,7 @@ import { Modal, ConfirmModal } from '../../components/ui/Modal';
 import { toast } from '../../components/ui/Toast';
 import { useAlertas, useResolverAlerta } from '../../hooks/useAlertas';
 import { alertaService } from '../../services/alerta.service';
+import { formatRelativeTime } from '../../utils/formatters';
 
 // Local alert shape used by UI
 interface AlertaLocal {
@@ -47,6 +48,7 @@ const tipoConfig = {
 };
 
 export const AlertasPage: React.FC = () => {
+  const navigate = useNavigate();
   // Real API data
   const { data: apiAlertas, isLoading, isError } = useAlertas();
   const resolverMutation = useResolverAlerta();
@@ -145,16 +147,6 @@ export const AlertasPage: React.FC = () => {
     toast.success('Alertas limpiadas', 'Todas las alertas fueron eliminadas');
   };
 
-  const formatFecha = (fecha: string) => {
-    const date = new Date(fecha);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-
-    if (hours < 1) return 'Hace minutos';
-    if (hours < 24) return `Hace ${hours} hora${hours > 1 ? 's' : ''}`;
-    return date.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
-  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -196,9 +188,6 @@ export const AlertasPage: React.FC = () => {
             disabled={alertas.length === 0}
           >
             Limpiar
-          </Button>
-          <Button variant="ghost" leftIcon={<Settings size={18} />}>
-            Configurar
           </Button>
         </div>
       </div>
@@ -279,7 +268,7 @@ export const AlertasPage: React.FC = () => {
                       </div>
                       <span className="text-xs text-neutral-500 whitespace-nowrap flex items-center gap-1">
                         <Clock size={12} />
-                        {formatFecha(alerta.fecha)}
+                        {formatRelativeTime(alerta.fecha)}
                       </span>
                     </div>
                     <div className="flex items-center gap-3 mt-3">
@@ -287,6 +276,7 @@ export const AlertasPage: React.FC = () => {
                         variant="ghost"
                         size="sm"
                         className="h-8"
+                        onClick={() => navigate('/manifiestos')}
                       >
                         {alerta.accion}
                       </Button>

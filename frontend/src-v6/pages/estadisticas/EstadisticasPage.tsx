@@ -23,6 +23,7 @@ import { Card } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { useDashboardStats } from '../../hooks/useDashboard';
 import { useGeneradores } from '../../hooks/useActores';
+import { useExportarReporte } from '../../hooks/useReportes';
 
 const EstadisticasPage: React.FC = () => {
   const navigate = useNavigate();
@@ -30,6 +31,7 @@ const EstadisticasPage: React.FC = () => {
 
   const { data: dashboardData, isLoading, isError } = useDashboardStats();
   const { data: generadoresData } = useGeneradores();
+  const exportarMutation = useExportarReporte();
 
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
@@ -100,7 +102,7 @@ const EstadisticasPage: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" leftIcon={<Download size={18} />} disabled title="Próximamente">
+          <Button variant="outline" leftIcon={<Download size={18} />} onClick={() => exportarMutation.mutate({ tipo: 'manifiestos', formato: 'csv' as const })} disabled={exportarMutation.isPending}>
             Exportar
           </Button>
         </div>

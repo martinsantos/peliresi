@@ -65,7 +65,7 @@ const AdminGeneradoresPage: React.FC = () => {
   const [form, setForm] = useState(INITIAL_FORM);
 
   // API hooks
-  const { data: apiData, isLoading, isError, error } = useGeneradores({ page: currentPage, limit: 20 });
+  const { data: apiData, isLoading, isError, error } = useGeneradores({ page: currentPage, limit: 20, search: busqueda || undefined });
   const createMutation = useCreateGenerador();
   const updateMutation = useUpdateGenerador();
   const deleteMutation = useDeleteGenerador();
@@ -92,15 +92,13 @@ const AdminGeneradoresPage: React.FC = () => {
     [generadoresData]
   );
 
+  // Server handles search; client filters categoria/estado on current page
   const filteredData = tableData.filter((g) => {
-    const matchesSearch = g.razonSocial.toLowerCase().includes(busqueda.toLowerCase()) ||
-                          g.cuit.includes(busqueda) ||
-                          g.domicilio.toLowerCase().includes(busqueda.toLowerCase());
     const matchesCategoria = !filtroCategoria || g.categoria.toLowerCase().includes(filtroCategoria.toLowerCase());
     const matchesEstado = filtroEstado === 'todos' ||
                           (filtroEstado === 'activo' && g.activo) ||
                           (filtroEstado === 'inactivo' && !g.activo);
-    return matchesSearch && matchesCategoria && matchesEstado;
+    return matchesCategoria && matchesEstado;
   });
 
   const stats = {
@@ -411,7 +409,7 @@ const AdminGeneradoresPage: React.FC = () => {
             <div className="flex-1">
               <SearchInput
                 value={busqueda}
-                onChange={setBusqueda}
+                onChange={(v) => { setBusqueda(v); setCurrentPage(1); }}
                 placeholder="Buscar por razón social, CUIT o domicilio..."
                 size="md"
               />

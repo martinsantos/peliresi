@@ -33,7 +33,7 @@ Permite el seguimiento completo del ciclo de vida de manifiestos: desde la gener
 | PWA App | `/var/www/sitrep/app/` |
 | Backend code | `/var/www/sitrep-backend/` |
 | Backend .env | `/var/www/sitrep-backend/.env` (symlink a `/home/demoambiente/.env`) |
-| Backend dist deploy target | `/home/demoambiente/` |
+| Backend dist deploy target | `/var/www/sitrep-backend/` |
 | Nginx config | `/etc/nginx/sites-available/sitrep.ultimamilla.com.ar` |
 | PM2 logs | `/root/.pm2/logs/sitrep-backend-*.log` |
 
@@ -95,7 +95,7 @@ cd backend
 npm run build
 tar czf /tmp/sitrep-backend.tar.gz dist package.json package-lock.json prisma
 scp /tmp/sitrep-backend.tar.gz root@23.105.176.45:/tmp/
-ssh root@23.105.176.45 "cd /home/demoambiente && tar xzf /tmp/sitrep-backend.tar.gz && npm ci --production && npx prisma generate && pm2 restart sitrep-backend"
+ssh root@23.105.176.45 "cd /var/www/sitrep-backend && tar xzf /tmp/sitrep-backend.tar.gz && npm ci --production && npx prisma generate && pm2 restart sitrep-backend"
 ```
 
 ## Deployment - Full (Frontend + Backend)
@@ -118,7 +118,7 @@ ssh root@23.105.176.45 "cd /var/www/sitrep && find . -maxdepth 1 ! -name app ! -
 ssh root@23.105.176.45 "cd /var/www/sitrep/app && rm -rf * && tar xzf /tmp/sitrep-app.tar.gz && chmod -R 755 ."
 
 # Deploy backend
-ssh root@23.105.176.45 "cd /home/demoambiente && tar xzf /tmp/sitrep-backend.tar.gz && npm ci --production && npx prisma generate && pm2 restart sitrep-backend"
+ssh root@23.105.176.45 "cd /var/www/sitrep-backend && tar xzf /tmp/sitrep-backend.tar.gz && npm ci --production && npx prisma generate && pm2 restart sitrep-backend"
 ```
 
 ---
@@ -168,7 +168,7 @@ ssh root@23.105.176.45 "docker exec -it directus-admin-database-1 psql -U direct
 
 ```
 GET  /api/manifiestos/dashboard      → estadísticas (borradores, aprobados, enTransito, entregados, recibidos, tratados, total) + recientes + enTransitoList
-GET  /api/reportes/manifiestos       → porEstado, porTipoResiduo, manifiestos[] (params: fechaInicio, fechaFin)
+GET  /api/reportes/manifiestos       → porEstado, porTipoResiduo, manifiestos[] (params: fechaInicio, fechaFin). NOTA: porTipoResiduo retorna objetos { cantidad, unidad }, NO números planos
 GET  /api/reportes/tratados          → porGenerador, totalPorTipo, detalle[] (params: fechaInicio, fechaFin)
 GET  /api/reportes/transporte        → transportistas[] con tasaCompletitud (params: fechaInicio, fechaFin)
 GET  /api/reportes/exportar/:tipo    → CSV blob (tipos: manifiestos, generadores, transportistas, operadores)
@@ -207,13 +207,13 @@ La función `mapFilters()` en `reporte.service.ts` traduce entre ambos.
 | Página | Archivo | Descripción |
 |--------|---------|-------------|
 | Dashboard | `pages/dashboard/DashboardPage.tsx` | KPIs, resumen general |
-| Centro de Control | `pages/centro-control/CentroControlPage.tsx` | Sala de operaciones: LIVE badge, 5 KPIs, pipeline funnel, mapa h-96, donut chart, bar chart, auto-refresh 30s, 6 acciones rápidas |
+| Centro de Control | `pages/centro-control/CentroControlPage.tsx` | Sala de operaciones: LIVE badge, 5 KPIs, pipeline funnel, mapa + viajes activos/realizados accordion, donut chart, bar chart, auto-refresh 30s, 6 acciones rápidas. Viajes panel usa `self-start` para no estirarse con el mapa. |
 | Mobile Dashboard | `pages/mobile/MobileDashboardPage.tsx` | Versión mobile optimizada |
 
 ### Reportes
 | Página | Archivo | Descripción |
 |--------|---------|-------------|
-| Centro de Reportes | `pages/reportes/ReportesPage.tsx` | 3 tabs (Manifiestos/Tratados/Transporte), Recharts (BarChart, PieChart, Donut, Gauge SVG), exportación PDF con jsPDF, exportación CSV, filtros de fecha inline |
+| Centro de Reportes | `pages/reportes/ReportesPage.tsx` | 7 tabs (Manifiestos/Residuos Tratados/Transporte/Establecimientos/Operadores/Departamentos/Mapa de Actores), Recharts (BarChart, PieChart, Donut, Gauge SVG), exportación PDF con jsPDF, exportación CSV, filtros de fecha inline con "Ver Todos", DepartamentoDetalleModal, sticky filter bar |
 
 ### Manifiestos
 | Página | Archivo | Descripción |
@@ -374,3 +374,108 @@ NuevoManifiestoPage auto-populates actor info cards (CUIT, teléfono, domicilio,
 - `createManifiesto` backend acepta `generadorId` del body para ADMIN (no requiere relación generador en el user)
 - `registrarIncidente` acepta tanto `tipo` como `tipoIncidente` del frontend
 - Certificado de Disposición (CU-O10): PDF generado por `pdf.controller.ts:generarCertificado` con Ley 24.051, datos completos, firma operador
+
+---
+
+## Lecciones Aprendidas (CSS/Layout)
+
+### Sticky filter bars en páginas con overflow
+- `position: sticky` SOLO funciona si el elemento sticky está dentro de un contenedor con scroll (e.g. `<main>` con `overflow-auto`)
+- El root layout DEBE usar `h-screen overflow-hidden` para forzar que `<main>` sea el scroll container (NO `min-h-screen`)
+- Los componentes de página deben usar React Fragment (`<>`) para que el sticky bar sea hijo directo de `<main>`
+- Usar `-mx-4 lg:-mx-8 px-4 lg:px-8` para sticky bars full-bleed dentro de `<main>` con padding
+- Leaflet mapas tienen z-index 400+; usar `isolate` en content wrappers para contener stacking context
+- NO poner top padding en `<main>` cuando hay sticky bars — solo `px-4 lg:px-8 pb-4 lg:pb-8`
+
+### CSS Grid y paneles de contenido variable
+- En CSS grid, columnas se estiran al alto de la fila (definido por el elemento más alto, e.g. mapa)
+- Usar `self-start` en columnas con contenido variable para evitar whitespace innecesario
+- `min-h-[X]` fuerza altura mínima incluso sin contenido — evitar para paneles dinámicos
+
+### Modales sobre headers fijos
+- Si el header tiene `h-16` (64px) y `z-30`, modales con `z-50` necesitan `pt-20` (80px) para que el contenido no quede detrás
+
+### Datos del backend — formas inconsistentes
+- `/api/reportes/manifiestos` → `porTipoResiduo` retorna `{ cantidad: number, unidad: string }` (objetos)
+- `/api/reportes/tratados` → `totalPorTipo` retorna `number` (números planos)
+- Siempre verificar con `typeof value === 'object'` y extraer `.cantidad` cuando corresponda
+
+---
+
+## Reglas de Ingeniería
+
+### Filosofía operativa
+Tú eres las manos; el humano es el arquitecto. Muévete rápido, pero nunca más rápido de lo que el humano pueda verificar. Tu código será vigilado con lupa; escribe en consecuencia.
+
+### Comportamientos obligatorios
+
+1. **Exponer suposiciones** (prioridad: crítica)
+   - Antes de implementar algo no trivial, declarar suposiciones explícitamente.
+   - Nunca rellenar silenciosamente requisitos ambiguos.
+   - Formato: `SUPOSICIONES QUE ESTOY HACIENDO: 1. [...] → Corrígeme ahora o procederé con esto.`
+
+2. **Gestión de confusión** (prioridad: crítica)
+   - Ante inconsistencias o requisitos contradictorios: DETENTE. Nombra la confusión. Presenta la disyuntiva. Espera resolución.
+   - Mal: elegir silenciosamente una interpretación. Bien: "Veo X en archivo A pero Y en archivo B. ¿Cuál tiene precedencia?"
+
+3. **Push back cuando corresponda** (prioridad: alta)
+   - No ser servil. Señalar problemas directamente, explicar desventaja concreta, proponer alternativa, aceptar si te anulan.
+
+4. **Simplicidad** (prioridad: alta)
+   - Resistir activamente la tendencia a sobrecomplicar. Preferir la solución aburrida y obvia.
+   - Si 100 líneas bastan, 1000 es un fallo. La astucia es costosa.
+
+5. **Disciplina de alcance** (prioridad: alta)
+   - Tocar SOLO lo que se pida. No eliminar comentarios, no "limpiar" código ortogonal, no refactorizar sistemas adyacentes, no borrar código aparentemente no utilizado sin aprobación.
+
+6. **Higiene de código muerto** (prioridad: media)
+   - Después de refactorizar: identificar código inalcanzable, enumerarlo, preguntar antes de eliminar.
+
+### Patrones de trabajo
+
+- **Declarativo sobre imperativo**: re-enmarcar instrucciones como criterios de éxito.
+- **Test primero**: escribir la prueba que define éxito, implementar hasta que pase, mostrar ambos.
+- **Naive primero, optimizar después**: corrección primero, rendimiento después.
+- **Plan inline**: para tareas de múltiples pasos, emitir plan ligero antes de ejecutar.
+
+### Estándares de output
+
+- Sin abstracciones infladas ni generalización prematura.
+- Sin trucos astutos sin comentarios que expliquen el porqué.
+- Estilo consistente con la base de código existente.
+- Nombres de variables significativos.
+
+### Comunicación
+
+- Ser directo sobre los problemas.
+- Cuantificar cuando sea posible ("esto añade ~200ms de latencia", no "esto podría ser más lento").
+- Cuando te atasques, decirlo y describir lo que has intentado.
+- No ocultar incertidumbre detrás de lenguaje confiado.
+
+### Resumen post-cambio obligatorio
+
+```
+CAMBIOS REALIZADOS:
+- [archivo]: [qué cambió y por qué]
+
+COSAS QUE NO TOQUÉ:
+- [archivo]: [dejado solo intencionalmente porque...]
+
+POSIBLES PREOCUPACIONES:
+- [cualquier riesgo o cosa a verificar]
+```
+
+### Modos de fallo a evitar
+
+1. Hacer suposiciones incorrectas sin verificar
+2. No gestionar tu propia confusión
+3. No buscar aclaraciones cuando se necesitan
+4. No exponer inconsistencias que notas
+5. No presentar tradeoffs en decisiones no obvias
+6. No cuestionar cuando deberías
+7. Ser servil ("¡Por supuesto!" a malas ideas)
+8. Sobrecomplicar el código y las APIs
+9. Inflar abstracciones innecesariamente
+10. No limpiar código muerto tras refactorizaciones
+11. Modificar comentarios/código ortogonal a la tarea
+12. Eliminar cosas que no entiendes completamente

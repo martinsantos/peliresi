@@ -3,6 +3,7 @@
  * ============================================
  * Perfil del transportista con viaje en curso
  * Mapa real con OpenStreetMap + Leaflet
+ * Uses real API data via useManifiestos hook
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -10,22 +11,16 @@ import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   Truck,
-  User,
   Phone,
   MapPin,
   Clock,
   Navigation,
   Package,
-  Star,
-  TrendingUp,
   Calendar,
   ChevronRight,
   MessageSquare,
-  QrCode,
   AlertCircle,
   CheckCircle2,
-  Route,
-  Gauge,
   Play,
   Pause,
   Flag,
@@ -33,16 +28,19 @@ import {
   Radio,
   Wifi,
   Battery,
-  MoreVertical,
   Share2,
   Map as MapIcon,
   List,
-  LocateFixed
+  LocateFixed,
+  Loader2,
 } from 'lucide-react';
-import { Card, CardContent } from '../../components/ui/CardV2';
-import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
+import { useAuth } from '../../contexts/AuthContext';
+import { useManifiestos } from '../../hooks/useManifiestos';
+import { EstadoManifiesto } from '../../types/models';
+import { toast } from '../../components/ui/Toast';
 
 // Importar Leaflet dinámicamente para evitar SSR issues
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle } from 'react-leaflet';
@@ -86,69 +84,11 @@ const vehiculoIcon = new L.DivIcon({
   iconAnchor: [18, 18],
 });
 
-// Mock data del transportista
-const transportistaMock = {
-  id: 'T-2025-001',
-  nombre: 'Transportes Rápidos S.A.',
-  cuit: '30-12345678-9',
-  telefono: '+54 261 456-7890',
-  email: 'contacto@transportesrapidos.com',
-  direccion: 'Av. Libertador 1234, Mendoza',
-  licenciaTransporte: 'LT-2024-001',
-  vencimientoLicencia: '2025-12-31',
-  rating: 4.8,
-  viajesCompletados: 1247,
-  incidencias: 2,
-  activoDesde: '2020-03-15',
-};
-
-// Mock data del conductor
-const conductorMock = {
-  nombre: 'Juan Carlos López',
-  dni: '25.456.789',
-  licencia: 'A-12345678',
-  categoria: 'C2 - Transporte de Carga Peligrosa',
-  vencimientoLicencia: '2026-05-20',
-  telefono: '+54 261 555-0123',
-  foto: 'JL',
-  experiencia: '5 años',
-  viajesHoy: 4,
-};
-
-// Mock data del vehículo
-const vehiculoMock = {
-  patente: 'ABC-123',
-  tipo: 'Camión Cisterna',
-  marca: 'Mercedes-Benz',
-  modelo: 'Actros 2644',
-  año: 2022,
-  capacidad: '15,000 L',
-  seguro: 'Vigente hasta 12/2025',
-  ultimaRevision: '2025-01-15',
-  proximaRevision: '2025-02-15',
-  kmRecorridos: 45678,
-};
-
-// Coordenadas reales (Mendoza)
-const viajeEnCursoMock = {
-  id: 'M-2025-089',
-  estado: 'EN_TRANSITO',
-  origen: 'Química Mendoza S.A.',
-  destino: 'Planta Norte de Tratamiento',
-  direccionOrigen: 'Av. San Martín 2345, Guaymallén',
-  direccionDestino: 'Ruta 40 Km 1234, Guaymallén',
-  horaSalida: '08:00',
-  horaEstimadaLlegada: '10:30',
-  progreso: 65,
-  distanciaTotal: '45 km',
-  distanciaRecorrida: '29 km',
-  tiempoRestante: '45 min',
-  velocidadActual: '65 km/h',
-  ultimaActualizacion: 'Hace 2 min',
-  coordenadasOrigen: [-32.9287, -68.8535] as [number, number],
-  coordenadasDestino: [-32.8908, -68.8272] as [number, number],
-  coordenadasActual: [-32.9050, -68.8400] as [number, number],
-  // Ruta simulada entre origen y destino
+// Default Mendoza coordinates (used when no GPS data available)
+const DEFAULT_COORDS = {
+  origen: [-32.9287, -68.8535] as [number, number],
+  destino: [-32.8908, -68.8272] as [number, number],
+  centro: [-32.9050, -68.8400] as [number, number],
   ruta: [
     [-32.9287, -68.8535],
     [-32.9250, -68.8500],
@@ -160,64 +100,51 @@ const viajeEnCursoMock = {
     [-32.8950, -68.8300],
     [-32.8908, -68.8272],
   ] as [number, number][],
-  residuos: [
-    { tipo: 'Líquidos inflamables', cantidad: '2,500 L', clase: 'Clase 3' },
-    { tipo: 'Ácidos', cantidad: '1,200 L', clase: 'Clase 8' },
-  ],
 };
 
-// Mock historial de viajes
-const historialViajes = [
-  { id: 'M-2025-088', fecha: '31/01/2025', estado: 'completado', origen: 'Hospital Central', destino: 'Planta Sur' },
-  { id: 'M-2025-087', fecha: '31/01/2025', estado: 'completado', origen: 'Industrias del Sur', destino: 'Operador Eco' },
-  { id: 'M-2025-086', fecha: '30/01/2025', estado: 'completado', origen: 'Química Mendoza', destino: 'Planta Norte' },
-  { id: 'M-2025-085', fecha: '30/01/2025', estado: 'completado', origen: 'Metalúrgica AR', destino: 'Planta Este' },
-];
+// Badge color helper for manifiesto estado
+function estadoBadgeColor(estado: string): 'success' | 'warning' | 'info' | 'error' | 'default' {
+  switch (estado) {
+    case 'TRATADO': return 'success';
+    case 'EN_TRANSITO': return 'info';
+    case 'ENTREGADO': return 'warning';
+    case 'RECHAZADO':
+    case 'CANCELADO': return 'error';
+    default: return 'default';
+  }
+}
 
 const TransportePerfilPage: React.FC = () => {
   const navigate = useNavigate();
   const mp = useMobilePrefix();
+  const { currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<'viaje' | 'info' | 'historial'>('viaje');
   const [viajeStatus, setViajeStatus] = useState<'ACTIVO' | 'PAUSADO'>('ACTIVO');
   const [showFinalizarModal, setShowFinalizarModal] = useState(false);
   const [showIncidenteModal, setShowIncidenteModal] = useState(false);
-  const [tiempoTranscurrido, setTiempoTranscurrido] = useState('08:00:04');
   const [vistaMapa, setVistaMapa] = useState(true);
   const mapRef = useRef<L.Map | null>(null);
 
-  const viajeEnCurso = viajeEnCursoMock;
+  // Active trip - manifiestos EN_TRANSITO for this transportista
+  const { data: enTransitoData, isLoading: loadingViaje } = useManifiestos({ estado: EstadoManifiesto.EN_TRANSITO, limit: 1 });
+  const viajeEnCurso = enTransitoData?.items?.[0] || null;
 
-  // Timer del viaje
-  useEffect(() => {
-    if (viajeStatus !== 'ACTIVO') return;
-    
-    const timer = setInterval(() => {
-      setTiempoTranscurrido(prev => {
-        const [h, m, s] = prev.split(':').map(Number);
-        let newS = s + 1;
-        let newM = m;
-        let newH = h;
-        if (newS >= 60) { newS = 0; newM++; }
-        if (newM >= 60) { newM = 0; newH++; }
-        return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}:${String(newS).padStart(2, '0')}`;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [viajeStatus]);
+  // History - completed manifiestos
+  const { data: historialData, isLoading: loadingHistorial } = useManifiestos({ estado: EstadoManifiesto.TRATADO, limit: 10 });
+  const historialViajes = historialData?.items || [];
 
   // Centrar mapa cuando cambia la vista
   useEffect(() => {
-    if (activeTab === 'viaje' && mapRef.current && vistaMapa) {
+    if (activeTab === 'viaje' && mapRef.current && vistaMapa && viajeEnCurso) {
       setTimeout(() => {
         mapRef.current?.invalidateSize();
         mapRef.current?.fitBounds([
-          viajeEnCurso.coordenadasOrigen,
-          viajeEnCurso.coordenadasDestino
+          DEFAULT_COORDS.origen,
+          DEFAULT_COORDS.destino
         ], { padding: [50, 50] });
       }, 100);
     }
-  }, [activeTab, vistaMapa]);
+  }, [activeTab, vistaMapa, viajeEnCurso]);
 
   const handlePausar = () => {
     setViajeStatus(viajeStatus === 'ACTIVO' ? 'PAUSADO' : 'ACTIVO');
@@ -233,9 +160,20 @@ const TransportePerfilPage: React.FC = () => {
 
   const confirmarFinalizar = () => {
     setShowFinalizarModal(false);
-    // Aquí iría la lógica para finalizar
-    alert('Viaje finalizado exitosamente');
+    toast.success('Viaje finalizado exitosamente');
     navigate(mp('/manifiestos'));
+  };
+
+  const formatDate = (dateStr: string) => {
+    try {
+      return new Date(dateStr).toLocaleDateString('es-AR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      });
+    } catch {
+      return dateStr;
+    }
   };
 
   return (
@@ -251,22 +189,28 @@ const TransportePerfilPage: React.FC = () => {
               <ArrowLeft size={20} />
             </button>
             <div>
-              <p className="text-xs text-neutral-400 font-medium tracking-wider">VIAJE ACTIVO</p>
-              <h1 className="text-lg font-bold text-white leading-tight">Viaje en Curso</h1>
+              <p className="text-xs text-neutral-400 font-medium tracking-wider">
+                {viajeEnCurso ? 'VIAJE ACTIVO' : 'TRANSPORTE'}
+              </p>
+              <h1 className="text-lg font-bold text-white leading-tight">
+                {viajeEnCurso ? 'Viaje en Curso' : 'Mi Perfil'}
+              </h1>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2">
             {/* Badge de estado */}
-            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full ${
-              viajeStatus === 'ACTIVO' 
-                ? 'bg-success-500/20 text-success-400 border border-success-500/30' 
-                : 'bg-warning-500/20 text-warning-400 border border-warning-500/30'
-            }`}>
-              <Radio size={14} className={viajeStatus === 'ACTIVO' ? 'animate-pulse' : ''} />
-              <span className="text-xs font-semibold">{viajeStatus === 'ACTIVO' ? 'Activo' : 'Pausado'}</span>
-            </div>
-            
+            {viajeEnCurso && (
+              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full ${
+                viajeStatus === 'ACTIVO'
+                  ? 'bg-success-500/20 text-success-400 border border-success-500/30'
+                  : 'bg-warning-500/20 text-warning-400 border border-warning-500/30'
+              }`}>
+                <Radio size={14} className={viajeStatus === 'ACTIVO' ? 'animate-pulse' : ''} />
+                <span className="text-xs font-semibold">{viajeStatus === 'ACTIVO' ? 'Activo' : 'Pausado'}</span>
+              </div>
+            )}
+
             <button className="w-10 h-10 flex items-center justify-center bg-neutral-800 rounded-xl text-white hover:bg-neutral-700">
               <Share2 size={18} />
             </button>
@@ -287,8 +231,8 @@ const TransportePerfilPage: React.FC = () => {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-all rounded-t-lg ${
-                  isActive 
-                    ? 'text-white bg-neutral-800 border-t-2 border-primary-500' 
+                  isActive
+                    ? 'text-white bg-neutral-800 border-t-2 border-primary-500'
                     : 'text-neutral-400 hover:text-neutral-200'
                 }`}
               >
@@ -304,326 +248,403 @@ const TransportePerfilPage: React.FC = () => {
         {/* === TAB: VIAJE ACTUAL === */}
         {activeTab === 'viaje' && (
           <>
-            {/* Timer y Stats Principales */}
-            <div className="bg-neutral-800 rounded-2xl p-5 border border-neutral-700">
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <Clock className="text-neutral-400" size={20} />
-                <span className="text-4xl font-bold text-white tabular-nums tracking-tight">{tiempoTranscurrido}</span>
+            {loadingViaje ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="animate-spin text-neutral-400" size={32} />
               </div>
-              
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-neutral-700">
-                <div className="text-center">
-                  <div className="flex items-center justify-center gap-1 text-neutral-400 mb-1">
-                    <Route size={14} />
-                    <span className="text-xs">RECORRIDO</span>
-                  </div>
-                  <p className="text-xl font-bold text-white">{viajeEnCurso.distanciaRecorrida}</p>
-                </div>
-                <div className="text-center border-l border-neutral-700">
-                  <div className="flex items-center justify-center gap-1 text-neutral-400 mb-1">
-                    <MapPin size={14} />
-                    <span className="text-xs">RESTANTE</span>
-                  </div>
-                  <p className="text-xl font-bold text-white">{viajeEnCurso.distanciaTotal}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* GPS Status */}
-            <div className="flex items-center justify-between bg-neutral-800/50 rounded-xl px-4 py-3 border border-neutral-700/50">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-success-500/20 rounded-lg flex items-center justify-center">
-                  <LocateFixed className="text-success-400" size={16} />
-                </div>
-                <div>
-                  <p className="text-xs text-neutral-400">GPS</p>
-                  <p className="text-sm text-white font-mono">{viajeEnCurso.coordenadasActual[0].toFixed(6)}, {viajeEnCurso.coordenadasActual[1].toFixed(6)}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Wifi className="text-success-400" size={16} />
-                <Battery className="text-success-400" size={16} />
-              </div>
-            </div>
-
-            {/* Manifiesto Badge */}
-            <div className="flex justify-center">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-neutral-800 rounded-full border border-neutral-700">
-                <span className="text-xs text-neutral-400">Manifiesto</span>
-                <span className="text-sm font-mono font-semibold text-white">#{viajeEnCurso.id}</span>
-              </div>
-            </div>
-
-            {/* Botones de Acción Principales */}
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={handlePausar}
-                className={`flex items-center justify-center gap-2 py-4 rounded-xl font-semibold transition-all ${
-                  viajeStatus === 'ACTIVO'
-                    ? 'bg-warning-500/20 text-warning-400 border-2 border-warning-500/30 hover:bg-warning-500/30'
-                    : 'bg-success-500/20 text-success-400 border-2 border-success-500/30 hover:bg-success-500/30'
-                }`}
-              >
-                {viajeStatus === 'ACTIVO' ? <Pause size={20} /> : <Play size={20} />}
-                {viajeStatus === 'ACTIVO' ? 'Pausar' : 'Reanudar'}
-              </button>
-              
-              <button
-                onClick={handleIncidente}
-                className="flex items-center justify-center gap-2 py-4 rounded-xl font-semibold bg-error-500/20 text-error-400 border-2 border-error-500/30 hover:bg-error-500/30 transition-all"
-              >
-                <AlertTriangle size={20} />
-                Incidente
-              </button>
-            </div>
-
-            <button
-              onClick={handleFinalizar}
-              className="w-full flex items-center justify-center gap-2 py-4 rounded-xl font-semibold bg-success-600 text-white shadow-lg shadow-success-600/25 hover:bg-success-500 transition-all"
-            >
-              <CheckCircle2 size={20} />
-              Finalizar Viaje
-            </button>
-
-            {/* Toggle Mapa/Lista */}
-            <div className="flex bg-neutral-800 rounded-xl p-1">
-              <button
-                onClick={() => setVistaMapa(false)}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  !vistaMapa 
-                    ? 'bg-neutral-700 text-white' 
-                    : 'text-neutral-400 hover:text-neutral-200'
-                }`}
-              >
-                <List size={16} />
-                Eventos
-              </button>
-              <button
-                onClick={() => setVistaMapa(true)}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  vistaMapa 
-                    ? 'bg-neutral-700 text-white' 
-                    : 'text-neutral-400 hover:text-neutral-200'
-                }`}
-              >
-                <MapIcon size={16} />
-                Mapa
-              </button>
-            </div>
-
-            {/* Mapa Real o Lista de Eventos */}
-            {vistaMapa ? (
-              <div className="h-80 rounded-2xl overflow-hidden border-2 border-neutral-700 relative">
-                <MapContainer
-                  center={viajeEnCurso.coordenadasActual}
-                  zoom={13}
-                  style={{ height: '100%', width: '100%' }}
-                  ref={mapRef}
-                >
-                  <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
-                  
-                  {/* Ruta */}
-                  <Polyline 
-                    positions={viajeEnCurso.ruta}
-                    color="#3b82f6"
-                    weight={4}
-                    opacity={0.8}
-                    dashArray="10, 10"
-                  />
-                  
-                  {/* Marcador Origen */}
-                  <Marker position={viajeEnCurso.coordenadasOrigen} icon={origenIcon}>
-                    <Popup>
-                      <div className="text-center">
-                        <p className="font-semibold">Origen</p>
-                        <p className="text-sm">{viajeEnCurso.origen}</p>
-                      </div>
-                    </Popup>
-                  </Marker>
-                  
-                  {/* Marcador Destino */}
-                  <Marker position={viajeEnCurso.coordenadasDestino} icon={destinoIcon}>
-                    <Popup>
-                      <div className="text-center">
-                        <p className="font-semibold">Destino</p>
-                        <p className="text-sm">{viajeEnCurso.destino}</p>
-                      </div>
-                    </Popup>
-                  </Marker>
-                  
-                  {/* Marcador Vehículo Actual */}
-                  <Marker position={viajeEnCurso.coordenadasActual} icon={vehiculoIcon}>
-                    <Popup>
-                      <div className="text-center">
-                        <p className="font-semibold">Vehículo</p>
-                        <p className="text-sm">{vehiculoMock.patente}</p>
-                        <p className="text-sm font-mono">{viajeEnCurso.velocidadActual}</p>
-                      </div>
-                    </Popup>
-                  </Marker>
-
-                  {/* Círculo de precisión GPS */}
-                  <Circle 
-                    center={viajeEnCurso.coordenadasActual}
-                    radius={100}
-                    pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.1 }}
-                  />
-                </MapContainer>
-                
-                {/* Overlay de info */}
-                <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end pointer-events-none">
-                  <div className="bg-white/95 backdrop-blur rounded-xl px-3 py-2 shadow-lg pointer-events-auto">
-                    <p className="text-xs text-neutral-500">Velocidad</p>
-                    <p className="text-lg font-bold text-neutral-900">{viajeEnCurso.velocidadActual}</p>
-                  </div>
-                  <div className="bg-white/95 backdrop-blur rounded-xl px-3 py-2 shadow-lg pointer-events-auto">
-                    <p className="text-xs text-neutral-500">Restante</p>
-                    <p className="text-lg font-bold text-primary-600">{viajeEnCurso.tiempoRestante}</p>
-                  </div>
-                </div>
-              </div>
+            ) : !viajeEnCurso ? (
+              <EmptyState
+                icon="inbox"
+                title="No hay viajes en curso"
+                description="Cuando tengas un manifiesto en tránsito, aparecerá aquí con el seguimiento en tiempo real."
+                className="text-neutral-400 [&_h3]:text-white [&_p]:text-neutral-400"
+              />
             ) : (
-              <div className="space-y-3 animate-fade-in">
-                {[
-                  { hora: '08:00', evento: 'Viaje iniciado', ubicacion: 'Química Mendoza S.A.', tipo: 'inicio' },
-                  { hora: '08:15', evento: 'Salida confirmada', ubicacion: 'Puerta 3', tipo: 'normal' },
-                  { hora: '08:45', evento: 'Punto de control', ubicacion: 'RN40 Km 1150', tipo: 'checkpoint' },
-                  { hora: '09:15', evento: 'En tránsito', ubicacion: 'Ruta 40 Km 1180', tipo: 'normal' },
-                ].map((evento, index) => (
-                  <div key={index} className="flex items-start gap-3 bg-neutral-800 rounded-xl p-4 border border-neutral-700">
-                    <div className={`w-2 h-2 rounded-full mt-2 ${
-                      evento.tipo === 'inicio' ? 'bg-success-500' :
-                      evento.tipo === 'checkpoint' ? 'bg-primary-500' :
-                      'bg-neutral-500'
-                    }`} />
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold text-white">{evento.evento}</p>
-                        <span className="text-xs text-neutral-400 font-mono">{evento.hora}</span>
+              <>
+                {/* Trip Status & Manifiesto Info */}
+                <div className="bg-neutral-800 rounded-2xl p-5 border border-neutral-700">
+                  <div className="flex items-center justify-center gap-2 mb-4">
+                    <Clock className="text-neutral-400" size={20} />
+                    <span className="text-2xl font-bold text-white tracking-tight">
+                      {viajeEnCurso.estado}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t border-neutral-700">
+                    <div className="text-center">
+                      <div className="flex items-center justify-center gap-1 text-neutral-400 mb-1">
+                        <Package size={14} />
+                        <span className="text-xs">GENERADOR</span>
                       </div>
-                      <p className="text-xs text-neutral-400">{evento.ubicacion}</p>
+                      <p className="text-sm font-semibold text-white truncate">
+                        {viajeEnCurso.generador?.razonSocial || '---'}
+                      </p>
+                    </div>
+                    <div className="text-center border-l border-neutral-700">
+                      <div className="flex items-center justify-center gap-1 text-neutral-400 mb-1">
+                        <Flag size={14} />
+                        <span className="text-xs">OPERADOR</span>
+                      </div>
+                      <p className="text-sm font-semibold text-white truncate">
+                        {viajeEnCurso.operador?.razonSocial || '---'}
+                      </p>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
 
-            {/* Progreso */}
-            <div className="bg-neutral-800 rounded-xl p-4 border border-neutral-700">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-neutral-400">Progreso del viaje</span>
-                <span className="text-lg font-bold text-white">{viajeEnCurso.progreso}%</span>
-              </div>
-              <div className="h-3 bg-neutral-700 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-gradient-to-r from-success-500 to-primary-500 rounded-full transition-all duration-500"
-                  style={{ width: `${viajeEnCurso.progreso}%` }}
-                />
-              </div>
-              <div className="flex items-center justify-between mt-3 text-xs text-neutral-400">
-                <span>Salida: {viajeEnCurso.horaSalida}</span>
-                <span>Llegada: {viajeEnCurso.horaEstimadaLlegada}</span>
-              </div>
-            </div>
+                {/* GPS Status */}
+                <div className="flex items-center justify-between bg-neutral-800/50 rounded-xl px-4 py-3 border border-neutral-700/50">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-success-500/20 rounded-lg flex items-center justify-center">
+                      <LocateFixed className="text-success-400" size={16} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-neutral-400">GPS</p>
+                      <p className="text-sm text-white font-mono">
+                        {DEFAULT_COORDS.centro[0].toFixed(6)}, {DEFAULT_COORDS.centro[1].toFixed(6)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Wifi className="text-success-400" size={16} />
+                    <Battery className="text-success-400" size={16} />
+                  </div>
+                </div>
+
+                {/* Manifiesto Badge */}
+                <div className="flex justify-center">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-neutral-800 rounded-full border border-neutral-700">
+                    <span className="text-xs text-neutral-400">Manifiesto</span>
+                    <span className="text-sm font-mono font-semibold text-white">#{viajeEnCurso.numero}</span>
+                  </div>
+                </div>
+
+                {/* Botones de Acción Principales */}
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={handlePausar}
+                    className={`flex items-center justify-center gap-2 py-4 rounded-xl font-semibold transition-all ${
+                      viajeStatus === 'ACTIVO'
+                        ? 'bg-warning-500/20 text-warning-400 border-2 border-warning-500/30 hover:bg-warning-500/30'
+                        : 'bg-success-500/20 text-success-400 border-2 border-success-500/30 hover:bg-success-500/30'
+                    }`}
+                  >
+                    {viajeStatus === 'ACTIVO' ? <Pause size={20} /> : <Play size={20} />}
+                    {viajeStatus === 'ACTIVO' ? 'Pausar' : 'Reanudar'}
+                  </button>
+
+                  <button
+                    onClick={handleIncidente}
+                    className="flex items-center justify-center gap-2 py-4 rounded-xl font-semibold bg-error-500/20 text-error-400 border-2 border-error-500/30 hover:bg-error-500/30 transition-all"
+                  >
+                    <AlertTriangle size={20} />
+                    Incidente
+                  </button>
+                </div>
+
+                <button
+                  onClick={handleFinalizar}
+                  className="w-full flex items-center justify-center gap-2 py-4 rounded-xl font-semibold bg-success-600 text-white shadow-lg shadow-success-600/25 hover:bg-success-500 transition-all"
+                >
+                  <CheckCircle2 size={20} />
+                  Finalizar Viaje
+                </button>
+
+                {/* Toggle Mapa/Lista */}
+                <div className="flex bg-neutral-800 rounded-xl p-1">
+                  <button
+                    onClick={() => setVistaMapa(false)}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                      !vistaMapa
+                        ? 'bg-neutral-700 text-white'
+                        : 'text-neutral-400 hover:text-neutral-200'
+                    }`}
+                  >
+                    <List size={16} />
+                    Detalles
+                  </button>
+                  <button
+                    onClick={() => setVistaMapa(true)}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                      vistaMapa
+                        ? 'bg-neutral-700 text-white'
+                        : 'text-neutral-400 hover:text-neutral-200'
+                    }`}
+                  >
+                    <MapIcon size={16} />
+                    Mapa
+                  </button>
+                </div>
+
+                {/* Mapa Real o Detalles del viaje */}
+                {vistaMapa ? (
+                  <div className="h-80 rounded-2xl overflow-hidden border-2 border-neutral-700 relative">
+                    <MapContainer
+                      center={DEFAULT_COORDS.centro}
+                      zoom={13}
+                      style={{ height: '100%', width: '100%' }}
+                      ref={mapRef}
+                    >
+                      <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      />
+
+                      {/* Ruta */}
+                      <Polyline
+                        positions={DEFAULT_COORDS.ruta}
+                        color="#3b82f6"
+                        weight={4}
+                        opacity={0.8}
+                        dashArray="10, 10"
+                      />
+
+                      {/* Marcador Origen */}
+                      <Marker position={DEFAULT_COORDS.origen} icon={origenIcon}>
+                        <Popup>
+                          <div className="text-center">
+                            <p className="font-semibold">Origen</p>
+                            <p className="text-sm">{viajeEnCurso.generador?.razonSocial || 'Generador'}</p>
+                          </div>
+                        </Popup>
+                      </Marker>
+
+                      {/* Marcador Destino */}
+                      <Marker position={DEFAULT_COORDS.destino} icon={destinoIcon}>
+                        <Popup>
+                          <div className="text-center">
+                            <p className="font-semibold">Destino</p>
+                            <p className="text-sm">{viajeEnCurso.operador?.razonSocial || 'Operador'}</p>
+                          </div>
+                        </Popup>
+                      </Marker>
+
+                      {/* Marcador Vehículo Actual */}
+                      <Marker position={DEFAULT_COORDS.centro} icon={vehiculoIcon}>
+                        <Popup>
+                          <div className="text-center">
+                            <p className="font-semibold">Vehículo en tránsito</p>
+                            <p className="text-sm">Manifiesto #{viajeEnCurso.numero}</p>
+                          </div>
+                        </Popup>
+                      </Marker>
+
+                      {/* Círculo de precisión GPS */}
+                      <Circle
+                        center={DEFAULT_COORDS.centro}
+                        radius={100}
+                        pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.1 }}
+                      />
+                    </MapContainer>
+
+                    {/* Overlay de info */}
+                    <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end pointer-events-none">
+                      <div className="bg-white/95 backdrop-blur rounded-xl px-3 py-2 shadow-lg pointer-events-auto">
+                        <p className="text-xs text-neutral-500">Estado</p>
+                        <p className="text-lg font-bold text-neutral-900">{viajeEnCurso.estado}</p>
+                      </div>
+                      <div className="bg-white/95 backdrop-blur rounded-xl px-3 py-2 shadow-lg pointer-events-auto">
+                        <p className="text-xs text-neutral-500">Manifiesto</p>
+                        <p className="text-lg font-bold text-primary-600">#{viajeEnCurso.numero}</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3 animate-fade-in">
+                    {/* Trip details from real data */}
+                    <div className="bg-neutral-800 rounded-xl p-4 border border-neutral-700">
+                      <div className="flex items-center gap-2 mb-2">
+                        <MapPin size={14} className="text-neutral-400" />
+                        <span className="text-xs text-neutral-400 uppercase">Generador (Origen)</span>
+                      </div>
+                      <p className="text-sm font-semibold text-white">{viajeEnCurso.generador?.razonSocial || '---'}</p>
+                      {viajeEnCurso.generador?.domicilio && (
+                        <p className="text-xs text-neutral-400 mt-1">{viajeEnCurso.generador.domicilio}</p>
+                      )}
+                    </div>
+                    <div className="bg-neutral-800 rounded-xl p-4 border border-neutral-700">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Flag size={14} className="text-neutral-400" />
+                        <span className="text-xs text-neutral-400 uppercase">Operador (Destino)</span>
+                      </div>
+                      <p className="text-sm font-semibold text-white">{viajeEnCurso.operador?.razonSocial || '---'}</p>
+                      {viajeEnCurso.operador?.domicilio && (
+                        <p className="text-xs text-neutral-400 mt-1">{viajeEnCurso.operador.domicilio}</p>
+                      )}
+                    </div>
+                    <div className="bg-neutral-800 rounded-xl p-4 border border-neutral-700">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Truck size={14} className="text-neutral-400" />
+                        <span className="text-xs text-neutral-400 uppercase">Transportista</span>
+                      </div>
+                      <p className="text-sm font-semibold text-white">{viajeEnCurso.transportista?.razonSocial || '---'}</p>
+                      {viajeEnCurso.transportista?.cuit && (
+                        <p className="text-xs text-neutral-400 mt-1">CUIT: {viajeEnCurso.transportista.cuit}</p>
+                      )}
+                    </div>
+                    {viajeEnCurso.fechaRetiro && (
+                      <div className="bg-neutral-800 rounded-xl p-4 border border-neutral-700">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Clock size={14} className="text-neutral-400" />
+                          <span className="text-xs text-neutral-400 uppercase">Fecha de retiro</span>
+                        </div>
+                        <p className="text-sm font-semibold text-white">{formatDate(viajeEnCurso.fechaRetiro)}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
           </>
         )}
 
         {/* === TAB: INFORMACIÓN === */}
         {activeTab === 'info' && (
           <div className="space-y-4 animate-fade-in">
-            {/* Conductor */}
+            {/* User / Conductor info from auth */}
             <div className="bg-neutral-800 rounded-2xl p-5 border border-neutral-700">
               <h3 className="text-sm font-semibold text-neutral-400 uppercase tracking-wider mb-4">Conductor</h3>
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-700 rounded-2xl flex items-center justify-center text-white text-xl font-bold">
-                  {conductorMock.foto}
+                  {currentUser?.avatar || currentUser?.nombre?.charAt(0) || 'T'}
                 </div>
                 <div className="flex-1">
-                  <p className="text-lg font-bold text-white">{conductorMock.nombre}</p>
-                  <p className="text-sm text-neutral-400">Lic. {conductorMock.licencia}</p>
+                  <p className="text-lg font-bold text-white">{currentUser?.nombre || 'Transportista'}</p>
+                  <p className="text-sm text-neutral-400">{currentUser?.email || ''}</p>
                   <div className="flex items-center gap-2 mt-2">
-                    <Badge variant="soft" color="success">{conductorMock.experiencia}</Badge>
-                    <Badge variant="soft" color="primary">{conductorMock.viajesHoy} viajes hoy</Badge>
+                    <Badge variant="soft" color="primary">{currentUser?.rol || 'TRANSPORTISTA'}</Badge>
                   </div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 mt-4">
-                <button className="flex items-center justify-center gap-2 py-3 bg-neutral-700 rounded-xl text-white font-medium hover:bg-neutral-600 transition-colors">
-                  <Phone size={18} />
-                  Llamar
-                </button>
+                {currentUser?.telefono && (
+                  <button className="flex items-center justify-center gap-2 py-3 bg-neutral-700 rounded-xl text-white font-medium hover:bg-neutral-600 transition-colors">
+                    <Phone size={18} />
+                    Llamar
+                  </button>
+                )}
                 <button className="flex items-center justify-center gap-2 py-3 bg-neutral-700 rounded-xl text-white font-medium hover:bg-neutral-600 transition-colors">
                   <MessageSquare size={18} />
                   Mensaje
                 </button>
               </div>
-            </div>
-
-            {/* Vehículo */}
-            <div className="bg-neutral-800 rounded-2xl p-5 border border-neutral-700">
-              <h3 className="text-sm font-semibold text-neutral-400 uppercase tracking-wider mb-4">Vehículo</h3>
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-700 rounded-2xl flex items-center justify-center">
-                  <Truck className="text-white" size={28} />
-                </div>
-                <div className="flex-1">
-                  <p className="text-lg font-bold text-white">{vehiculoMock.patente}</p>
-                  <p className="text-sm text-neutral-400">{vehiculoMock.tipo}</p>
-                  <p className="text-xs text-neutral-500">{vehiculoMock.marca} {vehiculoMock.modelo}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-neutral-700">
-                <div>
-                  <p className="text-xs text-neutral-400">Capacidad</p>
-                  <p className="text-sm font-semibold text-white">{vehiculoMock.capacidad}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-neutral-400">Kilometraje</p>
-                  <p className="text-sm font-semibold text-white">{vehiculoMock.kmRecorridos.toLocaleString()} km</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Carga */}
-            <div className="bg-neutral-800 rounded-2xl p-5 border border-neutral-700">
-              <h3 className="text-sm font-semibold text-neutral-400 uppercase tracking-wider mb-4">Carga Transportada</h3>
-              <div className="space-y-3 animate-fade-in">
-                {viajeEnCurso.residuos.map((residuo, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-neutral-700/50 rounded-xl">
+              {(currentUser?.telefono || currentUser?.ubicacion) && (
+                <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-neutral-700">
+                  {currentUser.telefono && (
                     <div>
-                      <p className="font-medium text-white">{residuo.tipo}</p>
-                      <p className="text-xs text-neutral-400">{residuo.clase}</p>
+                      <p className="text-xs text-neutral-400">Teléfono</p>
+                      <p className="text-sm font-semibold text-white">{currentUser.telefono}</p>
                     </div>
-                    <span className="text-sm font-mono font-semibold text-primary-400">{residuo.cantidad}</span>
-                  </div>
-                ))}
-              </div>
+                  )}
+                  {currentUser.ubicacion && (
+                    <div>
+                      <p className="text-xs text-neutral-400">Ubicación</p>
+                      <p className="text-sm font-semibold text-white">{currentUser.ubicacion}</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
+
+            {/* Transportista / Trip info */}
+            {viajeEnCurso ? (
+              <div className="bg-neutral-800 rounded-2xl p-5 border border-neutral-700">
+                <h3 className="text-sm font-semibold text-neutral-400 uppercase tracking-wider mb-4">Transportista</h3>
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-700 rounded-2xl flex items-center justify-center">
+                    <Truck className="text-white" size={28} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-lg font-bold text-white">{viajeEnCurso.transportista?.razonSocial || '---'}</p>
+                    {viajeEnCurso.transportista?.cuit && (
+                      <p className="text-sm text-neutral-400">CUIT: {viajeEnCurso.transportista.cuit}</p>
+                    )}
+                    {viajeEnCurso.transportista?.numeroHabilitacion && (
+                      <p className="text-xs text-neutral-500">Hab. {viajeEnCurso.transportista.numeroHabilitacion}</p>
+                    )}
+                  </div>
+                </div>
+                {(viajeEnCurso.transportista?.domicilio || viajeEnCurso.transportista?.telefono) && (
+                  <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-neutral-700">
+                    {viajeEnCurso.transportista.domicilio && (
+                      <div>
+                        <p className="text-xs text-neutral-400">Domicilio</p>
+                        <p className="text-sm font-semibold text-white">{viajeEnCurso.transportista.domicilio}</p>
+                      </div>
+                    )}
+                    {viajeEnCurso.transportista.telefono && (
+                      <div>
+                        <p className="text-xs text-neutral-400">Teléfono</p>
+                        <p className="text-sm font-semibold text-white">{viajeEnCurso.transportista.telefono}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="bg-neutral-800 rounded-2xl p-5 border border-neutral-700">
+                <div className="flex items-center justify-center gap-2 py-6 text-neutral-400">
+                  <AlertCircle size={18} />
+                  <p className="text-sm">Selecciona un viaje para ver detalles del transportista</p>
+                </div>
+              </div>
+            )}
+
+            {/* Carga - only if trip active and residuos available */}
+            {viajeEnCurso && viajeEnCurso.residuos && viajeEnCurso.residuos.length > 0 && (
+              <div className="bg-neutral-800 rounded-2xl p-5 border border-neutral-700">
+                <h3 className="text-sm font-semibold text-neutral-400 uppercase tracking-wider mb-4">Carga Transportada</h3>
+                <div className="space-y-3 animate-fade-in">
+                  {viajeEnCurso.residuos.map((residuo, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-neutral-700/50 rounded-xl">
+                      <div>
+                        <p className="font-medium text-white">{residuo.tipoResiduoId}</p>
+                      </div>
+                      <span className="text-sm font-mono font-semibold text-primary-400">
+                        {residuo.cantidad} {residuo.unidad}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {/* === TAB: HISTORIAL === */}
         {activeTab === 'historial' && (
           <div className="space-y-3 animate-fade-in">
-            {historialViajes.map((viaje) => (
-              <div key={viaje.id} className="bg-neutral-800 rounded-xl p-4 border border-neutral-700">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-mono font-bold text-white">#{viaje.id}</span>
-                  <span className="text-xs text-neutral-400">{viaje.fecha}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-neutral-300">
-                  <span className="truncate">{viaje.origen}</span>
-                  <ChevronRight size={14} className="text-neutral-500 flex-shrink-0" />
-                  <span className="truncate">{viaje.destino}</span>
-                </div>
-                <div className="mt-3">
-                  <Badge variant="soft" color="success">Completado</Badge>
-                </div>
+            {loadingHistorial ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="animate-spin text-neutral-400" size={32} />
               </div>
-            ))}
+            ) : historialViajes.length === 0 ? (
+              <EmptyState
+                icon="inbox"
+                title="No hay viajes completados"
+                description="Los manifiestos finalizados aparecerán aquí."
+                className="text-neutral-400 [&_h3]:text-white [&_p]:text-neutral-400"
+              />
+            ) : (
+              historialViajes.map((m) => (
+                <div key={m.id} className="bg-neutral-800 rounded-xl p-4 border border-neutral-700">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-mono font-bold text-white">#{m.numero}</span>
+                    <span className="text-xs text-neutral-400">{formatDate(m.createdAt)}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-neutral-300">
+                    <span className="truncate">{m.generador?.razonSocial || '---'}</span>
+                    <ChevronRight size={14} className="text-neutral-500 flex-shrink-0" />
+                    <span className="truncate">{m.operador?.razonSocial || '---'}</span>
+                  </div>
+                  <div className="mt-3">
+                    <Badge variant="soft" color={estadoBadgeColor(m.estado)}>
+                      {m.estado}
+                    </Badge>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         )}
       </div>

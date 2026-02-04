@@ -14,7 +14,6 @@ import {
   Phone,
   Mail,
   Calendar,
-  Edit,
   Download,
   CheckCircle,
   AlertTriangle,
@@ -30,6 +29,7 @@ import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Tabs, TabList, Tab, TabPanel } from '../../components/ui/Tabs';
 import { useGenerador } from '../../hooks/useActores';
+import { downloadCsv } from '../../utils/exportCsv';
 
 const EMPTY_DEFAULTS = {
   responsableAmbiental: { nombre: '-', matricula: '-', telefono: '-' },
@@ -118,8 +118,7 @@ const GeneradorDetallePage: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" leftIcon={<Download size={16} />} disabled title="Próximamente">Exportar</Button>
-          <Button leftIcon={<Edit size={16} />} disabled title="Próximamente">Editar</Button>
+          <Button variant="outline" leftIcon={<Download size={16} />} onClick={() => { if (generador) downloadCsv([{ RazónSocial: generador.razonSocial, CUIT: generador.cuit, Domicilio: generador.domicilio, Teléfono: generador.telefono, Email: generador.email, Inscripción: generador.inscripcionDGFA, Estado: generador.estado }], 'generador-' + (generador.cuit || id)); }}>Exportar</Button>
         </div>
       </div>
 

@@ -16,7 +16,6 @@ import {
   Users,
   FileText,
   MoreVertical,
-  Filter,
   Download,
   Edit,
   Trash2,
@@ -30,6 +29,7 @@ import { Table, Pagination } from '../../components/ui/Table';
 import { SearchInput } from '../../components/ui/SearchInput';
 import { Modal, ConfirmModal } from '../../components/ui/Modal';
 import { useGeneradores, useCreateGenerador, useDeleteGenerador } from '../../hooks/useActores';
+import { downloadCsv } from '../../utils/exportCsv';
 
 const tipoEstablecimiento = [
   { value: 'hospital', label: 'Hospital' },
@@ -67,7 +67,7 @@ export const AdminEstablecimientosPage: React.FC = () => {
     numeroInscripcion: '',
   });
 
-  const { data: paginatedData, isLoading, isError, error } = useGeneradores({ page: currentPage, limit: 20 });
+  const { data: paginatedData, isLoading, isError, error } = useGeneradores({ page: currentPage, limit: 20, search: searchQuery || undefined });
   const createMutation = useCreateGenerador();
   const deleteMutation = useDeleteGenerador();
 
@@ -95,12 +95,10 @@ export const AdminEstablecimientosPage: React.FC = () => {
   const statsActivos = items.filter(g => g.activo).length;
   const statsInactivos = items.filter(g => !g.activo).length;
 
+  // Server handles search; client filters estado on current page
   const filteredData = establecimientosData.filter(est => {
-    const matchesSearch = String(est.nombre || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         String(est.cuit || '').includes(searchQuery) ||
-                         String(est.direccion || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesEstado = filtroEstado === 'todos' || est.estado === filtroEstado;
-    return matchesSearch && matchesEstado;
+    return matchesEstado;
   });
 
   // Helpers
@@ -247,7 +245,7 @@ export const AdminEstablecimientosPage: React.FC = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" leftIcon={<Download size={18} />} disabled title="Próximamente">
+          <Button variant="outline" leftIcon={<Download size={18} />} onClick={() => downloadCsv(establecimientosData.map(e => ({ Nombre: e.nombre, Tipo: e.tipo, CUIT: e.cuit, Contacto: e.contacto, Teléfono: e.telefono, Dirección: e.direccion, Estado: e.estado })), 'establecimientos')}>
             Exportar
           </Button>
           <Button leftIcon={<Plus size={18} />} onClick={() => setIsModalOpen(true)}>
@@ -325,7 +323,7 @@ export const AdminEstablecimientosPage: React.FC = () => {
             <div className="flex-1">
               <SearchInput
                 value={searchQuery}
-                onChange={setSearchQuery}
+                onChange={(v) => { setSearchQuery(v); setCurrentPage(1); }}
                 placeholder="Buscar por nombre, CUIT o dirección..."
                 size="md"
               />
@@ -341,9 +339,6 @@ export const AdminEstablecimientosPage: React.FC = () => {
                 <option value="pendiente">Pendiente</option>
                 <option value="inactivo">Inactivo</option>
               </select>
-              <Button variant="outline" leftIcon={<Filter size={18} />} disabled title="Próximamente">
-                Más filtros
-              </Button>
             </div>
           </div>
         </CardContent>

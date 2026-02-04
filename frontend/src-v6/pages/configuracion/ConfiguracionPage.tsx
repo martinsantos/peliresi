@@ -13,8 +13,6 @@ import {
   Mail,
   Smartphone,
   Save,
-  Moon,
-  Sun,
   ChevronRight,
   Download,
   HelpCircle,
@@ -83,11 +81,6 @@ const ConfiguracionPage: React.FC = () => {
     reportes: false,
   });
 
-  // Appearance settings
-  const [appearance, setAppearance] = useState({
-    theme: 'light',
-    language: 'es',
-  });
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -100,7 +93,7 @@ const ConfiguracionPage: React.FC = () => {
       }
       toast.success('Configuración guardada', 'Los cambios se han guardado correctamente.');
     } catch {
-      toast.success('Configuración guardada', 'Cambios guardados localmente (modo demo).');
+      toast.warning('Cambios locales', 'Los cambios se aplicaron localmente');
     } finally {
       setIsSaving(false);
     }
@@ -137,7 +130,6 @@ const ConfiguracionPage: React.FC = () => {
                 <User size={32} />
               </div>
               <div>
-                <Button variant="outline" size="sm">Cambiar foto</Button>
                 <p className="text-xs text-neutral-500 mt-2">JPG, PNG o GIF. Máximo 2MB.</p>
               </div>
             </div>
@@ -243,38 +235,6 @@ const ConfiguracionPage: React.FC = () => {
       case 'apariencia':
         return (
           <div className="space-y-6 animate-fade-in">
-            <div>
-              <h4 className="font-medium text-neutral-900 mb-4">Tema</h4>
-              <div className="flex gap-4">
-                <button
-                  onClick={() => setAppearance({ ...appearance, theme: 'light' })}
-                  className={`flex flex-col items-center gap-3 p-6 rounded-xl border-2 transition-all ${
-                    appearance.theme === 'light'
-                      ? 'border-primary-500 bg-primary-50'
-                      : 'border-neutral-200 hover:border-neutral-300'
-                  }`}
-                >
-                  <div className="w-16 h-16 bg-white rounded-lg shadow-2 flex items-center justify-center">
-                    <Sun size={28} className="text-warning-500" />
-                  </div>
-                  <span className="font-medium text-neutral-900">Claro</span>
-                </button>
-                <button
-                  onClick={() => setAppearance({ ...appearance, theme: 'dark' })}
-                  className={`flex flex-col items-center gap-3 p-6 rounded-xl border-2 transition-all ${
-                    appearance.theme === 'dark'
-                      ? 'border-primary-500 bg-primary-50'
-                      : 'border-neutral-200 hover:border-neutral-300'
-                  }`}
-                >
-                  <div className="w-16 h-16 bg-neutral-800 rounded-lg shadow-2 flex items-center justify-center">
-                    <Moon size={28} className="text-primary-400" />
-                  </div>
-                  <span className="font-medium text-neutral-900">Oscuro</span>
-                </button>
-              </div>
-            </div>
-
             {/* Tour & Onboarding reset */}
             <div>
               <h4 className="font-medium text-neutral-900 mb-4">Ayuda y tour</h4>

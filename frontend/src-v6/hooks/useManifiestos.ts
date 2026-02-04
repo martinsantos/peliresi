@@ -168,6 +168,18 @@ export function useCerrarManifiesto() {
   });
 }
 
+export function useRevertirEstado() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, estadoNuevo, motivo }: { id: string; estadoNuevo: string; motivo?: string }) =>
+      manifiestoService.revertirEstado(id, estadoNuevo, motivo),
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: KEYS.detail(id) });
+      qc.invalidateQueries({ queryKey: KEYS.lists() });
+    },
+  });
+}
+
 export function useValidarQR() {
   return useMutation({
     mutationFn: (code: string) => manifiestoService.validarQR(code),

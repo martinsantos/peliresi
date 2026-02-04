@@ -15,7 +15,6 @@ import {
   Beaker,
   FileText,
   MoreVertical,
-  Filter,
   Download,
   Edit,
   Tag,
@@ -32,6 +31,7 @@ import { Modal } from '../../components/ui/Modal';
 import { Tabs, TabList, Tab, TabPanel } from '../../components/ui/Tabs';
 import { useTiposResiduo } from '../../hooks/useCatalogos';
 import { toast } from '../../components/ui/Toast';
+import { downloadCsv } from '../../utils/exportCsv';
 
 interface ResiduoDisplay {
   id: string;
@@ -226,7 +226,7 @@ export const AdminResiduosPage: React.FC = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" leftIcon={<Download size={18} />} disabled title="Próximamente">
+          <Button variant="outline" leftIcon={<Download size={18} />} onClick={() => downloadCsv(residuosData.map(r => ({ Código: r.codigo, Descripción: r.descripcion, Categoría: r.categoria, Tipo: r.tipo, Peligrosidad: r.peligrosidad, Estado: r.activo ? 'Activo' : 'Inactivo' })), 'catalogo-residuos')}>
             Exportar Catálogo
           </Button>
           <Button leftIcon={<Plus size={18} />} onClick={() => setIsModalOpen(true)}>
@@ -364,9 +364,6 @@ export const AdminResiduosPage: React.FC = () => {
                       <option key={cat.id} value={cat.nombre}>{cat.nombre}</option>
                     ))}
                   </select>
-                  <Button variant="outline" leftIcon={<Filter size={18} />} disabled title="Próximamente">
-                    Filtros
-                  </Button>
                 </div>
               </div>
               {(tipoFilter || categoriaFilter) && (
@@ -447,10 +444,6 @@ export const AdminResiduosPage: React.FC = () => {
                         <h4 className="font-semibold text-neutral-900">{cat.nombre}</h4>
                         <p className="text-sm text-neutral-500">{cat.residuos} tipos de residuos</p>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="sm" disabled title="Próximamente">Editar</Button>
-                      <Button variant="outline" size="sm" disabled title="Próximamente">Ver residuos</Button>
                     </div>
                   </div>
                 ))}

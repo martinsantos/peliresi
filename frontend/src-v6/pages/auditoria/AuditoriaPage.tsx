@@ -124,7 +124,7 @@ const AuditoriaPage: React.FC = () => {
       URL.revokeObjectURL(url);
       toast.success('Exportado', 'El reporte de auditoria fue descargado');
     } catch {
-      toast.info('Exportar', 'Funcionalidad disponible cuando el API este conectado');
+      toast.warning('Exportación local', 'Los cambios se aplicaron localmente');
     }
   };
 

@@ -66,20 +66,19 @@ const OperadoresPage: React.FC = () => {
   const [form, setForm] = useState(INITIAL_FORM);
 
   // API hooks
-  const { data: apiData, isLoading } = useOperadores();
+  const { data: apiData, isLoading } = useOperadores({ search: searchTerm || undefined });
   const createMutation = useCreateOperador();
   const updateMutation = useUpdateOperador();
   const deleteMutation = useDeleteOperador();
 
   const operadoresData = Array.isArray(apiData?.items) ? apiData.items : [];
 
+  // Server handles search; client filters estado
   const operadoresFiltrados = operadoresData.filter((op: any) => {
-    const matchesSearch = String(op.razonSocial || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         String(op.cuit || '').includes(searchTerm);
     const matchesEstado = filtroEstado === '' ||
       (filtroEstado === 'ACTIVO' && op.activo !== false) ||
       (filtroEstado === 'INACTIVO' && op.activo === false);
-    return matchesSearch && matchesEstado;
+    return matchesEstado;
   });
 
   const isMobile = typeof window !== 'undefined' && window.location.pathname.includes('/mobile');

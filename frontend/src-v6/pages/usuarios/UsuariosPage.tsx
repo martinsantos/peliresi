@@ -11,7 +11,6 @@ import {
   Search,
   Filter,
   MoreHorizontal,
-  Edit,
   Trash2,
   CheckCircle,
   XCircle,
@@ -44,6 +43,7 @@ import { toast } from '../../components/ui/Toast';
 import { Table, Pagination } from '../../components/ui/Table';
 import { Tabs, TabList, Tab, TabPanel } from '../../components/ui/Tabs';
 import { useUsuarios, useCreateUsuario, useDeleteUsuario, useUpdateUsuario, useToggleUsuarioActivo } from '../../hooks/useUsuarios';
+import { downloadCsv } from '../../utils/exportCsv';
 import type { Rol } from '../../types/models';
 
 
@@ -411,9 +411,6 @@ const UsuariosPage: React.FC = () => {
           >
             <RefreshCw size={16} />
           </Button>
-          <Button variant="ghost" size="sm" className="p-2" disabled title="Próximamente">
-            <Edit size={16} />
-          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -442,7 +439,7 @@ const UsuariosPage: React.FC = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" leftIcon={<Download size={18} />} disabled title="Próximamente">
+          <Button variant="outline" leftIcon={<Download size={18} />} onClick={() => downloadCsv(usuarios.map(u => ({ Nombre: u.nombre, Email: u.email, Teléfono: u.telefono, Rol: u.rol, Sector: u.sector, Estado: u.estado, UltimoAcceso: u.ultimoAcceso })), 'usuarios')}>
             Exportar
           </Button>
           <Button leftIcon={<UserPlus size={18} />} onClick={() => setModalCrear(true)}>
@@ -659,9 +656,6 @@ const UsuariosPage: React.FC = () => {
                               <Button variant="ghost" size="sm" className="p-2" onClick={() => verUsuario(usuario)}>
                                 <Eye size={16} />
                               </Button>
-                              <Button variant="ghost" size="sm" className="p-2" disabled title="Próximamente">
-                                <Edit size={16} />
-                              </Button>
                               <Button
                                 variant="ghost" size="sm" className="p-2 text-error-500"
                                 onClick={() => { setUsuarioSeleccionado(usuario); setModalEliminar(true); }}
@@ -703,7 +697,6 @@ const UsuariosPage: React.FC = () => {
         footer={
           <>
             <Button variant="outline" onClick={() => setModalVer(false)}>Cerrar</Button>
-            <Button leftIcon={<Edit size={18} />} disabled title="Próximamente">Editar Usuario</Button>
           </>
         }
       >
