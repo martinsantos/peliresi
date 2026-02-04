@@ -98,7 +98,7 @@ export const Select: React.FC<SelectProps> = ({
   };
 
   return (
-    <div className={cn(isFullWidth && 'w-full')} ref={containerRef}>
+    <div className={cn('relative', isFullWidth && 'w-full')} ref={containerRef}>
       {/* Label */}
       {label && (
         <label className="block text-sm font-medium text-neutral-700 mb-1.5">
@@ -134,7 +134,7 @@ export const Select: React.FC<SelectProps> = ({
         <ChevronDown
           size={18}
           className={cn(
-            'text-neutral-400 transition-transform duration-200',
+            'text-neutral-400 transition-transform duration-200 flex-shrink-0',
             isOpen && 'rotate-180'
           )}
         />
@@ -142,7 +142,7 @@ export const Select: React.FC<SelectProps> = ({
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute z-50 w-full min-w-[200px] max-w-sm mt-1 bg-white border border-neutral-200 rounded-xl shadow-3 animate-fade-in-down">
+        <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-xl shadow-lg overflow-hidden" style={{ maxWidth: '100%' }}>
           {/* Search */}
           {searchable && (
             <div className="p-2 border-b border-neutral-100">
@@ -155,8 +155,8 @@ export const Select: React.FC<SelectProps> = ({
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Buscar..."
-                  className="w-full pl-9 pr-3 py-2 text-sm bg-neutral-50 rounded-lg border-none focus:ring-2 focus:ring-primary-500/20"
+                  placeholder="Buscar por nombre, CUIT..."
+                  className="w-full pl-9 pr-3 py-2 text-sm bg-neutral-50 rounded-lg border-none focus:outline-none focus:ring-2 focus:ring-primary-500/20"
                   autoFocus
                 />
               </div>
@@ -180,17 +180,24 @@ export const Select: React.FC<SelectProps> = ({
                     'w-full flex items-center justify-between px-4 py-2.5 text-sm text-left',
                     'hover:bg-neutral-50 transition-colors',
                     option.disabled && 'opacity-50 cursor-not-allowed',
-                    value === option.value && 'bg-primary-50 text-primary-600'
+                    value === option.value && 'bg-primary-50 text-primary-600 font-medium'
                   )}
                 >
-                  <span>{option.label}</span>
+                  <span className="truncate">{option.label}</span>
                   {value === option.value && (
-                    <Check size={16} className="text-primary-500" />
+                    <Check size={16} className="text-primary-500 flex-shrink-0 ml-2" />
                   )}
                 </button>
               ))
             )}
           </div>
+
+          {/* Count */}
+          {searchable && (
+            <div className="px-3 py-1.5 border-t border-neutral-100 text-xs text-neutral-400">
+              {filteredOptions.length} de {options.length} opciones
+            </div>
+          )}
         </div>
       )}
 

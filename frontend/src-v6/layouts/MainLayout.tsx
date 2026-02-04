@@ -358,15 +358,25 @@ export const MainLayout: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Search */}
-            <div className="hidden md:flex items-center bg-neutral-100 rounded-xl px-4 py-2 gap-2">
+            {/* Search - navigates to manifiestos with query */}
+            <form
+              className="hidden md:flex items-center bg-neutral-100 rounded-xl px-4 py-2 gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const q = (e.currentTarget.elements.namedItem('globalSearch') as HTMLInputElement)?.value;
+                if (q?.trim()) {
+                  window.location.href = `/manifiestos?q=${encodeURIComponent(q.trim())}`;
+                }
+              }}
+            >
               <Search size={18} className="text-neutral-400" />
               <input
+                name="globalSearch"
                 type="text"
-                placeholder="Buscar..."
+                placeholder="Buscar manifiestos..."
                 className="bg-transparent border-none outline-none text-sm w-48 placeholder:text-neutral-400"
               />
-            </div>
+            </form>
 
             {/* Help / Tour restart */}
             <button

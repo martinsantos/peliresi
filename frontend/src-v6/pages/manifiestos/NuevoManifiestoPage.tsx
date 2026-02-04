@@ -26,6 +26,7 @@ import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Input } from '../../components/ui/Input';
+import { Select } from '../../components/ui/Select';
 import { toast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCreateManifiesto } from '../../hooks/useManifiestos';
@@ -190,21 +191,23 @@ export const NuevoManifiestoPage: React.FC = () => {
                   Establecimiento Generador *
                 </label>
                 {isAdmin ? (
-                  <select
+                  <Select
                     value={formData.generadorId}
-                    onChange={(e) => {
-                      const gen = generadoresList.find((g: any) => g.id === e.target.value);
-                      setFormData({ ...formData, generadorId: e.target.value, generador: gen?.razonSocial || gen?.nombre || '' });
+                    onChange={(val) => {
+                      const gen = generadoresList.find((g: any) => g.id === val);
+                      setFormData({ ...formData, generadorId: val, generador: gen?.razonSocial || gen?.nombre || '' });
                     }}
-                    className={`w-full px-3 py-2 rounded-lg border focus:border-primary-500 focus:outline-none ${validationErrors.generador ? 'border-error-300' : 'border-neutral-200'}`}
-                  >
-                    <option value="">Seleccionar generador</option>
-                    {generadoresList.map((g: any) => (
-                      <option key={g.id} value={g.id}>
-                        {g.razonSocial || g.nombre || g.label}
-                      </option>
-                    ))}
-                  </select>
+                    options={[...generadoresList]
+                      .sort((a: any, b: any) => (a.razonSocial || '').localeCompare(b.razonSocial || ''))
+                      .map((g: any) => ({
+                        value: g.id,
+                        label: `${g.razonSocial || g.nombre || g.label}${g.cuit ? ` — ${g.cuit}` : ''}`,
+                      }))}
+                    placeholder="Buscar generador por nombre o CUIT..."
+                    searchable
+                    errorMessage={validationErrors.generador}
+                    size="base"
+                  />
                 ) : (
                   <Input
                     value={formData.generador}
@@ -288,21 +291,19 @@ export const NuevoManifiestoPage: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-neutral-600 mb-1">
-                      Tipo de Residuo *
-                    </label>
-                    <select
+                    <Select
+                      label="Tipo de Residuo *"
                       value={residuo.tipo}
-                      onChange={(e) => handleResiduoChange(index, 'tipo', e.target.value)}
-                      className={`w-full px-3 py-2 rounded-lg border focus:border-primary-500 focus:outline-none ${validationErrors.residuos ? 'border-error-300' : 'border-neutral-200'}`}
-                    >
-                      <option value="">Seleccionar tipo</option>
-                      {tiposResiduo.map((r: any) => (
-                        <option key={r.id} value={r.id}>
-                          {r.codigo} - {r.nombre || r.descripcion}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(val) => handleResiduoChange(index, 'tipo', val)}
+                      options={tiposResiduo.map((r: any) => ({
+                        value: r.id,
+                        label: `${r.codigo} - ${r.nombre || r.descripcion}`,
+                      }))}
+                      placeholder="Buscar tipo de residuo..."
+                      searchable
+                      errorMessage={validationErrors.residuos && !residuo.tipo ? 'Requerido' : undefined}
+                      size="sm"
+                    />
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -370,21 +371,20 @@ export const NuevoManifiestoPage: React.FC = () => {
                 <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Transportista *
                 </label>
-                <select
+                <Select
                   value={formData.transportista}
-                  onChange={(e) => setFormData({ ...formData, transportista: e.target.value })}
-                  className={`w-full px-3 py-2 rounded-lg border focus:border-primary-500 focus:outline-none ${validationErrors.transportista ? 'border-error-300' : 'border-neutral-200'}`}
-                >
-                  <option value="">Seleccionar transportista</option>
-                  {transportistasList.map((t: any) => (
-                    <option key={t.id} value={t.id}>
-                      {t.razonSocial || t.nombre || t.label}
-                    </option>
-                  ))}
-                </select>
-                {validationErrors.transportista && (
-                  <p className="text-xs text-error-500 mt-1">{validationErrors.transportista}</p>
-                )}
+                  onChange={(val) => setFormData({ ...formData, transportista: val })}
+                  options={[...transportistasList]
+                    .sort((a: any, b: any) => (a.razonSocial || '').localeCompare(b.razonSocial || ''))
+                    .map((t: any) => ({
+                      value: t.id,
+                      label: `${t.razonSocial || t.nombre || t.label}${t.cuit ? ` — ${t.cuit}` : ''}`,
+                    }))}
+                  placeholder="Buscar transportista por nombre o CUIT..."
+                  searchable
+                  errorMessage={validationErrors.transportista}
+                  size="base"
+                />
               </div>
 
               {selectedTransportista && (
@@ -416,21 +416,20 @@ export const NuevoManifiestoPage: React.FC = () => {
                 <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Operador / Destino *
                 </label>
-                <select
+                <Select
                   value={formData.operador}
-                  onChange={(e) => setFormData({ ...formData, operador: e.target.value })}
-                  className={`w-full px-3 py-2 rounded-lg border focus:border-primary-500 focus:outline-none ${validationErrors.operador ? 'border-error-300' : 'border-neutral-200'}`}
-                >
-                  <option value="">Seleccionar operador</option>
-                  {operadoresList.map((o: any) => (
-                    <option key={o.id} value={o.id}>
-                      {o.razonSocial || o.nombre || o.label}
-                    </option>
-                  ))}
-                </select>
-                {validationErrors.operador && (
-                  <p className="text-xs text-error-500 mt-1">{validationErrors.operador}</p>
-                )}
+                  onChange={(val) => setFormData({ ...formData, operador: val })}
+                  options={[...operadoresList]
+                    .sort((a: any, b: any) => (a.razonSocial || '').localeCompare(b.razonSocial || ''))
+                    .map((o: any) => ({
+                      value: o.id,
+                      label: `${o.razonSocial || o.nombre || o.label}${o.cuit ? ` — ${o.cuit}` : ''}`,
+                    }))}
+                  placeholder="Buscar operador por nombre o CUIT..."
+                  searchable
+                  errorMessage={validationErrors.operador}
+                  size="base"
+                />
               </div>
 
               {selectedOperador && (

@@ -245,7 +245,7 @@ export const AdminVehiculosPage: React.FC = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" leftIcon={<Download size={18} />}>
+          <Button variant="outline" leftIcon={<Download size={18} />} disabled title="Próximamente">
             Exportar
           </Button>
           <Button leftIcon={<Plus size={18} />} onClick={() => setIsModalOpen(true)}>

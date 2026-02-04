@@ -226,7 +226,7 @@ export const AdminResiduosPage: React.FC = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" leftIcon={<Download size={18} />}>
+          <Button variant="outline" leftIcon={<Download size={18} />} disabled title="Próximamente">
             Exportar Catálogo
           </Button>
           <Button leftIcon={<Plus size={18} />} onClick={() => setIsModalOpen(true)}>
@@ -364,7 +364,7 @@ export const AdminResiduosPage: React.FC = () => {
                       <option key={cat.id} value={cat.nombre}>{cat.nombre}</option>
                     ))}
                   </select>
-                  <Button variant="outline" leftIcon={<Filter size={18} />}>
+                  <Button variant="outline" leftIcon={<Filter size={18} />} disabled title="Próximamente">
                     Filtros
                   </Button>
                 </div>
@@ -449,8 +449,8 @@ export const AdminResiduosPage: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="sm">Editar</Button>
-                      <Button variant="outline" size="sm">Ver residuos</Button>
+                      <Button variant="ghost" size="sm" disabled title="Próximamente">Editar</Button>
+                      <Button variant="outline" size="sm" disabled title="Próximamente">Ver residuos</Button>
                     </div>
                   </div>
                 ))}

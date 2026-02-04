@@ -411,7 +411,7 @@ const UsuariosPage: React.FC = () => {
           >
             <RefreshCw size={16} />
           </Button>
-          <Button variant="ghost" size="sm" className="p-2">
+          <Button variant="ghost" size="sm" className="p-2" disabled title="Próximamente">
             <Edit size={16} />
           </Button>
           <Button
@@ -442,7 +442,7 @@ const UsuariosPage: React.FC = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" leftIcon={<Download size={18} />}>
+          <Button variant="outline" leftIcon={<Download size={18} />} disabled title="Próximamente">
             Exportar
           </Button>
           <Button leftIcon={<UserPlus size={18} />} onClick={() => setModalCrear(true)}>
@@ -659,7 +659,7 @@ const UsuariosPage: React.FC = () => {
                               <Button variant="ghost" size="sm" className="p-2" onClick={() => verUsuario(usuario)}>
                                 <Eye size={16} />
                               </Button>
-                              <Button variant="ghost" size="sm" className="p-2">
+                              <Button variant="ghost" size="sm" className="p-2" disabled title="Próximamente">
                                 <Edit size={16} />
                               </Button>
                               <Button
@@ -703,7 +703,7 @@ const UsuariosPage: React.FC = () => {
         footer={
           <>
             <Button variant="outline" onClick={() => setModalVer(false)}>Cerrar</Button>
-            <Button leftIcon={<Edit size={18} />}>Editar Usuario</Button>
+            <Button leftIcon={<Edit size={18} />} disabled title="Próximamente">Editar Usuario</Button>
           </>
         }
       >

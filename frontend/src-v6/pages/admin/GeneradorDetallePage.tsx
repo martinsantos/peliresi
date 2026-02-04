@@ -118,8 +118,8 @@ const GeneradorDetallePage: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" leftIcon={<Download size={16} />}>Exportar</Button>
-          <Button leftIcon={<Edit size={16} />}>Editar</Button>
+          <Button variant="outline" leftIcon={<Download size={16} />} disabled title="Próximamente">Exportar</Button>
+          <Button leftIcon={<Edit size={16} />} disabled title="Próximamente">Editar</Button>
         </div>
       </div>
 

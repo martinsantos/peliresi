@@ -100,7 +100,7 @@ const EstadisticasPage: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" leftIcon={<Download size={18} />}>
+          <Button variant="outline" leftIcon={<Download size={18} />} disabled title="Próximamente">
             Exportar
           </Button>
         </div>
