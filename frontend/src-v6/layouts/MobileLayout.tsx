@@ -26,7 +26,6 @@ import {
   BarChart3,
   AlertTriangle,
   Truck,
-  Building2,
   Factory,
   Shield,
   LayoutDashboard,
@@ -160,7 +159,6 @@ export const MobileLayout: React.FC = () => {
     if (isAdmin) {
       items.push({ to: mp('/admin/usuarios'), icon: <User size={20} />, label: 'Usuarios', section: 'admin' });
       items.push({ to: mp('/admin/generadores'), icon: <Factory size={20} />, label: 'Generadores', section: 'admin' });
-      items.push({ to: mp('/admin/establecimientos'), icon: <Building2 size={20} />, label: 'Establecimientos', section: 'admin' });
       items.push({ to: mp('/admin/vehiculos'), icon: <Truck size={20} />, label: 'Vehículos', section: 'admin' });
       items.push({ to: mp('/admin/residuos'), icon: <Database size={20} />, label: 'Catálogo Residuos', section: 'admin' });
       items.push({ to: mp('/admin/auditoria'), icon: <Shield size={20} />, label: 'Auditoría', section: 'admin' });
@@ -207,7 +205,6 @@ export const MobileLayout: React.FC = () => {
     if (path.includes('/centro-control')) return 'Centro de Control';
     if (path.includes('/admin/usuarios')) return 'Usuarios';
     if (path.includes('/admin/generadores')) return 'Generadores';
-    if (path.includes('/admin/establecimientos')) return 'Establecimientos';
     if (path.includes('/admin/vehiculos')) return 'Vehículos';
     if (path.includes('/admin/residuos')) return 'Catálogo Residuos';
     if (path.includes('/admin/auditoria')) return 'Auditoría';

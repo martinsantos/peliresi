@@ -47,7 +47,7 @@ const ROLE_SLIDES: Record<UserRole, Slide[]> = {
       title: 'Gestiona Generadores',
       points: [
         'Alta y baja de generadores de residuos peligrosos.',
-        'Administra establecimientos, vehiculos y catalogo de residuos.',
+        'Administra generadores, vehículos y catálogo de residuos.',
         'Importa datos masivamente desde archivos CSV o Excel.',
       ],
       color: 'bg-primary-50 text-primary-600',

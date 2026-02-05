@@ -89,7 +89,7 @@ export const UserSwitcherPage: React.FC = () => {
                 </div>
                 <p className="text-sm text-neutral-600">
                   Puede crear y gestionar manifiestos de residuos, ver el estado 
-                  de sus envíos y acceder a reportes de su establecimiento.
+                  de sus envíos y acceder a reportes de su empresa.
                 </p>
               </CardContent>
             </Card>

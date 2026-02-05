@@ -24,7 +24,6 @@ import {
   AlertTriangle,
   Shield,
   Upload,
-  Building2,
   Truck,
   FlaskConical,
   Factory,
@@ -119,10 +118,9 @@ export const MainLayout: React.FC = () => {
 
     if (isAdmin) {
       items.push({ path: '/admin/usuarios', icon: User, label: 'Usuarios' });
-      items.push({ path: '/admin/establecimientos', icon: Building2, label: 'Establecimientos' });
+      items.push({ path: '/admin/generadores', icon: Factory, label: 'Generadores' });
       items.push({ path: '/admin/vehiculos', icon: Truck, label: 'Vehículos' });
       items.push({ path: '/admin/residuos', icon: FlaskConical, label: 'Catálogo Residuos' });
-      items.push({ path: '/admin/generadores', icon: Factory, label: 'Admin Generadores' });
       items.push({ path: '/admin/auditoria', icon: Shield, label: 'Auditoría' });
       items.push({ path: '/admin/carga-masiva', icon: Upload, label: 'Carga Masiva' });
     } else if (isTransportista) {

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import {
-  Building2, Package, MapPin, FileText, Calendar, Search,
+  Factory, Package, MapPin, FileText, Calendar, Search,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -14,7 +14,7 @@ import { KpiCard } from '../../../components/charts/KpiCard';
 import { getDepartamento } from '../../../utils/mendoza-departamentos';
 import type { CentroControlData } from '../../../hooks/useCentroControl';
 
-export default function EstablecimientosTab({
+export default function GeneradoresTab({
   ccData,
   periodoLabel,
 }: {
@@ -71,7 +71,7 @@ export default function EstablecimientosTab({
     return (
       <div className="flex flex-col items-center justify-center py-24">
         <div className="w-16 h-16 rounded-full border-4 border-primary-100 border-t-primary-500 animate-spin" />
-        <p className="mt-4 text-neutral-600 font-medium">Cargando establecimientos...</p>
+        <p className="mt-4 text-neutral-600 font-medium">Cargando generadores...</p>
       </div>
     );
   }
@@ -81,12 +81,12 @@ export default function EstablecimientosTab({
       <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl">
         <Calendar size={14} className="text-amber-600 shrink-0" />
         <span className="text-xs font-medium text-amber-800">
-          Establecimientos filtrados por: <strong>{periodoLabel}</strong>
+          Generadores filtrados por: <strong>{periodoLabel}</strong>
         </span>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard icon={Building2} label="Total Establecimientos" value={generadores.length} color="from-purple-600 to-purple-700" />
+        <KpiCard icon={Factory} label="Total Generadores" value={generadores.length} color="from-purple-600 to-purple-700" />
         <KpiCard icon={Package} label="Categorías" value={byCategoria.length} color="from-indigo-600 to-indigo-700" sub="tipos" />
         <KpiCard icon={MapPin} label="Departamentos" value={byDep.length} color="from-violet-600 to-violet-700" sub="con presencia" />
         <KpiCard icon={FileText} label="Manifiestos" value={generadores.reduce((s, g) => s + g.cantManifiestos, 0)} color="from-emerald-600 to-emerald-700" sub="generados" />
@@ -94,7 +94,7 @@ export default function EstablecimientosTab({
 
       <div className="grid lg:grid-cols-2 gap-6">
         <Card className="border-0 shadow-sm">
-          <CardHeader title="Por Categoría" subtitle="Distribución de establecimientos" />
+          <CardHeader title="Por Categoría" subtitle="Distribución de generadores" />
           <CardContent>
             {byCategoria.length > 0 ? (
               <ResponsiveContainer width="100%" height={320}>
@@ -125,7 +125,7 @@ export default function EstablecimientosTab({
         </Card>
 
         <Card className="border-0 shadow-sm">
-          <CardHeader title="Por Departamento" subtitle="Top departamentos con establecimientos" />
+          <CardHeader title="Por Departamento" subtitle="Top departamentos con generadores" />
           <CardContent>
             {byDep.length > 0 ? (
               <ResponsiveContainer width="100%" height={320}>
@@ -134,7 +134,7 @@ export default function EstablecimientosTab({
                   <XAxis type="number" tick={{ fontSize: 12 }} stroke="#94a3b8" />
                   <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={110} stroke="#94a3b8" />
                   <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="value" name="Establecimientos" fill="#7C3AED" radius={[0, 8, 8, 0]} barSize={22} />
+                  <Bar dataKey="value" name="Generadores" fill="#7C3AED" radius={[0, 8, 8, 0]} barSize={22} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -146,7 +146,7 @@ export default function EstablecimientosTab({
 
       <Card className="border-0 shadow-sm">
         <CardHeader
-          title={`Listado de Establecimientos (${filtered.length})`}
+          title={`Listado de Generadores (${filtered.length})`}
           subtitle="Generadores registrados en el sistema"
           action={
             <div className="flex items-center gap-2">
@@ -196,7 +196,7 @@ export default function EstablecimientosTab({
                 ))}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-12 text-center text-neutral-400 text-sm">Sin establecimientos que coincidan</td>
+                    <td colSpan={5} className="px-4 py-12 text-center text-neutral-400 text-sm">Sin generadores que coincidan</td>
                   </tr>
                 )}
               </tbody>

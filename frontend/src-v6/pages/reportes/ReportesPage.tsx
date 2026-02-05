@@ -18,7 +18,6 @@ import {
   MapPin,
   Map as MapIcon,
   Factory,
-  Building2,
 } from 'lucide-react';
 import { Card } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -34,7 +33,7 @@ import type { ReporteFilters } from '../../types/api';
 const ManifiestosTab = lazy(() => import('./tabs/ManifiestosTab'));
 const TratadosTab = lazy(() => import('./tabs/TratadosTab'));
 const TransporteTab = lazy(() => import('./tabs/TransporteTab'));
-const EstablecimientosTab = lazy(() => import('./tabs/EstablecimientosTab'));
+const GeneradoresTab = lazy(() => import('./tabs/GeneradoresTab'));
 const OperadoresTab = lazy(() => import('./tabs/OperadoresTab'));
 const DepartamentosTab = lazy(() => import('./tabs/DepartamentosTab'));
 const MapaActoresTab = lazy(() => import('./tabs/MapaActoresTab'));
@@ -44,13 +43,13 @@ const DepartamentoDetalleModalLazy = lazy(() =>
   import('./tabs/DepartamentosTab').then(mod => ({ default: mod.DepartamentoDetalleModal }))
 );
 
-type TabType = 'manifiestos' | 'tratados' | 'transporte' | 'establecimientos' | 'operadores' | 'departamentos' | 'mapa';
+type TabType = 'manifiestos' | 'tratados' | 'transporte' | 'generadores' | 'operadores' | 'departamentos' | 'mapa';
 
 const tabs: { id: TabType; label: string; icon: React.ElementType }[] = [
   { id: 'manifiestos', label: 'Manifiestos', icon: FileText },
   { id: 'tratados', label: 'Residuos Tratados', icon: Package },
   { id: 'transporte', label: 'Transporte', icon: Truck },
-  { id: 'establecimientos', label: 'Establecimientos', icon: Building2 },
+  { id: 'generadores', label: 'Generadores', icon: Factory },
   { id: 'operadores', label: 'Operadores', icon: Factory },
   { id: 'departamentos', label: 'Departamentos', icon: MapPin },
   { id: 'mapa', label: 'Mapa de Actores', icon: MapIcon },
@@ -345,7 +344,7 @@ const ReportesPage: React.FC = () => {
         <>
           {activeTab === 'departamentos' && <DepartamentosTab ccData={ccData || null} onSelectDep={handleSelectDep} periodoLabel={periodoLabel} />}
           {activeTab === 'mapa' && <MapaActoresTab ccData={ccData || null} onSelectDep={handleSelectDep} periodoLabel={periodoLabel} />}
-          {activeTab === 'establecimientos' && <EstablecimientosTab ccData={ccData || null} periodoLabel={periodoLabel} />}
+          {activeTab === 'generadores' && <GeneradoresTab ccData={ccData || null} periodoLabel={periodoLabel} />}
           {activeTab === 'operadores' && <OperadoresTab ccData={ccData || null} periodoLabel={periodoLabel} />}
         </>
       )}

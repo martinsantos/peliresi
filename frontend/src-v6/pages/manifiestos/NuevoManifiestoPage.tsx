@@ -217,15 +217,15 @@ export const NuevoManifiestoPage: React.FC = () => {
         {/* Step 1: Datos del Generador */}
         {step === 1 && (
           <Card>
-            <CardHeader 
-              title="Datos del Generador" 
+            <CardHeader
+              title="Datos del Generador"
               icon={<Factory size={20} />}
-              subtitle="Información del establecimiento que genera los residuos"
+              subtitle="Información del generador de residuos"
             />
             <CardContent className="space-y-4 animate-fade-in">
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">
-                  Establecimiento Generador *
+                  Generador *
                 </label>
                 <Select
                   value={formData.generadorId}
