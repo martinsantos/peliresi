@@ -50,6 +50,7 @@ import { useManifiestos } from '../../hooks/useManifiestos';
 import { useAlertas } from '../../hooks/useAlertas';
 // useReporteManifiestos removed — pipeline now uses cc.estadisticas.porEstado
 import { useCentroControl } from '../../hooks/useCentroControl';
+import { useAuth } from '../../contexts/AuthContext';
 import type { CentroControlData, ActorGenerador, ActorTransportista, ActorOperador, EnTransitoItem } from '../../hooks/useCentroControl';
 import { EstadoManifiesto } from '../../types/models';
 import { formatRelativeTime, formatDateTime } from '../../utils/formatters';
@@ -161,6 +162,7 @@ function ZoomTracker({ onZoom }: { onZoom: (z: number) => void }) {
 
 export const CentroControlPage: React.FC = () => {
   const navigate = useNavigate();
+  const { currentUser, isAdmin, isTransportista } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [countdown, setCountdown] = useState(POLL_INTERVAL);
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
@@ -195,7 +197,8 @@ export const CentroControlPage: React.FC = () => {
     fechaHasta,
     capas: Object.entries(layers).filter(([, v]) => v).map(([k]) => k),
   });
-  const { data: alertasData } = useAlertas({ limit: 10 });
+  // Only fetch alertas for ADMIN — TRANSPORTISTA gets 403
+  const { data: alertasData } = useAlertas({ limit: 10 }, isAdmin);
   const { data: completedData } = useManifiestos({ estado: EstadoManifiesto.ENTREGADO, limit: 20 });
   // Pipeline data now comes from cc.estadisticas.porEstado (filtered by date)
 
@@ -334,20 +337,34 @@ export const CentroControlPage: React.FC = () => {
   }, [cc?.generadores, mapZoom]);
 
   // ── Filtered trips + fly-to position ──
+  // FIX: TRANSPORTISTA only sees their own trips (matched by company name)
+  const userTransportista = isTransportista ? (currentUser?.sector || '') : '';
   const filteredEnTransito = useMemo(() => {
     if (!cc?.enTransito) return [];
-    if (!tripFilter.trim()) return cc.enTransito;
+    let items = cc.enTransito;
+    // Filter by user's transportista when role is TRANSPORTISTA
+    if (userTransportista) {
+      items = items.filter(m => m.transportista === userTransportista);
+    }
+    if (!tripFilter.trim()) return items;
     const q = tripFilter.toLowerCase();
-    return cc.enTransito.filter(m =>
+    return items.filter(m =>
       m.numero.toLowerCase().includes(q) || m.transportista.toLowerCase().includes(q)
     );
-  }, [cc?.enTransito, tripFilter]);
+  }, [cc?.enTransito, tripFilter, userTransportista]);
+
+  // enTransito for map markers — also filtered by user role
+  const enTransitoForMap = useMemo(() => {
+    if (!cc?.enTransito) return [];
+    if (!userTransportista) return cc.enTransito;
+    return cc.enTransito.filter(m => m.transportista === userTransportista);
+  }, [cc?.enTransito, userTransportista]);
 
   const flyToPosition: [number, number] | null = useMemo(() => {
-    if (!selectedTripId || !cc?.enTransito) return null;
-    const trip = cc.enTransito.find(m => m.manifiestoId === selectedTripId);
+    if (!selectedTripId || !enTransitoForMap.length) return null;
+    const trip = enTransitoForMap.find(m => m.manifiestoId === selectedTripId);
     return trip?.ultimaPosicion ? [trip.ultimaPosicion.latitud, trip.ultimaPosicion.longitud] : null;
-  }, [selectedTripId, cc?.enTransito]);
+  }, [selectedTripId, enTransitoForMap]);
 
   const viajesRealizados = useMemo(() => {
     const items = (completedData as any)?.items || (completedData as any)?.data?.items || [];
@@ -363,14 +380,14 @@ export const CentroControlPage: React.FC = () => {
     }));
   }, [completedData]);
 
-  // Auto-switch to realizados if no active trips
+  // Auto-switch to realizados if no active trips (uses filtered data)
   useEffect(() => {
-    if (cc && cc.enTransito.length === 0 && viajesRealizados.length > 0) {
+    if (cc && filteredEnTransito.length === 0 && viajesRealizados.length > 0) {
       setTripPanel('realizados');
-    } else if (cc && cc.enTransito.length > 0) {
+    } else if (cc && filteredEnTransito.length > 0) {
       setTripPanel('activos');
     }
-  }, [cc?.enTransito?.length, viajesRealizados.length]);
+  }, [cc, filteredEnTransito.length, viajesRealizados.length]);
 
   // ── Quick Actions ──
   const quickActions = [
@@ -545,7 +562,7 @@ export const CentroControlPage: React.FC = () => {
               <div className="flex items-center gap-3">
                 <h3 className="font-semibold text-neutral-900">Mapa de Actividad</h3>
                 <Badge variant="soft" color="primary">
-                  {(cc?.enTransito?.length || 0)} en tránsito
+                  {enTransitoForMap.length} en tránsito
                 </Badge>
               </div>
               {/* Map legend */}
@@ -624,8 +641,8 @@ export const CentroControlPage: React.FC = () => {
                     </Marker>
                   ))}
 
-                  {/* ── En Tránsito (markers + polylines) ── */}
-                  {layers.transito && cc?.enTransito?.map((m, idx) => (
+                  {/* ── En Tránsito (markers + polylines) — filtered by user role ── */}
+                  {layers.transito && enTransitoForMap.map((m, idx) => (
                     <React.Fragment key={`transit-${m.manifiestoId}-${idx}`}>
                       {m.ultimaPosicion && (
                         <Marker
@@ -705,7 +722,7 @@ export const CentroControlPage: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Truck size={18} className="text-amber-600" />
                 <h3 className="font-semibold text-neutral-900">Viajes Activos</h3>
-                <Badge variant="soft" color="warning">{cc?.enTransito?.length || 0}</Badge>
+                <Badge variant="soft" color="warning">{filteredEnTransito.length}</Badge>
               </div>
               <ChevronDown size={18} className={`text-neutral-400 transition-transform duration-200 ${tripPanel === 'activos' ? 'rotate-180' : ''}`} />
             </button>

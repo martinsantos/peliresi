@@ -41,10 +41,10 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 
-// Rate limiting - General API
+// Rate limiting - General API (300 req/min to support 30+ phones behind shared NAT/CGNAT)
 const generalLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 100, // 100 requests per minute per IP
+  max: 300, // 300 requests per minute per IP
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Demasiadas solicitudes, intente de nuevo en un momento' },

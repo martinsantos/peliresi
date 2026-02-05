@@ -122,6 +122,8 @@ export interface RechazarManifiestoRequest {
 export interface RegistrarIncidenteRequest {
   tipo: string;
   descripcion?: string;
+  latitud?: number;
+  longitud?: number;
 }
 
 export interface ManifiestoFilters {

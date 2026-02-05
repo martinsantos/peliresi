@@ -54,8 +54,12 @@ export const manifiestoService = {
     return data.data;
   },
 
-  async actualizarUbicacion(id: string, latitud: number, longitud: number): Promise<void> {
-    await api.post(`/manifiestos/${id}/ubicacion`, { latitud, longitud });
+  async actualizarUbicacion(id: string, latitud: number, longitud: number, velocidad?: number | null, direccion?: number | null): Promise<void> {
+    await api.post(`/manifiestos/${id}/ubicacion`, {
+      latitud, longitud,
+      ...(velocidad != null && { velocidad }),
+      ...(direccion != null && { direccion }),
+    });
   },
 
   async confirmarEntrega(id: string, req?: ConfirmarEntregaRequest): Promise<Manifiesto> {

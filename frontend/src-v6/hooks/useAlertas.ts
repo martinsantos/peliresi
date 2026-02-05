@@ -27,10 +27,11 @@ export function useCreateReglaAlerta() {
   });
 }
 
-export function useAlertas(filters?: AlertaFilters) {
+export function useAlertas(filters?: AlertaFilters, enabled = true) {
   return useQuery({
     queryKey: KEYS.alertas(filters),
     queryFn: () => alertaService.listAlertas(filters),
+    enabled,
   });
 }
 

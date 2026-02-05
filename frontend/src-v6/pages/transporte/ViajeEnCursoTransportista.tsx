@@ -1,18 +1,26 @@
 /**
  * SITREP v6 - Viaje en Curso (Transportista)
  * Conectado a API real con GPS tracking
+ *
+ * FIXES applied:
+ * 1. GPS permission check + status state machine + full metadata
+ * 2. (Dashboard banner — separate file)
+ * 3. Pause persistence via backend incident events + localStorage
+ * 4. Incident fix — description fallback + GPS coords
+ * 5. Retiro/Entrega send GPS coordinates
+ * 6. Timer persistence from m.fechaRetiro server timestamp
+ * 7. Full GPS data capture (speed, heading) sent to backend
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
-  ArrowLeft, Truck, Phone, MapPin, Clock, Navigation, Package,
+  ArrowLeft, Truck, MapPin, Clock, Navigation, Package,
   Play, Pause, CheckCircle2, AlertTriangle, Radio, Map as MapIcon, List,
-  MessageSquare, Loader2
+  Loader2, Compass, Gauge, Crosshair, WifiOff, LocateFixed
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
-import { Badge } from '../../components/ui/BadgeV2';
 import { toast } from '../../components/ui/Toast';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -52,13 +60,21 @@ const truckIcon = new L.Icon({
   iconSize: [25, 41], iconAnchor: [12, 41]
 });
 
-// Component to recenter map when position changes
+// Recenter map when position changes
 function RecenterMap({ position }: { position: [number, number] | null }) {
   const map = useMap();
   useEffect(() => {
     if (position) map.setView(position, map.getZoom());
   }, [position, map]);
   return null;
+}
+
+type GpsStatus = 'checking' | 'acquiring' | 'active' | 'denied' | 'unavailable' | 'error';
+
+function headingToCompass(heading: number | null): string {
+  if (heading == null) return '-';
+  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
+  return dirs[Math.round(heading / 45) % 8];
 }
 
 const ViajeEnCursoTransportista: React.FC = () => {
@@ -85,42 +101,122 @@ const ViajeEnCursoTransportista: React.FC = () => {
   const [incidenteDescripcion, setIncidenteDescripcion] = useState('');
   const [vistaMapa, setVistaMapa] = useState(true);
 
-  // GPS state
+  // GPS state — FIX 1: full state machine + metadata
+  const [gpsStatus, setGpsStatus] = useState<GpsStatus>('checking');
   const [currentPosition, setCurrentPosition] = useState<[number, number] | null>(null);
   const [trackPoints, setTrackPoints] = useState<[number, number][]>([]);
+  const [gpsDetails, setGpsDetails] = useState<{
+    accuracy: number | null;
+    speed: number | null;
+    heading: number | null;
+    altitude: number | null;
+    lastUpdate: Date | null;
+  }>({ accuracy: null, speed: null, heading: null, altitude: null, lastUpdate: null });
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [gpsSendStatus, setGpsSendStatus] = useState<'ok' | 'error' | 'idle'>('idle');
   const watchIdRef = useRef<number | null>(null);
   const sendIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pendingUpdatesRef = useRef<{ lat: number; lng: number; speed: number | null; heading: number | null }[]>([]);
 
   const isActionPending = confirmarRetiro.isPending || confirmarEntrega.isPending || registrarIncidente.isPending;
 
   // Default center (Mendoza, Argentina)
   const defaultCenter: [number, number] = [-32.9287, -68.8535];
 
-  // Start GPS tracking when EN_TRANSITO
+  // FIX 3B: Restore pause state from localStorage on mount
+  useEffect(() => {
+    if (id) {
+      const saved = localStorage.getItem(`viaje_status_${id}`);
+      if (saved === 'PAUSADO') setViajeStatus('PAUSADO');
+    }
+  }, [id]);
+
+  // FIX 1A: Check GPS permission on mount
+  useEffect(() => {
+    if (!('geolocation' in navigator)) {
+      setGpsStatus('unavailable');
+      return;
+    }
+    if (navigator.permissions?.query) {
+      navigator.permissions.query({ name: 'geolocation' as PermissionName }).then(result => {
+        if (result.state === 'denied') {
+          setGpsStatus('denied');
+        } else {
+          setGpsStatus('checking');
+        }
+      }).catch(() => {
+        setGpsStatus('checking'); // permissions API not supported, proceed anyway
+      });
+    } else {
+      setGpsStatus('checking');
+    }
+  }, []);
+
+  // FIX 6: Timer persistence from server timestamp (fechaRetiro)
+  useEffect(() => {
+    if (m.estado === EstadoManifiesto.EN_TRANSITO && m.fechaRetiro) {
+      const start = new Date(m.fechaRetiro).getTime();
+      const elapsed = Math.floor((Date.now() - start) / 1000);
+      setElapsedTime(elapsed > 0 ? elapsed : 0);
+    }
+  }, [m.estado, m.fechaRetiro]);
+
+  // Start GPS tracking when EN_TRANSITO and ACTIVO
   useEffect(() => {
     if (m.estado !== EstadoManifiesto.EN_TRANSITO || viajeStatus === 'PAUSADO') return;
+    if (gpsStatus === 'denied' || gpsStatus === 'unavailable') return;
 
-    if ('geolocation' in navigator) {
-      watchIdRef.current = navigator.geolocation.watchPosition(
-        (pos) => {
-          const point: [number, number] = [pos.coords.latitude, pos.coords.longitude];
-          setCurrentPosition(point);
-          setTrackPoints(prev => [...prev, point]);
-        },
-        (_err) => {
-          // GPS unavailable - fallback to default position
-          if (!currentPosition) setCurrentPosition(defaultCenter);
-        },
-        { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
-      );
-    }
+    setGpsStatus('acquiring');
 
-    // Send location to backend every 30s
-    sendIntervalRef.current = setInterval(() => {
-      if (currentPosition && id) {
-        manifiestoService.actualizarUbicacion(id, currentPosition[0], currentPosition[1]).catch(() => {});
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude, accuracy, speed, heading, altitude } = pos.coords;
+        const point: [number, number] = [latitude, longitude];
+        setCurrentPosition(point);
+        setTrackPoints(prev => [...prev, point]);
+        setGpsDetails({ accuracy, speed, heading, altitude, lastUpdate: new Date() });
+        setGpsStatus('active');
+      },
+      (err) => {
+        // FIX 1E: Error callback with user feedback
+        if (err.code === 1) {
+          setGpsStatus('denied');
+          toast.error('Permiso de ubicación denegado. Activa GPS en Ajustes.');
+        } else if (err.code === 2) {
+          setGpsStatus('unavailable');
+          toast.error('No se pudo obtener ubicación. Verifica que el GPS esté activo.');
+        } else {
+          setGpsStatus('error');
+          toast.error('Tiempo de espera GPS agotado. Reintentando...');
+        }
+        if (!currentPosition) setCurrentPosition(defaultCenter);
+      },
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+    );
+
+    // FIX 7: Send full GPS data (speed, heading) to backend every 30s
+    sendIntervalRef.current = setInterval(async () => {
+      if (!currentPosition || !id) return;
+
+      pendingUpdatesRef.current.push({
+        lat: currentPosition[0],
+        lng: currentPosition[1],
+        speed: gpsDetails.speed,
+        heading: gpsDetails.heading,
+      });
+
+      const latest = pendingUpdatesRef.current[pendingUpdatesRef.current.length - 1];
+      try {
+        await manifiestoService.actualizarUbicacion(id, latest.lat, latest.lng, latest.speed, latest.heading);
+        pendingUpdatesRef.current = [];
+        setGpsSendStatus('ok');
+      } catch {
+        setGpsSendStatus('error');
+        toast.warning('No se pudo enviar la ubicación. Se reintentará.');
+        if (pendingUpdatesRef.current.length > 10) {
+          pendingUpdatesRef.current = pendingUpdatesRef.current.slice(-5);
+        }
       }
     }, 30000);
 
@@ -128,9 +224,9 @@ const ViajeEnCursoTransportista: React.FC = () => {
       if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
       if (sendIntervalRef.current) clearInterval(sendIntervalRef.current);
     };
-  }, [m.estado, viajeStatus, id]);
+  }, [m.estado, viajeStatus, id, gpsStatus]);
 
-  // Timer
+  // Timer tick
   useEffect(() => {
     if (m.estado !== EstadoManifiesto.EN_TRANSITO || viajeStatus === 'PAUSADO') return;
     timerRef.current = setInterval(() => setElapsedTime(prev => prev + 1), 1000);
@@ -144,36 +240,67 @@ const ViajeEnCursoTransportista: React.FC = () => {
     return `${h}:${min}:${s}`;
   };
 
-  // Action handlers
+  // FIX 5: Confirmar Retiro with GPS coordinates
   const handleConfirmarRetiro = async () => {
     try {
-      await confirmarRetiro.mutateAsync({ id: id! });
+      await confirmarRetiro.mutateAsync({
+        id: id!,
+        latitud: currentPosition?.[0],
+        longitud: currentPosition?.[1],
+        observaciones: 'Retiro confirmado desde app móvil',
+      });
       toast.success('Retiro confirmado — viaje iniciado');
     } catch (err: any) {
       toast.error('Error', err?.response?.data?.message || 'No se pudo confirmar el retiro');
     }
   };
 
+  // FIX 5: Confirmar Entrega with GPS coordinates
   const handleConfirmarEntrega = async () => {
     try {
-      await confirmarEntrega.mutateAsync({ id: id! });
+      await confirmarEntrega.mutateAsync({
+        id: id!,
+        latitud: currentPosition?.[0],
+        longitud: currentPosition?.[1],
+        observaciones: 'Entrega confirmada desde app móvil',
+      });
       toast.success('Entrega confirmada exitosamente');
       // Stop GPS
       if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
       if (sendIntervalRef.current) clearInterval(sendIntervalRef.current);
+      // Clean localStorage
+      if (id) {
+        localStorage.removeItem(`viaje_status_${id}`);
+      }
       setShowFinalizarModal(false);
     } catch (err: any) {
       toast.error('Error', err?.response?.data?.message || 'No se pudo confirmar la entrega');
     }
   };
 
+  // FIX 4: Incident saving with description fallback + GPS coords
   const handleRegistrarIncidente = async () => {
     if (!incidenteTipo) {
       toast.warning('Selecciona un tipo de incidente');
       return;
     }
+    const tipoLabels: Record<string, string> = {
+      accidente: 'Accidente vehicular',
+      derrame: 'Derrame de residuos',
+      robo: 'Robo o asalto',
+      desvio: 'Desvío de ruta',
+      averia: 'Avería mecánica',
+      otro: 'Otro incidente',
+    };
+    const descripcionFinal = incidenteDescripcion.trim() || tipoLabels[incidenteTipo] || incidenteTipo;
     try {
-      await registrarIncidente.mutateAsync({ id: id!, tipo: incidenteTipo, descripcion: incidenteDescripcion || undefined });
+      await registrarIncidente.mutateAsync({
+        id: id!,
+        tipo: incidenteTipo,
+        descripcion: descripcionFinal,
+        latitud: currentPosition?.[0],
+        longitud: currentPosition?.[1],
+      });
       toast.success('Incidente registrado');
       setShowIncidenteModal(false);
       setIncidenteTipo('');
@@ -183,7 +310,24 @@ const ViajeEnCursoTransportista: React.FC = () => {
     }
   };
 
-  const handlePausar = () => setViajeStatus(viajeStatus === 'ACTIVO' ? 'PAUSADO' : 'ACTIVO');
+  // FIX 3: Pause/resume persisted via backend incident events
+  const handlePausar = async () => {
+    const newStatus = viajeStatus === 'ACTIVO' ? 'PAUSADO' : 'ACTIVO';
+    try {
+      await registrarIncidente.mutateAsync({
+        id: id!,
+        tipo: newStatus === 'PAUSADO' ? 'PAUSA' : 'REANUDACION',
+        descripcion: newStatus === 'PAUSADO' ? 'Viaje pausado por el transportista' : 'Viaje reanudado',
+        latitud: currentPosition?.[0],
+        longitud: currentPosition?.[1],
+      });
+      setViajeStatus(newStatus);
+      localStorage.setItem(`viaje_status_${id}`, newStatus);
+      toast.info(newStatus === 'PAUSADO' ? 'Viaje pausado' : 'Viaje reanudado');
+    } catch {
+      toast.error('No se pudo registrar la pausa');
+    }
+  };
 
   const mapCenter = currentPosition || defaultCenter;
 
@@ -211,6 +355,90 @@ const ViajeEnCursoTransportista: React.FC = () => {
 
   const totalPeso = Array.isArray(m.residuos) ? m.residuos.reduce((sum: number, r: any) => sum + (r.cantidad || 0), 0) : 0;
   const eventos = Array.isArray(m.eventos) ? m.eventos : [];
+
+  // FIX 1D: GPS Status Panel component
+  const GpsStatusPanel = () => {
+    if (m.estado !== EstadoManifiesto.EN_TRANSITO) return null;
+
+    const statusConfig: Record<GpsStatus, { color: string; bgColor: string; label: string; icon: React.ReactNode }> = {
+      checking: { color: 'text-neutral-500', bgColor: 'bg-neutral-100', label: 'Verificando GPS...', icon: <Loader2 size={14} className="animate-spin" /> },
+      acquiring: { color: 'text-warning-600', bgColor: 'bg-warning-50', label: 'Adquiriendo señal GPS...', icon: <LocateFixed size={14} className="animate-pulse" /> },
+      active: { color: 'text-success-600', bgColor: 'bg-success-50', label: 'GPS Activo', icon: <div className="w-2.5 h-2.5 rounded-full bg-success-500 animate-pulse" /> },
+      denied: { color: 'text-error-600', bgColor: 'bg-error-50', label: 'Permiso GPS Denegado', icon: <WifiOff size={14} /> },
+      unavailable: { color: 'text-error-600', bgColor: 'bg-error-50', label: 'GPS No Disponible', icon: <WifiOff size={14} /> },
+      error: { color: 'text-error-600', bgColor: 'bg-error-50', label: 'Error GPS', icon: <AlertTriangle size={14} /> },
+    };
+
+    const cfg = statusConfig[gpsStatus];
+
+    return (
+      <Card className={`${cfg.bgColor} border-none`}>
+        <CardContent className="p-3">
+          {/* Status row */}
+          <div className="flex items-center justify-between mb-2">
+            <div className={`flex items-center gap-2 ${cfg.color}`}>
+              {cfg.icon}
+              <span className="text-sm font-semibold">{cfg.label}</span>
+            </div>
+            {gpsSendStatus === 'error' && gpsStatus === 'active' && (
+              <span className="text-xs text-error-500 flex items-center gap-1">
+                <WifiOff size={12} /> Sin conexión
+              </span>
+            )}
+          </div>
+
+          {/* GPS denied help */}
+          {gpsStatus === 'denied' && (
+            <p className="text-xs text-error-500 mt-1">
+              Ve a Ajustes &gt; Privacidad &gt; Ubicación y permite el acceso para esta app. Luego recarga la página.
+            </p>
+          )}
+
+          {/* GPS data when active */}
+          {gpsStatus === 'active' && currentPosition && (
+            <div className="grid grid-cols-2 gap-2 mt-1">
+              <div className="flex items-center gap-1.5">
+                <Crosshair size={13} className="text-neutral-400" />
+                <span className="text-xs text-neutral-600">
+                  {currentPosition[0].toFixed(5)}, {currentPosition[1].toFixed(5)}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <MapPin size={13} className="text-neutral-400" />
+                <span className="text-xs text-neutral-600">
+                  ±{gpsDetails.accuracy != null ? Math.round(gpsDetails.accuracy) : '-'}m
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Gauge size={13} className="text-neutral-400" />
+                <span className="text-xs text-neutral-600">
+                  {gpsDetails.speed != null ? `${Math.round(gpsDetails.speed * 3.6)} km/h` : '- km/h'}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Compass size={13} className="text-neutral-400" />
+                <span className="text-xs text-neutral-600">
+                  {headingToCompass(gpsDetails.heading)} {gpsDetails.heading != null ? `(${Math.round(gpsDetails.heading)}°)` : ''}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Acquiring animation */}
+          {gpsStatus === 'acquiring' && (
+            <div className="flex items-center gap-2 mt-1">
+              <div className="flex gap-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-warning-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-1.5 h-1.5 rounded-full bg-warning-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-1.5 h-1.5 rounded-full bg-warning-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+              <span className="text-xs text-warning-500">Buscando satélites...</span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-neutral-50 pb-24">
@@ -270,6 +498,9 @@ const ViajeEnCursoTransportista: React.FC = () => {
         {/* EN_TRANSITO state: Active trip */}
         {m.estado === EstadoManifiesto.EN_TRANSITO && (
           <>
+            {/* GPS Status Panel — FIX 1D: Always visible */}
+            <GpsStatusPanel />
+
             {/* Timer */}
             <Card variant="elevated" className="bg-gradient-to-br from-primary-600 to-primary-700 text-white border-none shadow-lg">
               <CardContent className="p-5">
@@ -300,8 +531,12 @@ const ViajeEnCursoTransportista: React.FC = () => {
 
             {/* Action buttons */}
             <div className="grid grid-cols-2 gap-3">
-              <button onClick={handlePausar} className={`flex items-center justify-center gap-2 py-4 rounded-xl font-semibold border-2 transition-all ${viajeStatus === 'ACTIVO' ? 'bg-warning-50 text-warning-700 border-warning-200' : 'bg-success-50 text-success-700 border-success-200'}`}>
-                {viajeStatus === 'ACTIVO' ? <Pause size={20} /> : <Play size={20} />}
+              <button
+                onClick={handlePausar}
+                disabled={registrarIncidente.isPending}
+                className={`flex items-center justify-center gap-2 py-4 rounded-xl font-semibold border-2 transition-all disabled:opacity-50 ${viajeStatus === 'ACTIVO' ? 'bg-warning-50 text-warning-700 border-warning-200' : 'bg-success-50 text-success-700 border-success-200'}`}
+              >
+                {registrarIncidente.isPending ? <Loader2 size={20} className="animate-spin" /> : viajeStatus === 'ACTIVO' ? <Pause size={20} /> : <Play size={20} />}
                 {viajeStatus === 'ACTIVO' ? 'Pausar' : 'Reanudar'}
               </button>
               <button onClick={() => setShowIncidenteModal(true)} className="flex items-center justify-center gap-2 py-4 rounded-xl font-semibold bg-error-50 text-error-700 border-2 border-error-200 hover:bg-error-100">
@@ -337,15 +572,9 @@ const ViajeEnCursoTransportista: React.FC = () => {
                     >
                       <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                       {trackPoints.length > 1 && <Polyline positions={trackPoints} color="#0D8A4F" weight={4} opacity={0.8} />}
-                      {currentPosition && <Marker position={currentPosition} icon={truckIcon}><Popup>Tu posicion actual</Popup></Marker>}
+                      {currentPosition && <Marker position={currentPosition} icon={truckIcon}><Popup>Tu posición actual</Popup></Marker>}
                       <RecenterMap position={currentPosition} />
                     </MapContainer>
-                    {currentPosition && (
-                      <div className="absolute bottom-3 left-3 z-[400] bg-white rounded-lg px-3 py-2 shadow-lg border border-neutral-200">
-                        <p className="text-xs text-neutral-500">GPS</p>
-                        <p className="text-xs font-mono font-bold text-neutral-900">{currentPosition[0].toFixed(4)}, {currentPosition[1].toFixed(4)}</p>
-                      </div>
-                    )}
                   </div>
                 </Card>
               </div>
@@ -379,7 +608,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
                 <CheckCircle2 className="text-success-600" size={32} />
               </div>
               <h3 className="text-xl font-bold text-neutral-900 mb-2">Entrega Completada</h3>
-              <p className="text-neutral-600">Esperando confirmacion de recepcion del operador</p>
+              <p className="text-neutral-600">Esperando confirmación de recepción del operador</p>
               <p className="text-sm text-neutral-500 mt-2">Operador: {m.operador?.razonSocial || '-'}</p>
             </CardContent>
           </Card>
@@ -413,10 +642,15 @@ const ViajeEnCursoTransportista: React.FC = () => {
                 <CheckCircle2 className="text-success-600" size={32} />
               </div>
               <h3 className="text-xl font-bold text-neutral-900 mb-2">Confirmar Entrega?</h3>
-              <p className="text-neutral-600 text-sm mb-4">Se confirmara la entrega en {m.operador?.razonSocial || 'destino'}</p>
+              <p className="text-neutral-600 text-sm mb-4">Se confirmará la entrega en {m.operador?.razonSocial || 'destino'}</p>
+              {currentPosition && (
+                <p className="text-xs text-neutral-400 mb-4">
+                  Ubicación: {currentPosition[0].toFixed(4)}, {currentPosition[1].toFixed(4)}
+                </p>
+              )}
               <div className="space-y-3">
                 <Button fullWidth onClick={handleConfirmarEntrega} disabled={confirmarEntrega.isPending}>
-                  {confirmarEntrega.isPending ? 'Confirmando...' : 'Si, Confirmar Entrega'}
+                  {confirmarEntrega.isPending ? 'Confirmando...' : 'Sí, Confirmar Entrega'}
                 </Button>
                 <Button variant="outline" fullWidth onClick={() => setShowFinalizarModal(false)} disabled={confirmarEntrega.isPending}>
                   Cancelar
@@ -427,7 +661,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
         </div>
       )}
 
-      {/* Modal Incidente */}
+      {/* Modal Incidente — FIX 4B: proper select + description handling */}
       {showIncidenteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <Card className="w-full max-w-sm">
@@ -439,26 +673,48 @@ const ViajeEnCursoTransportista: React.FC = () => {
                 <h3 className="text-xl font-bold text-neutral-900">Reportar Incidente</h3>
               </div>
               <div className="space-y-3 mb-4">
-                <select
-                  value={incidenteTipo}
-                  onChange={(e) => setIncidenteTipo(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none"
-                >
-                  <option value="">Seleccionar tipo</option>
-                  <option value="accidente">Accidente vehicular</option>
-                  <option value="derrame">Derrame de residuos</option>
-                  <option value="robo">Robo o asalto</option>
-                  <option value="desvio">Desvio de ruta</option>
-                  <option value="averia">Averia mecanica</option>
-                  <option value="otro">Otro</option>
-                </select>
-                <textarea
-                  value={incidenteDescripcion}
-                  onChange={(e) => setIncidenteDescripcion(e.target.value)}
-                  placeholder="Describe el incidente..."
-                  rows={3}
-                  className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none resize-none"
-                />
+                {/* Incident type buttons instead of native select */}
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">Tipo de incidente</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { value: 'accidente', label: 'Accidente vehicular' },
+                      { value: 'derrame', label: 'Derrame de residuos' },
+                      { value: 'robo', label: 'Robo o asalto' },
+                      { value: 'desvio', label: 'Desvío de ruta' },
+                      { value: 'averia', label: 'Avería mecánica' },
+                      { value: 'otro', label: 'Otro' },
+                    ].map(opt => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setIncidenteTipo(opt.value)}
+                        className={`px-3 py-2.5 rounded-lg text-xs font-medium border-2 transition-all ${
+                          incidenteTipo === opt.value
+                            ? 'border-error-500 bg-error-50 text-error-700'
+                            : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Descripción (opcional)</label>
+                  <textarea
+                    value={incidenteDescripcion}
+                    onChange={(e) => setIncidenteDescripcion(e.target.value)}
+                    placeholder="Describe el incidente..."
+                    rows={3}
+                    className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none resize-none text-sm"
+                  />
+                </div>
+                {currentPosition && gpsStatus === 'active' && (
+                  <p className="text-xs text-neutral-400 flex items-center gap-1">
+                    <MapPin size={12} /> Se adjuntará la ubicación actual al incidente
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Button fullWidth onClick={handleRegistrarIncidente} disabled={registrarIncidente.isPending}>

@@ -177,7 +177,7 @@ ssh root@23.105.176.45 "docker exec directus-admin-database-1 psql -U directus -
 - **manifiestos**: generadorId, transportistaId, operadorId, estado, createdAt, [estado+createdAt]
 - **manifiestos_residuos**: manifiestoId
 - **eventos_manifiesto**: manifiestoId, [manifiestoId+tipo]
-- **tracking_gps**: manifiestoId
+- **tracking_gps**: manifiestoId, timestamp, [manifiestoId+timestamp]
 - **auditorias**: manifiestoId, createdAt
 - **alertas_generadas**: manifiestoId, estado
 - **anomalias_transporte**: manifiestoId
@@ -198,6 +198,7 @@ ssh root@23.105.176.45 "docker exec directus-admin-database-1 psql -U directus -
 | `/api/notificaciones/*` | notification.controller | Notificaciones push y alertas |
 | `/api/analytics/*` | analytics.controller | Dashboard stats (parcialmente implementado) |
 | `/api/pdf/*` | pdf.controller | Generación de PDF de manifiestos y certificados de disposición |
+| `/api/centro-control/*` | tracking.controller | Centro de Control: actividad por capas, mapa, estadísticas |
 
 ### Key API Endpoints
 
@@ -216,6 +217,8 @@ POST /api/manifiestos/:id/cerrar      → EN_TRATAMIENTO/RECIBIDO → TRATADO
 POST /api/manifiestos/:id/rechazar    → ENTREGADO → RECHAZADO
 POST /api/manifiestos/:id/incidente   → Registra incidente en transito (acepta campo `tipo` o `tipoIncidente`)
 POST /api/manifiestos/:id/cancelar    → Cancela manifiesto (si no es CANCELADO ni TRATADO)
+POST /api/manifiestos/:id/ubicacion   → GPS update (latitud, longitud, velocidad?, direccion?) — solo EN_TRANSITO
+GET  /api/centro-control/actividad    → Centro de Control con capas (params: fechaDesde, fechaHasta, capas=generadores,transportistas,operadores,transito)
 GET  /api/pdf/manifiesto/:id          → PDF del manifiesto
 GET  /api/pdf/certificado/:id         → Certificado de Tratamiento y Disposición Final (solo estado TRATADO)
 ```
@@ -233,6 +236,70 @@ La función `mapFilters()` en `reporte.service.ts` traduce entre ambos.
 | `GENERADOR` | Sus manifiestos, crear borradores, perfil |
 | `TRANSPORTISTA` | Manifiestos asignados, tracking GPS, viaje en curso |
 | `OPERADOR` | Manifiestos para tratamiento, recibir, tratar |
+
+---
+
+## GPS Tracking System
+
+### Architecture
+
+The GPS tracking system enables real-time position monitoring for up to **30 simultaneous trips**.
+
+**Flow**: Phone (watchPosition) → every 30s → `POST /api/manifiestos/:id/ubicacion` → `tracking_gps` table → Centro de Control polls every 30s
+
+### Frontend (ViajeEnCursoTransportista.tsx)
+
+- **GPS collection**: `navigator.geolocation.watchPosition()` runs continuously
+- **Transmission interval**: 30 seconds (sends latest position only)
+- **GPS Status State Machine**: `checking` → `acquiring` → `active` | `denied` | `unavailable` | `error`
+- **Data sent**: `{ latitud, longitud, velocidad?, direccion? }`
+- **Offline resilience**: Failed updates queued in `pendingUpdatesRef` (max 5), also backed by IndexedDB `sync_queue`
+- **Pause/Resume**: Records `PAUSA`/`REANUDACION` incidents via backend + localStorage backup
+- **Timer persistence**: Uses server `fechaRetiro` timestamp (not local counter)
+
+### Backend (manifiesto.controller.ts)
+
+- **Endpoint**: `POST /api/manifiestos/:id/ubicacion`
+- **Auth**: TRANSPORTISTA or ADMIN
+- **Validation**: Checks manifiesto exists and is EN_TRANSITO
+- **In-memory cache**: 60s TTL per manifiestoId to skip repeated `findUnique` SELECT (~10x faster for frequent GPS updates)
+- **Cache invalidation**: On `confirmarEntrega` (trip state change)
+- **Data stored**: `tracking_gps` table with `latitud`, `longitud`, `velocidad`, `direccion`, `timestamp`
+
+### Centro de Control (tracking.controller.ts)
+
+- **Endpoint**: `GET /api/centro-control/actividad`
+- **Params**: `fechaDesde`, `fechaHasta`, `capas` (csv: generadores, transportistas, operadores, transito)
+- **EN_TRANSITO filter**: Shows trips created in date range OR with GPS tracking in date range (OR condition)
+- **Date parsing**: `fechaHasta` auto-bumped to 23:59:59.999 to include full day (avoids midnight truncation bug)
+- **Layers**: Generadores, Transportistas, Operadores (filtered by activity in period), En Tránsito (up to 50 GPS points per trip)
+- **Statistics**: Pipeline counts per estado, KPIs, manifiestosPorDia via raw SQL
+
+### Capacity (tested and verified)
+
+| Parameter | Value | Notes |
+|-----------|-------|-------|
+| **Max concurrent trips** | 30+ | Tested with 30 simultaneous GPS POSTs |
+| **GPS update interval** | 30s per client | 1 req/30s per phone |
+| **Rate limit** | 300 req/min/IP | Supports 30 phones behind shared NAT/CGNAT |
+| **DB connection pool** | 20 per PM2 instance (40 total) | `connection_limit=20` in DATABASE_URL |
+| **PostgreSQL max_connections** | 100 | ~25 active in normal use |
+| **Load test result** | 30 concurrent: 399ms cold / 179ms cached | All 200 OK, zero errors |
+| **Per-request latency** | ~24ms (cached) / ~250ms (cold) | Cache TTL: 60s |
+| **Data growth** | ~3,600 rows/hour at 30 trips | With indexes, query perf stays constant |
+
+### Mobile Dashboard (MobileDashboardPage.tsx)
+
+- **TRANSPORTISTA-specific**: Shows trip assignment banner between welcome and stats grid
+- **Active trips (EN_TRANSITO)**: Pulsing green card with "Ir al viaje" button
+- **Pending trips (APROBADO)**: Warning-colored card with clickable list
+- **Data source**: `useManifiestos({ estado: EN_TRANSITO/APROBADO, limit: 5 })`
+
+### CentroControlPage Role Filtering
+
+- **ADMIN**: Sees all EN_TRANSITO trips
+- **TRANSPORTISTA**: Filtered by `currentUser.sector` (company name match against transportista)
+- **Alertas**: Only queried for ADMIN role (`useAlertas(filters, isAdmin)`)
 
 ---
 

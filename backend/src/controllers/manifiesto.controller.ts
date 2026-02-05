@@ -390,18 +390,30 @@ export const confirmarRetiro = async (req: AuthRequest, res: Response, next: Nex
   }
 };
 
-// Actualizar ubicación GPS
+// Actualizar ubicación GPS — optimized for high-frequency calls (30 clients × every 30s)
+// Uses a lightweight SELECT(id, estado) instead of full row, and skips it if the
+// manifiesto was validated recently (in-memory cache per PM2 instance, 60s TTL).
+const _enTransitoCache = new Map<string, number>(); // manifiestoId → timestamp
+const EN_TRANSITO_CACHE_TTL = 60_000; // 60 seconds
+
 export const actualizarUbicacion = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
     const { latitud, longitud, velocidad, direccion } = req.body;
 
-    const manifiesto = await prisma.manifiesto.findUnique({
-      where: { id }
-    });
+    // Check cache — skip DB lookup if we verified EN_TRANSITO recently
+    const cached = _enTransitoCache.get(id);
+    if (!cached || Date.now() - cached > EN_TRANSITO_CACHE_TTL) {
+      const manifiesto = await prisma.manifiesto.findUnique({
+        where: { id },
+        select: { id: true, estado: true },
+      });
 
-    if (!manifiesto || manifiesto.estado !== 'EN_TRANSITO') {
-      throw new AppError('Manifiesto no encontrado o no está en tránsito', 404);
+      if (!manifiesto || manifiesto.estado !== 'EN_TRANSITO') {
+        _enTransitoCache.delete(id);
+        throw new AppError('Manifiesto no encontrado o no está en tránsito', 404);
+      }
+      _enTransitoCache.set(id, Date.now());
     }
 
     const tracking = await prisma.trackingGPS.create({
@@ -459,6 +471,9 @@ export const confirmarEntrega = async (req: AuthRequest, res: Response, next: Ne
         operador: true
       }
     });
+
+    // Invalidate GPS cache — trip is no longer EN_TRANSITO
+    _enTransitoCache.delete(id);
 
     // Registrar evento
     await prisma.eventoManifiesto.create({
