@@ -3,7 +3,9 @@ module.exports = {
     name: 'sitrep-backend',
     script: 'dist/index.js',
     cwd: '/var/www/sitrep-backend',
-    max_memory_restart: '256M',
+    instances: 2,
+    exec_mode: 'cluster',
+    max_memory_restart: '512M',
     env: {
       NODE_ENV: 'production'
     },

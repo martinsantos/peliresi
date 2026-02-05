@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import { config } from './config/config';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
@@ -19,11 +20,17 @@ import prisma from './lib/prisma';
 // Inicializar la aplicación Express
 const app = express();
 
+// Trust proxy (required behind Nginx reverse proxy for rate limiting & IP detection)
+app.set('trust proxy', 1);
+
 // Security headers via Helmet
 app.use(helmet({
   contentSecurityPolicy: config.NODE_ENV === 'production' ? undefined : false,
   crossOriginEmbedderPolicy: false,
 }));
+
+// Response compression (gzip/brotli) — reduces payload size ~5-10x
+app.use(compression());
 
 // Middleware básico
 // Soportar múltiples orígenes CORS (separados por coma)
@@ -60,10 +67,22 @@ if (process.env.ENABLE_ANALYTICS === 'true') {
   app.use(analyticsMiddleware);
 }
 
+// Request timeout — prevents hanging queries from blocking the event loop
+app.use((req, res, next) => {
+  req.setTimeout(30000);
+  res.setTimeout(30000);
+  next();
+});
+
 // Rutas
-// Ruta de prueba (Health Check) - Mover al inicio para evitar conflictos de middleware
-app.get('/api/health', (req: Request, res: Response) => {
-  res.json({ status: 'ok', message: 'API is running' });
+// Health Check with DB connectivity verification
+app.get('/api/health', async (req: Request, res: Response) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ status: 'ok', db: 'connected', uptime: process.uptime() });
+  } catch {
+    res.status(503).json({ status: 'error', db: 'disconnected' });
+  }
 });
 
 app.use('/api/auth', authRoutes);

@@ -202,6 +202,12 @@ model Manifiesto {
   alertas         AlertaGenerada[]
   anomalias       AnomaliaTransporte[]
 
+  @@index([generadorId])
+  @@index([transportistaId])
+  @@index([operadorId])
+  @@index([estado])
+  @@index([createdAt])
+  @@index([estado, createdAt])
   @@map("manifiestos")
 }
 
@@ -222,6 +228,7 @@ model ManifiestoResiduo {
   manifiesto    Manifiesto    @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
   tipoResiduo   TipoResiduo   @relation(fields: [tipoResiduoId], references: [id])
 
+  @@index([manifiestoId])
   @@map("manifiestos_residuos")
 }
 
@@ -247,6 +254,8 @@ model EventoManifiesto {
   manifiesto    Manifiesto    @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
   usuario       Usuario       @relation(fields: [usuarioId], references: [id])
 
+  @@index([manifiestoId])
+  @@index([manifiestoId, tipo])
   @@map("eventos_manifiesto")
 }
 
@@ -264,6 +273,7 @@ model TrackingGPS {
   // Relaciones
   manifiesto    Manifiesto    @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
 
+  @@index([manifiestoId])
   @@map("tracking_gps")
 }
 
@@ -317,6 +327,8 @@ model Auditoria {
   usuario     Usuario     @relation("UsuarioAuditorias", fields: [usuarioId], references: [id])
   manifiesto  Manifiesto? @relation(fields: [manifiestoId], references: [id])
 
+  @@index([manifiestoId])
+  @@index([createdAt])
   @@map("auditorias")
 }
 
@@ -398,6 +410,8 @@ model AlertaGenerada {
   regla           ReglaAlerta         @relation(fields: [reglaId], references: [id])
   manifiesto      Manifiesto?         @relation(fields: [manifiestoId], references: [id])
 
+  @@index([manifiestoId])
+  @@index([estado])
   @@map("alertas_generadas")
 }
 
@@ -421,6 +435,7 @@ model AnomaliaTransporte {
   // Relaciones
   manifiesto      Manifiesto          @relation(fields: [manifiestoId], references: [id])
 
+  @@index([manifiestoId])
   @@map("anomalias_transporte")
 }
 

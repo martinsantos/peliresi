@@ -50,7 +50,10 @@ Permite el seguimiento completo del ciclo de vida de manifiestos: desde la gener
 - **ORM**: Prisma (PostgreSQL)
 - **Auth**: JWT (bcrypt passwords, role-based: ADMIN, GENERADOR, TRANSPORTISTA, OPERADOR)
 - **Database**: PostgreSQL en Docker (`directus-admin-database-1`)
-- **Process Manager**: PM2 (process name: `sitrep-backend`, port 3002)
+- **Process Manager**: PM2 cluster mode, 2 instances (process name: `sitrep-backend`, port 3002)
+- **Compression**: gzip via `compression` middleware (~7x payload reduction)
+- **Connection Pool**: Prisma `connection_limit=20` per instance (40 total across cluster)
+- **Request Timeout**: 30s middleware on all requests
 
 ### Frontend
 - **Framework**: React 19 + TypeScript + Vite 7.2
@@ -135,21 +138,49 @@ ssh root@23.105.176.45 "cd /var/www/sitrep-backend && tar xzf /tmp/sitrep-backen
 | `vite.config.v6.ts` | `/v6/` | `dist-v6/` | `src-v6/main.tsx` (dev only) |
 | `vite.config.app.ts` | `/app/` | `dist-app/` | `app.html` |
 
+### Vite Manual Chunks (vendor splitting)
+
+`vite.config.ts` splits vendor bundles for optimal caching and lazy loading:
+- `vendor-react` (45KB): react, react-dom, react-router-dom — always loaded
+- `vendor-query` (36KB): @tanstack/react-query — always loaded
+- `vendor-charts` (369KB): recharts — loaded only on chart pages
+- `vendor-maps` (152KB): leaflet, react-leaflet — loaded only on map pages
+- `vendor-pdf` (408KB): jspdf, jspdf-autotable — loaded only on PDF export
+
 ## PM2 Management
+
+PM2 runs in **cluster mode** with 2 instances (ecosystem.config.js), 512MB memory limit per instance.
 
 ```bash
 ssh root@23.105.176.45 "pm2 list"
 ssh root@23.105.176.45 "pm2 restart sitrep-backend"
 ssh root@23.105.176.45 "pm2 logs sitrep-backend --lines 50"
 ssh root@23.105.176.45 "pm2 show sitrep-backend"
+# To apply ecosystem.config.js changes:
+ssh root@23.105.176.45 "pm2 delete sitrep-backend && pm2 start /var/www/sitrep-backend/ecosystem.config.js && pm2 save"
 ```
 
 ## Database
 
+Database name is `trazabilidad_rrpp` (NOT `trazabilidad_demo`).
+
 ```bash
 # Acceso directo a PostgreSQL
-ssh root@23.105.176.45 "docker exec -it directus-admin-database-1 psql -U directus -d trazabilidad_demo"
+ssh root@23.105.176.45 "docker exec -it directus-admin-database-1 psql -U directus -d trazabilidad_rrpp"
+# Check indexes
+ssh root@23.105.176.45 "docker exec directus-admin-database-1 psql -U directus -d trazabilidad_rrpp -c \"SELECT tablename, indexname FROM pg_indexes WHERE schemaname='public' ORDER BY tablename, indexname;\""
 ```
+
+### Database Indexes (production optimization)
+
+14 custom indexes on key tables for query performance:
+- **manifiestos**: generadorId, transportistaId, operadorId, estado, createdAt, [estado+createdAt]
+- **manifiestos_residuos**: manifiestoId
+- **eventos_manifiesto**: manifiestoId, [manifiestoId+tipo]
+- **tracking_gps**: manifiestoId
+- **auditorias**: manifiestoId, createdAt
+- **alertas_generadas**: manifiestoId, estado
+- **anomalias_transporte**: manifiestoId
 
 ---
 
@@ -172,10 +203,10 @@ ssh root@23.105.176.45 "docker exec -it directus-admin-database-1 psql -U direct
 
 ```
 GET  /api/manifiestos/dashboard      → estadísticas (borradores, aprobados, enTransito, entregados, recibidos, tratados, total) + recientes + enTransitoList
-GET  /api/reportes/manifiestos       → porEstado, porTipoResiduo, manifiestos[] (params: fechaInicio, fechaFin). NOTA: porTipoResiduo retorna objetos { cantidad, unidad }, NO números planos
-GET  /api/reportes/tratados          → porGenerador, totalPorTipo, detalle[] (params: fechaInicio, fechaFin)
-GET  /api/reportes/transporte        → transportistas[] con tasaCompletitud (params: fechaInicio, fechaFin)
-GET  /api/reportes/exportar/:tipo    → CSV blob (tipos: manifiestos, generadores, transportistas, operadores)
+GET  /api/reportes/manifiestos       → porEstado, porTipoResiduo, manifiestos[], pagination (params: fechaInicio, fechaFin, page, limit). NOTA: porTipoResiduo retorna objetos { cantidad, unidad }, NO números planos. Agregación via Prisma groupBy.
+GET  /api/reportes/tratados          → porGenerador, totalPorTipo, detalle[], pagination (params: fechaInicio, fechaFin, page, limit)
+GET  /api/reportes/transporte        → transportistas[] con tasaCompletitud, pagination (params: fechaInicio, fechaFin, page, limit). Usa _count en vez de cargar manifiestos completos.
+GET  /api/reportes/exportar/:tipo    → CSV blob (tipos: manifiestos, generadores, transportistas, operadores). Límite: 10,000 filas max.
 POST /api/manifiestos/:id/aprobar    → Cambiar estado BORRADOR → APROBADO
 POST /api/manifiestos/:id/confirmar-retiro → APROBADO → EN_TRANSITO
 POST /api/manifiestos/:id/entregar   → EN_TRANSITO → ENTREGADO
@@ -214,10 +245,18 @@ La función `mapFilters()` en `reporte.service.ts` traduce entre ambos.
 | Centro de Control | `pages/centro-control/CentroControlPage.tsx` | Sala de operaciones: LIVE badge, 5 KPIs, pipeline funnel, mapa + viajes activos/realizados accordion, donut chart, bar chart, auto-refresh 30s, 6 acciones rápidas. Viajes panel usa `self-start` para no estirarse con el mapa. |
 | Mobile Dashboard | `pages/mobile/MobileDashboardPage.tsx` | Versión mobile optimizada |
 
-### Reportes
+### Reportes (code-split con React.lazy)
 | Página | Archivo | Descripción |
 |--------|---------|-------------|
-| Centro de Reportes | `pages/reportes/ReportesPage.tsx` | 7 tabs (Manifiestos/Residuos Tratados/Transporte/Establecimientos/Operadores/Departamentos/Mapa de Actores), Recharts (BarChart, PieChart, Donut, Gauge SVG), exportación PDF con jsPDF, exportación CSV, filtros de fecha inline con "Ver Todos", DepartamentoDetalleModal, sticky filter bar |
+| Centro de Reportes (shell) | `pages/reportes/ReportesPage.tsx` | Shell ~370 líneas: filter bar, tab switcher, exportación PDF/CSV, lazy loading de tabs con Suspense |
+| Tab: Manifiestos | `pages/reportes/tabs/ManifiestosTab.tsx` | KPIs, gráfico por estado (donut), por tipo residuo (bar), tabla paginada |
+| Tab: Residuos Tratados | `pages/reportes/tabs/TratadosTab.tsx` | KPIs, gauge tasa tratamiento, donut por tipo, tabla tratados |
+| Tab: Transporte | `pages/reportes/tabs/TransporteTab.tsx` | KPIs, bar chart completitud, tabla transportistas con progress bars |
+| Tab: Establecimientos | `pages/reportes/tabs/EstablecimientosTab.tsx` | KPIs, pie categorías, bar departamentos, tabla generadores |
+| Tab: Operadores | `pages/reportes/tabs/OperadoresTab.tsx` | KPIs, pie categorías, bar recibidos/tratados, tabla operadores |
+| Tab: Departamentos | `pages/reportes/tabs/DepartamentosTab.tsx` | Choropleth map, ranking, DepartamentoDetalleModal |
+| Tab: Mapa de Actores | `pages/reportes/tabs/MapaActoresTab.tsx` | Leaflet map con layer toggles, clustering, popups |
+| Shared utilities | `pages/reportes/tabs/shared.tsx` | downloadCsv, DonutCenterLabel, clusterMarkers |
 
 ### Manifiestos
 | Página | Archivo | Descripción |
@@ -364,8 +403,9 @@ NuevoManifiestoPage auto-populates actor info cards (CUIT, teléfono, domicilio,
 
 ## Key Notes
 
-- Backend runs on port **3002** via PM2 (process name: `sitrep-backend`, id: 2)
-- PM2 exec cwd: `/var/www/sitrep-backend/`, script: `dist/index.js`
+- Backend runs on port **3002** via PM2 cluster mode, 2 instances (process name: `sitrep-backend`)
+- PM2 exec cwd: `/var/www/sitrep-backend/`, script: `dist/index.js`, exec_mode: `cluster`
+- Express `trust proxy` enabled (required behind Nginx for rate limiting & IP detection)
 - Nginx proxies `/api/` to `http://127.0.0.1:3002`
 - PostgreSQL runs in Docker container `directus-admin-database-1`
 - Frontend uses SPA fallback (`try_files $uri $uri/ /index.html`)
@@ -375,6 +415,9 @@ NuevoManifiestoPage auto-populates actor info cards (CUIT, teléfono, domicilio,
 - `/analytics/*` endpoints are partially implemented - `getDashboardStats` works but `getManifiestosPorMes`, `getResiduosPorTipo`, etc. return empty via try/catch fallback
 - Centro de Control usa polling manual (countdown 30s + refetch) en lugar de WebSockets
 - Reportes usa Recharts para gráficos interactivos y jsPDF para exportación PDF client-side
+- Report endpoints usan paginación (`page`/`limit` params) y `Promise.all` para queries paralelas
+- CSV export limitado a 10,000 filas max por seguridad
+- Health check (`/api/health`) verifica conectividad a DB y retorna `{ status, db, uptime }`
 - `createManifiesto` backend acepta `generadorId` del body para ADMIN (no requiere relación generador en el user)
 - `registrarIncidente` acepta tanto `tipo` como `tipoIncidente` del frontend
 - Certificado de Disposición (CU-O10): PDF generado por `pdf.controller.ts:generarCertificado` con Ley 24.051, datos completos, firma operador
