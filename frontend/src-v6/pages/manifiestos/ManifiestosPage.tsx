@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   FileText, Search, Filter, Plus, Eye, Edit, Trash2, Loader2, AlertTriangle,
 } from 'lucide-react';
@@ -13,6 +13,7 @@ import { Card } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Input } from '../../components/ui/Input';
+import { Select } from '../../components/ui/Select';
 import { toast } from '../../components/ui/Toast';
 import { useManifiestos } from '../../hooks/useManifiestos';
 import { manifiestoService } from '../../services/manifiesto.service';
@@ -36,7 +37,8 @@ const estadoBadgeColor: Record<string, string> = {
 
 const ManifiestosPage: React.FC = () => {
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchParams] = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
   const [estadoFilter, setEstadoFilter] = useState('');
   const [page, setPage] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; numero: string } | null>(null);
@@ -114,20 +116,23 @@ const ManifiestosPage: React.FC = () => {
               leftIcon={<Search size={18} />}
             />
           </div>
-          <div className="flex gap-2">
-            <select
-              value={estadoFilter}
-              onChange={(e) => { setEstadoFilter(e.target.value); setPage(1); }}
-              className="px-4 py-2 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none transition-colors input-polished"
-            >
-              <option value="">Todos los estados</option>
-              {Object.values(EstadoManifiesto).map((e) => (
-                <option key={e} value={e}>{ESTADO_LABELS[e]}</option>
-              ))}
-            </select>
-            <Button variant="outline" leftIcon={<Filter size={18} />}>
-              Filtros
-            </Button>
+          <div className="flex gap-2 items-center">
+            <div className="w-48">
+              <Select
+                value={estadoFilter}
+                onChange={(val) => { setEstadoFilter(val); setPage(1); }}
+                options={[
+                  { value: '', label: 'Todos los estados' },
+                  ...Object.values(EstadoManifiesto).map((e) => ({
+                    value: e,
+                    label: ESTADO_LABELS[e] || e,
+                  })),
+                ]}
+                placeholder="Filtrar estado..."
+                size="sm"
+                clearable
+              />
+            </div>
           </div>
         </div>
       </Card>

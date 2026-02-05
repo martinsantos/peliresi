@@ -61,6 +61,16 @@ export const MobileDashboardPage: React.FC = () => {
   const activeTrips = tripsEnTransito?.items || [];
   const pendingTrips = tripsAprobados?.items || [];
 
+  // Fallback: read active trip from localStorage when API hasn't responded yet
+  const savedTripId = useMemo(() => localStorage.getItem('sitrep_active_trip_id'), []);
+  const savedTripSnapshot = useMemo(() => {
+    if (!savedTripId) return null;
+    try {
+      const s = localStorage.getItem(`viaje_snapshot_${savedTripId}`);
+      return s ? JSON.parse(s) : null;
+    } catch { return null; }
+  }, [savedTripId]);
+
   const accesosRapidos = useMemo(() => [
     { id: 1, label: 'Nuevo Manifiesto', icon: FileText, path: mp('/manifiestos/nuevo'), color: 'primary' },
     { id: 2, label: 'Escanear QR', icon: MapPin, path: mp('/scan'), color: 'success' },
@@ -98,6 +108,35 @@ export const MobileDashboardPage: React.FC = () => {
       </div>
 
       {/* FIX 2: TRANSPORTISTA Trip Assignment Banner */}
+      {isTransportista && activeTrips.length === 0 && savedTripSnapshot && (
+        <Card className="border-2 border-success-200 bg-success-50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-success-100 flex items-center justify-center">
+                  <Radio size={16} className="text-success-600 animate-pulse" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-success-800">Viaje en Curso</p>
+                  <p className="text-xs text-success-600">#{savedTripSnapshot.numero || savedTripId?.slice(0, 8)}</p>
+                </div>
+              </div>
+              <Badge variant="soft" color="warning">Datos guardados</Badge>
+            </div>
+            <p className="text-xs text-success-700 mb-3">
+              Destino: {savedTripSnapshot.operador || '-'}
+            </p>
+            <Button
+              fullWidth
+              size="sm"
+              onClick={() => navigate(mp(`/transporte/viaje/${savedTripId}`))}
+            >
+              <Navigation size={14} className="mr-1.5" />
+              Ir al viaje
+            </Button>
+          </CardContent>
+        </Card>
+      )}
       {isTransportista && (activeTrips.length > 0 || pendingTrips.length > 0) && (
         <div className="space-y-2">
           {/* Active trips (EN_TRANSITO) */}

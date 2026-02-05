@@ -29,7 +29,7 @@ export interface User {
 export interface AuthContextType {
   currentUser: User | null;
   users: User[];
-  switchUser: (userId: number) => void;
+  switchUser: (userId: number) => Promise<void>;
   getUsersByRole: (role: UserRole) => User[];
   isAdmin: boolean;
   isGenerador: boolean;
@@ -262,6 +262,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err: any) {
       // If API fails (network error OR 401/etc), fallback to demo mode
       // if the email matches a known demo user
+      // CRITICAL: Clear any stale tokens to prevent wrong-user API access
+      clearTokens();
       const demoUser = MOCK_USERS.find(u => u.email === email);
       if (demoUser) {
         setCurrentUser(demoUser);
@@ -288,32 +290,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       clearTokens();
       localStorage.removeItem('sitrep_demo_user');
+      // Clean up trip-related localStorage to prevent data leaking to next user
+      localStorage.removeItem('sitrep_active_trip_id');
+      const keysToClean: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('viaje_snapshot_') || key.startsWith('viaje_status_') || key.startsWith('gps_pending_'))) {
+          keysToClean.push(key);
+        }
+      }
+      keysToClean.forEach(k => localStorage.removeItem(k));
       setCurrentUser(null);
       setIsDemo(false);
     }
   }, [isDemo]);
 
   // Switch user (demo mode or real login for quick-switch)
-  const switchUser = useCallback((userId: number) => {
+  const switchUser = useCallback(async (userId: number) => {
+    // CRITICAL: Clear old tokens BEFORE switching to prevent stale JWT from
+    // previous user (e.g. ADMIN) leaking into API calls of the new user
+    setIsLoading(true);
+    setAuthError(null);
+    clearTokens();
+
     const credentials = DEMO_CREDENTIALS[userId];
     if (credentials) {
       // Try real login first, fallback to demo
-      authService.login(credentials)
-        .then(response => {
-          const user = apiUserToUser(response.user);
+      try {
+        const response = await authService.login(credentials);
+        const user = apiUserToUser(response.user);
+        setCurrentUser(user);
+        setIsDemo(false);
+        localStorage.removeItem('sitrep_demo_user');
+      } catch {
+        // Fallback to demo — tokens already cleared above
+        const user = MOCK_USERS.find(u => u.id === userId);
+        if (user) {
           setCurrentUser(user);
-          setIsDemo(false);
-          localStorage.removeItem('sitrep_demo_user');
-        })
-        .catch(() => {
-          // Fallback to demo
-          const user = MOCK_USERS.find(u => u.id === userId);
-          if (user) {
-            setCurrentUser(user);
-            setIsDemo(true);
-            localStorage.setItem('sitrep_demo_user', JSON.stringify(user));
-          }
-        });
+          setIsDemo(true);
+          localStorage.setItem('sitrep_demo_user', JSON.stringify(user));
+        }
+      }
     } else {
       // No credentials for this user, use demo
       const user = MOCK_USERS.find(u => u.id === userId);
@@ -323,6 +340,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.setItem('sitrep_demo_user', JSON.stringify(user));
       }
     }
+    setIsLoading(false);
   }, []);
 
   const getUsersByRole = useCallback((role: UserRole) => {

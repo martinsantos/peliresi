@@ -208,6 +208,8 @@ model Manifiesto {
   @@index([estado])
   @@index([createdAt])
   @@index([estado, createdAt])
+  @@index([numero])
+  @@index([transportistaId, estado])
   @@map("manifiestos")
 }
 
@@ -274,6 +276,7 @@ model TrackingGPS {
   manifiesto    Manifiesto    @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
 
   @@index([manifiestoId])
+  @@index([manifiestoId, timestamp])
   @@map("tracking_gps")
 }
 

@@ -49,7 +49,7 @@ export const MainLayout: React.FC = () => {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showTour, setShowTour] = useState(false);
   const location = useLocation();
-  const { currentUser, isAdmin, isGenerador, isTransportista, isOperador, canAccess, isLoading } = useAuth();
+  const { currentUser, isAdmin, isGenerador, isTransportista, isOperador, canAccess, isLoading, isDemo } = useAuth();
 
   // Guard: show loading or redirect if no user
   if (isLoading) {
@@ -139,6 +139,13 @@ export const MainLayout: React.FC = () => {
 
   return (
     <div className="h-screen bg-[#F8F8F6] flex flex-col overflow-hidden">
+      {/* Demo mode banner */}
+      {isDemo && (
+        <div className="bg-amber-500 text-white text-center text-xs sm:text-sm py-1 font-medium sticky top-0 z-50">
+          Modo Demo — Los datos no son reales
+        </div>
+      )}
+
       {/* Connectivity indicator - always visible at top */}
       <ConnectivityIndicator />
 

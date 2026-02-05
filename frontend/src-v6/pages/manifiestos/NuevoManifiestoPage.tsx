@@ -141,7 +141,44 @@ export const NuevoManifiestoPage: React.FC = () => {
     }
   };
 
-  const isMobile = window.location.pathname.includes('/mobile');
+  const isMobile = window.location.pathname.includes('/mobile') || window.location.pathname.includes('/app');
+
+  // Only GENERADOR and ADMIN can create manifiestos
+  const canCreate = isAdmin || isGenerador;
+
+  if (!canCreate) {
+    return (
+      <div className="min-h-screen bg-neutral-50 pb-20">
+        <header className="sticky top-0 z-30 bg-white border-b border-neutral-200 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+              <ArrowLeft size={20} />
+            </Button>
+            <h1 className="text-lg font-bold text-neutral-900">Nuevo Manifiesto</h1>
+          </div>
+        </header>
+        <div className="max-w-md mx-auto p-6 mt-8">
+          <Card>
+            <CardContent className="p-6 text-center">
+              <div className="w-16 h-16 bg-warning-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle className="text-warning-600" size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-neutral-900 mb-2">Acceso restringido</h3>
+              <p className="text-neutral-600 mb-4">
+                El perfil <span className="font-semibold">{currentUser?.rol || 'actual'}</span> no tiene permisos para crear manifiestos.
+              </p>
+              <p className="text-sm text-neutral-500 mb-6">
+                Solo los perfiles <span className="font-semibold">GENERADOR</span> y <span className="font-semibold">ADMIN</span> pueden crear nuevos manifiestos de residuos.
+              </p>
+              <Button fullWidth onClick={() => navigate(isMobile ? '/app/manifiestos' : '/manifiestos')}>
+                Volver a Manifiestos
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-neutral-50 pb-20">
@@ -190,32 +227,24 @@ export const NuevoManifiestoPage: React.FC = () => {
                 <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Establecimiento Generador *
                 </label>
-                {isAdmin ? (
-                  <Select
-                    value={formData.generadorId}
-                    onChange={(val) => {
-                      const gen = generadoresList.find((g: any) => g.id === val);
-                      setFormData({ ...formData, generadorId: val, generador: gen?.razonSocial || gen?.nombre || '' });
-                    }}
-                    options={[...generadoresList]
-                      .sort((a: any, b: any) => (a.razonSocial || '').localeCompare(b.razonSocial || ''))
-                      .map((g: any) => ({
-                        value: g.id,
-                        label: `${g.razonSocial || g.nombre || g.label}${g.cuit ? ` — ${g.cuit}` : ''}`,
-                      }))}
-                    placeholder="Buscar generador por nombre o CUIT..."
-                    searchable
-                    errorMessage={validationErrors.generador}
-                    size="base"
-                  />
-                ) : (
-                  <Input
-                    value={formData.generador}
-                    onChange={(e) => setFormData({ ...formData, generador: e.target.value })}
-                    placeholder="Nombre del establecimiento"
-                    disabled={currentUser?.rol === 'GENERADOR'}
-                  />
-                )}
+                <Select
+                  value={formData.generadorId}
+                  onChange={(val) => {
+                    const gen = generadoresList.find((g: any) => g.id === val);
+                    setFormData({ ...formData, generadorId: val, generador: gen?.razonSocial || gen?.nombre || '' });
+                  }}
+                  options={[...generadoresList]
+                    .sort((a: any, b: any) => (a.razonSocial || '').localeCompare(b.razonSocial || ''))
+                    .map((g: any) => ({
+                      value: g.id,
+                      label: `${g.razonSocial || g.nombre || g.label}${g.cuit ? ` — ${g.cuit}` : ''}`,
+                    }))}
+                  placeholder="Buscar generador por nombre o CUIT..."
+                  searchable
+                  errorMessage={validationErrors.generador}
+                  size="base"
+                  disabled={isGenerador}
+                />
                 {validationErrors.generador && (
                   <p className="text-xs text-error-500 mt-1">{validationErrors.generador}</p>
                 )}
@@ -252,7 +281,7 @@ export const NuevoManifiestoPage: React.FC = () => {
                 </div>
               )}
 
-              {!selectedGenerador && isAdmin && (
+              {!selectedGenerador && (
                 <p className="text-xs text-neutral-400 italic">Seleccioná un generador para ver sus datos</p>
               )}
 

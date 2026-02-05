@@ -253,3 +253,38 @@ export const logout = async (req: Request, res: Response, next: NextFunction) =>
     next(error);
   }
 };
+
+// Refrescar tokens (access token expirado, refresh token válido)
+export const refreshToken = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { refreshToken: token } = req.body;
+
+    if (!token) {
+      throw new AppError('Refresh token es requerido', 400);
+    }
+
+    let decoded: { id: string };
+    try {
+      decoded = jwt.verify(token, config.JWT_SECRET as string) as { id: string };
+    } catch (err) {
+      throw new AppError('Refresh token inválido o expirado', 401);
+    }
+
+    const user = await prisma.usuario.findUnique({
+      where: { id: decoded.id },
+    });
+
+    if (!user || !user.activo) {
+      throw new AppError('Usuario no encontrado o inactivo', 401);
+    }
+
+    const tokens = generateTokens(user.id);
+
+    res.json({
+      success: true,
+      data: tokens,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

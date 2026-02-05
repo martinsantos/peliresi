@@ -44,7 +44,9 @@ export interface EnTransitoItem {
   numero: string;
   transportista: string;
   origen: string;
+  origenLatLng: [number, number] | null;
   destino: string;
+  destinoLatLng: [number, number] | null;
   ultimaPosicion: {
     latitud: number;
     longitud: number;

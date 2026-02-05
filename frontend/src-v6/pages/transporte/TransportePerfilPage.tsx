@@ -46,43 +46,7 @@ import { toast } from '../../components/ui/Toast';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-
-// Fix para íconos de Leaflet
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerShadow from 'leaflet/dist/images/marker-shadow.png';
-
-let DefaultIcon = L.icon({
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41]
-});
-
-L.Marker.prototype.options.icon = DefaultIcon;
-
-// Iconos personalizados
-const origenIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-black.png',
-  shadowUrl: markerShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-});
-
-const destinoIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-  shadowUrl: markerShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-});
-
-const vehiculoIcon = new L.DivIcon({
-  className: 'custom-div-icon',
-  html: `<div style="background-color: #3b82f6; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 3px solid white; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg></div>`,
-  iconSize: [36, 36],
-  iconAnchor: [18, 18],
-});
+import { ACTOR_ICONS } from '../../utils/map-icons';
 
 // Default Mendoza coordinates (used when no GPS data available)
 const DEFAULT_COORDS = {
@@ -400,7 +364,7 @@ const TransportePerfilPage: React.FC = () => {
                       />
 
                       {/* Marcador Origen */}
-                      <Marker position={DEFAULT_COORDS.origen} icon={origenIcon}>
+                      <Marker position={DEFAULT_COORDS.origen} icon={ACTOR_ICONS.generador}>
                         <Popup>
                           <div className="text-center">
                             <p className="font-semibold">Origen</p>
@@ -410,7 +374,7 @@ const TransportePerfilPage: React.FC = () => {
                       </Marker>
 
                       {/* Marcador Destino */}
-                      <Marker position={DEFAULT_COORDS.destino} icon={destinoIcon}>
+                      <Marker position={DEFAULT_COORDS.destino} icon={ACTOR_ICONS.operador}>
                         <Popup>
                           <div className="text-center">
                             <p className="font-semibold">Destino</p>
@@ -420,7 +384,7 @@ const TransportePerfilPage: React.FC = () => {
                       </Marker>
 
                       {/* Marcador Vehículo Actual */}
-                      <Marker position={DEFAULT_COORDS.centro} icon={vehiculoIcon}>
+                      <Marker position={DEFAULT_COORDS.centro} icon={ACTOR_ICONS.enTransito}>
                         <Popup>
                           <div className="text-center">
                             <p className="font-semibold">Vehículo en tránsito</p>

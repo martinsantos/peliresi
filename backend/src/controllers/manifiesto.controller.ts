@@ -59,7 +59,7 @@ const generarNumeroManifiesto = async (): Promise<string> => {
 // Obtener todos los manifiestos
 export const getManifiestos = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { estado, generadorId, transportistaId, operadorId, page = 1, limit = 10 } = req.query;
+    const { estado, generadorId, transportistaId, operadorId, search, page = 1, limit = 10 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
     const where: any = {};
@@ -68,6 +68,17 @@ export const getManifiestos = async (req: AuthRequest, res: Response, next: Next
     if (generadorId) where.generadorId = generadorId;
     if (transportistaId) where.transportistaId = transportistaId;
     if (operadorId) where.operadorId = operadorId;
+
+    // Text search by numero or actor razón social
+    if (search && typeof search === 'string' && search.trim()) {
+      const q = search.trim();
+      where.OR = [
+        { numero: { contains: q, mode: 'insensitive' } },
+        { generador: { razonSocial: { contains: q, mode: 'insensitive' } } },
+        { transportista: { razonSocial: { contains: q, mode: 'insensitive' } } },
+        { operador: { razonSocial: { contains: q, mode: 'insensitive' } } },
+      ];
+    }
 
     // Filtrar según el rol del usuario
     if (req.user.rol === 'GENERADOR' && req.user.generador) {
@@ -78,12 +89,19 @@ export const getManifiestos = async (req: AuthRequest, res: Response, next: Next
       where.operadorId = req.user.operador.id;
     }
 
+    // Smart ordering: for completed states, order by the state-specific date
+    const orderBy: any =
+      estado === 'ENTREGADO' ? { fechaEntrega: 'desc' } :
+      estado === 'RECIBIDO' ? { fechaRecepcion: 'desc' } :
+      estado === 'TRATADO' ? { fechaCierre: 'desc' } :
+      { createdAt: 'desc' };
+
     const [manifiestos, total] = await Promise.all([
       prisma.manifiesto.findMany({
         where,
         skip,
         take: Number(limit),
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         include: {
           generador: true,
           transportista: true,
@@ -327,59 +345,61 @@ export const confirmarRetiro = async (req: AuthRequest, res: Response, next: Nex
       throw new AppError('Solo los transportistas pueden confirmar retiros', 403);
     }
 
-    const manifiesto = await prisma.manifiesto.findUnique({
-      where: { id }
-    });
+    // Transaction to prevent race condition (double-tap / concurrent requests)
+    const manifiestoActualizado = await prisma.$transaction(async (tx) => {
+      const manifiesto = await tx.manifiesto.findUnique({
+        where: { id }
+      });
 
-    if (!manifiesto) {
-      throw new AppError('Manifiesto no encontrado', 404);
-    }
+      if (!manifiesto) {
+        throw new AppError('Manifiesto no encontrado', 404);
+      }
 
-    if (manifiesto.estado !== 'APROBADO') {
-      throw new AppError('El manifiesto debe estar aprobado para confirmar retiro', 400);
-    }
+      if (manifiesto.estado !== 'APROBADO') {
+        throw new AppError('El manifiesto debe estar aprobado para confirmar retiro', 400);
+      }
 
-    // Actualizar manifiesto
-    const manifiestoActualizado = await prisma.manifiesto.update({
-      where: { id },
-      data: {
-        estado: 'EN_TRANSITO',
-        fechaRetiro: new Date()
-      },
-      include: {
-        generador: true,
-        transportista: true,
-        operador: true,
-        residuos: {
-          include: {
-            tipoResiduo: true
+      const updated = await tx.manifiesto.update({
+        where: { id },
+        data: {
+          estado: 'EN_TRANSITO',
+          fechaRetiro: new Date()
+        },
+        include: {
+          generador: true,
+          transportista: true,
+          operador: true,
+          residuos: {
+            include: {
+              tipoResiduo: true
+            }
           }
         }
-      }
-    });
+      });
 
-    // Registrar evento con ubicación
-    await prisma.eventoManifiesto.create({
-      data: {
-        manifiestoId: id,
-        tipo: 'RETIRO',
-        descripcion: observaciones || 'Carga retirada del generador',
-        latitud,
-        longitud,
-        usuarioId: userId
-      }
-    });
-
-    // Registrar primer punto de tracking
-    if (latitud && longitud) {
-      await prisma.trackingGPS.create({
+      await tx.eventoManifiesto.create({
         data: {
           manifiestoId: id,
+          tipo: 'RETIRO',
+          descripcion: observaciones || 'Carga retirada del generador',
           latitud,
-          longitud
+          longitud,
+          usuarioId: userId
         }
       });
-    }
+
+      if (latitud && longitud) {
+        await tx.trackingGPS.create({
+          data: {
+            manifiestoId: id,
+            latitud,
+            longitud
+          }
+        });
+      }
+
+      return updated;
+    });
 
     res.json({
       success: true,
@@ -394,7 +414,7 @@ export const confirmarRetiro = async (req: AuthRequest, res: Response, next: Nex
 // Uses a lightweight SELECT(id, estado) instead of full row, and skips it if the
 // manifiesto was validated recently (in-memory cache per PM2 instance, 60s TTL).
 const _enTransitoCache = new Map<string, number>(); // manifiestoId → timestamp
-const EN_TRANSITO_CACHE_TTL = 60_000; // 60 seconds
+const EN_TRANSITO_CACHE_TTL = 30_000; // 30s — matches GPS send interval for PM2 cluster cache coherence
 
 export const actualizarUbicacion = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -446,46 +466,49 @@ export const confirmarEntrega = async (req: AuthRequest, res: Response, next: Ne
       throw new AppError('Solo los transportistas pueden confirmar entregas', 403);
     }
 
-    const manifiesto = await prisma.manifiesto.findUnique({
-      where: { id }
-    });
+    // Transaction to prevent race condition (double-tap / concurrent requests)
+    const manifiestoActualizado = await prisma.$transaction(async (tx) => {
+      const manifiesto = await tx.manifiesto.findUnique({
+        where: { id }
+      });
 
-    if (!manifiesto) {
-      throw new AppError('Manifiesto no encontrado', 404);
-    }
-
-    if (manifiesto.estado !== 'EN_TRANSITO') {
-      throw new AppError('El manifiesto debe estar en tránsito', 400);
-    }
-
-    // Actualizar manifiesto
-    const manifiestoActualizado = await prisma.manifiesto.update({
-      where: { id },
-      data: {
-        estado: 'ENTREGADO',
-        fechaEntrega: new Date()
-      },
-      include: {
-        generador: true,
-        transportista: true,
-        operador: true
+      if (!manifiesto) {
+        throw new AppError('Manifiesto no encontrado', 404);
       }
+
+      if (manifiesto.estado !== 'EN_TRANSITO') {
+        throw new AppError('El manifiesto debe estar en tránsito', 400);
+      }
+
+      const updated = await tx.manifiesto.update({
+        where: { id },
+        data: {
+          estado: 'ENTREGADO',
+          fechaEntrega: new Date()
+        },
+        include: {
+          generador: true,
+          transportista: true,
+          operador: true
+        }
+      });
+
+      await tx.eventoManifiesto.create({
+        data: {
+          manifiestoId: id,
+          tipo: 'ENTREGA',
+          descripcion: observaciones || 'Carga entregada en planta de tratamiento',
+          latitud,
+          longitud,
+          usuarioId: userId
+        }
+      });
+
+      return updated;
     });
 
     // Invalidate GPS cache — trip is no longer EN_TRANSITO
     _enTransitoCache.delete(id);
-
-    // Registrar evento
-    await prisma.eventoManifiesto.create({
-      data: {
-        manifiestoId: id,
-        tipo: 'ENTREGA',
-        descripcion: observaciones || 'Carga entregada en planta de tratamiento',
-        latitud,
-        longitud,
-        usuarioId: userId
-      }
-    });
 
     res.json({
       success: true,
@@ -742,39 +765,42 @@ export const registrarTratamiento = async (req: AuthRequest, res: Response, next
       throw new AppError('Solo los operadores pueden registrar tratamientos', 403);
     }
 
-    const manifiesto = await prisma.manifiesto.findUnique({
-      where: { id }
-    });
+    // Transaction to prevent race condition (double-tap / concurrent requests)
+    const manifiestoActualizado = await prisma.$transaction(async (tx) => {
+      const manifiesto = await tx.manifiesto.findUnique({
+        where: { id }
+      });
 
-    if (!manifiesto) {
-      throw new AppError('Manifiesto no encontrado', 404);
-    }
-
-    if (manifiesto.estado !== 'RECIBIDO') {
-      throw new AppError('El manifiesto debe estar recibido para registrar tratamiento', 400);
-    }
-
-    // Actualizar manifiesto a EN_TRATAMIENTO
-    const manifiestoActualizado = await prisma.manifiesto.update({
-      where: { id },
-      data: {
-        estado: 'EN_TRATAMIENTO'
-      },
-      include: {
-        generador: true,
-        transportista: true,
-        operador: true
+      if (!manifiesto) {
+        throw new AppError('Manifiesto no encontrado', 404);
       }
-    });
 
-    // Registrar evento
-    await prisma.eventoManifiesto.create({
-      data: {
-        manifiestoId: id,
-        tipo: 'TRATAMIENTO',
-        descripcion: `Tratamiento iniciado: ${metodoFinal}. Fecha: ${fechaTratamiento || new Date().toISOString()}. ${observaciones || ''}`,
-        usuarioId: userId
+      if (manifiesto.estado !== 'RECIBIDO') {
+        throw new AppError('El manifiesto debe estar recibido para registrar tratamiento', 400);
       }
+
+      const updated = await tx.manifiesto.update({
+        where: { id },
+        data: {
+          estado: 'EN_TRATAMIENTO'
+        },
+        include: {
+          generador: true,
+          transportista: true,
+          operador: true
+        }
+      });
+
+      await tx.eventoManifiesto.create({
+        data: {
+          manifiestoId: id,
+          tipo: 'TRATAMIENTO',
+          descripcion: `Tratamiento iniciado: ${metodoFinal}. Fecha: ${fechaTratamiento || new Date().toISOString()}. ${observaciones || ''}`,
+          usuarioId: userId
+        }
+      });
+
+      return updated;
     });
 
     res.json({
@@ -1181,6 +1207,26 @@ export const revertirEstado = async (req: AuthRequest, res: Response, next: Next
                             'ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO', 'TRATADO'];
     if (!estadosValidos.includes(estadoNuevo)) {
       throw new AppError('Estado destino no válido', 400);
+    }
+
+    // Valid state reversions (current state -> allowed target states)
+    const VALID_REVERSIONS: Record<string, string[]> = {
+      'APROBADO': ['BORRADOR'],
+      'EN_TRANSITO': ['APROBADO'],
+      'ENTREGADO': ['EN_TRANSITO'],
+      'RECIBIDO': ['ENTREGADO'],
+      'EN_TRATAMIENTO': ['RECIBIDO'],
+      'TRATADO': ['EN_TRATAMIENTO', 'RECIBIDO'],
+      'RECHAZADO': ['ENTREGADO'],
+    };
+
+    const currentEstado = manifiesto.estado;
+    const validTargets = VALID_REVERSIONS[currentEstado];
+    if (!validTargets || !validTargets.includes(estadoNuevo)) {
+      throw new AppError(
+        `No se puede revertir de ${currentEstado} a ${estadoNuevo}. Transiciones válidas: ${validTargets?.join(', ') || 'ninguna'}`,
+        400
+      );
     }
 
     const estadoAnterior = manifiesto.estado;

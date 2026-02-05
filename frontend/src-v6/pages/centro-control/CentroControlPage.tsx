@@ -57,35 +57,7 @@ import { formatRelativeTime, formatDateTime } from '../../utils/formatters';
 import { ESTADO_CHART_COLORS } from '../../utils/chart-colors';
 import { ChartTooltip } from '../../components/charts/ChartTooltip';
 import { DATE_PRESETS, computeDateRange } from '../../utils/date-presets';
-
-// ── Leaflet Icons ──
-const DefaultIcon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41], iconAnchor: [12, 41],
-});
-L.Marker.prototype.options.icon = DefaultIcon;
-
-function createColorIcon(color: string, size = 10): L.DivIcon {
-  return L.divIcon({
-    className: '',
-    html: `<div style="
-      width:${size}px;height:${size}px;border-radius:50%;
-      background:${color};border:2px solid white;
-      box-shadow:0 1px 4px rgba(0,0,0,0.3);
-    "></div>`,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
-  });
-}
-
-const ICONS = {
-  generador: createColorIcon('#22c55e', 12),
-  generadorActive: createColorIcon('#16a34a', 16),
-  transportista: createColorIcon('#f97316', 14),
-  operador: createColorIcon('#3b82f6', 16),
-  enTransito: createColorIcon('#ef4444', 14),
-};
+import { ACTOR_ICONS, ACTOR_COLORS, createClusterIcon } from '../../utils/map-icons';
 
 // ── Constants ──
 const POLL_INTERVAL = 30;
@@ -125,21 +97,6 @@ function clusterMarkers<T extends { latitud: number; longitud: number }>(
   }));
 }
 
-function ClusterIcon({ count, color }: { count: number; color: string }) {
-  return L.divIcon({
-    className: '',
-    html: `<div style="
-      width:32px;height:32px;border-radius:50%;
-      background:${color};border:3px solid white;
-      box-shadow:0 2px 6px rgba(0,0,0,0.3);
-      display:flex;align-items:center;justify-content:center;
-      color:white;font-weight:700;font-size:11px;
-    ">${count}</div>`,
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-  });
-}
-
 // ── Fly to selected marker ──
 function FlyToMarker({ position }: { position: [number, number] | null }) {
   const map = useMap();
@@ -160,6 +117,20 @@ function ZoomTracker({ onZoom }: { onZoom: (z: number) => void }) {
   return null;
 }
 
+// ── Fit map to bounds ──
+function FitBounds({ points }: { points: [number, number][] }) {
+  const map = useMap();
+  useEffect(() => {
+    if (points.length === 0) return;
+    if (points.length === 1) {
+      map.flyTo(points[0], 13, { duration: 0.8 });
+    } else {
+      map.flyToBounds(L.latLngBounds(points), { padding: [40, 40], duration: 0.8, maxZoom: 14 });
+    }
+  }, [points, map]);
+  return null;
+}
+
 export const CentroControlPage: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser, isAdmin, isTransportista } = useAuth();
@@ -169,6 +140,7 @@ export const CentroControlPage: React.FC = () => {
 
   // ── Trip selection & filter ──
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
+  const [selectedRealizadoId, setSelectedRealizadoId] = useState<string | null>(null);
   const [tripFilter, setTripFilter] = useState('');
   const [tripPanel, setTripPanel] = useState<'activos' | 'realizados'>('activos');
 
@@ -180,10 +152,10 @@ export const CentroControlPage: React.FC = () => {
     transito: true,
   });
 
-  // ── Date range ──
-  const [datePreset, setDatePreset] = useState(30);
+  // ── Date range (default: Hoy) ──
+  const [datePreset, setDatePreset] = useState(1);
   const [fechaDesde, setFechaDesde] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().split('T')[0];
+    const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().split('T')[0];
   });
   const [fechaHasta, setFechaHasta] = useState(() => new Date().toISOString().split('T')[0]);
 
@@ -360,10 +332,16 @@ export const CentroControlPage: React.FC = () => {
     return cc.enTransito.filter(m => m.transportista === userTransportista);
   }, [cc?.enTransito, userTransportista]);
 
-  const flyToPosition: [number, number] | null = useMemo(() => {
-    if (!selectedTripId || !enTransitoForMap.length) return null;
+  // All points for the selected active trip (vehicle + origin + destination)
+  const activeTripFlyPoints = useMemo((): [number, number][] => {
+    if (!selectedTripId || !enTransitoForMap.length) return [];
     const trip = enTransitoForMap.find(m => m.manifiestoId === selectedTripId);
-    return trip?.ultimaPosicion ? [trip.ultimaPosicion.latitud, trip.ultimaPosicion.longitud] : null;
+    if (!trip) return [];
+    const pts: [number, number][] = [];
+    if (trip.ultimaPosicion) pts.push([trip.ultimaPosicion.latitud, trip.ultimaPosicion.longitud]);
+    if (trip.origenLatLng) pts.push(trip.origenLatLng);
+    if (trip.destinoLatLng) pts.push(trip.destinoLatLng);
+    return pts;
   }, [selectedTripId, enTransitoForMap]);
 
   const viajesRealizados = useMemo(() => {
@@ -375,10 +353,43 @@ export const CentroControlPage: React.FC = () => {
       transportista: m.transportista?.razonSocial || 'Transportista',
       origen: m.generador?.razonSocial || 'Origen',
       destino: m.operador?.razonSocial || 'Destino',
+      origenPos: m.generador?.latitud && m.generador?.longitud
+        ? [m.generador.latitud, m.generador.longitud] as [number, number] : null,
+      destinoPos: m.operador?.latitud && m.operador?.longitud
+        ? [m.operador.latitud, m.operador.longitud] as [number, number] : null,
       estado: m.estado,
       fechaEntrega: m.updatedAt || m.fechaEntrega,
     }));
   }, [completedData]);
+
+  // Bounds points for auto-fit when switching panels
+  const panelBoundsPoints = useMemo((): [number, number][] => {
+    if (tripPanel === 'activos') {
+      return enTransitoForMap
+        .filter(m => m.ultimaPosicion)
+        .map(m => [m.ultimaPosicion!.latitud, m.ultimaPosicion!.longitud] as [number, number]);
+    }
+    if (tripPanel === 'realizados') {
+      const pts: [number, number][] = [];
+      for (const m of viajesRealizados) {
+        if (m.origenPos) pts.push(m.origenPos);
+        if (m.destinoPos) pts.push(m.destinoPos);
+      }
+      return pts;
+    }
+    return [];
+  }, [tripPanel, enTransitoForMap, viajesRealizados]);
+
+  // Fly-to points for selected realizado trip
+  const realizadoFlyPoints = useMemo((): [number, number][] => {
+    if (!selectedRealizadoId) return [];
+    const trip = viajesRealizados.find((m: any) => m.id === selectedRealizadoId);
+    if (!trip) return [];
+    const pts: [number, number][] = [];
+    if (trip.origenPos) pts.push(trip.origenPos);
+    if (trip.destinoPos) pts.push(trip.destinoPos);
+    return pts;
+  }, [selectedRealizadoId, viajesRealizados]);
 
   // Auto-switch to realizados if no active trips (uses filtered data)
   useEffect(() => {
@@ -388,6 +399,12 @@ export const CentroControlPage: React.FC = () => {
       setTripPanel('activos');
     }
   }, [cc, filteredEnTransito.length, viajesRealizados.length]);
+
+  // Clear selections when switching panels
+  useEffect(() => {
+    setSelectedTripId(null);
+    setSelectedRealizadoId(null);
+  }, [tripPanel]);
 
   // ── Quick Actions ──
   const quickActions = [
@@ -459,7 +476,7 @@ export const CentroControlPage: React.FC = () => {
           <div className="flex items-center gap-1.5">
             <Layers size={16} className="text-neutral-400" />
             {([
-              { key: 'generadores' as const, label: 'Generadores', color: 'bg-green-500' },
+              { key: 'generadores' as const, label: 'Generadores', color: 'bg-purple-500' },
               { key: 'transportistas' as const, label: 'Transportistas', color: 'bg-orange-500' },
               { key: 'operadores' as const, label: 'Operadores', color: 'bg-blue-500' },
               { key: 'transito' as const, label: 'En Tránsito', color: 'bg-red-500' },
@@ -565,12 +582,12 @@ export const CentroControlPage: React.FC = () => {
                   {enTransitoForMap.length} en tránsito
                 </Badge>
               </div>
-              {/* Map legend */}
+              {/* Map legend — matches icon shapes */}
               <div className="hidden sm:flex items-center gap-3 text-xs text-neutral-500">
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-500" /> Generadores</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-orange-500" /> Transportistas</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Operadores</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500" /> En Tránsito</span>
+                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded" style={{ background: ACTOR_COLORS.generador }} /> Generadores</span>
+                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: ACTOR_COLORS.transportista, transform: 'rotate(45deg)' }} /> Transportistas</span>
+                <span className="flex items-center gap-1.5"><svg width="14" height="14" viewBox="0 0 14 14"><polygon points="7,1 13,4 13,10 7,13 1,10 1,4" fill={ACTOR_COLORS.operador}/></svg> Operadores</span>
+                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full" style={{ background: ACTOR_COLORS.enTransito }} /> En Tránsito</span>
               </div>
             </div>
             <div className="p-5">
@@ -583,14 +600,17 @@ export const CentroControlPage: React.FC = () => {
                 >
                   <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                   <ZoomTracker onZoom={setMapZoom} />
-                  <FlyToMarker position={flyToPosition} />
+                  {/* ── Fly to selected active trip (all points) ── */}
+                  {activeTripFlyPoints.length > 0 && (
+                    <FitBounds points={activeTripFlyPoints} />
+                  )}
 
                   {/* ── Generadores ── */}
                   {layers.generadores && generadoresClustered.map((g: any, idx: number) => (
                     <Marker
                       key={`gen-${g.id}-${idx}`}
                       position={[g.latitud, g.longitud]}
-                      icon={g.count ? ClusterIcon({ count: g.count, color: '#22c55e' }) : ICONS.generador}
+                      icon={g.count ? createClusterIcon(g.count, ACTOR_COLORS.generador) : ACTOR_ICONS.generador}
                     >
                       <Popup>
                         <div className="text-sm">
@@ -610,7 +630,7 @@ export const CentroControlPage: React.FC = () => {
                     <Marker
                       key={`trans-${t.id}-${idx}`}
                       position={[t.latitud, t.longitud]}
-                      icon={ICONS.transportista}
+                      icon={ACTOR_ICONS.transportista}
                     >
                       <Popup>
                         <div className="text-sm">
@@ -628,7 +648,7 @@ export const CentroControlPage: React.FC = () => {
                     <Marker
                       key={`oper-${o.id}-${idx}`}
                       position={[o.latitud, o.longitud]}
-                      icon={ICONS.operador}
+                      icon={ACTOR_ICONS.operador}
                     >
                       <Popup>
                         <div className="text-sm">
@@ -647,7 +667,7 @@ export const CentroControlPage: React.FC = () => {
                       {m.ultimaPosicion && (
                         <Marker
                           position={[m.ultimaPosicion.latitud, m.ultimaPosicion.longitud]}
-                          icon={m.manifiestoId === selectedTripId ? createColorIcon('#ef4444', 20) : ICONS.enTransito}
+                          icon={m.manifiestoId === selectedTripId ? ACTOR_ICONS.enTransitoSelected : ACTOR_ICONS.enTransito}
                           eventHandlers={{ click: () => setSelectedTripId(m.manifiestoId) }}
                         >
                           <Popup>
@@ -666,7 +686,7 @@ export const CentroControlPage: React.FC = () => {
                                 onClick={(e) => {
                                   e.preventDefault();
                                   const prefix = isMobile ? '/mobile' : '';
-                                  navigate(`${prefix}/centro-control/viaje/${m.manifiestoId}`);
+                                  navigate(`${prefix}/manifiestos/${m.manifiestoId}`);
                                 }}
                                 style={{ color: '#0D8A4F', fontWeight: 600, fontSize: '12px', display: 'block', marginTop: '6px' }}
                               >
@@ -687,15 +707,94 @@ export const CentroControlPage: React.FC = () => {
                       )}
                     </React.Fragment>
                   ))}
+
+                  {/* ── Selected active trip: show origin/destination markers ── */}
+                  {tripPanel === 'activos' && selectedTripId && (() => {
+                    const trip = enTransitoForMap.find(m => m.manifiestoId === selectedTripId);
+                    if (!trip) return null;
+                    return (
+                      <>
+                        {trip.origenLatLng && (
+                          <Marker position={trip.origenLatLng} icon={ACTOR_ICONS.generador}>
+                            <Popup><strong>Origen:</strong> {trip.origen}</Popup>
+                          </Marker>
+                        )}
+                        {trip.destinoLatLng && (
+                          <Marker position={trip.destinoLatLng} icon={ACTOR_ICONS.operador}>
+                            <Popup><strong>Destino:</strong> {trip.destino}</Popup>
+                          </Marker>
+                        )}
+                        {trip.origenLatLng && trip.destinoLatLng && (
+                          <Polyline
+                            positions={[trip.origenLatLng, trip.destinoLatLng]}
+                            pathOptions={{ color: '#6366f1', weight: 2, dashArray: '8 8', opacity: 0.7 }}
+                          />
+                        )}
+                      </>
+                    );
+                  })()}
+
+                  {/* ── Viajes Realizados: show origin/destination markers ── */}
+                  {tripPanel === 'realizados' && viajesRealizados.map((m: any) => {
+                    if (!m.origenPos && !m.destinoPos) return null;
+                    const isSelected = m.id === selectedRealizadoId;
+                    return (
+                      <React.Fragment key={`realizado-${m.id}`}>
+                        {m.origenPos && (
+                          <Marker position={m.origenPos} icon={ACTOR_ICONS.generador}>
+                            <Popup>
+                              <div className="text-sm">
+                                <strong className="text-green-700">Origen</strong><br />
+                                {m.origen}<br />
+                                <span className="text-xs text-neutral-500">{m.numero}</span>
+                              </div>
+                            </Popup>
+                          </Marker>
+                        )}
+                        {m.destinoPos && (
+                          <Marker position={m.destinoPos} icon={ACTOR_ICONS.operador}>
+                            <Popup>
+                              <div className="text-sm">
+                                <strong className="text-blue-700">Destino</strong><br />
+                                {m.destino}<br />
+                                <span className="text-xs text-neutral-500">{m.numero}</span>
+                              </div>
+                            </Popup>
+                          </Marker>
+                        )}
+                        {m.origenPos && m.destinoPos && (
+                          <Polyline
+                            positions={[m.origenPos, m.destinoPos]}
+                            pathOptions={{
+                              color: isSelected ? '#6366f1' : '#94a3b8',
+                              weight: isSelected ? 3 : 1.5,
+                              dashArray: '8 6',
+                              opacity: isSelected ? 0.9 : 0.4,
+                            }}
+                          />
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+
+                  {/* ── Auto-fit map bounds on panel switch ── */}
+                  {!selectedTripId && !selectedRealizadoId && panelBoundsPoints.length > 0 && (
+                    <FitBounds points={panelBoundsPoints} />
+                  )}
+
+                  {/* ── Fly to selected realizado trip ── */}
+                  {realizadoFlyPoints.length > 0 && (
+                    <FitBounds points={realizadoFlyPoints} />
+                  )}
                 </MapContainer>
 
                 {/* Mobile legend */}
                 <div className="sm:hidden absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg z-[400] text-xs">
                   <div className="flex items-center gap-3 flex-wrap">
-                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" /> Gen</span>
-                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500" /> Trans</span>
-                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" /> Oper</span>
-                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> Tránsito</span>
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded" style={{ background: ACTOR_COLORS.generador }} /> Gen</span>
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: ACTOR_COLORS.transportista, transform: 'rotate(45deg)' }} /> Trans</span>
+                    <span className="flex items-center gap-1"><svg width="11" height="11" viewBox="0 0 14 14"><polygon points="7,1 13,4 13,10 7,13 1,10 1,4" fill={ACTOR_COLORS.operador}/></svg> Oper</span>
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full" style={{ background: ACTOR_COLORS.enTransito }} /> Tránsito</span>
                   </div>
                 </div>
 
@@ -767,7 +866,7 @@ export const CentroControlPage: React.FC = () => {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 const prefix = isMobile ? '/mobile' : '';
-                                navigate(`${prefix}/centro-control/viaje/${m.manifiestoId}`);
+                                navigate(`${prefix}/manifiestos/${m.manifiestoId}`);
                               }}
                             >
                               Ver detalle del viaje
@@ -807,33 +906,49 @@ export const CentroControlPage: React.FC = () => {
             </button>
             {tripPanel === 'realizados' && (
               <div className="divide-y divide-neutral-100 flex-1 overflow-y-auto">
-                {viajesRealizados.map((m: any) => (
-                  <div
-                    key={m.id}
-                    className="p-3 flex items-start gap-3 row-hover cursor-pointer border-l-4 border-l-transparent"
-                    onClick={() => {
-                      const prefix = isMobile ? '/mobile' : '';
-                      navigate(`${prefix}/centro-control/viaje/${m.id}`);
-                    }}
-                  >
-                    <div className="w-3 h-3 rounded-full bg-emerald-500 flex-shrink-0 mt-1.5" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-mono font-semibold text-neutral-900">{m.numero}</p>
-                        <Badge variant="soft" color="success" className="text-[10px] px-1.5 py-0">Entregado</Badge>
+                {viajesRealizados.map((m: any) => {
+                  const isSelected = m.id === selectedRealizadoId;
+                  return (
+                    <div
+                      key={m.id}
+                      className={`p-3 flex items-start gap-3 cursor-pointer transition-colors ${
+                        isSelected
+                          ? 'bg-emerald-50 border-l-4 border-l-emerald-500'
+                          : 'row-hover border-l-4 border-l-transparent'
+                      }`}
+                      onClick={() => setSelectedRealizadoId(isSelected ? null : m.id)}
+                    >
+                      <div className="w-3 h-3 rounded-full bg-emerald-500 flex-shrink-0 mt-1.5" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-mono font-semibold text-neutral-900">{m.numero}</p>
+                          <Badge variant="soft" color="success" className="text-[10px] px-1.5 py-0">Entregado</Badge>
+                        </div>
+                        <div className="mt-1 space-y-0.5">
+                          <p className="text-xs text-neutral-500 truncate"><span className="font-semibold text-green-700">ORIGEN:</span> {m.origen}</p>
+                          <p className="text-xs text-neutral-500 truncate"><span className="font-semibold text-amber-700">TRANSPORTE:</span> {m.transportista}</p>
+                          <p className="text-xs text-neutral-500 truncate"><span className="font-semibold text-blue-700">OPERADOR:</span> {m.destino}</p>
+                        </div>
+                        {m.fechaEntrega && (
+                          <p className="text-[10px] text-neutral-400 mt-1">{formatDateTime(m.fechaEntrega)}</p>
+                        )}
+                        {isSelected && (
+                          <button
+                            className="mt-2 w-full text-center text-xs font-semibold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 rounded-lg py-1.5 transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const prefix = isMobile ? '/mobile' : '';
+                              navigate(`${prefix}/manifiestos/${m.id}`);
+                            }}
+                          >
+                            Ver detalle del viaje
+                          </button>
+                        )}
                       </div>
-                      <div className="mt-1 space-y-0.5">
-                        <p className="text-xs text-neutral-500 truncate"><span className="font-semibold text-green-700">ORIGEN:</span> {m.origen}</p>
-                        <p className="text-xs text-neutral-500 truncate"><span className="font-semibold text-amber-700">TRANSPORTE:</span> {m.transportista}</p>
-                        <p className="text-xs text-neutral-500 truncate"><span className="font-semibold text-blue-700">OPERADOR:</span> {m.destino}</p>
-                      </div>
-                      {m.fechaEntrega && (
-                        <p className="text-[10px] text-neutral-400 mt-1">{formatDateTime(m.fechaEntrega)}</p>
-                      )}
+                      <ChevronRight size={14} className={`flex-shrink-0 mt-1 ${isSelected ? 'text-emerald-500' : 'text-neutral-300'}`} />
                     </div>
-                    <ChevronRight size={14} className="text-neutral-300 flex-shrink-0 mt-1" />
-                  </div>
-                ))}
+                  );
+                })}
                 {viajesRealizados.length === 0 && (
                   <div className="p-6 text-center text-sm text-neutral-400">Sin viajes realizados recientes</div>
                 )}

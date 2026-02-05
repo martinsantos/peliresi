@@ -4,7 +4,7 @@
  * Detalle de manifiesto con timeline - Conectado a API
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -34,12 +34,18 @@ import {
   Leaf,
   Recycle,
   Microscope,
+  MapPin,
 } from 'lucide-react';
+import { MapContainer, TileLayer, Polyline, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { ACTOR_ICONS, ACTOR_COLORS } from '../../utils/map-icons';
 import { QRCodeSVG } from 'qrcode.react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Input } from '../../components/ui/Input';
+import { Select } from '../../components/ui/Select';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { toast } from '../../components/ui/Toast';
 import {
@@ -130,6 +136,7 @@ const ManifiestoDetailPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const isMobile = location.pathname.startsWith('/mobile');
+  const isApp = location.pathname.startsWith('/app');
   const { data: apiData, isLoading, isError } = useManifiesto(id || '');
   const [qrCopied, setQrCopied] = React.useState(false);
 
@@ -193,16 +200,68 @@ const ManifiestoDetailPage: React.FC = () => {
   const timeline = buildTimeline(m);
   const totalPeso = Array.isArray(m.residuos) ? m.residuos.reduce((sum, r) => sum + (typeof r.cantidad === 'number' ? r.cantidad : 0), 0) : 0;
 
+  // --- Tracking route for GPS map ---
+  const trackingRoute = useMemo(() => {
+    const points = (m as any)?.tracking || [];
+    if (!points.length) return null;
+    const sorted = [...points].sort((a: any, b: any) =>
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+    return {
+      points: sorted.map((t: any) => [t.latitud, t.longitud] as [number, number]),
+      start: [sorted[0].latitud, sorted[0].longitud] as [number, number],
+      end: [sorted[sorted.length - 1].latitud, sorted[sorted.length - 1].longitud] as [number, number],
+      startTime: sorted[0].timestamp,
+      endTime: sorted[sorted.length - 1].timestamp,
+      count: sorted.length,
+    };
+  }, [m]);
+
+  // Generador and Operador locations for planned route
+  const generadorPos = useMemo(() => {
+    const g = m.generador as any;
+    return g?.latitud && g?.longitud ? [g.latitud, g.longitud] as [number, number] : null;
+  }, [m]);
+  const operadorPos = useMemo(() => {
+    const o = m.operador as any;
+    return o?.latitud && o?.longitud ? [o.latitud, o.longitud] as [number, number] : null;
+  }, [m]);
+
+  // Combined bounds: tracking points + generador/operador positions
+  // Shows map if we have ANY geo data (tracking, generador, or operador)
+  const mapBounds = useMemo(() => {
+    const allPoints: [number, number][] = [];
+    if (trackingRoute) allPoints.push(...trackingRoute.points);
+    if (generadorPos) allPoints.push(generadorPos);
+    if (operadorPos) allPoints.push(operadorPos);
+    if (allPoints.length < 1) return null;
+    // If only one point, create a small bounding box around it
+    if (allPoints.length === 1) {
+      const [lat, lng] = allPoints[0];
+      return L.latLngBounds([[lat - 0.01, lng - 0.01], [lat + 0.01, lng + 0.01]]);
+    }
+    return L.latLngBounds(allPoints);
+  }, [trackingRoute, generadorPos, operadorPos]);
+
+  // Show map for manifiestos that are in transit or beyond (have route relevance)
+  const showMap = !!mapBounds;
+
   // --- Action Handlers ---
+  // M4: actionInFlight ref prevents double-tap before React re-renders isPending
+  const actionInFlightRef = React.useRef(false);
   const handleAction = async (
     action: () => Promise<any>,
     successMsg: string,
   ) => {
+    if (actionInFlightRef.current) return;
+    actionInFlightRef.current = true;
     try {
       await action();
       toast.success(successMsg);
     } catch (err: any) {
       toast.error('Error', err?.response?.data?.message || err?.message || 'Ocurrio un error');
+    } finally {
+      actionInFlightRef.current = false;
     }
   };
 
@@ -360,6 +419,15 @@ const ManifiestoDetailPage: React.FC = () => {
       setFirmaBase64('');
     });
   };
+
+  // Redirect TRANSPORTISTA to the trip view for actionable states
+  const isTransportista = userRol === 'TRANSPORTISTA';
+  const transportistaStates = [EstadoManifiesto.APROBADO, EstadoManifiesto.EN_TRANSITO, EstadoManifiesto.ENTREGADO];
+  if (!isLoading && manifiesto && isTransportista && m.estado && transportistaStates.includes(m.estado as EstadoManifiesto)) {
+    const prefix = isApp ? '/app' : isMobile ? '/mobile' : '';
+    navigate(`${prefix}/transporte/viaje/${id}`, { replace: true });
+    return null;
+  }
 
   if (isLoading) {
     return (
@@ -524,6 +592,130 @@ const ManifiestoDetailPage: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Ruta del Viaje — se muestra si hay tracking GPS, o posiciones de generador/operador */}
+          {showMap && (
+            <Card>
+              <div className="p-4 border-b border-neutral-100">
+                <div className="flex items-center gap-2">
+                  <MapPin size={18} className="text-primary-600" />
+                  <h3 className="font-semibold text-neutral-900">
+                    {trackingRoute ? 'Ruta del Viaje' : 'Mapa de Ruta'}
+                  </h3>
+                  {trackingRoute && (
+                    <Badge variant="soft" color="info">{trackingRoute.count} puntos GPS</Badge>
+                  )}
+                  {!trackingRoute && m.estado === EstadoManifiesto.EN_TRANSITO && (
+                    <Badge variant="soft" color="warning">En tránsito — esperando GPS</Badge>
+                  )}
+                </div>
+                {trackingRoute && (
+                  <p className="text-xs text-neutral-500 mt-1">
+                    {formatDateTime(trackingRoute.startTime)} → {formatDateTime(trackingRoute.endTime)}
+                  </p>
+                )}
+              </div>
+              <div style={{ height: 400 }} className="relative isolate">
+                <MapContainer
+                  bounds={mapBounds!}
+                  boundsOptions={{ padding: [40, 40] }}
+                  style={{ height: '100%', width: '100%' }}
+                  scrollWheelZoom={false}
+                >
+                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OSM" />
+
+                  {/* Ruta planificada (generador → operador) */}
+                  {generadorPos && operadorPos && (
+                    <Polyline
+                      positions={[generadorPos, operadorPos]}
+                      color="#6366f1"
+                      weight={3}
+                      opacity={0.5}
+                      dashArray="10, 8"
+                    />
+                  )}
+
+                  {/* Ruta GPS realizada */}
+                  {trackingRoute && (
+                    <Polyline positions={trackingRoute.points} color="#0D8A4F" weight={4} opacity={0.8} />
+                  )}
+
+                  {/* Marcadores inicio/fin GPS */}
+                  {trackingRoute && (
+                    <>
+                      <Marker position={trackingRoute.start} icon={ACTOR_ICONS.gpsStart}>
+                        <Popup>Inicio del viaje GPS</Popup>
+                      </Marker>
+                      <Marker position={trackingRoute.end} icon={ACTOR_ICONS.gpsEnd}>
+                        <Popup>Fin del viaje GPS</Popup>
+                      </Marker>
+                    </>
+                  )}
+
+                  {/* Generador (origen) */}
+                  {generadorPos && (
+                    <Marker position={generadorPos} icon={ACTOR_ICONS.generador}>
+                      <Popup>
+                        <strong>Generador</strong><br />
+                        {m.generador?.razonSocial || '-'}<br />
+                        <span style={{ fontSize: 11, color: '#666' }}>{(m.generador as any)?.domicilio || ''}</span>
+                      </Popup>
+                    </Marker>
+                  )}
+
+                  {/* Operador (destino) */}
+                  {operadorPos && (
+                    <Marker position={operadorPos} icon={ACTOR_ICONS.operador}>
+                      <Popup>
+                        <strong>Operador</strong><br />
+                        {m.operador?.razonSocial || '-'}<br />
+                        <span style={{ fontSize: 11, color: '#666' }}>{(m.operador as any)?.domicilio || ''}</span>
+                      </Popup>
+                    </Marker>
+                  )}
+                </MapContainer>
+              </div>
+              {/* Leyenda */}
+              <div className="px-4 py-2.5 border-t border-neutral-100 flex flex-wrap gap-x-5 gap-y-1 text-xs text-neutral-600">
+                {trackingRoute && (
+                  <span className="flex items-center gap-1.5">
+                    <span style={{ width: 20, height: 3, background: '#0D8A4F', display: 'inline-block', borderRadius: 2 }} />
+                    Ruta realizada
+                  </span>
+                )}
+                {generadorPos && operadorPos && (
+                  <span className="flex items-center gap-1.5">
+                    <span style={{ width: 20, height: 3, background: '#6366f1', display: 'inline-block', borderRadius: 2, borderTop: '1px dashed #6366f1' }} />
+                    Ruta planificada
+                  </span>
+                )}
+                {generadorPos && (
+                  <span className="flex items-center gap-1.5">
+                    <span style={{ width: 10, height: 10, background: ACTOR_COLORS.generador, borderRadius: 3, display: 'inline-block' }} />
+                    Generador
+                  </span>
+                )}
+                {operadorPos && (
+                  <span className="flex items-center gap-1.5">
+                    <svg width="12" height="12" viewBox="0 0 14 14"><polygon points="7,1 13,4 13,10 7,13 1,10 1,4" fill={ACTOR_COLORS.operador}/></svg>
+                    Operador
+                  </span>
+                )}
+                {trackingRoute && (
+                  <>
+                    <span className="flex items-center gap-1.5">
+                      <span style={{ width: 8, height: 8, background: ACTOR_COLORS.gpsStart, borderRadius: '50%', display: 'inline-block' }} />
+                      Inicio GPS
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span style={{ width: 8, height: 8, background: ACTOR_COLORS.gpsEnd, borderRadius: '50%', display: 'inline-block' }} />
+                      Fin GPS
+                    </span>
+                  </>
+                )}
+              </div>
+            </Card>
+          )}
 
           {/* Timeline */}
           <Card>
@@ -942,20 +1134,21 @@ const ManifiestoDetailPage: React.FC = () => {
             </h3>
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Motivo de rechazo *</label>
-                <select
+                <Select
+                  label="Motivo de rechazo *"
                   value={rechazarMotivo}
-                  onChange={(e) => setRechazarMotivo(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none"
-                >
-                  <option value="">Seleccionar motivo</option>
-                  <option value="documentacion_incompleta">Documentacion incompleta</option>
-                  <option value="carga_no_coincide">Carga no coincide con manifiesto</option>
-                  <option value="residuo_no_autorizado">Residuo no autorizado</option>
-                  <option value="capacidad_excedida">Capacidad excedida</option>
-                  <option value="condiciones_inseguras">Condiciones inseguras</option>
-                  <option value="otro">Otro</option>
-                </select>
+                  onChange={(val) => setRechazarMotivo(val)}
+                  options={[
+                    { value: 'documentacion_incompleta', label: 'Documentación incompleta' },
+                    { value: 'carga_no_coincide', label: 'Carga no coincide con manifiesto' },
+                    { value: 'residuo_no_autorizado', label: 'Residuo no autorizado' },
+                    { value: 'capacidad_excedida', label: 'Capacidad excedida' },
+                    { value: 'condiciones_inseguras', label: 'Condiciones inseguras' },
+                    { value: 'otro', label: 'Otro' },
+                  ]}
+                  placeholder="Seleccionar motivo"
+                  size="sm"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Descripcion</label>
@@ -989,20 +1182,21 @@ const ManifiestoDetailPage: React.FC = () => {
             </h3>
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Tipo de incidente *</label>
-                <select
+                <Select
+                  label="Tipo de incidente *"
                   value={incidenteTipo}
-                  onChange={(e) => setIncidenteTipo(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none"
-                >
-                  <option value="">Seleccionar tipo</option>
-                  <option value="accidente">Accidente vehicular</option>
-                  <option value="derrame">Derrame de residuos</option>
-                  <option value="robo">Robo o asalto</option>
-                  <option value="desvio">Desvio de ruta</option>
-                  <option value="averia">Averia mecanica</option>
-                  <option value="otro">Otro</option>
-                </select>
+                  onChange={(val) => setIncidenteTipo(val)}
+                  options={[
+                    { value: 'accidente', label: 'Accidente vehicular' },
+                    { value: 'derrame', label: 'Derrame de residuos' },
+                    { value: 'robo', label: 'Robo o asalto' },
+                    { value: 'desvio', label: 'Desvío de ruta' },
+                    { value: 'averia', label: 'Avería mecánica' },
+                    { value: 'otro', label: 'Otro' },
+                  ]}
+                  placeholder="Seleccionar tipo"
+                  size="sm"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Descripcion</label>
@@ -1067,23 +1261,23 @@ const ManifiestoDetailPage: React.FC = () => {
             </p>
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Estado destino *</label>
-                <select
+                <Select
+                  label="Estado destino *"
                   value={reversionEstado}
-                  onChange={(e) => setReversionEstado(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none"
-                >
-                  <option value="">Seleccionar estado</option>
-                  {ESTADOS_FLUJO
+                  onChange={(val) => setReversionEstado(val)}
+                  options={ESTADOS_FLUJO
                     .filter((est) => {
                       const currentIdx = ESTADOS_FLUJO.indexOf(m.estado as EstadoManifiesto);
                       const estIdx = ESTADOS_FLUJO.indexOf(est);
                       return estIdx < currentIdx && estIdx >= 0;
                     })
-                    .map((est) => (
-                      <option key={est} value={est}>{formatEstado(est)}</option>
-                    ))}
-                </select>
+                    .map((est) => ({
+                      value: est,
+                      label: formatEstado(est),
+                    }))}
+                  placeholder="Seleccionar estado"
+                  size="sm"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Motivo (opcional)</label>

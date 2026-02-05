@@ -221,7 +221,11 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
         numero: m.numero,
         transportista: m.transportista.razonSocial,
         origen: m.generador.razonSocial,
+        origenLatLng: m.generador.latitud && m.generador.longitud
+          ? [m.generador.latitud, m.generador.longitud] : null,
         destino: m.operador.razonSocial,
+        destinoLatLng: m.operador.latitud && m.operador.longitud
+          ? [m.operador.latitud, m.operador.longitud] : null,
         ultimaPosicion: m.tracking[0] || null,
         ruta: m.tracking.reverse().map(t => ({
           lat: t.latitud,
@@ -281,10 +285,10 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
           ],
         },
       }),
-      prisma.manifiesto.count({ where: { estado: 'ENTREGADO', fechaCreacion: dateFilter } }),
-      prisma.manifiesto.count({ where: { estado: 'RECIBIDO', fechaCreacion: dateFilter } }),
-      prisma.manifiesto.count({ where: { estado: 'EN_TRATAMIENTO', fechaCreacion: dateFilter } }),
-      prisma.manifiesto.count({ where: { estado: 'TRATADO', fechaCreacion: dateFilter } }),
+      prisma.manifiesto.count({ where: { estado: 'ENTREGADO', OR: [{ fechaCreacion: dateFilter }, { fechaEntrega: dateFilter }] } }),
+      prisma.manifiesto.count({ where: { estado: 'RECIBIDO', OR: [{ fechaCreacion: dateFilter }, { fechaRecepcion: dateFilter }] } }),
+      prisma.manifiesto.count({ where: { estado: 'EN_TRATAMIENTO', OR: [{ fechaCreacion: dateFilter }, { fechaRecepcion: dateFilter }] } }),
+      prisma.manifiesto.count({ where: { estado: 'TRATADO', OR: [{ fechaCreacion: dateFilter }, { fechaCierre: dateFilter }] } }),
       prisma.manifiesto.count({ where: { estado: 'RECHAZADO', fechaCreacion: dateFilter } }),
     ]);
 

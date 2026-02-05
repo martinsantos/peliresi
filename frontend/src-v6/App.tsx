@@ -119,7 +119,15 @@ const TrackingRedirect: React.FC = () => {
   const { id } = useParams();
   const loc = useLocation();
   const prefix = loc.pathname.startsWith('/mobile') ? '/mobile' : '';
-  return <Navigate to={id ? `${prefix}/centro-control/viaje/${id}` : `${prefix}/centro-control`} replace />;
+  return <Navigate to={id ? `${prefix}/manifiestos/${id}` : `${prefix}/centro-control`} replace />;
+};
+
+// Redirect centro-control/viaje/:id → manifiestos/:id (unified single view)
+const ViajeRedirect: React.FC = () => {
+  const { id } = useParams();
+  const loc = useLocation();
+  const prefix = loc.pathname.startsWith('/mobile') ? '/mobile' : '';
+  return <Navigate to={`${prefix}/manifiestos/${id}`} replace />;
 };
 
 // ========================================
@@ -142,11 +150,12 @@ function App() {
             <Route path="/mobile" element={<MobileDashboardPage />} />
             <Route path="/mobile/dashboard" element={<MobileDashboardPage />} />
             <Route path="/mobile/centro-control" element={<CentroControlPage />} />
-            <Route path="/mobile/centro-control/viaje/:id" element={<ViajeEnCursoPage />} />
+            <Route path="/mobile/centro-control/viaje/:id" element={<ViajeRedirect />} />
             <Route path="/mobile/manifiestos" element={<ManifiestosPage />} />
             <Route path="/mobile/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
             <Route path="/mobile/manifiestos/:id" element={<ManifiestoDetallePage />} />
             <Route path="/mobile/transporte/perfil" element={<ViajeEnCursoTransportista />} />
+            <Route path="/mobile/transporte/viaje/:id" element={<ViajeEnCursoTransportista />} />
             <Route path="/mobile/actores" element={<ActoresPage />} />
             <Route path="/mobile/actores/operadores" element={<OperadoresPage />} />
             <Route path="/mobile/actores/operadores/:id" element={<OperadorDetallePage />} />
@@ -186,7 +195,7 @@ function App() {
             {/* Dashboard */}
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/centro-control" element={<CentroControlPage />} />
-            <Route path="/centro-control/viaje/:id" element={<ViajeEnCursoPage />} />
+            <Route path="/centro-control/viaje/:id" element={<ViajeRedirect />} />
 
             {/* Manifiestos */}
             <Route path="/manifiestos" element={<ManifiestosPage />} />

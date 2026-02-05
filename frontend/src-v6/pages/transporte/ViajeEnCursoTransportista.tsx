@@ -12,7 +12,7 @@
  * 7. Full GPS data capture (speed, heading) sent to backend
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, Truck, MapPin, Clock, Navigation, Package,
@@ -25,6 +25,7 @@ import { toast } from '../../components/ui/Toast';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { ACTOR_ICONS } from '../../utils/map-icons';
 import {
   useManifiesto,
   useConfirmarRetiro,
@@ -34,31 +35,6 @@ import {
 import { manifiestoService } from '../../services/manifiesto.service';
 import { EstadoManifiesto } from '../../types/models';
 import { formatDateTime, formatWeight } from '../../utils/formatters';
-
-let DefaultIcon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41], iconAnchor: [12, 41]
-});
-L.Marker.prototype.options.icon = DefaultIcon;
-
-const origenIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-black.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41], iconAnchor: [12, 41]
-});
-
-const destinoIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41], iconAnchor: [12, 41]
-});
-
-const truckIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41], iconAnchor: [12, 41]
-});
 
 // Recenter map when position changes
 function RecenterMap({ position }: { position: [number, number] | null }) {
@@ -87,6 +63,35 @@ const ViajeEnCursoTransportista: React.FC = () => {
   const { data: apiData, isLoading, isError } = useManifiesto(id || '');
   const manifiesto = (apiData as any)?.data || apiData;
   const m = manifiesto || {};
+
+  // Persist active trip snapshot to localStorage for recovery after app restart
+  useEffect(() => {
+    if (id && m.id && m.estado === EstadoManifiesto.EN_TRANSITO) {
+      const snapshot = {
+        id: m.id,
+        numero: m.numero,
+        estado: m.estado,
+        generador: m.generador?.razonSocial,
+        operador: m.operador?.razonSocial,
+        transportista: m.transportista?.razonSocial,
+        fechaRetiro: m.fechaRetiro,
+        savedAt: new Date().toISOString(),
+      };
+      localStorage.setItem(`viaje_snapshot_${id}`, JSON.stringify(snapshot));
+      localStorage.setItem('sitrep_active_trip_id', id);
+    }
+  }, [id, m.id, m.estado]);
+
+  // Restore cached trip data while API is loading (stale-while-revalidate)
+  const cachedSnapshot = useMemo(() => {
+    if (!id) return null;
+    try {
+      const saved = localStorage.getItem(`viaje_snapshot_${id}`);
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  }, [id]);
+
+  const displayData = m.id ? m : (cachedSnapshot || {});
 
   // Mutations
   const confirmarRetiro = useConfirmarRetiro();
@@ -132,6 +137,32 @@ const ViajeEnCursoTransportista: React.FC = () => {
     }
   }, [id]);
 
+  // C2: Restore pending GPS updates from localStorage on mount and flush them
+  useEffect(() => {
+    if (!id) return;
+    const savedPending = localStorage.getItem(`gps_pending_${id}`);
+    if (savedPending) {
+      try {
+        const parsed = JSON.parse(savedPending);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Flush saved pending updates to backend
+          Promise.all(
+            parsed.map((p: any) =>
+              manifiestoService.actualizarUbicacion(id, p.lat, p.lng, p.speed, p.heading).catch(() => null)
+            )
+          ).then((results) => {
+            const allSent = results.every(r => r !== null);
+            if (allSent) {
+              localStorage.removeItem(`gps_pending_${id}`);
+            }
+          });
+        }
+      } catch {
+        localStorage.removeItem(`gps_pending_${id}`);
+      }
+    }
+  }, [id]);
+
   // FIX 1A: Check GPS permission on mount
   useEffect(() => {
     if (!('geolocation' in navigator)) {
@@ -161,6 +192,22 @@ const ViajeEnCursoTransportista: React.FC = () => {
       setElapsedTime(elapsed > 0 ? elapsed : 0);
     }
   }, [m.estado, m.fechaRetiro]);
+
+  // A2: Robust cleanup function — clears watcher + flushes pending to localStorage
+  const cleanupGps = useCallback(() => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    if (sendIntervalRef.current) {
+      clearInterval(sendIntervalRef.current);
+      sendIntervalRef.current = null;
+    }
+    // C2: Flush pending to localStorage on cleanup so they survive PWA close
+    if (id && pendingUpdatesRef.current.length > 0) {
+      localStorage.setItem(`gps_pending_${id}`, JSON.stringify(pendingUpdatesRef.current));
+    }
+  }, [id]);
 
   // Start GPS tracking when EN_TRANSITO and ACTIVO
   useEffect(() => {
@@ -206,25 +253,34 @@ const ViajeEnCursoTransportista: React.FC = () => {
         heading: gpsDetails.heading,
       });
 
+      // C2: Persist pending to localStorage before attempting send
+      localStorage.setItem(`gps_pending_${id}`, JSON.stringify(pendingUpdatesRef.current));
+
       const latest = pendingUpdatesRef.current[pendingUpdatesRef.current.length - 1];
       try {
         await manifiestoService.actualizarUbicacion(id, latest.lat, latest.lng, latest.speed, latest.heading);
         pendingUpdatesRef.current = [];
+        localStorage.removeItem(`gps_pending_${id}`);
         setGpsSendStatus('ok');
       } catch {
         setGpsSendStatus('error');
         toast.warning('No se pudo enviar la ubicación. Se reintentará.');
         if (pendingUpdatesRef.current.length > 10) {
           pendingUpdatesRef.current = pendingUpdatesRef.current.slice(-5);
+          localStorage.setItem(`gps_pending_${id}`, JSON.stringify(pendingUpdatesRef.current));
         }
       }
     }, 30000);
 
+    // A2: beforeunload listener to flush GPS data when PWA closes
+    const handleBeforeUnload = () => cleanupGps();
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     return () => {
-      if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
-      if (sendIntervalRef.current) clearInterval(sendIntervalRef.current);
+      cleanupGps();
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [m.estado, viajeStatus, id, gpsStatus]);
+  }, [m.estado, viajeStatus, id, gpsStatus, cleanupGps]);
 
   // Timer tick
   useEffect(() => {
@@ -265,12 +321,14 @@ const ViajeEnCursoTransportista: React.FC = () => {
         observaciones: 'Entrega confirmada desde app móvil',
       });
       toast.success('Entrega confirmada exitosamente');
-      // Stop GPS
-      if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
-      if (sendIntervalRef.current) clearInterval(sendIntervalRef.current);
+      // Stop GPS — use robust cleanup
+      cleanupGps();
       // Clean localStorage
       if (id) {
+        localStorage.removeItem(`viaje_snapshot_${id}`);
         localStorage.removeItem(`viaje_status_${id}`);
+        localStorage.removeItem(`gps_pending_${id}`);
+        localStorage.removeItem('sitrep_active_trip_id');
       }
       setShowFinalizarModal(false);
     } catch (err: any) {
@@ -331,10 +389,81 @@ const ViajeEnCursoTransportista: React.FC = () => {
 
   const mapCenter = currentPosition || defaultCenter;
 
-  if (isLoading) {
+  if (isLoading && !m.id) {
+    // Show cached snapshot header while API loads (stale-while-revalidate)
+    if (cachedSnapshot) {
+      return (
+        <div className="min-h-screen bg-neutral-50 pb-24">
+          <header className="sticky top-0 z-40 bg-white border-b border-neutral-200">
+            <div className="flex items-center justify-between h-14 px-4">
+              <div className="flex items-center gap-3">
+                <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-neutral-600 hover:bg-neutral-100 rounded-lg">
+                  <ArrowLeft size={20} />
+                </button>
+                <div>
+                  <p className="text-xs text-neutral-500 font-medium">{cachedSnapshot.numero || id}</p>
+                  <h1 className="text-lg font-bold text-neutral-900">Viaje en Curso</h1>
+                </div>
+              </div>
+            </div>
+          </header>
+          <div className="p-4 space-y-4">
+            <Card variant="elevated">
+              <CardContent className="p-4">
+                <div className="space-y-2">
+                  {cachedSnapshot.generador && <p className="text-sm text-neutral-600">Generador: <span className="font-semibold">{cachedSnapshot.generador}</span></p>}
+                  {cachedSnapshot.transportista && <p className="text-sm text-neutral-600">Transportista: <span className="font-semibold">{cachedSnapshot.transportista}</span></p>}
+                  {cachedSnapshot.operador && <p className="text-sm text-neutral-600">Destino: <span className="font-semibold">{cachedSnapshot.operador}</span></p>}
+                </div>
+              </CardContent>
+            </Card>
+            <div className="flex items-center justify-center py-8">
+              <Loader2 size={32} className="animate-spin text-primary-600" />
+              <span className="ml-3 text-neutral-500">Cargando datos del viaje...</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
         <Loader2 size={32} className="animate-spin text-primary-600" />
+      </div>
+    );
+  }
+
+  if ((!manifiesto || isError) && cachedSnapshot) {
+    // Show cached snapshot with reconnecting banner when API fails
+    return (
+      <div className="min-h-screen bg-neutral-50 pb-24">
+        <header className="sticky top-0 z-40 bg-white border-b border-neutral-200">
+          <div className="flex items-center justify-between h-14 px-4">
+            <div className="flex items-center gap-3">
+              <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-neutral-600 hover:bg-neutral-100 rounded-lg">
+                <ArrowLeft size={20} />
+              </button>
+              <div>
+                <p className="text-xs text-neutral-500 font-medium">{cachedSnapshot.numero || id}</p>
+                <h1 className="text-lg font-bold text-neutral-900">Viaje en Curso</h1>
+              </div>
+            </div>
+          </div>
+        </header>
+        <div className="p-4 space-y-4">
+          <div className="flex items-center gap-2 px-3 py-2 bg-warning-50 border border-warning-200 rounded-lg">
+            <WifiOff size={16} className="text-warning-600 flex-shrink-0" />
+            <p className="text-xs text-warning-700">Datos de la última sesión — reconectando...</p>
+          </div>
+          <Card variant="elevated">
+            <CardContent className="p-4">
+              <div className="space-y-2">
+                {cachedSnapshot.generador && <p className="text-sm text-neutral-600">Generador: <span className="font-semibold">{cachedSnapshot.generador}</span></p>}
+                {cachedSnapshot.transportista && <p className="text-sm text-neutral-600">Transportista: <span className="font-semibold">{cachedSnapshot.transportista}</span></p>}
+                {cachedSnapshot.operador && <p className="text-sm text-neutral-600">Destino: <span className="font-semibold">{cachedSnapshot.operador}</span></p>}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -572,7 +701,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
                     >
                       <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                       {trackPoints.length > 1 && <Polyline positions={trackPoints} color="#0D8A4F" weight={4} opacity={0.8} />}
-                      {currentPosition && <Marker position={currentPosition} icon={truckIcon}><Popup>Tu posición actual</Popup></Marker>}
+                      {currentPosition && <Marker position={currentPosition} icon={ACTOR_ICONS.enTransito}><Popup>Tu posición actual</Popup></Marker>}
                       <RecenterMap position={currentPosition} />
                     </MapContainer>
                   </div>

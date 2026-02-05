@@ -31,34 +31,10 @@ import { Skeleton } from '../../components/ui/Skeleton';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { ACTOR_ICONS, ACTOR_COLORS } from '../../utils/map-icons';
 import { useManifiesto } from '../../hooks/useManifiestos';
 import { EstadoManifiesto } from '../../types/models';
 import { formatDateTime, formatEstado, formatWeight, formatNumber, formatCuit } from '../../utils/formatters';
-
-let DefaultIcon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41], iconAnchor: [12, 41]
-});
-L.Marker.prototype.options.icon = DefaultIcon;
-
-const origenIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-black.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34]
-});
-
-const destinoIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34]
-});
-
-const truckIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34]
-});
 
 // Approximate geocoding for Mendoza demo locations
 // Ordered most-specific first so longer matches win over generic city names
@@ -357,7 +333,7 @@ const ViajeEnCursoPage: React.FC = () => {
                 )}
 
                 {/* Origin marker (Generador) */}
-                <Marker position={origenPos} icon={origenIcon}>
+                <Marker position={origenPos} icon={ACTOR_ICONS.generador}>
                   <Popup>
                     <div className="text-sm">
                       <strong>Origen — Generador</strong><br />
@@ -368,7 +344,7 @@ const ViajeEnCursoPage: React.FC = () => {
                 </Marker>
 
                 {/* Destination marker (Operador) */}
-                <Marker position={destinoPos} icon={destinoIcon}>
+                <Marker position={destinoPos} icon={ACTOR_ICONS.operador}>
                   <Popup>
                     <div className="text-sm">
                       <strong>Destino — Operador</strong><br />
@@ -380,7 +356,7 @@ const ViajeEnCursoPage: React.FC = () => {
 
                 {/* Truck marker (current position or midpoint) */}
                 {lastPosition && (
-                  <Marker position={lastPosition} icon={truckIcon}>
+                  <Marker position={lastPosition} icon={ACTOR_ICONS.enTransito}>
                     <Popup>
                       <div className="text-sm">
                         <strong>Transportista</strong><br />
@@ -395,17 +371,17 @@ const ViajeEnCursoPage: React.FC = () => {
             {/* Map legend */}
             <div className="px-4 py-2.5 bg-neutral-50 border-t border-neutral-100 flex items-center gap-4 text-xs text-neutral-500">
               <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-neutral-800" />
-                <span>Origen</span>
+                <span className="w-3 h-3 rounded" style={{ background: ACTOR_COLORS.generador }} />
+                <span>Generador</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-green-600" />
-                <span>Destino</span>
+                <svg width="14" height="14" viewBox="0 0 14 14"><polygon points="7,1 13,4 13,10 7,13 1,10 1,4" fill={ACTOR_COLORS.operador}/></svg>
+                <span>Operador</span>
               </div>
               {lastPosition && (
                 <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-blue-600" />
-                  <span>Camión</span>
+                  <span className="w-3 h-3 rounded-full" style={{ background: ACTOR_COLORS.enTransito }} />
+                  <span>En Tránsito</span>
                 </div>
               )}
               {selectedActor ? (

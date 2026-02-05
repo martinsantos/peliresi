@@ -124,4 +124,25 @@ api.interceptors.response.use(
   }
 );
 
+// A1: Cross-tab token sync — when another tab refreshes the token, pick it up
+// This prevents race conditions when multiple tabs try to refresh simultaneously
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === TOKEN_KEY && e.newValue) {
+      // Another tab updated the token — unblock queued requests
+      if (isRefreshing) {
+        isRefreshing = false;
+        processQueue(null, e.newValue);
+      }
+    }
+    if (e.key === TOKEN_KEY && !e.newValue) {
+      // Token was cleared in another tab (logout) — reject queued requests
+      if (isRefreshing) {
+        isRefreshing = false;
+        processQueue(new Error('Session ended in another tab'), null);
+      }
+    }
+  });
+}
+
 export default api;

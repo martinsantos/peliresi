@@ -104,7 +104,7 @@ export const MobileLayout: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentUser, users, switchUser, isAdmin, isGenerador, isTransportista, isOperador, isLoading } = useAuth();
+  const { currentUser, users, switchUser, isAdmin, isGenerador, isTransportista, isOperador, isLoading, isDemo } = useAuth();
   const mp = useMobilePrefix();
 
   const config = currentUser ? roleConfig[currentUser.rol] : roleConfig.ADMIN;
@@ -138,7 +138,12 @@ export const MobileLayout: React.FC = () => {
 
     // Principal
     items.push({ to: mp('/dashboard'), icon: <Home size={20} />, label: 'Inicio', section: 'main' });
-    items.push({ to: mp('/manifiestos'), icon: <FileText size={20} />, label: 'Manifiestos', section: 'main' });
+
+    if (isTransportista) {
+      items.push({ to: mp('/manifiestos'), icon: <MapPin size={20} />, label: 'Mis Viajes', section: 'main' });
+    } else {
+      items.push({ to: mp('/manifiestos'), icon: <FileText size={20} />, label: 'Manifiestos', section: 'main' });
+    }
 
     if (isAdmin || isTransportista) {
       items.push({ to: mp('/centro-control'), icon: <LayoutDashboard size={20} />, label: 'Centro de Control', section: 'main' });
@@ -186,7 +191,8 @@ export const MobileLayout: React.FC = () => {
     const path = location.pathname;
     if (path.includes('/dashboard')) return 'Inicio';
     if (path.includes('/manifiestos/nuevo')) return 'Nuevo Manifiesto';
-    if (path.includes('/manifiestos')) return 'Manifiestos';
+    if (path.includes('/manifiestos')) return isTransportista ? 'Mis Viajes' : 'Manifiestos';
+    if (path.includes('/transporte/viaje')) return 'Viaje en Curso';
     if (path.includes('/tracking')) return 'Tracking';
     if (path.includes('/actores')) return 'Actores';
     if (path.includes('/reportes')) return 'Reportes';
@@ -221,6 +227,13 @@ export const MobileLayout: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F8F8F6] flex flex-col tap-transparent">
+      {/* Demo mode banner */}
+      {isDemo && (
+        <div className="bg-amber-500 text-white text-center text-xs sm:text-sm py-1 font-medium sticky top-0 z-50">
+          Modo Demo — Los datos no son reales
+        </div>
+      )}
+
       {/* Connectivity indicator - always visible at top */}
       <ConnectivityIndicator />
 

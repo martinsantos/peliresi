@@ -54,7 +54,37 @@ const PageLoader: React.FC = () => (
 
 const TrackingRedirectMobile: React.FC = () => {
   const { id } = useParams();
-  return <Navigate to={id ? `/centro-control/viaje/${id}` : `/centro-control`} replace />;
+  return <Navigate to={id ? `/manifiestos/${id}` : `/centro-control`} replace />;
+};
+
+// Redirect centro-control/viaje/:id → manifiestos/:id (unified single view)
+const ViajeRedirectMobile: React.FC = () => {
+  const { id } = useParams();
+  return <Navigate to={`/manifiestos/${id}`} replace />;
+};
+
+// Auto-redirect to active trip when PWA reopens
+const ActiveTripGuard: React.FC = () => {
+  const activeTripId = localStorage.getItem('sitrep_active_trip_id');
+  if (activeTripId) {
+    // A3: Verify trip hasn't ended — if status is terminal, clean up and go to dashboard
+    const savedStatus = localStorage.getItem(`viaje_status_${activeTripId}`);
+    const snapshot = localStorage.getItem(`viaje_snapshot_${activeTripId}`);
+    let snapshotEstado: string | null = null;
+    if (snapshot) {
+      try { snapshotEstado = JSON.parse(snapshot)?.estado; } catch { /* ignore */ }
+    }
+    const terminalStates = ['ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO', 'TRATADO', 'CANCELADO', 'RECHAZADO'];
+    if ((snapshotEstado && terminalStates.includes(snapshotEstado)) || savedStatus === 'COMPLETED') {
+      localStorage.removeItem('sitrep_active_trip_id');
+      localStorage.removeItem(`viaje_snapshot_${activeTripId}`);
+      localStorage.removeItem(`viaje_status_${activeTripId}`);
+      localStorage.removeItem(`gps_pending_${activeTripId}`);
+      return <Navigate to="/dashboard" replace />;
+    }
+    return <Navigate to={`/transporte/viaje/${activeTripId}`} replace />;
+  }
+  return <Navigate to="/dashboard" replace />;
 };
 
 function AppMobile() {
@@ -69,11 +99,12 @@ function AppMobile() {
           <Route element={<MobileLayout />}>
             <Route path="/dashboard" element={<MobileDashboardPage />} />
             <Route path="/centro-control" element={<CentroControlPage />} />
-            <Route path="/centro-control/viaje/:id" element={<ViajeEnCursoPage />} />
+            <Route path="/centro-control/viaje/:id" element={<ViajeRedirectMobile />} />
             <Route path="/manifiestos" element={<ManifiestosPage />} />
             <Route path="/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
             <Route path="/manifiestos/:id" element={<ManifiestoDetallePage />} />
             <Route path="/transporte/perfil" element={<ViajeEnCursoTransportista />} />
+            <Route path="/transporte/viaje/:id" element={<ViajeEnCursoTransportista />} />
             <Route path="/actores" element={<ActoresPage />} />
             <Route path="/actores/operadores" element={<OperadoresPage />} />
             <Route path="/actores/operadores/:id" element={<OperadorDetallePage />} />
@@ -103,7 +134,7 @@ function AppMobile() {
           </Route>
 
           {/* Redirects */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<ActiveTripGuard />} />
 
           {/* Legacy tracking redirects */}
           <Route path="/tracking" element={<Navigate to="/centro-control" replace />} />
