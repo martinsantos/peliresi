@@ -52,7 +52,7 @@ Permite el seguimiento completo del ciclo de vida de manifiestos: desde la gener
 - **Database**: PostgreSQL en Docker (`directus-admin-database-1`)
 - **Process Manager**: PM2 cluster mode, 2 instances (process name: `sitrep-backend`, port 3002)
 - **Compression**: gzip via `compression` middleware (~7x payload reduction)
-- **Connection Pool**: Prisma `connection_limit=20` per instance (40 total across cluster)
+- **Connection Pool**: Prisma `connection_limit=20&pool_timeout=10` per instance (40 total across cluster)
 - **Request Timeout**: 30s middleware on all requests
 
 ### Frontend
@@ -173,8 +173,8 @@ ssh root@23.105.176.45 "docker exec directus-admin-database-1 psql -U directus -
 
 ### Database Indexes (production optimization)
 
-14 custom indexes on key tables for query performance:
-- **manifiestos**: generadorId, transportistaId, operadorId, estado, createdAt, [estado+createdAt]
+16 custom indexes on key tables for query performance:
+- **manifiestos**: generadorId, transportistaId, operadorId, estado, createdAt, [estado+createdAt], [numero], [transportistaId+estado]
 - **manifiestos_residuos**: manifiestoId
 - **eventos_manifiesto**: manifiestoId, [manifiestoId+tipo]
 - **tracking_gps**: manifiestoId, timestamp, [manifiestoId+timestamp]
@@ -243,7 +243,7 @@ La función `mapFilters()` en `reporte.service.ts` traduce entre ambos.
 
 ### Architecture
 
-The GPS tracking system enables real-time position monitoring for up to **30 simultaneous trips**.
+The GPS tracking system enables real-time position monitoring for up to **50 simultaneous trips**.
 
 **Flow**: Phone (watchPosition) → every 30s → `POST /api/manifiestos/:id/ubicacion` → `tracking_gps` table → Centro de Control polls every 30s
 
@@ -253,7 +253,8 @@ The GPS tracking system enables real-time position monitoring for up to **30 sim
 - **Transmission interval**: 30 seconds (sends latest position only)
 - **GPS Status State Machine**: `checking` → `acquiring` → `active` | `denied` | `unavailable` | `error`
 - **Data sent**: `{ latitud, longitud, velocidad?, direccion? }`
-- **Offline resilience**: Failed updates queued in `pendingUpdatesRef` (max 5), also backed by IndexedDB `sync_queue`
+- **Offline resilience**: Failed updates queued in `pendingUpdatesRef` (max 5), **persisted to localStorage** (`gps_pending_{id}`) on PWA close/backgrounding. On mount, saved GPS points are flushed to backend. Also backed by IndexedDB `sync_queue`
+- **watchPosition cleanup**: Robust cleanup via `cleanupGps` callback + `beforeunload` listener prevents zombie watchers on navigation/unmount
 - **Pause/Resume**: Records `PAUSA`/`REANUDACION` incidents via backend + localStorage backup
 - **Timer persistence**: Uses server `fechaRetiro` timestamp (not local counter)
 
@@ -262,7 +263,7 @@ The GPS tracking system enables real-time position monitoring for up to **30 sim
 - **Endpoint**: `POST /api/manifiestos/:id/ubicacion`
 - **Auth**: TRANSPORTISTA or ADMIN
 - **Validation**: Checks manifiesto exists and is EN_TRANSITO
-- **In-memory cache**: 60s TTL per manifiestoId to skip repeated `findUnique` SELECT (~10x faster for frequent GPS updates)
+- **In-memory cache**: 30s TTL per manifiestoId to skip repeated `findUnique` SELECT (~10x faster for frequent GPS updates, TTL matches GPS interval)
 - **Cache invalidation**: On `confirmarEntrega` (trip state change)
 - **Data stored**: `tracking_gps` table with `latitud`, `longitud`, `velocidad`, `direccion`, `timestamp`
 
@@ -275,18 +276,31 @@ The GPS tracking system enables real-time position monitoring for up to **30 sim
 - **Layers**: Generadores, Transportistas, Operadores (filtered by activity in period), En Tránsito (up to 50 GPS points per trip)
 - **Statistics**: Pipeline counts per estado, KPIs, manifiestosPorDia via raw SQL
 
-### Capacity (tested and verified)
+### Capacity (scaled to 50 transportistas)
 
 | Parameter | Value | Notes |
 |-----------|-------|-------|
-| **Max concurrent trips** | 30+ | Tested with 30 simultaneous GPS POSTs |
+| **Max concurrent trips** | 50+ | Scaled from 30 with connection pool, indexes, $transaction, and cache optimizations |
 | **GPS update interval** | 30s per client | 1 req/30s per phone |
-| **Rate limit** | 300 req/min/IP | Supports 30 phones behind shared NAT/CGNAT |
-| **DB connection pool** | 20 per PM2 instance (40 total) | `connection_limit=20` in DATABASE_URL |
-| **PostgreSQL max_connections** | 100 | ~25 active in normal use |
-| **Load test result** | 30 concurrent: 399ms cold / 179ms cached | All 200 OK, zero errors |
-| **Per-request latency** | ~24ms (cached) / ~250ms (cold) | Cache TTL: 60s |
-| **Data growth** | ~3,600 rows/hour at 30 trips | With indexes, query perf stays constant |
+| **Rate limit** | 600 req/min/IP | Supports 50+ phones behind shared NAT/CGNAT |
+| **DB connection pool** | 20 per PM2 instance (40 total) | `connection_limit=20&pool_timeout=10` in DATABASE_URL |
+| **PostgreSQL max_connections** | 100 | ~40 active at peak with 50 transportistas |
+| **Per-request latency** | ~24ms (cached) / ~250ms (cold) | Cache TTL: 30s |
+| **Data growth** | ~6,000 rows/hour at 50 trips | With composite indexes, query perf stays constant |
+| **Analytics** | GPS routes skipped | `/ubicacion` and `/gps` paths excluded from analytics middleware |
+
+### Concurrency Protections (50 transportistas)
+
+| Protection | File | Description |
+|------------|------|-------------|
+| **$transaction on workflow** | `manifiesto.controller.ts` | `confirmarRetiro`, `confirmarEntrega`, `registrarTratamiento` wrapped in `prisma.$transaction()` — prevents race conditions from double-tap or simultaneous requests |
+| **Double-tap guard** | `ManifiestoDetallePage.tsx` | `actionInFlightRef` blocks concurrent action submissions before React re-renders `isPending` |
+| **Cross-tab token sync** | `api.ts` | `storage` event listener syncs token refresh across browser tabs — prevents queue starvation |
+| **switchUser async** | `AuthContext.tsx` | `switchUser()` is async with `await` + `setIsLoading(true)` — prevents navigation with inconsistent tokens |
+| **Logout cleanup** | `AuthContext.tsx` | `logout()` clears `sitrep_active_trip_id`, `viaje_snapshot_*`, `viaje_status_*`, `gps_pending_*` from localStorage |
+| **ActiveTripGuard** | `AppMobile.tsx` | Validates trip estado against terminal states before redirecting — prevents redirect loop to finished trips |
+| **GPS localStorage persist** | `ViajeEnCursoTransportista.tsx` | `pendingUpdatesRef` persisted to `gps_pending_{id}` on close; flushed to backend on mount |
+| **watchPosition cleanup** | `ViajeEnCursoTransportista.tsx` | `cleanupGps` callback + `beforeunload` listener prevents zombie GPS watchers |
 
 ### Mobile Dashboard (MobileDashboardPage.tsx)
 
