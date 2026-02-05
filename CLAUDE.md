@@ -418,6 +418,32 @@ Before deploying any UI fix, create a mental checklist of all elements that coul
 3. box-shadow/border rendering at boundaries
 4. responsive behavior at different viewport sizes
 
+### Fix UI Procedure
+
+When fixing any CSS/layout bug, follow this procedure in order:
+1. Read the affected component's full CSS and its parent/sibling styles
+2. Identify all z-index values and stacking contexts in the page
+3. List potential side effects BEFORE making changes
+4. Make the minimal CSS change needed
+5. Grep for any Leaflet/map z-index values that could conflict
+6. Verify sticky/fixed elements don't create gaps or overlaps
+
+---
+
+## Hooks (Pre-Commit)
+
+Configuración recomendada para `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "preCommit": ["npx stylelint '**/*.css' --fix", "npx tsc --noEmit"]
+  }
+}
+```
+
+Esto ejecuta stylelint y type-check antes de cada commit para atrapar regresiones CSS y errores TypeScript antes de que lleguen a producción.
+
 ---
 
 ## Reglas de Ingeniería
