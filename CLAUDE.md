@@ -3,6 +3,10 @@
 Sistema de gestión y trazabilidad de residuos peligrosos para la Provincia de Mendoza.
 Permite el seguimiento completo del ciclo de vida de manifiestos: desde la generación hasta el tratamiento final.
 
+## General Rules
+
+- This is a TypeScript project. Use TypeScript for all new files. When editing existing .js files, check if there's a tsconfig and consider migrating to .ts if the file is being substantially rewritten.
+
 ## Repository
 
 - **GitHub**: https://github.com/martinsantos/peliresi.git
@@ -399,6 +403,20 @@ NuevoManifiestoPage auto-populates actor info cards (CUIT, teléfono, domicilio,
 - `/api/reportes/manifiestos` → `porTipoResiduo` retorna `{ cantidad: number, unidad: string }` (objetos)
 - `/api/reportes/tratados` → `totalPorTipo` retorna `number` (números planos)
 - Siempre verificar con `typeof value === 'object'` y extraer `.cantidad` cuando corresponda
+
+---
+
+## CSS & Layout Rules
+
+When fixing CSS/layout issues, ALWAYS test the fix visually in context before declaring it done. Check for: z-index conflicts (especially with Leaflet maps), box-shadow artifacts, gap/overlap issues with sticky positioned elements, and scroll behavior. Never assume a CSS fix is complete without verifying adjacent elements are unaffected.
+
+### Pre-Deploy UI Checklist
+
+Before deploying any UI fix, create a mental checklist of all elements that could be affected by the change. For sticky/fixed positioning changes, explicitly verify:
+1. z-index stacking context with all overlapping elements (maps, modals, dropdowns)
+2. scroll behavior
+3. box-shadow/border rendering at boundaries
+4. responsive behavior at different viewport sizes
 
 ---
 
