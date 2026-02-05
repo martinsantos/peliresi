@@ -27,6 +27,7 @@ import {
   Truck,
   FlaskConical,
   Factory,
+  Building2,
   SwitchCamera,
   QrCode,
   HelpCircle,
@@ -119,6 +120,7 @@ export const MainLayout: React.FC = () => {
     if (isAdmin) {
       items.push({ path: '/admin/usuarios', icon: User, label: 'Usuarios' });
       items.push({ path: '/admin/generadores', icon: Factory, label: 'Generadores' });
+      items.push({ path: '/admin/operadores', icon: Building2, label: 'Operadores' });
       items.push({ path: '/admin/vehiculos', icon: Truck, label: 'Vehículos' });
       items.push({ path: '/admin/residuos', icon: FlaskConical, label: 'Catálogo Residuos' });
       items.push({ path: '/admin/auditoria', icon: Shield, label: 'Auditoría' });

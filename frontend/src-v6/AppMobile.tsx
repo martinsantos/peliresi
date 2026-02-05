@@ -34,6 +34,7 @@ const UserSwitcherPage = lazy(() => import('./pages/auth/UserSwitcherPage'));
 const UsuariosPage = lazy(() => import('./pages/usuarios/UsuariosPage'));
 const AdminGeneradoresPage = lazy(() => import('./pages/admin/AdminGeneradoresPage'));
 const GeneradorDetallePage = lazy(() => import('./pages/admin/GeneradorDetallePage'));
+const AdminOperadoresPage = lazy(() => import('./pages/admin/AdminOperadoresPage'));
 const AdminVehiculosPage = lazy(() => import('./pages/admin/AdminVehiculosPage'));
 const AdminResiduosPage = lazy(() => import('./pages/admin/AdminResiduosPage'));
 const AuditoriaPage = lazy(() => import('./pages/auditoria/AuditoriaPage'));
@@ -121,6 +122,7 @@ function AppMobile() {
             <Route path="/admin/usuarios" element={<UsuariosPage />} />
             <Route path="/admin/generadores" element={<AdminGeneradoresPage />} />
             <Route path="/admin/generadores/:id" element={<GeneradorDetallePage />} />
+            <Route path="/admin/operadores" element={<AdminOperadoresPage />} />
             <Route path="/admin/vehiculos" element={<AdminVehiculosPage />} />
             <Route path="/admin/residuos" element={<AdminResiduosPage />} />
             <Route path="/admin/auditoria" element={<AuditoriaPage />} />
