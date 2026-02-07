@@ -70,6 +70,7 @@ Permite el seguimiento completo del ciclo de vida de manifiestos: desde la gener
 - **Fonts**: Plus Jakarta Sans (display), Inter (body), JetBrains Mono (mono)
 - **Effects**: Glassmorphism, spring easing, stagger-children, hover-lift
 - **UI Components**: 17+ componentes en `src-v6/components/ui/`
+- **Map Markers** (`utils/map-icons.ts`): Generador = purple rounded-square + Factory, Transportista = orange diamond + Truck, **Operador = blue rounded-square + FlaskConical** (NO hexágono). SVGs stroke-based Lucide 14×14 en blanco sobre fondo de color. Cluster = rounded-square con número.
 
 ---
 
@@ -403,6 +404,8 @@ The GPS tracking system enables real-time position monitoring for up to **50 sim
 |------|---------|---------|
 | `exportReportePDF` | `utils/exportPdf.ts` | Genera PDF profesional con jsPDF: header SITREP verde, KPI cards, tabla autoTable, footer paginado |
 | `formatRelativeTime` | `utils/formatters.ts` | Formato "hace X minutos" |
+| `ACTOR_ICONS` | `utils/map-icons.ts` | Leaflet divIcons para mapas: Generador (purple rounded-square + Factory), Transportista (orange diamond + Truck), Operador (blue rounded-square + FlaskConical), En Tránsito (red pulsing circle). Todos los íconos SVG son stroke-based Lucide 14×14. Operador debe usar FlaskConical (NO hexágono, NO Building2). |
+| `createClusterIcon` | `utils/map-icons.ts` | Cluster marker (rounded-square con count numérico) para >50 items en un grid de 0.05° |
 
 ### Services
 | Service | Archivo | API Base |

@@ -4,7 +4,7 @@
  * Uses the same Lucide icons as the UI system:
  *   Generador  → Factory (purple)
  *   Transportista → Truck (orange)
- *   Operador   → Building2 (blue)
+ *   Operador   → FlaskConical (blue)
  *   En Tránsito → pulsing red circle with arrow
  *   GPS start/end → green/red dots
  */
@@ -19,8 +19,8 @@ const SVG_FACTORY = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"
 // Truck icon (Lucide)
 const SVG_TRUCK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>';
 
-// Building2 icon (Lucide)
-const SVG_BUILDING = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>';
+// FlaskConical icon (Lucide) – stroke-based, matches sidebar icon
+const SVG_FLASK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2"/><path d="M8.5 2h7"/><path d="M7 16.5h10"/></svg>';
 
 // ── Actor colors (system consistent) ──
 export const ACTOR_COLORS = {
@@ -49,11 +49,11 @@ export const ACTOR_ICONS = {
     iconSize: [28, 28], iconAnchor: [14, 14],
   }),
 
-  // Operador: blue hexagon with Building2 icon
+  // Operador: blue rounded-square with FlaskConical icon (matches sidebar style)
   operador: L.divIcon({
     className: '',
-    html: `<div style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 2px 4px rgba(0,0,0,.35))"><svg width="30" height="30" viewBox="0 0 30 30"><polygon points="15,1 27,8 27,22 15,29 3,22 3,8" fill="${ACTOR_COLORS.operador}" stroke="white" stroke-width="2"/></svg><div style="position:absolute">${SVG_BUILDING}</div></div>`,
-    iconSize: [30, 30], iconAnchor: [15, 15],
+    html: `<div style="width:28px;height:28px;border-radius:6px;background:${ACTOR_COLORS.operador};border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center">${SVG_FLASK}</div>`,
+    iconSize: [28, 28], iconAnchor: [14, 14],
   }),
 
   // En Tránsito: red pulsing circle with navigation arrow
@@ -99,7 +99,7 @@ export function createClusterIcon(count: number, color: string): L.DivIcon {
 export const LEGEND_ITEMS = {
   generador: { shape: 'rounded-square', color: ACTOR_COLORS.generador, label: 'Generador' },
   transportista: { shape: 'diamond', color: ACTOR_COLORS.transportista, label: 'Transportista' },
-  operador: { shape: 'hexagon', color: ACTOR_COLORS.operador, label: 'Operador' },
+  operador: { shape: 'rounded-square', color: ACTOR_COLORS.operador, label: 'Operador' },
   enTransito: { shape: 'circle', color: ACTOR_COLORS.enTransito, label: 'En Tránsito' },
   gpsStart: { shape: 'circle', color: ACTOR_COLORS.gpsStart, label: 'Inicio GPS' },
   gpsEnd: { shape: 'circle', color: ACTOR_COLORS.gpsEnd, label: 'Fin GPS' },
