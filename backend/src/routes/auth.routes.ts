@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { register, login, getProfile, logout, refreshToken } from '../controllers/auth.controller';
+import { register, login, getProfile, logout, refreshToken, changePassword } from '../controllers/auth.controller';
 import { isAuthenticated } from '../middlewares/auth.middleware';
 
 const router = Router();
@@ -20,6 +20,9 @@ router.post('/refresh-token', refreshToken);
 
 // Obtener perfil (protegida)
 router.get('/profile', isAuthenticated, getProfile);
+
+// Cambiar contraseña (protegida)
+router.post('/change-password', isAuthenticated, changePassword);
 
 // Cerrar sesión (protegida)
 router.post('/logout', isAuthenticated, logout);

@@ -129,7 +129,7 @@ const EstadisticasPage: React.FC = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {statsCards.map((stat) => {
           const colors = getColorClasses(stat.color);
           const Icon = stat.icon;

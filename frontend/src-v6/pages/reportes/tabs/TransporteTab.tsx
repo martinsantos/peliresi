@@ -32,7 +32,7 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <KpiCard icon={Users} label="Transportistas" value={resumen.totalTransportistas || 0} color="from-violet-600 to-violet-700" />
         <KpiCard icon={Truck} label="Total Viajes" value={resumen.totalViajes || 0} color="from-blue-600 to-blue-700" />
         <KpiCard icon={Activity} label="En Tránsito" value={resumen.viajesActivos || 0} color="from-amber-600 to-amber-700" sub="viajes activos" />
@@ -113,16 +113,16 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
           />
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full text-left min-w-[700px]">
+              <table className="w-full text-left">
                 <thead className="bg-neutral-50/80 border-b border-neutral-200">
                   <tr>
                     <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Transportista</th>
                     <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Viajes</th>
                     <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Completados</th>
                     <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell">En Tránsito</th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden lg:table-cell">Vehículos</th>
+                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell">Vehículos</th>
                     <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden lg:table-cell">Choferes</th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Tasa</th>
+                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell">Tasa</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
@@ -134,9 +134,9 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
                         <td className="px-4 py-3 text-sm font-semibold text-neutral-900">{t.totalViajes}</td>
                         <td className="px-4 py-3 text-sm text-emerald-600 font-semibold">{t.completados}</td>
                         <td className="px-4 py-3 text-sm text-amber-600 hidden md:table-cell">{t.enTransito}</td>
-                        <td className="px-4 py-3 text-sm text-neutral-600 hidden lg:table-cell">{t.vehiculosRegistrados}</td>
+                        <td className="px-4 py-3 text-sm text-neutral-600 hidden md:table-cell">{t.vehiculosRegistrados}</td>
                         <td className="px-4 py-3 text-sm text-neutral-600 hidden lg:table-cell">{t.choferesRegistrados}</td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 hidden md:table-cell">
                           <div className="flex items-center gap-2">
                             <div className="w-16 h-2 bg-neutral-100 rounded-full overflow-hidden">
                               <div className="h-full rounded-full transition-all" style={{

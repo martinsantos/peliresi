@@ -126,7 +126,7 @@ const AyudaPage: React.FC = () => {
       </div>
 
       {/* Quick Links */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {[
           { icon: BookOpen, label: 'Documentación', color: 'bg-primary-50 text-primary-600' },
           { icon: Video, label: 'Tutoriales', color: 'bg-secondary-50 text-secondary-600' },

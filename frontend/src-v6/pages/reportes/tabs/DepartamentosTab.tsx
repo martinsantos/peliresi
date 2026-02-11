@@ -241,7 +241,7 @@ export function DepartamentoDetalleModal({
 
         {/* Table */}
         <div className="overflow-x-auto max-h-[50vh] overflow-y-auto">
-          <table className="w-full text-left min-w-[600px]">
+          <table className="w-full text-left">
             <thead className="bg-neutral-50/80 border-b border-neutral-200 sticky top-0">
               <tr>
                 <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Tipo</th>
@@ -380,7 +380,7 @@ export default function DepartamentosTab({
         </span>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <KpiCard icon={MapPin} label="Departamentos" value={depStats.length} color="from-violet-600 to-violet-700" sub="con actividad" />
         <KpiCard icon={Factory} label="Generadores" value={totalGen} color="from-green-600 to-green-700" />
         <KpiCard icon={Truck} label="Transportistas" value={totalTrans} color="from-orange-600 to-orange-700" />
@@ -480,17 +480,17 @@ export default function DepartamentosTab({
           <CardHeader title={`Detalle por Departamento (${filteredStats.length})`} subtitle="Click en una fila para ver los actores del departamento" />
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full text-left min-w-[500px]">
+              <table className="w-full text-left">
                 <thead className="bg-neutral-50/80 border-b border-neutral-200">
                   <tr>
                     <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Departamento</th>
                     <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center">
                       <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" /> Gen.</span>
                     </th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center">
+                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center hidden md:table-cell">
                       <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500" /> Trans.</span>
                     </th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center">
+                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center hidden md:table-cell">
                       <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" /> Oper.</span>
                     </th>
                     <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center">Total</th>
@@ -506,8 +506,8 @@ export default function DepartamentosTab({
                     >
                       <td className="px-4 py-3 text-sm font-medium text-neutral-900">{d.departamento}</td>
                       <td className="px-4 py-3 text-sm text-green-600 font-semibold text-center">{d.generadores}</td>
-                      <td className="px-4 py-3 text-sm text-orange-600 font-semibold text-center">{d.transportistas}</td>
-                      <td className="px-4 py-3 text-sm text-blue-600 font-semibold text-center">{d.operadores}</td>
+                      <td className="px-4 py-3 text-sm text-orange-600 font-semibold text-center hidden md:table-cell">{d.transportistas}</td>
+                      <td className="px-4 py-3 text-sm text-blue-600 font-semibold text-center hidden md:table-cell">{d.operadores}</td>
                       <td className="px-4 py-3 text-sm font-bold text-neutral-900 text-center">{d.total}</td>
                       <td className="px-4 py-3">
                         <ChevronRight size={14} className="text-neutral-300 group-hover:text-primary-500 transition-colors" />

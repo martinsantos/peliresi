@@ -14,10 +14,12 @@ import prisma from '../lib/prisma';
  *   - fechaDesde (ISO date string)
  *   - fechaHasta (ISO date string)
  *   - capas (csv: generadores,transportistas,operadores,transito)
+ *   - incluirTodos ('true' to skip manifiestos filter — returns all actors with coords)
  */
 export const getActividadCentroControl = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { fechaDesde, fechaHasta, capas } = req.query;
+    const { fechaDesde, fechaHasta, capas, incluirTodos } = req.query;
+    const showAll = incluirTodos === 'true';
 
     // Date range — ensure "hasta" covers the full day (end-of-day, not midnight)
     const desde = fechaDesde ? new Date(fechaDesde as string) : new Date(Date.now() - 30 * 24 * 3600000);
@@ -49,7 +51,7 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
         where: {
           activo: true,
           latitud: { not: null },
-          manifiestos: { some: { fechaCreacion: dateFilter } },
+          ...(showAll ? {} : { manifiestos: { some: { fechaCreacion: dateFilter } } }),
         },
         select: {
           id: true,
@@ -92,7 +94,7 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
         where: {
           activo: true,
           latitud: { not: null },
-          manifiestos: { some: { fechaCreacion: dateFilter } },
+          ...(showAll ? {} : { manifiestos: { some: { fechaCreacion: dateFilter } } }),
         },
         select: {
           id: true,
@@ -130,15 +132,17 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
         where: {
           activo: true,
           latitud: { not: null },
-          manifiestos: {
-            some: {
-              OR: [
-                { fechaRecepcion: dateFilter },
-                { fechaCierre: dateFilter },
-                { fechaCreacion: dateFilter },
-              ],
+          ...(showAll ? {} : {
+            manifiestos: {
+              some: {
+                OR: [
+                  { fechaRecepcion: dateFilter },
+                  { fechaCierre: dateFilter },
+                  { fechaCreacion: dateFilter },
+                ],
+              },
             },
-          },
+          }),
         },
         select: {
           id: true,

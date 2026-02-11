@@ -85,7 +85,9 @@ const TransportistaDetallePage: React.FC = () => {
     rendimiento: (apiTransportista as any).rendimiento || EMPTY_DEFAULTS.rendimiento,
   } : null;
 
-  const backPath = isMobile ? '/mobile/actores/transportistas' : '/actores/transportistas';
+  const backPath = isMobile
+    ? '/mobile/actores/transportistas'
+    : '/admin/actores/transportistas';
 
   if (isLoading) {
     return (

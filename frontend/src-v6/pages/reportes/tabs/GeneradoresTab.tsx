@@ -85,7 +85,7 @@ export default function GeneradoresTab({
         </span>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <KpiCard icon={Factory} label="Total Generadores" value={generadores.length} color="from-purple-600 to-purple-700" />
         <KpiCard icon={Package} label="Categorías" value={byCategoria.length} color="from-indigo-600 to-indigo-700" sub="tipos" />
         <KpiCard icon={MapPin} label="Departamentos" value={byDep.length} color="from-violet-600 to-violet-700" sub="con presencia" />
@@ -172,23 +172,23 @@ export default function GeneradoresTab({
         />
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-left min-w-[600px]">
+            <table className="w-full text-left">
               <thead className="bg-neutral-50/80 border-b border-neutral-200">
                 <tr>
                   <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Razón Social</th>
                   <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">CUIT</th>
                   <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell">Categoría</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Departamento</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell">Departamento</th>
                   <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center">Manifiestos</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
-                {filtered.slice(0, 50).map((g, i) => (
+                {filtered.slice(0, 100).map((g, i) => (
                   <tr key={`${g.id}-${i}`} className="hover:bg-primary-50/30 transition-colors">
                     <td className="px-4 py-3 text-sm font-medium text-neutral-900 max-w-[200px] truncate">{g.razonSocial}</td>
                     <td className="px-4 py-3 text-sm text-neutral-600 font-mono text-xs">{g.cuit}</td>
                     <td className="px-4 py-3 text-sm text-neutral-600 hidden md:table-cell">{g.categoria || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-neutral-600">{getDepartamento(g.latitud, g.longitud)}</td>
+                    <td className="px-4 py-3 text-sm text-neutral-600 hidden md:table-cell">{getDepartamento(g.latitud, g.longitud)}</td>
                     <td className="px-4 py-3 text-center">
                       <Badge variant="soft" color="primary">{g.cantManifiestos}</Badge>
                     </td>
@@ -202,9 +202,9 @@ export default function GeneradoresTab({
               </tbody>
             </table>
           </div>
-          {filtered.length > 50 && (
+          {filtered.length > 100 && (
             <div className="px-4 py-3 bg-neutral-50/50 border-t border-neutral-100 text-center">
-              <p className="text-sm text-neutral-500">Mostrando 50 de {filtered.length}</p>
+              <p className="text-sm text-neutral-500">Mostrando 100 de {filtered.length}</p>
             </div>
           )}
         </CardContent>

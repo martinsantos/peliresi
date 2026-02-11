@@ -331,12 +331,12 @@ const CargaMasivaPage: React.FC = () => {
       <Card>
         <CardHeader title="Historial de Cargas" icon={<FileText size={20} />} />
         <CardContent className="p-0 overflow-x-auto">
-          <table className="w-full table-fixed min-w-[600px]">
+          <table className="w-full table-fixed">
               <thead className="bg-neutral-50 border-b border-neutral-200">
                 <tr>
                   <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: "30%" }}>Archivo</th>
                   <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: "18%" }}>Fecha</th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: "12%" }}>Registros</th>
+                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: "12%" }}>Registros</th>
                   <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: "22%" }}>Resultado</th>
                   <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: "18%" }}>Estado</th>
                 </tr>
@@ -351,7 +351,7 @@ const CargaMasivaPage: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-3 py-2.5 text-sm text-neutral-600 hidden md:table-cell">{carga.fecha}</td>
-                    <td className="px-3 py-2.5 text-sm text-neutral-900">{carga.registros}</td>
+                    <td className="px-3 py-2.5 text-sm text-neutral-900 hidden md:table-cell">{carga.registros}</td>
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-2 text-sm">
                         <span className="text-success-600 font-medium">{carga.exitosos} OK</span>

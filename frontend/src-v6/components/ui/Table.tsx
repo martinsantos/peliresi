@@ -41,8 +41,10 @@ export interface TableProps<T> {
   striped?: boolean;
   compact?: boolean;
   bordered?: boolean;
+  stickyHeader?: boolean;
   className?: string;
   onRowClick?: (row: T) => void;
+  renderExpandedRow?: (row: T) => React.ReactNode | null;
 }
 
 // ========================================
@@ -61,9 +63,11 @@ export function Table<T extends Record<string, any>>({
   emptyMessage = 'No hay datos disponibles',
   striped = false,
   compact = false,
+  stickyHeader = false,
   bordered = false,
   className,
   onRowClick,
+  renderExpandedRow,
 }: TableProps<T>) {
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
@@ -113,9 +117,9 @@ export function Table<T extends Record<string, any>>({
   };
 
   return (
-    <div className={cn('overflow-hidden overflow-x-auto rounded-xl border border-neutral-200 bg-white', className)}>
-        <table className="w-full table-fixed text-left min-w-[500px]">
-          <thead className="bg-neutral-50 border-b border-neutral-200">
+    <div className={cn('overflow-x-auto rounded-xl border border-neutral-200 bg-white', stickyHeader ? 'max-h-[70vh] overflow-y-auto' : 'overflow-hidden', className)}>
+        <table className="w-full text-left">
+          <thead className={cn('bg-neutral-50 border-b border-neutral-200', stickyHeader && 'sticky top-0 z-10')}>
             <tr>
               {selectable && (
                 <th className={cn(headerPadding, 'w-px whitespace-nowrap')}>
@@ -186,9 +190,10 @@ export function Table<T extends Record<string, any>>({
               safeData.map((row, index) => {
                 const rowKey = keyExtractor(row);
                 const isSelected = selectedKeys.includes(rowKey);
+                const expandedContent = renderExpandedRow?.(row);
                 return (
+                  <React.Fragment key={rowKey}>
                   <tr
-                    key={rowKey}
                     className={cn(
                       'transition-colors',
                       striped && index % 2 === 1 && 'bg-neutral-50/50',
@@ -224,6 +229,14 @@ export function Table<T extends Record<string, any>>({
                       </td>
                     ))}
                   </tr>
+                  {expandedContent && (
+                    <tr>
+                      <td colSpan={columns.length + (selectable ? 1 : 0)} className="p-0">
+                        {expandedContent}
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 );
               })
             )}

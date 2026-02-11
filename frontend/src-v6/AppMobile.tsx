@@ -18,6 +18,7 @@ const ManifiestosPage = lazy(() => import('./pages/manifiestos/ManifiestosPage')
 const ManifiestoDetallePage = lazy(() => import('./pages/manifiestos/ManifiestoDetallePage'));
 const NuevoManifiestoPage = lazy(() => import('./pages/manifiestos/NuevoManifiestoPage'));
 const ViajeEnCursoPage = lazy(() => import('./pages/tracking/ViajeEnCursoPage'));
+const TransportePerfilPage = lazy(() => import('./pages/transporte/TransportePerfilPage'));
 const ViajeEnCursoTransportista = lazy(() => import('./pages/transporte/ViajeEnCursoTransportista'));
 const ActoresPage = lazy(() => import('./pages/actores/ActoresPage'));
 const OperadoresPage = lazy(() => import('./pages/actores/OperadoresPage'));
@@ -42,6 +43,7 @@ const CargaMasivaPage = lazy(() => import('./pages/carga-masiva/CargaMasivaPage'
 const EscanerQRPage = lazy(() => import('./pages/escaner/EscanerQRPage'));
 const EstadisticasPage = lazy(() => import('./pages/estadisticas/EstadisticasPage'));
 const NotFoundPage = lazy(() => import('./pages/shared/NotFoundPage'));
+const VerificarManifiestoPage = lazy(() => import('./pages/manifiestos/VerificarManifiestoPage'));
 
 const PageLoader: React.FC = () => (
   <div className="min-h-screen flex items-center justify-center bg-neutral-50">
@@ -103,7 +105,7 @@ function AppMobile() {
             <Route path="/manifiestos" element={<ManifiestosPage />} />
             <Route path="/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
             <Route path="/manifiestos/:id" element={<ManifiestoDetallePage />} />
-            <Route path="/transporte/perfil" element={<ViajeEnCursoTransportista />} />
+            <Route path="/transporte/perfil" element={<TransportePerfilPage />} />
             <Route path="/transporte/viaje/:id" element={<ViajeEnCursoTransportista />} />
             <Route path="/actores" element={<ActoresPage />} />
             <Route path="/actores/operadores" element={<OperadoresPage />} />
@@ -132,6 +134,9 @@ function AppMobile() {
             <Route path="/escaner-qr" element={<EscanerQRPage />} />
             <Route path="/estadisticas" element={<EstadisticasPage />} />
           </Route>
+
+          {/* Verificación pública de manifiesto (QR) */}
+          <Route path="/manifiestos/verificar/:numero" element={<VerificarManifiestoPage />} />
 
           {/* Redirects */}
           <Route path="/" element={<ActiveTripGuard />} />

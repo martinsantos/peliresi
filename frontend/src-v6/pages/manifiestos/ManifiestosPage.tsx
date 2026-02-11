@@ -39,7 +39,7 @@ const ManifiestosPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
-  const [estadoFilter, setEstadoFilter] = useState('');
+  const [estadoFilter, setEstadoFilter] = useState(searchParams.get('estado') || '');
   const [page, setPage] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; numero: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -146,9 +146,9 @@ const ManifiestosPage: React.FC = () => {
 
       {/* Table */}
       {!isLoading && (
-        <Card padding="none" className="overflow-x-auto">
-          <table className="w-full table-fixed min-w-[600px]">
-              <thead className="bg-[#F5F5F3] border-b border-neutral-200">
+        <Card padding="none" className="max-h-[70vh] overflow-auto">
+          <table className="w-full table-fixed">
+              <thead className="bg-[#F5F5F3] border-b border-neutral-200 sticky top-0 z-10">
                 <tr>
                   <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: "20%" }}>Manifiesto</th>
                   <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: "25%" }}>Generador</th>

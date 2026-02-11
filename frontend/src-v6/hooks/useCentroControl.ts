@@ -79,6 +79,7 @@ export interface CentroControlParams {
   fechaDesde?: string;
   fechaHasta?: string;
   capas?: string[];
+  incluirTodos?: string;
 }
 
 async function fetchActividad(params: CentroControlParams): Promise<CentroControlData> {
@@ -86,6 +87,7 @@ async function fetchActividad(params: CentroControlParams): Promise<CentroContro
   if (params.fechaDesde) searchParams.set('fechaDesde', params.fechaDesde);
   if (params.fechaHasta) searchParams.set('fechaHasta', params.fechaHasta);
   if (params.capas && params.capas.length > 0) searchParams.set('capas', params.capas.join(','));
+  if (params.incluirTodos) searchParams.set('incluirTodos', params.incluirTodos);
 
   const { data } = await api.get(`/centro-control/actividad?${searchParams.toString()}`);
   return data.data;
@@ -93,7 +95,7 @@ async function fetchActividad(params: CentroControlParams): Promise<CentroContro
 
 export function useCentroControl(params: CentroControlParams = {}, refreshInterval = 30000) {
   return useQuery<CentroControlData>({
-    queryKey: ['centro-control', 'actividad', params.fechaDesde, params.fechaHasta, params.capas?.join(',')],
+    queryKey: ['centro-control', 'actividad', params.fechaDesde, params.fechaHasta, params.capas?.join(','), params.incluirTodos],
     queryFn: () => fetchActividad(params),
     staleTime: 15000,
     refetchInterval: refreshInterval,

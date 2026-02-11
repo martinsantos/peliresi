@@ -13,7 +13,7 @@ const DEMO_USERS = [
   { label: 'Administrador', sublabel: 'DGFA', userId: 1, color: 'bg-primary-500' },
   { label: 'Generador', sublabel: 'Hospital Central', userId: 5, color: 'bg-purple-500' },
   { label: 'Transportista', sublabel: 'Transportes Andes', userId: 13, color: 'bg-orange-500' },
-  { label: 'Operador', sublabel: 'Planta Las Heras', userId: 19, color: 'bg-green-500' },
+  { label: 'Operador', sublabel: 'Planta Las Heras', userId: 19, color: 'bg-blue-500' },
 ];
 
 const LoginPage: React.FC = () => {

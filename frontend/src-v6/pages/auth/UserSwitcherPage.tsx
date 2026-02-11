@@ -54,7 +54,7 @@ export const UserSwitcherPage: React.FC = () => {
         {/* User Switcher Component */}
         <Card>
           <CardContent className="p-6">
-            <UserSwitcher variant="modal" />
+            <UserSwitcher variant="modal" onSwitch={() => navigate('/dashboard')} />
           </CardContent>
         </Card>
 

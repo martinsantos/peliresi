@@ -45,7 +45,7 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <KpiCard icon={FileText} label="Total Manifiestos" value={resumen.totalManifiestos || 0} color="from-emerald-600 to-emerald-700" />
         <KpiCard icon={Package} label="Total Residuos" value={`${(resumen.totalResiduos || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })} kg`} color="from-blue-600 to-blue-700" />
         <KpiCard icon={Activity} label="Estados Activos" value={Object.keys(porEstado).length} color="from-indigo-600 to-indigo-700" sub="tipos de estado" />
@@ -121,7 +121,7 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
           />
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full text-left min-w-[700px]">
+              <table className="w-full text-left">
                 <thead className="bg-neutral-50/80 border-b border-neutral-200">
                   <tr>
                     <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Número</th>
@@ -129,7 +129,7 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
                     <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Generador</th>
                     <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell">Transportista</th>
                     <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden lg:table-cell">Operador</th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Fecha</th>
+                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell">Fecha</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
@@ -148,7 +148,7 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
                       <td className="px-4 py-3 text-sm text-neutral-900 max-w-[200px] truncate">{m.generador}</td>
                       <td className="px-4 py-3 text-sm text-neutral-700 max-w-[200px] truncate hidden md:table-cell">{m.transportista || '-'}</td>
                       <td className="px-4 py-3 text-sm text-neutral-700 max-w-[200px] truncate hidden lg:table-cell">{m.operador || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-neutral-500">{m.fechaCreacion ? new Date(m.fechaCreacion).toLocaleDateString('es-AR') : '-'}</td>
+                      <td className="px-4 py-3 text-sm text-neutral-500 hidden md:table-cell">{m.fechaCreacion ? new Date(m.fechaCreacion).toLocaleDateString('es-AR') : '-'}</td>
                     </tr>
                   ))}
                 </tbody>

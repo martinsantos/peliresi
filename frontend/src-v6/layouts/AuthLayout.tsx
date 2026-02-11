@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Outlet } from 'react-router-dom';
-import { Leaf, Shield, Truck, Factory } from 'lucide-react';
+import { Leaf, FlaskConical, Truck, Factory } from 'lucide-react';
 
 export const AuthLayout: React.FC = () => {
   return (
@@ -55,7 +55,7 @@ export const AuthLayout: React.FC = () => {
             </div>
             <div className="flex flex-col items-center text-center">
               <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center mb-3">
-                <Shield size={24} />
+                <FlaskConical size={24} />
               </div>
               <span className="text-sm font-medium">Operadores</span>
             </div>

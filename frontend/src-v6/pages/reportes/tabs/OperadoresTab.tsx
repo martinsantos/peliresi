@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import {
-  Building2, Layers, MapPin, FileCheck, Calendar, Search,
+  FlaskConical, Layers, MapPin, FileCheck, Calendar, Search,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -96,8 +96,8 @@ export default function OperadoresTab({
         </span>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard icon={Building2} label="Total Operadores" value={operadores.length} color="from-blue-600 to-blue-700" />
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <KpiCard icon={FlaskConical} label="Total Operadores" value={operadores.length} color="from-blue-600 to-blue-700" />
         <KpiCard icon={Layers} label="Categorías" value={byCategoria.length} color="from-purple-600 to-purple-700" sub="tipos" />
         <KpiCard icon={FileCheck} label="Tratamientos" value={totalTratamientos} color="from-emerald-600 to-emerald-700" sub="autorizados" />
         <KpiCard icon={MapPin} label="FIJO" value={byTipo.find(x => x.name === 'FIJO')?.value || 0} color="from-cyan-600 to-cyan-700" sub="plantas fijas" />
@@ -187,7 +187,7 @@ export default function OperadoresTab({
         />
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-left min-w-[800px]">
+            <table className="w-full text-left">
               <thead className="bg-neutral-50/80 border-b border-neutral-200">
                 <tr>
                   <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Razón Social</th>

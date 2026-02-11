@@ -133,6 +133,40 @@ export const getOperadores = async (req: Request, res: Response, next: NextFunct
     }
 };
 
+// Obtener todos los vehículos (global)
+export const getAllVehiculos = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const vehiculos = await prisma.vehiculo.findMany({
+            where: { activo: true },
+            include: {
+                transportista: { select: { razonSocial: true, cuit: true } }
+            },
+            orderBy: { patente: 'asc' }
+        });
+
+        res.json({ success: true, data: { vehiculos } });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Obtener todos los choferes (global)
+export const getAllChoferes = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const choferes = await prisma.chofer.findMany({
+            where: { activo: true },
+            include: {
+                transportista: { select: { razonSocial: true, cuit: true } }
+            },
+            orderBy: { apellido: 'asc' }
+        });
+
+        res.json({ success: true, data: { choferes } });
+    } catch (error) {
+        next(error);
+    }
+};
+
 // Obtener vehículos de un transportista
 export const getVehiculos = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {

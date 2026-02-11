@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Truck,
   Search,
@@ -56,7 +56,8 @@ const INITIAL_FORM = {
 
 const TransportistasPage: React.FC = () => {
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchParams] = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
   const [filtroEstado, setFiltroEstado] = useState('');
   const [vista, setVista] = useState<'grid' | 'lista'>('lista');
   const [modalCrear, setModalCrear] = useState(false);
@@ -205,7 +206,7 @@ const TransportistasPage: React.FC = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <Card className="p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-success-50 rounded-lg flex items-center justify-center">
@@ -310,9 +311,9 @@ const TransportistasPage: React.FC = () => {
 
       {/* Lista */}
       {!isLoading && vista === 'lista' ? (
-        <Card padding="none" className="overflow-hidden overflow-x-auto">
-          <table className="w-full table-fixed min-w-[600px]">
-              <thead className="bg-neutral-50 border-b border-neutral-200">
+        <Card padding="none" className="max-h-[70vh] overflow-auto">
+          <table className="w-full table-fixed">
+              <thead className="bg-neutral-50 border-b border-neutral-200 sticky top-0 z-10">
                 <tr>
                   <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: "28%" }}>Transportista</th>
                   <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: "14%" }}>Estado</th>
@@ -329,7 +330,7 @@ const TransportistasPage: React.FC = () => {
                     <tr
                       key={t.id}
                       className="hover:bg-neutral-50 transition-colors cursor-pointer group"
-                      onClick={() => navigate(isMobile ? `/mobile/actores/transportistas/${t.id}` : `/actores/transportistas/${t.id}`)}
+                      onClick={() => navigate(isMobile ? `/mobile/actores/transportistas/${t.id}` : `/admin/actores/transportistas/${t.id}`)}
                     >
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-3">
@@ -361,7 +362,7 @@ const TransportistasPage: React.FC = () => {
                       </td>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button variant="ghost" size="sm" className="p-2" onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/actores/transportistas/${t.id}` : `/actores/transportistas/${t.id}`); }}>
+                          <Button variant="ghost" size="sm" className="p-2" onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/actores/transportistas/${t.id}` : `/admin/actores/transportistas/${t.id}`); }}>
                             <Eye size={16} />
                           </Button>
                           <Button variant="ghost" size="sm" className="p-2" onClick={(e) => { e.stopPropagation(); openEditar(t); }}>
@@ -380,7 +381,7 @@ const TransportistasPage: React.FC = () => {
         </Card>
       ) : !isLoading ? (
         /* Vista Grid */
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {transportistasFiltrados.map((t: any) => {
             const isActivo = t.activo !== false;
             const estado = isActivo ? estadoConfig.ACTIVO : estadoConfig.INACTIVO;
@@ -388,7 +389,7 @@ const TransportistasPage: React.FC = () => {
               <Card
                 key={t.id}
                 className="p-5 hover:shadow-md transition-all cursor-pointer group"
-                onClick={() => navigate(isMobile ? `/mobile/actores/transportistas/${t.id}` : `/actores/transportistas/${t.id}`)}
+                onClick={() => navigate(isMobile ? `/mobile/actores/transportistas/${t.id}` : `/admin/actores/transportistas/${t.id}`)}
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -424,7 +425,7 @@ const TransportistasPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2 pt-4 border-t border-neutral-100">
-                  <Button variant="outline" size="sm" className="flex-1" leftIcon={<Eye size={14} />} onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/actores/transportistas/${t.id}` : `/actores/transportistas/${t.id}`); }}>
+                  <Button variant="outline" size="sm" className="flex-1" leftIcon={<Eye size={14} />} onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/actores/transportistas/${t.id}` : `/admin/actores/transportistas/${t.id}`); }}>
                     Ver
                   </Button>
                   <Button variant="outline" size="sm" className="flex-1" leftIcon={<Edit size={14} />} onClick={(e) => { e.stopPropagation(); openEditar(t); }}>

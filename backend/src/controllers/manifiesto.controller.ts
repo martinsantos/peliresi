@@ -5,6 +5,64 @@ import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import prisma from '../lib/prisma';
 
+// Verificar manifiesto públicamente (sin auth) — usado por QR codes
+export const verificarManifiesto = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { numero } = req.params;
+
+    if (!numero) {
+      throw new AppError('Número de manifiesto requerido', 400);
+    }
+
+    const manifiesto = await prisma.manifiesto.findFirst({
+      where: { numero },
+      select: {
+        numero: true,
+        estado: true,
+        createdAt: true,
+        fechaFirma: true,
+        fechaRetiro: true,
+        fechaEntrega: true,
+        fechaRecepcion: true,
+        fechaCierre: true,
+        generador: {
+          select: { razonSocial: true }
+        },
+        transportista: {
+          select: { razonSocial: true }
+        },
+        operador: {
+          select: { razonSocial: true }
+        },
+        residuos: {
+          select: {
+            cantidad: true,
+            unidad: true,
+            tipoResiduo: {
+              select: { nombre: true, codigo: true }
+            }
+          }
+        }
+      }
+    });
+
+    if (!manifiesto) {
+      res.status(404).json({
+        success: false,
+        message: 'Manifiesto no encontrado'
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: { manifiesto }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Zod schemas for input validation
 const createManifiestoSchema = z.object({
   generadorId: z.string().min(1, 'El generador es requerido').optional(),
@@ -83,8 +141,9 @@ export const getManifiestos = async (req: AuthRequest, res: Response, next: Next
     // Filtrar según el rol del usuario
     if (req.user.rol === 'GENERADOR' && req.user.generador) {
       where.generadorId = req.user.generador.id;
-    } else if (req.user.rol === 'TRANSPORTISTA' && req.user.transportista) {
-      where.transportistaId = req.user.transportista.id;
+    // DEMO MODE: transportista ve todos los manifiestos (sin filtro por transportistaId)
+    // } else if (req.user.rol === 'TRANSPORTISTA' && req.user.transportista) {
+    //   where.transportistaId = req.user.transportista.id;
     } else if (req.user.rol === 'OPERADOR' && req.user.operador) {
       where.operadorId = req.user.operador.id;
     }
@@ -919,8 +978,9 @@ export const getDashboardStats = async (req: AuthRequest, res: Response, next: N
     // Filtrar según rol
     if (req.user.rol === 'GENERADOR' && req.user.generador) {
       where.generadorId = req.user.generador.id;
-    } else if (req.user.rol === 'TRANSPORTISTA' && req.user.transportista) {
-      where.transportistaId = req.user.transportista.id;
+    // DEMO MODE: transportista ve todos los manifiestos (sin filtro por transportistaId)
+    // } else if (req.user.rol === 'TRANSPORTISTA' && req.user.transportista) {
+    //   where.transportistaId = req.user.transportista.id;
     } else if (req.user.rol === 'OPERADOR' && req.user.operador) {
       where.operadorId = req.user.operador.id;
     }
@@ -1332,6 +1392,115 @@ export const validarQR = async (req: AuthRequest, res: Response, next: NextFunct
         }
       }
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Actualizar manifiesto (solo BORRADOR)
+export const updateManifiesto = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+
+    const manifiesto = await prisma.manifiesto.findUnique({ where: { id } });
+    if (!manifiesto) {
+      throw new AppError('Manifiesto no encontrado', 404);
+    }
+
+    if (manifiesto.estado !== 'BORRADOR') {
+      throw new AppError('Solo se pueden editar manifiestos en estado BORRADOR', 400);
+    }
+
+    const { transportistaId, operadorId, observaciones, residuos } = req.body;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      // Actualizar residuos si se proporcionan
+      if (residuos && Array.isArray(residuos)) {
+        await tx.manifiestoResiduo.deleteMany({ where: { manifiestoId: id } });
+        for (const r of residuos) {
+          await tx.manifiestoResiduo.create({
+            data: {
+              manifiestoId: id,
+              tipoResiduoId: r.tipoResiduoId,
+              cantidad: r.cantidad,
+              unidad: r.unidad,
+              descripcion: r.descripcion,
+              estado: 'pendiente',
+            },
+          });
+        }
+      }
+
+      return tx.manifiesto.update({
+        where: { id },
+        data: {
+          ...(transportistaId && { transportistaId }),
+          ...(operadorId && { operadorId }),
+          ...(observaciones !== undefined && { observaciones }),
+        },
+        include: {
+          generador: true,
+          transportista: true,
+          operador: true,
+          residuos: { include: { tipoResiduo: true } },
+        },
+      });
+    });
+
+    res.json({ success: true, data: { manifiesto: updated } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Eliminar manifiesto (solo BORRADOR o CANCELADO)
+export const deleteManifiesto = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+
+    const manifiesto = await prisma.manifiesto.findUnique({ where: { id } });
+    if (!manifiesto) {
+      throw new AppError('Manifiesto no encontrado', 404);
+    }
+
+    if (manifiesto.estado !== 'BORRADOR' && manifiesto.estado !== 'CANCELADO') {
+      throw new AppError('Solo se pueden eliminar manifiestos en estado BORRADOR o CANCELADO', 400);
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.manifiestoResiduo.deleteMany({ where: { manifiestoId: id } });
+      await tx.eventoManifiesto.deleteMany({ where: { manifiestoId: id } });
+      await tx.trackingGPS.deleteMany({ where: { manifiestoId: id } });
+      await tx.manifiesto.delete({ where: { id } });
+    });
+
+    res.json({ success: true, message: 'Manifiesto eliminado' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Obtener tracking GPS del viaje actual de un manifiesto
+export const getViajeActual = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+
+    const manifiesto = await prisma.manifiesto.findUnique({
+      where: { id },
+      select: { id: true, estado: true },
+    });
+
+    if (!manifiesto) {
+      throw new AppError('Manifiesto no encontrado', 404);
+    }
+
+    const tracking = await prisma.trackingGPS.findMany({
+      where: { manifiestoId: id },
+      orderBy: { timestamp: 'asc' },
+      take: 500,
+    });
+
+    res.json({ success: true, data: tracking });
   } catch (error) {
     next(error);
   }

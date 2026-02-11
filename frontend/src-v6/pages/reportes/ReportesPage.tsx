@@ -18,6 +18,7 @@ import {
   MapPin,
   Map as MapIcon,
   Factory,
+  FlaskConical,
 } from 'lucide-react';
 import { Card } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -37,20 +38,22 @@ const GeneradoresTab = lazy(() => import('./tabs/GeneradoresTab'));
 const OperadoresTab = lazy(() => import('./tabs/OperadoresTab'));
 const DepartamentosTab = lazy(() => import('./tabs/DepartamentosTab'));
 const MapaActoresTab = lazy(() => import('./tabs/MapaActoresTab'));
+const TratamientosTab = lazy(() => import('./tabs/TratamientosTab'));
 
 // Lazy-load the modal from DepartamentosTab
 const DepartamentoDetalleModalLazy = lazy(() =>
   import('./tabs/DepartamentosTab').then(mod => ({ default: mod.DepartamentoDetalleModal }))
 );
 
-type TabType = 'manifiestos' | 'tratados' | 'transporte' | 'generadores' | 'operadores' | 'departamentos' | 'mapa';
+type TabType = 'manifiestos' | 'tratados' | 'transporte' | 'generadores' | 'operadores' | 'tratamientos' | 'departamentos' | 'mapa';
 
 const tabs: { id: TabType; label: string; icon: React.ElementType }[] = [
   { id: 'manifiestos', label: 'Manifiestos', icon: FileText },
   { id: 'tratados', label: 'Residuos Tratados', icon: Package },
   { id: 'transporte', label: 'Transporte', icon: Truck },
   { id: 'generadores', label: 'Generadores', icon: Factory },
-  { id: 'operadores', label: 'Operadores', icon: Factory },
+  { id: 'operadores', label: 'Operadores', icon: FlaskConical },
+  { id: 'tratamientos', label: 'Tratamientos', icon: FlaskConical },
   { id: 'departamentos', label: 'Departamentos', icon: MapPin },
   { id: 'mapa', label: 'Mapa de Actores', icon: MapIcon },
 ];
@@ -73,6 +76,7 @@ const ReportesPage: React.FC = () => {
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
   const [activeTab, setActiveTab] = useState<TabType>('manifiestos');
+  const [incluirTodos, setIncluirTodos] = useState(true);
 
   // ── Department detail modal ──
   const [selectedDep, setSelectedDep] = useState<string | null>(null);
@@ -103,10 +107,11 @@ const ReportesPage: React.FC = () => {
 
   // ── Centro Control data (for Departamentos + Mapa tabs) ──
   const ccParams = useMemo(() => ({
-    ...(fechaDesde ? { fechaDesde } : {}),
-    ...(fechaHasta ? { fechaHasta } : {}),
+    ...(fechaDesde && !incluirTodos ? { fechaDesde } : {}),
+    ...(fechaHasta && !incluirTodos ? { fechaHasta } : {}),
     capas: ['generadores', 'transportistas', 'operadores'],
-  }), [fechaDesde, fechaHasta]);
+    ...(incluirTodos ? { incluirTodos: 'true' } : {}),
+  }), [fechaDesde, fechaHasta, incluirTodos]);
 
   const { data: ccData } = useCentroControl(ccParams, 0);
 
@@ -223,17 +228,17 @@ const ReportesPage: React.FC = () => {
 
   return (
     <>
-      {/* ── Sticky Filter Bar + Tabs ── */}
-      <div className="sticky top-0 z-20 bg-[#FAFAF8] -mx-4 lg:-mx-8 px-4 lg:px-8 pt-2 pb-1">
-        {/* Period presets + export actions */}
-        <div className="flex flex-wrap items-center gap-3 p-3 bg-white rounded-2xl border border-neutral-100 shadow-sm">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <Calendar size={16} className="text-neutral-400" />
+      {/* Filter Bar (2 rows): Row 1 = dates + actions, Row 2 = tabs */}
+      <div className="sticky top-0 z-20 bg-[#FAFAF8] pt-2 pb-1 -mx-4 lg:-mx-8 px-4 lg:px-8">
+        {/* Row 1: Date presets + date inputs + period badge + export buttons */}
+        <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 bg-white rounded-t-xl border border-neutral-100 shadow-sm">
+          <div className="flex items-center gap-1 flex-wrap">
+            <Calendar size={14} className="text-neutral-400" />
             {DATE_PRESETS.map(p => (
               <button
                 key={p.days}
                 onClick={() => handleDatePreset(p.days)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
                   datePreset === p.days
                     ? 'bg-primary-50 text-primary-700 border border-primary-200'
                     : 'text-neutral-500 hover:bg-neutral-50 border border-transparent'
@@ -242,7 +247,7 @@ const ReportesPage: React.FC = () => {
                 {p.label}
               </button>
             ))}
-            <div className="hidden sm:flex items-center gap-1.5 ml-2 text-xs text-neutral-400">
+            <div className="hidden sm:flex items-center gap-1.5 ml-1 text-xs text-neutral-400">
               <input
                 type="date"
                 value={fechaDesde}
@@ -258,45 +263,53 @@ const ReportesPage: React.FC = () => {
               />
             </div>
           </div>
-          <div className="ml-auto flex items-center gap-2">
-            <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border ${
+          <div className="ml-auto flex items-center gap-1.5 w-full sm:w-auto mt-2 sm:mt-0 justify-end">
+            <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${
               datePreset === 0
                 ? 'text-neutral-600 bg-neutral-100 border-neutral-200'
                 : 'text-amber-700 bg-amber-50 border-amber-200'
             }`}>
-              <Calendar size={11} />
+              <Calendar size={10} />
               {periodoLabel}
             </span>
             {isReportTab && (
               <>
-                <Button variant="outline" size="sm" leftIcon={<Printer size={14} />} onClick={() => window.print()} className="hidden sm:inline-flex">Imprimir</Button>
-                <Button variant="outline" size="sm" leftIcon={exportarReporte.isPending ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} onClick={handleExportCSV} disabled={exportarReporte.isPending}>CSV</Button>
-                <Button size="sm" leftIcon={<FileDown size={14} />} onClick={handleExportPDF} disabled={!activeQuery?.data}>PDF</Button>
+                <button onClick={() => window.print()} className="hidden sm:flex p-1.5 rounded-md text-neutral-500 hover:bg-neutral-100 transition-colors" title="Imprimir"><Printer size={14} /></button>
+                <button onClick={handleExportCSV} disabled={exportarReporte.isPending} className="p-1.5 rounded-md text-neutral-500 hover:bg-neutral-100 transition-colors disabled:opacity-50" title="CSV">
+                  {exportarReporte.isPending ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                </button>
+                <button onClick={handleExportPDF} disabled={!activeQuery?.data} className="p-1.5 rounded-md bg-primary-500 text-white hover:bg-primary-600 transition-colors disabled:opacity-50" title="PDF"><FileDown size={14} /></button>
               </>
             )}
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex border-b border-neutral-200 gap-1 overflow-x-auto mt-1">
-          {tabs.map(tab => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${
-                  isActive
-                    ? 'border-primary-600 text-primary-600 bg-primary-50/50'
-                    : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50'
-                }`}
-              >
-                <Icon size={16} />
-                {tab.label}
-              </button>
-            );
-          })}
+        {/* Row 2: Tabs — horizontally scrollable with gradient fade indicators */}
+        <div className="relative bg-white rounded-b-xl border-x border-b border-neutral-100">
+          {/* Left gradient fade */}
+          <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-white to-transparent z-10 rounded-bl-xl" />
+          {/* Right gradient fade */}
+          <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white to-transparent z-10 rounded-br-xl" />
+          <div className="flex items-center gap-0.5 px-2 overflow-x-auto scrollbar-hide">
+            {tabs.map(tab => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2.5 sm:py-2 text-xs font-medium border-b-2 transition-all whitespace-nowrap ${
+                    isActive
+                      ? 'border-primary-600 text-primary-600'
+                      : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50'
+                  }`}
+                >
+                  <Icon size={14} />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -343,9 +356,10 @@ const ReportesPage: React.FC = () => {
       ) : (
         <>
           {activeTab === 'departamentos' && <DepartamentosTab ccData={ccData || null} onSelectDep={handleSelectDep} periodoLabel={periodoLabel} />}
-          {activeTab === 'mapa' && <MapaActoresTab ccData={ccData || null} onSelectDep={handleSelectDep} periodoLabel={periodoLabel} />}
+          {activeTab === 'mapa' && <MapaActoresTab ccData={ccData || null} onSelectDep={handleSelectDep} periodoLabel={periodoLabel} incluirTodos={incluirTodos} onToggleIncluirTodos={setIncluirTodos} />}
           {activeTab === 'generadores' && <GeneradoresTab ccData={ccData || null} periodoLabel={periodoLabel} />}
           {activeTab === 'operadores' && <OperadoresTab ccData={ccData || null} periodoLabel={periodoLabel} />}
+          {activeTab === 'tratamientos' && <TratamientosTab periodoLabel={periodoLabel} />}
         </>
       )}
       </Suspense>

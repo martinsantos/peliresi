@@ -14,7 +14,7 @@ import {
   FileText,
   Factory,
   Truck,
-  Building2,
+  FlaskConical,
   Calendar,
   Package,
   AlertTriangle,

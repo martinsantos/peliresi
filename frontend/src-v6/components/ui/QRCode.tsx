@@ -111,9 +111,10 @@ export const QRCode: React.FC<QRCodeProps> = ({
           {/* Fondo con padding blanco */}
           <div className="bg-white p-4 rounded-xl shadow-lg border-2 border-neutral-100">
             {/* Grid del QR */}
-            <div 
+            <div
+              data-qr-grid
               className="grid gap-0"
-              style={{ 
+              style={{
                 gridTemplateColumns: 'repeat(29, 1fr)',
                 width: '200px',
                 height: '200px'
@@ -183,7 +184,36 @@ export const QRCodeModal: React.FC<QRCodeModalProps> = ({
   if (!isOpen) return null;
 
   const handleDownload = () => {
-    // TODO: implement QR download
+    const qrEl = document.querySelector('[data-qr-grid]') as HTMLElement;
+    if (!qrEl) return;
+
+    // Use canvas to capture the QR grid
+    const canvas = document.createElement('canvas');
+    const size = 580; // 29 cells * 20px
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size, size);
+
+    const cells = qrEl.children;
+    const cellSize = 20;
+    for (let i = 0; i < cells.length; i++) {
+      const cell = cells[i] as HTMLElement;
+      const row = Math.floor(i / 29);
+      const col = i % 29;
+      if (cell.classList.contains('bg-neutral-900')) {
+        ctx.fillStyle = '#171717';
+        ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+      }
+    }
+
+    const link = document.createElement('a');
+    link.download = `QR-${manifiestoId}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
   };
 
   const handleShare = async () => {

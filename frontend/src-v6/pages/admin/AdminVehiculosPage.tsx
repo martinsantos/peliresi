@@ -207,14 +207,14 @@ export const AdminVehiculosPage: React.FC = () => {
         <div className="flex items-center justify-end gap-1">
           <button
             className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-            onClick={() => navigate(isMobile ? '/mobile/actores/transportistas/' + row.transportistaId : '/actores/transportistas/' + row.transportistaId)}
+            onClick={() => navigate(isMobile ? '/mobile/admin/actores/transportistas/' + row.transportistaId : '/admin/actores/transportistas/' + row.transportistaId)}
             title="Ver transportista"
           >
             <Eye size={16} />
           </button>
           <button
             className="p-1.5 text-neutral-400 hover:text-info-600 hover:bg-info-50 rounded-lg transition-colors"
-            onClick={() => navigate(isMobile ? '/mobile/actores/transportistas/' + row.transportistaId : '/actores/transportistas/' + row.transportistaId)}
+            onClick={() => navigate(isMobile ? '/mobile/admin/actores/transportistas/' + row.transportistaId : '/admin/actores/transportistas/' + row.transportistaId)}
             title="Editar vehículo"
           >
             <Edit size={16} />
@@ -223,7 +223,7 @@ export const AdminVehiculosPage: React.FC = () => {
             className="p-1.5 text-neutral-400 hover:text-error-600 hover:bg-error-50 rounded-lg transition-colors"
             onClick={() => {
               if (window.confirm('La gestión de vehículos se realiza desde la ficha del transportista. ¿Desea ir a la ficha del transportista?')) {
-                navigate(isMobile ? '/mobile/actores/transportistas/' + row.transportistaId : '/actores/transportistas/' + row.transportistaId);
+                navigate(isMobile ? '/mobile/admin/actores/transportistas/' + row.transportistaId : '/admin/actores/transportistas/' + row.transportistaId);
               }
             }}
             title="Eliminar vehículo"
@@ -256,7 +256,7 @@ export const AdminVehiculosPage: React.FC = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -352,7 +352,8 @@ export const AdminVehiculosPage: React.FC = () => {
                     selectable
                     selectedKeys={selectedRows}
                     onSelectionChange={setSelectedRows}
-                    onRowClick={(row) => navigate(isMobile ? `/mobile/actores/transportistas/${row.transportistaId}` : `/actores/transportistas/${row.transportistaId}`)}
+                    onRowClick={(row) => navigate(isMobile ? `/mobile/admin/actores/transportistas/${row.transportistaId}` : `/admin/actores/transportistas/${row.transportistaId}`)}
+                    stickyHeader
                   />
                   <Pagination
                     currentPage={currentPage}

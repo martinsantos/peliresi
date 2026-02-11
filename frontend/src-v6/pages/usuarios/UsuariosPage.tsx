@@ -17,6 +17,7 @@ import {
   Shield,
   Factory,
   Truck,
+  FlaskConical,
   Building2,
   Mail,
   Phone,
@@ -41,7 +42,7 @@ import { Badge } from '../../components/ui/BadgeV2';
 import { Modal, ConfirmModal } from '../../components/ui/Modal';
 import { toast } from '../../components/ui/Toast';
 import { Table, Pagination } from '../../components/ui/Table';
-import { Tabs, TabList, Tab, TabPanel } from '../../components/ui/Tabs';
+import { Tabs, TabList, Tab } from '../../components/ui/Tabs';
 import { useUsuarios, useCreateUsuario, useDeleteUsuario, useUpdateUsuario, useToggleUsuarioActivo } from '../../hooks/useUsuarios';
 import { downloadCsv } from '../../utils/exportCsv';
 import type { Rol } from '../../types/models';
@@ -66,11 +67,11 @@ type UsuarioLocal = {
 // CONFIGURACION DE ROLES
 // ========================================
 const rolConfig = {
-  ADMIN: { label: 'Administrador', icon: Shield, color: 'primary', bgColor: 'bg-primary-100', textColor: 'text-primary-700', borderColor: 'border-primary-200' },
-  GENERADOR: { label: 'Generador', icon: Factory, color: 'purple', bgColor: 'bg-purple-100', textColor: 'text-purple-700', borderColor: 'border-purple-200' },
-  TRANSPORTISTA: { label: 'Transportista', icon: Truck, color: 'orange', bgColor: 'bg-orange-100', textColor: 'text-orange-700', borderColor: 'border-orange-200' },
-  OPERADOR: { label: 'Operador', icon: Building2, color: 'green', bgColor: 'bg-green-100', textColor: 'text-green-700', borderColor: 'border-green-200' },
-  AUDITOR: { label: 'Auditor', icon: User, color: 'info', bgColor: 'bg-info-100', textColor: 'text-info-700', borderColor: 'border-info-200' },
+  ADMIN: { label: 'Administrador General', icon: Shield, color: 'primary', bgColor: 'bg-primary-100', textColor: 'text-primary-700', borderColor: 'border-primary-200' },
+  GENERADOR: { label: 'Admin de Generadores', icon: Factory, color: 'purple', bgColor: 'bg-purple-100', textColor: 'text-purple-700', borderColor: 'border-purple-200' },
+  TRANSPORTISTA: { label: 'Admin de Transporte', icon: Truck, color: 'orange', bgColor: 'bg-orange-100', textColor: 'text-orange-700', borderColor: 'border-orange-200' },
+  OPERADOR: { label: 'Admin de Operadores', icon: FlaskConical, color: 'blue', bgColor: 'bg-blue-100', textColor: 'text-blue-700', borderColor: 'border-blue-200' },
+  AUDITOR: { label: 'Admin Auditor', icon: User, color: 'info', bgColor: 'bg-info-100', textColor: 'text-info-700', borderColor: 'border-info-200' },
   CONSULTOR: { label: 'Consultor', icon: User, color: 'neutral', bgColor: 'bg-neutral-100', textColor: 'text-neutral-700', borderColor: 'border-neutral-200' },
 };
 
@@ -317,6 +318,7 @@ const UsuariosPage: React.FC = () => {
       key: 'rol',
       width: '13%',
       header: 'Rol',
+      hiddenBelow: 'sm' as const,
       render: (row: UsuarioLocal) => {
         const config = rolConfig[row.rol as keyof typeof rolConfig];
         if (!config) return <Badge variant="soft" color="neutral">{row.rol}</Badge>;
@@ -425,90 +427,12 @@ const UsuariosPage: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-neutral-900">Gestion de Usuarios</h2>
-          <p className="text-neutral-600 mt-1">
-            {apiLoading ? (
-              <span className="flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Cargando usuarios...</span>
-            ) : (
-              <>{stats.total} perfiles registrados {'\u2022'} {stats.activos} activos {apiError ? '(error al cargar)' : ''}</>
-            )}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" leftIcon={<Download size={18} />} onClick={() => downloadCsv(usuarios.map(u => ({ Nombre: u.nombre, Email: u.email, Teléfono: u.telefono, Rol: u.rol, Sector: u.sector, Estado: u.estado, UltimoAcceso: u.ultimoAcceso })), 'usuarios')}>
-            Exportar
-          </Button>
-          <Button leftIcon={<UserPlus size={18} />} onClick={() => setModalCrear(true)}>
-            Nuevo Usuario
-          </Button>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="border-l-4 border-l-primary-500">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-neutral-600 mb-1">Administradores</p>
-                <p className="text-2xl font-bold text-neutral-900">{stats.admins}</p>
-              </div>
-              <div className="p-2 bg-primary-100 rounded-lg">
-                <Shield size={20} className="text-primary-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-l-4 border-l-purple-500">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-neutral-600 mb-1">Generadores</p>
-                <p className="text-2xl font-bold text-neutral-900">{stats.generadores}</p>
-              </div>
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Factory size={20} className="text-purple-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-l-4 border-l-orange-500">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-neutral-600 mb-1">Transportistas</p>
-                <p className="text-2xl font-bold text-neutral-900">{stats.transportistas}</p>
-              </div>
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <Truck size={20} className="text-orange-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-l-4 border-l-green-500">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-neutral-600 mb-1">Operadores</p>
-                <p className="text-2xl font-bold text-neutral-900">{stats.operadores}</p>
-              </div>
-              <div className="p-2 bg-green-100 rounded-lg">
-                <Building2 size={20} className="text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Tabs y Filtros */}
-      <Card>
-        <CardContent className="p-4">
-          <Tabs activeTab={activeTab} onChange={setActiveTab}>
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
+    <>
+      {/* Filter bar */}
+      <div className="pt-2 pb-2">
+        <div className="p-3 bg-white rounded-2xl border border-neutral-100 shadow-sm">
+          <Tabs activeTab={activeTab} onChange={(t) => { setActiveTab(t); setCurrentPage(1); }}>
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-3">
               <TabList>
                 <Tab id="todos">
                   Todos
@@ -548,145 +472,212 @@ const UsuariosPage: React.FC = () => {
                 </button>
               </div>
             </div>
-
-            {/* Filtros */}
-            <div className="flex flex-col md:flex-row gap-4 mb-4">
-              <div className="flex-1">
-                <Input
-                  placeholder="Buscar por nombre, email, sector o ubicacion..."
-                  value={busqueda}
-                  onChange={(e) => setBusqueda(e.target.value)}
-                  leftIcon={<Search size={18} />}
-                />
-              </div>
-              <div className="flex gap-2">
-                <select
-                  value={filtroRol}
-                  onChange={(e) => setFiltroRol(e.target.value)}
-                  className="px-4 py-2 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
-                >
-                  <option value="todos">Todos los roles</option>
-                  <option value="ADMIN">Administradores</option>
-                  <option value="GENERADOR">Generadores</option>
-                  <option value="TRANSPORTISTA">Transportistas</option>
-                  <option value="OPERADOR">Operadores</option>
-                </select>
-                <select
-                  value={filtroEstado}
-                  onChange={(e) => setFiltroEstado(e.target.value)}
-                  className="px-4 py-2 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
-                >
-                  <option value="todos">Todos los estados</option>
-                  <option value="activo">Activos</option>
-                  <option value="pendiente">Pendientes</option>
-                  <option value="inactivo">Inactivos</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Contenido segun vista */}
-            <TabPanel id="todos">
-              {vistaMode === 'list' ? (
-                <>
-                  <Table
-                    data={usuariosPaginados}
-                    columns={columns}
-                    keyExtractor={(row) => row.id.toString()}
-                    selectable
-                    selectedKeys={selectedRows}
-                    onSelectionChange={setSelectedRows}
-                  />
-                  <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    totalItems={usuariosFiltrados.length}
-                    itemsPerPage={itemsPerPage}
-                    onPageChange={setCurrentPage}
-                  />
-                </>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {usuariosPaginados.map((usuario) => {
-                    const config = rolConfig[usuario.rol as keyof typeof rolConfig];
-                    const Icon = config?.icon || User;
-                    return (
-                      <Card key={usuario.id} className="hover:shadow-md transition-shadow">
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between mb-4">
-                            <div className="flex items-center gap-3">
-                              <div className={`w-12 h-12 rounded-full flex items-center justify-center font-semibold ${config?.bgColor || 'bg-neutral-100'} ${config?.textColor || 'text-neutral-700'}`}>
-                                {usuario.avatar}
-                              </div>
-                              <div>
-                                <h4 className="font-semibold text-neutral-900">{usuario.nombre}</h4>
-                                <p className="text-sm text-neutral-500">{usuario.email}</p>
-                              </div>
-                            </div>
-                            <Badge
-                              variant="soft"
-                              color={usuario.estado === 'activo' ? 'success' : usuario.estado === 'pendiente' ? 'warning' : 'neutral'}
-                            >
-                              {usuario.estado}
-                            </Badge>
-                          </div>
-
-                          <div className="space-y-2 mb-4">
-                            <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium ${config?.bgColor || 'bg-neutral-100'} ${config?.textColor || 'text-neutral-700'}`}>
-                              <Icon size={12} />
-                              {config?.label || usuario.rol}
-                            </div>
-                            <p className="text-sm text-neutral-600">
-                              <Building2 size={12} className="inline mr-1" />
-                              {usuario.sector}
-                            </p>
-                            {usuario.ubicacion && (
-                              <p className="text-sm text-neutral-500">
-                                <MapPin size={12} className="inline mr-1" />
-                                {usuario.ubicacion}
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="flex items-center justify-between pt-4 border-t border-neutral-100">
-                            <div className="text-center">
-                              <p className="text-lg font-bold text-neutral-900">{usuario.manifiestos}</p>
-                              <p className="text-xs text-neutral-500">Manifiestos</p>
-                            </div>
-                            <div className="flex gap-1">
-                              <Button variant="ghost" size="sm" className="p-2" onClick={() => verUsuario(usuario)}>
-                                <Eye size={16} />
-                              </Button>
-                              <Button
-                                variant="ghost" size="sm" className="p-2 text-error-500"
-                                onClick={() => { setUsuarioSeleccionado(usuario); setModalEliminar(true); }}
-                              >
-                                <Trash2 size={16} />
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              )}
-            </TabPanel>
-
-            <TabPanel id="admin">
-              <Table data={usuariosPaginados} columns={columns} keyExtractor={(row) => row.id.toString()} />
-            </TabPanel>
-            <TabPanel id="generador">
-              <Table data={usuariosPaginados} columns={columns} keyExtractor={(row) => row.id.toString()} />
-            </TabPanel>
-            <TabPanel id="transportista">
-              <Table data={usuariosPaginados} columns={columns} keyExtractor={(row) => row.id.toString()} />
-            </TabPanel>
-            <TabPanel id="operador">
-              <Table data={usuariosPaginados} columns={columns} keyExtractor={(row) => row.id.toString()} />
-            </TabPanel>
           </Tabs>
-        </CardContent>
-      </Card>
+
+          {/* Filtros */}
+          <div className="flex flex-col md:flex-row gap-3">
+            <div className="flex-1">
+              <Input
+                placeholder="Buscar por nombre, email, sector o ubicacion..."
+                value={busqueda}
+                onChange={(e) => { setBusqueda(e.target.value); setCurrentPage(1); }}
+                leftIcon={<Search size={18} />}
+              />
+            </div>
+            <div className="flex gap-2">
+              <select
+                value={filtroRol}
+                onChange={(e) => { setFiltroRol(e.target.value); setCurrentPage(1); }}
+                className="px-4 py-2 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
+              >
+                <option value="todos">Todos los roles</option>
+                <option value="ADMIN">Administradores</option>
+                <option value="GENERADOR">Generadores</option>
+                <option value="TRANSPORTISTA">Transportistas</option>
+                <option value="OPERADOR">Operadores</option>
+              </select>
+              <select
+                value={filtroEstado}
+                onChange={(e) => { setFiltroEstado(e.target.value); setCurrentPage(1); }}
+                className="px-4 py-2 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
+              >
+                <option value="todos">Todos los estados</option>
+                <option value="activo">Activos</option>
+                <option value="pendiente">Pendientes</option>
+                <option value="inactivo">Inactivos</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Scrollable page content */}
+      <div className="space-y-6 pt-4 animate-fade-in">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-neutral-900">Gestion de Usuarios</h2>
+            <p className="text-neutral-600 mt-1">
+              {apiLoading ? (
+                <span className="flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Cargando usuarios...</span>
+              ) : (
+                <>{stats.total} perfiles registrados {'\u2022'} {stats.activos} activos {apiError ? '(error al cargar)' : ''}</>
+              )}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" leftIcon={<Download size={18} />} onClick={() => downloadCsv(usuarios.map(u => ({ Nombre: u.nombre, Email: u.email, Teléfono: u.telefono, Rol: u.rol, Sector: u.sector, Estado: u.estado, UltimoAcceso: u.ultimoAcceso })), 'usuarios')}>
+              Exportar
+            </Button>
+            <Button leftIcon={<UserPlus size={18} />} onClick={() => setModalCrear(true)}>
+              Nuevo Usuario
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="border-l-4 border-l-primary-500">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-neutral-600 mb-1">Administradores</p>
+                  <p className="text-2xl font-bold text-neutral-900">{stats.admins}</p>
+                </div>
+                <div className="p-2 bg-primary-100 rounded-lg">
+                  <Shield size={20} className="text-primary-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-l-4 border-l-purple-500">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-neutral-600 mb-1">Generadores</p>
+                  <p className="text-2xl font-bold text-neutral-900">{stats.generadores}</p>
+                </div>
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <Factory size={20} className="text-purple-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-l-4 border-l-orange-500">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-neutral-600 mb-1">Transportistas</p>
+                  <p className="text-2xl font-bold text-neutral-900">{stats.transportistas}</p>
+                </div>
+                <div className="p-2 bg-orange-100 rounded-lg">
+                  <Truck size={20} className="text-orange-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-l-4 border-l-blue-500">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-neutral-600 mb-1">Operadores</p>
+                  <p className="text-2xl font-bold text-neutral-900">{stats.operadores}</p>
+                </div>
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <FlaskConical size={20} className="text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Table or Grid content - filtered by activeTab state, no TabPanel needed */}
+        {vistaMode === 'list' ? (
+          <>
+            <Table
+              data={usuariosPaginados}
+              columns={columns}
+              keyExtractor={(row) => row.id.toString()}
+              selectable
+              selectedKeys={selectedRows}
+              onSelectionChange={setSelectedRows}
+              stickyHeader
+            />
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={usuariosFiltrados.length}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+            />
+          </>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {usuariosPaginados.map((usuario) => {
+              const config = rolConfig[usuario.rol as keyof typeof rolConfig];
+              const Icon = config?.icon || User;
+              return (
+                <Card key={usuario.id} className="hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center font-semibold ${config?.bgColor || 'bg-neutral-100'} ${config?.textColor || 'text-neutral-700'}`}>
+                          {usuario.avatar}
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-neutral-900">{usuario.nombre}</h4>
+                          <p className="text-sm text-neutral-500">{usuario.email}</p>
+                        </div>
+                      </div>
+                      <Badge
+                        variant="soft"
+                        color={usuario.estado === 'activo' ? 'success' : usuario.estado === 'pendiente' ? 'warning' : 'neutral'}
+                      >
+                        {usuario.estado}
+                      </Badge>
+                    </div>
+
+                    <div className="space-y-2 mb-4">
+                      <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium ${config?.bgColor || 'bg-neutral-100'} ${config?.textColor || 'text-neutral-700'}`}>
+                        <Icon size={12} />
+                        {config?.label || usuario.rol}
+                      </div>
+                      <p className="text-sm text-neutral-600">
+                        <Building2 size={12} className="inline mr-1" />
+                        {usuario.sector}
+                      </p>
+                      {usuario.ubicacion && (
+                        <p className="text-sm text-neutral-500">
+                          <MapPin size={12} className="inline mr-1" />
+                          {usuario.ubicacion}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-4 border-t border-neutral-100">
+                      <div className="text-center">
+                        <p className="text-lg font-bold text-neutral-900">{usuario.manifiestos}</p>
+                        <p className="text-xs text-neutral-500">Manifiestos</p>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" className="p-2" onClick={() => verUsuario(usuario)}>
+                          <Eye size={16} />
+                        </Button>
+                        <Button
+                          variant="ghost" size="sm" className="p-2 text-error-500"
+                          onClick={() => { setUsuarioSeleccionado(usuario); setModalEliminar(true); }}
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Modal Ver Usuario */}
       <Modal
@@ -845,7 +836,7 @@ const UsuariosPage: React.FC = () => {
         cancelText="Cancelar"
         variant="danger"
       />
-    </div>
+    </>
   );
 };
 

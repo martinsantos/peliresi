@@ -1,20 +1,20 @@
 /**
  * SITREP v6 - Gestion de Actores Page
  * ===================================
- * Administracion de generadores, transportistas y operadores
+ * Vista unificada de generadores, transportistas y operadores
+ * Con filtros sticky, tabs, Table component y pagination
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import {
   Users,
   Factory,
   Truck,
-  Building2,
+  FlaskConical,
   Search,
   Plus,
-  Filter,
   Edit,
   Eye,
   FileText,
@@ -24,13 +24,20 @@ import {
   XCircle,
   ChevronRight,
   Trash2,
-  ArrowLeft
+  ArrowLeft,
+  Download,
+  List,
+  Grid3X3,
+  Loader2,
 } from 'lucide-react';
-import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
+import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Modal, ConfirmModal } from '../../components/ui/Modal';
+import { Table, Pagination } from '../../components/ui/Table';
+import { Tabs, TabList, Tab } from '../../components/ui/Tabs';
+import { downloadCsv } from '../../utils/exportCsv';
 import {
   useGeneradores,
   useTransportistas,
@@ -46,7 +53,7 @@ import {
 const tipoConfig = {
   generador: { label: 'Generador', icon: Factory, color: 'purple' },
   transportista: { label: 'Transportista', icon: Truck, color: 'orange' },
-  operador: { label: 'Operador', icon: Building2, color: 'green' },
+  operador: { label: 'Operador', icon: FlaskConical, color: 'blue' },
 };
 
 const INITIAL_FORM = {
@@ -66,14 +73,20 @@ const INITIAL_FORM = {
 export const ActoresPage: React.FC = () => {
   const navigate = useNavigate();
   const mp = useMobilePrefix();
-  const [filtroTipo, setFiltroTipo] = useState<string>('todos');
+  const [activeTab, setActiveTab] = useState('todos');
   const [busqueda, setBusqueda] = useState('');
+  const [filtroEstado, setFiltroEstado] = useState('todos');
+  const [vistaMode, setVistaMode] = useState<'grid' | 'list'>('list');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [actorSeleccionado, setActorSeleccionado] = useState<any>(null);
   const [modalDetalle, setModalDetalle] = useState(false);
   const [modalCrear, setModalCrear] = useState(false);
   const [modalEliminar, setModalEliminar] = useState(false);
   const [actorEliminar, setActorEliminar] = useState<{ id: string; tipo: string; razonSocial: string } | null>(null);
   const [form, setForm] = useState(INITIAL_FORM);
+
+  const itemsPerPage = 10;
 
   // API hooks
   const { data: generadoresData, isLoading: loadingGen } = useGeneradores({ search: busqueda || undefined });
@@ -90,29 +103,56 @@ export const ActoresPage: React.FC = () => {
   const isLoading = loadingGen || loadingTrans || loadingOp;
 
   // Build unified list from API data
-  const actoresFromApi: any[] = [];
-  if (generadoresData?.items && Array.isArray(generadoresData.items)) {
-    generadoresData.items.forEach((g: any) => actoresFromApi.push({ ...g, tipo: 'generador' }));
-  }
-  if (transportistasData?.items && Array.isArray(transportistasData.items)) {
-    transportistasData.items.forEach((t: any) => actoresFromApi.push({ ...t, tipo: 'transportista' }));
-  }
-  if (operadoresData?.items && Array.isArray(operadoresData.items)) {
-    operadoresData.items.forEach((o: any) => actoresFromApi.push({ ...o, tipo: 'operador' }));
-  }
-
-  const actoresData = actoresFromApi;
+  const actoresData = useMemo(() => {
+    const list: any[] = [];
+    if (generadoresData?.items && Array.isArray(generadoresData.items)) {
+      generadoresData.items.forEach((g: any) => list.push({ ...g, tipo: 'generador' }));
+    }
+    if (transportistasData?.items && Array.isArray(transportistasData.items)) {
+      transportistasData.items.forEach((t: any) => list.push({ ...t, tipo: 'transportista' }));
+    }
+    if (operadoresData?.items && Array.isArray(operadoresData.items)) {
+      operadoresData.items.forEach((o: any) => list.push({ ...o, tipo: 'operador' }));
+    }
+    return list;
+  }, [generadoresData, transportistasData, operadoresData]);
 
   const generadoresCount = generadoresData?.total ?? actoresData.filter(a => a.tipo === 'generador').length;
   const transportistasCount = transportistasData?.total ?? actoresData.filter(a => a.tipo === 'transportista').length;
   const operadoresCount = operadoresData?.total ?? actoresData.filter(a => a.tipo === 'operador').length;
   const totalCount = generadoresCount + transportistasCount + operadoresCount;
 
-  // Server handles search; client filters by tipo
-  const actoresFiltrados = actoresData.filter(actor => {
-    const matchTipo = filtroTipo === 'todos' || actor.tipo === filtroTipo;
-    return matchTipo;
-  });
+  const tabCounts = {
+    todos: totalCount,
+    generador: generadoresCount,
+    transportista: transportistasCount,
+    operador: operadoresCount,
+  };
+
+  // Filter by tab + estado
+  const actoresFiltrados = useMemo(() => {
+    let filtered = actoresData;
+
+    if (activeTab !== 'todos') {
+      filtered = filtered.filter(a => a.tipo === activeTab);
+    }
+
+    if (filtroEstado !== 'todos') {
+      filtered = filtered.filter(a => {
+        const isActivo = a.activo !== false && a.estado !== 'inactivo';
+        return filtroEstado === 'activo' ? isActivo : !isActivo;
+      });
+    }
+
+    return filtered;
+  }, [actoresData, activeTab, filtroEstado]);
+
+  // Pagination
+  const totalPages = Math.ceil(actoresFiltrados.length / itemsPerPage);
+  const actoresPaginados = actoresFiltrados.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const verDetalle = (actor: any) => {
     setActorSeleccionado(actor);
@@ -162,230 +202,375 @@ export const ActoresPage: React.FC = () => {
 
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
-  return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          {isMobile && (
-            <button
-              onClick={() => navigate(-1)}
-              className="p-2 -ml-2 hover:bg-neutral-100 rounded-lg transition-colors"
-            >
-              <ArrowLeft size={20} className="text-neutral-600" />
-            </button>
-          )}
-          <div>
-            <h2 className="text-2xl font-bold text-neutral-900">Gestion de Actores</h2>
-            <p className="text-neutral-600 mt-1">
-              Administra generadores, transportistas y operadores
-            </p>
-          </div>
-        </div>
-        <Button leftIcon={<Plus size={18} />} onClick={() => setModalCrear(true)}>
-          Nuevo Actor
-        </Button>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card
-          className="bg-purple-50 border-purple-200 hover:shadow-md hover:border-purple-300 transition-all cursor-pointer group"
-          onClick={() => navigate(mp('/admin/generadores'))}
-        >
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg group-hover:scale-110 transition-transform">
-              <Factory size={20} className="text-purple-600" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm text-purple-700">Generadores</p>
-              <p className="text-2xl font-bold text-purple-900">{generadoresCount}</p>
-            </div>
-            <ChevronRight size={16} className="text-purple-400" />
-          </CardContent>
-        </Card>
-        <Card
-          className="bg-orange-50 border-orange-200 hover:shadow-md hover:border-orange-300 transition-all cursor-pointer group"
-          onClick={() => navigate(mp('/actores/transportistas'))}
-        >
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 bg-orange-100 rounded-lg group-hover:scale-110 transition-transform">
-              <Truck size={20} className="text-orange-600" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm text-orange-700">Transportistas</p>
-              <p className="text-2xl font-bold text-orange-900">{transportistasCount}</p>
-            </div>
-            <ChevronRight size={16} className="text-orange-400" />
-          </CardContent>
-        </Card>
-        <Card
-          className="bg-green-50 border-green-200 hover:shadow-md hover:border-green-300 transition-all cursor-pointer group"
-          onClick={() => navigate(mp('/actores/operadores'))}
-        >
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg group-hover:scale-110 transition-transform">
-              <Building2 size={20} className="text-green-600" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm text-green-700">Operadores</p>
-              <p className="text-2xl font-bold text-green-900">{operadoresCount}</p>
-            </div>
-            <ChevronRight size={16} className="text-green-400" />
-          </CardContent>
-        </Card>
-        <Card className="bg-neutral-50 border-neutral-200">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 bg-neutral-100 rounded-lg">
-              <Users size={20} className="text-neutral-600" />
+  // Table columns
+  const columns = [
+    {
+      key: 'actor',
+      width: '28%',
+      header: 'Actor',
+      render: (row: any) => {
+        const config = tipoConfig[row.tipo as keyof typeof tipoConfig] || tipoConfig['generador'];
+        const Icon = config.icon;
+        return (
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center bg-${config.color}-100`}>
+              <Icon size={18} className={`text-${config.color}-600`} />
             </div>
             <div>
-              <p className="text-sm text-neutral-700">Total</p>
-              <p className="text-2xl font-bold text-neutral-900">{totalCount}</p>
+              <p className="font-semibold text-neutral-900">{row.razonSocial}</p>
+              <p className="text-sm text-neutral-500 font-mono">{row.cuit}</p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'tipo',
+      width: '12%',
+      header: 'Tipo',
+      render: (row: any) => {
+        const config = tipoConfig[row.tipo as keyof typeof tipoConfig];
+        return <Badge variant="soft" color={config?.color as any}>{config?.label}</Badge>;
+      },
+    },
+    {
+      key: 'contacto',
+      width: '22%',
+      hiddenBelow: 'md' as const,
+      header: 'Contacto',
+      render: (row: any) => (
+        <div className="space-y-1">
+          <div className="flex items-center gap-1 text-sm text-neutral-600">
+            <Mail size={14} />
+            <span className="truncate max-w-[150px]">{row.email}</span>
+          </div>
+          <div className="flex items-center gap-1 text-sm text-neutral-600">
+            <Phone size={14} />
+            <span>{row.telefono}</span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'estado',
+      width: '10%',
+      header: 'Estado',
+      render: (row: any) => {
+        const isActivo = row.activo !== false && row.estado !== 'inactivo';
+        return (
+          <Badge variant="soft" color={isActivo ? 'success' : 'neutral'}>
+            {isActivo ? 'Activo' : 'Inactivo'}
+          </Badge>
+        );
+      },
+    },
+    {
+      key: 'acciones',
+      width: '15%',
+      header: '',
+      align: 'right' as const,
+      render: (row: any) => (
+        <div className="flex items-center justify-end gap-1">
+          <Button variant="ghost" size="sm" className="p-2" onClick={(e: any) => { e.stopPropagation(); verDetalle(row); }}>
+            <Eye size={16} />
+          </Button>
+          <Button variant="ghost" size="sm" className="p-2" onClick={(e: any) => { e.stopPropagation(); }}>
+            <Edit size={16} />
+          </Button>
+          <Button
+            variant="ghost" size="sm" className="p-2 text-error-500 hover:text-error-600"
+            onClick={(e: any) => {
+              e.stopPropagation();
+              setActorEliminar({ id: row.id, tipo: row.tipo, razonSocial: row.razonSocial });
+              setModalEliminar(true);
+            }}
+          >
+            <Trash2 size={16} />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <>
+      {/* Filter bar */}
+      <div className="pt-2 pb-2">
+        <div className="p-3 bg-white rounded-2xl border border-neutral-100 shadow-sm">
+          <Tabs activeTab={activeTab} onChange={(t) => { setActiveTab(t); setCurrentPage(1); }}>
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-3">
+              <TabList>
+                <Tab id="todos">
+                  Todos
+                  <Badge variant="soft" color="neutral" className="ml-2">{tabCounts.todos}</Badge>
+                </Tab>
+                <Tab id="generador">
+                  Generadores
+                  <Badge variant="soft" color="purple" className="ml-2">{tabCounts.generador}</Badge>
+                </Tab>
+                <Tab id="transportista">
+                  Transportistas
+                  <Badge variant="soft" color="warning" className="ml-2">{tabCounts.transportista}</Badge>
+                </Tab>
+                <Tab id="operador">
+                  Operadores
+                  <Badge variant="soft" color="success" className="ml-2">{tabCounts.operador}</Badge>
+                </Tab>
+              </TabList>
+
+              {/* Toggle Vista */}
+              <div className="flex items-center gap-2 bg-neutral-100 p-1 rounded-lg">
+                <button
+                  onClick={() => setVistaMode('list')}
+                  className={`p-2 rounded-md transition-colors ${vistaMode === 'list' ? 'bg-white shadow-sm text-primary-600' : 'text-neutral-500'}`}
+                >
+                  <List size={18} />
+                </button>
+                <button
+                  onClick={() => setVistaMode('grid')}
+                  className={`p-2 rounded-md transition-colors ${vistaMode === 'grid' ? 'bg-white shadow-sm text-primary-600' : 'text-neutral-500'}`}
+                >
+                  <Grid3X3 size={18} />
+                </button>
+              </div>
+            </div>
+          </Tabs>
+
+          {/* Search + Filters */}
+          <div className="flex flex-col md:flex-row gap-3">
+            <div className="flex-1">
+              <Input
+                placeholder="Buscar por razon social o CUIT..."
+                value={busqueda}
+                onChange={(e) => { setBusqueda(e.target.value); setCurrentPage(1); }}
+                leftIcon={<Search size={18} />}
+              />
+            </div>
+            <div className="flex gap-2">
+              <select
+                value={filtroEstado}
+                onChange={(e) => { setFiltroEstado(e.target.value); setCurrentPage(1); }}
+                className="px-4 py-2 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
+              >
+                <option value="todos">Todos los estados</option>
+                <option value="activo">Activos</option>
+                <option value="inactivo">Inactivos</option>
+              </select>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Filtros */}
-      <Card padding="base">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
-            <Input
-              placeholder="Buscar por razon social o CUIT..."
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              leftIcon={<Search size={18} />}
-            />
+      {/* Scrollable page content */}
+      <div className="space-y-6 pt-4 animate-fade-in">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex items-center gap-3">
+            {isMobile && (
+              <button
+                onClick={() => navigate(-1)}
+                className="p-2 -ml-2 hover:bg-neutral-100 rounded-lg transition-colors"
+              >
+                <ArrowLeft size={20} className="text-neutral-600" />
+              </button>
+            )}
+            <div>
+              <h2 className="text-2xl font-bold text-neutral-900">Gestion de Actores</h2>
+              <p className="text-neutral-600 mt-1">
+                {isLoading ? (
+                  <span className="flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Cargando actores...</span>
+                ) : (
+                  <>{totalCount} actores registrados</>
+                )}
+              </p>
+            </div>
           </div>
           <div className="flex gap-2">
-            <select
-              value={filtroTipo}
-              onChange={(e) => setFiltroTipo(e.target.value)}
-              className="px-4 py-2 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
+            <Button
+              variant="outline"
+              leftIcon={<Download size={18} />}
+              onClick={() => downloadCsv(actoresData.map(a => ({
+                'Razon Social': a.razonSocial,
+                CUIT: a.cuit,
+                Tipo: tipoConfig[a.tipo as keyof typeof tipoConfig]?.label || a.tipo,
+                Email: a.email,
+                Telefono: a.telefono,
+                Domicilio: a.domicilio,
+                Estado: (a.activo !== false && a.estado !== 'inactivo') ? 'Activo' : 'Inactivo',
+              })), 'actores')}
             >
-              <option value="todos">Todos los tipos</option>
-              <option value="generador">Generadores</option>
-              <option value="transportista">Transportistas</option>
-              <option value="operador">Operadores</option>
-            </select>
-            <Button variant="outline" leftIcon={<Filter size={18} />}>
-              Filtros
+              Exportar
+            </Button>
+            <Button leftIcon={<Plus size={18} />} onClick={() => setModalCrear(true)}>
+              Nuevo Actor
             </Button>
           </div>
         </div>
-      </Card>
 
-      {/* Loading state */}
-      {isLoading && (
-        <Card className="py-12">
-          <div className="text-center">
-            <div className="animate-spin w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full mx-auto mb-4" />
-            <p className="text-neutral-500">Cargando actores...</p>
-          </div>
-        </Card>
-      )}
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card
+            className="bg-purple-50 border-purple-200 hover:shadow-md hover:border-purple-300 transition-all cursor-pointer group"
+            onClick={() => navigate(mp('/admin/actores/generadores'))}
+          >
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-2 bg-purple-100 rounded-lg group-hover:scale-110 transition-transform">
+                <Factory size={20} className="text-purple-600" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm text-purple-700">Generadores</p>
+                <p className="text-2xl font-bold text-purple-900">{generadoresCount}</p>
+              </div>
+              <ChevronRight size={16} className="text-purple-400" />
+            </CardContent>
+          </Card>
+          <Card
+            className="bg-orange-50 border-orange-200 hover:shadow-md hover:border-orange-300 transition-all cursor-pointer group"
+            onClick={() => navigate(mp('/admin/actores/transportistas'))}
+          >
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-2 bg-orange-100 rounded-lg group-hover:scale-110 transition-transform">
+                <Truck size={20} className="text-orange-600" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm text-orange-700">Transportistas</p>
+                <p className="text-2xl font-bold text-orange-900">{transportistasCount}</p>
+              </div>
+              <ChevronRight size={16} className="text-orange-400" />
+            </CardContent>
+          </Card>
+          <Card
+            className="bg-blue-50 border-blue-200 hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group"
+            onClick={() => navigate(mp('/admin/actores/operadores'))}
+          >
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg group-hover:scale-110 transition-transform">
+                <FlaskConical size={20} className="text-blue-600" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm text-blue-700">Operadores</p>
+                <p className="text-2xl font-bold text-blue-900">{operadoresCount}</p>
+              </div>
+              <ChevronRight size={16} className="text-blue-400" />
+            </CardContent>
+          </Card>
+          <Card className="bg-neutral-50 border-neutral-200">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-2 bg-neutral-100 rounded-lg">
+                <Users size={20} className="text-neutral-600" />
+              </div>
+              <div>
+                <p className="text-sm text-neutral-700">Total</p>
+                <p className="text-2xl font-bold text-neutral-900">{totalCount}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-      {/* Tabla de actores */}
-      {!isLoading && (
-        <Card padding="none">
-          <table className="w-full table-fixed">
-              <thead className="bg-neutral-50 border-b border-neutral-200">
-                <tr>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '30%' }}>Actor</th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '15%' }}>Tipo</th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '25%' }}>Contacto</th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '12%' }}>Estado</th>
-                  <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase" style={{ width: '18%' }}>Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-100">
-                {actoresFiltrados.map((actor) => {
-                  const config = tipoConfig[actor.tipo as keyof typeof tipoConfig] || tipoConfig['generador'];
-                  const Icon = config.icon;
-                  const isActivo = actor.activo !== false && actor.estado !== 'inactivo';
-                  return (
-                    <tr
-                      key={`${actor.tipo}-${actor.id}`}
-                      className="hover:bg-neutral-50 transition-colors cursor-pointer group"
-                      onClick={() => verDetalle(actor)}
-                    >
-                      <td className="px-3 py-2.5">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center bg-${config.color}-100 group-hover:scale-110 transition-transform`}>
-                            <Icon size={18} className={`text-${config.color}-600`} />
-                          </div>
-                          <div>
-                            <p className="font-semibold text-neutral-900 group-hover:text-primary-600 transition-colors">{actor.razonSocial}</p>
-                            <p className="text-sm text-neutral-500 font-mono">{actor.cuit}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <Badge variant="soft" color={config.color as any}>
-                          {config.label}
-                        </Badge>
-                      </td>
-                      <td className="px-3 py-2.5 hidden md:table-cell">
-                        <div className="space-y-1 animate-fade-in">
-                          <div className="flex items-center gap-1 text-sm text-neutral-600">
-                            <Mail size={14} />
-                            <span className="truncate max-w-[150px]">{actor.email}</span>
-                          </div>
-                          <div className="flex items-center gap-1 text-sm text-neutral-600">
-                            <Phone size={14} />
-                            <span>{actor.telefono}</span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <Badge
-                          variant="soft"
-                          color={isActivo ? 'success' : 'neutral'}
-                        >
-                          {isActivo ? 'Activo' : 'Inactivo'}
-                        </Badge>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="p-2"
-                            onClick={(e) => { e.stopPropagation(); verDetalle(actor); }}
-                          >
-                            <Eye size={16} />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="p-2" onClick={(e) => { e.stopPropagation(); }}>
-                            <Edit size={16} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="p-2 text-error-500 hover:text-error-600"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActorEliminar({ id: actor.id, tipo: actor.tipo, razonSocial: actor.razonSocial });
-                              setModalEliminar(true);
-                            }}
-                          >
-                            <Trash2 size={16} />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          {actoresFiltrados.length === 0 && !isLoading && (
-            <div className="py-12 text-center">
-              <Users className="mx-auto text-neutral-300 mb-3" size={40} />
-              <p className="text-neutral-500">No se encontraron actores</p>
+        {/* Table or Grid */}
+        {isLoading ? (
+          <Card className="py-12">
+            <div className="text-center">
+              <div className="animate-spin w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full mx-auto mb-4" />
+              <p className="text-neutral-500">Cargando actores...</p>
             </div>
-          )}
-        </Card>
-      )}
+          </Card>
+        ) : vistaMode === 'list' ? (
+          <>
+            <Table
+              data={actoresPaginados}
+              columns={columns}
+              keyExtractor={(row) => `${row.tipo}-${row.id}`}
+              selectable
+              selectedKeys={selectedRows}
+              onSelectionChange={setSelectedRows}
+              onRowClick={verDetalle}
+              stickyHeader
+              emptyMessage="No se encontraron actores"
+            />
+            {totalPages > 1 && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={actoresFiltrados.length}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentPage}
+              />
+            )}
+          </>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {actoresPaginados.map((actor) => {
+              const config = tipoConfig[actor.tipo as keyof typeof tipoConfig] || tipoConfig['generador'];
+              const Icon = config.icon;
+              const isActivo = actor.activo !== false && actor.estado !== 'inactivo';
+              return (
+                <Card key={`${actor.tipo}-${actor.id}`} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => verDetalle(actor)}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-12 h-12 rounded-lg flex items-center justify-center bg-${config.color}-100`}>
+                          <Icon size={24} className={`text-${config.color}-600`} />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-neutral-900">{actor.razonSocial}</h4>
+                          <p className="text-sm text-neutral-500 font-mono">{actor.cuit}</p>
+                        </div>
+                      </div>
+                      <Badge variant="soft" color={isActivo ? 'success' : 'neutral'}>
+                        {isActivo ? 'Activo' : 'Inactivo'}
+                      </Badge>
+                    </div>
+                    <div className="space-y-2 mb-4">
+                      <Badge variant="soft" color={config.color as any}>
+                        {config.label}
+                      </Badge>
+                      <div className="flex items-center gap-1 text-sm text-neutral-600">
+                        <Mail size={14} />
+                        <span className="truncate">{actor.email}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-sm text-neutral-600">
+                        <Phone size={14} />
+                        <span>{actor.telefono}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-end gap-1 pt-3 border-t border-neutral-100">
+                      <Button variant="ghost" size="sm" className="p-2" onClick={(e: any) => { e.stopPropagation(); verDetalle(actor); }}>
+                        <Eye size={16} />
+                      </Button>
+                      <Button
+                        variant="ghost" size="sm" className="p-2 text-error-500"
+                        onClick={(e: any) => {
+                          e.stopPropagation();
+                          setActorEliminar({ id: actor.id, tipo: actor.tipo, razonSocial: actor.razonSocial });
+                          setModalEliminar(true);
+                        }}
+                      >
+                        <Trash2 size={16} />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+            {actoresFiltrados.length === 0 && (
+              <div className="col-span-full py-12 text-center">
+                <Users className="mx-auto text-neutral-300 mb-3" size={40} />
+                <p className="text-neutral-500">No se encontraron actores</p>
+              </div>
+            )}
+          </div>
+        )}
+        {vistaMode === 'grid' && totalPages > 1 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={actoresFiltrados.length}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+          />
+        )}
+      </div>
 
       {/* Modal de detalle */}
       <Modal
@@ -520,7 +705,7 @@ export const ActoresPage: React.FC = () => {
         variant="danger"
         isLoading={deleteGenerador.isPending || deleteTransportista.isPending || deleteOperador.isPending}
       />
-    </div>
+    </>
   );
 };
 

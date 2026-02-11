@@ -223,15 +223,15 @@ const AuditoriaPage: React.FC = () => {
       </Card>
 
       {/* Tabla de logs */}
-      <Card padding="none" className="overflow-x-auto">
-        <table className="w-full table-fixed min-w-[600px]">
-            <thead className="bg-neutral-50 border-b border-neutral-200">
+      <Card padding="none" className="max-h-[70vh] overflow-auto">
+        <table className="w-full table-fixed">
+            <thead className="bg-neutral-50 border-b border-neutral-200 sticky top-0 z-10">
               <tr>
                 <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: "15%" }}>Fecha</th>
                 <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: "20%" }}>Usuario</th>
                 <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: "12%" }}>Accion</th>
                 <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: "13%" }}>Modulo</th>
-                <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: "25%" }}>Detalle</th>
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: "25%" }}>Detalle</th>
                 <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: "15%" }}>IP</th>
               </tr>
             </thead>
@@ -264,7 +264,7 @@ const AuditoriaPage: React.FC = () => {
                     <td className="px-3 py-2.5 text-sm text-neutral-600 hidden md:table-cell">
                       {log.modulo}
                     </td>
-                    <td className="px-3 py-2.5 text-sm text-neutral-900 truncate">
+                    <td className="px-3 py-2.5 text-sm text-neutral-900 truncate hidden md:table-cell">
                       {log.detalle}
                     </td>
                     <td className="px-3 py-2.5 text-sm text-neutral-500 font-mono hidden md:table-cell">

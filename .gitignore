@@ -13,6 +13,7 @@ backend/.env
 
 # Build outputs
 dist/
+dist-app/
 build/
 .next/
 out/
@@ -51,6 +52,7 @@ backend/prisma/migrations/
 # Test coverage
 coverage/
 .nyc_output/
+test-results*/
 
 # Temporary files
 tmp/

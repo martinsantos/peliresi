@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   FileText,
@@ -49,7 +49,8 @@ export const MainLayout: React.FC = () => {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showTour, setShowTour] = useState(false);
   const location = useLocation();
-  const { currentUser, isAdmin, isGenerador, isTransportista, isOperador, canAccess, isLoading, isDemo } = useAuth();
+  const navigate = useNavigate();
+  const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, canAccess, isLoading, isDemo } = useAuth();
 
   // Guard: show loading or redirect if no user
   if (isLoading) {
@@ -99,9 +100,9 @@ export const MainLayout: React.FC = () => {
     // Manifiestos para todos
     items.push({ path: '/manifiestos', icon: FileText, label: 'Manifiestos' });
     
-    // Actores solo para Admin
+    // Usuarios del sistema solo para Admin
     if (isAdmin) {
-      items.push({ path: '/actores', icon: Users, label: 'Actores' });
+      items.push({ path: '/admin/usuarios', icon: Users, label: 'Usuarios' });
     }
     
     // Reportes para todos excepto algunos casos
@@ -118,11 +119,12 @@ export const MainLayout: React.FC = () => {
     const items = [];
 
     if (isAdmin) {
-      items.push({ path: '/admin/usuarios', icon: User, label: 'Usuarios' });
-      items.push({ path: '/admin/generadores', icon: Factory, label: 'Generadores' });
-      items.push({ path: '/admin/operadores', icon: Building2, label: 'Operadores' });
-      items.push({ path: '/admin/vehiculos', icon: Truck, label: 'Vehículos' });
+      items.push({ path: '/admin/actores', icon: Building2, label: 'Actores' });
+      items.push({ path: '/admin/actores/generadores', icon: Factory, label: 'Admin Generadores' });
+      items.push({ path: '/admin/actores/operadores', icon: FlaskConical, label: 'Admin Operadores' });
+      items.push({ path: '/admin/actores/transportistas', icon: Truck, label: 'Admin Transporte' });
       items.push({ path: '/admin/residuos', icon: FlaskConical, label: 'Catálogo Residuos' });
+      items.push({ path: '/admin/tratamientos', icon: BarChart3, label: 'Tratamientos' });
       items.push({ path: '/admin/auditoria', icon: Shield, label: 'Auditoría' });
       items.push({ path: '/admin/carga-masiva', icon: Upload, label: 'Carga Masiva' });
     } else if (isTransportista) {
@@ -183,15 +185,17 @@ export const MainLayout: React.FC = () => {
         <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto sidebar-scrollbar">
           {navItems.map((item) => {
             const Icon = item.icon;
+            // Custom isActive: match path prefix (for /actores/operadores/:id to highlight Actores)
+            const isItemActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
             return (
               <NavLink
                 key={item.path}
                 to={item.path}
                 onClick={() => setSidebarOpen(false)}
-                className={({ isActive }) => `
+                className={`
                   flex items-center gap-3 px-3 py-2.5 rounded-xl
                   font-medium text-sm transition-all duration-200
-                  ${isActive
+                  ${isItemActive
                     ? 'bg-white/20 text-white'
                     : 'text-white/70 hover:bg-white/10 hover:text-white'
                   }
@@ -211,15 +215,17 @@ export const MainLayout: React.FC = () => {
               </p>
               {adminItems.map((item) => {
                 const Icon = item.icon;
+                // Custom isActive check: match path prefix for admin routes (to handle /admin/operadores/:id)
+                const isItemActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
                 return (
                   <NavLink
                     key={item.path}
                     to={item.path}
                     onClick={() => setSidebarOpen(false)}
-                    className={({ isActive }) => `
+                    className={`
                       flex items-center gap-3 px-3 py-2.5 rounded-xl
                       font-medium text-sm transition-all duration-200
-                      ${isActive
+                      ${isItemActive
                         ? 'bg-white/20 text-white'
                         : 'text-white/70 hover:bg-white/10 hover:text-white'
                       }
@@ -319,12 +325,18 @@ export const MainLayout: React.FC = () => {
                   <SwitchCamera size={16} />
                   Cambiar Usuario
                 </NavLink>
-                <button className="w-full flex items-center gap-2 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50">
+                <button
+                  onClick={() => { navigate('/configuracion'); setUserMenuOpen(false); }}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+                >
                   <Settings size={16} />
                   Configuración
                 </button>
                 <div className="border-t border-neutral-100 my-2" />
-                <button className="w-full flex items-center gap-2 px-4 py-2 text-sm text-error-600 hover:bg-error-50">
+                <button
+                  onClick={() => { logout(); navigate('/login'); }}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-error-600 hover:bg-error-50"
+                >
                   <LogOut size={16} />
                   Cerrar sesión
                 </button>
@@ -396,7 +408,7 @@ export const MainLayout: React.FC = () => {
             <NotificationBell />
 
             {/* User Switcher Dropdown */}
-            <UserSwitcher variant="dropdown" />
+            <UserSwitcher variant="dropdown" onSwitch={() => navigate('/dashboard')} />
           </div>
         </header>
 

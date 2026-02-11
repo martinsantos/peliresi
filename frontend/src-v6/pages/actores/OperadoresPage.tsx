@@ -7,7 +7,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Building2,
+  FlaskConical,
   Search,
   Plus,
   Filter,
@@ -210,11 +210,11 @@ const OperadoresPage: React.FC = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <Card className="p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-success-50 rounded-lg flex items-center justify-center">
-              <Building2 className="text-success-600" size={20} />
+              <FlaskConical className="text-success-600" size={20} />
             </div>
             <div>
               <p className="text-2xl font-bold text-neutral-900">{activosCount}</p>
@@ -315,9 +315,9 @@ const OperadoresPage: React.FC = () => {
 
       {/* Lista */}
       {!isLoading && vista === 'lista' ? (
-        <Card padding="none" className="overflow-hidden overflow-x-auto">
-          <table className="w-full table-fixed min-w-[600px]">
-              <thead className="bg-neutral-50 border-b border-neutral-200">
+        <Card padding="none" className="max-h-[70vh] overflow-auto">
+          <table className="w-full table-fixed">
+              <thead className="bg-neutral-50 border-b border-neutral-200 sticky top-0 z-10">
                 <tr>
                   <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '30%' }}>Operador</th>
                   <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '15%' }}>Estado</th>
@@ -339,7 +339,7 @@ const OperadoresPage: React.FC = () => {
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <Building2 className="text-primary-600" size={18} />
+                            <FlaskConical className="text-primary-600" size={18} />
                           </div>
                           <div>
                             <p className="font-semibold text-neutral-900 group-hover:text-primary-600 transition-colors truncate">{op.razonSocial}</p>
@@ -384,7 +384,7 @@ const OperadoresPage: React.FC = () => {
         </Card>
       ) : !isLoading ? (
         /* Vista Grid */
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {operadoresFiltrados.map((op: any) => {
             const isActivo = op.activo !== false;
             const estado = isActivo ? estadoConfig.ACTIVO : estadoConfig.INACTIVO;
@@ -397,7 +397,7 @@ const OperadoresPage: React.FC = () => {
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-primary-50 rounded-xl flex items-center justify-center">
-                      <Building2 className="text-primary-600" size={24} />
+                      <FlaskConical className="text-primary-600" size={24} />
                     </div>
                     <div>
                       <h3 className="font-semibold text-neutral-900 group-hover:text-primary-600 transition-colors">{op.razonSocial}</h3>
@@ -455,7 +455,7 @@ const OperadoresPage: React.FC = () => {
         <Card className="py-16">
           <div className="text-center">
             <div className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Building2 className="text-neutral-400" size={24} />
+              <FlaskConical className="text-neutral-400" size={24} />
             </div>
             <h3 className="text-lg font-medium text-neutral-900 mb-1">No se encontraron operadores</h3>
             <p className="text-neutral-500">Intenta con otros terminos de busqueda</p>

@@ -4,7 +4,7 @@
  * Layout optimizado para dispositivos móviles - Adaptado por rol
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -27,7 +27,7 @@ import {
   AlertTriangle,
   Truck,
   Factory,
-  Building2,
+  FlaskConical,
   Shield,
   LayoutDashboard,
   ScanLine,
@@ -35,7 +35,8 @@ import {
   PieChart,
   Database,
   Upload,
-  HelpCircle
+  HelpCircle,
+  Navigation
 } from 'lucide-react';
 import { Badge } from '../components/ui/BadgeV2';
 import { NotificationBell } from '../components/NotificationBell';
@@ -45,6 +46,7 @@ import { InstallPWAModal } from '../components/InstallPWAModal';
 import { useAuth } from '../contexts/AuthContext';
 import type { UserRole } from '../contexts/AuthContext';
 import { useMobilePrefix } from '../hooks/useMobilePrefix';
+import { useActiveTripRecovery } from '../hooks/useActiveTripRecovery';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -57,7 +59,7 @@ const roleConfig: Record<UserRole, { label: string; color: string; bgColor: stri
   ADMIN: { label: 'Admin', color: 'text-primary-600', bgColor: 'bg-primary-500' },
   GENERADOR: { label: 'Generador', color: 'text-purple-600', bgColor: 'bg-purple-500' },
   TRANSPORTISTA: { label: 'Transportista', color: 'text-orange-600', bgColor: 'bg-orange-500' },
-  OPERADOR: { label: 'Operador', color: 'text-green-600', bgColor: 'bg-green-500' },
+  OPERADOR: { label: 'Operador', color: 'text-blue-600', bgColor: 'bg-blue-500' },
   AUDITOR: { label: 'Auditor', color: 'text-info-600', bgColor: 'bg-info-500' },
 };
 
@@ -104,10 +106,27 @@ export const MobileLayout: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentUser, users, switchUser, isAdmin, isGenerador, isTransportista, isOperador, isLoading, isDemo } = useAuth();
+  const { currentUser, users, switchUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isLoading, isDemo } = useAuth();
   const mp = useMobilePrefix();
 
+  // Recover active trip from API after reinstall/crash
+  useActiveTripRecovery();
+
   const config = currentUser ? roleConfig[currentUser.rol] : roleConfig.ADMIN;
+
+  // Track active trip for TRANSPORTISTA
+  const [activeTripId, setActiveTripId] = useState<string | null>(null);
+  useEffect(() => {
+    const checkActiveTrip = () => {
+      const tripId = localStorage.getItem('sitrep_active_trip_id');
+      setActiveTripId(tripId);
+    };
+    checkActiveTrip();
+    // Re-check when localStorage changes (other tabs) or on navigation
+    window.addEventListener('storage', checkActiveTrip);
+    const interval = setInterval(checkActiveTrip, 5000);
+    return () => { window.removeEventListener('storage', checkActiveTrip); clearInterval(interval); };
+  }, []);
 
   // Items de navegación según rol — depend on currentUser.rol directly
   // NOTE: hooks must be called unconditionally (before any early returns)
@@ -115,7 +134,11 @@ export const MobileLayout: React.FC = () => {
     const items = [];
 
     items.push({ to: mp('/dashboard'), icon: <Home size={22} />, label: 'Inicio' });
-    items.push({ to: mp('/manifiestos'), icon: <FileText size={22} />, label: 'Manifiestos' });
+    items.push({
+      to: isTransportista ? mp('/transporte/perfil') : mp('/manifiestos'),
+      icon: isTransportista ? <Truck size={22} /> : <FileText size={22} />,
+      label: isTransportista ? 'Mis Viajes' : 'Manifiestos',
+    });
 
     if (isAdmin || isTransportista) {
       items.push({ to: mp('/centro-control'), icon: <MapPin size={22} />, label: 'Control' });
@@ -140,7 +163,11 @@ export const MobileLayout: React.FC = () => {
     items.push({ to: mp('/dashboard'), icon: <Home size={20} />, label: 'Inicio', section: 'main' });
 
     if (isTransportista) {
-      items.push({ to: mp('/manifiestos'), icon: <MapPin size={20} />, label: 'Mis Viajes', section: 'main' });
+      items.push({ to: mp('/transporte/perfil'), icon: <Truck size={20} />, label: 'Mis Viajes', section: 'main' });
+      items.push({ to: mp('/manifiestos'), icon: <FileText size={20} />, label: 'Todos los Manifiestos', section: 'main' });
+      if (activeTripId) {
+        items.push({ to: mp(`/transporte/viaje/${activeTripId}`), icon: <Navigation size={20} />, label: 'Viaje en Curso', section: 'main' });
+      }
     } else {
       items.push({ to: mp('/manifiestos'), icon: <FileText size={20} />, label: 'Manifiestos', section: 'main' });
     }
@@ -160,7 +187,7 @@ export const MobileLayout: React.FC = () => {
     if (isAdmin) {
       items.push({ to: mp('/admin/usuarios'), icon: <User size={20} />, label: 'Usuarios', section: 'admin' });
       items.push({ to: mp('/admin/generadores'), icon: <Factory size={20} />, label: 'Generadores', section: 'admin' });
-      items.push({ to: mp('/admin/operadores'), icon: <Building2 size={20} />, label: 'Operadores', section: 'admin' });
+      items.push({ to: mp('/admin/operadores'), icon: <FlaskConical size={20} />, label: 'Operadores', section: 'admin' });
       items.push({ to: mp('/admin/vehiculos'), icon: <Truck size={20} />, label: 'Vehículos', section: 'admin' });
       items.push({ to: mp('/admin/residuos'), icon: <Database size={20} />, label: 'Catálogo Residuos', section: 'admin' });
       items.push({ to: mp('/admin/auditoria'), icon: <Shield size={20} />, label: 'Auditoría', section: 'admin' });
@@ -172,11 +199,13 @@ export const MobileLayout: React.FC = () => {
 
     // Herramientas comunes
     items.push({ to: mp('/escaner-qr'), icon: <ScanLine size={20} />, label: 'Escanear QR', section: 'tools' });
-    items.push({ to: mp('/transporte/perfil'), icon: <Truck size={20} />, label: 'Mi Transporte', section: 'tools' });
+    if (!isTransportista) {
+      items.push({ to: mp('/transporte/perfil'), icon: <Truck size={20} />, label: 'Mi Transporte', section: 'tools' });
+    }
     items.push({ to: mp('/ayuda'), icon: <HelpCircle size={20} />, label: 'Ayuda', section: 'tools' });
 
     return items;
-  }, [currentUser?.rol, mp]);
+  }, [currentUser?.rol, mp, activeTripId]);
 
   // Separar items por sección
   const mainItems = menuItems.filter(i => i.section === 'main');
@@ -192,6 +221,7 @@ export const MobileLayout: React.FC = () => {
     if (path.includes('/dashboard')) return 'Inicio';
     if (path.includes('/manifiestos/nuevo')) return 'Nuevo Manifiesto';
     if (path.includes('/manifiestos')) return isTransportista ? 'Mis Viajes' : 'Manifiestos';
+    if (path.includes('/transporte/perfil')) return 'Mis Viajes';
     if (path.includes('/transporte/viaje')) return 'Viaje en Curso';
     if (path.includes('/tracking')) return 'Tracking';
     if (path.includes('/actores')) return 'Actores';
@@ -273,6 +303,18 @@ export const MobileLayout: React.FC = () => {
           className={`fixed right-4 bottom-24 w-14 h-14 ${config.bgColor} text-white rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-all z-30 hover-glow animate-scale-in-bounce`}
         >
           <Plus size={28} />
+        </button>
+      )}
+
+      {/* Active Trip Banner — floats above bottom nav for TRANSPORTISTA */}
+      {isTransportista && activeTripId && !location.pathname.includes('/transporte/viaje/') && (
+        <button
+          onClick={() => navigate(mp(`/transporte/viaje/${activeTripId}`))}
+          className="fixed left-2 right-2 bottom-[68px] z-40 flex items-center gap-3 px-4 py-3 bg-emerald-600 text-white rounded-xl shadow-lg animate-pulse-subtle"
+        >
+          <Navigation size={20} className="shrink-0" />
+          <span className="flex-1 text-sm font-semibold text-left">Viaje en Curso</span>
+          <ChevronRight size={18} className="shrink-0 opacity-70" />
         </button>
       )}
 
@@ -464,7 +506,10 @@ export const MobileLayout: React.FC = () => {
             {/* Drawer Footer */}
             <div className="p-4 border-t border-neutral-100 bg-white safe-area-bottom space-y-2">
               <InstallPWAButton />
-              <button className="w-full flex items-center gap-3 px-3 py-2.5 text-error-600 hover:bg-error-50 rounded-xl transition-colors">
+              <button
+                onClick={() => { logout(); setIsMenuOpen(false); navigate('/login'); }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 text-error-600 hover:bg-error-50 rounded-xl transition-colors"
+              >
                 <LogOut size={20} />
                 <span className="font-medium">Cerrar Sesión</span>
               </button>

@@ -2,13 +2,14 @@
  * SITREP v6 - Operador Detail Page
  * =================================
  * Vista detalle de un operador/planta de tratamiento con tabs
+ * Integra datos de la API + enriquecimiento CSV (certificado, tipo, tecnología, corrientes)
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
-  Building2,
+  FlaskConical,
   FileText,
   MapPin,
   Phone,
@@ -19,18 +20,20 @@ import {
   AlertCircle,
   Shield,
   Beaker,
-  TrendingUp,
   BarChart3,
   Award,
   Gauge,
   Leaf,
   ClipboardCheck,
+  Zap,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Tabs, TabList, Tab, TabPanel } from '../../components/ui/Tabs';
 import { useOperador } from '../../hooks/useActores';
+import { OPERADORES_DATA, type OperadorEnriched } from '../../data/operadores-enrichment';
+import { CORRIENTES_Y } from '../../data/corrientes-y';
 
 const EMPTY_DEFAULTS = {
   metodosAutorizados: [] as string[],
@@ -40,6 +43,7 @@ const EMPTY_DEFAULTS = {
   manifiestos: { recibidos: 0, enTratamiento: 0, cerrados: 0, rechazados: 0 },
   ultimosManifiestos: [] as any[],
   tratamientos: [] as any[],
+  tratamientosAutorizados: [] as any[],
   metodosMasUsados: [] as any[],
 };
 
@@ -70,13 +74,37 @@ const getCapacidadBg = (usada: number, total: number) => {
   return 'bg-success-500';
 };
 
+/** Parse tecnologia string into structured entries: { metodo, corrientes[] } */
+function parseTecnologias(tecnologia: string): { metodo: string; corrientes: string[] }[] {
+  if (!tecnologia) return [];
+  // Split on period or comma-before-uppercase (but not Y-codes inside methods)
+  const segments = tecnologia
+    .split(/\.\s*/)
+    .flatMap(s => s.split(/,\s*(?=[A-Z][a-záéíóú])/))
+    .map(s => s.trim())
+    .filter(s => s.length > 3);
+
+  return segments.map(seg => {
+    // Extract Y-codes from the segment
+    const yMatches = seg.match(/Y\d+/g) || [];
+    // Clean method name: remove Y-codes and colons
+    const metodo = seg
+      .replace(/:\s*Y\d+[\s,eéy/]*(?:Y\d+[\s,eéy/]*)*/g, '')
+      .replace(/Y\d+/g, '')
+      .replace(/\s+/g, ' ')
+      .replace(/,\s*$/, '')
+      .trim();
+    return { metodo: metodo || seg, corrientes: [...new Set(yMatches)] };
+  });
+}
+
 const OperadorDetallePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = location.pathname.startsWith('/mobile');
 
-  const { data: apiOperador, isLoading, isError } = useOperador(id || '');
+  const { data: apiOperador, isLoading } = useOperador(id || '');
 
   // Build operador from API data with safe defaults
   const operador = apiOperador ? {
@@ -93,6 +121,7 @@ const OperadorDetallePage: React.FC = () => {
     manifiestos: (apiOperador as any).manifiestos || EMPTY_DEFAULTS.manifiestos,
     ultimosManifiestos: (apiOperador as any).ultimosManifiestos || EMPTY_DEFAULTS.ultimosManifiestos,
     tratamientos: (apiOperador as any).tratamientos || EMPTY_DEFAULTS.tratamientos,
+    tratamientosAutorizados: (apiOperador as any).tratamientosAutorizados || EMPTY_DEFAULTS.tratamientosAutorizados,
     metodosMasUsados: (apiOperador as any).metodosMasUsados || EMPTY_DEFAULTS.metodosMasUsados,
     capacidadTotal: (apiOperador as any).capacidadTotal || 1,
     capacidadUsada: (apiOperador as any).capacidadUsada || 0,
@@ -101,7 +130,20 @@ const OperadorDetallePage: React.FC = () => {
     proximaAuditoria: (apiOperador as any).proximaAuditoria || '-',
   } : null;
 
-  const backPath = isMobile ? '/mobile/actores/operadores' : '/actores/operadores';
+  // CSV enrichment lookup by CUIT
+  const enriched: OperadorEnriched | null = operador?.cuit ? (OPERADORES_DATA[operador.cuit] || null) : null;
+
+  // Parse tecnologías from CSV into structured list
+  const tecnologiasParsed = useMemo(() =>
+    enriched ? parseTecnologias(enriched.tecnologia) : [],
+    [enriched]
+  );
+
+  // Determine back path based on where we came from (admin vs actores)
+  const isFromAdmin = location.pathname.includes('/admin/');
+  const backPath = isMobile
+    ? (isFromAdmin ? '/mobile/admin/actores/operadores' : '/mobile/actores/operadores')
+    : (isFromAdmin ? '/admin/actores/operadores' : '/actores/operadores');
 
   if (isLoading) {
     return (
@@ -134,7 +176,7 @@ const OperadorDetallePage: React.FC = () => {
           </Button>
           <div className="flex items-center gap-3">
             <div className="w-14 h-14 bg-primary-100 rounded-xl flex items-center justify-center">
-              <Building2 size={28} className="text-primary-600" />
+              <FlaskConical size={28} className="text-primary-600" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -143,9 +185,21 @@ const OperadorDetallePage: React.FC = () => {
                   {operador.estado === 'ACTIVO' ? <CheckCircle2 size={12} className="mr-1" /> : <AlertCircle size={12} className="mr-1" />}
                   {est.label}
                 </Badge>
+                {enriched?.tipoOperador && (
+                  <Badge variant="outline" color={enriched.tipoOperador.includes('FIJO') ? 'primary' : 'success'}>
+                    {enriched.tipoOperador}
+                  </Badge>
+                )}
               </div>
-              <p className="text-neutral-600 mt-1 text-sm">{operador.razonSocial}</p>
-              <p className="text-neutral-500 font-mono text-sm">CUIT: {operador.cuit}</p>
+              <div className="flex items-center gap-3 mt-1 flex-wrap">
+                <span className="text-neutral-500 font-mono text-sm">CUIT: {operador.cuit}</span>
+                {enriched?.certificado && (
+                  <span className="text-xs font-mono text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md">{enriched.certificado}</span>
+                )}
+              </div>
+              {enriched?.expediente && (
+                <p className="text-xs text-neutral-400 mt-0.5">Exp: {enriched.expediente}</p>
+              )}
             </div>
           </div>
         </div>
@@ -170,46 +224,70 @@ const OperadorDetallePage: React.FC = () => {
           <p className="text-3xl font-bold text-primary-700">{operador.manifiestos.cerrados}</p>
         </Card>
         <Card className="p-4">
-          <p className="text-sm text-neutral-500">Procesado (mes)</p>
-          <p className="text-3xl font-bold text-neutral-900">{operador.procesadoMes.toLocaleString()} Tn</p>
+          <p className="text-sm text-neutral-500">Corrientes Y</p>
+          <p className="text-3xl font-bold text-neutral-900">{enriched?.corrientes.length || 0}</p>
         </Card>
       </div>
 
       {/* Tabs */}
       <Tabs defaultTab="info" variant="default">
         <TabList>
-          <Tab id="info" icon={<Building2 size={16} />}>Información General</Tab>
-          <Tab id="capacidad" icon={<Gauge size={16} />}>Capacidad</Tab>
-          <Tab id="manifiestos" icon={<FileText size={16} />}>Manifiestos</Tab>
+          <Tab id="info" icon={<FlaskConical size={16} />}>Información General</Tab>
           <Tab id="tratamientos" icon={<Beaker size={16} />}>Tratamientos</Tab>
+          <Tab id="manifiestos" icon={<FileText size={16} />}>Manifiestos</Tab>
+          <Tab id="capacidad" icon={<Gauge size={16} />}>Capacidad</Tab>
         </TabList>
 
         {/* Tab: Info General */}
         <TabPanel id="info">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Datos de la Planta */}
             <Card>
-              <CardHeader title="Datos de la Planta" icon={<Building2 size={20} />} />
+              <CardHeader title="Datos de la Planta" icon={<FlaskConical size={20} />} />
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex items-center gap-3 text-sm">
-                    <MapPin size={16} className="text-neutral-400 shrink-0" />
-                    <div>
-                      <p className="text-neutral-500">Dirección</p>
-                      <p className="font-medium text-neutral-900">{operador.direccion}</p>
+                  {/* Domicilio Real (CSV - structured) */}
+                  {enriched?.domicilioReal ? (
+                    <div className="flex items-start gap-3 text-sm">
+                      <MapPin size={16} className="text-neutral-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-neutral-500">Domicilio Real (planta)</p>
+                        <p className="font-medium text-neutral-900">{enriched.domicilioReal.calle}</p>
+                        <p className="text-neutral-600">{enriched.domicilioReal.localidad}, {enriched.domicilioReal.departamento}</p>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="flex items-start gap-3 text-sm">
+                      <MapPin size={16} className="text-neutral-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-neutral-500">Dirección</p>
+                        <p className="font-medium text-neutral-900">{operador.direccion}</p>
+                      </div>
+                    </div>
+                  )}
+                  {/* Domicilio Legal (CSV) */}
+                  {enriched?.domicilioLegal && (
+                    <div className="flex items-start gap-3 text-sm">
+                      <MapPin size={16} className="text-neutral-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-neutral-500">Domicilio Legal</p>
+                        <p className="font-medium text-neutral-900">{enriched.domicilioLegal.calle}</p>
+                        <p className="text-neutral-600">{enriched.domicilioLegal.localidad}, {enriched.domicilioLegal.departamento}</p>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex items-center gap-3 text-sm">
                     <Phone size={16} className="text-neutral-400 shrink-0" />
                     <div>
                       <p className="text-neutral-500">Teléfono</p>
-                      <p className="font-medium text-neutral-900">{operador.telefono}</p>
+                      <p className="font-medium text-neutral-900">{enriched?.telefono || operador.telefono || '-'}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 text-sm">
                     <Mail size={16} className="text-neutral-400 shrink-0" />
                     <div>
                       <p className="text-neutral-500">Email</p>
-                      <p className="font-medium text-neutral-900">{operador.email}</p>
+                      <p className="font-medium text-neutral-900">{enriched?.mail || operador.email || '-'}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 text-sm">
@@ -230,45 +308,191 @@ const OperadorDetallePage: React.FC = () => {
               </CardContent>
             </Card>
 
+            {/* Corrientes de Residuos */}
             <Card>
-              <CardHeader title="Métodos y Residuos" icon={<Beaker size={20} />} />
+              <CardHeader title="Corrientes de Residuos Autorizadas" icon={<Award size={20} />} />
               <CardContent>
-                <div className="mb-6">
-                  <p className="text-sm font-medium text-neutral-700 mb-3">Métodos de tratamiento autorizados</p>
-                  <div className="space-y-2">
-                    {operador.metodosAutorizados.map((m: string) => (
-                      <div key={m} className="flex items-center gap-2 text-sm">
-                        <Leaf size={14} className="text-success-500" />
-                        <span className="text-neutral-700">{m}</span>
+                {enriched && enriched.corrientes.length > 0 ? (
+                  <div className="space-y-3">
+                    {enriched.corrientes.map((code: string) => (
+                      <div key={code} className="flex items-start gap-3 p-3 bg-neutral-50 rounded-xl">
+                        <Badge variant="outline" color="warning" className="shrink-0 mt-0.5">{code}</Badge>
+                        <p className="text-sm text-neutral-700">{CORRIENTES_Y[code] || 'Sin descripción'}</p>
                       </div>
                     ))}
                   </div>
-                </div>
-                <div className="mb-6">
-                  <p className="text-sm font-medium text-neutral-700 mb-3">Tipos de residuos aceptados</p>
+                ) : operador.residuosAceptados.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {operador.residuosAceptados.map((r: string) => (
                       <Badge key={r} variant="outline" color="neutral">{r}</Badge>
                     ))}
                   </div>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-neutral-700 mb-3">Certificaciones</p>
-                  <div className="flex flex-wrap gap-2">
-                    {operador.certificaciones.map((cert: string) => (
-                      <Badge key={cert} variant="soft" color="success">
-                        <CheckCircle2 size={12} className="mr-1" />
-                        {cert}
-                      </Badge>
-                    ))}
-                    {operador.certificaciones.length === 0 && (
-                      <span className="text-sm text-neutral-400">Sin certificaciones</span>
-                    )}
-                  </div>
-                </div>
+                ) : (
+                  <p className="text-sm text-neutral-400">Sin corrientes registradas</p>
+                )}
               </CardContent>
             </Card>
           </div>
+        </TabPanel>
+
+        {/* Tab: Tratamientos — DATOS REALES DEL CSV */}
+        <TabPanel id="tratamientos">
+          <div className="space-y-6">
+            {/* Tecnologías Autorizadas (CSV real) */}
+            <Card>
+              <CardHeader title="Tecnologías y Tratamientos Autorizados" icon={<Zap size={20} />} />
+              <CardContent>
+                {tecnologiasParsed.length > 0 ? (
+                  <div className="space-y-3">
+                    {tecnologiasParsed.map((tec, i) => (
+                      <div key={i} className="p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+                        <div className="flex items-start gap-3">
+                          <Leaf size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-neutral-800">{tec.metodo}</p>
+                            {tec.corrientes.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 mt-2">
+                                {tec.corrientes.map(code => (
+                                  <Badge key={code} variant="outline" color="warning" className="text-xs" title={CORRIENTES_Y[code] || code}>
+                                    {code}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-neutral-500">
+                    <Beaker size={32} className="mx-auto mb-2 text-neutral-300" />
+                    <p>Sin tecnologías registradas en el CSV oficial</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Texto completo de tecnología (para referencia) */}
+            {enriched?.tecnologia && (
+              <Card>
+                <CardHeader title="Descripción Completa de Tecnología" icon={<BarChart3 size={20} />} />
+                <CardContent>
+                  <div className="p-4 bg-neutral-50 rounded-xl">
+                    <p className="text-sm text-neutral-700 leading-relaxed whitespace-pre-wrap">{enriched.tecnologia}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Link al catálogo de tratamientos */}
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<BarChart3 size={14} />}
+                onClick={() => navigate(`${isMobile ? '/mobile' : ''}/admin/tratamientos`)}
+              >
+                Ver catálogo completo de tratamientos
+              </Button>
+            </div>
+
+            {/* Historial de Tratamientos (API) */}
+            {operador.tratamientos && operador.tratamientos.length > 0 && (
+              <Card>
+                <CardHeader title="Historial de Tratamientos" icon={<Beaker size={20} />} />
+                <CardContent>
+                  <table className="w-full table-fixed">
+                    <thead className="bg-neutral-50">
+                      <tr>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Fecha</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '25%' }}>Manifiesto</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '25%' }}>Método</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '15%' }}>Peso</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '15%' }}>Certificado</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-100">
+                      {operador.tratamientos.map((t: any) => (
+                        <tr key={t.id} className="hover:bg-neutral-50 transition-colors">
+                          <td className="px-3 py-2.5 text-neutral-600">
+                            {t.fecha ? new Date(t.fecha).toLocaleDateString('es-AR') : '-'}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span
+                              className="font-mono text-primary-600 cursor-pointer hover:underline"
+                              onClick={() => navigate(isMobile ? `/mobile/manifiestos/${t.id}` : `/manifiestos/${t.id}`)}
+                            >
+                              {t.manifiesto}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2.5 text-neutral-700 truncate">{t.metodo}</td>
+                          <td className="px-3 py-2.5 font-medium text-neutral-700">{(t.peso ?? 0).toLocaleString('es-AR')} kg</td>
+                          <td className="px-3 py-2.5 hidden md:table-cell">
+                            <Badge variant="soft" color="success">{t.certificado || '-'}</Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabPanel>
+
+        {/* Tab: Manifiestos */}
+        <TabPanel id="manifiestos">
+          <Card padding="none">
+              <table className="w-full table-fixed">
+                <thead className="bg-[#F5F5F3] border-b border-neutral-200">
+                  <tr>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '20%' }}>Manifiesto</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '18%' }}>Fecha</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '20%' }}>Estado</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider hidden md:table-cell" style={{ width: '18%' }}>Peso</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider truncate hidden md:table-cell" style={{ width: '24%' }}>Generador</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100">
+                  {(operador.ultimosManifiestos || []).length > 0 ? (
+                    operador.ultimosManifiestos.map((m: any) => (
+                      <tr
+                        key={m.id}
+                        className="hover:bg-neutral-50 transition-colors cursor-pointer group"
+                        onClick={() => navigate(isMobile ? `/mobile/manifiestos/${m.id}` : `/manifiestos/${m.id}`)}
+                      >
+                        <td className="px-3 py-2.5">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-primary-50 rounded-lg flex items-center justify-center text-primary-600">
+                              <FileText size={16} />
+                            </div>
+                            <span className="font-mono font-semibold text-neutral-900 group-hover:text-primary-600 transition-colors">
+                              {m.id}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2.5 text-neutral-600">{m.fecha || '-'}</td>
+                        <td className="px-3 py-2.5">
+                          <Badge variant="soft" color={estadoManifiestoColor[m.estado] || 'neutral'}>
+                            {String(m.estado || '').replace(/_/g, ' ')}
+                          </Badge>
+                        </td>
+                        <td className="px-3 py-2.5 font-medium text-neutral-700 hidden md:table-cell">{(m.peso ?? 0).toLocaleString('es-AR')} kg</td>
+                        <td className="px-3 py-2.5 text-neutral-600 truncate hidden md:table-cell">{m.generador || '-'}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-12 text-center text-neutral-500">
+                        <FileText size={32} className="mx-auto mb-2 text-neutral-300" />
+                        <p>Sin manifiestos registrados</p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+          </Card>
         </TabPanel>
 
         {/* Tab: Capacidad */}
@@ -333,117 +557,6 @@ const OperadorDetallePage: React.FC = () => {
                     <p className="text-lg font-semibold text-neutral-900">{operador.procesadoMes.toLocaleString()} Tn</p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabPanel>
-
-        {/* Tab: Manifiestos */}
-        <TabPanel id="manifiestos">
-          <Card padding="none">
-              <table className="w-full table-fixed">
-                <thead className="bg-[#F5F5F3] border-b border-neutral-200">
-                  <tr>
-                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '20%' }}>Manifiesto</th>
-                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '18%' }}>Fecha</th>
-                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '20%' }}>Estado</th>
-                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider hidden md:table-cell" style={{ width: '18%' }}>Peso</th>
-                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider truncate hidden md:table-cell" style={{ width: '24%' }}>Generador</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-100">
-                  {(operador.ultimosManifiestos || []).map((m: any) => (
-                    <tr
-                      key={m.id}
-                      className="hover:bg-neutral-50 transition-colors cursor-pointer group"
-                      onClick={() => navigate(isMobile ? `/mobile/manifiestos/${m.id}` : `/manifiestos/${m.id}`)}
-                    >
-                      <td className="px-3 py-2.5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-primary-50 rounded-lg flex items-center justify-center text-primary-600">
-                            <FileText size={16} />
-                          </div>
-                          <span className="font-mono font-semibold text-neutral-900 group-hover:text-primary-600 transition-colors">
-                            {m.id}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5 text-neutral-600">{m.fecha || '-'}</td>
-                      <td className="px-3 py-2.5">
-                        <Badge variant="soft" color={estadoManifiestoColor[m.estado] || 'neutral'}>
-                          {String(m.estado || '').replace(/_/g, ' ')}
-                        </Badge>
-                      </td>
-                      <td className="px-3 py-2.5 font-medium text-neutral-700 hidden md:table-cell">{(m.peso ?? 0).toLocaleString('es-AR')} kg</td>
-                      <td className="px-3 py-2.5 text-neutral-600 truncate hidden md:table-cell">{m.generador || '-'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-          </Card>
-        </TabPanel>
-
-        {/* Tab: Tratamientos */}
-        <TabPanel id="tratamientos">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader title="Métodos más Usados" icon={<BarChart3 size={20} />} />
-              <CardContent>
-                <div className="space-y-4">
-                  {operador.metodosMasUsados.map((m: any) => (
-                    <div key={m.metodo}>
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span className="text-neutral-700">{m.metodo}</span>
-                        <span className="font-medium text-neutral-900">{m.porcentaje}%</span>
-                      </div>
-                      <div className="h-2 bg-neutral-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-primary-400 rounded-full"
-                          style={{ width: `${m.porcentaje}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader title="Historial de Tratamientos" icon={<Beaker size={20} />} />
-              <CardContent>
-                  <table className="w-full table-fixed">
-                    <thead className="bg-neutral-50">
-                      <tr>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '10%' }}>ID</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '15%' }}>Fecha</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '18%' }}>Manifiesto</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '22%' }}>Método</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '15%' }}>Peso</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '20%' }}>Certificado</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-neutral-100">
-                      {(operador.tratamientos || []).map((t: any) => (
-                        <tr key={t.id} className="hover:bg-neutral-50 transition-colors">
-                          <td className="px-3 py-2.5 font-mono text-sm text-neutral-900 hidden md:table-cell">{t.id}</td>
-                          <td className="px-3 py-2.5 text-neutral-600">{t.fecha || '-'}</td>
-                          <td className="px-3 py-2.5">
-                            <span
-                              className="font-mono text-primary-600 cursor-pointer hover:underline"
-                              onClick={() => navigate(isMobile ? `/mobile/manifiestos/${t.manifiesto}` : `/manifiestos/${t.manifiesto}`)}
-                            >
-                              {t.manifiesto}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2.5 text-neutral-700 truncate">{t.metodo}</td>
-                          <td className="px-3 py-2.5 font-medium text-neutral-700">{(t.peso ?? 0).toLocaleString('es-AR')} kg</td>
-                          <td className="px-3 py-2.5 hidden md:table-cell">
-                            <Badge variant="soft" color="success">{t.certificado || '-'}</Badge>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
               </CardContent>
             </Card>
           </div>

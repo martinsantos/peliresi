@@ -234,30 +234,35 @@ export const CentroControlPage: React.FC = () => {
       value: cc?.estadisticas?.totalManifiestos || 0,
       icon: FileText,
       gradient: 'from-emerald-600 to-emerald-700',
+      href: '/manifiestos',
     },
     {
       label: 'En Tránsito',
       value: cc?.estadisticas?.enTransitoActivos || 0,
       icon: Truck,
       gradient: 'from-amber-500 to-amber-600',
+      href: '/manifiestos?estado=EN_TRANSITO',
     },
     {
       label: 'Generadores Activos',
       value: cc?.estadisticas?.generadoresActivos || 0,
       icon: Factory,
       gradient: 'from-green-600 to-green-700',
+      href: '/admin/actores/generadores',
     },
     {
       label: 'Operadores Activos',
       value: cc?.estadisticas?.operadoresActivos || 0,
       icon: Package,
       gradient: 'from-blue-600 to-blue-700',
+      href: '/admin/actores/operadores',
     },
     {
       label: 'Toneladas Período',
       value: cc?.estadisticas?.toneladasPeriodo || 0,
       icon: TrendingUp,
       gradient: 'from-teal-600 to-teal-700',
+      href: '/reportes',
       suffix: 't',
     },
   ], [cc]);
@@ -515,7 +520,7 @@ export const CentroControlPage: React.FC = () => {
         {kpis.map((kpi, i) => {
           const Icon = kpi.icon;
           return (
-            <div key={i} className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${kpi.gradient} p-4 group hover:shadow-lg transition-all duration-300 hover-lift`}>
+            <div key={i} className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${kpi.gradient} p-4 group hover:shadow-lg transition-all duration-300 hover-lift cursor-pointer`} onClick={() => (kpi as any).href && navigate(`${isMobile ? '/mobile' : ''}${(kpi as any).href}`)}>
               <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-white/10 -translate-y-1/3 translate-x-1/3 group-hover:scale-125 transition-transform duration-500" />
               <div className="relative">
                 <div className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center mb-2">
@@ -541,7 +546,8 @@ export const CentroControlPage: React.FC = () => {
               return (
                 <div
                   key={stage.key}
-                  className="relative flex flex-col items-center justify-center rounded-xl transition-all duration-500 hover:scale-[1.02] group cursor-default"
+                  className="relative flex flex-col items-center justify-center rounded-xl transition-all duration-500 hover:scale-[1.02] group cursor-pointer"
+                  onClick={() => navigate(`${isMobile ? '/mobile' : ''}/manifiestos?estado=${stage.key}`)}
                   style={{
                     flex: `${widthPercent} 1 0%`,
                     backgroundColor: stage.color + '18',
@@ -591,7 +597,7 @@ export const CentroControlPage: React.FC = () => {
               </div>
             </div>
             <div className="p-5">
-              <div className="h-[28rem] sm:h-[32rem] rounded-xl overflow-hidden border border-neutral-200 relative isolate">
+              <div className="h-[20rem] sm:h-[28rem] lg:h-[32rem] rounded-xl overflow-hidden border border-neutral-200 relative isolate">
                 <MapContainer
                   center={[-32.9287, -68.8535]}
                   zoom={10}
@@ -671,7 +677,7 @@ export const CentroControlPage: React.FC = () => {
                           eventHandlers={{ click: () => setSelectedTripId(m.manifiestoId) }}
                         >
                           <Popup>
-                            <div className="text-sm min-w-[200px]">
+                            <div className="text-sm">
                               <strong className="text-red-700">{m.numero}</strong>
                               {m.ultimaPosicion.velocidad != null && (
                                 <span style={{ fontSize: '11px', color: '#64748b', marginLeft: '6px' }}>{Math.round(m.ultimaPosicion.velocidad)} km/h</span>
@@ -811,7 +817,7 @@ export const CentroControlPage: React.FC = () => {
         </div>
 
         {/* Viajes Activos + Realizados — accordion right of map */}
-        <div className="flex flex-col gap-0 max-h-[calc(100vh-12rem)] self-start">
+        <div className="flex flex-col gap-0 max-h-[50vh] lg:max-h-[calc(100vh-12rem)] overflow-y-auto self-start">
           {/* ── Viajes Activos accordion ── */}
           <Card padding="none" className={`flex flex-col ${tripPanel === 'activos' ? 'flex-1 min-h-0' : ''}`}>
             <button

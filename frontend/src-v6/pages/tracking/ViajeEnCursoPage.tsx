@@ -17,7 +17,7 @@ import {
   Truck,
   CheckCircle2,
   Loader2,
-  Building2,
+  FlaskConical,
   User,
   FileText,
   Weight,
@@ -458,7 +458,7 @@ const ViajeEnCursoPage: React.FC = () => {
             <CardHeader title="Residuos Transportados" icon={<Package size={20} />} />
             <CardContent>
               <div className="overflow-x-auto">
-                <table className="w-full table-fixed min-w-[400px]">
+                <table className="w-full">
                   <thead className="bg-neutral-50">
                     <tr>
                       <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '15%' }}>Código</th>
@@ -565,8 +565,8 @@ const ViajeEnCursoPage: React.FC = () => {
                       : 'border-transparent hover:border-green-200 hover:bg-green-50/50'
                   }`}
                 >
-                  <div className="p-2 bg-green-50 rounded-lg text-green-600 shrink-0">
-                    <Building2 size={18} />
+                  <div className="p-2 bg-blue-50 rounded-lg text-blue-600 shrink-0">
+                    <FlaskConical size={18} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-neutral-500">Operador</p>

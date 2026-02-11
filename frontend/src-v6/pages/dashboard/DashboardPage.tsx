@@ -15,7 +15,7 @@ import {
   Truck,
   MapPin,
   Factory,
-  Building2,
+  FlaskConical,
   Users,
   BarChart3,
   ArrowRight,
@@ -53,15 +53,16 @@ const AdminDashboard: React.FC = () => {
   const complianceRate = totalM > 0 ? `${((tratadosM / totalM) * 100).toFixed(1)}%` : '-';
 
   const stats = [
-    { id: 1, label: 'Manifiestos Total', value: String(totalM), icon: FileText, color: 'primary' },
-    { id: 2, label: 'En Tránsito', value: String(enTransitoM), icon: Truck, color: 'info' },
-    { id: 3, label: 'Alertas Activas', value: '0', icon: AlertCircle, color: 'warning' },
-    { id: 4, label: 'Tasa Cumplimiento', value: complianceRate, icon: CheckCircle2, color: 'success' },
+    { id: 1, label: 'Manifiestos Total', value: String(totalM), icon: FileText, color: 'primary', href: '/manifiestos' },
+    { id: 2, label: 'En Tránsito', value: String(enTransitoM), icon: Truck, color: 'info', href: '/manifiestos?estado=EN_TRANSITO' },
+    { id: 3, label: 'Alertas Activas', value: '0', icon: AlertCircle, color: 'warning', href: '/alertas' },
+    { id: 4, label: 'Tasa Cumplimiento', value: complianceRate, icon: CheckCircle2, color: 'success', href: '/reportes' },
   ];
 
   const recientes = dashStats?.recientes || recentManifiestos?.items || [];
   const actividadReciente = recientes.slice(0, 4).map((m: any, i: number) => ({
     id: i + 1,
+    manifiestoId: m.id,
     titulo: `Manifiesto #${m.numero || m.id}`,
     accion: m.generador?.razonSocial || m.generador || 'Generador',
     tiempo: m.updatedAt || m.createdAt
@@ -131,7 +132,7 @@ const AdminDashboard: React.FC = () => {
             stat.color === 'info' ? '--color-info-500' :
             stat.color === 'warning' ? '--color-warning-500' : '--color-success-500';
           return (
-            <Card key={stat.id} className="card-interactive stat-card" style={{ '--stat-accent': `var(${accentVar})` } as React.CSSProperties} onClick={() => navigate(route('/manifiestos'))}>
+            <Card key={stat.id} className="card-interactive stat-card" style={{ '--stat-accent': `var(${accentVar})` } as React.CSSProperties} onClick={() => navigate(route(stat.href))}>
               <CardContent className="p-5">
                 <div className="flex items-start justify-between mb-3">
                   <div className={`p-2.5 rounded-xl ${
@@ -173,7 +174,11 @@ const AdminDashboard: React.FC = () => {
             ) : (
             <div className="divide-y divide-neutral-100">
               {actividadReciente.map((item) => (
-                <div key={item.id} className="flex items-center justify-between p-4 row-hover transition-colors">
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between p-4 row-hover transition-colors cursor-pointer"
+                  onClick={() => item.manifiestoId && navigate(route(`/manifiestos/${item.manifiestoId}`))}
+                >
                   <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                       item.estado === 'nuevo' ? 'bg-primary-100 text-primary-600' :
@@ -191,7 +196,10 @@ const AdminDashboard: React.FC = () => {
                       <p className="text-sm text-neutral-500">{item.accion}</p>
                     </div>
                   </div>
-                  <span className="text-xs text-neutral-400">{item.tiempo}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-neutral-400">{item.tiempo}</span>
+                    <ArrowRight size={14} className="text-neutral-300" />
+                  </div>
                 </div>
               ))}
             </div>
@@ -229,10 +237,10 @@ const GeneradorDashboard: React.FC = () => {
 
   const est = dashStats?.estadisticas;
   const stats = [
-    { id: 1, label: 'Mis Manifiestos', value: String(est?.total ?? 0), icon: FileText, color: 'purple' },
-    { id: 2, label: 'En Tránsito', value: String(est?.enTransito ?? 0), icon: Truck, color: 'info' },
-    { id: 3, label: 'Pendientes', value: String(est?.borradores ?? 0), icon: Clock, color: 'warning' },
-    { id: 4, label: 'Tratados', value: String(est?.tratados ?? 0), icon: Factory, color: 'success' },
+    { id: 1, label: 'Mis Manifiestos', value: String(est?.total ?? 0), icon: FileText, color: 'purple', href: '/manifiestos' },
+    { id: 2, label: 'En Tránsito', value: String(est?.enTransito ?? 0), icon: Truck, color: 'info', href: '/manifiestos?estado=EN_TRANSITO' },
+    { id: 3, label: 'Pendientes', value: String(est?.borradores ?? 0), icon: Clock, color: 'warning', href: '/manifiestos?estado=BORRADOR' },
+    { id: 4, label: 'Tratados', value: String(est?.tratados ?? 0), icon: Factory, color: 'success', href: '/manifiestos?estado=TRATADO' },
   ];
 
   return (
@@ -248,7 +256,7 @@ const GeneradorDashboard: React.FC = () => {
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.id} className="hover:shadow-md transition-shadow">
+            <Card key={stat.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(route(stat.href))}>
               <CardContent className="p-4">
                 <div className={`p-2 rounded-lg w-fit mb-2 ${
                   stat.color === 'purple' ? 'bg-purple-100' :
@@ -304,15 +312,20 @@ const GeneradorDashboard: React.FC = () => {
             ) : (
               <div className="divide-y divide-neutral-100">
                 {recientes.slice(0, 3).map((m: any) => (
-                  <div key={m.id} className="flex items-center justify-between p-4">
+                  <div
+                    key={m.id}
+                    className="flex items-center justify-between p-4 cursor-pointer hover:bg-neutral-50 transition-colors"
+                    onClick={() => navigate(route(`/manifiestos/${m.id}`))}
+                  >
                     <div>
                       <p className="font-medium text-neutral-900">{m.numero || m.id}</p>
                       <p className="text-sm text-neutral-500">{m.createdAt ? new Date(m.createdAt).toLocaleDateString('es-AR') : '-'}</p>
                     </div>
-                    <div className="text-right">
+                    <div className="flex items-center gap-2">
                       <Badge variant="soft" color={m.estado === 'TRATADO' || m.estado === 'ENTREGADO' ? 'success' : 'info'}>
                         {m.estado === 'EN_TRANSITO' ? 'En Tránsito' : m.estado?.replace(/_/g, ' ') || '-'}
                       </Badge>
+                      <ArrowRight size={14} className="text-neutral-300" />
                     </div>
                   </div>
                 ))}
@@ -336,13 +349,17 @@ const TransportistaDashboard: React.FC = () => {
   const route = (path: string) => isMobile ? `/mobile${path}` : path;
 
   const { data: dashStats } = useDashboardStats();
+  const { data: tripsEnTransito } = useManifiestos({ estado: 'EN_TRANSITO' as any, limit: 5 });
+  const { data: tripsAprobados } = useManifiestos({ estado: 'APROBADO' as any, limit: 5 });
+  const activeTrips = tripsEnTransito?.items || [];
+  const pendingTrips = tripsAprobados?.items || [];
 
   const est = dashStats?.estadisticas;
   const stats = [
-    { id: 1, label: 'Entregados', value: String(est?.entregados ?? 0), icon: CheckCircle2, color: 'orange' },
-    { id: 2, label: 'En Camino', value: String(est?.enTransito ?? 0), icon: Truck, color: 'info' },
-    { id: 3, label: 'Pendientes', value: String(est?.aprobados ?? 0), icon: Clock, color: 'warning' },
-    { id: 4, label: 'Recibidos', value: String(est?.recibidos ?? 0), icon: MapPin, color: 'success' },
+    { id: 1, label: 'Entregados', value: String(est?.entregados ?? 0), icon: CheckCircle2, color: 'orange', href: '/manifiestos?estado=ENTREGADO' },
+    { id: 2, label: 'En Camino', value: String(est?.enTransito ?? 0), icon: Truck, color: 'info', href: '/manifiestos?estado=EN_TRANSITO' },
+    { id: 3, label: 'Pendientes', value: String(est?.aprobados ?? 0), icon: Clock, color: 'warning', href: '/manifiestos?estado=APROBADO' },
+    { id: 4, label: 'Recibidos', value: String(est?.recibidos ?? 0), icon: MapPin, color: 'success', href: '/manifiestos?estado=RECIBIDO' },
   ];
 
   return (
@@ -353,12 +370,82 @@ const TransportistaDashboard: React.FC = () => {
         <p className="text-neutral-600">{currentUser?.sector}</p>
       </div>
 
+      {/* Trip Assignment Banner — viajes EN_TRANSITO o APROBADO */}
+      {(activeTrips.length > 0 || pendingTrips.length > 0) && (
+        <div className="space-y-3">
+          {/* Active trips (EN_TRANSITO) — green banner */}
+          {activeTrips.map((trip: any) => (
+            <Card key={trip.id} className="border-2 border-success-200 bg-success-50">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-success-100 flex items-center justify-center">
+                      <Truck size={20} className="text-success-600 animate-pulse" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-success-800">Viaje en Curso</p>
+                      <p className="text-sm text-success-600">#{trip.numero || trip.id?.slice(0, 8)}</p>
+                    </div>
+                  </div>
+                  <Badge variant="soft" color="success">EN TRÁNSITO</Badge>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-success-700 mb-3">
+                  <span>{trip.generador?.razonSocial || '-'}</span>
+                  <ArrowRight size={14} />
+                  <span>{trip.operador?.razonSocial || '-'}</span>
+                </div>
+                <Button fullWidth onClick={() => navigate(route(`/transporte/viaje/${trip.id}`))}>
+                  <MapPin size={16} className="mr-2" />
+                  Ir al Viaje
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+
+          {/* Pending trips (APROBADO) — warning banner */}
+          {pendingTrips.length > 0 && (
+            <Card className="border-2 border-warning-200 bg-warning-50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-full bg-warning-100 flex items-center justify-center">
+                    <Truck size={20} className="text-warning-600" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-warning-800">
+                      {pendingTrips.length} viaje{pendingTrips.length > 1 ? 's' : ''} asignado{pendingTrips.length > 1 ? 's' : ''}
+                    </p>
+                    <p className="text-sm text-warning-600">Pendientes de retiro</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {pendingTrips.slice(0, 3).map((trip: any) => (
+                    <button
+                      key={trip.id}
+                      onClick={() => navigate(route(`/transporte/viaje/${trip.id}`))}
+                      className="w-full flex items-center justify-between p-3 bg-white rounded-lg border border-warning-200 hover:bg-warning-50 transition-colors"
+                    >
+                      <div className="text-left">
+                        <p className="text-sm font-semibold text-neutral-800">#{trip.numero || trip.id?.slice(0, 8)}</p>
+                        <p className="text-xs text-neutral-500">
+                          {trip.generador?.razonSocial || '-'} → {trip.operador?.razonSocial || '-'}
+                        </p>
+                      </div>
+                      <ArrowRight size={16} className="text-warning-400" />
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.id} className="hover:shadow-md transition-shadow">
+            <Card key={stat.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(route(stat.href))}>
               <CardContent className="p-4">
                 <div className={`p-2 rounded-lg w-fit mb-2 ${
                   stat.color === 'orange' ? 'bg-orange-100' :
@@ -383,16 +470,16 @@ const TransportistaDashboard: React.FC = () => {
 
       {/* Acciones */}
       <div className="grid grid-cols-2 gap-4">
-        <Button 
-          size="lg" 
+        <Button
+          size="lg"
           leftIcon={<MapPin size={20} />}
-          onClick={() => navigate(route('/tracking'))}
+          onClick={() => navigate(route('/transporte/perfil'))}
         >
-          Ver Ruta
+          Mis Viajes
         </Button>
-        <Button 
-          variant="outline" 
-          size="lg" 
+        <Button
+          variant="outline"
+          size="lg"
           leftIcon={<QrCode size={20} />}
           onClick={() => navigate(route('/manifiestos'))}
         >
@@ -411,7 +498,11 @@ const TransportistaDashboard: React.FC = () => {
             ) : (
               <div className="divide-y divide-neutral-100">
                 {enTransito.slice(0, 5).map((m: any) => (
-                  <div key={m.id} className="p-4 hover:bg-neutral-50">
+                  <div
+                    key={m.id}
+                    className="p-4 hover:bg-neutral-50 cursor-pointer transition-colors"
+                    onClick={() => navigate(route(`/transporte/viaje/${m.id}`))}
+                  >
                     <div className="flex items-center justify-between mb-2">
                       <p className="font-medium text-neutral-900">{m.numero || m.id}</p>
                       <Badge variant="soft" color="warning">{m.estado?.replace(/_/g, ' ') || 'En Tránsito'}</Badge>
@@ -446,10 +537,10 @@ const OperadorDashboard: React.FC = () => {
 
   const est = dashStats?.estadisticas;
   const stats = [
-    { id: 1, label: 'Recibidos', value: String(est?.recibidos ?? 0), icon: Building2, color: 'green' },
-    { id: 2, label: 'En Tránsito', value: String(est?.enTransito ?? 0), icon: Factory, color: 'info' },
-    { id: 3, label: 'Pendientes', value: String(est?.entregados ?? 0), icon: Clock, color: 'warning' },
-    { id: 4, label: 'Tratados', value: String(est?.tratados ?? 0), icon: CheckCircle2, color: 'success' },
+    { id: 1, label: 'Recibidos', value: String(est?.recibidos ?? 0), icon: FlaskConical, color: 'blue', href: '/manifiestos?estado=RECIBIDO' },
+    { id: 2, label: 'En Tránsito', value: String(est?.enTransito ?? 0), icon: Factory, color: 'info', href: '/manifiestos?estado=EN_TRANSITO' },
+    { id: 3, label: 'Pendientes', value: String(est?.entregados ?? 0), icon: Clock, color: 'warning', href: '/manifiestos?estado=ENTREGADO' },
+    { id: 4, label: 'Tratados', value: String(est?.tratados ?? 0), icon: CheckCircle2, color: 'success', href: '/manifiestos?estado=TRATADO' },
   ];
 
   return (
@@ -465,7 +556,7 @@ const OperadorDashboard: React.FC = () => {
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.id} className="hover:shadow-md transition-shadow">
+            <Card key={stat.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(route(stat.href))}>
               <CardContent className="p-4">
                 <div className={`p-2 rounded-lg w-fit mb-2 ${
                   stat.color === 'green' ? 'bg-green-100' :
@@ -518,13 +609,18 @@ const OperadorDashboard: React.FC = () => {
             ) : (
               <div className="divide-y divide-neutral-100">
                 {recientes.slice(0, 5).map((m: any) => (
-                  <div key={m.id} className="flex items-center justify-between p-4 hover:bg-neutral-50">
+                  <div
+                    key={m.id}
+                    className="flex items-center justify-between p-4 hover:bg-neutral-50 cursor-pointer transition-colors"
+                    onClick={() => navigate(route(`/manifiestos/${m.id}`))}
+                  >
                     <div>
                       <p className="font-medium text-neutral-900">{m.numero || m.id}</p>
                       <p className="text-sm text-neutral-500">{m.transportista?.razonSocial || m.transportista || '-'}</p>
                     </div>
-                    <div className="text-right">
+                    <div className="flex items-center gap-2">
                       <Badge variant="soft" color="info">{m.estado?.replace(/_/g, ' ') || '-'}</Badge>
+                      <ArrowRight size={14} className="text-neutral-300" />
                     </div>
                   </div>
                 ))}

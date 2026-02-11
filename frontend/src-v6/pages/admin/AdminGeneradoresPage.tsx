@@ -1,7 +1,8 @@
 /**
  * SITREP v6 - Admin Generadores Page
  * ==================================
- * Panel administrativo para generadores - Vista tabla
+ * Panel administrativo para generadores de residuos
+ * Integra datos de la API + enriquecimiento JSON (certificado, rubro, actividad, categorías Y)
  */
 
 import React, { useState, useMemo } from 'react';
@@ -12,30 +13,31 @@ import {
   Search,
   AlertTriangle,
   CheckCircle,
-  MapPin,
   Phone,
   Mail,
   Edit,
   Eye,
   Trash2,
   Download,
-  Filter,
   Loader2,
 } from 'lucide-react';
-import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
+import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Modal, ConfirmModal } from '../../components/ui/Modal';
 import { Table, Pagination } from '../../components/ui/Table';
 import { SearchInput } from '../../components/ui/SearchInput';
+import { toast } from '../../components/ui/Toast';
+import { downloadCsv } from '../../utils/exportCsv';
 import {
   useGeneradores,
   useCreateGenerador,
   useUpdateGenerador,
   useDeleteGenerador,
 } from '../../hooks/useActores';
-
+import { GENERADORES_DATA, TOP_RUBROS, type GeneradorEnriched } from '../../data/generadores-enrichment';
+import { CORRIENTES_Y } from '../../data/corrientes-y';
 
 const INITIAL_FORM = {
   razonSocial: '',
@@ -55,6 +57,7 @@ const AdminGeneradoresPage: React.FC = () => {
   const isMobile = location.pathname.startsWith('/mobile');
   const [busqueda, setBusqueda] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState('');
+  const [filtroRubro, setFiltroRubro] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [currentPage, setCurrentPage] = useState(1);
   const [modalCrear, setModalCrear] = useState(false);
@@ -74,26 +77,38 @@ const AdminGeneradoresPage: React.FC = () => {
   const total = apiData?.total || generadoresData.length;
   const totalPages = apiData?.totalPages || 1;
 
-  // Map to display format
+  // Map to display format + merge JSON enrichment
   const tableData = useMemo(() =>
-    generadoresData.map((g: any) => ({
-      id: g.id,
-      razonSocial: g.razonSocial || '',
-      cuit: g.cuit || '',
-      categoria: g.categoria || '-',
-      domicilio: g.domicilio || '',
-      telefono: g.telefono || '',
-      email: g.email || g.usuario?.email || '',
-      numeroInscripcion: g.numeroInscripcion || '-',
-      activo: g.activo !== false,
-      createdAt: g.createdAt,
-      _raw: g,
-    })),
+    generadoresData.map((g: any) => {
+      const enriched: GeneradorEnriched | null = GENERADORES_DATA[g.cuit] || null;
+
+      return {
+        id: g.id,
+        razonSocial: g.razonSocial || '',
+        cuit: g.cuit || '',
+        categoria: g.categoria || '-',
+        domicilio: g.domicilio || '',
+        telefono: g.telefono || '',
+        email: g.email || g.usuario?.email || '',
+        numeroInscripcion: g.numeroInscripcion || '-',
+        activo: g.activo !== false,
+        createdAt: g.createdAt,
+        _raw: g,
+        // JSON enrichment
+        certificado: enriched?.certificado || null,
+        rubro: enriched?.rubro || null,
+        actividad: enriched?.actividad || null,
+        categoriasControl: enriched?.categoriasControl || [],
+        emailOriginal: enriched?.emailOriginal || null,
+        emailGenerado: enriched?.emailGenerado || false,
+      };
+    }),
     [generadoresData]
   );
 
-  // Server handles search; client filters categoria/estado on current page
+  // Client-side filters
   const filteredData = tableData.filter((g) => {
+    if (filtroRubro && g.rubro !== filtroRubro) return false;
     const matchesCategoria = !filtroCategoria || g.categoria.toLowerCase().includes(filtroCategoria.toLowerCase());
     const matchesEstado = filtroEstado === 'todos' ||
                           (filtroEstado === 'activo' && g.activo) ||
@@ -102,7 +117,7 @@ const AdminGeneradoresPage: React.FC = () => {
   });
 
   const stats = {
-    total: total,
+    total,
     activos: generadoresData.filter((g: any) => g.activo !== false).length,
     inactivos: generadoresData.filter((g: any) => g.activo === false).length,
     filtrados: filteredData.length,
@@ -180,6 +195,29 @@ const AdminGeneradoresPage: React.FC = () => {
     }
   };
 
+  const handleExport = () => {
+    downloadCsv(
+      filteredData.map(g => ({
+        'Razón Social': g.razonSocial,
+        CUIT: g.cuit,
+        Certificado: g.certificado || '',
+        Categoría: g.categoria,
+        Rubro: g.rubro || '',
+        Actividad: g.actividad || '',
+        'Categorías Y': g.categoriasControl.join(', '),
+        'Email (original)': g.emailOriginal || '',
+        Email: g.email,
+        Teléfono: g.telefono,
+        Domicilio: g.domicilio,
+        Inscripción: g.numeroInscripcion,
+        Estado: g.activo ? 'Activo' : 'Inactivo',
+        Alta: g.createdAt ? new Date(g.createdAt).toLocaleDateString() : '',
+      })),
+      'admin-generadores'
+    );
+    toast.success('Exportar', 'CSV descargado');
+  };
+
   const renderForm = () => (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
@@ -219,7 +257,7 @@ const AdminGeneradoresPage: React.FC = () => {
   const columns = [
     {
       key: 'generador',
-      width: '28%',
+      width: '24%',
       header: 'Generador',
       render: (row: typeof tableData[0]) => (
         <div className="flex items-center gap-3">
@@ -228,66 +266,98 @@ const AdminGeneradoresPage: React.FC = () => {
           </div>
           <div className="min-w-0">
             <p className="font-medium text-neutral-900 truncate">{row.razonSocial}</p>
-            <p className="text-xs text-neutral-500 font-mono">{row.cuit}</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-xs text-neutral-500 font-mono">{row.cuit}</span>
+              {row.certificado && (
+                <span className="text-[10px] font-mono text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded">{row.certificado}</span>
+              )}
+            </div>
           </div>
         </div>
       ),
     },
     {
-      key: 'categoria',
+      key: 'rubro',
       width: '14%',
-      header: 'Categoría',
+      header: 'Rubro',
       hiddenBelow: 'md' as const,
-      render: (row: typeof tableData[0]) => (
-        <span className="text-sm text-neutral-700">{row.categoria}</span>
+      render: (row: typeof tableData[0]) => row.rubro ? (
+        <span className="text-xs text-neutral-700 bg-neutral-100 px-2 py-0.5 rounded-full truncate inline-block max-w-[160px]" title={row.rubro}>
+          {row.rubro}
+        </span>
+      ) : (
+        <span className="text-xs text-neutral-400">{row.categoria !== '-' ? row.categoria : '-'}</span>
       ),
     },
     {
-      key: 'inscripcion',
-      width: '12%',
-      header: 'Inscripción',
-      hiddenBelow: 'md' as const,
-      render: (row: typeof tableData[0]) => (
-        <span className="text-sm font-mono text-neutral-600">{row.numeroInscripcion}</span>
+      key: 'actividad',
+      width: '14%',
+      header: 'Actividad',
+      hiddenBelow: 'lg' as const,
+      render: (row: typeof tableData[0]) => row.actividad ? (
+        <p className="text-xs text-neutral-600 line-clamp-2" title={row.actividad}>
+          {row.actividad}
+        </p>
+      ) : (
+        <span className="text-xs text-neutral-400">-</span>
+      ),
+    },
+    {
+      key: 'categoriasY',
+      width: '14%',
+      header: 'Categorías Y',
+      hiddenBelow: 'lg' as const,
+      render: (row: typeof tableData[0]) => row.categoriasControl.length > 0 ? (
+        <div className="flex flex-wrap gap-1">
+          {row.categoriasControl.slice(0, 3).map((code: string) => (
+            <Badge key={code} variant="outline" color="warning" className="text-xs" title={CORRIENTES_Y[code] || code}>
+              {code}
+            </Badge>
+          ))}
+          {row.categoriasControl.length > 3 && (
+            <Badge variant="soft" color="neutral" className="text-xs" title={row.categoriasControl.join(', ')}>
+              +{row.categoriasControl.length - 3}
+            </Badge>
+          )}
+        </div>
+      ) : (
+        <span className="text-xs text-neutral-400">-</span>
       ),
     },
     {
       key: 'contacto',
-      width: '20%',
+      width: '14%',
       header: 'Contacto',
       hiddenBelow: 'lg' as const,
-      render: (row: typeof tableData[0]) => (
-        <div className="text-sm min-w-0">
-          <p className="text-neutral-600 truncate flex items-center gap-1">
-            <MapPin size={12} className="flex-shrink-0" />
-            <span className="truncate">{row.domicilio || '-'}</span>
-          </p>
-          <p className="text-neutral-500 flex items-center gap-1">
-            <Phone size={12} className="flex-shrink-0" />
-            {row.telefono || '-'}
-          </p>
-        </div>
-      ),
+      render: (row: typeof tableData[0]) => {
+        const mail = row.emailOriginal || row.email;
+        return (
+          <div className="text-xs min-w-0">
+            {mail && (
+              <p className="text-neutral-600 truncate flex items-center gap-1">
+                <Mail size={11} className="flex-shrink-0" />
+                <span className="truncate">{mail.split(',')[0].trim()}</span>
+              </p>
+            )}
+            {row.telefono && (
+              <p className="text-neutral-500 flex items-center gap-1 mt-0.5">
+                <Phone size={11} className="flex-shrink-0" />
+                <span className="truncate">{row.telefono}</span>
+              </p>
+            )}
+            {!mail && !row.telefono && <span className="text-neutral-400">-</span>}
+          </div>
+        );
+      },
     },
     {
       key: 'estado',
-      width: '10%',
+      width: '8%',
       header: 'Estado',
       render: (row: typeof tableData[0]) => (
         <Badge variant="soft" color={row.activo ? 'success' : 'warning'}>
           {row.activo ? 'Activo' : 'Inactivo'}
         </Badge>
-      ),
-    },
-    {
-      key: 'alta',
-      width: '8%',
-      header: 'Alta',
-      hiddenBelow: 'lg' as const,
-      render: (row: typeof tableData[0]) => (
-        <span className="text-xs text-neutral-500">
-          {row.createdAt ? new Date(row.createdAt).toLocaleDateString() : '-'}
-        </span>
       ),
     },
     {
@@ -299,7 +369,7 @@ const AdminGeneradoresPage: React.FC = () => {
         <div className="flex items-center justify-end gap-1">
           <button
             className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-            onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/admin/generadores/${row.id}` : `/admin/generadores/${row.id}`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/admin/actores/generadores/${row.id}` : `/admin/actores/generadores/${row.id}`); }}
             title="Ver"
           >
             <Eye size={16} />
@@ -337,7 +407,7 @@ const AdminGeneradoresPage: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" leftIcon={<Download size={18} />}>
+          <Button variant="outline" leftIcon={<Download size={18} />} onClick={handleExport}>
             Exportar
           </Button>
           <Button leftIcon={<Plus size={18} />} onClick={() => { setForm(INITIAL_FORM); setModalCrear(true); }}>
@@ -414,10 +484,20 @@ const AdminGeneradoresPage: React.FC = () => {
                 size="md"
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              <select
+                value={filtroRubro}
+                onChange={(e) => { setFiltroRubro(e.target.value); setCurrentPage(1); }}
+                className="px-4 h-10 rounded-xl border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
+              >
+                <option value="">Todos los rubros</option>
+                {TOP_RUBROS.map(r => (
+                  <option key={r} value={r}>{r.length > 35 ? r.substring(0, 33) + '...' : r}</option>
+                ))}
+              </select>
               <select
                 value={filtroCategoria}
-                onChange={(e) => setFiltroCategoria(e.target.value)}
+                onChange={(e) => { setFiltroCategoria(e.target.value); setCurrentPage(1); }}
                 className="px-4 h-10 rounded-xl border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
               >
                 <option value="">Todas las categorías</option>
@@ -427,7 +507,7 @@ const AdminGeneradoresPage: React.FC = () => {
               </select>
               <select
                 value={filtroEstado}
-                onChange={(e) => setFiltroEstado(e.target.value)}
+                onChange={(e) => { setFiltroEstado(e.target.value); setCurrentPage(1); }}
                 className="px-4 h-10 rounded-xl border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
               >
                 <option value="todos">Todos los estados</option>
@@ -456,8 +536,9 @@ const AdminGeneradoresPage: React.FC = () => {
               data={filteredData}
               columns={columns}
               keyExtractor={(row) => row.id}
-              onRowClick={(row) => navigate(isMobile ? `/mobile/admin/generadores/${row.id}` : `/admin/generadores/${row.id}`)}
+              onRowClick={(row) => navigate(isMobile ? `/mobile/admin/actores/generadores/${row.id}` : `/admin/actores/generadores/${row.id}`)}
               emptyMessage="No se encontraron generadores"
+              stickyHeader
             />
             <Pagination
               currentPage={currentPage}

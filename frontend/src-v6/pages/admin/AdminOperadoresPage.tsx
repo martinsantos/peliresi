@@ -1,42 +1,43 @@
 /**
  * SITREP v6 - Admin Operadores Page
  * ==================================
- * Panel administrativo para operadores de tratamiento - Vista tabla
+ * Panel administrativo para operadores de tratamiento
+ * Integra datos de la API + enriquecimiento CSV (certificado, tipo, tecnología, corrientes)
  */
 
 import React, { useState, useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
-  Building2,
+  FlaskConical,
   Plus,
   Search,
   AlertTriangle,
   CheckCircle,
-  MapPin,
   Phone,
   Mail,
   Edit,
   Eye,
   Trash2,
   Download,
-  Filter,
   Loader2,
-  FileCheck,
 } from 'lucide-react';
-import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
+import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Modal, ConfirmModal } from '../../components/ui/Modal';
 import { Table, Pagination } from '../../components/ui/Table';
 import { SearchInput } from '../../components/ui/SearchInput';
+import { toast } from '../../components/ui/Toast';
+import { downloadCsv } from '../../utils/exportCsv';
 import {
   useOperadores,
   useCreateOperador,
   useUpdateOperador,
   useDeleteOperador,
 } from '../../hooks/useActores';
-
+import { OPERADORES_DATA, type OperadorEnriched } from '../../data/operadores-enrichment';
+import { CORRIENTES_Y, CORRIENTES_Y_CODES } from '../../data/corrientes-y';
 
 const INITIAL_FORM = {
   razonSocial: '',
@@ -53,9 +54,11 @@ const INITIAL_FORM = {
 const AdminOperadoresPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const isMobile = location.pathname.startsWith('/mobile');
-  const [busqueda, setBusqueda] = useState('');
-  const [filtroCategoria, setFiltroCategoria] = useState('');
+  const [busqueda, setBusqueda] = useState(searchParams.get('q') || '');
+  const [filtroTipo, setFiltroTipo] = useState('');
+  const [filtroCorriente, setFiltroCorriente] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [currentPage, setCurrentPage] = useState(1);
   const [modalCrear, setModalCrear] = useState(false);
@@ -75,36 +78,59 @@ const AdminOperadoresPage: React.FC = () => {
   const total = apiData?.total || operadoresData.length;
   const totalPages = apiData?.totalPages || 1;
 
-  // Map to display format
+  // Map to display format + merge CSV enrichment
   const tableData = useMemo(() =>
-    operadoresData.map((o: any) => ({
-      id: o.id,
-      razonSocial: o.razonSocial || '',
-      cuit: o.cuit || '',
-      categoria: o.categoria || '-',
-      domicilio: o.domicilio || '',
-      telefono: o.telefono || '',
-      email: o.email || o.usuario?.email || '',
-      numeroHabilitacion: o.numeroHabilitacion || '-',
-      tratamientos: o.tratamientos?.length || 0,
-      activo: o.activo !== false,
-      createdAt: o.createdAt,
-      _raw: o,
-    })),
+    operadoresData.map((o: any) => {
+      const enriched: OperadorEnriched | null = OPERADORES_DATA[o.cuit] || null;
+
+      // API residuos
+      const residuosCodigos = o.tratamientos?.map((t: any) => t.tipoResiduo?.codigo).filter(Boolean) || [];
+      const residuosUnicos = [...new Set(residuosCodigos)] as string[];
+      const metodosUnicos = [...new Set(o.tratamientos?.map((t: any) => t.metodo).filter(Boolean) || [])] as string[];
+
+      return {
+        id: o.id,
+        razonSocial: o.razonSocial || '',
+        cuit: o.cuit || '',
+        categoria: o.categoria || enriched?.tipoOperador || '-',
+        domicilio: o.domicilio || '',
+        telefono: o.telefono || '',
+        email: o.email || o.usuario?.email || '',
+        numeroHabilitacion: o.numeroHabilitacion || '-',
+        tratamientosCount: o.tratamientos?.length || 0,
+        residuosAceptados: residuosUnicos,
+        metodosAutorizados: metodosUnicos,
+        manifiestosProcesados: o._count?.manifiestos || 0,
+        activo: o.activo !== false,
+        createdAt: o.createdAt,
+        _raw: o,
+        // CSV enrichment
+        certificado: enriched?.certificado || null,
+        tipoOperador: enriched?.tipoOperador || null,
+        tecnologia: enriched?.tecnologia || null,
+        corrientes: enriched?.corrientes || [],
+        mailCSV: enriched?.mail || null,
+        telefonoCSV: enriched?.telefono || null,
+        domicilioReal: enriched?.domicilioReal || null,
+        domicilioLegal: enriched?.domicilioLegal || null,
+        expediente: enriched?.expediente || null,
+      };
+    }),
     [operadoresData]
   );
 
-  // Server handles search; client filters categoria/estado on current page
+  // Client-side filters (on top of server-side search)
   const filteredData = tableData.filter((o) => {
-    const matchesCategoria = !filtroCategoria || o.categoria.toLowerCase().includes(filtroCategoria.toLowerCase());
+    if (filtroTipo && o.tipoOperador !== filtroTipo) return false;
+    if (filtroCorriente && !o.corrientes.includes(filtroCorriente)) return false;
     const matchesEstado = filtroEstado === 'todos' ||
                           (filtroEstado === 'activo' && o.activo) ||
                           (filtroEstado === 'inactivo' && !o.activo);
-    return matchesCategoria && matchesEstado;
+    return matchesEstado;
   });
 
   const stats = {
-    total: total,
+    total,
     activos: operadoresData.filter((o: any) => o.activo !== false).length,
     inactivos: operadoresData.filter((o: any) => o.activo === false).length,
     filtrados: filteredData.length,
@@ -182,6 +208,32 @@ const AdminOperadoresPage: React.FC = () => {
     }
   };
 
+  const handleExport = () => {
+    downloadCsv(
+      filteredData.map(o => ({
+        'Razón Social': o.razonSocial,
+        CUIT: o.cuit,
+        Certificado: o.certificado || '',
+        Tipo: o.tipoOperador || o.categoria,
+        Habilitación: o.numeroHabilitacion,
+        Expediente: o.expediente || '',
+        Corrientes: o.corrientes.join(', '),
+        Tecnología: o.tecnologia || '',
+        'Email (CSV)': o.mailCSV || '',
+        'Email (API)': o.email,
+        'Teléfono (CSV)': o.telefonoCSV || '',
+        'Teléfono (API)': o.telefono,
+        'Domicilio Real': o.domicilioReal ? `${o.domicilioReal.calle}, ${o.domicilioReal.localidad}, ${o.domicilioReal.departamento}` : '',
+        'Domicilio Legal': o.domicilioLegal ? `${o.domicilioLegal.calle}, ${o.domicilioLegal.localidad}, ${o.domicilioLegal.departamento}` : '',
+        Tratamientos: o.tratamientosCount,
+        Manifiestos: o.manifiestosProcesados,
+        Estado: o.activo ? 'Activo' : 'Inactivo',
+      })),
+      'admin-operadores'
+    );
+    toast.success('Exportar', 'CSV descargado');
+  };
+
   const renderForm = () => (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
@@ -221,72 +273,106 @@ const AdminOperadoresPage: React.FC = () => {
   const columns = [
     {
       key: 'operador',
-      width: '28%',
+      width: '24%',
       header: 'Operador',
       render: (row: typeof tableData[0]) => (
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
-            <Building2 size={20} className="text-emerald-600" />
+            <FlaskConical size={20} className="text-emerald-600" />
           </div>
           <div className="min-w-0">
             <p className="font-medium text-neutral-900 truncate">{row.razonSocial}</p>
-            <p className="text-xs text-neutral-500 font-mono">{row.cuit}</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-xs text-neutral-500 font-mono">{row.cuit}</span>
+              {row.certificado && (
+                <span className="text-[10px] font-mono text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded">{row.certificado}</span>
+              )}
+            </div>
           </div>
         </div>
       ),
     },
     {
-      key: 'categoria',
-      width: '12%',
-      header: 'Categoria',
-      hiddenBelow: 'md' as const,
-      render: (row: typeof tableData[0]) => (
-        <Badge variant="soft" color={row.categoria.includes('FIJO') ? 'primary' : 'success'}>
-          {row.categoria}
-        </Badge>
-      ),
-    },
-    {
-      key: 'habilitacion',
-      width: '12%',
-      header: 'Habilitacion',
-      hiddenBelow: 'md' as const,
-      render: (row: typeof tableData[0]) => (
-        <span className="text-sm font-mono text-neutral-600">{row.numeroHabilitacion}</span>
-      ),
-    },
-    {
-      key: 'tratamientos',
+      key: 'tipo',
       width: '10%',
-      header: 'Tratam.',
-      render: (row: typeof tableData[0]) => (
-        <div className="flex items-center gap-1">
-          <FileCheck size={14} className="text-emerald-500" />
-          <span className="text-sm font-medium text-neutral-700">{row.tratamientos}</span>
+      header: 'Tipo',
+      hiddenBelow: 'md' as const,
+      render: (row: typeof tableData[0]) => {
+        const tipo = (row.tipoOperador || row.categoria) as string;
+        return tipo && tipo !== '-' ? (
+          <Badge variant="soft" color={tipo.includes('FIJO') ? 'primary' : 'success'}>
+            {tipo}
+          </Badge>
+        ) : (
+          <span className="text-xs text-neutral-400">-</span>
+        );
+      },
+    },
+    {
+      key: 'corrientes',
+      width: '14%',
+      header: 'Corrientes',
+      hiddenBelow: 'lg' as const,
+      render: (row: typeof tableData[0]) => row.corrientes.length > 0 ? (
+        <div className="flex flex-wrap gap-1">
+          {row.corrientes.slice(0, 3).map((code: string) => (
+            <Badge key={code} variant="outline" color="warning" className="text-xs" title={CORRIENTES_Y[code] || code}>
+              {code}
+            </Badge>
+          ))}
+          {row.corrientes.length > 3 && (
+            <Badge variant="soft" color="neutral" className="text-xs" title={row.corrientes.join(', ')}>
+              +{row.corrientes.length - 3}
+            </Badge>
+          )}
         </div>
+      ) : (
+        <span className="text-xs text-neutral-400">-</span>
+      ),
+    },
+    {
+      key: 'tecnologia',
+      width: '20%',
+      header: 'Tecnología',
+      hiddenBelow: 'lg' as const,
+      render: (row: typeof tableData[0]) => row.tecnologia ? (
+        <p className="text-xs text-neutral-600 line-clamp-2" title={row.tecnologia}>
+          {row.tecnologia}
+        </p>
+      ) : (
+        <span className="text-xs text-neutral-400">-</span>
       ),
     },
     {
       key: 'contacto',
-      width: '18%',
+      width: '14%',
       header: 'Contacto',
       hiddenBelow: 'lg' as const,
-      render: (row: typeof tableData[0]) => (
-        <div className="text-sm min-w-0">
-          <p className="text-neutral-600 truncate flex items-center gap-1">
-            <MapPin size={12} className="flex-shrink-0" />
-            <span className="truncate">{row.domicilio || '-'}</span>
-          </p>
-          <p className="text-neutral-500 flex items-center gap-1">
-            <Phone size={12} className="flex-shrink-0" />
-            {row.telefono || '-'}
-          </p>
-        </div>
-      ),
+      render: (row: typeof tableData[0]) => {
+        const mail = row.mailCSV || row.email;
+        const tel = row.telefonoCSV || row.telefono;
+        return (
+          <div className="text-xs min-w-0">
+            {mail && (
+              <p className="text-neutral-600 truncate flex items-center gap-1">
+                <Mail size={11} className="flex-shrink-0" />
+                <span className="truncate">{mail.split(';')[0].trim()}</span>
+              </p>
+            )}
+            {tel && (
+              <p className="text-neutral-500 flex items-center gap-1 mt-0.5">
+                <Phone size={11} className="flex-shrink-0" />
+                <span className="truncate">{tel}</span>
+              </p>
+            )}
+            {!mail && !tel && <span className="text-neutral-400">-</span>}
+          </div>
+        );
+      },
     },
     {
       key: 'estado',
-      width: '10%',
+      width: '8%',
       header: 'Estado',
       render: (row: typeof tableData[0]) => (
         <Badge variant="soft" color={row.activo ? 'success' : 'warning'}>
@@ -303,7 +389,7 @@ const AdminOperadoresPage: React.FC = () => {
         <div className="flex items-center justify-end gap-1">
           <button
             className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-            onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/actores/operadores/${row.id}` : `/actores/operadores/${row.id}`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/admin/actores/operadores/${row.id}` : `/admin/actores/operadores/${row.id}`); }}
             title="Ver"
           >
             <Eye size={16} />
@@ -333,15 +419,15 @@ const AdminOperadoresPage: React.FC = () => {
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-emerald-100 rounded-xl">
-            <Building2 size={24} className="text-emerald-600" />
+            <FlaskConical size={24} className="text-emerald-600" />
           </div>
           <div>
             <h2 className="text-2xl font-bold text-neutral-900">Admin Operadores</h2>
-            <p className="text-neutral-600">Panel de gestion de operadores de tratamiento</p>
+            <p className="text-neutral-600">Panel de gestión de operadores de tratamiento</p>
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" leftIcon={<Download size={18} />}>
+          <Button variant="outline" leftIcon={<Download size={18} />} onClick={handleExport}>
             Exportar
           </Button>
           <Button leftIcon={<Plus size={18} />} onClick={() => { setForm(INITIAL_FORM); setModalCrear(true); }}>
@@ -356,7 +442,7 @@ const AdminOperadoresPage: React.FC = () => {
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-emerald-100 rounded-lg">
-                <Building2 size={20} className="text-emerald-600" />
+                <FlaskConical size={20} className="text-emerald-600" />
               </div>
               <div>
                 <p className="text-2xl font-bold text-neutral-900">{stats.total}</p>
@@ -414,23 +500,33 @@ const AdminOperadoresPage: React.FC = () => {
               <SearchInput
                 value={busqueda}
                 onChange={(v) => { setBusqueda(v); setCurrentPage(1); }}
-                placeholder="Buscar por razon social, CUIT o habilitacion..."
+                placeholder="Buscar por razón social, CUIT o habilitación..."
                 size="md"
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <select
-                value={filtroCategoria}
-                onChange={(e) => setFiltroCategoria(e.target.value)}
+                value={filtroTipo}
+                onChange={(e) => { setFiltroTipo(e.target.value); setCurrentPage(1); }}
                 className="px-4 h-10 rounded-xl border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
               >
-                <option value="">Todas las categorias</option>
+                <option value="">Todos los tipos</option>
                 <option value="FIJO">FIJO</option>
                 <option value="IN SITU">IN SITU</option>
               </select>
               <select
+                value={filtroCorriente}
+                onChange={(e) => { setFiltroCorriente(e.target.value); setCurrentPage(1); }}
+                className="px-4 h-10 rounded-xl border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
+              >
+                <option value="">Todas las corrientes</option>
+                {CORRIENTES_Y_CODES.map(code => (
+                  <option key={code} value={code}>{code}</option>
+                ))}
+              </select>
+              <select
                 value={filtroEstado}
-                onChange={(e) => setFiltroEstado(e.target.value)}
+                onChange={(e) => { setFiltroEstado(e.target.value); setCurrentPage(1); }}
                 className="px-4 h-10 rounded-xl border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
               >
                 <option value="todos">Todos los estados</option>
@@ -459,8 +555,9 @@ const AdminOperadoresPage: React.FC = () => {
               data={filteredData}
               columns={columns}
               keyExtractor={(row) => row.id}
-              onRowClick={(row) => navigate(isMobile ? `/mobile/actores/operadores/${row.id}` : `/actores/operadores/${row.id}`)}
+              onRowClick={(row) => navigate(isMobile ? `/mobile/admin/actores/operadores/${row.id}` : `/admin/actores/operadores/${row.id}`)}
               emptyMessage="No se encontraron operadores"
+              stickyHeader
             />
             <Pagination
               currentPage={currentPage}
@@ -515,7 +612,7 @@ const AdminOperadoresPage: React.FC = () => {
         onClose={() => { setModalEliminar(false); setDeleteTarget(null); }}
         onConfirm={handleEliminar}
         title="Eliminar Operador"
-        description={`Esta seguro que desea eliminar a "${deleteTarget?.razonSocial}"? Esta accion no se puede deshacer.`}
+        description={`¿Está seguro que desea eliminar a "${deleteTarget?.razonSocial}"? Esta acción no se puede deshacer.`}
         confirmText="Eliminar"
         variant="danger"
         isLoading={deleteMutation.isPending}

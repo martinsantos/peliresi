@@ -7,13 +7,13 @@
 import React, { useState } from 'react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { 
-  Users, 
-  Shield, 
-  Factory, 
-  Truck, 
-  Building2, 
-  User, 
+import {
+  Users,
+  Shield,
+  Factory,
+  Truck,
+  FlaskConical,
+  User,
   Check,
   ChevronDown,
   X
@@ -52,12 +52,12 @@ const roleConfig: Record<UserRole, { label: string; icon: React.ElementType; col
     bgColor: 'bg-orange-100',
     borderColor: 'border-orange-200'
   },
-  OPERADOR: { 
-    label: 'Operador', 
-    icon: Building2, 
-    color: 'text-green-700',
-    bgColor: 'bg-green-100',
-    borderColor: 'border-green-200'
+  OPERADOR: {
+    label: 'Operador',
+    icon: FlaskConical,
+    color: 'text-blue-700',
+    bgColor: 'bg-blue-100',
+    borderColor: 'border-blue-200'
   },
   AUDITOR: { 
     label: 'Auditor', 
@@ -74,11 +74,13 @@ const roleConfig: Record<UserRole, { label: string; icon: React.ElementType; col
 interface UserSwitcherProps {
   variant?: 'dropdown' | 'modal' | 'sidebar';
   className?: string;
+  onSwitch?: () => void;
 }
 
-export const UserSwitcher: React.FC<UserSwitcherProps> = ({ 
+export const UserSwitcher: React.FC<UserSwitcherProps> = ({
   variant = 'dropdown',
-  className 
+  className,
+  onSwitch,
 }) => {
   const { currentUser, users, switchUser, getUsersByRole } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
@@ -95,18 +97,16 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
 
   const [isSwitching, setIsSwitching] = useState(false);
 
-  const handleSwitch = (userId: number | string) => {
+  const handleSwitch = async (userId: number | string) => {
     if (userId === currentUser.id) {
       setIsOpen(false);
       return;
     }
     setIsSwitching(true);
     setIsOpen(false);
-    // Breve feedback visual antes del cambio
-    setTimeout(() => {
-      switchUser(Number(userId));
-      setIsSwitching(false);
-    }, 150);
+    await switchUser(Number(userId));
+    setIsSwitching(false);
+    onSwitch?.();
   };
 
   // ========================================
@@ -307,7 +307,7 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
                   currentUser.rol === 'ADMIN' ? 'primary' :
                   currentUser.rol === 'GENERADOR' ? 'purple' :
                   currentUser.rol === 'TRANSPORTISTA' ? 'orange' :
-                  currentUser.rol === 'OPERADOR' ? 'green' : 'info'
+                  currentUser.rol === 'OPERADOR' ? 'blue' : 'info'
                 }>
                   <CurrentIcon size={12} className="mr-1" />
                   {currentConfig.label}

@@ -321,6 +321,32 @@ export const updateTransportista = async (req: AuthRequest, res: Response, next:
     }
 };
 
+export const deleteTransportista = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { id } = req.params;
+
+        const manifiestos = await prisma.manifiesto.count({ where: { transportistaId: id } });
+        if (manifiestos > 0) {
+            throw new AppError('No se puede eliminar un transportista con manifiestos asociados', 400);
+        }
+
+        const transportista = await prisma.transportista.findUnique({ where: { id } });
+        if (!transportista) {
+            throw new AppError('Transportista no encontrado', 404);
+        }
+
+        // Eliminar vehículos y choferes asociados, luego transportista, luego usuario
+        await prisma.vehiculo.deleteMany({ where: { transportistaId: id } });
+        await prisma.chofer.deleteMany({ where: { transportistaId: id } });
+        await prisma.transportista.delete({ where: { id } });
+        await prisma.usuario.delete({ where: { id: transportista.usuarioId } });
+
+        res.json({ success: true, message: 'Transportista eliminado' });
+    } catch (error) {
+        next(error);
+    }
+};
+
 // Gestionar vehículos
 export const addVehiculo = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -423,7 +449,9 @@ export const getOperadorById = async (req: AuthRequest, res: Response, next: Nex
             where: { id },
             include: {
                 usuario: { select: { email: true, nombre: true, apellido: true } },
-                tratamientos: true
+                tratamientos: {
+                    include: { tipoResiduo: true }
+                }
             }
         });
 
@@ -431,7 +459,96 @@ export const getOperadorById = async (req: AuthRequest, res: Response, next: Nex
             throw new AppError('Operador no encontrado', 404);
         }
 
-        res.json({ success: true, data: { operador } });
+        // Estadísticas y datos enriquecidos
+        const [manifiestoStats, ultimosManifiestos, historialTratados] = await Promise.all([
+            // Contar manifiestos por estado
+            prisma.manifiesto.groupBy({
+                by: ['estado'],
+                where: { operadorId: id },
+                _count: true
+            }),
+            // Últimos 10 manifiestos
+            prisma.manifiesto.findMany({
+                where: { operadorId: id },
+                orderBy: { createdAt: 'desc' },
+                take: 10,
+                include: {
+                    generador: { select: { razonSocial: true } },
+                    residuos: { select: { cantidad: true, cantidadRecibida: true, unidad: true } }
+                }
+            }),
+            // Historial de tratamientos (manifiestos TRATADO/EN_TRATAMIENTO/RECIBIDO)
+            prisma.manifiesto.findMany({
+                where: {
+                    operadorId: id,
+                    estado: { in: ['TRATADO', 'EN_TRATAMIENTO', 'RECIBIDO'] }
+                },
+                orderBy: { updatedAt: 'desc' },
+                take: 50,
+                include: {
+                    residuos: { select: { cantidad: true, cantidadRecibida: true, unidad: true } }
+                }
+            })
+        ]);
+
+        // Procesar métodos autorizados (únicos)
+        const metodosAutorizados = [...new Set(operador.tratamientos.map(t => t.metodo))];
+
+        // Procesar residuos aceptados (códigos únicos)
+        const residuosAceptados = [...new Set(operador.tratamientos.map(t => t.tipoResiduo.codigo))];
+
+        // Estadísticas de manifiestos
+        const manifiestos = {
+            recibidos: manifiestoStats.find(s => s.estado === 'RECIBIDO')?._count || 0,
+            enTratamiento: manifiestoStats.find(s => s.estado === 'EN_TRATAMIENTO')?._count || 0,
+            cerrados: manifiestoStats.find(s => s.estado === 'TRATADO')?._count || 0,
+            rechazados: manifiestoStats.find(s => s.estado === 'RECHAZADO')?._count || 0,
+        };
+
+        // Mapear últimos manifiestos para UI
+        const ultimosManifiestosUI = ultimosManifiestos.map(m => ({
+            id: m.id,
+            numero: m.numero,
+            fecha: m.createdAt,
+            estado: m.estado,
+            peso: m.residuos.reduce((sum, r) => sum + (r.cantidad || 0), 0),
+            generador: m.generador?.razonSocial || '-'
+        }));
+
+        // Mapear historial de tratamientos (manifiestos procesados)
+        const tratamientos = historialTratados.map(m => ({
+            id: m.id,
+            fecha: m.fechaCierre || m.fechaRecepcion || m.updatedAt,
+            manifiesto: m.numero,
+            metodo: metodosAutorizados[0] || 'Tratamiento estándar',
+            peso: m.residuos.reduce((sum, r) => sum + (r.cantidadRecibida || r.cantidad || 0), 0),
+            certificado: operador.numeroHabilitacion || '-'
+        }));
+
+        // Mapear tratamientos autorizados para UI
+        const tratamientosAutorizados = operador.tratamientos.map(t => ({
+            id: t.id,
+            tipoResiduo: t.tipoResiduo.codigo,
+            tipoResiduoNombre: t.tipoResiduo.nombre,
+            metodo: t.metodo,
+            capacidad: t.capacidad,
+            activo: t.activo
+        }));
+
+        res.json({
+            success: true,
+            data: {
+                operador: {
+                    ...operador,
+                    metodosAutorizados,
+                    residuosAceptados,
+                    manifiestos,
+                    ultimosManifiestos: ultimosManifiestosUI,
+                    tratamientos,
+                    tratamientosAutorizados
+                }
+            }
+        });
     } catch (error) {
         next(error);
     }

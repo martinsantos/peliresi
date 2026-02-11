@@ -81,10 +81,10 @@ export const MobileDashboardPage: React.FC = () => {
   const dashStats = (dashData as any)?.data || dashData;
 
   const stats = [
-    { id: 1, label: 'Manifiestos Total', value: String(dashStats?.manifiestos?.total ?? 0), change: undefined, icon: FileText, color: 'primary' },
-    { id: 2, label: 'En Tránsito', value: String(dashStats?.manifiestos?.enTransito ?? 0), change: undefined, icon: MapPin, color: 'info' },
-    { id: 3, label: 'Pendientes', value: String(dashStats?.manifiestos?.pendientes ?? 0), icon: Clock, color: 'warning' },
-    { id: 4, label: 'Completados', value: String(dashStats?.manifiestos?.completados ?? 0), change: undefined, icon: CheckCircle2, color: 'success' },
+    { id: 1, label: 'Manifiestos Total', value: String(dashStats?.manifiestos?.total ?? 0), change: undefined, icon: FileText, color: 'primary', href: '/manifiestos' },
+    { id: 2, label: 'En Tránsito', value: String(dashStats?.manifiestos?.enTransito ?? 0), change: undefined, icon: MapPin, color: 'info', href: '/manifiestos?estado=EN_TRANSITO' },
+    { id: 3, label: 'Pendientes', value: String(dashStats?.manifiestos?.pendientes ?? 0), icon: Clock, color: 'warning', href: '/manifiestos?estado=BORRADOR' },
+    { id: 4, label: 'Completados', value: String(dashStats?.manifiestos?.completados ?? 0), change: undefined, icon: CheckCircle2, color: 'success', href: '/manifiestos?estado=TRATADO' },
   ];
 
   const greeting = () => {
@@ -211,7 +211,7 @@ export const MobileDashboardPage: React.FC = () => {
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(mp('/manifiestos'))}>
+            <Card key={stat.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(mp(stat.href))}>
               <CardContent className="p-3">
                 <div className="flex items-start justify-between mb-2">
                   <div className={`p-2 rounded-lg ${

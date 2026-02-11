@@ -5,6 +5,8 @@ import {
     getGeneradores,
     getTransportistas,
     getOperadores,
+    getAllVehiculos,
+    getAllChoferes,
     getVehiculos,
     getChoferes,
     getTratamientos
@@ -21,6 +23,8 @@ router.use(isAuthenticated);
 router.get('/generadores', getGeneradores);
 router.get('/transportistas', getTransportistas);
 router.get('/operadores', getOperadores);
+router.get('/vehiculos', getAllVehiculos);
+router.get('/choferes', getAllChoferes);
 router.get('/transportistas/:transportistaId/vehiculos', getVehiculos);
 router.get('/transportistas/:transportistaId/choferes', getChoferes);
 router.get('/operadores/:operadorId/tratamientos', getTratamientos);

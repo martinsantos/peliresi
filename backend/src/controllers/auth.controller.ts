@@ -254,6 +254,47 @@ export const logout = async (req: Request, res: Response, next: NextFunction) =>
   }
 };
 
+// Cambiar contraseña (usuario autenticado)
+export const changePassword = async (req: Request & { user?: any }, res: Response, next: NextFunction) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      throw new AppError('Se requieren la contraseña actual y la nueva', 400);
+    }
+
+    const user = await prisma.usuario.findUnique({
+      where: { id: req.user.id },
+    });
+
+    if (!user) {
+      throw new AppError('Usuario no encontrado', 404);
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      throw new AppError('La contraseña actual es incorrecta', 400);
+    }
+
+    const passwordError = validatePasswordStrength(newPassword);
+    if (passwordError) {
+      throw new AppError(passwordError, 400);
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    await prisma.usuario.update({
+      where: { id: req.user.id },
+      data: { password: hashedPassword },
+    });
+
+    res.json({ success: true, message: 'Contraseña actualizada correctamente' });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Refrescar tokens (access token expirado, refresh token válido)
 export const refreshToken = async (req: Request, res: Response, next: NextFunction) => {
   try {

@@ -191,13 +191,14 @@ ssh root@23.105.176.45 "docker exec directus-admin-database-1 psql -U directus -
 
 | Route | Controller | Descripción |
 |-------|-----------|-------------|
-| `/api/auth/*` | auth.controller | Login, registro, refresh token, perfil |
+| `/api/auth/*` | auth.controller | Login, registro, refresh token, perfil, cambio de contraseña |
 | `/api/manifiestos/*` | manifiesto.controller | CRUD manifiestos, workflow de estados, dashboard |
 | `/api/actores/*` | actor.controller | Generadores, transportistas, operadores |
 | `/api/reportes/*` | reporte.controller | Reportes por período, tratados, transporte, CSV export |
 | `/api/catalogos/*` | catalogo.controller | Residuos, categorías, establecimientos, vehículos |
 | `/api/notificaciones/*` | notification.controller | Notificaciones push y alertas |
-| `/api/analytics/*` | analytics.controller | Dashboard stats (parcialmente implementado) |
+| `/api/analytics/*` | analytics.controller | Dashboard analytics: manifiestos por mes/estado, residuos por tipo, tiempo promedio |
+| `/api/admin/*` | admin.controller | CRUD usuarios (solo ADMIN): listar, crear, editar, eliminar, toggle activo |
 | `/api/pdf/*` | pdf.controller | Generación de PDF de manifiestos y certificados de disposición |
 | `/api/centro-control/*` | tracking.controller | Centro de Control: actividad por capas, mapa, estadísticas |
 
@@ -222,6 +223,24 @@ POST /api/manifiestos/:id/ubicacion   → GPS update (latitud, longitud, velocid
 GET  /api/centro-control/actividad    → Centro de Control con capas (params: fechaDesde, fechaHasta, capas=generadores,transportistas,operadores,transito)
 GET  /api/pdf/manifiesto/:id          → PDF del manifiesto
 GET  /api/pdf/certificado/:id         → Certificado de Tratamiento y Disposición Final (solo estado TRATADO)
+PUT  /api/manifiestos/:id             → Editar manifiesto (solo BORRADOR, reemplaza residuos via $transaction)
+DEL  /api/manifiestos/:id             → Eliminar manifiesto (solo BORRADOR/CANCELADO, cascading delete)
+GET  /api/manifiestos/:id/viaje-actual → GPS tracking points para un manifiesto (limit 500, ordered by timestamp)
+POST /api/auth/change-password        → Cambiar contraseña (verifica actual, valida nueva, hash bcrypt)
+GET  /api/catalogos/vehiculos         → Lista global de vehículos activos (con transportista)
+GET  /api/catalogos/choferes          → Lista global de choferes activos (con transportista)
+DEL  /api/actores/transportistas/:id  → Eliminar transportista (verifica sin manifiestos, cascade vehiculos/choferes/usuario)
+GET  /api/analytics/manifiestos-por-mes    → Manifiestos creados por mes (últimos 12 meses, raw SQL)
+GET  /api/analytics/residuos-por-tipo      → Residuos agrupados por tipo (Prisma groupBy)
+GET  /api/analytics/manifiestos-por-estado → Manifiestos agrupados por estado (Prisma groupBy)
+GET  /api/analytics/tiempo-promedio        → Tiempo promedio por etapa del workflow (horas entre fechas)
+GET  /api/admin/usuarios              → Lista usuarios con filtros (rol, search, activo) + paginación
+GET  /api/admin/usuarios/:id          → Detalle de usuario con actor asociado
+POST /api/admin/usuarios              → Crear usuario (Zod validation, hash bcrypt)
+PUT  /api/admin/usuarios/:id          → Editar usuario (email, nombre, rol, etc.)
+DEL  /api/admin/usuarios/:id          → Eliminar usuario (verifica sin manifiestos asociados)
+PATCH /api/admin/usuarios/:id/toggle-activo → Toggle campo activo del usuario
+GET  /api/manifiestos/verificar/:numero → Verificación pública de manifiesto por número (sin auth)
 ```
 
 ### Frontend Filter Mapping
@@ -234,9 +253,9 @@ La función `mapFilters()` en `reporte.service.ts` traduce entre ambos.
 | Rol | Acceso |
 |-----|--------|
 | `ADMIN` | Todo: dashboard, manifiestos, actores, reportes, auditoría, configuración, usuarios |
-| `GENERADOR` | Sus manifiestos, crear borradores, perfil |
-| `TRANSPORTISTA` | Manifiestos asignados, tracking GPS, viaje en curso |
-| `OPERADOR` | Manifiestos para tratamiento, recibir, tratar |
+| `GENERADOR` | Sus manifiestos (filtrado por generadorId), crear borradores, perfil |
+| `TRANSPORTISTA` | **DEMO MODE: ve TODOS los manifiestos** (filtro por transportistaId desactivado en `getManifiestos` y `getDashboardStats`). Tracking GPS, viaje en curso, "Tomar Viaje" desde perfil |
+| `OPERADOR` | Sus manifiestos (filtrado por operadorId), recibir, tratar |
 
 ---
 
@@ -310,6 +329,16 @@ The GPS tracking system enables real-time position monitoring for up to **50 sim
 - **Pending trips (APROBADO)**: Warning-colored card with clickable list
 - **Data source**: `useManifiestos({ estado: EN_TRANSITO/APROBADO, limit: 5 })`
 
+### TransportePerfilPage (TransportePerfilPage.tsx)
+
+- **3 tabs**: Viaje, Info, Historial
+- **Tab Viaje — prioridad de visualización**:
+  1. Si hay manifiesto EN_TRANSITO → muestra viaje activo con mapa, controles (pausar/incidente/finalizar)
+  2. Si NO hay EN_TRANSITO pero hay APROBADO → muestra lista "Viajes Asignados" con cards (número, generador, operador, residuos, fecha) y botón **"Tomar Viaje"** → navega a `/transporte/viaje/:id` (ViajeEnCursoTransportista)
+  3. Si no hay ninguno → EmptyState
+- **Data source**: `useManifiestos({ estado: EN_TRANSITO, limit: 1 })` + `useManifiestos({ estado: APROBADO, limit: 10 })`
+- **Flujo "Tomar Viaje"**: TransportePerfilPage (lista APROBADO) → click "Tomar Viaje" → ViajeEnCursoTransportista → "Confirmar Retiro" → manifiesto pasa a EN_TRANSITO + GPS tracking
+
 ### CentroControlPage Role Filtering
 
 - **ADMIN**: Sees all EN_TRANSITO trips
@@ -346,6 +375,7 @@ The GPS tracking system enables real-time position monitoring for up to **50 sim
 | Lista | `pages/manifiestos/ManifiestosPage.tsx` | Tabla con búsqueda, filtros por estado, paginación |
 | Detalle | `pages/manifiestos/ManifiestoDetallePage.tsx` | Workflow completo con 10 acciones por estado/rol, timeline, descarga PDF y Certificado de Disposición (estado TRATADO) |
 | Nuevo | `pages/manifiestos/NuevoManifiestoPage.tsx` | Formulario multi-paso con auto-populate de datos del actor al seleccionar (CUIT, teléfono, domicilio, habilitación) |
+| Verificar | `pages/manifiestos/VerificarManifiestoPage.tsx` | Verificación pública de manifiesto via QR/número |
 
 ### Actores
 | Página | Archivo | Descripción |
@@ -359,16 +389,17 @@ The GPS tracking system enables real-time position monitoring for up to **50 sim
 |--------|---------|-------------|
 | Residuos | `pages/admin/AdminResiduosPage.tsx` | Catálogo con filtros interactivos en stat cards y categorías |
 | Generadores | `pages/admin/AdminGeneradoresPage.tsx` | CRUD generadores |
-| Establecimientos | `pages/admin/AdminEstablecimientosPage.tsx` | CRUD establecimientos |
+| Operadores | `pages/admin/AdminOperadoresPage.tsx` | CRUD operadores con enrichment DPA |
+| Tratamientos | `pages/admin/AdminTratamientosPage.tsx` | Catálogo de tratamientos |
 | Vehículos | `pages/admin/AdminVehiculosPage.tsx` | CRUD vehículos |
-| Usuarios | `pages/usuarios/UsuariosPage.tsx` | Gestión de usuarios y roles |
+| Usuarios | `pages/usuarios/UsuariosPage.tsx` | Gestión de usuarios y roles (CRUD completo via admin.controller) |
 
 ### Transporte & Tracking
 | Página | Archivo | Descripción |
 |--------|---------|-------------|
 | Tracking | `pages/tracking/TrackingPage.tsx` | Seguimiento GPS en mapa |
 | Viaje en Curso | `pages/tracking/ViajeEnCursoPage.tsx` | Vista de viaje activo |
-| Perfil Transporte | `pages/transporte/TransportePerfilPage.tsx` | Dashboard transportista |
+| Perfil Transporte | `pages/transporte/TransportePerfilPage.tsx` | Dashboard transportista: 3 tabs (Viaje, Info, Historial). Tab Viaje muestra viaje EN_TRANSITO activo, o lista de viajes APROBADO con botón "Tomar Viaje", o EmptyState |
 | Viaje Transportista | `pages/transporte/ViajeEnCursoTransportista.tsx` | Control de viaje para transportista |
 
 ### Otros
@@ -411,7 +442,8 @@ The GPS tracking system enables real-time position monitoring for up to **50 sim
 | Service | Archivo | API Base |
 |---------|---------|----------|
 | `reporteService` | `services/reporte.service.ts` | `/reportes/*` (con mapFilters fechaDesde→fechaInicio) |
-| `analyticsService` | `services/analytics.service.ts` | `/analytics/*` (parcial - algunas rutas no existen en backend) |
+| `analyticsService` | `services/analytics.service.ts` | `/analytics/*` (4 dashboard endpoints fully implemented) |
+| `usuarioService` | `services/usuario.service.ts` | `/admin/usuarios/*` (CRUD usuarios, solo ADMIN) |
 | `manifiestoService` | `services/manifiesto.service.ts` | `/manifiestos/*` |
 | `actoresService` | `services/actores.service.ts` | `/actores/*` |
 | `catalogoService` | `services/catalogo.service.ts` | `/catalogos/*` (tipos residuos, generadores, transportistas, operadores, vehículos, choferes, tratamientos) |
@@ -485,6 +517,31 @@ NuevoManifiestoPage auto-populates actor info cards (CUIT, teléfono, domicilio,
 
 ---
 
+## Testing
+
+### Smoke Test
+
+```bash
+# Run full API smoke test against production (44 endpoints)
+bash backend/tests/smoke-test.sh
+
+# Run against local
+bash backend/tests/smoke-test.sh http://localhost:3002
+```
+
+- **Script**: `backend/tests/smoke-test.sh`
+- **Coverage**: 44 endpoints across all route groups (Health, Auth, Manifiestos, Catalogos, Actores, Admin, Reportes, PDF, Analytics, Centro de Control, Notificaciones, QR Verification)
+- **Auth**: Logs in as admin (`juan.perez@dgfa.gob.ar` / `admin123`), uses JWT token for authenticated endpoints
+- **Dynamic IDs**: Fetches real IDs for detail/sub-resource tests (manifiestoId, transportistaId, operadorId)
+- **Exit code**: 0 on all pass, 1 on any failure
+
+### Service Worker Versioning
+
+- **Current version**: v10 (`sw.js` cache name: `trazabilidad-rrpp-v10`)
+- **Bump on deploy**: After deploying new frontend code, increment cache version in `frontend/public/sw.js` (`CACHE_NAME` and `RUNTIME_CACHE`) and redeploy `sw.js` to force PWA clients to fetch fresh assets
+
+---
+
 ## Key Notes
 
 - Backend runs on port **3002** via PM2 cluster mode, 2 instances (process name: `sitrep-backend`)
@@ -496,7 +553,7 @@ NuevoManifiestoPage auto-populates actor info cards (CUIT, teléfono, domicilio,
 - App uses SPA fallback to `/app/app.html`
 - SSL via Let's Encrypt (auto-renewal)
 - Admin email: `admin@dgfa.mendoza.gov.ar`
-- `/analytics/*` endpoints are partially implemented - `getDashboardStats` works but `getManifiestosPorMes`, `getResiduosPorTipo`, etc. return empty via try/catch fallback
+- `/analytics/*` endpoints fully implemented: `manifiestos-por-mes` (raw SQL), `residuos-por-tipo`, `manifiestos-por-estado` (Prisma groupBy), `tiempo-promedio` (calculated from workflow dates). All accessible by any authenticated user. Superadmin-only endpoints (`/summary`) behind `isSuperAdmin` middleware
 - Centro de Control usa polling manual (countdown 30s + refetch) en lugar de WebSockets
 - Reportes usa Recharts para gráficos interactivos y jsPDF para exportación PDF client-side
 - Report endpoints usan paginación (`page`/`limit` params) y `Promise.all` para queries paralelas
@@ -505,6 +562,18 @@ NuevoManifiestoPage auto-populates actor info cards (CUIT, teléfono, domicilio,
 - `createManifiesto` backend acepta `generadorId` del body para ADMIN (no requiere relación generador en el user)
 - `registrarIncidente` acepta tanto `tipo` como `tipoIncidente` del frontend
 - Certificado de Disposición (CU-O10): PDF generado por `pdf.controller.ts:generarCertificado` con Ley 24.051, datos completos, firma operador
+
+### Demo Mode — Filtro transportistaId desactivado
+
+En `manifiesto.controller.ts`, el filtro `where.transportistaId = req.user.transportista.id` está **comentado** en dos funciones para modo demo:
+- **`getManifiestos`** (~línea 144): cualquier transportista ve todos los manifiestos (no solo los asignados a su empresa)
+- **`getDashboardStats`** (~línea 981): estadísticas globales para cualquier transportista
+
+Esto permite que en demo cualquier usuario transportista (Carlos Rodriguez, Elena Vargas, etc.) vea y "tome" cualquier viaje APROBADO, sin importar a qué empresa transportista fue asignado el manifiesto.
+
+**Para restaurar filtro en producción**: descomentar las líneas marcadas con `DEMO MODE` en ambas funciones.
+
+**NOTA**: `getSyncInicial` (sincronización offline) **sigue filtrando** por `transportistaId` — no fue modificado.
 
 ---
 

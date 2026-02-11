@@ -24,10 +24,14 @@ export default function MapaActoresTab({
   ccData,
   onSelectDep,
   periodoLabel,
+  incluirTodos = true,
+  onToggleIncluirTodos,
 }: {
   ccData: CentroControlData | null;
   onSelectDep: (dep: string) => void;
   periodoLabel: string;
+  incluirTodos?: boolean;
+  onToggleIncluirTodos?: (value: boolean) => void;
 }) {
   const [layers, setLayers] = useState({
     generadores: true,
@@ -48,6 +52,10 @@ export default function MapaActoresTab({
   const totalTrans = ccData?.transportistas?.length || 0;
   const totalOper = ccData?.operadores?.length || 0;
 
+  if (import.meta.env.DEV) {
+    console.debug('[MapaActores] Generadores:', totalGen, 'Transportistas:', totalTrans, 'Operadores:', totalOper, 'incluirTodos:', incluirTodos);
+  }
+
   if (!ccData) {
     return (
       <div className="flex flex-col items-center justify-center py-24">
@@ -59,19 +67,32 @@ export default function MapaActoresTab({
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Active filter banner */}
+      {/* Active filter banner + toggle */}
       <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl">
         <Calendar size={14} className="text-amber-600 shrink-0" />
         <span className="text-xs font-medium text-amber-800">
-          Actores en mapa filtrados por: <strong>{periodoLabel}</strong>
+          {incluirTodos ? 'Mostrando todos los actores registrados' : <>Actores filtrados por: <strong>{periodoLabel}</strong></>}
         </span>
+        {onToggleIncluirTodos && (
+          <label className="ml-auto flex items-center gap-2 cursor-pointer select-none">
+            <span className="text-xs font-medium text-amber-800">Mostrar todos</span>
+            <button
+              role="switch"
+              aria-checked={incluirTodos}
+              onClick={() => onToggleIncluirTodos(!incluirTodos)}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${incluirTodos ? 'bg-primary-500' : 'bg-neutral-300'}`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${incluirTodos ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
+            </button>
+          </label>
+        )}
       </div>
 
       {/* KPI + Layer toggles */}
       <div className="flex flex-wrap items-center gap-3 p-4 bg-white rounded-2xl border border-neutral-100 shadow-sm">
         <Layers size={16} className="text-neutral-400" />
         {([
-          { key: 'generadores' as const, label: 'Generadores', color: 'bg-green-500', count: totalGen },
+          { key: 'generadores' as const, label: 'Generadores', color: 'bg-purple-500', count: totalGen },
           { key: 'transportistas' as const, label: 'Transportistas', color: 'bg-orange-500', count: totalTrans },
           { key: 'operadores' as const, label: 'Operadores', color: 'bg-blue-500', count: totalOper },
         ]).map(l => (
@@ -116,7 +137,7 @@ export default function MapaActoresTab({
                 >
                   <Popup>
                     <div className="text-sm">
-                      <strong className="text-green-700">{g.razonSocial}</strong>
+                      <strong className="text-purple-700">{g.razonSocial}</strong>
                       {g.count && <span className="text-xs text-neutral-500 ml-1">({g.count} en zona)</span>}
                       <br />
                       <span className="text-xs text-neutral-500">CUIT: {g.cuit}</span><br />
@@ -185,7 +206,7 @@ export default function MapaActoresTab({
             {/* Legend overlay */}
             <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg z-[400] text-xs">
               <div className="flex items-center gap-3 flex-wrap">
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-500" /> Generadores</span>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-purple-500" /> Generadores</span>
                 <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-orange-500" /> Transportistas</span>
                 <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Operadores</span>
               </div>

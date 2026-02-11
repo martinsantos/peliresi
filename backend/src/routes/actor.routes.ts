@@ -10,6 +10,7 @@ import {
     getTransportistaById,
     createTransportista,
     updateTransportista,
+    deleteTransportista,
     addVehiculo,
     addChofer,
     getOperadores,
@@ -35,6 +36,7 @@ router.get('/transportistas', getTransportistas);
 router.get('/transportistas/:id', getTransportistaById);
 router.post('/transportistas', hasRole('ADMIN'), createTransportista);
 router.put('/transportistas/:id', hasRole('ADMIN'), updateTransportista);
+router.delete('/transportistas/:id', hasRole('ADMIN'), deleteTransportista);
 router.post('/transportistas/:id/vehiculos', hasRole('ADMIN'), addVehiculo);
 router.post('/transportistas/:id/choferes', hasRole('ADMIN'), addChofer);
 

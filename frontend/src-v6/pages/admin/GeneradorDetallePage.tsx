@@ -17,12 +17,14 @@ import {
   Download,
   CheckCircle,
   AlertTriangle,
+  Biohazard,
   TrendingUp,
   BarChart3,
   Truck,
-  Building2,
+  FlaskConical,
   User,
   Shield,
+  ExternalLink,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -30,6 +32,8 @@ import { Badge } from '../../components/ui/BadgeV2';
 import { Tabs, TabList, Tab, TabPanel } from '../../components/ui/Tabs';
 import { useGenerador } from '../../hooks/useActores';
 import { downloadCsv } from '../../utils/exportCsv';
+import { GENERADORES_DATA } from '../../data/generadores-enrichment';
+import { CORRIENTES_Y } from '../../data/corrientes-y';
 
 const EMPTY_DEFAULTS = {
   responsableAmbiental: { nombre: '-', matricula: '-', telefono: '-' },
@@ -72,7 +76,7 @@ const GeneradorDetallePage: React.FC = () => {
     ultimosManifiestos: (apiGenerador as any).ultimosManifiestos || EMPTY_DEFAULTS.ultimosManifiestos,
   } : null;
 
-  const backPath = isMobile ? '/mobile/admin/generadores' : '/admin/generadores';
+  const backPath = isMobile ? '/mobile/admin/actores/generadores' : '/admin/actores/generadores';
 
   if (isLoading) {
     return (
@@ -148,6 +152,7 @@ const GeneradorDetallePage: React.FC = () => {
           <Tab id="info" icon={<Factory size={16} />}>Información General</Tab>
           <Tab id="manifiestos" icon={<FileText size={16} />}>Manifiestos</Tab>
           <Tab id="estadisticas" icon={<BarChart3 size={16} />}>Estadísticas</Tab>
+          <Tab id="residuos" icon={<Biohazard size={16} />}>Residuos Inscriptos</Tab>
         </TabList>
 
         {/* Tab: Info General */}
@@ -218,9 +223,14 @@ const GeneradorDetallePage: React.FC = () => {
                   <p className="text-sm font-medium text-neutral-700 mb-3">Transportistas habituales</p>
                   <div className="space-y-2">
                     {generador.transportistas.map((t: string) => (
-                      <div key={t} className="flex items-center gap-2 text-sm">
-                        <Truck size={14} className="text-neutral-400" />
-                        <span className="text-neutral-700">{t}</span>
+                      <div
+                        key={t}
+                        className="flex items-center gap-2 text-sm cursor-pointer hover:text-primary-600 group"
+                        onClick={() => navigate(`${isMobile ? '/mobile' : ''}/admin/actores/transportistas?q=${encodeURIComponent(t)}`)}
+                      >
+                        <Truck size={14} className="text-neutral-400 group-hover:text-primary-500" />
+                        <span className="text-neutral-700 group-hover:text-primary-600">{t}</span>
+                        <ExternalLink size={10} className="text-neutral-300 group-hover:text-primary-400" />
                       </div>
                     ))}
                   </div>
@@ -230,9 +240,14 @@ const GeneradorDetallePage: React.FC = () => {
                   <p className="text-sm font-medium text-neutral-700 mb-3">Operadores destino</p>
                   <div className="space-y-2">
                     {generador.operadores.map((o: string) => (
-                      <div key={o} className="flex items-center gap-2 text-sm">
-                        <Building2 size={14} className="text-neutral-400" />
-                        <span className="text-neutral-700">{o}</span>
+                      <div
+                        key={o}
+                        className="flex items-center gap-2 text-sm cursor-pointer hover:text-primary-600 group"
+                        onClick={() => navigate(`${isMobile ? '/mobile' : ''}/admin/actores/operadores?q=${encodeURIComponent(o)}`)}
+                      >
+                        <FlaskConical size={14} className="text-neutral-400 group-hover:text-primary-500" />
+                        <span className="text-neutral-700 group-hover:text-primary-600">{o}</span>
+                        <ExternalLink size={10} className="text-neutral-300 group-hover:text-primary-400" />
                       </div>
                     ))}
                   </div>
@@ -335,6 +350,44 @@ const GeneradorDetallePage: React.FC = () => {
               </CardContent>
             </Card>
           </div>
+        </TabPanel>
+
+        {/* Tab: Residuos Inscriptos */}
+        <TabPanel id="residuos">
+          {(() => {
+            const enriched = generador.cuit ? GENERADORES_DATA[generador.cuit] : null;
+            const categorias = enriched?.categoriasControl || [];
+            return categorias.length > 0 ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-neutral-500">
+                    {categorias.length} corriente{categorias.length !== 1 ? 's' : ''} de residuos peligrosos inscripta{categorias.length !== 1 ? 's' : ''} (Convenio de Basilea)
+                  </p>
+                  <Badge variant="soft" color="warning">{categorias.length} categorías</Badge>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {categorias.map((code: string) => (
+                    <div key={code} className="flex items-start gap-3 p-4 bg-white border border-neutral-200 rounded-xl hover:border-purple-300 hover:bg-purple-50/30 transition-colors">
+                      <div className="shrink-0 w-14 h-8 bg-amber-100 border border-amber-300 rounded-md flex items-center justify-center">
+                        <span className="text-xs font-bold text-amber-800">{code}</span>
+                      </div>
+                      <p className="text-sm text-neutral-700 leading-relaxed">
+                        {CORRIENTES_Y[code] || 'Descripción no disponible'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <Card className="py-12">
+                <div className="text-center">
+                  <Biohazard size={32} className="text-neutral-300 mx-auto mb-3" />
+                  <p className="text-neutral-500">No se encontraron categorías de residuos inscriptas para este generador</p>
+                  <p className="text-xs text-neutral-400 mt-1">CUIT: {generador.cuit}</p>
+                </div>
+              </Card>
+            );
+          })()}
         </TabPanel>
       </Tabs>
     </div>

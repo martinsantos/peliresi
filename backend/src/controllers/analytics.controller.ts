@@ -223,3 +223,128 @@ export const getUserActivity = async (req: Request, res: Response) => {
         });
     }
 };
+
+// ============== DASHBOARD ANALYTICS (any authenticated user) ==============
+
+// Manifiestos por mes (últimos 12 meses)
+export const getManifiestosPorMes = async (req: Request, res: Response) => {
+    try {
+        const datos = await prisma.$queryRaw<Array<{ mes: string; cantidad: bigint }>>`
+            SELECT TO_CHAR(DATE_TRUNC('month', "createdAt"), 'YYYY-MM') as mes,
+                   COUNT(*) as cantidad
+            FROM "Manifiesto"
+            WHERE "createdAt" >= NOW() - INTERVAL '12 months'
+            GROUP BY DATE_TRUNC('month', "createdAt")
+            ORDER BY mes ASC
+        `;
+
+        res.json({
+            success: true,
+            data: datos.map(d => ({
+                name: d.mes,
+                value: Number(d.cantidad),
+            })),
+        });
+    } catch (error) {
+        console.error('Error getting manifiestos por mes:', error);
+        res.json({ success: true, data: [] });
+    }
+};
+
+// Residuos por tipo
+export const getResiduosPorTipo = async (req: Request, res: Response) => {
+    try {
+        const datos = await prisma.manifiestoResiduo.groupBy({
+            by: ['tipoResiduoId'],
+            _sum: { cantidad: true },
+            _count: true,
+        });
+
+        const tiposResiduo = await prisma.tipoResiduo.findMany({
+            where: { id: { in: datos.map(d => d.tipoResiduoId) } },
+            select: { id: true, nombre: true, codigo: true },
+        });
+
+        const tipoMap = new Map(tiposResiduo.map(t => [t.id, t]));
+
+        res.json({
+            success: true,
+            data: datos.map(d => ({
+                name: tipoMap.get(d.tipoResiduoId)?.nombre || d.tipoResiduoId,
+                value: d._sum.cantidad || 0,
+                count: d._count,
+            })),
+        });
+    } catch (error) {
+        console.error('Error getting residuos por tipo:', error);
+        res.json({ success: true, data: [] });
+    }
+};
+
+// Manifiestos por estado
+export const getManifiestosPorEstado = async (req: Request, res: Response) => {
+    try {
+        const datos = await prisma.manifiesto.groupBy({
+            by: ['estado'],
+            _count: true,
+        });
+
+        res.json({
+            success: true,
+            data: datos.map(d => ({
+                name: d.estado,
+                value: d._count,
+            })),
+        });
+    } catch (error) {
+        console.error('Error getting manifiestos por estado:', error);
+        res.json({ success: true, data: [] });
+    }
+};
+
+// Tiempo promedio por etapa
+export const getTiempoPromedioPorEtapa = async (req: Request, res: Response) => {
+    try {
+        // Calcular tiempos promedio entre estados basado en fechas del manifiesto
+        const manifiestos = await prisma.manifiesto.findMany({
+            where: { estado: 'TRATADO' },
+            select: {
+                createdAt: true,
+                fechaFirma: true,
+                fechaRetiro: true,
+                fechaEntrega: true,
+                fechaRecepcion: true,
+                fechaCierre: true,
+            },
+            take: 200,
+            orderBy: { createdAt: 'desc' },
+        });
+
+        const etapas = [
+            { name: 'Creación → Firma', from: 'createdAt', to: 'fechaFirma' },
+            { name: 'Firma → Retiro', from: 'fechaFirma', to: 'fechaRetiro' },
+            { name: 'Retiro → Entrega', from: 'fechaRetiro', to: 'fechaEntrega' },
+            { name: 'Entrega → Recepción', from: 'fechaRecepcion', to: 'fechaRecepcion' },
+            { name: 'Recepción → Cierre', from: 'fechaRecepcion', to: 'fechaCierre' },
+        ];
+
+        const result = etapas.map(etapa => {
+            const tiempos: number[] = [];
+            for (const m of manifiestos) {
+                const fromDate = (m as any)[etapa.from];
+                const toDate = (m as any)[etapa.to];
+                if (fromDate && toDate) {
+                    const diffHours = (new Date(toDate).getTime() - new Date(fromDate).getTime()) / (1000 * 60 * 60);
+                    if (diffHours > 0) tiempos.push(diffHours);
+                }
+            }
+            const avg = tiempos.length > 0 ? tiempos.reduce((a, b) => a + b, 0) / tiempos.length : 0;
+            return { name: etapa.name, value: Math.round(avg * 10) / 10 };
+        });
+
+        res.json({ success: true, data: result });
+    } catch (error) {
+        console.error('Error getting tiempo promedio:', error);
+        res.json({ success: true, data: [] });
+    }
+};

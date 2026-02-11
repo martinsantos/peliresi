@@ -1,9 +1,13 @@
 import { Router } from 'express';
 import { isAuthenticated, hasRole } from '../middlewares/auth.middleware';
 import {
+    verificarManifiesto,
     getManifiestos,
     getManifiestoById,
     createManifiesto,
+    updateManifiesto,
+    deleteManifiesto,
+    getViajeActual,
     firmarManifiesto,
     confirmarRetiro,
     actualizarUbicacion,
@@ -23,7 +27,10 @@ import {
 
 const router = Router();
 
-// Todas las rutas requieren autenticación
+// Ruta PUBLICA (sin auth) — verificación de manifiesto via QR
+router.get('/verificar/:numero', verificarManifiesto);
+
+// Todas las rutas siguientes requieren autenticación
 router.use(isAuthenticated);
 
 // Dashboard
@@ -37,10 +44,15 @@ router.get('/esperados', hasRole('OPERADOR', 'ADMIN'), getManifiestosEsperados);
 // Validar código QR de manifiesto
 router.post('/validar-qr', validarQR);
 
-// Manifiestos
+// Manifiestos CRUD
 router.get('/', getManifiestos);
 router.get('/:id', getManifiestoById);
 router.post('/', hasRole('GENERADOR', 'ADMIN'), createManifiesto);
+router.put('/:id', hasRole('GENERADOR', 'ADMIN'), updateManifiesto);
+router.delete('/:id', hasRole('GENERADOR', 'ADMIN'), deleteManifiesto);
+
+// Tracking del viaje actual
+router.get('/:id/viaje-actual', getViajeActual);
 
 // Flujo de manifiesto - Generador (ADMIN puede ejecutar todas las acciones)
 router.post('/:id/firmar', hasRole('GENERADOR', 'ADMIN'), firmarManifiesto);
