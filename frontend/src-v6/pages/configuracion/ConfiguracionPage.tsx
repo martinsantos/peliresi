@@ -7,11 +7,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   User,
-  Bell,
   Shield,
   Palette,
-  Mail,
-  Smartphone,
   Save,
   ChevronRight,
   Download,
@@ -34,7 +31,6 @@ import { usuarioService } from '../../services/usuario.service';
 // Secciones de configuración
 const configSections = [
   { id: 'perfil', label: 'Perfil', icon: User },
-  { id: 'notificaciones', label: 'Notificaciones', icon: Bell },
   { id: 'seguridad', label: 'Seguridad', icon: Shield },
   { id: 'apariencia', label: 'Apariencia', icon: Palette },
 ];
@@ -70,17 +66,6 @@ const ConfiguracionPage: React.FC = () => {
     nueva: '',
     confirmar: '',
   });
-
-  // Notification settings
-  const [notifications, setNotifications] = useState({
-    email: true,
-    push: true,
-    sms: false,
-    manifiestos: true,
-    alertas: true,
-    reportes: false,
-  });
-
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -156,45 +141,6 @@ const ConfiguracionPage: React.FC = () => {
                 value={profile.cargo}
                 onChange={(e) => setProfile({ ...profile, cargo: e.target.value })}
               />
-            </div>
-          </div>
-        );
-
-      case 'notificaciones':
-        return (
-          <div className="space-y-6 animate-fade-in">
-            <div>
-              <h4 className="font-medium text-neutral-900 mb-4">Canales de notificación</h4>
-              <div className="space-y-4 animate-fade-in">
-                {[
-                  { key: 'email', label: 'Correo electrónico', icon: Mail, desc: 'Recibir notificaciones por email' },
-                  { key: 'push', label: 'Notificaciones push', icon: Smartphone, desc: 'Recibir notificaciones en el navegador' },
-                  { key: 'sms', label: 'SMS', icon: Smartphone, desc: 'Recibir notificaciones por mensaje de texto' },
-                ].map((item) => (
-                  <label
-                    key={item.key}
-                    className="flex items-center justify-between p-4 bg-neutral-50 rounded-xl cursor-pointer hover:bg-neutral-100 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-white rounded-lg text-neutral-600">
-                        <item.icon size={18} />
-                      </div>
-                      <div>
-                        <p className="font-medium text-neutral-900">{item.label}</p>
-                        <p className="text-sm text-neutral-500">{item.desc}</p>
-                      </div>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={notifications[item.key as keyof typeof notifications]}
-                      onChange={(e) =>
-                        setNotifications({ ...notifications, [item.key]: e.target.checked })
-                      }
-                      className="w-5 h-5 rounded border-neutral-300 text-primary-500 focus:ring-primary-500"
-                    />
-                  </label>
-                ))}
-              </div>
             </div>
           </div>
         );

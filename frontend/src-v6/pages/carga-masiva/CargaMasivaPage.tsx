@@ -1,7 +1,7 @@
 /**
  * SITREP v6 - Carga Masiva Page
  * =============================
- * Importacion masiva de datos - Real API + fallback mock
+ * Importacion masiva de datos via API
  */
 
 import React, { useState } from 'react';
@@ -36,11 +36,11 @@ interface CargaResultado {
 
 // Historial starts empty - populated by actual uploads
 
-// Template types for download
+// Template types for download — match backend routes in notification.routes.ts
 const TEMPLATE_TYPES = [
-  { tipo: 'manifiestos', label: 'Manifiestos', version: 'v2.0', color: 'primary', bgColor: 'bg-primary-100', textColor: 'text-primary-600' },
-  { tipo: 'actores', label: 'Actores', version: 'v1.5', color: 'purple', bgColor: 'bg-purple-100', textColor: 'text-purple-600' },
-  { tipo: 'residuos', label: 'Residuos', version: 'v1.0', color: 'orange', bgColor: 'bg-orange-100', textColor: 'text-orange-600' },
+  { tipo: 'generadores', label: 'Generadores', version: 'v2.0', color: 'primary', bgColor: 'bg-primary-100', textColor: 'text-primary-600' },
+  { tipo: 'transportistas', label: 'Transportistas', version: 'v1.5', color: 'purple', bgColor: 'bg-purple-100', textColor: 'text-purple-600' },
+  { tipo: 'operadores', label: 'Operadores', version: 'v1.0', color: 'orange', bgColor: 'bg-orange-100', textColor: 'text-orange-600' },
 ];
 
 const CargaMasivaPage: React.FC = () => {
@@ -48,7 +48,7 @@ const CargaMasivaPage: React.FC = () => {
   const [archivo, setArchivo] = useState<File | null>(null);
   const [procesando, setProcesando] = useState(false);
   const [progreso, setProgreso] = useState(0);
-  const [tipoSeleccionado, setTipoSeleccionado] = useState('manifiestos');
+  const [tipoSeleccionado, setTipoSeleccionado] = useState('generadores');
   const [historial, setHistorial] = useState<CargaResultado[]>([]);
 
   const handleDrag = (e: React.DragEvent) => {
@@ -102,7 +102,7 @@ const CargaMasivaPage: React.FC = () => {
     try {
       // Build FormData for real upload
       const formData = new FormData();
-      formData.append('file', archivo);
+      formData.append('archivo', archivo);
 
       // Use XMLHttpRequest for progress tracking
       const result = await new Promise<any>((resolve, reject) => {
@@ -156,25 +156,7 @@ const CargaMasivaPage: React.FC = () => {
       setHistorial(prev => [nuevoRegistro, ...prev]);
       toast.success('Carga completada', `Se procesaron ${nuevoRegistro.registros} registros de ${archivo.name}`);
     } catch {
-      // Fallback: simulate progress for demo
-      for (let i = 0; i <= 100; i += 10) {
-        await new Promise(resolve => setTimeout(resolve, 200));
-        setProgreso(i);
-      }
-
-      const nuevoRegistro: CargaResultado = {
-        id: historial.length + 1,
-        archivo: archivo.name,
-        fecha: new Date().toLocaleString('es-AR'),
-        registros: Math.floor(Math.random() * 50) + 10,
-        exitosos: Math.floor(Math.random() * 40) + 10,
-        fallidos: Math.floor(Math.random() * 5),
-        estado: 'completado',
-      };
-      nuevoRegistro.estado = nuevoRegistro.fallidos > 0 ? 'parcial' : 'completado';
-
-      setHistorial(prev => [nuevoRegistro, ...prev]);
-      toast.success('Carga completada', `Se procesaron los datos de ${archivo.name} (demo)`);
+      toast.error('Error de carga', `No se pudo procesar el archivo ${archivo.name}. Verifica el formato e intenta nuevamente.`);
     } finally {
       setProcesando(false);
       setArchivo(null);
@@ -245,9 +227,9 @@ const CargaMasivaPage: React.FC = () => {
               onChange={(e) => setTipoSeleccionado(e.target.value)}
               className="px-4 py-2 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
             >
-              <option value="manifiestos">Manifiestos</option>
-              <option value="actores">Actores</option>
-              <option value="residuos">Residuos</option>
+              <option value="generadores">Generadores</option>
+              <option value="transportistas">Transportistas</option>
+              <option value="operadores">Operadores</option>
             </select>
           </div>
 

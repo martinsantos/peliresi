@@ -1,7 +1,7 @@
 // Service Worker para modo Offline-First (CU-T09)
 // Scope: / (main site)
-const CACHE_NAME = 'trazabilidad-rrpp-v10';
-const RUNTIME_CACHE = 'runtime-cache-v10';
+const CACHE_NAME = 'trazabilidad-rrpp-v12';
+const RUNTIME_CACHE = 'runtime-cache-v12';
 
 // Recursos críticos para cachear en instalación
 const PRECACHE_URLS = [
@@ -11,7 +11,7 @@ const PRECACHE_URLS = [
 
 // Instalación del Service Worker
 self.addEventListener('install', (event) => {
-    console.log('[SW] Installing Service Worker v10...');
+    console.log('[SW] Installing Service Worker v12...');
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then((cache) => {
@@ -30,7 +30,7 @@ self.addEventListener('install', (event) => {
 
 // Activación del Service Worker
 self.addEventListener('activate', (event) => {
-    console.log('[SW] Activando Service Worker v10...');
+    console.log('[SW] Activando Service Worker v12...');
     event.waitUntil(
         caches.keys().then((cacheNames) => {
             return Promise.all(
@@ -126,4 +126,4 @@ self.addEventListener('push', (event) => {
     );
 });
 
-console.log('[SW] Service Worker v10 cargado');
+console.log('[SW] Service Worker v12 cargado');

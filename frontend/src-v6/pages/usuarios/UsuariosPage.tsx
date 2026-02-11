@@ -23,7 +23,6 @@ import {
   Phone,
   Calendar,
   Lock,
-  RefreshCw,
   Grid3X3,
   List,
   User,
@@ -284,10 +283,6 @@ const UsuariosPage: React.FC = () => {
     setFormPassword('');
   };
 
-  const resetearPassword = (id: string) => {
-    toast.success('Password reseteado', 'Se envio un email con instrucciones');
-  };
-
   const verUsuario = (usuario: UsuarioLocal) => {
     setUsuarioSeleccionado(usuario);
     setModalVer(true);
@@ -403,15 +398,6 @@ const UsuariosPage: React.FC = () => {
             title="Ver detalle"
           >
             <Eye size={16} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="p-2"
-            onClick={() => resetearPassword(row.id)}
-            title="Resetear password"
-          >
-            <RefreshCw size={16} />
           </Button>
           <Button
             variant="ghost"

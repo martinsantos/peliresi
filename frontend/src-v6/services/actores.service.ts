@@ -105,25 +105,25 @@ export const actoresService = {
 
   // Vehículos
   async listVehiculos(transportistaId: string): Promise<Vehiculo[]> {
-    const { data } = await api.get(`/catalogos/transportistas/${transportistaId}/vehiculos`);
+    const { data } = await api.get(`/actores/transportistas/${transportistaId}/vehiculos`);
     const raw = data.data;
     return Array.isArray(raw) ? raw : raw.vehiculos || [];
   },
 
   async createVehiculo(transportistaId: string, req: Partial<Vehiculo>): Promise<Vehiculo> {
-    const { data } = await api.post(`/catalogos/transportistas/${transportistaId}/vehiculos`, req);
+    const { data } = await api.post(`/actores/transportistas/${transportistaId}/vehiculos`, req);
     return data.data?.vehiculo || data.data;
   },
 
   // Choferes
   async listChoferes(transportistaId: string): Promise<Chofer[]> {
-    const { data } = await api.get(`/catalogos/transportistas/${transportistaId}/choferes`);
+    const { data } = await api.get(`/actores/transportistas/${transportistaId}/choferes`);
     const raw = data.data;
     return Array.isArray(raw) ? raw : raw.choferes || [];
   },
 
   async createChofer(transportistaId: string, req: Partial<Chofer>): Promise<Chofer> {
-    const { data } = await api.post(`/catalogos/transportistas/${transportistaId}/choferes`, req);
+    const { data } = await api.post(`/actores/transportistas/${transportistaId}/choferes`, req);
     return data.data?.chofer || data.data;
   },
 };

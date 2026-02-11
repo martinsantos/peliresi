@@ -7,13 +7,10 @@
 import React, { useState, useMemo } from 'react';
 import {
   FlaskConical,
-  Plus,
   AlertTriangle,
   Leaf,
   Beaker,
   Download,
-  Edit,
-  Trash2,
   Loader2,
   Flame,
 } from 'lucide-react';
@@ -22,7 +19,6 @@ import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Table, Pagination } from '../../components/ui/Table';
 import { SearchInput } from '../../components/ui/SearchInput';
-import { Modal } from '../../components/ui/Modal';
 import { useTiposResiduo } from '../../hooks/useCatalogos';
 import { toast } from '../../components/ui/Toast';
 import { downloadCsv } from '../../utils/exportCsv';
@@ -46,7 +42,6 @@ interface ResiduoDisplay {
 export const AdminResiduosPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [corrienteFilter, setCorrienteFilter] = useState('');
   const [peligrosidadFilter, setPeligrosidadFilter] = useState('');
   const [estadoFilter, setEstadoFilter] = useState('');
@@ -255,28 +250,6 @@ export const AdminResiduosPage: React.FC = () => {
         </Badge>
       ),
     },
-    {
-      key: 'acciones',
-      width: '8%',
-      header: '',
-      align: 'right' as const,
-      render: (row: ResiduoDisplay) => (
-        <div className="flex items-center justify-end gap-1">
-          <button
-            className="p-1.5 text-neutral-400 hover:text-info-600 hover:bg-info-50 rounded-lg transition-colors"
-            onClick={() => { toast.info('Editar residuo', 'La edición estará disponible próximamente'); }}
-          >
-            <Edit size={16} />
-          </button>
-          <button
-            className="p-1.5 text-neutral-400 hover:text-error-600 hover:bg-error-50 rounded-lg transition-colors"
-            onClick={() => { if (window.confirm('¿Eliminar tipo de residuo ' + row.codigo + '?')) { toast.info('Eliminar', 'La eliminación estará disponible próximamente'); } }}
-          >
-            <Trash2 size={16} />
-          </button>
-        </div>
-      ),
-    },
   ];
 
   return (
@@ -295,9 +268,6 @@ export const AdminResiduosPage: React.FC = () => {
         <div className="flex gap-2">
           <Button variant="outline" leftIcon={<Download size={18} />} onClick={handleExport}>
             Exportar
-          </Button>
-          <Button leftIcon={<Plus size={18} />} onClick={() => setIsModalOpen(true)}>
-            Nuevo Tipo
           </Button>
         </div>
       </div>
@@ -464,63 +434,6 @@ export const AdminResiduosPage: React.FC = () => {
         )}
       </Card>
 
-      {/* Modal Nuevo Tipo */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="Nuevo Tipo de Residuo"
-        size="lg"
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setIsModalOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={() => { toast.info('Nuevo tipo', 'La creación de tipos estará disponible próximamente'); setIsModalOpen(false); }}>
-              Guardar Tipo
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-4 animate-fade-in">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Código *</label>
-              <input type="text" className="w-full px-4 h-10 rounded-xl border border-neutral-200" placeholder="180103" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Corriente Y</label>
-              <select className="w-full px-4 h-10 rounded-xl border border-neutral-200">
-                <option value="">Sin corriente</option>
-                {CORRIENTES_Y_CODES.map(code => (
-                  <option key={code} value={code}>{code} — {CORRIENTES_Y[code].substring(0, 50)}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">Descripción *</label>
-            <input type="text" className="w-full px-4 h-10 rounded-xl border border-neutral-200" placeholder="Descripción del residuo" />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Tipo *</label>
-              <select className="w-full px-4 h-10 rounded-xl border border-neutral-200">
-                <option>Peligroso</option>
-                <option>No Peligroso</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Nivel de Peligrosidad *</label>
-              <select className="w-full px-4 h-10 rounded-xl border border-neutral-200">
-                <option>Alta</option>
-                <option>Media</option>
-                <option>Baja</option>
-                <option>Ninguna</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 };

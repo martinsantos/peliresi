@@ -8,17 +8,9 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Truck,
-  Plus,
-  Search,
-  MapPin,
-  Calendar,
   Wrench,
   FileText,
-  MoreVertical,
-  Filter,
   Download,
-  Edit,
-  Trash2,
   Eye,
   AlertTriangle,
   CheckCircle2,
@@ -29,10 +21,8 @@ import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Table, Pagination } from '../../components/ui/Table';
 import { SearchInput } from '../../components/ui/SearchInput';
-import { Modal } from '../../components/ui/Modal';
 import { Tabs, TabList, Tab, TabPanel } from '../../components/ui/Tabs';
 import { useTransportistas } from '../../hooks/useActores';
-import { toast } from '../../components/ui/Toast';
 import { downloadCsv } from '../../utils/exportCsv';
 
 interface VehiculoDisplay {
@@ -53,8 +43,6 @@ interface VehiculoDisplay {
 export const AdminVehiculosPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedRows, setSelectedRows] = useState<string[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('vehiculos');
 
   const navigate = useNavigate();
@@ -200,37 +188,17 @@ export const AdminVehiculosPage: React.FC = () => {
     },
     {
       key: 'acciones',
-      width: '11%',
+      width: '8%',
       header: '',
       align: 'right' as const,
       render: (row: VehiculoDisplay) => (
-        <div className="flex items-center justify-end gap-1">
-          <button
-            className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-            onClick={() => navigate(isMobile ? '/mobile/admin/actores/transportistas/' + row.transportistaId : '/admin/actores/transportistas/' + row.transportistaId)}
-            title="Ver transportista"
-          >
-            <Eye size={16} />
-          </button>
-          <button
-            className="p-1.5 text-neutral-400 hover:text-info-600 hover:bg-info-50 rounded-lg transition-colors"
-            onClick={() => navigate(isMobile ? '/mobile/admin/actores/transportistas/' + row.transportistaId : '/admin/actores/transportistas/' + row.transportistaId)}
-            title="Editar vehículo"
-          >
-            <Edit size={16} />
-          </button>
-          <button
-            className="p-1.5 text-neutral-400 hover:text-error-600 hover:bg-error-50 rounded-lg transition-colors"
-            onClick={() => {
-              if (window.confirm('La gestión de vehículos se realiza desde la ficha del transportista. ¿Desea ir a la ficha del transportista?')) {
-                navigate(isMobile ? '/mobile/admin/actores/transportistas/' + row.transportistaId : '/admin/actores/transportistas/' + row.transportistaId);
-              }
-            }}
-            title="Eliminar vehículo"
-          >
-            <Trash2 size={16} />
-          </button>
-        </div>
+        <button
+          className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+          onClick={() => navigate(isMobile ? '/mobile/admin/actores/transportistas/' + row.transportistaId : '/admin/actores/transportistas/' + row.transportistaId)}
+          title="Ver transportista"
+        >
+          <Eye size={16} />
+        </button>
       ),
     },
   ];
@@ -245,14 +213,9 @@ export const AdminVehiculosPage: React.FC = () => {
             Gestión de flota de transporte
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" leftIcon={<Download size={18} />} onClick={() => downloadCsv(allVehicles.map(v => ({ Patente: v.patente, Marca: v.marca, Modelo: v.modelo, Año: v.anio, Capacidad: v.capacidad, Transportista: v.transportista, Habilitación: v.habilitacion, Estado: v.estado })), 'vehiculos')}>
-            Exportar
-          </Button>
-          <Button leftIcon={<Plus size={18} />} onClick={() => setIsModalOpen(true)}>
-            Nuevo Vehículo
-          </Button>
-        </div>
+        <Button variant="outline" leftIcon={<Download size={18} />} onClick={() => downloadCsv(allVehicles.map(v => ({ Patente: v.patente, Marca: v.marca, Modelo: v.modelo, Año: v.anio, Capacidad: v.capacidad, Transportista: v.transportista, Habilitación: v.habilitacion, Estado: v.estado })), 'vehiculos')}>
+          Exportar
+        </Button>
       </div>
 
       {/* Stats */}
@@ -315,24 +278,18 @@ export const AdminVehiculosPage: React.FC = () => {
       <Tabs activeTab={activeTab} onChange={setActiveTab}>
         <TabList>
           <Tab id="vehiculos">Vehículos</Tab>
-          <Tab id="mantenimiento">Mantenimiento</Tab>
           <Tab id="documentacion">Documentación</Tab>
         </TabList>
 
         <TabPanel id="vehiculos">
           <Card>
             <CardContent className="p-4">
-              <div className="flex flex-col md:flex-row gap-4 mb-4">
-                <div className="flex-1">
-                  <SearchInput
-                    value={searchQuery}
-                    onChange={setSearchQuery}
-                    placeholder="Buscar por patente, transportista o marca..."
-                  />
-                </div>
-                <Button variant="outline" leftIcon={<Filter size={18} />}>
-                  Filtros
-                </Button>
+              <div className="mb-4">
+                <SearchInput
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  placeholder="Buscar por patente, transportista o marca..."
+                />
               </div>
               {isLoading ? (
                 <div className="flex items-center justify-center py-16">
@@ -349,9 +306,6 @@ export const AdminVehiculosPage: React.FC = () => {
                     data={paginatedData}
                     columns={columns}
                     keyExtractor={(row) => row.id}
-                    selectable
-                    selectedKeys={selectedRows}
-                    onSelectionChange={setSelectedRows}
                     onRowClick={(row) => navigate(isMobile ? `/mobile/admin/actores/transportistas/${row.transportistaId}` : `/admin/actores/transportistas/${row.transportistaId}`)}
                     stickyHeader
                   />
@@ -364,22 +318,6 @@ export const AdminVehiculosPage: React.FC = () => {
                   />
                 </>
               )}
-            </CardContent>
-          </Card>
-        </TabPanel>
-
-        <TabPanel id="mantenimiento">
-          <Card>
-            <CardHeader
-              title="Historial de Mantenimiento"
-              action={<Button variant="outline" size="sm">+ Nuevo Service</Button>}
-            />
-            <CardContent className="p-6">
-              <div className="flex flex-col items-center justify-center py-8 text-neutral-400">
-                <Wrench size={40} className="mb-3" />
-                <p className="text-neutral-600 font-medium">Sin registros de mantenimiento</p>
-                <p className="text-sm text-neutral-400 mt-1">Los registros de mantenimiento aparecerán aquí</p>
-              </div>
             </CardContent>
           </Card>
         </TabPanel>
@@ -470,68 +408,6 @@ export const AdminVehiculosPage: React.FC = () => {
         </TabPanel>
       </Tabs>
 
-      {/* Modal Nuevo Vehículo */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="Nuevo Vehículo"
-        size="lg"
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setIsModalOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={() => { toast.info('Los vehículos se gestionan desde la ficha del transportista'); setIsModalOpen(false); }}>Registrar Vehículo</Button>
-          </div>
-        }
-      >
-        <div className="space-y-4 animate-fade-in">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Patente *</label>
-              <input type="text" className="w-full px-4 h-10 rounded-xl border border-neutral-200" placeholder="ABC123" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Tipo *</label>
-              <select className="w-full px-4 h-10 rounded-xl border border-neutral-200">
-                <option>Camión</option>
-                <option>Furgón</option>
-                <option>Camioneta</option>
-                <option>Semi-remolque</option>
-              </select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Marca *</label>
-              <input type="text" className="w-full px-4 h-10 rounded-xl border border-neutral-200" placeholder="Mercedes-Benz" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Modelo *</label>
-              <input type="text" className="w-full px-4 h-10 rounded-xl border border-neutral-200" placeholder="Actros 2545" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Año *</label>
-              <input type="number" className="w-full px-4 h-10 rounded-xl border border-neutral-200" placeholder="2023" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Capacidad *</label>
-              <input type="text" className="w-full px-4 h-10 rounded-xl border border-neutral-200" placeholder="15.000 kg" />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">Transportista *</label>
-            <select className="w-full px-4 h-10 rounded-xl border border-neutral-200">
-              {transportistas.map(t => (
-                <option key={t.id} value={t.id}>{t.razonSocial}</option>
-              ))}
-              {transportistas.length === 0 && <option>Cargando transportistas...</option>}
-            </select>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 };

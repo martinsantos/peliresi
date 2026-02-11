@@ -10,21 +10,17 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
   FlaskConical,
-  FileText,
   MapPin,
   Phone,
   Mail,
   Calendar,
-  Edit,
   CheckCircle2,
   AlertCircle,
   Shield,
   Beaker,
   BarChart3,
   Award,
-  Gauge,
   Leaf,
-  ClipboardCheck,
   Zap,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
@@ -35,43 +31,10 @@ import { useOperador } from '../../hooks/useActores';
 import { OPERADORES_DATA, type OperadorEnriched } from '../../data/operadores-enrichment';
 import { CORRIENTES_Y } from '../../data/corrientes-y';
 
-const EMPTY_DEFAULTS = {
-  metodosAutorizados: [] as string[],
-  residuosAceptados: [] as string[],
-  certificaciones: [] as string[],
-  capacidadPorTipo: [] as any[],
-  manifiestos: { recibidos: 0, enTratamiento: 0, cerrados: 0, rechazados: 0 },
-  ultimosManifiestos: [] as any[],
-  tratamientos: [] as any[],
-  tratamientosAutorizados: [] as any[],
-  metodosMasUsados: [] as any[],
-};
-
 const estadoConfig: Record<string, { label: string; color: string }> = {
   ACTIVO: { label: 'En línea', color: 'success' },
   MANTENIMIENTO: { label: 'Mantenimiento', color: 'warning' },
   INACTIVO: { label: 'Fuera de servicio', color: 'error' },
-};
-
-const estadoManifiestoColor: Record<string, string> = {
-  EN_TRATAMIENTO: 'warning',
-  TRATADO: 'primary',
-  RECHAZADO: 'error',
-  RECIBIDO: 'info',
-};
-
-const getCapacidadColor = (usada: number, total: number) => {
-  const pct = total > 0 ? (usada / total) * 100 : 0;
-  if (pct > 90) return 'text-error-600';
-  if (pct > 70) return 'text-warning-600';
-  return 'text-success-600';
-};
-
-const getCapacidadBg = (usada: number, total: number) => {
-  const pct = total > 0 ? (usada / total) * 100 : 0;
-  if (pct > 90) return 'bg-error-500';
-  if (pct > 70) return 'bg-warning-500';
-  return 'bg-success-500';
 };
 
 /** Parse tecnologia string into structured entries: { metodo, corrientes[] } */
@@ -106,7 +69,6 @@ const OperadorDetallePage: React.FC = () => {
 
   const { data: apiOperador, isLoading } = useOperador(id || '');
 
-  // Build operador from API data with safe defaults
   const operador = apiOperador ? {
     ...apiOperador,
     nombre: (apiOperador as any).razonSocial || '-',
@@ -114,20 +76,8 @@ const OperadorDetallePage: React.FC = () => {
     estado: (apiOperador as any).activo !== false ? 'ACTIVO' : 'INACTIVO',
     habilitacion: (apiOperador as any).numeroHabilitacion || '-',
     vencimientoHab: (apiOperador as any).vencimientoHab || '-',
-    metodosAutorizados: (apiOperador as any).metodosAutorizados || EMPTY_DEFAULTS.metodosAutorizados,
-    residuosAceptados: (apiOperador as any).residuosAceptados || EMPTY_DEFAULTS.residuosAceptados,
-    certificaciones: (apiOperador as any).certificaciones || EMPTY_DEFAULTS.certificaciones,
-    capacidadPorTipo: (apiOperador as any).capacidadPorTipo || EMPTY_DEFAULTS.capacidadPorTipo,
-    manifiestos: (apiOperador as any).manifiestos || EMPTY_DEFAULTS.manifiestos,
-    ultimosManifiestos: (apiOperador as any).ultimosManifiestos || EMPTY_DEFAULTS.ultimosManifiestos,
-    tratamientos: (apiOperador as any).tratamientos || EMPTY_DEFAULTS.tratamientos,
-    tratamientosAutorizados: (apiOperador as any).tratamientosAutorizados || EMPTY_DEFAULTS.tratamientosAutorizados,
-    metodosMasUsados: (apiOperador as any).metodosMasUsados || EMPTY_DEFAULTS.metodosMasUsados,
-    capacidadTotal: (apiOperador as any).capacidadTotal || 1,
-    capacidadUsada: (apiOperador as any).capacidadUsada || 0,
-    procesadoMes: (apiOperador as any).procesadoMes || 0,
-    ultimaAuditoria: (apiOperador as any).ultimaAuditoria || '-',
-    proximaAuditoria: (apiOperador as any).proximaAuditoria || '-',
+    residuosAceptados: (apiOperador as any).residuosAceptados || [],
+    certificaciones: (apiOperador as any).certificaciones || [],
   } : null;
 
   // CSV enrichment lookup by CUIT
@@ -163,7 +113,6 @@ const OperadorDetallePage: React.FC = () => {
 
   if (!operador) return null;
 
-  const capacidadPct = (operador.capacidadUsada / operador.capacidadTotal) * 100;
   const est = estadoConfig[operador.estado] || estadoConfig.ACTIVO;
 
   return (
@@ -203,39 +152,25 @@ const OperadorDetallePage: React.FC = () => {
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline">Cambiar Estado</Button>
-          <Button leftIcon={<Edit size={16} />}>Editar</Button>
-        </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="p-4">
-          <p className="text-sm text-neutral-500">Recibidos</p>
-          <p className="text-3xl font-bold text-neutral-900">{operador.manifiestos.recibidos}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-sm text-warning-600">En tratamiento</p>
-          <p className="text-3xl font-bold text-warning-700">{operador.manifiestos.enTratamiento}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-sm text-primary-600">Cerrados</p>
-          <p className="text-3xl font-bold text-primary-700">{operador.manifiestos.cerrados}</p>
-        </Card>
+      {/* Stats — only real data */}
+      <div className="grid grid-cols-2 gap-4">
         <Card className="p-4">
           <p className="text-sm text-neutral-500">Corrientes Y</p>
           <p className="text-3xl font-bold text-neutral-900">{enriched?.corrientes.length || 0}</p>
         </Card>
+        <Card className="p-4">
+          <p className="text-sm text-neutral-500">Tecnologías</p>
+          <p className="text-3xl font-bold text-neutral-900">{tecnologiasParsed.length}</p>
+        </Card>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — only real data */}
       <Tabs defaultTab="info" variant="default">
         <TabList>
           <Tab id="info" icon={<FlaskConical size={16} />}>Información General</Tab>
           <Tab id="tratamientos" icon={<Beaker size={16} />}>Tratamientos</Tab>
-          <Tab id="manifiestos" icon={<FileText size={16} />}>Manifiestos</Tab>
-          <Tab id="capacidad" icon={<Gauge size={16} />}>Capacidad</Tab>
         </TabList>
 
         {/* Tab: Info General */}
@@ -396,169 +331,6 @@ const OperadorDetallePage: React.FC = () => {
                 Ver catálogo completo de tratamientos
               </Button>
             </div>
-
-            {/* Historial de Tratamientos (API) */}
-            {operador.tratamientos && operador.tratamientos.length > 0 && (
-              <Card>
-                <CardHeader title="Historial de Tratamientos" icon={<Beaker size={20} />} />
-                <CardContent>
-                  <table className="w-full table-fixed">
-                    <thead className="bg-neutral-50">
-                      <tr>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Fecha</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '25%' }}>Manifiesto</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '25%' }}>Método</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '15%' }}>Peso</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '15%' }}>Certificado</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-neutral-100">
-                      {operador.tratamientos.map((t: any) => (
-                        <tr key={t.id} className="hover:bg-neutral-50 transition-colors">
-                          <td className="px-3 py-2.5 text-neutral-600">
-                            {t.fecha ? new Date(t.fecha).toLocaleDateString('es-AR') : '-'}
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <span
-                              className="font-mono text-primary-600 cursor-pointer hover:underline"
-                              onClick={() => navigate(isMobile ? `/mobile/manifiestos/${t.id}` : `/manifiestos/${t.id}`)}
-                            >
-                              {t.manifiesto}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2.5 text-neutral-700 truncate">{t.metodo}</td>
-                          <td className="px-3 py-2.5 font-medium text-neutral-700">{(t.peso ?? 0).toLocaleString('es-AR')} kg</td>
-                          <td className="px-3 py-2.5 hidden md:table-cell">
-                            <Badge variant="soft" color="success">{t.certificado || '-'}</Badge>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </TabPanel>
-
-        {/* Tab: Manifiestos */}
-        <TabPanel id="manifiestos">
-          <Card padding="none">
-              <table className="w-full table-fixed">
-                <thead className="bg-[#F5F5F3] border-b border-neutral-200">
-                  <tr>
-                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '20%' }}>Manifiesto</th>
-                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '18%' }}>Fecha</th>
-                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '20%' }}>Estado</th>
-                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider hidden md:table-cell" style={{ width: '18%' }}>Peso</th>
-                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider truncate hidden md:table-cell" style={{ width: '24%' }}>Generador</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-100">
-                  {(operador.ultimosManifiestos || []).length > 0 ? (
-                    operador.ultimosManifiestos.map((m: any) => (
-                      <tr
-                        key={m.id}
-                        className="hover:bg-neutral-50 transition-colors cursor-pointer group"
-                        onClick={() => navigate(isMobile ? `/mobile/manifiestos/${m.id}` : `/manifiestos/${m.id}`)}
-                      >
-                        <td className="px-3 py-2.5">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-primary-50 rounded-lg flex items-center justify-center text-primary-600">
-                              <FileText size={16} />
-                            </div>
-                            <span className="font-mono font-semibold text-neutral-900 group-hover:text-primary-600 transition-colors">
-                              {m.id}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-3 py-2.5 text-neutral-600">{m.fecha || '-'}</td>
-                        <td className="px-3 py-2.5">
-                          <Badge variant="soft" color={estadoManifiestoColor[m.estado] || 'neutral'}>
-                            {String(m.estado || '').replace(/_/g, ' ')}
-                          </Badge>
-                        </td>
-                        <td className="px-3 py-2.5 font-medium text-neutral-700 hidden md:table-cell">{(m.peso ?? 0).toLocaleString('es-AR')} kg</td>
-                        <td className="px-3 py-2.5 text-neutral-600 truncate hidden md:table-cell">{m.generador || '-'}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-12 text-center text-neutral-500">
-                        <FileText size={32} className="mx-auto mb-2 text-neutral-300" />
-                        <p>Sin manifiestos registrados</p>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-          </Card>
-        </TabPanel>
-
-        {/* Tab: Capacidad */}
-        <TabPanel id="capacidad">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader title="Capacidad General" icon={<Gauge size={20} />} />
-              <CardContent>
-                <div className="text-center mb-6">
-                  <p className={`text-5xl font-bold ${getCapacidadColor(operador.capacidadUsada, operador.capacidadTotal)}`}>
-                    {capacidadPct.toFixed(0)}%
-                  </p>
-                  <p className="text-neutral-500 mt-1">
-                    {operador.capacidadUsada.toLocaleString()} / {operador.capacidadTotal.toLocaleString()} Tn
-                  </p>
-                </div>
-                <div className="h-4 bg-neutral-100 rounded-full overflow-hidden mb-6">
-                  <div
-                    className={`h-full rounded-full transition-all ${getCapacidadBg(operador.capacidadUsada, operador.capacidadTotal)}`}
-                    style={{ width: `${capacidadPct}%` }}
-                  />
-                </div>
-
-                <div className="space-y-4">
-                  {operador.capacidadPorTipo.map((ct: any) => {
-                    const pct = ct.capacidad > 0 ? (ct.usado / ct.capacidad) * 100 : 0;
-                    return (
-                      <div key={ct.tipo}>
-                        <div className="flex items-center justify-between text-sm mb-1">
-                          <span className="text-neutral-700">{ct.tipo}</span>
-                          <span className={`font-medium ${getCapacidadColor(ct.usado, ct.capacidad)}`}>
-                            {pct.toFixed(0)}% — {ct.usado.toLocaleString()}/{ct.capacidad.toLocaleString()} Tn
-                          </span>
-                        </div>
-                        <div className="h-2 bg-neutral-100 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${getCapacidadBg(ct.usado, ct.capacidad)}`}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader title="Auditorías y Compliance" icon={<ClipboardCheck size={20} />} />
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="p-4 bg-neutral-50 rounded-xl">
-                    <p className="text-sm text-neutral-500">Última auditoría</p>
-                    <p className="text-lg font-semibold text-neutral-900">{operador.ultimaAuditoria}</p>
-                  </div>
-                  <div className="p-4 bg-neutral-50 rounded-xl">
-                    <p className="text-sm text-neutral-500">Próxima auditoría programada</p>
-                    <p className="text-lg font-semibold text-neutral-900">{operador.proximaAuditoria}</p>
-                  </div>
-                  <div className="p-4 bg-neutral-50 rounded-xl">
-                    <p className="text-sm text-neutral-500">Procesado este mes</p>
-                    <p className="text-lg font-semibold text-neutral-900">{operador.procesadoMes.toLocaleString()} Tn</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </div>
         </TabPanel>
       </Tabs>

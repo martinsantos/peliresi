@@ -55,7 +55,7 @@ const AdminDashboard: React.FC = () => {
   const stats = [
     { id: 1, label: 'Manifiestos Total', value: String(totalM), icon: FileText, color: 'primary', href: '/manifiestos' },
     { id: 2, label: 'En Tránsito', value: String(enTransitoM), icon: Truck, color: 'info', href: '/manifiestos?estado=EN_TRANSITO' },
-    { id: 3, label: 'Alertas Activas', value: '0', icon: AlertCircle, color: 'warning', href: '/alertas' },
+    { id: 3, label: 'Tratados', value: String(tratadosM), icon: AlertCircle, color: 'warning', href: '/reportes' },
     { id: 4, label: 'Tasa Cumplimiento', value: complianceRate, icon: CheckCircle2, color: 'success', href: '/reportes' },
   ];
 
