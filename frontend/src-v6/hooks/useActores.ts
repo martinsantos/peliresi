@@ -156,3 +156,27 @@ export function useChoferes(transportistaId: string) {
     enabled: !!transportistaId,
   });
 }
+
+export function useCreateVehiculo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ transportistaId, data }: { transportistaId: string; data: Partial<import('../types/models').Vehiculo> }) =>
+      actoresService.createVehiculo(transportistaId, data),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['vehiculos', vars.transportistaId] });
+      qc.invalidateQueries({ queryKey: ['transportistas'] });
+    },
+  });
+}
+
+export function useCreateChofer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ transportistaId, data }: { transportistaId: string; data: Partial<import('../types/models').Chofer> }) =>
+      actoresService.createChofer(transportistaId, data),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['choferes', vars.transportistaId] });
+      qc.invalidateQueries({ queryKey: ['transportistas'] });
+    },
+  });
+}

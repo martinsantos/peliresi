@@ -103,9 +103,9 @@ export const actoresService = {
     await api.delete(`/actores/operadores/${id}`);
   },
 
-  // Vehículos
+  // Vehículos (GET via /catalogos, POST via /actores)
   async listVehiculos(transportistaId: string): Promise<Vehiculo[]> {
-    const { data } = await api.get(`/actores/transportistas/${transportistaId}/vehiculos`);
+    const { data } = await api.get(`/catalogos/transportistas/${transportistaId}/vehiculos`);
     const raw = data.data;
     return Array.isArray(raw) ? raw : raw.vehiculos || [];
   },
@@ -115,9 +115,9 @@ export const actoresService = {
     return data.data?.vehiculo || data.data;
   },
 
-  // Choferes
+  // Choferes (GET via /catalogos, POST via /actores)
   async listChoferes(transportistaId: string): Promise<Chofer[]> {
-    const { data } = await api.get(`/actores/transportistas/${transportistaId}/choferes`);
+    const { data } = await api.get(`/catalogos/transportistas/${transportistaId}/choferes`);
     const raw = data.data;
     return Array.isArray(raw) ? raw : raw.choferes || [];
   },
