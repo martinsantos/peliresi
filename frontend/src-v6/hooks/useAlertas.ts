@@ -44,6 +44,23 @@ export function useResolverAlerta() {
   });
 }
 
+export function useUpdateReglaAlerta() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<CreateReglaAlertaRequest & { activa: boolean }> }) =>
+      alertaService.updateRegla(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.reglas }),
+  });
+}
+
+export function useDeleteReglaAlerta() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => alertaService.deleteRegla(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.reglas }),
+  });
+}
+
 export function useAnomalias(manifiestoId?: string) {
   return useQuery({
     queryKey: KEYS.anomalias(manifiestoId),

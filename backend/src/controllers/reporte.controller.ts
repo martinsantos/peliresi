@@ -105,6 +105,7 @@ export const reporteManifiestosPorPeriodo = async (req: AuthRequest, res: Respon
                 porEstado,
                 porTipoResiduo,
                 manifiestos: manifiestos.map(m => ({
+                    id: m.id,
                     numero: m.numero,
                     estado: m.estado,
                     fechaCreacion: m.createdAt,
@@ -205,6 +206,7 @@ export const reporteResiduosTratados = async (req: AuthRequest, res: Response, n
                 porGenerador,
                 totalPorTipo,
                 detalle: manifiestos.map(m => ({
+                    id: m.id,
                     numero: m.numero,
                     fechaTratamiento: m.fechaCierre,
                     generador: m.generador.razonSocial,

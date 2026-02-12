@@ -76,7 +76,7 @@ export const getGeneradorById = async (req: AuthRequest, res: Response, next: Ne
 
 export const createGenerador = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const { razonSocial, cuit, domicilio, telefono, email, numeroInscripcion, categoria } = req.body;
+        const { razonSocial, cuit, domicilio, telefono, email, numeroInscripcion, categoria, actividad, rubro, corrientesControl } = req.body;
 
         // Verificar CUIT único
         const existente = await prisma.generador.findFirst({ where: { cuit } });
@@ -106,7 +106,10 @@ export const createGenerador = async (req: AuthRequest, res: Response, next: Nex
                 telefono,
                 email,
                 numeroInscripcion,
-                categoria
+                categoria,
+                actividad,
+                rubro,
+                corrientesControl
             },
             include: {
                 usuario: { select: { email: true } }
@@ -126,7 +129,7 @@ export const createGenerador = async (req: AuthRequest, res: Response, next: Nex
 export const updateGenerador = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const { id } = req.params;
-        const { razonSocial, domicilio, telefono, email, numeroInscripcion, categoria, activo } = req.body;
+        const { razonSocial, domicilio, telefono, email, numeroInscripcion, categoria, activo, actividad, rubro, corrientesControl } = req.body;
 
         const generador = await prisma.generador.update({
             where: { id },
@@ -137,7 +140,10 @@ export const updateGenerador = async (req: AuthRequest, res: Response, next: Nex
                 email,
                 numeroInscripcion,
                 categoria,
-                activo
+                activo,
+                actividad,
+                rubro,
+                corrientesControl
             }
         });
 
@@ -372,6 +378,61 @@ export const addVehiculo = async (req: AuthRequest, res: Response, next: NextFun
     }
 };
 
+// Actualizar vehículo
+export const updateVehiculo = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { id, vehiculoId } = req.params;
+        const { patente, marca, modelo, anio, capacidad, numeroHabilitacion, vencimiento, activo } = req.body;
+
+        const vehiculo = await prisma.vehiculo.findUnique({ where: { id: vehiculoId } });
+        if (!vehiculo) {
+            throw new AppError('Vehículo no encontrado', 404);
+        }
+        if (vehiculo.transportistaId !== id) {
+            throw new AppError('El vehículo no pertenece a este transportista', 403);
+        }
+
+        const updated = await prisma.vehiculo.update({
+            where: { id: vehiculoId },
+            data: {
+                ...(patente !== undefined && { patente }),
+                ...(marca !== undefined && { marca }),
+                ...(modelo !== undefined && { modelo }),
+                ...(anio !== undefined && { anio }),
+                ...(capacidad !== undefined && { capacidad }),
+                ...(numeroHabilitacion !== undefined && { numeroHabilitacion }),
+                ...(vencimiento !== undefined && { vencimiento: new Date(vencimiento) }),
+                ...(activo !== undefined && { activo }),
+            }
+        });
+
+        res.json({ success: true, data: { vehiculo: updated } });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Eliminar vehículo
+export const deleteVehiculo = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { id, vehiculoId } = req.params;
+
+        const vehiculo = await prisma.vehiculo.findUnique({ where: { id: vehiculoId } });
+        if (!vehiculo) {
+            throw new AppError('Vehículo no encontrado', 404);
+        }
+        if (vehiculo.transportistaId !== id) {
+            throw new AppError('El vehículo no pertenece a este transportista', 403);
+        }
+
+        await prisma.vehiculo.delete({ where: { id: vehiculoId } });
+
+        res.json({ success: true, message: 'Vehículo eliminado' });
+    } catch (error) {
+        next(error);
+    }
+};
+
 // Gestionar choferes
 export const addChofer = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -391,6 +452,60 @@ export const addChofer = async (req: AuthRequest, res: Response, next: NextFunct
         });
 
         res.status(201).json({ success: true, data: { chofer } });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Actualizar chofer
+export const updateChofer = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { id, choferId } = req.params;
+        const { nombre, apellido, dni, licencia, vencimiento, telefono, activo } = req.body;
+
+        const chofer = await prisma.chofer.findUnique({ where: { id: choferId } });
+        if (!chofer) {
+            throw new AppError('Chofer no encontrado', 404);
+        }
+        if (chofer.transportistaId !== id) {
+            throw new AppError('El chofer no pertenece a este transportista', 403);
+        }
+
+        const updated = await prisma.chofer.update({
+            where: { id: choferId },
+            data: {
+                ...(nombre !== undefined && { nombre }),
+                ...(apellido !== undefined && { apellido }),
+                ...(dni !== undefined && { dni }),
+                ...(licencia !== undefined && { licencia }),
+                ...(vencimiento !== undefined && { vencimiento: new Date(vencimiento) }),
+                ...(telefono !== undefined && { telefono }),
+                ...(activo !== undefined && { activo }),
+            }
+        });
+
+        res.json({ success: true, data: { chofer: updated } });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Eliminar chofer
+export const deleteChofer = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { id, choferId } = req.params;
+
+        const chofer = await prisma.chofer.findUnique({ where: { id: choferId } });
+        if (!chofer) {
+            throw new AppError('Chofer no encontrado', 404);
+        }
+        if (chofer.transportistaId !== id) {
+            throw new AppError('El chofer no pertenece a este transportista', 403);
+        }
+
+        await prisma.chofer.delete({ where: { id: choferId } });
+
+        res.json({ success: true, message: 'Chofer eliminado' });
     } catch (error) {
         next(error);
     }
@@ -556,7 +671,7 @@ export const getOperadorById = async (req: AuthRequest, res: Response, next: Nex
 
 export const createOperador = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const { razonSocial, cuit, numeroHabilitacion, domicilio, telefono, email, categoria } = req.body;
+        const { razonSocial, cuit, numeroHabilitacion, domicilio, telefono, email, categoria, tipoOperador, tecnologia, corrientesY } = req.body;
 
         const existente = await prisma.operador.findFirst({ where: { cuit } });
         if (existente) {
@@ -583,7 +698,10 @@ export const createOperador = async (req: AuthRequest, res: Response, next: Next
                 domicilio,
                 telefono,
                 email,
-                categoria
+                categoria,
+                tipoOperador,
+                tecnologia,
+                corrientesY
             }
         });
 
@@ -600,7 +718,7 @@ export const createOperador = async (req: AuthRequest, res: Response, next: Next
 export const updateOperador = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const { id } = req.params;
-        const { razonSocial, numeroHabilitacion, domicilio, telefono, email, categoria, activo } = req.body;
+        const { razonSocial, numeroHabilitacion, domicilio, telefono, email, categoria, activo, tipoOperador, tecnologia, corrientesY } = req.body;
 
         const operador = await prisma.operador.update({
             where: { id },
@@ -611,7 +729,10 @@ export const updateOperador = async (req: AuthRequest, res: Response, next: Next
                 telefono,
                 email,
                 categoria,
-                activo
+                activo,
+                tipoOperador,
+                tecnologia,
+                corrientesY
             }
         });
 

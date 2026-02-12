@@ -24,6 +24,15 @@ export const alertaService = {
     return data.data;
   },
 
+  async updateRegla(id: string, req: Partial<CreateReglaAlertaRequest & { activa: boolean }>): Promise<ReglaAlerta> {
+    const { data } = await api.put(`/alertas/reglas/${id}`, req);
+    return data.data;
+  },
+
+  async deleteRegla(id: string): Promise<void> {
+    await api.delete(`/alertas/reglas/${id}`);
+  },
+
   // Alertas generadas
   async listAlertas(filters?: AlertaFilters): Promise<PaginatedData<AlertaGenerada>> {
     const { data } = await api.get('/alertas', { params: filters });

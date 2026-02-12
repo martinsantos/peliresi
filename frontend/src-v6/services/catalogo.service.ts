@@ -48,4 +48,41 @@ export const catalogoService = {
     const raw = data.data;
     return Array.isArray(raw) ? raw : raw.tratamientos || [];
   },
+
+  // CRUD tipos-residuos
+  async createTipoResiduo(req: Partial<TipoResiduo>): Promise<TipoResiduo> {
+    const { data } = await api.post('/catalogos/tipos-residuos', req);
+    return data.data?.tipoResiduo || data.data;
+  },
+
+  async updateTipoResiduo(id: string, req: Partial<TipoResiduo>): Promise<TipoResiduo> {
+    const { data } = await api.put(`/catalogos/tipos-residuos/${id}`, req);
+    return data.data?.tipoResiduo || data.data;
+  },
+
+  async deleteTipoResiduo(id: string): Promise<void> {
+    await api.delete(`/catalogos/tipos-residuos/${id}`);
+  },
+
+  // List all tratamientos autorizados (admin)
+  async allTratamientos(): Promise<any[]> {
+    const { data } = await api.get('/catalogos/tratamientos');
+    const raw = data.data;
+    return Array.isArray(raw) ? raw : raw.tratamientos || [];
+  },
+
+  // CRUD tratamientos autorizados
+  async createTratamiento(req: { operadorId: string; tipoResiduoId: string; metodo: string; descripcion?: string; capacidad?: number }): Promise<any> {
+    const { data } = await api.post('/catalogos/tratamientos', req);
+    return data.data?.tratamiento || data.data;
+  },
+
+  async updateTratamiento(id: string, req: { metodo?: string; descripcion?: string; capacidad?: number; activo?: boolean }): Promise<any> {
+    const { data } = await api.put(`/catalogos/tratamientos/${id}`, req);
+    return data.data?.tratamiento || data.data;
+  },
+
+  async deleteTratamiento(id: string): Promise<void> {
+    await api.delete(`/catalogos/tratamientos/${id}`);
+  },
 };

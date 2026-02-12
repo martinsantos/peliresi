@@ -50,6 +50,9 @@ model Generador {
   email             String
   numeroInscripcion String
   categoria         String
+  actividad         String?
+  rubro             String?
+  corrientesControl String?
   latitud           Float?
   longitud          Float?
   activo            Boolean     @default(true)
@@ -97,6 +100,9 @@ model Operador {
   email               String
   numeroHabilitacion  String
   categoria           String
+  tipoOperador        String?
+  tecnologia          String?
+  corrientesY         String?
   latitud             Float?
   longitud            Float?
   activo              Boolean   @default(true)

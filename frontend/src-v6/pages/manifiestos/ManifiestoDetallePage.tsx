@@ -508,9 +508,11 @@ const ManifiestoDetailPage: React.FC = () => {
               Certificado
             </Button>
           )}
-          <Button onClick={() => navigate(isMobile ? `/mobile/manifiestos/${id}/editar` : `/manifiestos/${id}/editar`)}>
-            Editar
-          </Button>
+          {m.estado === EstadoManifiesto.BORRADOR && (isAdmin || userRol === 'GENERADOR') && (
+            <Button onClick={() => navigate(isMobile ? `/mobile/manifiestos/${id}/editar` : `/manifiestos/${id}/editar`)}>
+              Editar
+            </Button>
+          )}
         </div>
       </div>
 
@@ -524,46 +526,46 @@ const ManifiestoDetailPage: React.FC = () => {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div
-                  className="flex items-start gap-3 p-2 -m-2 rounded-lg cursor-pointer hover:bg-purple-50/50 transition-colors group"
-                  onClick={() => m.generadorId && navigate(`${isMobile ? '/mobile' : ''}/admin/actores/generadores/${m.generadorId}`)}
+                  className={`flex items-start gap-3 p-2 -m-2 rounded-lg transition-colors ${isAdmin ? 'cursor-pointer hover:bg-purple-50/50 group' : ''}`}
+                  onClick={() => isAdmin && m.generadorId && navigate(`${isMobile ? '/mobile' : ''}/admin/actores/generadores/${m.generadorId}`)}
                 >
                   <div className="p-2 bg-purple-50 rounded-lg text-purple-600">
                     <User size={20} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-neutral-500">Generador</p>
-                    <p className="font-medium text-neutral-900 group-hover:text-purple-700">{m.generador?.razonSocial || '-'}</p>
+                    <p className={`font-medium text-neutral-900 ${isAdmin ? 'group-hover:text-purple-700' : ''}`}>{m.generador?.razonSocial || '-'}</p>
                     <p className="text-sm text-neutral-600">CUIT: {m.generador?.cuit ? formatCuit(m.generador.cuit) : '-'}</p>
                   </div>
-                  {m.generadorId && <ExternalLink size={12} className="text-neutral-300 group-hover:text-purple-400 mt-1 shrink-0" />}
+                  {isAdmin && m.generadorId && <ExternalLink size={12} className="text-neutral-300 group-hover:text-purple-400 mt-1 shrink-0" />}
                 </div>
                 <div
-                  className="flex items-start gap-3 p-2 -m-2 rounded-lg cursor-pointer hover:bg-orange-50/50 transition-colors group"
-                  onClick={() => m.transportistaId && navigate(`${isMobile ? '/mobile' : ''}/admin/actores/transportistas/${m.transportistaId}`)}
+                  className={`flex items-start gap-3 p-2 -m-2 rounded-lg transition-colors ${isAdmin ? 'cursor-pointer hover:bg-orange-50/50 group' : ''}`}
+                  onClick={() => isAdmin && m.transportistaId && navigate(`${isMobile ? '/mobile' : ''}/admin/actores/transportistas/${m.transportistaId}`)}
                 >
                   <div className="p-2 bg-orange-50 rounded-lg text-orange-600">
                     <Truck size={20} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-neutral-500">Transportista</p>
-                    <p className="font-medium text-neutral-900 group-hover:text-orange-700">{m.transportista?.razonSocial || '-'}</p>
+                    <p className={`font-medium text-neutral-900 ${isAdmin ? 'group-hover:text-orange-700' : ''}`}>{m.transportista?.razonSocial || '-'}</p>
                     <p className="text-sm text-neutral-600">Hab: {m.transportista?.numeroHabilitacion || '-'}</p>
                   </div>
-                  {m.transportistaId && <ExternalLink size={12} className="text-neutral-300 group-hover:text-orange-400 mt-1 shrink-0" />}
+                  {isAdmin && m.transportistaId && <ExternalLink size={12} className="text-neutral-300 group-hover:text-orange-400 mt-1 shrink-0" />}
                 </div>
                 <div
-                  className="flex items-start gap-3 p-2 -m-2 rounded-lg cursor-pointer hover:bg-blue-50/50 transition-colors group"
-                  onClick={() => m.operadorId && navigate(`${isMobile ? '/mobile' : ''}/admin/actores/operadores/${m.operadorId}`)}
+                  className={`flex items-start gap-3 p-2 -m-2 rounded-lg transition-colors ${isAdmin ? 'cursor-pointer hover:bg-blue-50/50 group' : ''}`}
+                  onClick={() => isAdmin && m.operadorId && navigate(`${isMobile ? '/mobile' : ''}/admin/actores/operadores/${m.operadorId}`)}
                 >
                   <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
                     <FlaskConical size={20} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-neutral-500">Operador</p>
-                    <p className="font-medium text-neutral-900 group-hover:text-blue-700">{m.operador?.razonSocial || '-'}</p>
+                    <p className={`font-medium text-neutral-900 ${isAdmin ? 'group-hover:text-blue-700' : ''}`}>{m.operador?.razonSocial || '-'}</p>
                     <p className="text-sm text-neutral-600">Hab: {m.operador?.numeroHabilitacion || '-'}</p>
                   </div>
-                  {m.operadorId && <ExternalLink size={12} className="text-neutral-300 group-hover:text-blue-400 mt-1 shrink-0" />}
+                  {isAdmin && m.operadorId && <ExternalLink size={12} className="text-neutral-300 group-hover:text-blue-400 mt-1 shrink-0" />}
                 </div>
               </div>
             </CardContent>

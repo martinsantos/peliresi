@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Package, Activity, Users, FileDown,
 } from 'lucide-react';
@@ -14,6 +15,7 @@ import { ChartTooltip } from '../../../components/charts/ChartTooltip';
 import { KpiCard } from '../../../components/charts/KpiCard';
 
 export default function TratadosTab({ data, periodo, onExportPDF }: { data: any; periodo: string; onExportPDF: () => void }) {
+  const navigate = useNavigate();
   const resumen = data.resumen || {};
   const porGenerador = data.porGenerador || {};
   const totalPorTipo = data.totalPorTipo || {};
@@ -124,7 +126,7 @@ export default function TratadosTab({ data, periodo, onExportPDF }: { data: any;
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
                   {detalle.slice(0, 50).map((d: any, i: number) => (
-                    <tr key={i} className="hover:bg-primary-50/30 transition-colors">
+                    <tr key={i} className="hover:bg-primary-50/30 transition-colors cursor-pointer" onClick={() => d.id && navigate(`/manifiestos/${d.id}`)}>
                       <td className="px-4 py-3 text-sm font-semibold text-primary-600">{d.numero}</td>
                       <td className="px-4 py-3 text-sm text-neutral-900 max-w-[200px] truncate">{d.generador}</td>
                       <td className="px-4 py-3 text-sm text-neutral-700 hidden md:table-cell">{d.metodoTratamiento || '-'}</td>

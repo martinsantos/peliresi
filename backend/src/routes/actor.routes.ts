@@ -12,7 +12,11 @@ import {
     updateTransportista,
     deleteTransportista,
     addVehiculo,
+    updateVehiculo,
+    deleteVehiculo,
     addChofer,
+    updateChofer,
+    deleteChofer,
     getOperadores,
     getOperadorById,
     createOperador,
@@ -38,7 +42,11 @@ router.post('/transportistas', hasRole('ADMIN'), createTransportista);
 router.put('/transportistas/:id', hasRole('ADMIN'), updateTransportista);
 router.delete('/transportistas/:id', hasRole('ADMIN'), deleteTransportista);
 router.post('/transportistas/:id/vehiculos', hasRole('ADMIN'), addVehiculo);
+router.put('/transportistas/:id/vehiculos/:vehiculoId', hasRole('ADMIN'), updateVehiculo);
+router.delete('/transportistas/:id/vehiculos/:vehiculoId', hasRole('ADMIN'), deleteVehiculo);
 router.post('/transportistas/:id/choferes', hasRole('ADMIN'), addChofer);
+router.put('/transportistas/:id/choferes/:choferId', hasRole('ADMIN'), updateChofer);
+router.delete('/transportistas/:id/choferes/:choferId', hasRole('ADMIN'), deleteChofer);
 
 // ===== OPERADORES =====
 router.get('/operadores', getOperadores);

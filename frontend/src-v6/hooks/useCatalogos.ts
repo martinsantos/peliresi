@@ -3,9 +3,10 @@
  * With offline fallback via IndexedDB
  */
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { catalogoService } from '../services/catalogo.service';
 import { saveOffline, getOffline } from '../services/indexeddb';
+import type { TipoResiduo } from '../types/models';
 
 const STALE_TIME = 10 * 60 * 1000; // 10 min cache for catalogos
 
@@ -75,5 +76,75 @@ export function useCatalogoChoferes() {
     queryKey: ['catalogos', 'choferes'],
     queryFn: () => fetchWithOfflineFallback('choferes', () => catalogoService.choferes()),
     staleTime: STALE_TIME,
+  });
+}
+
+// CRUD mutations for tipos-residuos
+export function useCreateTipoResiduo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (req: Partial<TipoResiduo>) => catalogoService.createTipoResiduo(req),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['catalogos', 'tipos-residuo'] }),
+  });
+}
+
+export function useUpdateTipoResiduo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<TipoResiduo> }) =>
+      catalogoService.updateTipoResiduo(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['catalogos', 'tipos-residuo'] }),
+  });
+}
+
+export function useDeleteTipoResiduo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => catalogoService.deleteTipoResiduo(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['catalogos', 'tipos-residuo'] }),
+  });
+}
+
+// List all tratamientos autorizados (admin)
+export function useAllTratamientos() {
+  return useQuery({
+    queryKey: ['catalogos', 'tratamientos'],
+    queryFn: () => catalogoService.allTratamientos(),
+  });
+}
+
+// CRUD mutations for tratamientos autorizados
+export function useCreateTratamiento() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (req: { operadorId: string; tipoResiduoId: string; metodo: string; descripcion?: string; capacidad?: number }) =>
+      catalogoService.createTratamiento(req),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['catalogos', 'tratamientos'] });
+      qc.invalidateQueries({ queryKey: ['operadores'] });
+    },
+  });
+}
+
+export function useUpdateTratamiento() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { metodo?: string; descripcion?: string; capacidad?: number; activo?: boolean } }) =>
+      catalogoService.updateTratamiento(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['catalogos', 'tratamientos'] });
+      qc.invalidateQueries({ queryKey: ['operadores'] });
+    },
+  });
+}
+
+export function useDeleteTratamiento() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => catalogoService.deleteTratamiento(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['catalogos', 'tratamientos'] });
+      qc.invalidateQueries({ queryKey: ['operadores'] });
+    },
   });
 }

@@ -49,6 +49,9 @@ const INITIAL_FORM = {
   nombre: '',
   numeroHabilitacion: '',
   categoria: '',
+  tipoOperador: '',
+  tecnologia: '',
+  corrientesY: '',
 };
 
 const AdminOperadoresPage: React.FC = () => {
@@ -104,11 +107,12 @@ const AdminOperadoresPage: React.FC = () => {
         activo: o.activo !== false,
         createdAt: o.createdAt,
         _raw: o,
-        // CSV enrichment
+        // DB fields with CSV enrichment fallback
         certificado: enriched?.certificado || null,
-        tipoOperador: enriched?.tipoOperador || null,
-        tecnologia: enriched?.tecnologia || null,
-        corrientes: enriched?.corrientes || [],
+        tipoOperador: o.tipoOperador || enriched?.tipoOperador || null,
+        tecnologia: o.tecnologia || enriched?.tecnologia || null,
+        corrientes: o.corrientesY ? o.corrientesY.split(',').map((s: string) => s.trim()) : (enriched?.corrientes || []),
+        corrientesYRaw: o.corrientesY || (enriched?.corrientes?.join(', ') || ''),
         mailCSV: enriched?.mail || null,
         telefonoCSV: enriched?.telefono || null,
         domicilioReal: enriched?.domicilioReal || null,
@@ -139,6 +143,10 @@ const AdminOperadoresPage: React.FC = () => {
   const updateField = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }));
 
   const handleCrear = async () => {
+    if (!form.razonSocial || !form.cuit || !form.email) {
+      toast.error('Campos requeridos', 'Razón social, CUIT y email son obligatorios');
+      return;
+    }
     try {
       await createMutation.mutateAsync({
         email: form.email,
@@ -150,11 +158,15 @@ const AdminOperadoresPage: React.FC = () => {
         telefono: form.telefono,
         numeroHabilitacion: form.numeroHabilitacion,
         categoria: form.categoria,
+        tipoOperador: form.tipoOperador,
+        tecnologia: form.tecnologia,
+        corrientesY: form.corrientesY,
       });
+      toast.success('Creado', `Operador ${form.razonSocial} creado`);
       setModalCrear(false);
       setForm(INITIAL_FORM);
-    } catch (err) {
-      // Error handled by React Query
+    } catch (err: any) {
+      toast.error('Error', err?.response?.data?.message || 'No se pudo crear el operador');
     }
   };
 
@@ -171,28 +183,35 @@ const AdminOperadoresPage: React.FC = () => {
           email: form.email,
           numeroHabilitacion: form.numeroHabilitacion,
           categoria: form.categoria,
+          tipoOperador: form.tipoOperador,
+          tecnologia: form.tecnologia,
+          corrientesY: form.corrientesY,
         },
       });
+      toast.success('Actualizado', `Operador ${form.razonSocial} actualizado`);
       setModalEditar(false);
       setEditId(null);
       setForm(INITIAL_FORM);
-    } catch (err) {
-      // Error handled by React Query
+    } catch (err: any) {
+      toast.error('Error', err?.response?.data?.message || 'No se pudo actualizar');
     }
   };
 
-  const openEditar = (operador: any) => {
-    setEditId(operador.id);
+  const openEditar = (row: typeof tableData[0]) => {
+    setEditId(row.id);
     setForm({
-      razonSocial: operador.razonSocial || '',
-      cuit: operador.cuit || '',
-      domicilio: operador.domicilio || '',
-      telefono: operador.telefono || '',
-      email: operador.email || '',
+      razonSocial: row.razonSocial || '',
+      cuit: row.cuit || '',
+      domicilio: row.domicilio || '',
+      telefono: row.telefono || '',
+      email: row.email || '',
       password: '',
       nombre: '',
-      numeroHabilitacion: operador.numeroHabilitacion || '',
-      categoria: operador.categoria || '',
+      numeroHabilitacion: row.numeroHabilitacion !== '-' ? row.numeroHabilitacion : '',
+      categoria: row.categoria !== '-' ? row.categoria : '',
+      tipoOperador: row.tipoOperador || '',
+      tecnologia: row.tecnologia || '',
+      corrientesY: row.corrientesYRaw || '',
     });
     setModalEditar(true);
   };
@@ -201,10 +220,11 @@ const AdminOperadoresPage: React.FC = () => {
     if (!deleteTarget) return;
     try {
       await deleteMutation.mutateAsync(deleteTarget.id);
+      toast.success('Eliminado', `Operador ${deleteTarget.razonSocial} eliminado`);
       setModalEliminar(false);
       setDeleteTarget(null);
-    } catch (err) {
-      // Error handled by React Query
+    } catch (err: any) {
+      toast.error('Error', err?.response?.data?.message || 'No se pudo eliminar');
     }
   };
 
@@ -261,6 +281,49 @@ const AdminOperadoresPage: React.FC = () => {
           </select>
         </div>
       </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 mb-1">Tipo Operador</label>
+          <select
+            value={form.tipoOperador}
+            onChange={(e) => updateField('tipoOperador', e.target.value)}
+            className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm"
+          >
+            <option value="">Seleccionar...</option>
+            <option value="FIJO">FIJO</option>
+            <option value="IN SITU">IN SITU</option>
+            <option value="FIJO / IN SITU">FIJO / IN SITU</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 mb-1">Corrientes Y (separadas por coma)</label>
+          <input
+            value={form.corrientesY}
+            onChange={(e) => updateField('corrientesY', e.target.value)}
+            placeholder="Ej: Y8, Y9, Y12, Y48"
+            className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm"
+          />
+        </div>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-neutral-700 mb-1">Tecnología</label>
+        <textarea
+          value={form.tecnologia}
+          onChange={(e) => updateField('tecnologia', e.target.value)}
+          placeholder="Descripción de las tecnologías de tratamiento autorizadas..."
+          rows={3}
+          className="w-full px-4 py-2 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm resize-none"
+        />
+      </div>
+      {form.corrientesY && (
+        <div className="flex flex-wrap gap-1">
+          {form.corrientesY.split(',').map(c => c.trim()).filter(Boolean).map(code => (
+            <span key={code} className="text-[11px] px-1.5 py-0.5 bg-warning-50 text-warning-700 border border-warning-200 rounded" title={CORRIENTES_Y[code] || code}>
+              {code}
+            </span>
+          ))}
+        </div>
+      )}
       {!editId && (
         <div className="grid grid-cols-2 gap-4">
           <Input label="Nombre Responsable" value={form.nombre} onChange={(e) => updateField('nombre', e.target.value)} placeholder="Juan Perez" />
@@ -273,7 +336,7 @@ const AdminOperadoresPage: React.FC = () => {
   const columns = [
     {
       key: 'operador',
-      width: '24%',
+      width: '20%',
       header: 'Operador',
       render: (row: typeof tableData[0]) => (
         <div className="flex items-center gap-3">
@@ -281,7 +344,7 @@ const AdminOperadoresPage: React.FC = () => {
             <FlaskConical size={20} className="text-emerald-600" />
           </div>
           <div className="min-w-0">
-            <p className="font-medium text-neutral-900 truncate">{row.razonSocial}</p>
+            <p className="font-medium text-neutral-900 text-sm leading-tight line-clamp-2">{row.razonSocial}</p>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-xs text-neutral-500 font-mono">{row.cuit}</span>
               {row.certificado && (
@@ -294,7 +357,7 @@ const AdminOperadoresPage: React.FC = () => {
     },
     {
       key: 'tipo',
-      width: '10%',
+      width: '12%',
       header: 'Tipo',
       hiddenBelow: 'md' as const,
       render: (row: typeof tableData[0]) => {
@@ -332,7 +395,7 @@ const AdminOperadoresPage: React.FC = () => {
     },
     {
       key: 'tecnologia',
-      width: '20%',
+      width: '22%',
       header: 'Tecnología',
       hiddenBelow: 'lg' as const,
       render: (row: typeof tableData[0]) => row.tecnologia ? (
@@ -396,7 +459,7 @@ const AdminOperadoresPage: React.FC = () => {
           </button>
           <button
             className="p-1.5 text-neutral-400 hover:text-info-600 hover:bg-info-50 rounded-lg transition-colors"
-            onClick={(e) => { e.stopPropagation(); openEditar(row._raw); }}
+            onClick={(e) => { e.stopPropagation(); openEditar(row); }}
             title="Editar"
           >
             <Edit size={16} />

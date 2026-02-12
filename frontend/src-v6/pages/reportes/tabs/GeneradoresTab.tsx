@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Factory, Package, MapPin, FileText, Calendar, Search,
 } from 'lucide-react';
@@ -21,6 +22,7 @@ export default function GeneradoresTab({
   ccData: CentroControlData | null;
   periodoLabel: string;
 }) {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [categoriaFilter, setCategoriaFilter] = useState('');
 
@@ -184,7 +186,7 @@ export default function GeneradoresTab({
               </thead>
               <tbody className="divide-y divide-neutral-100">
                 {filtered.slice(0, 100).map((g, i) => (
-                  <tr key={`${g.id}-${i}`} className="hover:bg-primary-50/30 transition-colors">
+                  <tr key={`${g.id}-${i}`} className="hover:bg-primary-50/30 transition-colors cursor-pointer" onClick={() => g.id && navigate(`/admin/actores/generadores/${g.id}`)}>
                     <td className="px-4 py-3 text-sm font-medium text-neutral-900 max-w-[200px] truncate">{g.razonSocial}</td>
                     <td className="px-4 py-3 text-sm text-neutral-600 font-mono text-xs">{g.cuit}</td>
                     <td className="px-4 py-3 text-sm text-neutral-600 hidden md:table-cell">{g.categoria || '-'}</td>

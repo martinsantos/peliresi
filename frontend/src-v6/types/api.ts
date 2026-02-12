@@ -159,6 +159,9 @@ export interface CreateGeneradorRequest {
   telefono: string;
   numeroInscripcion: string;
   categoria: string;
+  actividad?: string;
+  rubro?: string;
+  corrientesControl?: string;
 }
 
 export interface CreateTransportistaRequest {
@@ -184,6 +187,9 @@ export interface CreateOperadorRequest {
   telefono: string;
   numeroHabilitacion: string;
   categoria: string;
+  tipoOperador?: string;
+  tecnologia?: string;
+  corrientesY?: string;
 }
 
 export interface ActorFilters {

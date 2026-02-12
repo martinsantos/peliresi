@@ -49,6 +49,9 @@ const INITIAL_FORM = {
   nombre: '',
   numeroInscripcion: '',
   categoria: '',
+  actividad: '',
+  rubro: '',
+  corrientesControl: '',
 };
 
 const AdminGeneradoresPage: React.FC = () => {
@@ -94,11 +97,12 @@ const AdminGeneradoresPage: React.FC = () => {
         activo: g.activo !== false,
         createdAt: g.createdAt,
         _raw: g,
-        // JSON enrichment
+        // DB fields with JSON enrichment fallback
         certificado: enriched?.certificado || null,
-        rubro: enriched?.rubro || null,
-        actividad: enriched?.actividad || null,
-        categoriasControl: enriched?.categoriasControl || [],
+        rubro: g.rubro || enriched?.rubro || null,
+        actividad: g.actividad || enriched?.actividad || null,
+        categoriasControl: g.corrientesControl ? g.corrientesControl.split(',').map((s: string) => s.trim()) : (enriched?.categoriasControl || []),
+        corrientesControlRaw: g.corrientesControl || (enriched?.categoriasControl?.join(', ') || ''),
         emailOriginal: enriched?.emailOriginal || null,
         emailGenerado: enriched?.emailGenerado || false,
       };
@@ -126,6 +130,10 @@ const AdminGeneradoresPage: React.FC = () => {
   const updateField = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }));
 
   const handleCrear = async () => {
+    if (!form.razonSocial || !form.cuit || !form.email) {
+      toast.error('Campos requeridos', 'Razón social, CUIT y email son obligatorios');
+      return;
+    }
     try {
       await createMutation.mutateAsync({
         email: form.email,
@@ -137,11 +145,15 @@ const AdminGeneradoresPage: React.FC = () => {
         telefono: form.telefono,
         numeroInscripcion: form.numeroInscripcion,
         categoria: form.categoria,
+        actividad: form.actividad,
+        rubro: form.rubro,
+        corrientesControl: form.corrientesControl,
       });
+      toast.success('Creado', `Generador ${form.razonSocial} creado`);
       setModalCrear(false);
       setForm(INITIAL_FORM);
-    } catch (err) {
-      // Error handled by React Query
+    } catch (err: any) {
+      toast.error('Error', err?.response?.data?.message || 'No se pudo crear el generador');
     }
   };
 
@@ -158,28 +170,35 @@ const AdminGeneradoresPage: React.FC = () => {
           email: form.email,
           numeroInscripcion: form.numeroInscripcion,
           categoria: form.categoria,
+          actividad: form.actividad,
+          rubro: form.rubro,
+          corrientesControl: form.corrientesControl,
         },
       });
+      toast.success('Actualizado', `Generador ${form.razonSocial} actualizado`);
       setModalEditar(false);
       setEditId(null);
       setForm(INITIAL_FORM);
-    } catch (err) {
-      // Error handled by React Query
+    } catch (err: any) {
+      toast.error('Error', err?.response?.data?.message || 'No se pudo actualizar');
     }
   };
 
-  const openEditar = (generador: any) => {
-    setEditId(generador.id);
+  const openEditar = (row: typeof tableData[0]) => {
+    setEditId(row.id);
     setForm({
-      razonSocial: generador.razonSocial || '',
-      cuit: generador.cuit || '',
-      domicilio: generador.domicilio || '',
-      telefono: generador.telefono || '',
-      email: generador.email || '',
+      razonSocial: row.razonSocial || '',
+      cuit: row.cuit || '',
+      domicilio: row.domicilio || '',
+      telefono: row.telefono || '',
+      email: row.email || '',
       password: '',
       nombre: '',
-      numeroInscripcion: generador.numeroInscripcion || '',
-      categoria: generador.categoria || '',
+      numeroInscripcion: row.numeroInscripcion !== '-' ? row.numeroInscripcion : '',
+      categoria: row.categoria !== '-' ? row.categoria : '',
+      actividad: row.actividad || '',
+      rubro: row.rubro || '',
+      corrientesControl: row.corrientesControlRaw || '',
     });
     setModalEditar(true);
   };
@@ -188,10 +207,11 @@ const AdminGeneradoresPage: React.FC = () => {
     if (!deleteTarget) return;
     try {
       await deleteMutation.mutateAsync(deleteTarget.id);
+      toast.success('Eliminado', `Generador ${deleteTarget.razonSocial} eliminado`);
       setModalEliminar(false);
       setDeleteTarget(null);
-    } catch (err) {
-      // Error handled by React Query
+    } catch (err: any) {
+      toast.error('Error', err?.response?.data?.message || 'No se pudo eliminar');
     }
   };
 
@@ -245,6 +265,26 @@ const AdminGeneradoresPage: React.FC = () => {
           </select>
         </div>
       </div>
+      <Input label="Actividad" value={form.actividad} onChange={(e) => updateField('actividad', e.target.value)} placeholder="Ej: generación de energía eléctrica" />
+      <Input label="Rubro" value={form.rubro} onChange={(e) => updateField('rubro', e.target.value)} placeholder="Ej: INDUSTRIA QUIMICA" />
+      <div>
+        <label className="block text-sm font-medium text-neutral-700 mb-1">Corrientes Y (separadas por coma)</label>
+        <input
+          value={form.corrientesControl}
+          onChange={(e) => updateField('corrientesControl', e.target.value)}
+          placeholder="Ej: Y8, Y9, Y12, Y48"
+          className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm"
+        />
+        {form.corrientesControl && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {form.corrientesControl.split(',').map(c => c.trim()).filter(Boolean).map(code => (
+              <span key={code} className="text-[11px] px-1.5 py-0.5 bg-warning-50 text-warning-700 border border-warning-200 rounded" title={CORRIENTES_Y[code] || code}>
+                {code}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
       {!editId && (
         <div className="grid grid-cols-2 gap-4">
           <Input label="Nombre Responsable" value={form.nombre} onChange={(e) => updateField('nombre', e.target.value)} placeholder="Juan Perez" />
@@ -257,7 +297,7 @@ const AdminGeneradoresPage: React.FC = () => {
   const columns = [
     {
       key: 'generador',
-      width: '24%',
+      width: '20%',
       header: 'Generador',
       render: (row: typeof tableData[0]) => (
         <div className="flex items-center gap-3">
@@ -265,7 +305,7 @@ const AdminGeneradoresPage: React.FC = () => {
             <Factory size={20} className="text-purple-600" />
           </div>
           <div className="min-w-0">
-            <p className="font-medium text-neutral-900 truncate">{row.razonSocial}</p>
+            <p className="font-medium text-neutral-900 text-sm leading-tight line-clamp-2">{row.razonSocial}</p>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-xs text-neutral-500 font-mono">{row.cuit}</span>
               {row.certificado && (
@@ -277,35 +317,25 @@ const AdminGeneradoresPage: React.FC = () => {
       ),
     },
     {
-      key: 'rubro',
-      width: '14%',
-      header: 'Rubro',
+      key: 'categoria',
+      width: '12%',
+      header: 'Categoría',
       hiddenBelow: 'md' as const,
-      render: (row: typeof tableData[0]) => row.rubro ? (
-        <span className="text-xs text-neutral-700 bg-neutral-100 px-2 py-0.5 rounded-full truncate inline-block max-w-[160px]" title={row.rubro}>
-          {row.rubro}
-        </span>
-      ) : (
-        <span className="text-xs text-neutral-400">{row.categoria !== '-' ? row.categoria : '-'}</span>
-      ),
-    },
-    {
-      key: 'actividad',
-      width: '14%',
-      header: 'Actividad',
-      hiddenBelow: 'lg' as const,
-      render: (row: typeof tableData[0]) => row.actividad ? (
-        <p className="text-xs text-neutral-600 line-clamp-2" title={row.actividad}>
-          {row.actividad}
-        </p>
-      ) : (
-        <span className="text-xs text-neutral-400">-</span>
-      ),
+      render: (row: typeof tableData[0]) => {
+        const cat = row.categoria !== '-' ? row.categoria : null;
+        return cat ? (
+          <Badge variant="soft" color={cat.includes('Grande') ? 'error' : cat.includes('Mediano') ? 'warning' : 'info'}>
+            {cat.replace(' Generadores', '').replace('Generadores', 'Gen.')}
+          </Badge>
+        ) : (
+          <span className="text-xs text-neutral-400">-</span>
+        );
+      },
     },
     {
       key: 'categoriasY',
-      width: '14%',
-      header: 'Categorías Y',
+      width: '16%',
+      header: 'Corrientes Y',
       hiddenBelow: 'lg' as const,
       render: (row: typeof tableData[0]) => row.categoriasControl.length > 0 ? (
         <div className="flex flex-wrap gap-1">
@@ -325,8 +355,24 @@ const AdminGeneradoresPage: React.FC = () => {
       ),
     },
     {
+      key: 'rubro',
+      width: '18%',
+      header: 'Rubro / Actividad',
+      hiddenBelow: 'lg' as const,
+      render: (row: typeof tableData[0]) => {
+        const text = row.rubro || row.actividad;
+        return text ? (
+          <p className="text-xs text-neutral-600 leading-tight line-clamp-2" title={`${row.rubro || ''}${row.actividad ? ' — ' + row.actividad : ''}`}>
+            {text}
+          </p>
+        ) : (
+          <span className="text-xs text-neutral-400">-</span>
+        );
+      },
+    },
+    {
       key: 'contacto',
-      width: '14%',
+      width: '16%',
       header: 'Contacto',
       hiddenBelow: 'lg' as const,
       render: (row: typeof tableData[0]) => {
@@ -362,7 +408,7 @@ const AdminGeneradoresPage: React.FC = () => {
     },
     {
       key: 'acciones',
-      width: '8%',
+      width: '10%',
       header: '',
       align: 'right' as const,
       render: (row: typeof tableData[0]) => (
@@ -376,7 +422,7 @@ const AdminGeneradoresPage: React.FC = () => {
           </button>
           <button
             className="p-1.5 text-neutral-400 hover:text-info-600 hover:bg-info-50 rounded-lg transition-colors"
-            onClick={(e) => { e.stopPropagation(); openEditar(row._raw); }}
+            onClick={(e) => { e.stopPropagation(); openEditar(row); }}
             title="Editar"
           >
             <Edit size={16} />

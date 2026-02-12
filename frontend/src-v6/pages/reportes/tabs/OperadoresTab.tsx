@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   FlaskConical, Layers, MapPin, FileCheck, Calendar, Search,
 } from 'lucide-react';
@@ -18,6 +19,7 @@ export default function OperadoresTab({
   ccData?: any; // Keep for compatibility but unused
   periodoLabel: string;
 }) {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [categoriaFilter, setCategoriaFilter] = useState('');
 
@@ -200,7 +202,7 @@ export default function OperadoresTab({
               </thead>
               <tbody className="divide-y divide-neutral-100">
                 {filtered.slice(0, 50).map((o: any, i: number) => (
-                  <tr key={`${o.id}-${i}`} className="hover:bg-primary-50/30 transition-colors">
+                  <tr key={`${o.id}-${i}`} className="hover:bg-primary-50/30 transition-colors cursor-pointer" onClick={() => o.id && navigate(`/admin/actores/operadores/${o.id}`)}>
                     <td className="px-4 py-3 text-sm font-medium text-neutral-900 max-w-[250px] truncate" title={o.razonSocial}>
                       {o.razonSocial}
                     </td>

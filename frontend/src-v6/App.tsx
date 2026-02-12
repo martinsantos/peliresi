@@ -36,6 +36,7 @@ const CentroControlPage = lazy(() => import('./pages/centro-control/CentroContro
 const ManifiestosPage = lazy(() => import('./pages/manifiestos/ManifiestosPage'));
 const ManifiestoDetallePage = lazy(() => import('./pages/manifiestos/ManifiestoDetallePage'));
 const NuevoManifiestoPage = lazy(() => import('./pages/manifiestos/NuevoManifiestoPage'));
+const EditarManifiestoPage = lazy(() => import('./pages/manifiestos/EditarManifiestoPage'));
 
 // Tracking (TrackingPage eliminated — functionality merged into CentroControlPage)
 const ViajeEnCursoPage = lazy(() => import('./pages/tracking/ViajeEnCursoPage'));
@@ -163,6 +164,7 @@ function App() {
             <Route path="/mobile/centro-control/viaje/:id" element={<ViajeRedirect />} />
             <Route path="/mobile/manifiestos" element={<ManifiestosPage />} />
             <Route path="/mobile/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
+            <Route path="/mobile/manifiestos/:id/editar" element={<EditarManifiestoPage />} />
             <Route path="/mobile/manifiestos/:id" element={<ManifiestoDetallePage />} />
             <Route path="/mobile/transporte/perfil" element={<TransportePerfilPage />} />
             <Route path="/mobile/transporte/viaje/:id" element={<ViajeEnCursoTransportista />} />
@@ -209,6 +211,7 @@ function App() {
             {/* Manifiestos */}
             <Route path="/manifiestos" element={<ManifiestosPage />} />
             <Route path="/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
+            <Route path="/manifiestos/:id/editar" element={<EditarManifiestoPage />} />
             <Route path="/manifiestos/:id" element={<ManifiestoDetallePage />} />
 
             {/* Transporte */}

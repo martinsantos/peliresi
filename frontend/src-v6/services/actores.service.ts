@@ -126,4 +126,22 @@ export const actoresService = {
     const { data } = await api.post(`/actores/transportistas/${transportistaId}/choferes`, req);
     return data.data?.chofer || data.data;
   },
+
+  async updateVehiculo(transportistaId: string, vehiculoId: string, req: Partial<Vehiculo>): Promise<Vehiculo> {
+    const { data } = await api.put(`/actores/transportistas/${transportistaId}/vehiculos/${vehiculoId}`, req);
+    return data.data?.vehiculo || data.data;
+  },
+
+  async deleteVehiculo(transportistaId: string, vehiculoId: string): Promise<void> {
+    await api.delete(`/actores/transportistas/${transportistaId}/vehiculos/${vehiculoId}`);
+  },
+
+  async updateChofer(transportistaId: string, choferId: string, req: Partial<Chofer>): Promise<Chofer> {
+    const { data } = await api.put(`/actores/transportistas/${transportistaId}/choferes/${choferId}`, req);
+    return data.data?.chofer || data.data;
+  },
+
+  async deleteChofer(transportistaId: string, choferId: string): Promise<void> {
+    await api.delete(`/actores/transportistas/${transportistaId}/choferes/${choferId}`);
+  },
 };

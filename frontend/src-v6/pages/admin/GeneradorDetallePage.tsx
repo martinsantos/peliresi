@@ -63,9 +63,11 @@ const GeneradorDetallePage: React.FC = () => {
 
   if (!generador) return null;
 
-  // CSV enrichment lookup
-  const enriched = generador.cuit ? GENERADORES_DATA[generador.cuit] : null;
-  const categorias = enriched?.categoriasControl || [];
+  // DB-first with enrichment fallback (CUIT may have dashes in enrichment but not in DB)
+  const enriched = generador.cuit ? (GENERADORES_DATA[generador.cuit] || GENERADORES_DATA[generador.cuit.replace(/^(\d{2})(\d{8})(\d)$/, '$1-$2-$3')]) : null;
+  const categorias = (generador as any).corrientesControl
+    ? (generador as any).corrientesControl.split(',').map((s: string) => s.trim()).filter(Boolean)
+    : (enriched?.categoriasControl || []);
 
   return (
     <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">

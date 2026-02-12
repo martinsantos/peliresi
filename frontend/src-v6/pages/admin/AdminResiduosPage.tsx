@@ -1,7 +1,7 @@
 /**
  * SITREP v6 - Admin Residuos Page
  * ================================
- * Catálogo de residuos con enriquecimiento de corrientes Y y operadores
+ * Catálogo de residuos con CRUD completo y enriquecimiento de corrientes Y y operadores
  */
 
 import React, { useState, useMemo } from 'react';
@@ -13,13 +13,18 @@ import {
   Download,
   Loader2,
   Flame,
+  Plus,
+  Edit,
+  Trash2,
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
+import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/BadgeV2';
+import { Modal, ConfirmModal } from '../../components/ui/Modal';
 import { Table, Pagination } from '../../components/ui/Table';
 import { SearchInput } from '../../components/ui/SearchInput';
-import { useTiposResiduo } from '../../hooks/useCatalogos';
+import { useTiposResiduo, useCreateTipoResiduo, useUpdateTipoResiduo, useDeleteTipoResiduo } from '../../hooks/useCatalogos';
 import { toast } from '../../components/ui/Toast';
 import { downloadCsv } from '../../utils/exportCsv';
 import { CORRIENTES_Y, CORRIENTES_Y_CODES } from '../../data/corrientes-y';
@@ -28,8 +33,10 @@ import { OPERADORES_POR_CORRIENTE, OPERADORES_DATA } from '../../data/operadores
 interface ResiduoDisplay {
   id: string;
   codigo: string;
+  nombre: string;
   descripcion: string;
   categoria: string;
+  caracteristicas: string;
   tipo: string;
   peligrosidad: string;
   activo: boolean;
@@ -39,6 +46,15 @@ interface ResiduoDisplay {
   tecnologias: string[];
 }
 
+const INITIAL_FORM = {
+  codigo: '',
+  nombre: '',
+  descripcion: '',
+  categoria: '',
+  caracteristicas: '',
+  peligrosidad: 'ninguna',
+};
+
 export const AdminResiduosPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -46,23 +62,32 @@ export const AdminResiduosPage: React.FC = () => {
   const [peligrosidadFilter, setPeligrosidadFilter] = useState('');
   const [estadoFilter, setEstadoFilter] = useState('');
 
+  // CRUD modal state
+  const [modalCrear, setModalCrear] = useState(false);
+  const [modalEditar, setModalEditar] = useState(false);
+  const [modalEliminar, setModalEliminar] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; codigo: string } | null>(null);
+  const [form, setForm] = useState(INITIAL_FORM);
+
+  // API hooks
   const { data: tiposResiduoRaw, isLoading, isError, error } = useTiposResiduo();
   const tiposResiduo = tiposResiduoRaw || [];
+  const createMutation = useCreateTipoResiduo();
+  const updateMutation = useUpdateTipoResiduo();
+  const deleteMutation = useDeleteTipoResiduo();
 
   // Map API data + enrich with corrientes Y and operadores
   const residuosData: ResiduoDisplay[] = useMemo(() =>
     tiposResiduo.map(r => {
-      // Try to match categoría with a Y-code
       const cat = r.categoria || '';
       const yMatch = cat.match(/Y\d+/);
       const corrienteY = yMatch ? yMatch[0] : null;
       const corrienteDesc = corrienteY ? CORRIENTES_Y[corrienteY] || null : null;
 
-      // How many operadores handle this corriente
       const operadoresCuits = corrienteY ? (OPERADORES_POR_CORRIENTE[corrienteY] || []) : [];
       const operadoresCount = operadoresCuits.length;
 
-      // Collect unique tecnologías from those operadores
       const tecnologias: string[] = [];
       const tecSet = new Set<string>();
       for (const cuit of operadoresCuits.slice(0, 10)) {
@@ -82,8 +107,10 @@ export const AdminResiduosPage: React.FC = () => {
       return {
         id: r.id,
         codigo: r.codigo,
+        nombre: r.nombre,
         descripcion: r.descripcion || r.nombre,
         categoria: r.categoria || 'Sin categoría',
+        caracteristicas: r.caracteristicas || '',
         tipo: r.peligrosidad === 'alta' || r.peligrosidad === 'media' ? 'Peligroso' : 'No Peligroso',
         peligrosidad: r.peligrosidad || 'ninguna',
         activo: r.activo,
@@ -126,10 +153,84 @@ export const AdminResiduosPage: React.FC = () => {
   const totalFilteredPages = Math.max(1, Math.ceil(filteredData.length / itemsPerPage));
   const paginatedData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
+  // Form helpers
+  const updateField = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }));
+
+  const handleCrear = async () => {
+    if (!form.codigo || !form.nombre || !form.categoria || !form.peligrosidad) {
+      toast.error('Campos requeridos', 'Código, nombre, categoría y peligrosidad son obligatorios');
+      return;
+    }
+    try {
+      await createMutation.mutateAsync({
+        codigo: form.codigo,
+        nombre: form.nombre,
+        descripcion: form.descripcion || null,
+        categoria: form.categoria,
+        caracteristicas: form.caracteristicas || null,
+        peligrosidad: form.peligrosidad,
+      } as any);
+      toast.success('Creado', `Tipo de residuo ${form.codigo} creado`);
+      setModalCrear(false);
+      setForm(INITIAL_FORM);
+    } catch (err: any) {
+      toast.error('Error', err?.response?.data?.message || 'No se pudo crear el tipo de residuo');
+    }
+  };
+
+  const openEditar = (r: ResiduoDisplay) => {
+    setEditId(r.id);
+    setForm({
+      codigo: r.codigo,
+      nombre: r.nombre,
+      descripcion: r.descripcion || '',
+      categoria: r.categoria,
+      caracteristicas: r.caracteristicas || '',
+      peligrosidad: r.peligrosidad,
+    });
+    setModalEditar(true);
+  };
+
+  const handleEditar = async () => {
+    if (!editId) return;
+    try {
+      await updateMutation.mutateAsync({
+        id: editId,
+        data: {
+          codigo: form.codigo,
+          nombre: form.nombre,
+          descripcion: form.descripcion || null,
+          categoria: form.categoria,
+          caracteristicas: form.caracteristicas || null,
+          peligrosidad: form.peligrosidad,
+        } as any,
+      });
+      toast.success('Actualizado', `Tipo de residuo ${form.codigo} actualizado`);
+      setModalEditar(false);
+      setEditId(null);
+      setForm(INITIAL_FORM);
+    } catch (err: any) {
+      toast.error('Error', err?.response?.data?.message || 'No se pudo actualizar');
+    }
+  };
+
+  const handleEliminar = async () => {
+    if (!deleteTarget) return;
+    try {
+      await deleteMutation.mutateAsync(deleteTarget.id);
+      toast.success('Eliminado', `Tipo de residuo ${deleteTarget.codigo} eliminado`);
+      setModalEliminar(false);
+      setDeleteTarget(null);
+    } catch (err: any) {
+      toast.error('Error', err?.response?.data?.message || 'No se pudo eliminar');
+    }
+  };
+
   const handleExport = () => {
     downloadCsv(
       filteredData.map(r => ({
         Código: r.codigo,
+        Nombre: r.nombre,
         Descripción: r.descripcion,
         Categoría: r.categoria,
         'Corriente Y': r.corrienteY || '',
@@ -144,6 +245,33 @@ export const AdminResiduosPage: React.FC = () => {
     );
     toast.success('Exportar', 'CSV descargado');
   };
+
+  const renderForm = () => (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <Input label="Código *" value={form.codigo} onChange={(e) => updateField('codigo', e.target.value)} placeholder="Y1-001" />
+        <Input label="Nombre *" value={form.nombre} onChange={(e) => updateField('nombre', e.target.value)} placeholder="Desechos clínicos" />
+      </div>
+      <Input label="Descripción" value={form.descripcion} onChange={(e) => updateField('descripcion', e.target.value)} placeholder="Descripción del tipo de residuo" />
+      <div className="grid grid-cols-2 gap-4">
+        <Input label="Categoría *" value={form.categoria} onChange={(e) => updateField('categoria', e.target.value)} placeholder="Y1 - Desechos clínicos" />
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 mb-1.5">Peligrosidad *</label>
+          <select
+            value={form.peligrosidad}
+            onChange={(e) => updateField('peligrosidad', e.target.value)}
+            className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
+          >
+            <option value="alta">Alta</option>
+            <option value="media">Media</option>
+            <option value="baja">Baja</option>
+            <option value="ninguna">Ninguna</option>
+          </select>
+        </div>
+      </div>
+      <Input label="Características" value={form.caracteristicas} onChange={(e) => updateField('caracteristicas', e.target.value)} placeholder="Inflamable, tóxico, corrosivo..." />
+    </div>
+  );
 
   const columns = [
     {
@@ -219,28 +347,6 @@ export const AdminResiduosPage: React.FC = () => {
       ),
     },
     {
-      key: 'tecnologias',
-      width: '20%',
-      header: 'Tecnologías',
-      hiddenBelow: 'lg' as const,
-      render: (row: ResiduoDisplay) => row.tecnologias.length > 0 ? (
-        <div className="flex flex-wrap gap-1">
-          {row.tecnologias.slice(0, 2).map((t, i) => (
-            <span key={i} className="text-xs text-neutral-600 bg-neutral-100 px-2 py-0.5 rounded-full truncate max-w-[140px]" title={t}>
-              {t.length > 30 ? t.substring(0, 28) + '...' : t}
-            </span>
-          ))}
-          {row.tecnologias.length > 2 && (
-            <span className="text-xs text-neutral-400" title={row.tecnologias.join(', ')}>
-              +{row.tecnologias.length - 2}
-            </span>
-          )}
-        </div>
-      ) : (
-        <span className="text-xs text-neutral-400">-</span>
-      ),
-    },
-    {
       key: 'estado',
       width: '8%',
       header: 'Estado',
@@ -248,6 +354,29 @@ export const AdminResiduosPage: React.FC = () => {
         <Badge variant="soft" color={row.activo ? 'success' : 'neutral'}>
           {row.activo ? 'Activo' : 'Inactivo'}
         </Badge>
+      ),
+    },
+    {
+      key: 'acciones',
+      width: '10%',
+      header: 'Acciones',
+      render: (row: ResiduoDisplay) => (
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => openEditar(row)}
+            className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-500 hover:text-primary-600 transition-colors"
+            title="Editar"
+          >
+            <Edit size={16} />
+          </button>
+          <button
+            onClick={() => { setDeleteTarget({ id: row.id, codigo: row.codigo }); setModalEliminar(true); }}
+            className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-500 hover:text-error-600 transition-colors"
+            title="Eliminar"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
       ),
     },
   ];
@@ -268,6 +397,9 @@ export const AdminResiduosPage: React.FC = () => {
         <div className="flex gap-2">
           <Button variant="outline" leftIcon={<Download size={18} />} onClick={handleExport}>
             Exportar
+          </Button>
+          <Button leftIcon={<Plus size={18} />} onClick={() => { setForm(INITIAL_FORM); setModalCrear(true); }}>
+            Nuevo Tipo
           </Button>
         </div>
       </div>
@@ -434,6 +566,53 @@ export const AdminResiduosPage: React.FC = () => {
         )}
       </Card>
 
+      {/* Modal Crear */}
+      <Modal
+        isOpen={modalCrear}
+        onClose={() => setModalCrear(false)}
+        title="Nuevo Tipo de Residuo"
+        size="lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setModalCrear(false)}>Cancelar</Button>
+            <Button onClick={handleCrear} disabled={createMutation.isPending}>
+              {createMutation.isPending ? 'Creando...' : 'Crear'}
+            </Button>
+          </>
+        }
+      >
+        {renderForm()}
+      </Modal>
+
+      {/* Modal Editar */}
+      <Modal
+        isOpen={modalEditar}
+        onClose={() => { setModalEditar(false); setEditId(null); }}
+        title="Editar Tipo de Residuo"
+        size="lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => { setModalEditar(false); setEditId(null); }}>Cancelar</Button>
+            <Button onClick={handleEditar} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </>
+        }
+      >
+        {renderForm()}
+      </Modal>
+
+      {/* Modal Eliminar */}
+      <ConfirmModal
+        isOpen={modalEliminar}
+        onClose={() => { setModalEliminar(false); setDeleteTarget(null); }}
+        onConfirm={handleEliminar}
+        title="Eliminar Tipo de Residuo"
+        description={`¿Estás seguro de eliminar el tipo de residuo "${deleteTarget?.codigo}"? Esta acción no se puede deshacer.`}
+        confirmText="Eliminar"
+        variant="danger"
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   );
 };

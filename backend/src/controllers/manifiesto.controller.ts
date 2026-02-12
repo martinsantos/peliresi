@@ -911,7 +911,7 @@ export const registrarPesaje = async (req: AuthRequest, res: Response, next: Nex
     await prisma.$transaction(
       normalizedResiduos.map((item: any) => {
         const residuoOriginal = manifiesto.residuos.find(r => r.id === item.id);
-        if (!residuoOriginal) return prisma.manifiestoResiduo.findMany({ where: { id: 'dummy' } }); // Skip invalid IDs safely? or throw.
+        if (!residuoOriginal) throw new AppError(`Residuo con ID ${item.id} no encontrado en el manifiesto`, 400);
 
         pesoDeclaradoTotal += residuoOriginal.cantidad;
         pesoRealTotal += Number(item.pesoReal);

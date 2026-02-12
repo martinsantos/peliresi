@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   FileText, Package, Activity, TrendingUp, FileDown,
 } from 'lucide-react';
@@ -13,6 +14,7 @@ import { ChartTooltip } from '../../../components/charts/ChartTooltip';
 import { KpiCard } from '../../../components/charts/KpiCard';
 
 export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: any; periodo: string; onExportPDF: () => void }) {
+  const navigate = useNavigate();
   const resumen = data.resumen || {};
   const porEstado = data.porEstado || {};
   const porTipoResiduo = data.porTipoResiduo || {};
@@ -134,7 +136,7 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
                   {manifiestosList.slice(0, 50).map((m: any, i: number) => (
-                    <tr key={i} className="hover:bg-primary-50/30 transition-colors">
+                    <tr key={i} className="hover:bg-primary-50/30 transition-colors cursor-pointer" onClick={() => m.id && navigate(`/manifiestos/${m.id}`)}>
                       <td className="px-4 py-3 text-sm font-semibold text-primary-600">{m.numero}</td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full" style={{
