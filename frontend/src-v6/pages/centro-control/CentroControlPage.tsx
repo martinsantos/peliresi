@@ -817,7 +817,7 @@ export const CentroControlPage: React.FC = () => {
         </div>
 
         {/* Viajes Activos + Realizados — accordion right of map */}
-        <div className="sticky top-[6.5rem] flex flex-col gap-0 max-h-[calc(100vh-10rem)]">
+        <div className="lg:fixed lg:top-[6.5rem] lg:right-8 lg:w-[min(28rem,calc((100vw-16rem)/3))] flex flex-col gap-0 max-h-[calc(100vh-8.5rem)] lg:z-10">
           {/* ── Viajes Activos accordion ── */}
           <Card padding="none" className={`flex flex-col ${tripPanel === 'activos' ? 'flex-1 min-h-0' : ''}`}>
             <button
