@@ -152,10 +152,10 @@ export const CentroControlPage: React.FC = () => {
     transito: true,
   });
 
-  // ── Date range (default: Hoy) ──
-  const [datePreset, setDatePreset] = useState(1);
+  // ── Date range (default: 30 días) ──
+  const [datePreset, setDatePreset] = useState(30);
   const [fechaDesde, setFechaDesde] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().split('T')[0];
+    const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().split('T')[0];
   });
   const [fechaHasta, setFechaHasta] = useState(() => new Date().toISOString().split('T')[0]);
 
@@ -817,7 +817,7 @@ export const CentroControlPage: React.FC = () => {
         </div>
 
         {/* Viajes Activos + Realizados — accordion right of map */}
-        <div className="sticky top-20 flex flex-col gap-0 max-h-[50vh] lg:max-h-[calc(100vh-12rem)] overflow-y-auto">
+        <div className="sticky top-20 flex flex-col gap-0 max-h-[calc(100vh-10rem)]">
           {/* ── Viajes Activos accordion ── */}
           <Card padding="none" className={`flex flex-col ${tripPanel === 'activos' ? 'flex-1 min-h-0' : ''}`}>
             <button
