@@ -261,89 +261,158 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
     {
       key: 'operador',
       header: 'Operador',
-      width: '25%',
+      width: '30%',
       render: (t: TratamientoDB) => (
-        <div>
-          <p className="font-semibold text-neutral-900 truncate">{t.operador?.razonSocial || '-'}</p>
-          <p className="text-xs text-neutral-400 font-mono">{t.operador?.cuit || ''}</p>
+        <div className="flex items-start gap-3">
+          <div className="shrink-0 w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
+            <FlaskConical size={18} className="text-blue-600" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-neutral-900 truncate">{t.operador?.razonSocial || '-'}</p>
+            <p className="text-xs text-neutral-400 font-mono">{t.operador?.cuit || ''}</p>
+          </div>
         </div>
       ),
     },
     {
       key: 'residuo',
       header: 'Tipo Residuo',
-      width: '20%',
+      width: '25%',
       render: (t: TratamientoDB) => (
         <div>
-          <p className="text-sm font-medium text-neutral-900">{t.tipoResiduo?.codigo || '-'}</p>
-          <p className="text-xs text-neutral-500 truncate">{t.tipoResiduo?.nombre || ''}</p>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="inline-block px-2 py-1 text-xs font-mono font-bold rounded bg-primary-100 text-primary-800">
+              {t.tipoResiduo?.codigo || '-'}
+            </span>
+            {t.activo && (
+              <Badge variant="soft" color="success" className="text-[10px]">
+                Activo
+              </Badge>
+            )}
+            {!t.activo && (
+              <Badge variant="soft" color="error" className="text-[10px]">
+                Inactivo
+              </Badge>
+            )}
+          </div>
+          <p className="text-sm text-neutral-600">{t.tipoResiduo?.nombre || ''}</p>
         </div>
       ),
     },
     {
       key: 'metodo',
-      header: 'Método',
-      width: '20%',
+      header: 'Método y Capacidad',
+      width: '30%',
       render: (t: TratamientoDB) => (
-        <p className="text-sm text-neutral-900">{t.metodo}</p>
-      ),
-    },
-    {
-      key: 'capacidad',
-      header: 'Capacidad',
-      width: '10%',
-      hiddenBelow: 'md' as const,
-      render: (t: TratamientoDB) => (
-        <p className="text-sm text-neutral-700 text-center">{t.capacidad ? `${t.capacidad} tn/mes` : '-'}</p>
-      ),
-    },
-    {
-      key: 'activo',
-      header: 'Estado',
-      width: '10%',
-      render: (t: TratamientoDB) => (
-        <Badge variant="soft" color={t.activo ? 'success' : 'error'}>
-          {t.activo ? 'Activo' : 'Inactivo'}
-        </Badge>
+        <div>
+          <p className="font-medium text-neutral-900 mb-1">{t.metodo}</p>
+          {t.descripcion && (
+            <p className="text-xs text-neutral-500 line-clamp-2 mb-1">{t.descripcion}</p>
+          )}
+          {t.capacidad && (
+            <div className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-primary-500"></div>
+              <span className="text-xs font-semibold text-primary-700">
+                {t.capacidad} tn/mes
+              </span>
+            </div>
+          )}
+        </div>
       ),
     },
     {
       key: 'acciones',
-      header: '',
+      header: 'Acciones',
       width: '15%',
       render: (t: TratamientoDB) => (
-        <div className="flex items-center justify-end gap-1">
-          <button onClick={(e) => { e.stopPropagation(); openEdit(t); }} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-primary-600">
-            <Pencil size={14} />
-          </button>
-          <button onClick={(e) => { e.stopPropagation(); setDeleteItem(t); }} className="p-1.5 rounded-lg hover:bg-red-50 text-neutral-400 hover:text-red-600">
-            <Trash2 size={14} />
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            leftIcon={<Pencil size={14} />}
+            onClick={(e) => { e.stopPropagation(); openEdit(t); }}
+            className="!px-3 !py-1.5"
+          >
+            Editar
+          </Button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setDeleteItem(t); }}
+            className="p-2 rounded-lg hover:bg-red-50 text-neutral-400 hover:text-red-600 transition-colors"
+            title="Eliminar"
+          >
+            <Trash2 size={16} />
           </button>
         </div>
       ),
     },
   ];
 
+  const handleExport = () => {
+    const rows = filtered.map(t => ({
+      Operador: t.operador?.razonSocial || '',
+      CUIT: t.operador?.cuit || '',
+      'Tipo Residuo': t.tipoResiduo?.codigo || '',
+      'Nombre Residuo': t.tipoResiduo?.nombre || '',
+      Método: t.metodo,
+      Descripción: t.descripcion || '',
+      'Capacidad (tn/mes)': t.capacidad || '',
+      Estado: t.activo ? 'Activo' : 'Inactivo',
+    }));
+    downloadCsv(rows, 'autorizaciones-tratamiento');
+  };
+
   return (
     <div className="space-y-4 mt-4">
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <Card className="p-3">
-          <p className="text-xs text-neutral-500 uppercase tracking-wider">Total Autorizaciones</p>
-          <p className="text-2xl font-bold text-neutral-900">{allTratamientos.length}</p>
+      {/* Stats Cards - Spectacular Design */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card className="p-4 border-l-4 border-l-primary-500">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center">
+              <ShieldCheck size={24} className="text-primary-600" />
+            </div>
+            <div>
+              <p className="text-xs text-neutral-500 uppercase tracking-wider">Total Autorizaciones</p>
+              <p className="text-3xl font-bold text-neutral-900">{allTratamientos.length}</p>
+            </div>
+          </div>
         </Card>
-        <Card className="p-3">
-          <p className="text-xs text-neutral-500 uppercase tracking-wider">Activas</p>
-          <p className="text-2xl font-bold text-green-700">{allTratamientos.filter(t => t.activo).length}</p>
+        <Card className="p-4 border-l-4 border-l-green-500">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
+              <CheckCircle2 size={24} className="text-green-600" />
+            </div>
+            <div>
+              <p className="text-xs text-neutral-500 uppercase tracking-wider">Activas</p>
+              <p className="text-3xl font-bold text-green-700">{allTratamientos.filter(t => t.activo).length}</p>
+            </div>
+          </div>
         </Card>
-        <Card className="p-3">
-          <p className="text-xs text-neutral-500 uppercase tracking-wider">Operadores</p>
-          <p className="text-2xl font-bold text-neutral-900">{new Set(allTratamientos.map(t => t.operadorId)).size}</p>
+        <Card className="p-4 border-l-4 border-l-blue-500">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
+              <FlaskConical size={24} className="text-blue-600" />
+            </div>
+            <div>
+              <p className="text-xs text-neutral-500 uppercase tracking-wider">Operadores</p>
+              <p className="text-3xl font-bold text-neutral-900">{new Set(allTratamientos.map(t => t.operadorId)).size}</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4 border-l-4 border-l-amber-500">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
+              <AlertTriangle size={24} className="text-amber-600" />
+            </div>
+            <div>
+              <p className="text-xs text-neutral-500 uppercase tracking-wider">Inactivas</p>
+              <p className="text-3xl font-bold text-amber-700">{allTratamientos.filter(t => !t.activo).length}</p>
+            </div>
+          </div>
         </Card>
       </div>
 
-      {/* Filters + Action */}
-      <Card padding="base">
+      {/* Filters + Actions */}
+      <Card padding="base" className="shadow-sm">
         <div className="flex flex-col md:flex-row flex-wrap gap-3">
           <div className="flex-1">
             <Input
@@ -356,26 +425,62 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
           <select
             value={filtroOperador}
             onChange={(e) => { setFiltroOperador(e.target.value); setCurrentPage(1); }}
-            className="px-3 py-2 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
+            className="px-4 py-2.5 rounded-xl border-2 border-neutral-200 bg-white text-sm font-medium focus:border-primary-500 focus:outline-none hover:border-neutral-300 transition-colors"
           >
-            <option value="">Todos los operadores</option>
+            <option value="">Todos los operadores ({operadoresList.length})</option>
             {operadoresList.map((o: any) => (
               <option key={o.id} value={o.id}>{o.razonSocial || o.nombre}</option>
             ))}
           </select>
+          <Button variant="outline" leftIcon={<Download size={16} />} onClick={handleExport}>
+            Exportar CSV
+          </Button>
           <Button leftIcon={<Plus size={16} />} onClick={openCreate}>
             Nueva Autorización
           </Button>
         </div>
+        {(searchTerm || filtroOperador) && (
+          <div className="mt-3 flex items-center gap-2 pt-3 border-t border-neutral-100">
+            <span className="text-sm text-neutral-600">
+              Mostrando <span className="font-semibold text-primary-600">{filtered.length}</span> de {allTratamientos.length} autorizaciones
+            </span>
+            <button
+              onClick={() => { setSearchTerm(''); setFiltroOperador(''); setCurrentPage(1); }}
+              className="text-sm text-primary-600 hover:text-primary-700 font-medium hover:underline"
+            >
+              Limpiar filtros
+            </button>
+          </div>
+        )}
       </Card>
 
       {/* Table */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 size={24} className="animate-spin text-primary-500" />
-        </div>
-      ) : (
-        <>
+      <Card className="overflow-hidden shadow-sm">
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-16">
+            <Loader2 size={32} className="animate-spin text-primary-500 mb-3" />
+            <p className="text-sm text-neutral-500">Cargando autorizaciones...</p>
+          </div>
+        ) : paginados.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 px-4">
+            <div className="w-16 h-16 rounded-full bg-neutral-100 flex items-center justify-center mb-4">
+              <ShieldCheck size={32} className="text-neutral-400" />
+            </div>
+            <p className="text-lg font-semibold text-neutral-900 mb-2">
+              {searchTerm || filtroOperador ? 'No se encontraron resultados' : 'No hay autorizaciones registradas'}
+            </p>
+            <p className="text-sm text-neutral-500 mb-6 text-center max-w-md">
+              {searchTerm || filtroOperador
+                ? 'Intenta ajustar los filtros para encontrar lo que buscas'
+                : 'Comienza creando la primera autorización de tratamiento'}
+            </p>
+            {!(searchTerm || filtroOperador) && (
+              <Button leftIcon={<Plus size={16} />} onClick={openCreate}>
+                Nueva Autorización
+              </Button>
+            )}
+          </div>
+        ) : (
           <Table
             data={paginados}
             columns={columns}
@@ -383,16 +488,17 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
             stickyHeader
             emptyMessage="No hay tratamientos autorizados registrados"
           />
-          {totalPages > 1 && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalItems={filtered.length}
-              itemsPerPage={itemsPerPage}
-              onPageChange={setCurrentPage}
-            />
-          )}
-        </>
+        )}
+      </Card>
+
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filtered.length}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+        />
       )}
 
       {/* Create/Edit Modal */}

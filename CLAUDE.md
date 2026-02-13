@@ -31,14 +31,19 @@ Permite el seguimiento completo del ciclo de vida de manifiestos: desde la gener
 
 ## Latest Build & Test Status
 
-**Last Successful Build**: 2026-02-13
-- ✅ Main Frontend: Built in 7.15s → `dist/` (2826 modules transformed)
+**Last Successful Build**: 2026-02-13 (CRUD Enhancements)
+- ✅ Main Frontend: Built in 6.25s → `dist/` (2826 modules transformed)
 - ✅ PWA App: Built in 5.42s → `dist-app/` (2818 modules transformed)
 - ✅ Smoke Test: **44/44 endpoints PASS** (100% coverage)
   - Health (1), Auth (6), Manifiestos (7), Catalogos (9), Actores (6)
   - Admin Usuarios (3), Reportes (3), PDF (1), Analytics (4)
   - Centro de Control (1), Notificaciones (1), QR Verification (2)
 - ✅ Production API: All systems operational at https://sitrep.ultimamilla.com.ar/api
+
+**Recent Enhancements**:
+- ✅ TransportistaDetallePage: Added full CRUD (edit/delete) for Vehículos and Conductores tables
+- ✅ AdminTratamientosPage: Redesigned with spectacular visual design + full CRUD functionality
+- ✅ All Admin CRUD pages verified with consistent edit/delete functionality
 
 ## Server Paths
 

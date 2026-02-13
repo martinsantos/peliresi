@@ -21,13 +21,23 @@ import {
   Shield,
   Award,
   Plus,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Tabs, TabList, Tab, TabPanel } from '../../components/ui/Tabs';
 import { Modal } from '../../components/ui/Modal';
-import { useTransportista, useCreateVehiculo, useCreateChofer } from '../../hooks/useActores';
+import {
+  useTransportista,
+  useCreateVehiculo,
+  useCreateChofer,
+  useUpdateVehiculo,
+  useDeleteVehiculo,
+  useUpdateChofer,
+  useDeleteChofer,
+} from '../../hooks/useActores';
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from '../../components/ui/Toast';
 
@@ -44,11 +54,19 @@ const TransportistaDetallePage: React.FC = () => {
   const { data: apiTransportista, isLoading } = useTransportista(id || '');
   const createVehiculo = useCreateVehiculo();
   const createChofer = useCreateChofer();
+  const updateVehiculo = useUpdateVehiculo();
+  const deleteVehiculo = useDeleteVehiculo();
+  const updateChofer = useUpdateChofer();
+  const deleteChofer = useDeleteChofer();
 
   const [showVehiculoModal, setShowVehiculoModal] = useState(false);
   const [showChoferModal, setShowChoferModal] = useState(false);
   const [vehiculoForm, setVehiculoForm] = useState(EMPTY_VEHICULO);
   const [choferForm, setChoferForm] = useState(EMPTY_CHOFER);
+  const [editingVehiculo, setEditingVehiculo] = useState<any>(null);
+  const [editingChofer, setEditingChofer] = useState<any>(null);
+  const [deleteVehiculoItem, setDeleteVehiculoItem] = useState<any>(null);
+  const [deleteChoferItem, setDeleteChoferItem] = useState<any>(null);
 
   const transportista = apiTransportista ? {
     ...apiTransportista,
@@ -65,38 +83,139 @@ const TransportistaDetallePage: React.FC = () => {
     ? '/mobile/actores/transportistas'
     : '/admin/actores/transportistas';
 
-  const handleCreateVehiculo = () => {
+  const openCreateVehiculo = () => {
+    setEditingVehiculo(null);
+    setVehiculoForm(EMPTY_VEHICULO);
+    setShowVehiculoModal(true);
+  };
+
+  const openEditVehiculo = (v: any) => {
+    setEditingVehiculo(v);
+    setVehiculoForm({
+      patente: v.patente || '',
+      marca: v.marca || '',
+      modelo: v.modelo || '',
+      anio: v.anio || new Date().getFullYear(),
+      capacidad: v.capacidad || 0,
+      numeroHabilitacion: v.numeroHabilitacion || '',
+      vencimiento: v.vencimiento ? new Date(v.vencimiento).toISOString().split('T')[0] : '',
+    });
+    setShowVehiculoModal(true);
+  };
+
+  const openCreateChofer = () => {
+    setEditingChofer(null);
+    setChoferForm(EMPTY_CHOFER);
+    setShowChoferModal(true);
+  };
+
+  const openEditChofer = (c: any) => {
+    setEditingChofer(c);
+    setChoferForm({
+      nombre: c.nombre || '',
+      apellido: c.apellido || '',
+      dni: c.dni || '',
+      licencia: c.licencia || '',
+      vencimiento: c.vencimiento ? new Date(c.vencimiento).toISOString().split('T')[0] : '',
+      telefono: c.telefono || '',
+    });
+    setShowChoferModal(true);
+  };
+
+  const handleSaveVehiculo = () => {
     if (!id || !vehiculoForm.patente || !vehiculoForm.marca || !vehiculoForm.modelo || !vehiculoForm.vencimiento) {
       toast.error('Campos requeridos', 'Completar patente, marca, modelo y vencimiento');
       return;
     }
-    createVehiculo.mutate(
-      { transportistaId: id, data: { ...vehiculoForm, anio: Number(vehiculoForm.anio), capacidad: Number(vehiculoForm.capacidad) } },
+
+    const data = { ...vehiculoForm, anio: Number(vehiculoForm.anio), capacidad: Number(vehiculoForm.capacidad) };
+
+    if (editingVehiculo) {
+      updateVehiculo.mutate(
+        { transportistaId: id, vehiculoId: editingVehiculo.id, data },
+        {
+          onSuccess: () => {
+            toast.success('Vehículo actualizado', `Patente ${vehiculoForm.patente} modificado`);
+            setShowVehiculoModal(false);
+            setVehiculoForm(EMPTY_VEHICULO);
+            setEditingVehiculo(null);
+          },
+          onError: () => toast.error('Error', 'No se pudo actualizar el vehículo'),
+        }
+      );
+    } else {
+      createVehiculo.mutate(
+        { transportistaId: id, data },
+        {
+          onSuccess: () => {
+            toast.success('Vehículo creado', `Patente ${vehiculoForm.patente} registrado`);
+            setShowVehiculoModal(false);
+            setVehiculoForm(EMPTY_VEHICULO);
+          },
+          onError: () => toast.error('Error', 'No se pudo crear el vehículo'),
+        }
+      );
+    }
+  };
+
+  const handleDeleteVehiculo = () => {
+    if (!id || !deleteVehiculoItem) return;
+    deleteVehiculo.mutate(
+      { transportistaId: id, vehiculoId: deleteVehiculoItem.id },
       {
         onSuccess: () => {
-          toast.success('Vehículo creado', `Patente ${vehiculoForm.patente} registrado`);
-          setShowVehiculoModal(false);
-          setVehiculoForm(EMPTY_VEHICULO);
+          toast.success('Vehículo eliminado', `Patente ${deleteVehiculoItem.patente} eliminado`);
+          setDeleteVehiculoItem(null);
         },
-        onError: () => toast.error('Error', 'No se pudo crear el vehículo'),
+        onError: () => toast.error('Error', 'No se pudo eliminar el vehículo'),
       }
     );
   };
 
-  const handleCreateChofer = () => {
+  const handleSaveChofer = () => {
     if (!id || !choferForm.nombre || !choferForm.dni || !choferForm.licencia || !choferForm.vencimiento) {
       toast.error('Campos requeridos', 'Completar nombre, DNI, licencia y vencimiento');
       return;
     }
-    createChofer.mutate(
-      { transportistaId: id, data: choferForm },
+
+    if (editingChofer) {
+      updateChofer.mutate(
+        { transportistaId: id, choferId: editingChofer.id, data: choferForm },
+        {
+          onSuccess: () => {
+            toast.success('Conductor actualizado', `${choferForm.nombre} modificado`);
+            setShowChoferModal(false);
+            setChoferForm(EMPTY_CHOFER);
+            setEditingChofer(null);
+          },
+          onError: () => toast.error('Error', 'No se pudo actualizar el conductor'),
+        }
+      );
+    } else {
+      createChofer.mutate(
+        { transportistaId: id, data: choferForm },
+        {
+          onSuccess: () => {
+            toast.success('Conductor creado', `${choferForm.nombre} registrado`);
+            setShowChoferModal(false);
+            setChoferForm(EMPTY_CHOFER);
+          },
+          onError: () => toast.error('Error', 'No se pudo crear el conductor'),
+        }
+      );
+    }
+  };
+
+  const handleDeleteChofer = () => {
+    if (!id || !deleteChoferItem) return;
+    deleteChofer.mutate(
+      { transportistaId: id, choferId: deleteChoferItem.id },
       {
         onSuccess: () => {
-          toast.success('Conductor creado', `${choferForm.nombre} registrado`);
-          setShowChoferModal(false);
-          setChoferForm(EMPTY_CHOFER);
+          toast.success('Conductor eliminado', `${deleteChoferItem.nombre} eliminado`);
+          setDeleteChoferItem(null);
         },
-        onError: () => toast.error('Error', 'No se pudo crear el conductor'),
+        onError: () => toast.error('Error', 'No se pudo eliminar el conductor'),
       }
     );
   };
@@ -250,19 +369,20 @@ const TransportistaDetallePage: React.FC = () => {
               <CardHeader
                 title="Vehículos"
                 icon={<Truck size={20} />}
-                action={isAdmin ? <Button size="sm" leftIcon={<Plus size={14} />} onClick={() => setShowVehiculoModal(true)}>Agregar</Button> : undefined}
+                action={isAdmin ? <Button size="sm" leftIcon={<Plus size={14} />} onClick={openCreateVehiculo}>Agregar</Button> : undefined}
               />
               <CardContent>
                 {transportista.flota.length > 0 ? (
                   <table className="w-full table-fixed">
                     <thead className="bg-neutral-50">
                       <tr>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '18%' }}>Patente</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '24%' }}>Marca / Modelo</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '15%' }}>Capacidad</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '13%' }}>Estado</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '15%' }}>Habilitación</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '15%' }}>Vencimiento</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '15%' }}>Patente</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Marca / Modelo</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '12%' }}>Capacidad</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '10%' }}>Estado</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '13%' }}>Habilitación</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '12%' }}>Vencimiento</th>
+                        {isAdmin && <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase" style={{ width: '18%' }}>Acciones</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-100">
@@ -278,6 +398,33 @@ const TransportistaDetallePage: React.FC = () => {
                           </td>
                           <td className="px-3 py-2.5 text-neutral-600 hidden md:table-cell">{v.numeroHabilitacion || '-'}</td>
                           <td className="px-3 py-2.5 text-neutral-600 hidden md:table-cell">{v.vencimiento ? new Date(v.vencimiento).toLocaleDateString('es-AR') : '-'}</td>
+                          {isAdmin && (
+                            <td className="px-3 py-2.5">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  leftIcon={<Pencil size={14} />}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openEditVehiculo(v);
+                                  }}
+                                >
+                                  Editar
+                                </Button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeleteVehiculoItem(v);
+                                  }}
+                                  className="p-2 rounded-lg hover:bg-red-50 text-neutral-400 hover:text-red-600 transition-colors"
+                                  title="Eliminar"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -292,18 +439,19 @@ const TransportistaDetallePage: React.FC = () => {
               <CardHeader
                 title="Conductores"
                 icon={<Users size={20} />}
-                action={isAdmin ? <Button size="sm" leftIcon={<Plus size={14} />} onClick={() => setShowChoferModal(true)}>Agregar</Button> : undefined}
+                action={isAdmin ? <Button size="sm" leftIcon={<Plus size={14} />} onClick={openCreateChofer}>Agregar</Button> : undefined}
               />
               <CardContent>
                 {transportista.conductores.length > 0 ? (
                   <table className="w-full table-fixed">
                     <thead className="bg-neutral-50">
                       <tr>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '25%' }}>Nombre</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '18%' }}>DNI</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '18%' }}>Licencia</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '17%' }}>Teléfono</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '22%' }}>Vto. Licencia</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '22%' }}>Nombre</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '15%' }}>DNI</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '15%' }}>Licencia</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '14%' }}>Teléfono</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '16%' }}>Vto. Licencia</th>
+                        {isAdmin && <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase" style={{ width: '18%' }}>Acciones</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-100">
@@ -314,6 +462,33 @@ const TransportistaDetallePage: React.FC = () => {
                           <td className="px-3 py-2.5 text-neutral-700">{c.licencia || '-'}</td>
                           <td className="px-3 py-2.5 text-neutral-700 hidden md:table-cell">{c.telefono || '-'}</td>
                           <td className="px-3 py-2.5 text-neutral-600 hidden md:table-cell">{c.vencimiento ? new Date(c.vencimiento).toLocaleDateString('es-AR') : '-'}</td>
+                          {isAdmin && (
+                            <td className="px-3 py-2.5">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  leftIcon={<Pencil size={14} />}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openEditChofer(c);
+                                  }}
+                                >
+                                  Editar
+                                </Button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeleteChoferItem(c);
+                                  }}
+                                  className="p-2 rounded-lg hover:bg-red-50 text-neutral-400 hover:text-red-600 transition-colors"
+                                  title="Eliminar"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -327,13 +502,39 @@ const TransportistaDetallePage: React.FC = () => {
         </TabPanel>
       </Tabs>
 
-      {/* Modal: Nuevo Vehículo */}
-      <Modal isOpen={showVehiculoModal} onClose={() => setShowVehiculoModal(false)} title="Nuevo Vehículo" size="lg"
+      {/* Modal: Nuevo/Editar Vehículo */}
+      <Modal
+        isOpen={showVehiculoModal}
+        onClose={() => {
+          setShowVehiculoModal(false);
+          setEditingVehiculo(null);
+          setVehiculoForm(EMPTY_VEHICULO);
+        }}
+        title={editingVehiculo ? 'Editar Vehículo' : 'Nuevo Vehículo'}
+        size="lg"
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowVehiculoModal(false)}>Cancelar</Button>
-            <Button onClick={handleCreateVehiculo} disabled={createVehiculo.isPending}>
-              {createVehiculo.isPending ? 'Registrando...' : 'Registrar Vehículo'}
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowVehiculoModal(false);
+                setEditingVehiculo(null);
+                setVehiculoForm(EMPTY_VEHICULO);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSaveVehiculo}
+              disabled={createVehiculo.isPending || updateVehiculo.isPending}
+            >
+              {createVehiculo.isPending || updateVehiculo.isPending
+                ? editingVehiculo
+                  ? 'Actualizando...'
+                  : 'Registrando...'
+                : editingVehiculo
+                ? 'Actualizar Vehículo'
+                : 'Registrar Vehículo'}
             </Button>
           </div>
         }
@@ -383,13 +584,39 @@ const TransportistaDetallePage: React.FC = () => {
         </div>
       </Modal>
 
-      {/* Modal: Nuevo Conductor */}
-      <Modal isOpen={showChoferModal} onClose={() => setShowChoferModal(false)} title="Nuevo Conductor" size="lg"
+      {/* Modal: Nuevo/Editar Conductor */}
+      <Modal
+        isOpen={showChoferModal}
+        onClose={() => {
+          setShowChoferModal(false);
+          setEditingChofer(null);
+          setChoferForm(EMPTY_CHOFER);
+        }}
+        title={editingChofer ? 'Editar Conductor' : 'Nuevo Conductor'}
+        size="lg"
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowChoferModal(false)}>Cancelar</Button>
-            <Button onClick={handleCreateChofer} disabled={createChofer.isPending}>
-              {createChofer.isPending ? 'Registrando...' : 'Registrar Conductor'}
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowChoferModal(false);
+                setEditingChofer(null);
+                setChoferForm(EMPTY_CHOFER);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSaveChofer}
+              disabled={createChofer.isPending || updateChofer.isPending}
+            >
+              {createChofer.isPending || updateChofer.isPending
+                ? editingChofer
+                  ? 'Actualizando...'
+                  : 'Registrando...'
+                : editingChofer
+                ? 'Actualizar Conductor'
+                : 'Registrar Conductor'}
             </Button>
           </div>
         }
@@ -429,6 +656,74 @@ const TransportistaDetallePage: React.FC = () => {
               <label className="block text-sm font-medium text-neutral-700 mb-1">Vencimiento licencia *</label>
               <input type="date" className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none"
                 value={choferForm.vencimiento} onChange={e => setChoferForm(p => ({ ...p, vencimiento: e.target.value }))} />
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal: Confirmar Eliminar Vehículo */}
+      <Modal
+        isOpen={!!deleteVehiculoItem}
+        onClose={() => setDeleteVehiculoItem(null)}
+        title="Confirmar Eliminación"
+        size="sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setDeleteVehiculoItem(null)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleDeleteVehiculo}
+              disabled={deleteVehiculo.isPending}
+            >
+              {deleteVehiculo.isPending ? 'Eliminando...' : 'Eliminar'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 p-4 bg-red-50 rounded-lg">
+            <AlertTriangle size={20} className="text-red-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-red-900 mb-1">¿Está seguro?</p>
+              <p className="text-sm text-red-700">
+                Esta acción eliminará el vehículo <strong className="font-mono">{deleteVehiculoItem?.patente}</strong> de forma permanente.
+              </p>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal: Confirmar Eliminar Conductor */}
+      <Modal
+        isOpen={!!deleteChoferItem}
+        onClose={() => setDeleteChoferItem(null)}
+        title="Confirmar Eliminación"
+        size="sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setDeleteChoferItem(null)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleDeleteChofer}
+              disabled={deleteChofer.isPending}
+            >
+              {deleteChofer.isPending ? 'Eliminando...' : 'Eliminar'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 p-4 bg-red-50 rounded-lg">
+            <AlertTriangle size={20} className="text-red-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-red-900 mb-1">¿Está seguro?</p>
+              <p className="text-sm text-red-700">
+                Esta acción eliminará al conductor <strong>{deleteChoferItem?.nombre} {deleteChoferItem?.apellido}</strong> de forma permanente.
+              </p>
             </div>
           </div>
         </div>
