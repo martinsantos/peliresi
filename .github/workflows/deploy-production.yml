@@ -67,7 +67,7 @@ jobs:
       - name: Build Backend
         run: |
           cd backend
-          npm ci --production
+          npm ci
           npm run build
 
       - name: Package Backend
