@@ -8,3 +8,5 @@ export { useLocalStorage } from './useLocalStorage';
 export { useDebounce } from './useDebounce';
 export { useToggle } from './useToggle';
 export { useMobilePrefix } from './useMobilePrefix';
+export { usePWAInstall } from './usePWAInstall';
+export { useConnectivity } from './useConnectivity';

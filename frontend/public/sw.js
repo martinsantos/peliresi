@@ -1,22 +1,21 @@
 // Service Worker para modo Offline-First (CU-T09)
-const CACHE_NAME = 'trazabilidad-rrpp-v4';
-const RUNTIME_CACHE = 'runtime-cache-v4';
+// Scope: / (main site)
+const CACHE_NAME = 'trazabilidad-rrpp-v12';
+const RUNTIME_CACHE = 'runtime-cache-v12';
 
 // Recursos críticos para cachear en instalación
-// Paths relativos al scope del SW
 const PRECACHE_URLS = [
-    '/demoambiente/',
-    '/demoambiente/index.html'
+    '/',
+    '/index.html'
 ];
 
 // Instalación del Service Worker
 self.addEventListener('install', (event) => {
-    console.log('[SW] Installing Service Worker...');
+    console.log('[SW] Installing Service Worker v12...');
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then((cache) => {
                 console.log('[SW] Caching static assets...');
-                // Use addAll with catch for individual failures
                 return Promise.all(
                     PRECACHE_URLS.map(url =>
                         cache.add(url).catch(err => {
@@ -31,7 +30,7 @@ self.addEventListener('install', (event) => {
 
 // Activación del Service Worker
 self.addEventListener('activate', (event) => {
-    console.log('[SW] Activando Service Worker...');
+    console.log('[SW] Activando Service Worker v12...');
     event.waitUntil(
         caches.keys().then((cacheNames) => {
             return Promise.all(
@@ -61,27 +60,28 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    // Navigation requests (HTML pages): network-first, never cache HTML to avoid stale asset references
+    if (request.mode === 'navigate') {
+        event.respondWith(
+            fetch(request).catch(() => {
+                return caches.match(request).then((cached) => cached || caches.match('/offline.html'));
+            })
+        );
+        return;
+    }
+
+    // Static assets: network-first with cache fallback
     event.respondWith(
         caches.open(RUNTIME_CACHE).then((cache) => {
             return fetch(request)
                 .then((response) => {
-                    // Cachear respuesta exitosa
                     if (response.status === 200) {
                         cache.put(request, response.clone());
                     }
                     return response;
                 })
                 .catch(() => {
-                    // Si falla la red, intentar desde caché
-                    return cache.match(request).then((cachedResponse) => {
-                        if (cachedResponse) {
-                            return cachedResponse;
-                        }
-                        // Si no hay caché, mostrar página offline
-                        if (request.mode === 'navigate') {
-                            return cache.match('/offline.html');
-                        }
-                    });
+                    return cache.match(request);
                 });
         })
     );
@@ -116,8 +116,8 @@ self.addEventListener('push', (event) => {
     const title = data.title || 'Trazabilidad RRPP';
     const options = {
         body: data.body || 'Nueva notificación',
-        icon: '/demoambiente/icon-192.png',
-        badge: '/demoambiente/icon-192.png',
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
         data: data
     };
 
@@ -126,4 +126,4 @@ self.addEventListener('push', (event) => {
     );
 });
 
-console.log('[SW] Service Worker cargado');
+console.log('[SW] Service Worker v12 cargado');

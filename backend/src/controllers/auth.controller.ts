@@ -2,11 +2,42 @@ import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { StringValue } from 'ms';
-import { PrismaClient } from '@prisma/client';
+import { z } from 'zod';
 import { config } from '../config/config';
 import { AppError } from '../middlewares/errorHandler';
+import prisma from '../lib/prisma';
 
-const prisma = new PrismaClient();
+// Demo mode accounts (relaxed password validation)
+const DEMO_EMAILS = [
+  'juan.perez@dgfa.gob.ar',
+  'm.gonzalez@hospitalcentral.gob.ar',
+  'c.rodriguez@transportesandes.com',
+  'ana.martinez@plantalasheras.com',
+];
+
+// Zod schemas
+const loginSchema = z.object({
+  email: z.string().email('Email inválido'),
+  password: z.string().min(1, 'La contraseña es requerida'),
+});
+
+const registerSchema = z.object({
+  email: z.string().email('Email inválido'),
+  password: z.string().min(1, 'La contraseña es requerida'),
+  rol: z.enum(['ADMIN', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR']),
+  nombre: z.string().min(1, 'El nombre es requerido').max(100),
+  apellido: z.string().optional(),
+  empresa: z.string().optional(),
+  telefono: z.string().optional(),
+});
+
+// Password strength validation for non-demo users
+function validatePasswordStrength(password: string): string | null {
+  if (password.length < 8) return 'La contraseña debe tener al menos 8 caracteres';
+  if (!/[A-Z]/.test(password)) return 'La contraseña debe contener al menos una mayúscula';
+  if (!/[0-9]/.test(password)) return 'La contraseña debe contener al menos un número';
+  return null;
+}
 
 // Generar tokens JWT
 const generateTokens = (userId: string) => {
@@ -22,7 +53,21 @@ const generateTokens = (userId: string) => {
 // Registrar nuevo usuario
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password, rol, nombre, apellido, empresa, telefono } = req.body;
+    const parsed = registerSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError(parsed.error.issues[0].message, 400);
+    }
+
+    const { email, password, rol, nombre, apellido, empresa, telefono } = parsed.data;
+
+    // Password strength check (skip for demo mode accounts)
+    const isDemoMode = process.env.DEMO_MODE === 'true';
+    if (!isDemoMode || !DEMO_EMAILS.includes(email)) {
+      const passwordError = validatePasswordStrength(password);
+      if (passwordError) {
+        throw new AppError(passwordError, 400);
+      }
+    }
 
     // Verificar si el usuario ya existe
     const existingUser = await prisma.usuario.findUnique({
@@ -78,7 +123,12 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
 // Iniciar sesión
 export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password } = req.body;
+    const parsed = loginSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError(parsed.error.issues[0].message, 400);
+    }
+
+    const { email, password } = parsed.data;
 
     // Buscar usuario
     const user = await prisma.usuario.findUnique({
@@ -195,11 +245,85 @@ export const getProfile = async (req: Request & { user?: any }, res: Response, n
 // Cerrar sesión
 export const logout = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // En una implementación real, aquí invalidaríamos el refresh token
-    // Por ahora, simplemente respondemos con éxito
     res.json({
       success: true,
       message: 'Sesión cerrada correctamente',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Cambiar contraseña (usuario autenticado)
+export const changePassword = async (req: Request & { user?: any }, res: Response, next: NextFunction) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      throw new AppError('Se requieren la contraseña actual y la nueva', 400);
+    }
+
+    const user = await prisma.usuario.findUnique({
+      where: { id: req.user.id },
+    });
+
+    if (!user) {
+      throw new AppError('Usuario no encontrado', 404);
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      throw new AppError('La contraseña actual es incorrecta', 400);
+    }
+
+    const passwordError = validatePasswordStrength(newPassword);
+    if (passwordError) {
+      throw new AppError(passwordError, 400);
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    await prisma.usuario.update({
+      where: { id: req.user.id },
+      data: { password: hashedPassword },
+    });
+
+    res.json({ success: true, message: 'Contraseña actualizada correctamente' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Refrescar tokens (access token expirado, refresh token válido)
+export const refreshToken = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { refreshToken: token } = req.body;
+
+    if (!token) {
+      throw new AppError('Refresh token es requerido', 400);
+    }
+
+    let decoded: { id: string };
+    try {
+      decoded = jwt.verify(token, config.JWT_SECRET as string) as { id: string };
+    } catch (err) {
+      throw new AppError('Refresh token inválido o expirado', 401);
+    }
+
+    const user = await prisma.usuario.findUnique({
+      where: { id: decoded.id },
+    });
+
+    if (!user || !user.activo) {
+      throw new AppError('Usuario no encontrado o inactivo', 401);
+    }
+
+    const tokens = generateTokens(user.id);
+
+    res.json({
+      success: true,
+      data: tokens,
     });
   } catch (error) {
     next(error);

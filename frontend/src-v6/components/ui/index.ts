@@ -15,4 +15,4 @@ export { QRCode, QRCodeModal } from './QRCode';
 export { Input } from './Input';
 export { Modal } from './Modal';
 export { Select } from './Select';
-export { Textarea } from './Textarea';
+

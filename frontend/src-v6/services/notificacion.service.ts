@@ -9,19 +9,30 @@ import type { NotificacionFilters, PaginatedData } from '../types/api';
 export const notificacionService = {
   async list(filters?: NotificacionFilters): Promise<PaginatedData<Notificacion>> {
     const { data } = await api.get('/notificaciones', { params: filters });
-    return data.data;
+    const raw = data.data;
+    return {
+      items: raw.notificaciones || [],
+      total: raw.notificaciones?.length || 0,
+      page: 1,
+      limit: 100,
+      totalPages: 1,
+    };
   },
 
   async marcarLeida(id: string): Promise<void> {
-    await api.patch(`/notificaciones/${id}/leida`);
+    await api.put(`/notificaciones/${id}/leida`);
   },
 
   async marcarTodasLeidas(): Promise<void> {
-    await api.patch('/notificaciones/marcar-todas-leidas');
+    await api.put('/notificaciones/todas-leidas');
   },
 
   async getNoLeidas(): Promise<number> {
-    const { data } = await api.get('/notificaciones/no-leidas/count');
-    return data.data;
+    try {
+      const { data } = await api.get('/notificaciones');
+      return data.data?.noLeidas || 0;
+    } catch {
+      return 0;
+    }
   },
 };

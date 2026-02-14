@@ -41,6 +41,23 @@ export function useCreateGenerador() {
   });
 }
 
+export function useUpdateGenerador() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<CreateGeneradorRequest> }) =>
+      actoresService.updateGenerador(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['generadores'] }),
+  });
+}
+
+export function useDeleteGenerador() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => actoresService.deleteGenerador(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['generadores'] }),
+  });
+}
+
 // Transportistas
 export function useTransportistas(filters?: ActorFilters) {
   return useQuery({
@@ -61,6 +78,23 @@ export function useCreateTransportista() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (req: CreateTransportistaRequest) => actoresService.createTransportista(req),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['transportistas'] }),
+  });
+}
+
+export function useUpdateTransportista() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<CreateTransportistaRequest> }) =>
+      actoresService.updateTransportista(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['transportistas'] }),
+  });
+}
+
+export function useDeleteTransportista() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => actoresService.deleteTransportista(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['transportistas'] }),
   });
 }
@@ -89,6 +123,23 @@ export function useCreateOperador() {
   });
 }
 
+export function useUpdateOperador() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<CreateOperadorRequest> }) =>
+      actoresService.updateOperador(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['operadores'] }),
+  });
+}
+
+export function useDeleteOperador() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => actoresService.deleteOperador(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['operadores'] }),
+  });
+}
+
 // Vehiculos & Choferes
 export function useVehiculos(transportistaId: string) {
   return useQuery({
@@ -103,5 +154,77 @@ export function useChoferes(transportistaId: string) {
     queryKey: KEYS.choferes(transportistaId),
     queryFn: () => actoresService.listChoferes(transportistaId),
     enabled: !!transportistaId,
+  });
+}
+
+export function useCreateVehiculo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ transportistaId, data }: { transportistaId: string; data: Partial<import('../types/models').Vehiculo> }) =>
+      actoresService.createVehiculo(transportistaId, data),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['vehiculos', vars.transportistaId] });
+      qc.invalidateQueries({ queryKey: ['transportistas'] });
+    },
+  });
+}
+
+export function useCreateChofer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ transportistaId, data }: { transportistaId: string; data: Partial<import('../types/models').Chofer> }) =>
+      actoresService.createChofer(transportistaId, data),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['choferes', vars.transportistaId] });
+      qc.invalidateQueries({ queryKey: ['transportistas'] });
+    },
+  });
+}
+
+export function useUpdateVehiculo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ transportistaId, vehiculoId, data }: { transportistaId: string; vehiculoId: string; data: Partial<import('../types/models').Vehiculo> }) =>
+      actoresService.updateVehiculo(transportistaId, vehiculoId, data),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['vehiculos', vars.transportistaId] });
+      qc.invalidateQueries({ queryKey: ['transportistas'] });
+    },
+  });
+}
+
+export function useDeleteVehiculo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ transportistaId, vehiculoId }: { transportistaId: string; vehiculoId: string }) =>
+      actoresService.deleteVehiculo(transportistaId, vehiculoId),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['vehiculos', vars.transportistaId] });
+      qc.invalidateQueries({ queryKey: ['transportistas'] });
+    },
+  });
+}
+
+export function useUpdateChofer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ transportistaId, choferId, data }: { transportistaId: string; choferId: string; data: Partial<import('../types/models').Chofer> }) =>
+      actoresService.updateChofer(transportistaId, choferId, data),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['choferes', vars.transportistaId] });
+      qc.invalidateQueries({ queryKey: ['transportistas'] });
+    },
+  });
+}
+
+export function useDeleteChofer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ transportistaId, choferId }: { transportistaId: string; choferId: string }) =>
+      actoresService.deleteChofer(transportistaId, choferId),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['choferes', vars.transportistaId] });
+      qc.invalidateQueries({ queryKey: ['transportistas'] });
+    },
   });
 }

@@ -4,7 +4,7 @@
  * Layout optimizado para dispositivos móviles - Adaptado por rol
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -26,8 +26,8 @@ import {
   BarChart3,
   AlertTriangle,
   Truck,
-  Building2,
   Factory,
+  FlaskConical,
   Shield,
   LayoutDashboard,
   ScanLine,
@@ -35,11 +35,18 @@ import {
   PieChart,
   Database,
   Upload,
-  HelpCircle
+  HelpCircle,
+  Navigation
 } from 'lucide-react';
 import { Badge } from '../components/ui/BadgeV2';
+import { NotificationBell } from '../components/NotificationBell';
+import { ConnectivityIndicator } from '../components/ConnectivityIndicator';
+import { InstallPWAButton } from '../components/InstallPWAButton';
+import { InstallPWAModal } from '../components/InstallPWAModal';
 import { useAuth } from '../contexts/AuthContext';
 import type { UserRole } from '../contexts/AuthContext';
+import { useMobilePrefix } from '../hooks/useMobilePrefix';
+import { useActiveTripRecovery } from '../hooks/useActiveTripRecovery';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -52,7 +59,7 @@ const roleConfig: Record<UserRole, { label: string; color: string; bgColor: stri
   ADMIN: { label: 'Admin', color: 'text-primary-600', bgColor: 'bg-primary-500' },
   GENERADOR: { label: 'Generador', color: 'text-purple-600', bgColor: 'bg-purple-500' },
   TRANSPORTISTA: { label: 'Transportista', color: 'text-orange-600', bgColor: 'bg-orange-500' },
-  OPERADOR: { label: 'Operador', color: 'text-green-600', bgColor: 'bg-green-500' },
+  OPERADOR: { label: 'Operador', color: 'text-blue-600', bgColor: 'bg-blue-500' },
   AUDITOR: { label: 'Auditor', color: 'text-info-600', bgColor: 'bg-info-500' },
 };
 
@@ -99,85 +106,123 @@ export const MobileLayout: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentUser, users, switchUser, isAdmin, isGenerador, isTransportista, isOperador } = useAuth();
+  const { currentUser, users, switchUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isLoading, isDemo } = useAuth();
+  const mp = useMobilePrefix();
 
-  const config = roleConfig[currentUser.rol];
+  // Recover active trip from API after reinstall/crash
+  useActiveTripRecovery();
+
+  const config = currentUser ? roleConfig[currentUser.rol] : roleConfig.ADMIN;
+
+  // Track active trip for TRANSPORTISTA
+  const [activeTripId, setActiveTripId] = useState<string | null>(null);
+  useEffect(() => {
+    const checkActiveTrip = () => {
+      const tripId = localStorage.getItem('sitrep_active_trip_id');
+      setActiveTripId(tripId);
+    };
+    checkActiveTrip();
+    // Re-check when localStorage changes (other tabs) or on navigation
+    window.addEventListener('storage', checkActiveTrip);
+    const interval = setInterval(checkActiveTrip, 5000);
+    return () => { window.removeEventListener('storage', checkActiveTrip); clearInterval(interval); };
+  }, []);
 
   // Items de navegación según rol — depend on currentUser.rol directly
+  // NOTE: hooks must be called unconditionally (before any early returns)
   const bottomNavItems = useMemo(() => {
     const items = [];
 
-    items.push({ to: '/mobile/dashboard', icon: <Home size={22} />, label: 'Inicio' });
-    items.push({ to: '/mobile/manifiestos', icon: <FileText size={22} />, label: 'Manifiestos' });
+    items.push({ to: mp('/dashboard'), icon: <Home size={22} />, label: 'Inicio' });
+    items.push({
+      to: isTransportista ? mp('/transporte/perfil') : mp('/manifiestos'),
+      icon: isTransportista ? <Truck size={22} /> : <FileText size={22} />,
+      label: isTransportista ? 'Mis Viajes' : 'Manifiestos',
+    });
 
     if (isAdmin || isTransportista) {
-      items.push({ to: '/mobile/tracking', icon: <MapPin size={22} />, label: 'Tracking' });
+      items.push({ to: mp('/centro-control'), icon: <MapPin size={22} />, label: 'Control' });
     } else {
-      items.push({ to: '/mobile/reportes', icon: <BarChart3 size={22} />, label: 'Reportes' });
+      items.push({ to: mp('/reportes'), icon: <BarChart3 size={22} />, label: 'Reportes' });
     }
 
     if (isAdmin) {
-      items.push({ to: '/mobile/actores', icon: <Users size={22} />, label: 'Actores' });
+      items.push({ to: mp('/actores'), icon: <Users size={22} />, label: 'Actores' });
     } else {
-      items.push({ to: '/mobile/alertas', icon: <Bell size={22} />, label: 'Alertas', badge: 3 });
+      items.push({ to: mp('/alertas'), icon: <Bell size={22} />, label: 'Alertas', badge: 3 });
     }
 
     return items;
-  }, [currentUser.rol]);
+  }, [currentUser?.rol, mp]);
 
   // Menu items según rol
   const menuItems = useMemo(() => {
     const items = [];
-    
+
     // Principal
-    items.push({ to: '/mobile/dashboard', icon: <Home size={20} />, label: 'Inicio', section: 'main' });
-    items.push({ to: '/mobile/manifiestos', icon: <FileText size={20} />, label: 'Manifiestos', section: 'main' });
-    
+    items.push({ to: mp('/dashboard'), icon: <Home size={20} />, label: 'Inicio', section: 'main' });
+
+    if (isTransportista) {
+      items.push({ to: mp('/transporte/perfil'), icon: <Truck size={20} />, label: 'Mis Viajes', section: 'main' });
+      items.push({ to: mp('/manifiestos'), icon: <FileText size={20} />, label: 'Todos los Manifiestos', section: 'main' });
+      if (activeTripId) {
+        items.push({ to: mp(`/transporte/viaje/${activeTripId}`), icon: <Navigation size={20} />, label: 'Viaje en Curso', section: 'main' });
+      }
+    } else {
+      items.push({ to: mp('/manifiestos'), icon: <FileText size={20} />, label: 'Manifiestos', section: 'main' });
+    }
+
     if (isAdmin || isTransportista) {
-      items.push({ to: '/mobile/tracking', icon: <MapPin size={20} />, label: 'Tracking', section: 'main' });
+      items.push({ to: mp('/centro-control'), icon: <LayoutDashboard size={20} />, label: 'Centro de Control', section: 'main' });
     }
-    
+
     if (isAdmin) {
-      items.push({ to: '/mobile/actores', icon: <Users size={20} />, label: 'Actores', section: 'main' });
-      items.push({ to: '/mobile/centro-control', icon: <LayoutDashboard size={20} />, label: 'Centro de Control', section: 'main' });
+      items.push({ to: mp('/actores'), icon: <Users size={20} />, label: 'Actores', section: 'main' });
     }
-    
-    items.push({ to: '/mobile/reportes', icon: <BarChart3 size={20} />, label: 'Reportes', section: 'main' });
-    items.push({ to: '/mobile/alertas', icon: <Bell size={20} />, label: 'Alertas', badge: 3, section: 'main' });
-    
+
+    items.push({ to: mp('/reportes'), icon: <BarChart3 size={20} />, label: 'Reportes', section: 'main' });
+    items.push({ to: mp('/alertas'), icon: <Bell size={20} />, label: 'Alertas', badge: 3, section: 'main' });
+
     // Admin section
     if (isAdmin) {
-      items.push({ to: '/mobile/admin/usuarios', icon: <User size={20} />, label: 'Usuarios', section: 'admin' });
-      items.push({ to: '/mobile/admin/generadores', icon: <Factory size={20} />, label: 'Generadores', section: 'admin' });
-      items.push({ to: '/mobile/admin/establecimientos', icon: <Building2 size={20} />, label: 'Establecimientos', section: 'admin' });
-      items.push({ to: '/mobile/admin/vehiculos', icon: <Truck size={20} />, label: 'Vehículos', section: 'admin' });
-      items.push({ to: '/mobile/admin/residuos', icon: <Database size={20} />, label: 'Catálogo Residuos', section: 'admin' });
-      items.push({ to: '/mobile/admin/auditoria', icon: <Shield size={20} />, label: 'Auditoría', section: 'admin' });
-      items.push({ to: '/mobile/admin/carga-masiva', icon: <Upload size={20} />, label: 'Carga Masiva', section: 'admin' });
-      items.push({ to: '/mobile/estadisticas', icon: <PieChart size={20} />, label: 'Estadísticas', section: 'admin' });
+      items.push({ to: mp('/admin/usuarios'), icon: <User size={20} />, label: 'Usuarios', section: 'admin' });
+      items.push({ to: mp('/admin/generadores'), icon: <Factory size={20} />, label: 'Generadores', section: 'admin' });
+      items.push({ to: mp('/admin/operadores'), icon: <FlaskConical size={20} />, label: 'Operadores', section: 'admin' });
+      items.push({ to: mp('/admin/vehiculos'), icon: <Truck size={20} />, label: 'Vehículos', section: 'admin' });
+      items.push({ to: mp('/admin/residuos'), icon: <Database size={20} />, label: 'Catálogo Residuos', section: 'admin' });
+      items.push({ to: mp('/admin/auditoria'), icon: <Shield size={20} />, label: 'Auditoría', section: 'admin' });
+      items.push({ to: mp('/admin/carga-masiva'), icon: <Upload size={20} />, label: 'Carga Masiva', section: 'admin' });
+      items.push({ to: mp('/estadisticas'), icon: <PieChart size={20} />, label: 'Estadísticas', section: 'admin' });
     } else if (isTransportista) {
-      items.push({ to: '/mobile/admin/vehiculos', icon: <Truck size={20} />, label: 'Mis Vehículos', section: 'admin' });
+      items.push({ to: mp('/admin/vehiculos'), icon: <Truck size={20} />, label: 'Mis Vehículos', section: 'admin' });
     }
-    
+
     // Herramientas comunes
-    items.push({ to: '/mobile/escaner-qr', icon: <ScanLine size={20} />, label: 'Escanear QR', section: 'tools' });
-    items.push({ to: '/mobile/transporte/perfil', icon: <Truck size={20} />, label: 'Mi Transporte', section: 'tools' });
-    items.push({ to: '/mobile/ayuda', icon: <HelpCircle size={20} />, label: 'Ayuda', section: 'tools' });
-    
+    items.push({ to: mp('/escaner-qr'), icon: <ScanLine size={20} />, label: 'Escanear QR', section: 'tools' });
+    if (!isTransportista) {
+      items.push({ to: mp('/transporte/perfil'), icon: <Truck size={20} />, label: 'Mi Transporte', section: 'tools' });
+    }
+    items.push({ to: mp('/ayuda'), icon: <HelpCircle size={20} />, label: 'Ayuda', section: 'tools' });
+
     return items;
-  }, [currentUser.rol]);
+  }, [currentUser?.rol, mp, activeTripId]);
 
   // Separar items por sección
   const mainItems = menuItems.filter(i => i.section === 'main');
   const adminItems = menuItems.filter(i => i.section === 'admin');
   const toolsItems = menuItems.filter(i => i.section === 'tools');
 
+  // Early return AFTER all hooks
+  if (isLoading || !currentUser) return null;
+
   // Título según la ruta actual
   const getPageTitle = () => {
     const path = location.pathname;
     if (path.includes('/dashboard')) return 'Inicio';
     if (path.includes('/manifiestos/nuevo')) return 'Nuevo Manifiesto';
-    if (path.includes('/manifiestos')) return 'Manifiestos';
+    if (path.includes('/manifiestos')) return isTransportista ? 'Mis Viajes' : 'Manifiestos';
+    if (path.includes('/transporte/perfil')) return 'Mis Viajes';
+    if (path.includes('/transporte/viaje')) return 'Viaje en Curso';
     if (path.includes('/tracking')) return 'Tracking';
     if (path.includes('/actores')) return 'Actores';
     if (path.includes('/reportes')) return 'Reportes';
@@ -192,7 +237,7 @@ export const MobileLayout: React.FC = () => {
     if (path.includes('/centro-control')) return 'Centro de Control';
     if (path.includes('/admin/usuarios')) return 'Usuarios';
     if (path.includes('/admin/generadores')) return 'Generadores';
-    if (path.includes('/admin/establecimientos')) return 'Establecimientos';
+    if (path.includes('/admin/operadores')) return 'Operadores';
     if (path.includes('/admin/vehiculos')) return 'Vehículos';
     if (path.includes('/admin/residuos')) return 'Catálogo Residuos';
     if (path.includes('/admin/auditoria')) return 'Auditoría';
@@ -201,17 +246,27 @@ export const MobileLayout: React.FC = () => {
   };
 
   // Determinar si mostrar FAB
-  const showFab = location.pathname.includes('/mobile/manifiestos') && (isAdmin || isGenerador);
+  const showFab = location.pathname.includes('/manifiestos') && !location.pathname.includes('/nuevo') && (isAdmin || isGenerador);
 
-  const handleSwitchUser = (userId: number) => {
+  const handleSwitchUser = (userId: number | string) => {
     if (userId === currentUser.id) return;
-    switchUser(userId);
+    switchUser(Number(userId));
     // Brief delay so the user sees the menu update before it closes
     setTimeout(() => setIsMenuOpen(false), 200);
   };
 
   return (
     <div className="min-h-screen bg-[#F8F8F6] flex flex-col tap-transparent">
+      {/* Demo mode banner */}
+      {isDemo && (
+        <div className="bg-amber-500 text-white text-center text-xs sm:text-sm py-1 font-medium sticky top-0 z-50">
+          Modo Demo — Los datos no son reales
+        </div>
+      )}
+
+      {/* Connectivity indicator - always visible at top */}
+      <ConnectivityIndicator />
+
       {/* Header */}
       <header className="sticky top-0 z-40 sidebar-polished safe-area-top">
         <div className="flex items-center justify-between h-14 px-4 safe-top">
@@ -229,13 +284,7 @@ export const MobileLayout: React.FC = () => {
             <span className="text-xs font-medium px-2 py-1 rounded-full bg-white/20 text-white">
               {config.label}
             </span>
-            <button
-              onClick={() => navigate('/mobile/alertas')}
-              className="p-2 text-white/80 hover:bg-white/10 rounded-xl transition-colors relative touch-target"
-            >
-              <Bell size={22} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-error-500 rounded-full ring-2 ring-[#1B5E3C]" />
-            </button>
+            <NotificationBell basePath={mp('')} />
           </div>
         </div>
       </header>
@@ -250,10 +299,22 @@ export const MobileLayout: React.FC = () => {
       {/* Floating Action Button */}
       {showFab && (
         <button
-          onClick={() => navigate('/mobile/manifiestos/nuevo')}
+          onClick={() => navigate(mp('/manifiestos/nuevo'))}
           className={`fixed right-4 bottom-24 w-14 h-14 ${config.bgColor} text-white rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-all z-30 hover-glow animate-scale-in-bounce`}
         >
           <Plus size={28} />
+        </button>
+      )}
+
+      {/* Active Trip Banner — floats above bottom nav for TRANSPORTISTA */}
+      {isTransportista && activeTripId && !location.pathname.includes('/transporte/viaje/') && (
+        <button
+          onClick={() => navigate(mp(`/transporte/viaje/${activeTripId}`))}
+          className="fixed left-2 right-2 bottom-[68px] z-40 flex items-center gap-3 px-4 py-3 bg-emerald-600 text-white rounded-xl shadow-lg animate-pulse-subtle"
+        >
+          <Navigation size={20} className="shrink-0" />
+          <span className="flex-1 text-sm font-semibold text-left">Viaje en Curso</span>
+          <ChevronRight size={18} className="shrink-0 opacity-70" />
         </button>
       )}
 
@@ -272,6 +333,9 @@ export const MobileLayout: React.FC = () => {
           ))}
         </div>
       </nav>
+
+      {/* PWA Install Modal (appears after 45s of use) */}
+      <InstallPWAModal />
 
       {/* Side Menu Drawer */}
       {isMenuOpen && (
@@ -411,7 +475,7 @@ export const MobileLayout: React.FC = () => {
                   );
                 })}
                 <NavLink
-                  to="/mobile/switch-user"
+                  to={mp('/switch-user')}
                   onClick={() => setIsMenuOpen(false)}
                   className="flex items-center gap-2 px-2 py-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                 >
@@ -422,17 +486,17 @@ export const MobileLayout: React.FC = () => {
 
               <div className="border-t border-neutral-100 my-2" />
               <div className="space-y-1">
-                <MenuItem 
-                  to="/mobile/configuracion" 
-                  icon={<Settings size={20} />} 
-                  label="Configuración" 
+                <MenuItem
+                  to={mp('/configuracion')}
+                  icon={<Settings size={20} />}
+                  label="Configuración"
                   onClick={() => setIsMenuOpen(false)}
                   activeColor={config.color}
                 />
-                <MenuItem 
-                  to="/mobile/mi-perfil" 
-                  icon={<User size={20} />} 
-                  label="Mi Perfil" 
+                <MenuItem
+                  to={mp('/mi-perfil')}
+                  icon={<User size={20} />}
+                  label="Mi Perfil"
                   onClick={() => setIsMenuOpen(false)}
                   activeColor={config.color}
                 />
@@ -440,8 +504,12 @@ export const MobileLayout: React.FC = () => {
             </div>
 
             {/* Drawer Footer */}
-            <div className="p-4 border-t border-neutral-100 bg-white safe-area-bottom">
-              <button className="w-full flex items-center gap-3 px-3 py-2.5 text-error-600 hover:bg-error-50 rounded-xl transition-colors">
+            <div className="p-4 border-t border-neutral-100 bg-white safe-area-bottom space-y-2">
+              <InstallPWAButton />
+              <button
+                onClick={() => { logout(); setIsMenuOpen(false); navigate('/login'); }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 text-error-600 hover:bg-error-50 rounded-xl transition-colors"
+              >
                 <LogOut size={20} />
                 <span className="font-medium">Cerrar Sesión</span>
               </button>

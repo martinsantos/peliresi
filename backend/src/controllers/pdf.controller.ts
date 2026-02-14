@@ -1,10 +1,8 @@
 import { Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma';
 import PDFDocument from 'pdfkit';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
-
-const prisma = new PrismaClient();
 
 // Generar PDF del Manifiesto (CU-G10)
 export const generarPDFManifiesto = async (req: AuthRequest, res: Response, next: NextFunction) => {

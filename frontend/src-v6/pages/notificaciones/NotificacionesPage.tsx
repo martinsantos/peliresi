@@ -22,50 +22,7 @@ import { Card } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { useNotificaciones, useMarcarLeida, useMarcarTodasLeidas } from '../../hooks/useNotificaciones';
-
-// Mock data
-const mockNotificaciones = [
-  {
-    id: 1,
-    tipo: 'success',
-    titulo: 'Manifiesto aprobado',
-    mensaje: 'El manifiesto M-2025-088 ha sido aprobado exitosamente.',
-    fecha: new Date(Date.now() - 1000 * 60 * 5), // 5 min ago
-    leida: false,
-  },
-  {
-    id: 2,
-    tipo: 'warning',
-    titulo: 'Alerta de tránsito',
-    mensaje: 'El transporte del manifiesto M-2025-085 está demorado.',
-    fecha: new Date(Date.now() - 1000 * 60 * 30), // 30 min ago
-    leida: false,
-  },
-  {
-    id: 3,
-    tipo: 'info',
-    titulo: 'Nuevo manifiesto asignado',
-    mensaje: 'Se te ha asignado el manifiesto M-2025-090.',
-    fecha: new Date(Date.now() - 1000 * 60 * 60), // 1 hour ago
-    leida: true,
-  },
-  {
-    id: 4,
-    tipo: 'success',
-    titulo: 'Entrega confirmada',
-    mensaje: 'El manifiesto M-2025-082 ha sido recibido en el operador.',
-    fecha: new Date(Date.now() - 1000 * 60 * 60 * 3), // 3 hours ago
-    leida: true,
-  },
-  {
-    id: 5,
-    tipo: 'info',
-    titulo: 'Actualización de sistema',
-    mensaje: 'SITREP v6.1 estará disponible el próximo lunes.',
-    fecha: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-    leida: true,
-  },
-];
+import { formatRelativeTime } from '../../utils/formatters';
 
 const getIconByType = (tipo: string) => {
   switch (tipo) {
@@ -91,14 +48,6 @@ const getBgByType = (tipo: string) => {
   }
 };
 
-const formatTimeAgo = (date: Date) => {
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  
-  if (seconds < 60) return 'Hace un momento';
-  if (seconds < 3600) return `Hace ${Math.floor(seconds / 60)} min`;
-  if (seconds < 86400) return `Hace ${Math.floor(seconds / 3600)} h`;
-  return `Hace ${Math.floor(seconds / 86400)} d`;
-};
 
 const NotificacionesPage: React.FC = () => {
   const navigate = useNavigate();
@@ -109,46 +58,31 @@ const NotificacionesPage: React.FC = () => {
   const marcarLeidaMutation = useMarcarLeida();
   const marcarTodasMutation = useMarcarTodasLeidas();
 
-  // Local state as fallback
-  const [localNotificaciones, setLocalNotificaciones] = useState(mockNotificaciones);
-
   const notificaciones = useMemo(() => {
-    if (apiData?.items?.length) {
-      return apiData.items.map((n: any) => ({
-        id: n.id,
-        tipo: n.tipo?.includes('RECHAZ') || n.tipo?.includes('INCIDENTE') ? 'warning' :
-              n.tipo?.includes('TRATADO') || n.tipo?.includes('RECIBIDO') ? 'success' : 'info',
-        titulo: n.titulo,
-        mensaje: n.mensaje,
-        fecha: new Date(n.createdAt),
-        leida: n.leida,
-      }));
-    }
-    return filtro === 'no-leidas' ? localNotificaciones.filter(n => !n.leida) : localNotificaciones;
-  }, [apiData, localNotificaciones, filtro]);
+    const items = apiData?.items || [];
+    return items.map((n: any) => ({
+      id: n.id,
+      tipo: n.tipo?.includes('RECHAZ') || n.tipo?.includes('INCIDENTE') ? 'warning' :
+            n.tipo?.includes('TRATADO') || n.tipo?.includes('RECIBIDO') ? 'success' : 'info',
+      titulo: n.titulo,
+      mensaje: n.mensaje,
+      fecha: new Date(n.createdAt),
+      leida: n.leida,
+    }));
+  }, [apiData]);
 
   const notificacionesFiltradas = notificaciones;
 
   const marcarLeida = (id: number | string) => {
-    if (typeof id === 'string') {
-      marcarLeidaMutation.mutate(id);
-    } else {
-      setLocalNotificaciones(prev => prev.map(n => n.id === id ? { ...n, leida: true } : n));
-    }
+    marcarLeidaMutation.mutate(String(id));
   };
 
   const marcarTodasLeidas = () => {
-    if (apiData?.items?.length) {
-      marcarTodasMutation.mutate();
-    } else {
-      setLocalNotificaciones(prev => prev.map(n => ({ ...n, leida: true })));
-    }
+    marcarTodasMutation.mutate();
   };
 
-  const eliminarNotificacion = (id: number | string) => {
-    if (typeof id === 'number') {
-      setLocalNotificaciones(prev => prev.filter(n => n.id !== id));
-    }
+  const eliminarNotificacion = (_id: number | string) => {
+    // Deletion handled by API when available
   };
 
   const noLeidasCount = notificaciones.filter(n => !n.leida).length;
@@ -265,7 +199,7 @@ const NotificacionesPage: React.FC = () => {
                         {notif.mensaje}
                       </p>
                       <span className="text-xs text-neutral-500 mt-2 block">
-                        {formatTimeAgo(notif.fecha)}
+                        {formatRelativeTime(notif.fecha instanceof Date ? notif.fecha.toISOString() : notif.fecha)}
                       </span>
                     </div>
                   </div>

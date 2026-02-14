@@ -8,6 +8,7 @@ import type {
   ManifiestoFilters, CreateManifiestoRequest, FirmarManifiestoRequest,
   ConfirmarRetiroRequest, ConfirmarEntregaRequest, PesajeRequest,
   ConfirmarRecepcionRequest, RegistrarTratamientoRequest,
+  RechazarManifiestoRequest, RegistrarIncidenteRequest,
 } from '../types/api';
 
 const KEYS = {
@@ -132,11 +133,47 @@ export function useRegistrarTratamiento() {
   });
 }
 
+export function useRechazarManifiesto() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...req }: { id: string } & RechazarManifiestoRequest) =>
+      manifiestoService.rechazar(id, req),
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: KEYS.detail(id) });
+      qc.invalidateQueries({ queryKey: KEYS.lists() });
+    },
+  });
+}
+
+export function useRegistrarIncidente() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...req }: { id: string } & RegistrarIncidenteRequest) =>
+      manifiestoService.registrarIncidente(id, req),
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: KEYS.detail(id) });
+      qc.invalidateQueries({ queryKey: KEYS.lists() });
+    },
+  });
+}
+
 export function useCerrarManifiesto() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => manifiestoService.cerrar(id),
     onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: KEYS.detail(id) });
+      qc.invalidateQueries({ queryKey: KEYS.lists() });
+    },
+  });
+}
+
+export function useRevertirEstado() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, estadoNuevo, motivo }: { id: string; estadoNuevo: string; motivo?: string }) =>
+      manifiestoService.revertirEstado(id, estadoNuevo, motivo),
+    onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },

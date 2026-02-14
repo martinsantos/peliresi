@@ -10,7 +10,7 @@ const TOKEN_KEY = 'sitrep_access_token';
 const REFRESH_TOKEN_KEY = 'sitrep_refresh_token';
 
 export const api = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_URL || '/api',
   headers: { 'Content-Type': 'application/json' },
   timeout: 30000,
 });
@@ -66,9 +66,16 @@ api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError<ApiErrorResponse>) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    const requestUrl = originalRequest?.url || '';
 
-    // In demo mode (no tokens), don't redirect on 401 — just let the error propagate
-    // so React Query can fallback to mock data gracefully
+    // Never intercept auth endpoints — let errors propagate naturally
+    const isAuthEndpoint = requestUrl.includes('/auth/');
+    if (isAuthEndpoint) {
+      return Promise.reject(error);
+    }
+
+    // In demo mode (no tokens), just let 401s propagate so React Query
+    // can fallback to mock data gracefully
     const hasToken = !!getAccessToken();
 
     if (error.response?.status === 401 && !originalRequest._retry && hasToken) {
@@ -105,9 +112,8 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         clearTokens();
-        // Only redirect to login if we had real tokens that expired
-        // Don't redirect in demo mode
-        window.location.href = '/v6/login';
+        // Don't hard-redirect — let React Router handle it
+        // The ProtectedRoute will redirect to /login when currentUser is null
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
@@ -117,5 +123,26 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// A1: Cross-tab token sync — when another tab refreshes the token, pick it up
+// This prevents race conditions when multiple tabs try to refresh simultaneously
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === TOKEN_KEY && e.newValue) {
+      // Another tab updated the token — unblock queued requests
+      if (isRefreshing) {
+        isRefreshing = false;
+        processQueue(null, e.newValue);
+      }
+    }
+    if (e.key === TOKEN_KEY && !e.newValue) {
+      // Token was cleared in another tab (logout) — reject queued requests
+      if (isRefreshing) {
+        isRefreshing = false;
+        processQueue(new Error('Session ended in another tab'), null);
+      }
+    }
+  });
+}
 
 export default api;

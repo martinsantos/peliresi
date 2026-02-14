@@ -7,6 +7,7 @@ import type {
   CreateManifiestoRequest, ManifiestoFilters, ManifiestoDashboard,
   FirmarManifiestoRequest, ConfirmarRetiroRequest, ConfirmarEntregaRequest,
   PesajeRequest, ConfirmarRecepcionRequest, RegistrarTratamientoRequest,
+  RechazarManifiestoRequest, RegistrarIncidenteRequest,
   PaginatedData,
 } from '../types/api';
 import type { Manifiesto } from '../types/models';
@@ -14,22 +15,29 @@ import type { Manifiesto } from '../types/models';
 export const manifiestoService = {
   async list(filters?: ManifiestoFilters): Promise<PaginatedData<Manifiesto>> {
     const { data } = await api.get('/manifiestos', { params: filters });
-    return data.data;
+    const raw = data.data;
+    return {
+      items: raw.manifiestos || [],
+      total: raw.pagination?.total || 0,
+      page: raw.pagination?.page || 1,
+      limit: raw.pagination?.limit || 10,
+      totalPages: raw.pagination?.pages || 1,
+    };
   },
 
   async getById(id: string): Promise<Manifiesto> {
     const { data } = await api.get(`/manifiestos/${id}`);
-    return data.data;
+    return data.data?.manifiesto || data.data;
   },
 
   async create(req: CreateManifiestoRequest): Promise<Manifiesto> {
     const { data } = await api.post('/manifiestos', req);
-    return data.data;
+    return data.data?.manifiesto || data.data;
   },
 
   async update(id: string, req: Partial<CreateManifiestoRequest>): Promise<Manifiesto> {
     const { data } = await api.put(`/manifiestos/${id}`, req);
-    return data.data;
+    return data.data?.manifiesto || data.data;
   },
 
   async delete(id: string): Promise<void> {
@@ -46,8 +54,12 @@ export const manifiestoService = {
     return data.data;
   },
 
-  async actualizarUbicacion(id: string, latitud: number, longitud: number): Promise<void> {
-    await api.post(`/manifiestos/${id}/ubicacion`, { latitud, longitud });
+  async actualizarUbicacion(id: string, latitud: number, longitud: number, velocidad?: number | null, direccion?: number | null): Promise<void> {
+    await api.post(`/manifiestos/${id}/ubicacion`, {
+      latitud, longitud,
+      ...(velocidad != null && { velocidad }),
+      ...(direccion != null && { direccion }),
+    });
   },
 
   async confirmarEntrega(id: string, req?: ConfirmarEntregaRequest): Promise<Manifiesto> {
@@ -61,18 +73,33 @@ export const manifiestoService = {
   },
 
   async confirmarRecepcion(id: string, req?: ConfirmarRecepcionRequest): Promise<Manifiesto> {
-    const { data } = await api.post(`/manifiestos/${id}/confirmarRecepcion`, req);
+    const { data } = await api.post(`/manifiestos/${id}/confirmar-recepcion`, req);
     return data.data;
   },
 
   async registrarTratamiento(id: string, req: RegistrarTratamientoRequest): Promise<Manifiesto> {
-    const { data } = await api.post(`/manifiestos/${id}/registrarTratamiento`, req);
+    const { data } = await api.post(`/manifiestos/${id}/tratamiento`, req);
+    return data.data;
+  },
+
+  async rechazar(id: string, req: RechazarManifiestoRequest): Promise<Manifiesto> {
+    const { data } = await api.post(`/manifiestos/${id}/rechazar`, req);
+    return data.data;
+  },
+
+  async registrarIncidente(id: string, req: RegistrarIncidenteRequest): Promise<Manifiesto> {
+    const { data } = await api.post(`/manifiestos/${id}/incidente`, req);
     return data.data;
   },
 
   async cerrar(id: string): Promise<Manifiesto> {
     const { data } = await api.post(`/manifiestos/${id}/cerrar`);
     return data.data;
+  },
+
+  async revertirEstado(id: string, estadoNuevo: string, motivo?: string): Promise<Manifiesto> {
+    const { data } = await api.post(`/manifiestos/${id}/revertir-estado`, { estadoNuevo, motivo });
+    return data.data?.manifiesto || data.data;
   },
 
   async dashboard(): Promise<ManifiestoDashboard> {
@@ -82,7 +109,8 @@ export const manifiestoService = {
 
   async syncInicial(): Promise<Manifiesto[]> {
     const { data } = await api.get('/manifiestos/sync-inicial');
-    return data.data;
+    const raw = data.data;
+    return Array.isArray(raw) ? raw : raw.manifiestos || [];
   },
 
   async validarQR(code: string): Promise<Manifiesto> {

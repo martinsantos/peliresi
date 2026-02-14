@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="description" content="SITREP - App Mobile de Trazabilidad de Residuos Peligrosos" />
     <meta name="theme-color" content="#0D8A4F" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="SITREP" />
     <link rel="manifest" href="/app/manifest-app.json" />
@@ -19,5 +19,38 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src-v6/main-app.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        // Clean up old caches from previous SW versions
+        if ('caches' in window) {
+          caches.keys().then(function(names) {
+            names.forEach(function(name) {
+              if (name.indexOf('v9') === -1) {
+                caches.delete(name);
+                console.log('[SW-App] Cleaned old cache:', name);
+              }
+            });
+          });
+        }
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/app/sw-app.js', { scope: '/app/' })
+            .then(function(reg) {
+              console.log('[SW-App] Registered', reg.scope);
+              reg.addEventListener('updatefound', function() {
+                var newWorker = reg.installing;
+                if (newWorker) {
+                  newWorker.addEventListener('statechange', function() {
+                    if (newWorker.state === 'activated') {
+                      console.log('[SW-App] New version activated, reloading...');
+                      window.location.reload();
+                    }
+                  });
+                }
+              });
+            })
+            .catch(function(err) { console.warn('[SW-App] Registration failed:', err); });
+        });
+      }
+    </script>
   </body>
 </html>

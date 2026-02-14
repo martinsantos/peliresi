@@ -1,17 +1,16 @@
 /**
  * SITREP v6 - Operadores Page
  * ============================
- * Gestión de operadores de tratamiento
+ * Gestion de operadores de tratamiento
  */
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Building2,
+  FlaskConical,
   Search,
   Plus,
   Filter,
-  MoreVertical,
   Phone,
   Mail,
   MapPin,
@@ -28,83 +27,30 @@ import { Card } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Input } from '../../components/ui/Input';
+import { Modal, ConfirmModal } from '../../components/ui/Modal';
+import {
+  useOperadores,
+  useCreateOperador,
+  useUpdateOperador,
+  useDeleteOperador,
+} from '../../hooks/useActores';
 
-// Mock data
-const operadoresMock = [
-  {
-    id: 1,
-    nombre: 'Planta Norte',
-    razonSocial: 'Tratamiento de Residuos Norte S.A.',
-    cuit: '30-12345678-9',
-    direccion: 'Ruta 40 Km 1234, Guaymallén',
-    telefono: '+54 261 456-7890',
-    email: 'contacto@plantanorte.com',
-    estado: 'ACTIVO',
-    capacidadTotal: 5000,
-    capacidadUsada: 4250,
-    procesadoMes: 1240,
-    residuosAceptados: ['Líquidos', 'Sólidos', 'Pastosos'],
-    certificaciones: ['ISO 14001', 'ISO 9001'],
-    ultimaAuditoria: '2025-01-15',
-    proximaAuditoria: '2025-07-15',
-  },
-  {
-    id: 2,
-    nombre: 'EcoResiduos Sur',
-    razonSocial: 'EcoResiduos Mendoza S.A.',
-    cuit: '30-87654321-0',
-    direccion: 'Ruta 7 Km 985, San Rafael',
-    telefono: '+54 260 456-7890',
-    email: 'info@ecoresiduos.com',
-    estado: 'ACTIVO',
-    capacidadTotal: 3500,
-    capacidadUsada: 2100,
-    procesadoMes: 890,
-    residuosAceptados: ['Sólidos', 'Líquidos'],
-    certificaciones: ['ISO 14001'],
-    ultimaAuditoria: '2024-12-20',
-    proximaAuditoria: '2025-06-20',
-  },
-  {
-    id: 3,
-    nombre: 'Planta Este',
-    razonSocial: 'Operador Este S.R.L.',
-    cuit: '30-11111111-1',
-    direccion: 'Av. Acceso Este 2345, Maipú',
-    telefono: '+54 261 234-5678',
-    email: 'admin@plantaeste.com',
-    estado: 'MANTENIMIENTO',
-    capacidadTotal: 2800,
-    capacidadUsada: 0,
-    procesadoMes: 0,
-    residuosAceptados: ['Sólidos'],
-    certificaciones: [],
-    ultimaAuditoria: '2024-11-10',
-    proximaAuditoria: '2025-05-10',
-  },
-  {
-    id: 4,
-    nombre: 'Operador Sur',
-    razonSocial: 'Residuos del Sur S.A.',
-    cuit: '30-22222222-2',
-    direccion: 'Calle Principal 456, Las Heras',
-    telefono: '+54 261 876-5432',
-    email: 'contacto@operadorsur.com',
-    estado: 'ACTIVO',
-    capacidadTotal: 4200,
-    capacidadUsada: 3780,
-    procesadoMes: 1050,
-    residuosAceptados: ['Líquidos', 'Sólidos', 'Gases'],
-    certificaciones: ['ISO 14001', 'ISO 9001', 'OHSAS 18001'],
-    ultimaAuditoria: '2025-01-05',
-    proximaAuditoria: '2025-07-05',
-  },
-];
-
-const estadoConfig: Record<string, { label: string; color: Badge['color']; icon: React.ReactNode }> = {
-  ACTIVO: { label: 'En línea', color: 'success', icon: <CheckCircle2 size={14} /> },
+const estadoConfig: Record<string, { label: string; color: any; icon: React.ReactNode }> = {
+  ACTIVO: { label: 'En linea', color: 'success', icon: <CheckCircle2 size={14} /> },
   MANTENIMIENTO: { label: 'Mantenimiento', color: 'warning', icon: <AlertCircle size={14} /> },
   INACTIVO: { label: 'Fuera de servicio', color: 'error', icon: <AlertCircle size={14} /> },
+};
+
+const INITIAL_FORM = {
+  razonSocial: '',
+  cuit: '',
+  domicilio: '',
+  telefono: '',
+  email: '',
+  password: '',
+  nombre: '',
+  numeroHabilitacion: '',
+  categoria: '',
 };
 
 const OperadoresPage: React.FC = () => {
@@ -112,30 +58,128 @@ const OperadoresPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('');
   const [vista, setVista] = useState<'grid' | 'lista'>('lista');
+  const [modalCrear, setModalCrear] = useState(false);
+  const [modalEditar, setModalEditar] = useState(false);
+  const [modalEliminar, setModalEliminar] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; razonSocial: string } | null>(null);
+  const [form, setForm] = useState(INITIAL_FORM);
 
-  const operadoresFiltrados = operadoresMock.filter(op => {
-    const matchesSearch = op.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         op.razonSocial.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         op.cuit.includes(searchTerm);
-    const matchesEstado = filtroEstado === '' || op.estado === filtroEstado;
-    return matchesSearch && matchesEstado;
+  // API hooks
+  const { data: apiData, isLoading } = useOperadores({ search: searchTerm || undefined });
+  const createMutation = useCreateOperador();
+  const updateMutation = useUpdateOperador();
+  const deleteMutation = useDeleteOperador();
+
+  const operadoresData = Array.isArray(apiData?.items) ? apiData.items : [];
+
+  // Server handles search; client filters estado
+  const operadoresFiltrados = operadoresData.filter((op: any) => {
+    const matchesEstado = filtroEstado === '' ||
+      (filtroEstado === 'ACTIVO' && op.activo !== false) ||
+      (filtroEstado === 'INACTIVO' && op.activo === false);
+    return matchesEstado;
   });
 
   const isMobile = typeof window !== 'undefined' && window.location.pathname.includes('/mobile');
 
-  const getCapacidadColor = (usada: number, total: number) => {
-    const porcentaje = (usada / total) * 100;
-    if (porcentaje > 90) return 'text-error-600';
-    if (porcentaje > 70) return 'text-warning-600';
-    return 'text-success-600';
+  const updateField = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }));
+
+  const handleCrear = async () => {
+    try {
+      await createMutation.mutateAsync({
+        email: form.email,
+        password: form.password || 'TempPass123!',
+        nombre: form.nombre || form.razonSocial,
+        razonSocial: form.razonSocial,
+        cuit: form.cuit,
+        domicilio: form.domicilio,
+        telefono: form.telefono,
+        numeroHabilitacion: form.numeroHabilitacion,
+        categoria: form.categoria,
+      });
+      setModalCrear(false);
+      setForm(INITIAL_FORM);
+    } catch {
+      // Error handled by React Query
+    }
   };
 
-  const getCapacidadBg = (usada: number, total: number) => {
-    const porcentaje = (usada / total) * 100;
-    if (porcentaje > 90) return 'bg-error-500';
-    if (porcentaje > 70) return 'bg-warning-500';
-    return 'bg-success-500';
+  const handleEditar = async () => {
+    if (!editId) return;
+    try {
+      await updateMutation.mutateAsync({
+        id: editId,
+        data: {
+          razonSocial: form.razonSocial,
+          cuit: form.cuit,
+          domicilio: form.domicilio,
+          telefono: form.telefono,
+          email: form.email,
+          numeroHabilitacion: form.numeroHabilitacion,
+          categoria: form.categoria,
+        },
+      });
+      setModalEditar(false);
+      setEditId(null);
+      setForm(INITIAL_FORM);
+    } catch {
+      // Error handled by React Query
+    }
   };
+
+  const openEditar = (op: any) => {
+    setEditId(op.id);
+    setForm({
+      razonSocial: op.razonSocial || '',
+      cuit: op.cuit || '',
+      domicilio: op.domicilio || '',
+      telefono: op.telefono || '',
+      email: op.email || '',
+      password: '',
+      nombre: '',
+      numeroHabilitacion: op.numeroHabilitacion || '',
+      categoria: op.categoria || '',
+    });
+    setModalEditar(true);
+  };
+
+  const handleEliminar = async () => {
+    if (!deleteTarget) return;
+    try {
+      await deleteMutation.mutateAsync(deleteTarget.id);
+      setModalEliminar(false);
+      setDeleteTarget(null);
+    } catch {
+      // Error handled by React Query
+    }
+  };
+
+  const renderForm = () => (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <Input label="Razon Social" value={form.razonSocial} onChange={(e) => updateField('razonSocial', e.target.value)} placeholder="Empresa S.A." />
+        <Input label="CUIT" value={form.cuit} onChange={(e) => updateField('cuit', e.target.value)} placeholder="30-12345678-9" />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <Input label="Email" type="email" value={form.email} onChange={(e) => updateField('email', e.target.value)} placeholder="contacto@empresa.com" />
+        <Input label="Telefono" value={form.telefono} onChange={(e) => updateField('telefono', e.target.value)} placeholder="+54 261 ..." />
+      </div>
+      <Input label="Domicilio" value={form.domicilio} onChange={(e) => updateField('domicilio', e.target.value)} placeholder="Ruta 40 Km 1234, Guaymallen" />
+      <div className="grid grid-cols-2 gap-4">
+        <Input label="N. Habilitacion" value={form.numeroHabilitacion} onChange={(e) => updateField('numeroHabilitacion', e.target.value)} placeholder="HAB-OP-2024-XXXX" />
+        <Input label="Categoria" value={form.categoria} onChange={(e) => updateField('categoria', e.target.value)} placeholder="Incineracion" />
+      </div>
+      {!editId && (
+        <div className="grid grid-cols-2 gap-4">
+          <Input label="Nombre Responsable" value={form.nombre} onChange={(e) => updateField('nombre', e.target.value)} placeholder="Juan Perez" />
+          <Input label="Password inicial" type="password" value={form.password} onChange={(e) => updateField('password', e.target.value)} placeholder="Min. 8 caracteres" />
+        </div>
+      )}
+    </div>
+  );
+
+  const activosCount = operadoresData.filter((op: any) => op.activo !== false).length;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -143,7 +187,7 @@ const OperadoresPage: React.FC = () => {
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex items-center gap-3">
           {isMobile && (
-            <button 
+            <button
               onClick={() => navigate(-1)}
               className="p-2 -ml-2 hover:bg-neutral-100 rounded-lg transition-colors"
             >
@@ -153,27 +197,27 @@ const OperadoresPage: React.FC = () => {
           <div>
             <div className="flex items-center gap-3">
               <h2 className="text-2xl font-bold text-neutral-900">Operadores</h2>
-              <Badge variant="soft" color="primary">{operadoresFiltrados.length}</Badge>
+              <Badge variant="soft" color="primary">{apiData?.total ?? operadoresFiltrados.length}</Badge>
             </div>
             <p className="text-neutral-600 mt-1">
-              Gestión de plantas de tratamiento
+              Gestion de plantas de tratamiento
             </p>
           </div>
         </div>
-        <Button leftIcon={<Plus size={18} />}>
+        <Button leftIcon={<Plus size={18} />} onClick={() => { setForm(INITIAL_FORM); setModalCrear(true); }}>
           Nuevo Operador
         </Button>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <Card className="p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-success-50 rounded-lg flex items-center justify-center">
-              <Building2 className="text-success-600" size={20} />
+              <FlaskConical className="text-success-600" size={20} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-neutral-900">3</p>
+              <p className="text-2xl font-bold text-neutral-900">{activosCount}</p>
               <p className="text-xs text-neutral-500">Activos</p>
             </div>
           </div>
@@ -184,8 +228,8 @@ const OperadoresPage: React.FC = () => {
               <AlertCircle className="text-warning-600" size={20} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-neutral-900">1</p>
-              <p className="text-xs text-neutral-500">Mantenimiento</p>
+              <p className="text-2xl font-bold text-neutral-900">{operadoresData.filter((op: any) => op.activo === false).length}</p>
+              <p className="text-xs text-neutral-500">Inactivos</p>
             </div>
           </div>
         </Card>
@@ -195,8 +239,8 @@ const OperadoresPage: React.FC = () => {
               <TrendingUp className="text-primary-600" size={20} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-neutral-900">3,180</p>
-              <p className="text-xs text-neutral-500">Tn este mes</p>
+              <p className="text-2xl font-bold text-neutral-900">{apiData?.total ?? operadoresData.length}</p>
+              <p className="text-xs text-neutral-500">Total registrados</p>
             </div>
           </div>
         </Card>
@@ -206,7 +250,7 @@ const OperadoresPage: React.FC = () => {
               <Factory className="text-info-600" size={20} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-neutral-900">13,500</p>
+              <p className="text-2xl font-bold text-neutral-900">-</p>
               <p className="text-xs text-neutral-500">Tn capacidad total</p>
             </div>
           </div>
@@ -218,7 +262,7 @@ const OperadoresPage: React.FC = () => {
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1">
             <Input
-              placeholder="Buscar por nombre, razón social o CUIT..."
+              placeholder="Buscar por nombre, razon social o CUIT..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               leftIcon={<Search size={18} />}
@@ -231,9 +275,8 @@ const OperadoresPage: React.FC = () => {
               className="px-4 py-2 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
             >
               <option value="">Todos los estados</option>
-              <option value="ACTIVO">En línea</option>
-              <option value="MANTENIMIENTO">Mantenimiento</option>
-              <option value="INACTIVO">Fuera de servicio</option>
+              <option value="ACTIVO">Activo</option>
+              <option value="INACTIVO">Inactivo</option>
             </select>
             <div className="flex bg-neutral-100 rounded-lg p-1">
               <button
@@ -260,58 +303,51 @@ const OperadoresPage: React.FC = () => {
         </div>
       </Card>
 
+      {/* Loading */}
+      {isLoading && (
+        <Card className="py-12">
+          <div className="text-center">
+            <div className="animate-spin w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full mx-auto mb-4" />
+            <p className="text-neutral-500">Cargando operadores...</p>
+          </div>
+        </Card>
+      )}
+
       {/* Lista */}
-      {vista === 'lista' ? (
-        <Card padding="none" className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-neutral-50 border-b border-neutral-200">
+      {!isLoading && vista === 'lista' ? (
+        <Card padding="none" className="max-h-[70vh] overflow-auto">
+          <table className="w-full table-fixed">
+              <thead className="bg-neutral-50 border-b border-neutral-200 sticky top-0 z-10">
                 <tr>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">
-                    Operador
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">
-                    Estado
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">
-                    Capacidad
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">
-                    Procesado (mes)
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">
-                    Contacto
-                  </th>
-                  <th className="px-6 py-4 text-right text-xs font-semibold text-neutral-600 uppercase tracking-wider">
-                    Acciones
-                  </th>
+                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '30%' }}>Operador</th>
+                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '15%' }}>Estado</th>
+                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider hidden md:table-cell" style={{ width: '15%' }}>Categoria</th>
+                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider hidden md:table-cell" style={{ width: '22%' }}>Contacto</th>
+                  <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '18%' }}>Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
-                {operadoresFiltrados.map((op) => {
-                  const estado = estadoConfig[op.estado];
-                  const capacidadPorcentaje = (op.capacidadUsada / op.capacidadTotal) * 100;
-                  
+                {operadoresFiltrados.map((op: any) => {
+                  const isActivo = op.activo !== false;
+                  const estado = isActivo ? estadoConfig.ACTIVO : estadoConfig.INACTIVO;
                   return (
-                    <tr 
-                      key={op.id} 
+                    <tr
+                      key={op.id}
                       className="hover:bg-neutral-50 transition-colors cursor-pointer group"
                       onClick={() => navigate(isMobile ? `/mobile/actores/operadores/${op.id}` : `/actores/operadores/${op.id}`)}
                     >
-                      <td className="px-6 py-4">
+                      <td className="px-3 py-2.5">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <Building2 className="text-primary-600" size={18} />
+                            <FlaskConical className="text-primary-600" size={18} />
                           </div>
                           <div>
-                            <p className="font-semibold text-neutral-900 group-hover:text-primary-600 transition-colors">
-                              {op.nombre}
-                            </p>
+                            <p className="font-semibold text-neutral-900 group-hover:text-primary-600 transition-colors truncate">{op.razonSocial}</p>
                             <p className="text-xs text-neutral-500">{op.cuit}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 py-2.5">
                         <Badge variant="soft" color={estado.color}>
                           <span className="flex items-center gap-1">
                             {estado.icon}
@@ -319,46 +355,23 @@ const OperadoresPage: React.FC = () => {
                           </span>
                         </Badge>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="w-32">
-                          <div className="flex items-center justify-between text-xs mb-1">
-                            <span className={getCapacidadColor(op.capacidadUsada, op.capacidadTotal)}>
-                              {capacidadPorcentaje.toFixed(0)}%
-                            </span>
-                            <span className="text-neutral-500">
-                              {op.capacidadUsada.toLocaleString()}/{op.capacidadTotal.toLocaleString()}
-                            </span>
-                          </div>
-                          <div className="h-1.5 bg-neutral-200 rounded-full overflow-hidden">
-                            <div 
-                              className={`h-full rounded-full ${getCapacidadBg(op.capacidadUsada, op.capacidadTotal)}`}
-                              style={{ width: `${capacidadPorcentaje}%` }}
-                            />
-                          </div>
-                        </div>
+                      <td className="px-3 py-2.5 hidden md:table-cell">
+                        <span className="text-sm text-neutral-700">{op.categoria || '-'}</span>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className="font-medium text-neutral-900">
-                          {op.procesadoMes.toLocaleString()} Tn
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 py-2.5 hidden md:table-cell">
                         <div className="text-sm text-neutral-600">
-                          <p className="flex items-center gap-1">
-                            <Phone size={12} />
-                            {op.telefono}
-                          </p>
+                          <p className="flex items-center gap-1"><Phone size={12} /> {op.telefono}</p>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 py-2.5">
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button variant="ghost" size="sm" className="p-2" onClick={(e) => { e.stopPropagation(); }}>
+                          <Button variant="ghost" size="sm" className="p-2" onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/actores/operadores/${op.id}` : `/actores/operadores/${op.id}`); }}>
                             <Eye size={16} />
                           </Button>
-                          <Button variant="ghost" size="sm" className="p-2" onClick={(e) => { e.stopPropagation(); }}>
+                          <Button variant="ghost" size="sm" className="p-2" onClick={(e) => { e.stopPropagation(); openEditar(op); }}>
                             <Edit size={16} />
                           </Button>
-                          <Button variant="ghost" size="sm" className="p-2 text-error-500 hover:text-error-600" onClick={(e) => { e.stopPropagation(); }}>
+                          <Button variant="ghost" size="sm" className="p-2 text-error-500 hover:text-error-600" onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: op.id, razonSocial: op.razonSocial }); setModalEliminar(true); }}>
                             <Trash2 size={16} />
                           </Button>
                         </div>
@@ -368,17 +381,15 @@ const OperadoresPage: React.FC = () => {
                 })}
               </tbody>
             </table>
-          </div>
         </Card>
-      ) : (
+      ) : !isLoading ? (
         /* Vista Grid */
-        <div className="grid md:grid-cols-2 gap-4">
-          {operadoresFiltrados.map((op) => {
-            const estado = estadoConfig[op.estado];
-            const capacidadPorcentaje = (op.capacidadUsada / op.capacidadTotal) * 100;
-            
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {operadoresFiltrados.map((op: any) => {
+            const isActivo = op.activo !== false;
+            const estado = isActivo ? estadoConfig.ACTIVO : estadoConfig.INACTIVO;
             return (
-              <Card 
+              <Card
                 key={op.id}
                 className="p-5 hover:shadow-md transition-all cursor-pointer group"
                 onClick={() => navigate(isMobile ? `/mobile/actores/operadores/${op.id}` : `/actores/operadores/${op.id}`)}
@@ -386,102 +397,119 @@ const OperadoresPage: React.FC = () => {
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-primary-50 rounded-xl flex items-center justify-center">
-                      <Building2 className="text-primary-600" size={24} />
+                      <FlaskConical className="text-primary-600" size={24} />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-neutral-900 group-hover:text-primary-600 transition-colors">
-                        {op.nombre}
-                      </h3>
-                      <p className="text-xs text-neutral-500">{op.razonSocial}</p>
+                      <h3 className="font-semibold text-neutral-900 group-hover:text-primary-600 transition-colors">{op.razonSocial}</h3>
+                      <p className="text-xs text-neutral-500">{op.cuit}</p>
                     </div>
                   </div>
-                  <Badge variant="soft" color={estado.color}>
-                    {estado.label}
-                  </Badge>
+                  <Badge variant="soft" color={estado.color}>{estado.label}</Badge>
                 </div>
 
-                {/* Capacidad */}
-                <div className="mb-4">
-                  <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-neutral-600">Capacidad utilizada</span>
-                    <span className={getCapacidadColor(op.capacidadUsada, op.capacidadTotal)}>
-                      {capacidadPorcentaje.toFixed(0)}%
-                    </span>
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center gap-2 text-sm text-neutral-600">
+                    <MapPin size={14} />
+                    <span className="truncate">{op.domicilio}</span>
                   </div>
-                  <div className="h-2 bg-neutral-100 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full rounded-full ${getCapacidadBg(op.capacidadUsada, op.capacidadTotal)}`}
-                      style={{ width: `${capacidadPorcentaje}%` }}
-                    />
-                  </div>
-                  <p className="text-xs text-neutral-500 mt-1">
-                    {op.capacidadUsada.toLocaleString()} / {op.capacidadTotal.toLocaleString()} Tn
-                  </p>
-                </div>
-
-                {/* Info adicional */}
-                <div className="grid grid-cols-2 gap-3 text-sm mb-4">
-                  <div>
-                    <p className="text-xs text-neutral-500 mb-1">Procesado (mes)</p>
-                    <p className="font-medium text-neutral-900">{op.procesadoMes.toLocaleString()} Tn</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-neutral-500 mb-1">Residuos</p>
-                    <p className="font-medium text-neutral-900">{op.residuosAceptados.length} tipos</p>
-                  </div>
-                </div>
-
-                {/* Certificaciones */}
-                <div className="flex flex-wrap gap-1 mb-4">
-                  {op.certificaciones.map(cert => (
-                    <span key={cert} className="px-2 py-0.5 bg-success-50 text-success-700 text-xs rounded-full">
-                      {cert}
-                    </span>
-                  ))}
-                  {op.certificaciones.length === 0 && (
-                    <span className="text-xs text-neutral-400">Sin certificaciones</span>
-                  )}
-                </div>
-
-                {/* Contacto */}
-                <div className="flex items-center gap-3 pt-4 border-t border-neutral-100">
-                  <button 
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary-50 text-primary-600 rounded-lg text-sm font-medium hover:bg-primary-100 transition-colors"
-                    onClick={(e) => { e.stopPropagation(); }}
-                  >
-                    <Phone size={14} />
-                    Llamar
-                  </button>
-                  <button 
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-neutral-50 text-neutral-700 rounded-lg text-sm font-medium hover:bg-neutral-100 transition-colors"
-                    onClick={(e) => { e.stopPropagation(); }}
-                  >
+                  <div className="flex items-center gap-2 text-sm text-neutral-600">
                     <Mail size={14} />
-                    Email
-                  </button>
+                    <span>{op.email}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-neutral-600">
+                    <Phone size={14} />
+                    <span>{op.telefono}</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-sm mb-4">
+                  <div className="bg-neutral-50 rounded-lg p-3">
+                    <p className="text-xs text-neutral-500 mb-1">Habilitacion</p>
+                    <p className="font-mono font-medium text-neutral-900">{op.numeroHabilitacion || '-'}</p>
+                  </div>
+                  <div className="bg-neutral-50 rounded-lg p-3">
+                    <p className="text-xs text-neutral-500 mb-1">Categoria</p>
+                    <p className="font-medium text-neutral-900">{op.categoria || '-'}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-4 border-t border-neutral-100">
+                  <Button variant="outline" size="sm" className="flex-1" leftIcon={<Eye size={14} />} onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/actores/operadores/${op.id}` : `/actores/operadores/${op.id}`); }}>
+                    Ver
+                  </Button>
+                  <Button variant="outline" size="sm" className="flex-1" leftIcon={<Edit size={14} />} onClick={(e) => { e.stopPropagation(); openEditar(op); }}>
+                    Editar
+                  </Button>
+                  <Button variant="outline" size="sm" className="p-2 text-error-500" onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: op.id, razonSocial: op.razonSocial }); setModalEliminar(true); }}>
+                    <Trash2 size={14} />
+                  </Button>
                 </div>
               </Card>
             );
           })}
         </div>
-      )}
+      ) : null}
 
       {/* Empty state */}
-      {operadoresFiltrados.length === 0 && (
+      {!isLoading && operadoresFiltrados.length === 0 && (
         <Card className="py-16">
           <div className="text-center">
             <div className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Building2 className="text-neutral-400" size={24} />
+              <FlaskConical className="text-neutral-400" size={24} />
             </div>
-            <h3 className="text-lg font-medium text-neutral-900 mb-1">
-              No se encontraron operadores
-            </h3>
-            <p className="text-neutral-500">
-              Intenta con otros términos de búsqueda
-            </p>
+            <h3 className="text-lg font-medium text-neutral-900 mb-1">No se encontraron operadores</h3>
+            <p className="text-neutral-500">Intenta con otros terminos de busqueda</p>
           </div>
         </Card>
       )}
+
+      {/* Modal crear */}
+      <Modal
+        isOpen={modalCrear}
+        onClose={() => { setModalCrear(false); setForm(INITIAL_FORM); }}
+        title="Nuevo Operador"
+        size="lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => { setModalCrear(false); setForm(INITIAL_FORM); }}>Cancelar</Button>
+            <Button onClick={handleCrear} disabled={createMutation.isPending}>
+              {createMutation.isPending ? 'Guardando...' : 'Crear Operador'}
+            </Button>
+          </>
+        }
+      >
+        {renderForm()}
+      </Modal>
+
+      {/* Modal editar */}
+      <Modal
+        isOpen={modalEditar}
+        onClose={() => { setModalEditar(false); setEditId(null); setForm(INITIAL_FORM); }}
+        title="Editar Operador"
+        size="lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => { setModalEditar(false); setEditId(null); setForm(INITIAL_FORM); }}>Cancelar</Button>
+            <Button onClick={handleEditar} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? 'Guardando...' : 'Guardar Cambios'}
+            </Button>
+          </>
+        }
+      >
+        {renderForm()}
+      </Modal>
+
+      {/* Modal eliminar */}
+      <ConfirmModal
+        isOpen={modalEliminar}
+        onClose={() => { setModalEliminar(false); setDeleteTarget(null); }}
+        onConfirm={handleEliminar}
+        title="Eliminar Operador"
+        description={`Esta seguro que desea eliminar a "${deleteTarget?.razonSocial}"? Esta accion no se puede deshacer.`}
+        confirmText="Eliminar"
+        variant="danger"
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   );
 };

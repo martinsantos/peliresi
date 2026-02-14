@@ -21,6 +21,7 @@ interface SkeletonProps {
   height?: string | number;
   circle?: boolean;
   count?: number;
+  style?: React.CSSProperties;
 }
 
 interface SkeletonTextProps {
@@ -45,10 +46,12 @@ export const Skeleton: React.FC<SkeletonProps> = ({
   height,
   circle = false,
   count = 1,
+  style: styleProp,
 }) => {
   const style: React.CSSProperties = {
     width: width,
     height: height,
+    ...styleProp,
   };
 
   return (

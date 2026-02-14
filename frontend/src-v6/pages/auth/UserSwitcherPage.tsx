@@ -54,7 +54,7 @@ export const UserSwitcherPage: React.FC = () => {
         {/* User Switcher Component */}
         <Card>
           <CardContent className="p-6">
-            <UserSwitcher variant="modal" />
+            <UserSwitcher variant="modal" onSwitch={() => navigate('/dashboard')} />
           </CardContent>
         </Card>
 
@@ -89,7 +89,7 @@ export const UserSwitcherPage: React.FC = () => {
                 </div>
                 <p className="text-sm text-neutral-600">
                   Puede crear y gestionar manifiestos de residuos, ver el estado 
-                  de sus envíos y acceder a reportes de su establecimiento.
+                  de sus envíos y acceder a reportes de su empresa.
                 </p>
               </CardContent>
             </Card>

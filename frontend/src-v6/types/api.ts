@@ -114,6 +114,18 @@ export interface RegistrarTratamientoRequest {
   observaciones?: string;
 }
 
+export interface RechazarManifiestoRequest {
+  motivo: string;
+  descripcion?: string;
+}
+
+export interface RegistrarIncidenteRequest {
+  tipo: string;
+  descripcion?: string;
+  latitud?: number;
+  longitud?: number;
+}
+
 export interface ManifiestoFilters {
   estado?: EstadoManifiesto;
   generadorId?: string;
@@ -147,6 +159,9 @@ export interface CreateGeneradorRequest {
   telefono: string;
   numeroInscripcion: string;
   categoria: string;
+  actividad?: string;
+  rubro?: string;
+  corrientesControl?: string;
 }
 
 export interface CreateTransportistaRequest {
@@ -172,6 +187,9 @@ export interface CreateOperadorRequest {
   telefono: string;
   numeroHabilitacion: string;
   categoria: string;
+  tipoOperador?: string;
+  tecnologia?: string;
+  corrientesY?: string;
 }
 
 export interface ActorFilters {
@@ -275,22 +293,35 @@ export interface UsuarioFilters {
 // ========================================
 
 export interface DashboardStats {
-  manifiestos: {
+  // Backend real format from GET /api/manifiestos/dashboard
+  estadisticas?: {
+    borradores: number;
+    aprobados: number;
+    enTransito: number;
+    entregados: number;
+    recibidos: number;
+    tratados: number;
+    total: number;
+  };
+  recientes?: Array<any>;
+  enTransitoList?: Array<any>;
+  // Legacy frontend format (kept for compatibility)
+  manifiestos?: {
     total: number;
     enTransito: number;
     completados: number;
     pendientes: number;
   };
-  actores: {
+  actores?: {
     generadores: number;
     transportistas: number;
     operadores: number;
   };
-  alertas: {
+  alertas?: {
     pendientes: number;
     criticas: number;
   };
-  residuos: {
+  residuos?: {
     totalKg: number;
     tratados: number;
   };
@@ -307,8 +338,11 @@ export interface DashboardChart {
 
 export interface CatalogoItem {
   id: string;
-  nombre: string;
+  nombre?: string;
+  razonSocial?: string;
   label?: string;
+  cuit?: string;
+  [key: string]: any;
 }
 
 export interface CatalogosResponse {

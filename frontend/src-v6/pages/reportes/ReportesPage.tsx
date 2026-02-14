@@ -1,289 +1,384 @@
 /**
- * SITREP v6 - Reportes Page (Conectada a API)
- * ============================================
- * Centro de reportes con diseño mejorado
+ * SITREP v6 - Centro de Inteligencia de Reportes (v3)
+ * ====================================================
+ * Shell: filter bar, tab switcher, lazy-loaded tab content
  */
 
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useMemo, useCallback, lazy, Suspense } from 'react';
 import {
   FileText,
   Truck,
   BarChart3,
-  TrendingUp,
-  Building2,
   Calendar,
   Download,
-  ChevronRight,
-  Filter,
-  ArrowLeft,
   Loader2,
+  FileDown,
+  Package,
+  Printer,
+  MapPin,
+  Map as MapIcon,
+  Factory,
+  FlaskConical,
 } from 'lucide-react';
 import { Card } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
-import { Badge } from '../../components/ui/BadgeV2';
-import { useExportarReporte } from '../../hooks/useReportes';
+import { useReporteManifiestos, useReporteTratados, useReporteTransporte, useExportarReporte } from '../../hooks/useReportes';
+import { useCentroControl } from '../../hooks/useCentroControl';
+import type { ActorGenerador, ActorTransportista, ActorOperador } from '../../hooks/useCentroControl';
+import { exportReportePDF } from '../../utils/exportPdf';
+import { DATE_PRESETS, computeDateRange } from '../../utils/date-presets';
+import { agruparPorDepartamento } from '../../utils/mendoza-departamentos';
+import type { ReporteFilters } from '../../types/api';
 
-// Reportes disponibles
-const reportes = [
-  {
-    id: 'manifiestos-periodo',
-    titulo: 'Manifiestos por Período',
-    descripcion: 'Resumen de manifiestos generados en un rango de fechas',
-    icono: FileText,
-    color: 'primary',
-    frecuencia: 'Diario',
-    frecuenciaColor: 'neutral' as const,
-    tipo: 'manifiestos',
-  },
-  {
-    id: 'transporte-stats',
-    titulo: 'Estadísticas de Transporte',
-    descripcion: 'Análisis de rutas, tiempos y eficiencia',
-    icono: Truck,
-    color: 'secondary',
-    frecuencia: 'Semanal',
-    frecuenciaColor: 'neutral' as const,
-    tipo: 'transporte',
-  },
-  {
-    id: 'residuos-generacion',
-    titulo: 'Generación de Residuos',
-    descripcion: 'Volumen y tipos de residuos por generador',
-    icono: BarChart3,
-    color: 'accent',
-    frecuencia: 'Mensual',
-    frecuenciaColor: 'neutral' as const,
-    tipo: 'tratados',
-  },
-  {
-    id: 'operadores-capacidad',
-    titulo: 'Capacidad de Operadores',
-    descripcion: 'Utilización de plantas de tratamiento',
-    icono: Building2,
-    color: 'success',
-    frecuencia: 'Mensual',
-    frecuenciaColor: 'neutral' as const,
-    tipo: 'tratados',
-  },
-  {
-    id: 'tendencias',
-    titulo: 'Tendencias Anuales',
-    descripcion: 'Comparativa interanual de gestión',
-    icono: TrendingUp,
-    color: 'info',
-    frecuencia: 'Anual',
-    frecuenciaColor: 'neutral' as const,
-    tipo: 'manifiestos',
-  },
+// ── Lazy-loaded tab components ──
+const ManifiestosTab = lazy(() => import('./tabs/ManifiestosTab'));
+const TratadosTab = lazy(() => import('./tabs/TratadosTab'));
+const TransporteTab = lazy(() => import('./tabs/TransporteTab'));
+const GeneradoresTab = lazy(() => import('./tabs/GeneradoresTab'));
+const OperadoresTab = lazy(() => import('./tabs/OperadoresTab'));
+const DepartamentosTab = lazy(() => import('./tabs/DepartamentosTab'));
+const MapaActoresTab = lazy(() => import('./tabs/MapaActoresTab'));
+const TratamientosTab = lazy(() => import('./tabs/TratamientosTab'));
+
+// Lazy-load the modal from DepartamentosTab
+const DepartamentoDetalleModalLazy = lazy(() =>
+  import('./tabs/DepartamentosTab').then(mod => ({ default: mod.DepartamentoDetalleModal }))
+);
+
+type TabType = 'manifiestos' | 'tratados' | 'transporte' | 'generadores' | 'operadores' | 'tratamientos' | 'departamentos' | 'mapa';
+
+const tabs: { id: TabType; label: string; icon: React.ElementType }[] = [
+  { id: 'manifiestos', label: 'Manifiestos', icon: FileText },
+  { id: 'tratados', label: 'Residuos Tratados', icon: Package },
+  { id: 'transporte', label: 'Transporte', icon: Truck },
+  { id: 'generadores', label: 'Generadores', icon: Factory },
+  { id: 'operadores', label: 'Operadores', icon: FlaskConical },
+  { id: 'tratamientos', label: 'Tratamientos', icon: FlaskConical },
+  { id: 'departamentos', label: 'Departamentos', icon: MapPin },
+  { id: 'mapa', label: 'Mapa de Actores', icon: MapIcon },
 ];
 
-const getColorClasses = (color: string) => {
-  const colors: Record<string, { bg: string; icon: string; border: string }> = {
-    primary: { bg: 'bg-primary-50', icon: 'text-primary-600', border: 'border-primary-100' },
-    secondary: { bg: 'bg-secondary-50', icon: 'text-secondary-600', border: 'border-secondary-100' },
-    accent: { bg: 'bg-accent-50', icon: 'text-accent-600', border: 'border-accent-100' },
-    success: { bg: 'bg-success-50', icon: 'text-success-600', border: 'border-success-100' },
-    info: { bg: 'bg-info-50', icon: 'text-info-600', border: 'border-info-100' },
-  };
-  return colors[color] || colors.primary;
-};
+function TabSpinner() {
+  return (
+    <div className="flex flex-col items-center justify-center py-24">
+      <div className="relative">
+        <div className="w-16 h-16 rounded-full border-4 border-primary-100 border-t-primary-500 animate-spin" />
+        <BarChart3 size={24} className="absolute inset-0 m-auto text-primary-500" />
+      </div>
+      <p className="mt-4 text-neutral-600 font-medium">Cargando módulo...</p>
+    </div>
+  );
+}
 
 const ReportesPage: React.FC = () => {
-  const navigate = useNavigate();
-  const [filtro, setFiltro] = useState('');
-  const [generatingId, setGeneratingId] = useState<string | null>(null);
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  // ── Period filter state (default: Ver Todos = days 0) ──
+  const [datePreset, setDatePreset] = useState(0);
+  const [fechaDesde, setFechaDesde] = useState('');
+  const [fechaHasta, setFechaHasta] = useState('');
+  const [activeTab, setActiveTab] = useState<TabType>('manifiestos');
+  const [incluirTodos, setIncluirTodos] = useState(true);
+
+  // ── Department detail modal ──
+  const [selectedDep, setSelectedDep] = useState<string | null>(null);
 
   const exportarReporte = useExportarReporte();
 
-  const reportesFiltrados = reportes.filter(r =>
-    r.titulo.toLowerCase().includes(filtro.toLowerCase()) ||
-    r.descripcion.toLowerCase().includes(filtro.toLowerCase())
-  );
+  // ── Filters computed reactively ──
+  const appliedFilters: ReporteFilters | undefined = useMemo(() => {
+    if (!fechaDesde && !fechaHasta) return undefined;
+    return {
+      ...(fechaDesde ? { fechaDesde } : {}),
+      ...(fechaHasta ? { fechaHasta } : {}),
+    };
+  }, [fechaDesde, fechaHasta]);
 
-  const handleGenerar = (reporte: typeof reportes[0]) => {
-    setGeneratingId(reporte.id);
-    exportarReporte.mutate(
-      { tipo: reporte.tipo, formato: 'pdf' },
-      {
-        onSettled: () => setGeneratingId(null),
-      }
-    );
+  // ── Date preset handler ──
+  const handleDatePreset = useCallback((days: number) => {
+    setDatePreset(days);
+    const range = computeDateRange(days);
+    setFechaDesde(range.desde);
+    setFechaHasta(range.hasta);
+  }, []);
+
+  // ── Queries — reports (only fetch if filters exist, i.e. dates are set) ──
+  const manifiestos = useReporteManifiestos(activeTab === 'manifiestos' ? (appliedFilters || { fechaDesde: '', fechaHasta: '' }) : undefined);
+  const tratados = useReporteTratados(activeTab === 'tratados' ? (appliedFilters || { fechaDesde: '', fechaHasta: '' }) : undefined);
+  const transporte = useReporteTransporte(activeTab === 'transporte' ? (appliedFilters || { fechaDesde: '', fechaHasta: '' }) : undefined);
+
+  // ── Centro Control data (for Departamentos + Mapa tabs) ──
+  const ccParams = useMemo(() => ({
+    ...(fechaDesde && !incluirTodos ? { fechaDesde } : {}),
+    ...(fechaHasta && !incluirTodos ? { fechaHasta } : {}),
+    capas: ['generadores', 'transportistas', 'operadores'],
+    ...(incluirTodos ? { incluirTodos: 'true' } : {}),
+  }), [fechaDesde, fechaHasta, incluirTodos]);
+
+  const { data: ccData } = useCentroControl(ccParams, 0);
+
+  const activeQuery = activeTab === 'manifiestos' ? manifiestos
+    : activeTab === 'tratados' ? tratados
+    : activeTab === 'transporte' ? transporte
+    : null;
+
+  const periodoLabel = fechaDesde && fechaHasta
+    ? `${fechaDesde} — ${fechaHasta}`
+    : 'Todos los períodos';
+
+  const handleExportCSV = () => {
+    const tipoMap: Record<string, string> = { manifiestos: 'manifiestos', tratados: 'manifiestos', transporte: 'transportistas' };
+    const tipo = tipoMap[activeTab];
+    if (tipo) {
+      exportarReporte.mutate({ tipo, formato: 'csv', filters: appliedFilters || {} });
+    }
   };
 
-  const handleExportarTodo = () => {
-    exportarReporte.mutate({ tipo: 'manifiestos', formato: 'excel' });
+  const handleExportPDF = () => {
+    const data = activeQuery?.data;
+    if (!data) return;
+
+    const tabLabels: Record<string, string> = {
+      manifiestos: 'Reporte de Manifiestos',
+      tratados: 'Reporte de Residuos Tratados',
+      transporte: 'Reporte de Transporte',
+    };
+
+    let kpis: { label: string; value: string | number }[] = [];
+    let headers: string[] = [];
+    let rows: (string | number)[][] = [];
+
+    if (activeTab === 'manifiestos') {
+      const r: any = data.resumen || {};
+      const list = (data as any).manifiestos || [];
+      kpis = [
+        { label: 'Total Manifiestos', value: r.totalManifiestos || 0 },
+        { label: 'Total Residuos (kg)', value: Number(r.totalResiduos || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 }) },
+        { label: 'Estados', value: Object.keys((data as any).porEstado || {}).length },
+      ];
+      headers = ['Número', 'Estado', 'Generador', 'Transportista', 'Operador', 'Fecha'];
+      rows = list.map((m: any) => [
+        m.numero || '',
+        m.estado || '',
+        m.generador || '',
+        m.transportista || '',
+        m.operador || '',
+        m.fechaCreacion ? new Date(m.fechaCreacion).toLocaleDateString('es-AR') : '',
+      ]);
+    } else if (activeTab === 'tratados') {
+      const r: any = data.resumen || {};
+      const list = (data as any).detalle || [];
+      kpis = [
+        { label: 'Manifiestos Tratados', value: r.totalManifiestosTratados || 0 },
+        { label: 'Residuos Tratados (kg)', value: Number(r.totalResiduosTratados || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 }) },
+        { label: 'Generadores', value: Object.keys((data as any).porGenerador || {}).length },
+      ];
+      headers = ['Número', 'Generador', 'Método', 'Fecha', 'Residuos'];
+      rows = list.map((d: any) => [
+        d.numero || '',
+        d.generador || '',
+        d.metodoTratamiento || '',
+        d.fechaTratamiento ? new Date(d.fechaTratamiento).toLocaleDateString('es-AR') : '',
+        d.residuos?.length || 0,
+      ]);
+    } else if (activeTab === 'transporte') {
+      const r: any = data.resumen || {};
+      const list = (data as any).transportistas || [];
+      kpis = [
+        { label: 'Transportistas', value: r.totalTransportistas || 0 },
+        { label: 'Total Viajes', value: r.totalViajes || 0 },
+        { label: 'En Tránsito', value: r.viajesActivos || 0 },
+      ];
+      headers = ['Transportista', 'Viajes', 'Completados', 'En Tránsito', 'Vehículos', 'Tasa'];
+      rows = list.map((t: any) => [
+        t.transportista || '',
+        t.totalViajes || 0,
+        t.completados || 0,
+        t.enTransito || 0,
+        t.vehiculosRegistrados || 0,
+        t.tasaCompletitud || '0%',
+      ]);
+    }
+
+    exportReportePDF({
+      titulo: tabLabels[activeTab] || 'Reporte',
+      subtitulo: `${tabs.find(t => t.id === activeTab)?.label} - Sistema SITREP`,
+      periodo: periodoLabel,
+      kpis,
+      tabla: { headers, rows },
+    });
   };
+
+  // ── Department detail modal data ──
+  const depModalData = useMemo(() => {
+    if (!selectedDep || !ccData) return null;
+    const genByDep = agruparPorDepartamento(ccData.generadores || []);
+    const transByDep = agruparPorDepartamento(ccData.transportistas || []);
+    const operByDep = agruparPorDepartamento(ccData.operadores || []);
+    return {
+      generadores: (genByDep[selectedDep] || []) as ActorGenerador[],
+      transportistas: (transByDep[selectedDep] || []) as ActorTransportista[],
+      operadores: (operByDep[selectedDep] || []) as ActorOperador[],
+    };
+  }, [selectedDep, ccData]);
+
+  const handleSelectDep = useCallback((dep: string) => {
+    setSelectedDep(dep);
+  }, []);
+
+  const isReportTab = activeTab === 'manifiestos' || activeTab === 'tratados' || activeTab === 'transporte';
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          {isMobile && (
-            <button
-              onClick={() => navigate(-1)}
-              className="p-2 -ml-2 hover:bg-neutral-100 rounded-lg transition-colors"
-            >
-              <ArrowLeft size={20} className="text-neutral-600" />
-            </button>
-          )}
-          <div>
-            <div className="flex items-center gap-3">
-              <h2 className="text-2xl font-bold text-neutral-900">Reportes</h2>
-              <Badge variant="soft" color="primary">ADMIN</Badge>
-            </div>
-            <p className="text-neutral-600 mt-1">
-              Genera y descarga reportes del sistema
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" leftIcon={<Filter size={18} />}>
-            Filtros
-          </Button>
-          <Button
-            leftIcon={exportarReporte.isPending ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-            onClick={handleExportarTodo}
-            disabled={exportarReporte.isPending}
-          >
-            Exportar Todo
-          </Button>
-        </div>
-      </div>
-
-      {/* Search */}
-      <div className="relative max-w-md">
-        <input
-          type="text"
-          placeholder="Buscar reportes..."
-          value={filtro}
-          onChange={(e) => setFiltro(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-neutral-200 focus:border-[#1B5E3C] focus:ring-4 focus:ring-[#1B5E3C]/10 focus:outline-none transition-all"
-        />
-        <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={20} />
-      </div>
-
-      {/* Grid de Reportes */}
-      <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5 stagger-children">
-        {reportesFiltrados.map((reporte) => {
-          const colors = getColorClasses(reporte.color);
-          const Icon = reporte.icono;
-          const isGenerating = generatingId === reporte.id;
-
-          return (
-            <Card
-              key={reporte.id}
-              className="group relative overflow-hidden hover:shadow-lg transition-all duration-300 border-2 border-transparent hover:border-[rgba(27,94,60,0.15)] hover-lift"
-            >
-              <div className="p-5">
-                {/* Header de tarjeta */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`w-12 h-12 ${colors.bg} rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform`}>
-                    <Icon className={colors.icon} size={24} />
-                  </div>
-                  <Badge variant="soft" color={reporte.frecuenciaColor}>
-                    {reporte.frecuencia}
-                  </Badge>
-                </div>
-
-                {/* Contenido */}
-                <h3 className="text-lg font-semibold text-neutral-900 mb-2 group-hover:text-primary-600 transition-colors">
-                  {reporte.titulo}
-                </h3>
-                <p className="text-sm text-neutral-600 mb-5 line-clamp-2">
-                  {reporte.descripcion}
-                </p>
-
-                {/* Footer con botón */}
-                <div className="flex items-center justify-between pt-4 border-t border-neutral-100">
-                  <div className="flex items-center gap-2 text-xs text-neutral-500">
-                    <Calendar size={14} />
-                    <span>Último: Hoy</span>
-                  </div>
-                  <button
-                    onClick={() => handleGenerar(reporte)}
-                    disabled={isGenerating}
-                    className="flex items-center gap-2 px-4 py-2 bg-primary-50 text-primary-600 rounded-lg text-sm font-medium hover:bg-primary-100 transition-colors group/btn disabled:opacity-50"
-                  >
-                    {isGenerating ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" />
-                        Generando...
-                      </>
-                    ) : (
-                      <>
-                        Generar
-                        <ChevronRight size={16} className="group-hover/btn:translate-x-1 transition-transform" />
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* Efecto hover decoration */}
-              <div className={`absolute top-0 right-0 w-32 h-32 ${colors.bg} rounded-full -translate-y-1/2 translate-x-1/2 opacity-50 group-hover:scale-150 transition-transform duration-500 pointer-events-none`} />
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Empty state */}
-      {reportesFiltrados.length === 0 && (
-        <Card className="py-16">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FileText className="text-neutral-400" size={24} />
-            </div>
-            <h3 className="text-lg font-medium text-neutral-900 mb-1">
-              No se encontraron reportes
-            </h3>
-            <p className="text-neutral-500">
-              Intenta con otros términos de búsqueda
-            </p>
-          </div>
-        </Card>
-      )}
-
-      {/* Reportes Recientes */}
-      <div className="mt-8">
-        <h3 className="text-lg font-semibold text-neutral-900 mb-4">
-          Reportes Generados Recientemente
-        </h3>
-        <Card>
-          <div className="divide-y divide-neutral-100">
-            {[
-              { nombre: 'Manifiestos_Enero_2025.pdf', fecha: 'Hoy, 10:30', tamaño: '2.4 MB' },
-              { nombre: 'Transporte_Semana_4.pdf', fecha: 'Ayer, 16:45', tamaño: '1.8 MB' },
-              { nombre: 'Residuos_Diciembre_2024.pdf', fecha: '28 Ene, 09:15', tamaño: '3.2 MB' },
-            ].map((reporte, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between p-4 hover:bg-neutral-50 transition-colors cursor-pointer group"
+    <>
+      {/* Filter Bar (2 rows): Row 1 = dates + actions, Row 2 = tabs */}
+      <div className="sticky top-0 z-20 bg-[#FAFAF8] pt-2 pb-1 -mx-4 lg:-mx-8 px-4 lg:px-8">
+        {/* Row 1: Date presets + date inputs + period badge + export buttons */}
+        <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 bg-white rounded-t-xl border border-neutral-100 shadow-sm">
+          <div className="flex items-center gap-1 flex-wrap">
+            <Calendar size={14} className="text-neutral-400" />
+            {DATE_PRESETS.map(p => (
+              <button
+                key={p.days}
+                onClick={() => handleDatePreset(p.days)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
+                  datePreset === p.days
+                    ? 'bg-primary-50 text-primary-700 border border-primary-200'
+                    : 'text-neutral-500 hover:bg-neutral-50 border border-transparent'
+                }`}
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center">
-                    <FileText className="text-red-500" size={18} />
-                  </div>
-                  <div>
-                    <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors">
-                      {reporte.nombre}
-                    </p>
-                    <p className="text-sm text-neutral-500">
-                      {reporte.fecha} • {reporte.tamaño}
-                    </p>
-                  </div>
-                </div>
-                <Button variant="ghost" size="sm">
-                  <Download size={18} />
-                </Button>
-              </div>
+                {p.label}
+              </button>
             ))}
+            <div className="hidden sm:flex items-center gap-1.5 ml-1 text-xs text-neutral-400">
+              <input
+                type="date"
+                value={fechaDesde}
+                onChange={e => { setFechaDesde(e.target.value); setDatePreset(-1); }}
+                className="px-2 py-1 rounded border border-neutral-200 text-neutral-600 text-xs"
+              />
+              <span>—</span>
+              <input
+                type="date"
+                value={fechaHasta}
+                onChange={e => { setFechaHasta(e.target.value); setDatePreset(-1); }}
+                className="px-2 py-1 rounded border border-neutral-200 text-neutral-600 text-xs"
+              />
+            </div>
           </div>
-        </Card>
+          <div className="ml-auto flex items-center gap-1.5 w-full sm:w-auto mt-2 sm:mt-0 justify-end">
+            <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${
+              datePreset === 0
+                ? 'text-neutral-600 bg-neutral-100 border-neutral-200'
+                : 'text-amber-700 bg-amber-50 border-amber-200'
+            }`}>
+              <Calendar size={10} />
+              {periodoLabel}
+            </span>
+            {isReportTab && (
+              <>
+                <button onClick={() => window.print()} className="hidden sm:flex p-1.5 rounded-md text-neutral-500 hover:bg-neutral-100 transition-colors" title="Imprimir"><Printer size={14} /></button>
+                <button onClick={handleExportCSV} disabled={exportarReporte.isPending} className="p-1.5 rounded-md text-neutral-500 hover:bg-neutral-100 transition-colors disabled:opacity-50" title="CSV">
+                  {exportarReporte.isPending ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                </button>
+                <button onClick={handleExportPDF} disabled={!activeQuery?.data} className="p-1.5 rounded-md bg-primary-500 text-white hover:bg-primary-600 transition-colors disabled:opacity-50" title="PDF"><FileDown size={14} /></button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Row 2: Tabs — horizontally scrollable with gradient fade indicators */}
+        <div className="relative bg-white rounded-b-xl border-x border-b border-neutral-100">
+          {/* Left gradient fade */}
+          <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-white to-transparent z-10 rounded-bl-xl" />
+          {/* Right gradient fade */}
+          <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white to-transparent z-10 rounded-br-xl" />
+          <div className="flex items-center gap-0.5 px-2 overflow-x-auto scrollbar-hide">
+            {tabs.map(tab => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2.5 sm:py-2 text-xs font-medium border-b-2 transition-all whitespace-nowrap ${
+                    isActive
+                      ? 'border-primary-600 text-primary-600'
+                      : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50'
+                  }`}
+                >
+                  <Icon size={14} />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
-    </div>
+
+      {/* ── Tab Content ── */}
+      <div className="mt-4 isolate">
+      <Suspense fallback={<TabSpinner />}>
+      {isReportTab ? (
+        activeQuery?.isLoading ? (
+          <div className="flex flex-col items-center justify-center py-24">
+            <div className="relative">
+              <div className="w-16 h-16 rounded-full border-4 border-primary-100 border-t-primary-500 animate-spin" />
+              <BarChart3 size={24} className="absolute inset-0 m-auto text-primary-500" />
+            </div>
+            <p className="mt-4 text-neutral-600 font-medium">Generando reporte...</p>
+            <p className="text-sm text-neutral-400 mt-1">Consultando datos del sistema</p>
+          </div>
+        ) : activeQuery?.isError ? (
+          <Card className="border-0 shadow-sm">
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
+                <FileText className="text-red-400" size={24} />
+              </div>
+              <p className="text-error-600 font-medium">Error al generar el reporte</p>
+              <p className="text-sm text-neutral-500 mt-1">Verifica tu conexión e intenta nuevamente</p>
+            </div>
+          </Card>
+        ) : activeQuery?.data ? (
+          <>
+            {activeTab === 'manifiestos' && <ManifiestosTab data={activeQuery.data} periodo={periodoLabel} onExportPDF={handleExportPDF} />}
+            {activeTab === 'tratados' && <TratadosTab data={activeQuery.data} periodo={periodoLabel} onExportPDF={handleExportPDF} />}
+            {activeTab === 'transporte' && <TransporteTab data={activeQuery.data} periodo={periodoLabel} onExportPDF={handleExportPDF} />}
+          </>
+        ) : (
+          <Card className="border-0 shadow-sm">
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center mb-4">
+                <BarChart3 className="text-neutral-400" size={24} />
+              </div>
+              <p className="text-neutral-700 font-medium">Cargando reporte...</p>
+              <p className="text-sm text-neutral-500 mt-1">Los gráficos se actualizarán automáticamente</p>
+            </div>
+          </Card>
+        )
+      ) : (
+        <>
+          {activeTab === 'departamentos' && <DepartamentosTab ccData={ccData || null} onSelectDep={handleSelectDep} periodoLabel={periodoLabel} />}
+          {activeTab === 'mapa' && <MapaActoresTab ccData={ccData || null} onSelectDep={handleSelectDep} periodoLabel={periodoLabel} incluirTodos={incluirTodos} onToggleIncluirTodos={setIncluirTodos} />}
+          {activeTab === 'generadores' && <GeneradoresTab ccData={ccData || null} periodoLabel={periodoLabel} />}
+          {activeTab === 'operadores' && <OperadoresTab ccData={ccData || null} periodoLabel={periodoLabel} />}
+          {activeTab === 'tratamientos' && <TratamientosTab periodoLabel={periodoLabel} />}
+        </>
+      )}
+      </Suspense>
+
+      {/* ── Department Detail Modal ── */}
+      {selectedDep && depModalData && (
+        <Suspense fallback={null}>
+          <DepartamentoDetalleModalLazy
+            departamento={selectedDep}
+            generadores={depModalData.generadores}
+            transportistas={depModalData.transportistas}
+            operadores={depModalData.operadores}
+            periodoLabel={periodoLabel}
+            onClose={() => setSelectedDep(null)}
+          />
+        </Suspense>
+      )}
+      </div>
+    </>
   );
 };
 

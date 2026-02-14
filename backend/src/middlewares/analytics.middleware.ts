@@ -1,8 +1,6 @@
 // Analytics Middleware - Tracks all API requests for superadmin stats
 import { Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '../lib/prisma';
 
 interface AnalyticsData {
     timestamp: Date;
@@ -56,8 +54,16 @@ async function flushAnalyticsBuffer() {
 // Start periodic flush
 setInterval(flushAnalyticsBuffer, FLUSH_INTERVAL);
 
+// High-frequency GPS routes to skip — ~100 writes/min unnecessary at 50 transportistas
+const SKIP_ANALYTICS_PATHS = ['/ubicacion', '/gps'];
+
 // Middleware
 export const analyticsMiddleware = (req: Request, res: Response, next: NextFunction) => {
+    // M2: Skip analytics for GPS routes to reduce DB write pressure
+    if (SKIP_ANALYTICS_PATHS.some(p => req.path.includes(p))) {
+        return next();
+    }
+
     const startTime = Date.now();
 
     // Capture response finish

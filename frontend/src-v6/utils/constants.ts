@@ -77,3 +77,9 @@ export const PAGINATION_DEFAULTS = {
   page: 1,
   limit: 20,
 };
+
+export const EMPTY_MESSAGES = {
+  noResults: 'No se encontraron resultados',
+  noData: (item: string) => `No hay ${item} disponibles`,
+  noChartData: 'Sin datos para el período seleccionado',
+};

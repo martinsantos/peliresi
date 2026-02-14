@@ -258,7 +258,8 @@ export function DateRangePicker({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSelect = (date: Date) => {
+  const handleSelect = (date: Date | null) => {
+    if (!date) return;
     if (selecting === 'start') {
       onChange(date, null);
       setSelecting('end');
@@ -266,7 +267,7 @@ export function DateRangePicker({
       if (startDate && date < startDate) {
         onChange(date, startDate);
       } else {
-        onChange(startDate, date);
+        onChange(startDate ?? null, date);
       }
       setIsOpen(false);
       setSelecting('start');

@@ -4,22 +4,28 @@
  * Dashboard optimizado para dispositivos móviles
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FileText,
   MapPin,
-  Users,
   TrendingUp,
-  AlertCircle,
   Clock,
   ChevronRight,
   Package,
-  CheckCircle2
+  CheckCircle2,
+  Truck,
+  Radio,
+  Navigation
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
 import { Badge } from '../../components/ui/BadgeV2';
+import { Button } from '../../components/ui/ButtonV2';
 import { useAuth } from '../../contexts/AuthContext';
+import { useDashboardStats } from '../../hooks/useDashboard';
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
+import { useManifiestos } from '../../hooks/useManifiestos';
+import { EstadoManifiesto } from '../../types/models';
 
 const roleLabelMap: Record<string, string> = {
   ADMIN: 'Admin',
@@ -29,39 +35,57 @@ const roleLabelMap: Record<string, string> = {
   AUDITOR: 'Auditor',
 };
 
-const roleBadgeColor: Record<string, 'primary' | 'purple' | 'orange' | 'green' | 'info'> = {
+const roleBadgeColor: Record<string, 'primary' | 'info' | 'warning' | 'success'> = {
   ADMIN: 'primary',
-  GENERADOR: 'purple',
-  TRANSPORTISTA: 'orange',
-  OPERADOR: 'green',
+  GENERADOR: 'info',
+  TRANSPORTISTA: 'warning',
+  OPERADOR: 'success',
   AUDITOR: 'info',
 };
-
-// Mock data
-const stats = [
-  { id: 1, label: 'Manifiestos Hoy', value: '12', change: '+3', icon: FileText, color: 'primary' },
-  { id: 2, label: 'En Tránsito', value: '8', change: '+2', icon: MapPin, color: 'info' },
-  { id: 3, label: 'Pendientes', value: '5', icon: Clock, color: 'warning' },
-  { id: 4, label: 'Completados', value: '45', change: '+12', icon: CheckCircle2, color: 'success' },
-];
-
-const actividadReciente = [
-  { id: 1, tipo: 'manifiesto', titulo: 'Manifiesto #2025-00184', estado: 'en_transito', tiempo: 'Hace 10 min', icon: FileText },
-  { id: 2, tipo: 'alerta', titulo: 'Retraso en entrega', estado: 'warning', tiempo: 'Hace 25 min', icon: AlertCircle },
-  { id: 3, tipo: 'manifiesto', titulo: 'Manifiesto #2025-00183', estado: 'completado', tiempo: 'Hace 1 hora', icon: CheckCircle2 },
-  { id: 4, tipo: 'manifiesto', titulo: 'Manifiesto #2025-00182', estado: 'completado', tiempo: 'Hace 2 horas', icon: CheckCircle2 },
-];
-
-const accesosRapidos = [
-  { id: 1, label: 'Nuevo Manifiesto', icon: FileText, path: '/mobile/manifiestos/nuevo', color: 'primary' },
-  { id: 2, label: 'Escanear QR', icon: MapPin, path: '/mobile/scan', color: 'success' },
-  { id: 3, label: 'Ver Tracking', icon: Package, path: '/mobile/tracking', color: 'info' },
-  { id: 4, label: 'Reportes', icon: TrendingUp, path: '/mobile/reportes', color: 'purple' },
-];
 
 export const MobileDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
+  const { data: dashData, isLoading: dashLoading } = useDashboardStats();
+  const mp = useMobilePrefix();
+  const isTransportista = currentUser?.rol === 'TRANSPORTISTA';
+
+  // FIX 2: Fetch assigned/active trips for TRANSPORTISTA
+  const { data: tripsEnTransito } = useManifiestos(
+    isTransportista ? { estado: EstadoManifiesto.EN_TRANSITO, limit: 5 } : undefined
+  );
+  const { data: tripsAprobados } = useManifiestos(
+    isTransportista ? { estado: EstadoManifiesto.APROBADO, limit: 5 } : undefined
+  );
+
+  const activeTrips = tripsEnTransito?.items || [];
+  const pendingTrips = tripsAprobados?.items || [];
+
+  // Fallback: read active trip from localStorage when API hasn't responded yet
+  const savedTripId = useMemo(() => localStorage.getItem('sitrep_active_trip_id'), []);
+  const savedTripSnapshot = useMemo(() => {
+    if (!savedTripId) return null;
+    try {
+      const s = localStorage.getItem(`viaje_snapshot_${savedTripId}`);
+      return s ? JSON.parse(s) : null;
+    } catch { return null; }
+  }, [savedTripId]);
+
+  const accesosRapidos = useMemo(() => [
+    { id: 1, label: 'Nuevo Manifiesto', icon: FileText, path: mp('/manifiestos/nuevo'), color: 'primary' },
+    { id: 2, label: 'Escanear QR', icon: MapPin, path: mp('/scan'), color: 'success' },
+    { id: 3, label: 'Ver Tracking', icon: Package, path: mp('/tracking'), color: 'info' },
+    { id: 4, label: 'Reportes', icon: TrendingUp, path: mp('/reportes'), color: 'purple' },
+  ], [mp]);
+
+  const dashStats = (dashData as any)?.data || dashData;
+
+  const stats = [
+    { id: 1, label: 'Manifiestos Total', value: String(dashStats?.manifiestos?.total ?? 0), change: undefined, icon: FileText, color: 'primary', href: '/manifiestos' },
+    { id: 2, label: 'En Tránsito', value: String(dashStats?.manifiestos?.enTransito ?? 0), change: undefined, icon: MapPin, color: 'info', href: '/manifiestos?estado=EN_TRANSITO' },
+    { id: 3, label: 'Pendientes', value: String(dashStats?.manifiestos?.pendientes ?? 0), icon: Clock, color: 'warning', href: '/manifiestos?estado=BORRADOR' },
+    { id: 4, label: 'Completados', value: String(dashStats?.manifiestos?.completados ?? 0), change: undefined, icon: CheckCircle2, color: 'success', href: '/manifiestos?estado=TRATADO' },
+  ];
 
   const greeting = () => {
     const h = new Date().getHours();
@@ -76,19 +100,118 @@ export const MobileDashboardPage: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-neutral-500">{greeting()},</p>
-          <h2 className="text-xl font-bold text-neutral-900">{currentUser.nombre}</h2>
+          <h2 className="text-xl font-bold text-neutral-900">{currentUser?.nombre || 'Usuario'}</h2>
         </div>
-        <Badge variant="soft" color={roleBadgeColor[currentUser.rol] || 'primary'}>
-          {roleLabelMap[currentUser.rol] || currentUser.rol}
+        <Badge variant="soft" color={roleBadgeColor[currentUser?.rol || 'ADMIN'] || 'primary'}>
+          {roleLabelMap[currentUser?.rol || 'ADMIN'] || currentUser?.rol || 'ADMIN'}
         </Badge>
       </div>
+
+      {/* FIX 2: TRANSPORTISTA Trip Assignment Banner */}
+      {isTransportista && activeTrips.length === 0 && savedTripSnapshot && (
+        <Card className="border-2 border-success-200 bg-success-50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-success-100 flex items-center justify-center">
+                  <Radio size={16} className="text-success-600 animate-pulse" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-success-800">Viaje en Curso</p>
+                  <p className="text-xs text-success-600">#{savedTripSnapshot.numero || savedTripId?.slice(0, 8)}</p>
+                </div>
+              </div>
+              <Badge variant="soft" color="warning">Datos guardados</Badge>
+            </div>
+            <p className="text-xs text-success-700 mb-3">
+              Destino: {savedTripSnapshot.operador || '-'}
+            </p>
+            <Button
+              fullWidth
+              size="sm"
+              onClick={() => navigate(mp(`/transporte/viaje/${savedTripId}`))}
+            >
+              <Navigation size={14} className="mr-1.5" />
+              Ir al viaje
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+      {isTransportista && (activeTrips.length > 0 || pendingTrips.length > 0) && (
+        <div className="space-y-2">
+          {/* Active trips (EN_TRANSITO) */}
+          {activeTrips.map((trip: any) => (
+            <Card key={trip.id} className="border-2 border-success-200 bg-success-50">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-success-100 flex items-center justify-center">
+                      <Radio size={16} className="text-success-600 animate-pulse" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-success-800">Viaje en Curso</p>
+                      <p className="text-xs text-success-600">#{trip.numero || trip.id?.slice(0, 8)}</p>
+                    </div>
+                  </div>
+                  <Badge variant="soft" color="success">EN TRANSITO</Badge>
+                </div>
+                <p className="text-xs text-success-700 mb-3">
+                  Destino: {trip.operador?.razonSocial || '-'}
+                </p>
+                <Button
+                  fullWidth
+                  size="sm"
+                  onClick={() => navigate(mp(`/transporte/viaje/${trip.id}`))}
+                >
+                  <Navigation size={14} className="mr-1.5" />
+                  Ir al viaje
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+
+          {/* Pending trips (APROBADO) */}
+          {pendingTrips.length > 0 && (
+            <Card className="border-2 border-warning-200 bg-warning-50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 rounded-full bg-warning-100 flex items-center justify-center">
+                    <Truck size={16} className="text-warning-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-warning-800">
+                      {pendingTrips.length} viaje{pendingTrips.length > 1 ? 's' : ''} asignado{pendingTrips.length > 1 ? 's' : ''}
+                    </p>
+                    <p className="text-xs text-warning-600">Pendientes de retiro</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {pendingTrips.slice(0, 3).map((trip: any) => (
+                    <button
+                      key={trip.id}
+                      onClick={() => navigate(mp(`/transporte/viaje/${trip.id}`))}
+                      className="w-full flex items-center justify-between p-2.5 bg-white rounded-lg border border-warning-200 hover:bg-warning-50 transition-colors"
+                    >
+                      <div className="text-left">
+                        <p className="text-xs font-semibold text-neutral-800">#{trip.numero || trip.id?.slice(0, 8)}</p>
+                        <p className="text-xs text-neutral-500">{trip.generador?.razonSocial || '-'}</p>
+                      </div>
+                      <ChevronRight size={16} className="text-warning-400" />
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-3">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate('/mobile/manifiestos')}>
+            <Card key={stat.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(mp(stat.href))}>
               <CardContent className="p-3">
                 <div className="flex items-start justify-between mb-2">
                   <div className={`p-2 rounded-lg ${
@@ -155,7 +278,7 @@ export const MobileDashboardPage: React.FC = () => {
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-neutral-900">Actividad Reciente</h3>
           <button 
-            onClick={() => navigate('/mobile/manifiestos')}
+            onClick={() => navigate(mp('/manifiestos'))}
             className="text-xs text-primary-600 font-medium flex items-center gap-0.5"
           >
             Ver todo
@@ -164,45 +287,24 @@ export const MobileDashboardPage: React.FC = () => {
         </div>
         
         <div className="space-y-2 animate-fade-in">
-          {actividadReciente.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Card key={item.id} className="active:bg-neutral-50 transition-colors">
-                <CardContent className="p-3">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                      item.estado === 'en_transito' ? 'bg-info-100' :
-                      item.estado === 'warning' ? 'bg-warning-100' :
-                      'bg-success-100'
-                    }`}>
-                      <Icon size={18} className={
-                        item.estado === 'en_transito' ? 'text-info-600' :
-                        item.estado === 'warning' ? 'text-warning-600' :
-                        'text-success-600'
-                      } />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-neutral-900 text-sm truncate">{item.titulo}</p>
-                      <p className="text-xs text-neutral-500">{item.tiempo}</p>
-                    </div>
-                    <Badge 
-                      variant="soft" 
-                      size="sm"
-                      color={
-                        item.estado === 'en_transito' ? 'info' :
-                        item.estado === 'warning' ? 'warning' :
-                        'success'
-                      }
-                    >
-                      {item.estado === 'en_transito' ? 'En tránsito' :
-                       item.estado === 'warning' ? 'Alerta' :
-                       'Completado'}
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+          {dashLoading ? (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <div className="animate-spin w-6 h-6 border-3 border-primary-200 border-t-primary-600 rounded-full mx-auto mb-2" />
+                <p className="text-xs text-neutral-400">Cargando...</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-4 text-center">
+                <p className="text-sm text-neutral-500">
+                  {(dashStats?.manifiestos?.enTransito ?? 0) > 0
+                    ? `${dashStats.manifiestos.enTransito} manifiestos en tránsito`
+                    : 'Sin actividad reciente'}
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 
@@ -212,8 +314,8 @@ export const MobileDashboardPage: React.FC = () => {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-primary-100 text-sm">Resumen del día</p>
-              <h3 className="text-xl font-bold mt-1">8 manifiestos activos</h3>
-              <p className="text-primary-100 text-sm mt-1">2 pendientes de recepción</p>
+              <h3 className="text-xl font-bold mt-1">{dashStats?.manifiestos?.enTransito ?? 0} manifiestos activos</h3>
+              <p className="text-primary-100 text-sm mt-1">{dashStats?.manifiestos?.pendientes ?? 0} pendientes</p>
             </div>
             <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
               <TrendingUp size={24} className="text-white" />
@@ -221,13 +323,13 @@ export const MobileDashboardPage: React.FC = () => {
           </div>
           <div className="mt-4 flex gap-2">
             <button 
-              onClick={() => navigate('/mobile/manifiestos')}
+              onClick={() => navigate(mp('/manifiestos'))}
               className="flex-1 py-2 bg-white text-primary-600 font-medium rounded-lg text-sm"
             >
               Ver manifiestos
             </button>
             <button 
-              onClick={() => navigate('/mobile/tracking')}
+              onClick={() => navigate(mp('/tracking'))}
               className="flex-1 py-2 bg-primary-400/50 text-white font-medium rounded-lg text-sm"
             >
               Ver tracking

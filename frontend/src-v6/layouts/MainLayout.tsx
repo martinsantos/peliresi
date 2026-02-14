@@ -5,13 +5,12 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   FileText,
   MapPin,
   Settings,
-  Bell,
   Search,
   Menu,
   X,
@@ -25,16 +24,21 @@ import {
   AlertTriangle,
   Shield,
   Upload,
-  Building2,
   Truck,
   FlaskConical,
   Factory,
+  Building2,
   SwitchCamera,
-  QrCode
+  QrCode,
+  HelpCircle,
 } from 'lucide-react';
 import { Button } from '../components/ui/ButtonV2';
 import { Badge } from '../components/ui/BadgeV2';
 import { UserSwitcher } from '../components/ui/UserSwitcher';
+import { NotificationBell } from '../components/NotificationBell';
+import { ConnectivityIndicator } from '../components/ConnectivityIndicator';
+import { OnboardingTour, resetOnboardingTour } from '../components/OnboardingTour';
+import { DemoAppOnboarding } from '../components/DemoAppOnboarding';
 import { useAuth } from '../contexts/AuthContext';
 
 // ========================================
@@ -43,11 +47,30 @@ import { useAuth } from '../contexts/AuthContext';
 export const MainLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [showTour, setShowTour] = useState(false);
   const location = useLocation();
-  const { currentUser, isAdmin, isGenerador, isTransportista, isOperador, canAccess } = useAuth();
+  const navigate = useNavigate();
+  const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, canAccess, isLoading, isDemo } = useAuth();
+
+  // Guard: show loading or redirect if no user
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-neutral-50">
+        <div className="text-center">
+          <div className="w-10 h-10 border-3 border-primary-200 border-t-primary-600 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-neutral-600">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    // Will be handled by router redirect, but guard against null access
+    return null;
+  }
 
   // Configuración de colores según rol (para header badges)
-  const roleStyles = useMemo(() => {
+  const roleStyles = (() => {
     switch (currentUser.rol) {
       case 'ADMIN':
         return { badge: 'primary' as const };
@@ -60,31 +83,26 @@ export const MainLayout: React.FC = () => {
       default:
         return { badge: 'neutral' as const };
     }
-  }, [currentUser.rol]);
+  })();
 
-  // Items de navegación según rol
-  const navItems = useMemo(() => {
+  // Items de navegacion segun rol
+  const navItems = (() => {
     const items = [];
     
     // Dashboard para todos
     items.push({ path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' });
     
-    // Centro de Control solo para Admin
-    if (isAdmin) {
+    // Centro de Control para Admin y Transportista
+    if (isAdmin || isTransportista) {
       items.push({ path: '/centro-control', icon: Command, label: 'Centro de Control' });
     }
-    
+
     // Manifiestos para todos
     items.push({ path: '/manifiestos', icon: FileText, label: 'Manifiestos' });
     
-    // Tracking para Admin y Transportista
-    if (isAdmin || isTransportista) {
-      items.push({ path: '/tracking', icon: MapPin, label: 'Tracking' });
-    }
-    
-    // Actores solo para Admin
+    // Usuarios del sistema solo para Admin
     if (isAdmin) {
-      items.push({ path: '/actores', icon: Users, label: 'Actores' });
+      items.push({ path: '/admin/usuarios', icon: Users, label: 'Usuarios' });
     }
     
     // Reportes para todos excepto algunos casos
@@ -94,25 +112,26 @@ export const MainLayout: React.FC = () => {
     items.push({ path: '/alertas', icon: AlertTriangle, label: 'Alertas' });
     
     return items;
-  }, [isAdmin, isGenerador, isTransportista, isOperador]);
+  })();
 
   // Items de administración según rol
   const adminItems = useMemo(() => {
     const items = [];
-    
+
     if (isAdmin) {
-      items.push({ path: '/admin/usuarios', icon: User, label: 'Usuarios' });
-      items.push({ path: '/admin/establecimientos', icon: Building2, label: 'Establecimientos' });
-      items.push({ path: '/admin/vehiculos', icon: Truck, label: 'Vehículos' });
+      items.push({ path: '/admin/actores', icon: Building2, label: 'Actores' });
+      items.push({ path: '/admin/actores/generadores', icon: Factory, label: 'Admin Generadores' });
+      items.push({ path: '/admin/actores/operadores', icon: FlaskConical, label: 'Admin Operadores' });
+      items.push({ path: '/admin/actores/transportistas', icon: Truck, label: 'Admin Transporte' });
       items.push({ path: '/admin/residuos', icon: FlaskConical, label: 'Catálogo Residuos' });
-      items.push({ path: '/admin/generadores', icon: Factory, label: 'Admin Generadores' });
+      items.push({ path: '/admin/tratamientos', icon: BarChart3, label: 'Tratamientos' });
       items.push({ path: '/admin/auditoria', icon: Shield, label: 'Auditoría' });
       items.push({ path: '/admin/carga-masiva', icon: Upload, label: 'Carga Masiva' });
     } else if (isTransportista) {
       // Transportista ve sus vehículos
       items.push({ path: '/admin/vehiculos', icon: Truck, label: 'Mis Vehículos' });
     }
-    
+
     return items;
   }, [isAdmin, isTransportista]);
 
@@ -121,7 +140,18 @@ export const MainLayout: React.FC = () => {
     adminItems.find(item => item.path === location.pathname)?.label || 'SITREP';
 
   return (
-    <div className="min-h-screen bg-[#F8F8F6] flex">
+    <div className="h-screen bg-[#F8F8F6] flex flex-col overflow-hidden">
+      {/* Demo mode banner */}
+      {isDemo && (
+        <div className="bg-amber-500 text-white text-center text-xs sm:text-sm py-1 font-medium sticky top-0 z-50">
+          Modo Demo — Los datos no son reales
+        </div>
+      )}
+
+      {/* Connectivity indicator - always visible at top */}
+      <ConnectivityIndicator />
+
+      <div className="flex flex-1 min-h-0">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
@@ -155,15 +185,17 @@ export const MainLayout: React.FC = () => {
         <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto sidebar-scrollbar">
           {navItems.map((item) => {
             const Icon = item.icon;
+            // Custom isActive: match path prefix (for /actores/operadores/:id to highlight Actores)
+            const isItemActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
             return (
               <NavLink
                 key={item.path}
                 to={item.path}
                 onClick={() => setSidebarOpen(false)}
-                className={({ isActive }) => `
+                className={`
                   flex items-center gap-3 px-3 py-2.5 rounded-xl
                   font-medium text-sm transition-all duration-200
-                  ${isActive
+                  ${isItemActive
                     ? 'bg-white/20 text-white'
                     : 'text-white/70 hover:bg-white/10 hover:text-white'
                   }
@@ -171,9 +203,6 @@ export const MainLayout: React.FC = () => {
               >
                 <Icon size={20} />
                 {item.label}
-                {item.path === '/alertas' && (
-                  <Badge color="error" size="sm" className="ml-auto">3</Badge>
-                )}
               </NavLink>
             );
           })}
@@ -186,15 +215,17 @@ export const MainLayout: React.FC = () => {
               </p>
               {adminItems.map((item) => {
                 const Icon = item.icon;
+                // Custom isActive check: match path prefix for admin routes (to handle /admin/operadores/:id)
+                const isItemActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
                 return (
                   <NavLink
                     key={item.path}
                     to={item.path}
                     onClick={() => setSidebarOpen(false)}
-                    className={({ isActive }) => `
+                    className={`
                       flex items-center gap-3 px-3 py-2.5 rounded-xl
                       font-medium text-sm transition-all duration-200
-                      ${isActive
+                      ${isItemActive
                         ? 'bg-white/20 text-white'
                         : 'text-white/70 hover:bg-white/10 hover:text-white'
                       }
@@ -294,12 +325,18 @@ export const MainLayout: React.FC = () => {
                   <SwitchCamera size={16} />
                   Cambiar Usuario
                 </NavLink>
-                <button className="w-full flex items-center gap-2 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50">
+                <button
+                  onClick={() => { navigate('/configuracion'); setUserMenuOpen(false); }}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+                >
                   <Settings size={16} />
                   Configuración
                 </button>
                 <div className="border-t border-neutral-100 my-2" />
-                <button className="w-full flex items-center gap-2 px-4 py-2 text-sm text-error-600 hover:bg-error-50">
+                <button
+                  onClick={() => { logout(); navigate('/login'); }}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-error-600 hover:bg-error-50"
+                >
                   <LogOut size={16} />
                   Cerrar sesión
                 </button>
@@ -335,32 +372,61 @@ export const MainLayout: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Search */}
-            <div className="hidden md:flex items-center bg-neutral-100 rounded-xl px-4 py-2 gap-2">
+            {/* Search - navigates to manifiestos with query */}
+            <form
+              className="hidden md:flex items-center bg-neutral-100 rounded-xl px-4 py-2 gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const q = (e.currentTarget.elements.namedItem('globalSearch') as HTMLInputElement)?.value;
+                if (q?.trim()) {
+                  window.location.href = `/manifiestos?q=${encodeURIComponent(q.trim())}`;
+                }
+              }}
+            >
               <Search size={18} className="text-neutral-400" />
               <input
+                name="globalSearch"
                 type="text"
-                placeholder="Buscar..."
+                placeholder="Buscar manifiestos..."
                 className="bg-transparent border-none outline-none text-sm w-48 placeholder:text-neutral-400"
               />
-            </div>
+            </form>
+
+            {/* Help / Tour restart */}
+            <button
+              onClick={() => {
+                resetOnboardingTour();
+                setShowTour(true);
+              }}
+              className="p-2 rounded-xl text-neutral-500 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+              title="Ver tour de ayuda"
+            >
+              <HelpCircle size={20} />
+            </button>
 
             {/* Notifications */}
-            <NavLink to="/alertas" className="relative p-2 rounded-xl hover:bg-neutral-100 transition-colors">
-              <Bell size={20} className="text-neutral-600" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-error-500 rounded-full" />
-            </NavLink>
+            <NotificationBell />
 
             {/* User Switcher Dropdown */}
-            <UserSwitcher variant="dropdown" />
+            <UserSwitcher variant="dropdown" onSwitch={() => navigate('/dashboard')} />
           </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 p-4 lg:p-8 overflow-auto bg-[#FAFAF8]">
+        <main className="flex-1 px-4 lg:px-8 pb-4 lg:pb-8 overflow-auto bg-[#FAFAF8]">
           <Outlet />
         </main>
       </div>
+      </div>
+
+      {/* Onboarding Tour */}
+      <OnboardingTour
+        forceShow={showTour}
+        onComplete={() => setShowTour(false)}
+      />
+
+      {/* Role-specific welcome modal */}
+      <DemoAppOnboarding />
     </div>
   );
 };

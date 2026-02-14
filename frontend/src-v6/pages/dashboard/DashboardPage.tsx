@@ -15,7 +15,7 @@ import {
   Truck,
   MapPin,
   Factory,
-  Building2,
+  FlaskConical,
   Users,
   BarChart3,
   ArrowRight,
@@ -27,6 +27,7 @@ import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { QuickActions } from '../../components/ui/QuickActions';
+import { SkeletonStats, SkeletonCard } from '../../components/ui/Skeleton';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDashboardStats } from '../../hooks/useDashboard';
 import { useManifiestos } from '../../hooks/useManifiestos';
@@ -42,28 +43,73 @@ const AdminDashboard: React.FC = () => {
   const route = (path: string) => isMobile ? `/mobile${path}` : path;
 
   // Try real API data
-  const { data: dashStats } = useDashboardStats();
-  const { data: recentManifiestos } = useManifiestos({ limit: 4 });
+  const { data: dashStats, isLoading: loadingStats, isError: errorStats } = useDashboardStats();
+  const { data: recentManifiestos, isLoading: loadingRecent } = useManifiestos({ limit: 4 });
+
+  const est = dashStats?.estadisticas;
+  const totalM = est?.total ?? 0;
+  const enTransitoM = est?.enTransito ?? 0;
+  const tratadosM = est?.tratados ?? 0;
+  const complianceRate = totalM > 0 ? `${((tratadosM / totalM) * 100).toFixed(1)}%` : '-';
 
   const stats = [
-    { id: 1, label: 'Manifiestos Hoy', value: dashStats?.manifiestos?.total?.toString() || '24', change: '+12%', icon: FileText, color: 'primary' },
-    { id: 2, label: 'En Tránsito', value: dashStats?.manifiestos?.enTransito?.toString() || '18', change: '+5%', icon: Truck, color: 'info' },
-    { id: 3, label: 'Alertas Activas', value: dashStats?.alertas?.pendientes?.toString() || '7', icon: AlertCircle, color: 'warning' },
-    { id: 4, label: 'Tasa Cumplimiento', value: '97.2%', change: '+2.1%', icon: CheckCircle2, color: 'success' },
+    { id: 1, label: 'Manifiestos Total', value: String(totalM), icon: FileText, color: 'primary', href: '/manifiestos' },
+    { id: 2, label: 'En Tránsito', value: String(enTransitoM), icon: Truck, color: 'info', href: '/manifiestos?estado=EN_TRANSITO' },
+    { id: 3, label: 'Tratados', value: String(tratadosM), icon: AlertCircle, color: 'warning', href: '/reportes' },
+    { id: 4, label: 'Tasa Cumplimiento', value: complianceRate, icon: CheckCircle2, color: 'success', href: '/reportes' },
   ];
 
-  const actividadReciente = recentManifiestos?.items?.slice(0, 4).map((m: any, i: number) => ({
+  const recientes = dashStats?.recientes || recentManifiestos?.items || [];
+  const actividadReciente = recientes.slice(0, 4).map((m: any, i: number) => ({
     id: i + 1,
-    titulo: `Manifiesto #${m.numero}`,
-    accion: m.generador?.razonSocial || 'Generador',
-    tiempo: new Date(m.updatedAt || m.createdAt).toLocaleString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+    manifiestoId: m.id,
+    titulo: `Manifiesto #${m.numero || m.id}`,
+    accion: m.generador?.razonSocial || m.generador || 'Generador',
+    tiempo: m.updatedAt || m.createdAt
+      ? new Date(m.updatedAt || m.createdAt).toLocaleString('es-AR', { hour: '2-digit', minute: '2-digit' })
+      : '-',
     estado: m.estado === 'EN_TRANSITO' ? 'alerta' : m.estado === 'TRATADO' ? 'exito' : 'nuevo',
-  })) || [
-    { id: 1, titulo: 'Manifiesto #2025-00184', accion: 'Creado por Hospital Central', tiempo: 'Hace 10 min', estado: 'nuevo' },
-    { id: 2, titulo: 'Retraso detectado', accion: 'Transporte MZA-234', tiempo: 'Hace 25 min', estado: 'alerta' },
-    { id: 3, titulo: 'Manifiesto #2025-00183', accion: 'Entregado en Planta Las Heras', tiempo: 'Hace 1 hora', estado: 'exito' },
-    { id: 4, titulo: 'Nuevo usuario registrado', accion: 'Clínica del Sol', tiempo: 'Hace 2 horas', estado: 'info' },
-  ];
+  }));
+
+  const isLoading = loadingStats || loadingRecent;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-neutral-900">Panel de Control</h2>
+            <p className="text-neutral-600">Vista general del sistema de trazabilidad</p>
+          </div>
+        </div>
+        <SkeletonStats count={4} />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <SkeletonCard className="lg:col-span-2" lines={4} />
+          <SkeletonCard lines={4} />
+        </div>
+      </div>
+    );
+  }
+
+  if (errorStats) {
+    return (
+      <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-neutral-900">Panel de Control</h2>
+            <p className="text-neutral-600">Vista general del sistema de trazabilidad</p>
+          </div>
+        </div>
+        <div className="flex flex-col items-center justify-center py-16">
+          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
+            <AlertCircle className="text-red-400" size={24} />
+          </div>
+          <p className="text-red-600 font-medium">Error al cargar datos del dashboard</p>
+          <p className="text-sm text-neutral-500 mt-1">Verifica tu conexión e intenta nuevamente</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
@@ -86,7 +132,7 @@ const AdminDashboard: React.FC = () => {
             stat.color === 'info' ? '--color-info-500' :
             stat.color === 'warning' ? '--color-warning-500' : '--color-success-500';
           return (
-            <Card key={stat.id} className="card-interactive stat-card" style={{ '--stat-accent': `var(${accentVar})` } as React.CSSProperties} onClick={() => navigate(route('/manifiestos'))}>
+            <Card key={stat.id} className="card-interactive stat-card" style={{ '--stat-accent': `var(${accentVar})` } as React.CSSProperties} onClick={() => navigate(route(stat.href))}>
               <CardContent className="p-5">
                 <div className="flex items-start justify-between mb-3">
                   <div className={`p-2.5 rounded-xl ${
@@ -102,8 +148,8 @@ const AdminDashboard: React.FC = () => {
                       'text-success-600'
                     } />
                   </div>
-                  {stat.change && (
-                    <span className="text-xs font-semibold text-success-600 bg-success-50 px-2 py-0.5 rounded-full">{stat.change}</span>
+                  {(stat as any).change && (
+                    <span className="text-xs font-semibold text-success-600 bg-success-50 px-2 py-0.5 rounded-full">{(stat as any).change}</span>
                   )}
                 </div>
                 <p className="text-2xl font-bold text-neutral-900 animate-count-up">{stat.value}</p>
@@ -120,12 +166,19 @@ const AdminDashboard: React.FC = () => {
         <Card className="lg:col-span-2">
           <CardHeader 
             title="Actividad Reciente" 
-            action={<Button variant="ghost" size="sm">Ver todo</Button>}
+            action={<Button variant="ghost" size="sm" onClick={() => navigate(route('/manifiestos'))}>Ver todo</Button>}
           />
           <CardContent className="p-0">
+            {actividadReciente.length === 0 ? (
+              <div className="p-8 text-center text-neutral-500">No hay actividad reciente</div>
+            ) : (
             <div className="divide-y divide-neutral-100">
               {actividadReciente.map((item) => (
-                <div key={item.id} className="flex items-center justify-between p-4 row-hover transition-colors">
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between p-4 row-hover transition-colors cursor-pointer"
+                  onClick={() => item.manifiestoId && navigate(route(`/manifiestos/${item.manifiestoId}`))}
+                >
                   <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                       item.estado === 'nuevo' ? 'bg-primary-100 text-primary-600' :
@@ -143,10 +196,14 @@ const AdminDashboard: React.FC = () => {
                       <p className="text-sm text-neutral-500">{item.accion}</p>
                     </div>
                   </div>
-                  <span className="text-xs text-neutral-400">{item.tiempo}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-neutral-400">{item.tiempo}</span>
+                    <ArrowRight size={14} className="text-neutral-300" />
+                  </div>
                 </div>
               ))}
             </div>
+            )}
           </CardContent>
         </Card>
 
@@ -175,19 +232,23 @@ const GeneradorDashboard: React.FC = () => {
   const isMobile = location.pathname.includes('/mobile');
   const route = (path: string) => isMobile ? `/mobile${path}` : path;
 
+  const { data: dashStats } = useDashboardStats();
+  const { data: recentManifiestos } = useManifiestos({ limit: 4 });
+
+  const est = dashStats?.estadisticas;
   const stats = [
-    { id: 1, label: 'Mis Manifiestos', value: '156', icon: FileText, color: 'purple' },
-    { id: 2, label: 'En Tránsito', value: '12', icon: Truck, color: 'info' },
-    { id: 3, label: 'Pendientes', value: '3', icon: Clock, color: 'warning' },
-    { id: 4, label: 'Residuos (kg)', value: '2,450', icon: Factory, color: 'success' },
+    { id: 1, label: 'Mis Manifiestos', value: String(est?.total ?? 0), icon: FileText, color: 'purple', href: '/manifiestos' },
+    { id: 2, label: 'En Tránsito', value: String(est?.enTransito ?? 0), icon: Truck, color: 'info', href: '/manifiestos?estado=EN_TRANSITO' },
+    { id: 3, label: 'Pendientes', value: String(est?.borradores ?? 0), icon: Clock, color: 'warning', href: '/manifiestos?estado=BORRADOR' },
+    { id: 4, label: 'Tratados', value: String(est?.tratados ?? 0), icon: Factory, color: 'success', href: '/manifiestos?estado=TRATADO' },
   ];
 
   return (
     <div className="space-y-6">
       {/* Welcome */}
       <div>
-        <h2 className="text-2xl font-bold text-neutral-900">¡Hola, {currentUser.nombre.split(' ')[0]}!</h2>
-        <p className="text-neutral-600">{currentUser.sector}</p>
+        <h2 className="text-2xl font-bold text-neutral-900">¡Hola, {currentUser?.nombre?.split(' ')[0] || 'Usuario'}!</h2>
+        <p className="text-neutral-600">{currentUser?.sector}</p>
       </div>
 
       {/* Stats Grid */}
@@ -195,7 +256,7 @@ const GeneradorDashboard: React.FC = () => {
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.id} className="hover:shadow-md transition-shadow">
+            <Card key={stat.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(route(stat.href))}>
               <CardContent className="p-4">
                 <div className={`p-2 rounded-lg w-fit mb-2 ${
                   stat.color === 'purple' ? 'bg-purple-100' :
@@ -244,26 +305,33 @@ const GeneradorDashboard: React.FC = () => {
           action={<Button variant="ghost" size="sm" onClick={() => navigate(route('/manifiestos'))}>Ver todo</Button>}
         />
         <CardContent className="p-0">
-          <div className="divide-y divide-neutral-100">
-            {[
-              { id: 'M-2025-0156', fecha: '31/01/2025', estado: 'en_transito', residuos: '45 kg' },
-              { id: 'M-2025-0155', fecha: '30/01/2025', estado: 'completado', residuos: '120 kg' },
-              { id: 'M-2025-0154', fecha: '29/01/2025', estado: 'completado', residuos: '85 kg' },
-            ].map((m) => (
-              <div key={m.id} className="flex items-center justify-between p-4 hover:bg-neutral-50" onClick={() => navigate(route(`/manifiestos/${m.id}`))}>
-                <div>
-                  <p className="font-medium text-neutral-900">{m.id}</p>
-                  <p className="text-sm text-neutral-500">{m.fecha}</p>
-                </div>
-                <div className="text-right">
-                  <Badge variant="soft" color={m.estado === 'completado' ? 'success' : 'info'}>
-                    {m.estado === 'completado' ? 'Completado' : 'En Tránsito'}
-                  </Badge>
-                  <p className="text-sm text-neutral-500 mt-1">{m.residuos}</p>
-                </div>
+          {(() => {
+            const recientes = dashStats?.recientes || recentManifiestos?.items || [];
+            return recientes.length === 0 ? (
+              <div className="p-8 text-center text-neutral-500">No hay manifiestos recientes</div>
+            ) : (
+              <div className="divide-y divide-neutral-100">
+                {recientes.slice(0, 3).map((m: any) => (
+                  <div
+                    key={m.id}
+                    className="flex items-center justify-between p-4 cursor-pointer hover:bg-neutral-50 transition-colors"
+                    onClick={() => navigate(route(`/manifiestos/${m.id}`))}
+                  >
+                    <div>
+                      <p className="font-medium text-neutral-900">{m.numero || m.id}</p>
+                      <p className="text-sm text-neutral-500">{m.createdAt ? new Date(m.createdAt).toLocaleDateString('es-AR') : '-'}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="soft" color={m.estado === 'TRATADO' || m.estado === 'ENTREGADO' ? 'success' : 'info'}>
+                        {m.estado === 'EN_TRANSITO' ? 'En Tránsito' : m.estado?.replace(/_/g, ' ') || '-'}
+                      </Badge>
+                      <ArrowRight size={14} className="text-neutral-300" />
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            );
+          })()}
         </CardContent>
       </Card>
     </div>
@@ -280,27 +348,104 @@ const TransportistaDashboard: React.FC = () => {
   const isMobile = location.pathname.includes('/mobile');
   const route = (path: string) => isMobile ? `/mobile${path}` : path;
 
+  const { data: dashStats } = useDashboardStats();
+  const { data: tripsEnTransito } = useManifiestos({ estado: 'EN_TRANSITO' as any, limit: 5 });
+  const { data: tripsAprobados } = useManifiestos({ estado: 'APROBADO' as any, limit: 5 });
+  const activeTrips = tripsEnTransito?.items || [];
+  const pendingTrips = tripsAprobados?.items || [];
+
+  const est = dashStats?.estadisticas;
   const stats = [
-    { id: 1, label: 'Entregas Hoy', value: '8', icon: CheckCircle2, color: 'orange' },
-    { id: 2, label: 'En Camino', value: '4', icon: Truck, color: 'info' },
-    { id: 3, label: 'Pendientes', value: '6', icon: Clock, color: 'warning' },
-    { id: 4, label: 'Km Recorridos', value: '234', icon: MapPin, color: 'success' },
+    { id: 1, label: 'Entregados', value: String(est?.entregados ?? 0), icon: CheckCircle2, color: 'orange', href: '/manifiestos?estado=ENTREGADO' },
+    { id: 2, label: 'En Camino', value: String(est?.enTransito ?? 0), icon: Truck, color: 'info', href: '/manifiestos?estado=EN_TRANSITO' },
+    { id: 3, label: 'Pendientes', value: String(est?.aprobados ?? 0), icon: Clock, color: 'warning', href: '/manifiestos?estado=APROBADO' },
+    { id: 4, label: 'Recibidos', value: String(est?.recibidos ?? 0), icon: MapPin, color: 'success', href: '/manifiestos?estado=RECIBIDO' },
   ];
 
   return (
     <div className="space-y-6">
       {/* Welcome */}
       <div>
-        <h2 className="text-2xl font-bold text-neutral-900">¡Hola, {currentUser.nombre.split(' ')[0]}!</h2>
-        <p className="text-neutral-600">{currentUser.sector}</p>
+        <h2 className="text-2xl font-bold text-neutral-900">¡Hola, {currentUser?.nombre?.split(' ')[0] || 'Usuario'}!</h2>
+        <p className="text-neutral-600">{currentUser?.sector}</p>
       </div>
+
+      {/* Trip Assignment Banner — viajes EN_TRANSITO o APROBADO */}
+      {(activeTrips.length > 0 || pendingTrips.length > 0) && (
+        <div className="space-y-3">
+          {/* Active trips (EN_TRANSITO) — green banner */}
+          {activeTrips.map((trip: any) => (
+            <Card key={trip.id} className="border-2 border-success-200 bg-success-50">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-success-100 flex items-center justify-center">
+                      <Truck size={20} className="text-success-600 animate-pulse" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-success-800">Viaje en Curso</p>
+                      <p className="text-sm text-success-600">#{trip.numero || trip.id?.slice(0, 8)}</p>
+                    </div>
+                  </div>
+                  <Badge variant="soft" color="success">EN TRÁNSITO</Badge>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-success-700 mb-3">
+                  <span>{trip.generador?.razonSocial || '-'}</span>
+                  <ArrowRight size={14} />
+                  <span>{trip.operador?.razonSocial || '-'}</span>
+                </div>
+                <Button fullWidth onClick={() => navigate(route(`/transporte/viaje/${trip.id}`))}>
+                  <MapPin size={16} className="mr-2" />
+                  Ir al Viaje
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+
+          {/* Pending trips (APROBADO) — warning banner */}
+          {pendingTrips.length > 0 && (
+            <Card className="border-2 border-warning-200 bg-warning-50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-full bg-warning-100 flex items-center justify-center">
+                    <Truck size={20} className="text-warning-600" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-warning-800">
+                      {pendingTrips.length} viaje{pendingTrips.length > 1 ? 's' : ''} asignado{pendingTrips.length > 1 ? 's' : ''}
+                    </p>
+                    <p className="text-sm text-warning-600">Pendientes de retiro</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {pendingTrips.slice(0, 3).map((trip: any) => (
+                    <button
+                      key={trip.id}
+                      onClick={() => navigate(route(`/transporte/viaje/${trip.id}`))}
+                      className="w-full flex items-center justify-between p-3 bg-white rounded-lg border border-warning-200 hover:bg-warning-50 transition-colors"
+                    >
+                      <div className="text-left">
+                        <p className="text-sm font-semibold text-neutral-800">#{trip.numero || trip.id?.slice(0, 8)}</p>
+                        <p className="text-xs text-neutral-500">
+                          {trip.generador?.razonSocial || '-'} → {trip.operador?.razonSocial || '-'}
+                        </p>
+                      </div>
+                      <ArrowRight size={16} className="text-warning-400" />
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.id} className="hover:shadow-md transition-shadow">
+            <Card key={stat.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(route(stat.href))}>
               <CardContent className="p-4">
                 <div className={`p-2 rounded-lg w-fit mb-2 ${
                   stat.color === 'orange' ? 'bg-orange-100' :
@@ -325,16 +470,16 @@ const TransportistaDashboard: React.FC = () => {
 
       {/* Acciones */}
       <div className="grid grid-cols-2 gap-4">
-        <Button 
-          size="lg" 
+        <Button
+          size="lg"
           leftIcon={<MapPin size={20} />}
-          onClick={() => navigate(route('/tracking'))}
+          onClick={() => navigate(route('/transporte/perfil'))}
         >
-          Ver Ruta
+          Mis Viajes
         </Button>
-        <Button 
-          variant="outline" 
-          size="lg" 
+        <Button
+          variant="outline"
+          size="lg"
           leftIcon={<QrCode size={20} />}
           onClick={() => navigate(route('/manifiestos'))}
         >
@@ -346,26 +491,32 @@ const TransportistaDashboard: React.FC = () => {
       <Card>
         <CardHeader title="Entregas Pendientes" />
         <CardContent className="p-0">
-          <div className="divide-y divide-neutral-100">
-            {[
-              { id: 'M-2025-0156', origen: 'Hospital Central', destino: 'Planta Las Heras', hora: '14:30' },
-              { id: 'M-2025-0155', origen: 'Clínica Mendoza', destino: 'Incineradora Eco', hora: '16:00' },
-              { id: 'M-2025-0154', origen: 'Hospital Pediátrico', destino: 'Planta Norte', hora: '17:30' },
-            ].map((m) => (
-              <div key={m.id} className="p-4 hover:bg-neutral-50">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="font-medium text-neutral-900">{m.id}</p>
-                  <Badge variant="soft" color="warning">Pendiente</Badge>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-neutral-600">
-                  <span>{m.origen}</span>
-                  <ArrowRight size={14} />
-                  <span>{m.destino}</span>
-                </div>
-                <p className="text-xs text-neutral-400 mt-1">Retiro: {m.hora}</p>
+          {(() => {
+            const enTransito = dashStats?.enTransitoList || [];
+            return enTransito.length === 0 ? (
+              <div className="p-8 text-center text-neutral-500">No hay entregas pendientes</div>
+            ) : (
+              <div className="divide-y divide-neutral-100">
+                {enTransito.slice(0, 5).map((m: any) => (
+                  <div
+                    key={m.id}
+                    className="p-4 hover:bg-neutral-50 cursor-pointer transition-colors"
+                    onClick={() => navigate(route(`/transporte/viaje/${m.id}`))}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="font-medium text-neutral-900">{m.numero || m.id}</p>
+                      <Badge variant="soft" color="warning">{m.estado?.replace(/_/g, ' ') || 'En Tránsito'}</Badge>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-neutral-600">
+                      <span>{m.generador?.razonSocial || m.generador || '-'}</span>
+                      <ArrowRight size={14} />
+                      <span>{m.operador?.razonSocial || m.operador || '-'}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            );
+          })()}
         </CardContent>
       </Card>
     </div>
@@ -382,19 +533,22 @@ const OperadorDashboard: React.FC = () => {
   const isMobile = location.pathname.includes('/mobile');
   const route = (path: string) => isMobile ? `/mobile${path}` : path;
 
+  const { data: dashStats } = useDashboardStats();
+
+  const est = dashStats?.estadisticas;
   const stats = [
-    { id: 1, label: 'Recibidos Hoy', value: '24', icon: Building2, color: 'green' },
-    { id: 2, label: 'En Tratamiento', value: '18', icon: Factory, color: 'info' },
-    { id: 3, label: 'Pendientes', value: '12', icon: Clock, color: 'warning' },
-    { id: 4, label: 'Tratados', value: '156', icon: CheckCircle2, color: 'success' },
+    { id: 1, label: 'Recibidos', value: String(est?.recibidos ?? 0), icon: FlaskConical, color: 'blue', href: '/manifiestos?estado=RECIBIDO' },
+    { id: 2, label: 'En Tránsito', value: String(est?.enTransito ?? 0), icon: Factory, color: 'info', href: '/manifiestos?estado=EN_TRANSITO' },
+    { id: 3, label: 'Pendientes', value: String(est?.entregados ?? 0), icon: Clock, color: 'warning', href: '/manifiestos?estado=ENTREGADO' },
+    { id: 4, label: 'Tratados', value: String(est?.tratados ?? 0), icon: CheckCircle2, color: 'success', href: '/manifiestos?estado=TRATADO' },
   ];
 
   return (
     <div className="space-y-6">
       {/* Welcome */}
       <div>
-        <h2 className="text-2xl font-bold text-neutral-900">¡Hola, {currentUser.nombre.split(' ')[0]}!</h2>
-        <p className="text-neutral-600">{currentUser.sector}</p>
+        <h2 className="text-2xl font-bold text-neutral-900">¡Hola, {currentUser?.nombre?.split(' ')[0] || 'Usuario'}!</h2>
+        <p className="text-neutral-600">{currentUser?.sector}</p>
       </div>
 
       {/* Stats Grid */}
@@ -402,7 +556,7 @@ const OperadorDashboard: React.FC = () => {
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.id} className="hover:shadow-md transition-shadow">
+            <Card key={stat.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(route(stat.href))}>
               <CardContent className="p-4">
                 <div className={`p-2 rounded-lg w-fit mb-2 ${
                   stat.color === 'green' ? 'bg-green-100' :
@@ -446,26 +600,33 @@ const OperadorDashboard: React.FC = () => {
 
       {/* Manifiestos por Recibir */}
       <Card>
-        <CardHeader title="Por Recibir Hoy" />
+        <CardHeader title="Recientes" />
         <CardContent className="p-0">
-          <div className="divide-y divide-neutral-100">
-            {[
-              { id: 'M-2025-0156', transportista: 'Transportes Andes', hora: '14:30', residuos: '45 kg' },
-              { id: 'M-2025-0155', transportista: 'EcoTransporte AR', hora: '15:00', residuos: '120 kg' },
-              { id: 'M-2025-0154', transportista: 'Transporte Logístico', hora: '16:30', residuos: '85 kg' },
-            ].map((m) => (
-              <div key={m.id} className="flex items-center justify-between p-4 hover:bg-neutral-50">
-                <div>
-                  <p className="font-medium text-neutral-900">{m.id}</p>
-                  <p className="text-sm text-neutral-500">{m.transportista}</p>
-                </div>
-                <div className="text-right">
-                  <Badge variant="soft" color="info">{m.hora}</Badge>
-                  <p className="text-sm text-neutral-500 mt-1">{m.residuos}</p>
-                </div>
+          {(() => {
+            const recientes = dashStats?.recientes || [];
+            return recientes.length === 0 ? (
+              <div className="p-8 text-center text-neutral-500">No hay manifiestos recientes</div>
+            ) : (
+              <div className="divide-y divide-neutral-100">
+                {recientes.slice(0, 5).map((m: any) => (
+                  <div
+                    key={m.id}
+                    className="flex items-center justify-between p-4 hover:bg-neutral-50 cursor-pointer transition-colors"
+                    onClick={() => navigate(route(`/manifiestos/${m.id}`))}
+                  >
+                    <div>
+                      <p className="font-medium text-neutral-900">{m.numero || m.id}</p>
+                      <p className="text-sm text-neutral-500">{m.transportista?.razonSocial || m.transportista || '-'}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="soft" color="info">{m.estado?.replace(/_/g, ' ') || '-'}</Badge>
+                      <ArrowRight size={14} className="text-neutral-300" />
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            );
+          })()}
         </CardContent>
       </Card>
     </div>

@@ -14,54 +14,59 @@ import {
   FileText,
   Factory,
   Truck,
-  Building2,
+  FlaskConical,
   Calendar,
   Package,
   AlertTriangle,
   CheckCircle2,
-  QrCode
+  QrCode,
+  Loader2,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Input } from '../../components/ui/Input';
+import { Select } from '../../components/ui/Select';
 import { toast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCreateManifiesto } from '../../hooks/useManifiestos';
+import { useTiposResiduo, useCatalogoGeneradores, useCatalogoTransportistas, useCatalogoOperadores } from '../../hooks/useCatalogos';
 
-// Mock data
-const residuosDisponibles = [
-  { id: 'RES-001', codigo: '180103', descripcion: 'Residuos de procedencia hospitalaria', categoria: 'Anatomopatológico' },
-  { id: 'RES-002', codigo: '180106', descripcion: 'Objetos punzantes o cortantes', categoria: 'Cortopunzante' },
-  { id: 'RES-003', codigo: '180108', descripcion: 'Residuos biológicos', categoria: 'Biológico' },
-];
-
-const transportistas = [
-  { id: 1, nombre: 'Transportes Andes S.A.', cuit: '30-12345678-9' },
-  { id: 2, nombre: 'EcoTransporte AR', cuit: '30-87654321-0' },
-  { id: 3, nombre: 'Transporte Logístico', cuit: '30-11223344-5' },
-];
-
-const operadores = [
-  { id: 1, nombre: 'Planta Las Heras', direccion: 'Las Heras, Mendoza' },
-  { id: 2, nombre: 'Incineradora Eco', direccion: 'Godoy Cruz, Mendoza' },
-  { id: 3, nombre: 'Planta de Tratamiento Norte', direccion: 'Guaymallén, Mendoza' },
-];
 
 export const NuevoManifiestoPage: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser, isAdmin, isGenerador, isTransportista, isOperador } = useAuth();
   const [step, setStep] = useState(1);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+  // API hooks
+  const createManifiesto = useCreateManifiesto();
+  const { data: apiTiposResiduo } = useTiposResiduo();
+  const { data: apiGeneradores } = useCatalogoGeneradores();
+  const { data: apiTransportistas } = useCatalogoTransportistas();
+  const { data: apiOperadores } = useCatalogoOperadores();
+
+  // Use API catalogos only
+  const tiposResiduo = apiTiposResiduo || [];
+  const generadoresList = apiGeneradores || [];
+  const transportistasList = apiTransportistas || [];
+  const operadoresList = apiOperadores || [];
+
   // Form state
   const [formData, setFormData] = useState({
-    generador: currentUser.rol === 'GENERADOR' ? currentUser.sector : '',
+    generador: currentUser?.rol === 'GENERADOR' ? currentUser?.sector || '' : '',
+    generadorId: currentUser?.rol === 'GENERADOR' ? (currentUser as any).generadorId || '' : '',
     transportista: '',
     operador: '',
     fechaRetiro: new Date().toISOString().split('T')[0],
     observaciones: '',
     residuos: [{ tipo: '', cantidad: '', unidad: 'kg' }],
   });
+
+  // Selected actor details (auto-populated from catalogs)
+  const selectedGenerador = generadoresList.find((g: any) => g.id === formData.generadorId) as any;
+  const selectedTransportista = transportistasList.find((t: any) => t.id === formData.transportista) as any;
+  const selectedOperador = operadoresList.find((o: any) => o.id === formData.operador) as any;
 
   const handleAddResiduo = () => {
     setFormData({
@@ -81,21 +86,99 @@ export const NuevoManifiestoPage: React.FC = () => {
     setFormData({ ...formData, residuos: newResiduos });
   };
 
-  const handleSubmit = async () => {
-    setIsSubmitting(true);
-    // Simular API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsSubmitting(false);
-    
-    const newManifiestoId = 'M-2025-' + String(Math.floor(Math.random() * 1000)).padStart(4, '0');
-    toast.success('Manifiesto creado', `El manifiesto ${newManifiestoId} fue creado exitosamente`);
-    
-    // Redirigir según el contexto (mobile o desktop)
-    const isMobile = window.location.pathname.includes('/mobile');
-    navigate(isMobile ? `/mobile/manifiestos` : `/manifiestos`);
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (!formData.generadorId && !formData.generador) {
+      errors.generador = 'El generador es requerido';
+    }
+    if (!formData.transportista) {
+      errors.transportista = 'El transportista es requerido';
+    }
+    if (!formData.operador) {
+      errors.operador = 'El operador es requerido';
+    }
+
+    const hasInvalidResiduos = formData.residuos.some(
+      (r) => !r.tipo || !r.cantidad || Number(r.cantidad) <= 0
+    );
+    if (hasInvalidResiduos) {
+      errors.residuos = 'Todos los residuos deben tener tipo y cantidad valida';
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
-  const isMobile = window.location.pathname.includes('/mobile');
+  const handleSubmit = async () => {
+    if (!validateForm()) {
+      toast.warning('Formulario incompleto', 'Por favor completa todos los campos requeridos');
+      return;
+    }
+
+    const isMobile = window.location.pathname.includes('/mobile');
+
+    try {
+      const result = await createManifiesto.mutateAsync({
+        generadorId: formData.generadorId || formData.generador,
+        transportistaId: formData.transportista,
+        operadorId: formData.operador,
+        observaciones: formData.observaciones || undefined,
+        residuos: formData.residuos.map((r) => ({
+          tipoResiduoId: r.tipo,
+          cantidad: Number(r.cantidad),
+          unidad: r.unidad,
+        })),
+      });
+
+      toast.success('Manifiesto creado', `El manifiesto ${result.numero || result.id} fue creado exitosamente`);
+      navigate(isMobile ? `/mobile/manifiestos/${result.id}` : `/manifiestos/${result.id}`);
+    } catch (err: any) {
+      toast.error(
+        'Error al crear manifiesto',
+        err?.response?.data?.message || err?.message || 'Ocurrio un error inesperado'
+      );
+    }
+  };
+
+  const isMobile = window.location.pathname.includes('/mobile') || window.location.pathname.includes('/app');
+
+  // Only GENERADOR and ADMIN can create manifiestos
+  const canCreate = isAdmin || isGenerador;
+
+  if (!canCreate) {
+    return (
+      <div className="min-h-screen bg-neutral-50 pb-20">
+        <header className="sticky top-0 z-30 bg-white border-b border-neutral-200 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+              <ArrowLeft size={20} />
+            </Button>
+            <h1 className="text-lg font-bold text-neutral-900">Nuevo Manifiesto</h1>
+          </div>
+        </header>
+        <div className="max-w-md mx-auto p-6 mt-8">
+          <Card>
+            <CardContent className="p-6 text-center">
+              <div className="w-16 h-16 bg-warning-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle className="text-warning-600" size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-neutral-900 mb-2">Acceso restringido</h3>
+              <p className="text-neutral-600 mb-4">
+                El perfil <span className="font-semibold">{currentUser?.rol || 'actual'}</span> no tiene permisos para crear manifiestos.
+              </p>
+              <p className="text-sm text-neutral-500 mb-6">
+                Solo los perfiles <span className="font-semibold">GENERADOR</span> y <span className="font-semibold">ADMIN</span> pueden crear nuevos manifiestos de residuos.
+              </p>
+              <Button fullWidth onClick={() => navigate(isMobile ? '/app/manifiestos' : '/manifiestos')}>
+                Volver a Manifiestos
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-neutral-50 pb-20">
@@ -134,45 +217,73 @@ export const NuevoManifiestoPage: React.FC = () => {
         {/* Step 1: Datos del Generador */}
         {step === 1 && (
           <Card>
-            <CardHeader 
-              title="Datos del Generador" 
+            <CardHeader
+              title="Datos del Generador"
               icon={<Factory size={20} />}
-              subtitle="Información del establecimiento que genera los residuos"
+              subtitle="Información del generador de residuos"
             />
             <CardContent className="space-y-4 animate-fade-in">
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">
-                  Establecimiento Generador *
+                  Generador *
                 </label>
-                <Input
-                  value={formData.generador}
-                  onChange={(e) => setFormData({ ...formData, generador: e.target.value })}
-                  placeholder="Nombre del establecimiento"
-                  disabled={currentUser.rol === 'GENERADOR'}
+                <Select
+                  value={formData.generadorId}
+                  onChange={(val) => {
+                    const gen = generadoresList.find((g: any) => g.id === val);
+                    setFormData({ ...formData, generadorId: val, generador: gen?.razonSocial || gen?.nombre || '' });
+                  }}
+                  options={[...generadoresList]
+                    .sort((a: any, b: any) => (a.razonSocial || '').localeCompare(b.razonSocial || ''))
+                    .map((g: any) => ({
+                      value: g.id,
+                      label: `${g.razonSocial || g.nombre || g.label}${g.cuit ? ` — ${g.cuit}` : ''}`,
+                    }))}
+                  placeholder="Buscar generador por nombre o CUIT..."
+                  searchable
+                  errorMessage={validationErrors.generador}
+                  size="base"
+                  disabled={isGenerador}
                 />
+                {validationErrors.generador && (
+                  <p className="text-xs text-error-500 mt-1">{validationErrors.generador}</p>
+                )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">
-                    CUIT *
-                  </label>
-                  <Input placeholder="30-12345678-9" />
+              {selectedGenerador && (
+                <div className="p-4 bg-primary-50 rounded-xl border border-primary-100 space-y-3 animate-fade-in">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 mb-0.5">CUIT</label>
+                      <p className="text-sm font-semibold text-neutral-900">{selectedGenerador.cuit || '-'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 mb-0.5">Teléfono</label>
+                      <p className="text-sm font-semibold text-neutral-900">{selectedGenerador.telefono || '-'}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-neutral-500 mb-0.5">Domicilio</label>
+                    <p className="text-sm font-semibold text-neutral-900">{selectedGenerador.domicilio || '-'}</p>
+                  </div>
+                  {selectedGenerador.usuario?.email && (
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 mb-0.5">Email</label>
+                      <p className="text-sm font-semibold text-neutral-900">{selectedGenerador.usuario.email}</p>
+                    </div>
+                  )}
+                  {selectedGenerador.numeroInscripcion && (
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 mb-0.5">N° Inscripción</label>
+                      <p className="text-sm font-semibold text-neutral-900">{selectedGenerador.numeroInscripcion}</p>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">
-                    Teléfono
-                  </label>
-                  <Input placeholder="261-4123456" />
-                </div>
-              </div>
+              )}
 
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">
-                  Dirección de Retiro *
-                </label>
-                <Input placeholder="Calle, número, localidad" />
-              </div>
+              {!selectedGenerador && (
+                <p className="text-xs text-neutral-400 italic">Seleccioná un generador para ver sus datos</p>
+              )}
 
               <div className="flex justify-end pt-4">
                 <Button onClick={() => setStep(2)}>
@@ -209,21 +320,19 @@ export const NuevoManifiestoPage: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-neutral-600 mb-1">
-                      Tipo de Residuo *
-                    </label>
-                    <select
+                    <Select
+                      label="Tipo de Residuo *"
                       value={residuo.tipo}
-                      onChange={(e) => handleResiduoChange(index, 'tipo', e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none"
-                    >
-                      <option value="">Seleccionar tipo</option>
-                      {residuosDisponibles.map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.codigo} - {r.descripcion}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(val) => handleResiduoChange(index, 'tipo', val)}
+                      options={tiposResiduo.map((r: any) => ({
+                        value: r.id,
+                        label: `${r.codigo} - ${r.nombre || r.descripcion}`,
+                      }))}
+                      placeholder="Buscar tipo de residuo..."
+                      searchable
+                      errorMessage={validationErrors.residuos && !residuo.tipo ? 'Requerido' : undefined}
+                      size="sm"
+                    />
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -291,37 +400,97 @@ export const NuevoManifiestoPage: React.FC = () => {
                 <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Transportista *
                 </label>
-                <select
+                <Select
                   value={formData.transportista}
-                  onChange={(e) => setFormData({ ...formData, transportista: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none"
-                >
-                  <option value="">Seleccionar transportista</option>
-                  {transportistas.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.nombre} ({t.cuit})
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setFormData({ ...formData, transportista: val })}
+                  options={[...transportistasList]
+                    .sort((a: any, b: any) => (a.razonSocial || '').localeCompare(b.razonSocial || ''))
+                    .map((t: any) => ({
+                      value: t.id,
+                      label: `${t.razonSocial || t.nombre || t.label}${t.cuit ? ` — ${t.cuit}` : ''}`,
+                    }))}
+                  placeholder="Buscar transportista por nombre o CUIT..."
+                  searchable
+                  errorMessage={validationErrors.transportista}
+                  size="base"
+                />
               </div>
+
+              {selectedTransportista && (
+                <div className="p-4 bg-orange-50 rounded-xl border border-orange-100 space-y-2 animate-fade-in">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 mb-0.5">CUIT</label>
+                      <p className="text-sm font-semibold text-neutral-900">{selectedTransportista.cuit || '-'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 mb-0.5">Teléfono</label>
+                      <p className="text-sm font-semibold text-neutral-900">{selectedTransportista.telefono || '-'}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-neutral-500 mb-0.5">Domicilio</label>
+                    <p className="text-sm font-semibold text-neutral-900">{selectedTransportista.domicilio || '-'}</p>
+                  </div>
+                  {selectedTransportista.numeroHabilitacion && (
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 mb-0.5">N° Habilitación</label>
+                      <p className="text-sm font-semibold text-neutral-900">{selectedTransportista.numeroHabilitacion}</p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Operador / Destino *
                 </label>
-                <select
+                <Select
                   value={formData.operador}
-                  onChange={(e) => setFormData({ ...formData, operador: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none"
-                >
-                  <option value="">Seleccionar operador</option>
-                  {operadores.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.nombre} - {o.direccion}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setFormData({ ...formData, operador: val })}
+                  options={[...operadoresList]
+                    .sort((a: any, b: any) => (a.razonSocial || '').localeCompare(b.razonSocial || ''))
+                    .map((o: any) => ({
+                      value: o.id,
+                      label: `${o.razonSocial || o.nombre || o.label}${o.cuit ? ` — ${o.cuit}` : ''}`,
+                    }))}
+                  placeholder="Buscar operador por nombre o CUIT..."
+                  searchable
+                  errorMessage={validationErrors.operador}
+                  size="base"
+                />
               </div>
+
+              {selectedOperador && (
+                <div className="p-4 bg-green-50 rounded-xl border border-green-100 space-y-2 animate-fade-in">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 mb-0.5">CUIT</label>
+                      <p className="text-sm font-semibold text-neutral-900">{selectedOperador.cuit || '-'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 mb-0.5">Teléfono</label>
+                      <p className="text-sm font-semibold text-neutral-900">{selectedOperador.telefono || '-'}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-neutral-500 mb-0.5">Domicilio</label>
+                    <p className="text-sm font-semibold text-neutral-900">{selectedOperador.domicilio || '-'}</p>
+                  </div>
+                  {selectedOperador.numeroHabilitacion && (
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 mb-0.5">N° Habilitación</label>
+                      <p className="text-sm font-semibold text-neutral-900">{selectedOperador.numeroHabilitacion}</p>
+                    </div>
+                  )}
+                  {selectedOperador.categoria && (
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 mb-0.5">Categoría</label>
+                      <p className="text-sm font-semibold text-neutral-900">{selectedOperador.categoria}</p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">
@@ -352,11 +521,11 @@ export const NuevoManifiestoPage: React.FC = () => {
                   Anterior
                 </Button>
                 <Button
-                  leftIcon={isSubmitting ? undefined : <Save size={18} />}
+                  leftIcon={createManifiesto.isPending ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
                   onClick={handleSubmit}
-                  disabled={isSubmitting}
+                  disabled={createManifiesto.isPending}
                 >
-                  {isSubmitting ? 'Guardando...' : 'Crear Manifiesto'}
+                  {createManifiesto.isPending ? 'Guardando...' : 'Crear Manifiesto'}
                 </Button>
               </div>
             </CardContent>

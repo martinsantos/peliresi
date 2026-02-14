@@ -44,6 +44,7 @@ export function formatRelativeTime(dateStr: string): string {
 // ========================================
 
 export function formatNumber(value: number, decimals = 0): string {
+  if (value == null || isNaN(value)) return '0';
   return value.toLocaleString('es-AR', {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
@@ -55,6 +56,7 @@ export function formatCurrency(value: number): string {
 }
 
 export function formatWeight(kg: number): string {
+  if (kg == null || isNaN(kg)) return '0 kg';
   if (kg >= 1000) return `${formatNumber(kg / 1000, 1)} tn`;
   return `${formatNumber(kg)} kg`;
 }
@@ -93,11 +95,13 @@ export function formatManifiestoNumero(numero: string): string {
 // ========================================
 
 export function truncate(text: string, maxLen: number): string {
+  if (!text) return '';
   if (text.length <= maxLen) return text;
   return text.slice(0, maxLen - 3) + '...';
 }
 
 export function capitalize(text: string): string {
+  if (!text) return '';
   return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
 }
 

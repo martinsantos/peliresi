@@ -27,10 +27,11 @@ export function useCreateReglaAlerta() {
   });
 }
 
-export function useAlertas(filters?: AlertaFilters) {
+export function useAlertas(filters?: AlertaFilters, enabled = true) {
   return useQuery({
     queryKey: KEYS.alertas(filters),
     queryFn: () => alertaService.listAlertas(filters),
+    enabled,
   });
 }
 
@@ -40,6 +41,23 @@ export function useResolverAlerta() {
     mutationFn: ({ id, notas }: { id: string; notas?: string }) =>
       alertaService.resolverAlerta(id, notas),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['alertas'] }),
+  });
+}
+
+export function useUpdateReglaAlerta() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<CreateReglaAlertaRequest & { activa: boolean }> }) =>
+      alertaService.updateRegla(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.reglas }),
+  });
+}
+
+export function useDeleteReglaAlerta() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => alertaService.deleteRegla(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.reglas }),
   });
 }
 
