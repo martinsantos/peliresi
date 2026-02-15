@@ -70,6 +70,7 @@ jobs:
           npm ci
           npm run build
           npx prisma generate
+          npm prune --production
 
       - name: Package Backend
         run: |
@@ -79,8 +80,7 @@ jobs:
             package.json \
             package-lock.json \
             prisma/ \
-            node_modules/.prisma/ \
-            node_modules/@prisma/ \
+            node_modules/ \
             ecosystem.config.js
 
       - name: Setup SSH Key
