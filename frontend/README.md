@@ -75,3 +75,4 @@ export default defineConfig([
 # Build on VPS test 1771189253
 # Real deployment test 1771189890
 # Deploy with fixed health check 1771190162
+# Deploy with PWA app included 1771191257
