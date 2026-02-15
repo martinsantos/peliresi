@@ -76,3 +76,5 @@ export default defineConfig([
 # Real deployment test 1771189890
 # Deploy with fixed health check 1771190162
 # Deploy with PWA app included 1771191257
+# ✅ PWA APP DEPLOYED SUCCESSFULLY - Release 20260215-213430
+# Fix: Added Host header to health check (https://sitrep.ultimamilla.com.ar/app/)
