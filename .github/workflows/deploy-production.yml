@@ -8,7 +8,7 @@ on:
       - 'backend/**'
 
 env:
-  DRY_RUN: true  # Set to 'false' after verifying dry-run
+  DRY_RUN: false  # Real deployment activated
 
 jobs:
   deploy-frontend:
