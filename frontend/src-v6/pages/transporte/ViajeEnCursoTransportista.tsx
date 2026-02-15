@@ -243,32 +243,33 @@ const ViajeEnCursoTransportista: React.FC = () => {
     );
 
     // FIX 7: Send full GPS data (speed, heading) to backend every 30s
+    // Strategy: collect current position, try to send it along with any
+    // previously failed points. On success, clear all pending. On failure,
+    // keep only the latest point in pending (backend only needs current pos).
     sendIntervalRef.current = setInterval(async () => {
       if (!currentPosition || !id) return;
 
-      pendingUpdatesRef.current.push({
+      const point = {
         lat: currentPosition[0],
         lng: currentPosition[1],
         speed: gpsDetails.speed,
         heading: gpsDetails.heading,
-      });
+      };
 
-      // C2: Persist pending to localStorage before attempting send
-      localStorage.setItem(`gps_pending_${id}`, JSON.stringify(pendingUpdatesRef.current));
-
-      const latest = pendingUpdatesRef.current[pendingUpdatesRef.current.length - 1];
       try {
-        await manifiestoService.actualizarUbicacion(id, latest.lat, latest.lng, latest.speed, latest.heading);
+        // Send current position to backend
+        await manifiestoService.actualizarUbicacion(id, point.lat, point.lng, point.speed, point.heading);
+        // Success: clear any pending failures
         pendingUpdatesRef.current = [];
         localStorage.removeItem(`gps_pending_${id}`);
         setGpsSendStatus('ok');
       } catch {
+        // Failure: save current point for offline recovery
+        // Only keep the latest position (avoids unbounded growth + duplicates on flush)
+        pendingUpdatesRef.current = [point];
+        localStorage.setItem(`gps_pending_${id}`, JSON.stringify(pendingUpdatesRef.current));
         setGpsSendStatus('error');
         toast.warning('No se pudo enviar la ubicación. Se reintentará.');
-        if (pendingUpdatesRef.current.length > 10) {
-          pendingUpdatesRef.current = pendingUpdatesRef.current.slice(-5);
-          localStorage.setItem(`gps_pending_${id}`, JSON.stringify(pendingUpdatesRef.current));
-        }
       }
     }, 30000);
 
