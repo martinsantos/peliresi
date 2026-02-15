@@ -3,6 +3,10 @@
 Sistema de gestión y trazabilidad de residuos peligrosos para la Provincia de Mendoza.
 Permite el seguimiento completo del ciclo de vida de manifiestos: desde la generación hasta el tratamiento final.
 
+**📚 Documentación Unificada**: Ver [`../INFRAESTRUCTURA.md`](../INFRAESTRUCTURA.md) para arquitectura completa de ambos servidores (Producción + Preview), stack tecnológico compartido, y CI/CD workflows.
+
+**Última actualización CI/CD**: 2026-02-15 - Backend workflow con Prisma binary fix + atomic deployments + rollback automático. Database compartida con Directus en PostgreSQL container.
+
 ## General Rules
 
 - This is a TypeScript project. Use TypeScript for all new files. When editing existing .js files, check if there's a tsconfig and consider migrating to .ts if the file is being substantially rewritten.
@@ -735,3 +739,142 @@ POSIBLES PREOCUPACIONES:
 10. No limpiar código muerto tras refactorizaciones
 11. Modificar comentarios/código ortogonal a la tarea
 12. Eliminar cosas que no entiendes completamente
+
+---
+
+## CI/CD Status (Updated 2026-02-15)
+
+### ✅ Active Workflows
+
+| Workflow | Status | Last Successful | Deploy Time |
+|----------|--------|----------------|-------------|
+| **Deploy SITREP Backend** | ✅ Active | 2026-02-14 23:33 | ~2-3 min |
+
+### Backend CI/CD Implementation
+
+**Atomic Deployment Pattern**:
+```bash
+1. GitHub Actions builds in cloud (FREE)
+2. Build: npm ci && npm run build
+3. Package: dist/ + package.json + prisma/ + ecosystem.config.js
+4. SCP to VPS /tmp/
+5. Deploy script:
+   - Extract to /var/www/sitrep-backend-releases/YYYYMMDD-HHMMSS/
+   - Copy .env from current release
+   - npx prisma generate (RHEL binaries) ← FIX 2026-02-15
+   - Symlink /var/www/sitrep-backend → new release
+   - pm2 restart sitrep-backend (cluster mode, 2 instances)
+   - Health check https://sitrep.ultimamilla.com.ar/api/health
+   - ROLLBACK if health fails (automatic, 2 seconds)
+   - Cleanup (keep last 5 releases)
+```
+
+**Data Protection**:
+- ✅ Shared PostgreSQL with Directus: `directus-admin-database-1`
+- ✅ Database: `trazabilidad_rrpp`
+- ✅ Schema created via `prisma db push`
+- ⚠️ Backups: Manual only (NEEDS automation)
+
+**Prisma Binary Fix (2026-02-15)**:
+```bash
+Problem: GitHub Actions (Ubuntu) generates debian binaries
+         Production server (RHEL) needs rhel binaries
+         Error: PrismaClientInitializationError
+
+Solution: Added to deploy_sitrep_backend.sh:
+  echo "🔧 Generating Prisma Client for RHEL..."
+  cd $RELEASE_DIR
+  npx prisma generate  # Regenerates with rhel-openssl-3.0.x
+
+Result: ✅ Deployment successful
+        ✅ Health: {"status":"ok","db":"connected"}
+        ✅ 2 PM2 instances online, 0 Prisma errors
+```
+
+**Files**:
+- Workflow: `.github/workflows/deploy-production.yml`
+- Deploy script: `/opt/scripts-cicd/deploy_sitrep_backend.sh`
+- Config: `/var/www/sitrep-backend/.env` (symlink to /home/demoambiente/.env)
+- PM2: `/var/www/sitrep-backend/ecosystem.config.js`
+
+### Shared Infrastructure with ultimamilla.com.ar
+
+**PostgreSQL Container (Shared)**:
+```yaml
+Container: directus-admin-database-1
+Image: postgres:15-alpine
+Port: 5432 (localhost)
+Managed by: Directus docker-compose (/opt/directus-admin/)
+
+Databases:
+  - directus (Directus CMS: 518 Antecedentes + 8 Servicios)
+  - trazabilidad_rrpp (SITREP: Manifiestos, Usuarios, etc.)
+
+Connection from SITREP:
+  DATABASE_URL=postgresql://directus:password@localhost:5432/trazabilidad_rrpp?schema=public
+```
+
+**IMPORTANT**: SITREP backend runs outside Docker (PM2), connects to PostgreSQL container via localhost:5432. Container must be running for SITREP to work.
+
+### Test SITREP Deployment
+
+```bash
+# Smoke test (44 endpoints)
+cd backend
+bash tests/smoke-test.sh
+
+# Comprehensive test (includes SITREP health)
+cd /Volumes/SDTERA/ultima\ milla/LICITACIONES/PRESENTADAS2025/AMBIENTE
+bash test-all-simple.sh
+
+# Expected: 18/18 tests passed
+```
+
+Last comprehensive test: **18/18 passed** ✅ (2026-02-15 11:30)
+
+---
+
+## Backup Strategy (CRITICAL - Updated 2026-02-15)
+
+### Current Backups
+
+| Data | Location | Frequency | Last Backup | Status |
+|------|----------|-----------|-------------|--------|
+| **SITREP Database** | `/root/backups/sitrep_pre_scale_20260114_203611.sql` | ⚠️ Manual | 2026-01-14 | 🔴 OUTDATED |
+| **Directus Database** | `/opt/directus-backups/directus-db-*.sql.gz` | Daily 2 AM | 2026-02-15 11:19 | ✅ CURRENT |
+
+### ⚠️ URGENT: SITREP Automated Backup Needed
+
+**Recommendation**:
+```bash
+# Create backup script
+cat > /opt/scripts-cicd/backup_sitrep.sh << 'EOF'
+#!/bin/bash
+DATE=$(date +%Y%m%d-%H%M%S)
+BACKUP_DIR=/opt/sitrep-backups
+mkdir -p $BACKUP_DIR
+
+# Backup SITREP database
+docker exec directus-admin-database-1 pg_dump -U directus trazabilidad_rrpp | gzip > $BACKUP_DIR/sitrep-db-$DATE.sql.gz
+
+# Cleanup old backups (keep last 30 days)
+find $BACKUP_DIR -name "sitrep-db-*.sql.gz" -mtime +30 -delete
+EOF
+
+# Add to cron (daily 3 AM)
+echo "0 3 * * * /opt/scripts-cicd/backup_sitrep.sh" | crontab -
+```
+
+**Cross-Server Backup** (recommended):
+```bash
+# Rsync to Hostinger preview server (76.13.234.213)
+0 4 * * * rsync -avz /opt/sitrep-backups/ root@76.13.234.213:/backups/sitrep-prod/
+```
+
+---
+
+## Related Documentation
+
+- [`../INFRAESTRUCTURA.md`](../INFRAESTRUCTURA.md) - Complete infrastructure overview
+- [`DEPLOYMENT.md`](./DEPLOYMENT.md) - Detailed deployment procedures (to be created)
+- [`backend/tests/smoke-test.sh`](./backend/tests/smoke-test.sh) - API smoke test script
