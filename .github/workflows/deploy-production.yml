@@ -2,16 +2,28 @@ name: Deploy SITREP to Production
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
     paths:
       - 'frontend/**'
       - 'backend/**'
+  workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: 'What to deploy'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - frontend-only
+          - backend-only
+          - both
 
 env:
   DRY_RUN: false  # Real deployment activated
 
 jobs:
   deploy-frontend:
+    if: github.event_name == 'push' || github.event.inputs.deploy_target != 'backend-only'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,6 +51,7 @@ jobs:
           ENDSSH
 
   deploy-backend:
+    if: github.event_name == 'push' || github.event.inputs.deploy_target != 'frontend-only'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
