@@ -1058,8 +1058,8 @@ export const CentroControlPage: React.FC = () => {
           <CardHeader title="Distribución por Estado" subtitle="Proporción actual de manifiestos" />
           <CardContent>
             {donutData.length > 0 ? (
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height={300} minWidth={200} minHeight={200}>
+              <div className="h-[250px] sm:h-[300px]">
+                <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={80}>
                   <PieChart>
                     <Pie data={donutData} cx="50%" cy="50%" innerRadius={65} outerRadius={110} paddingAngle={3} dataKey="value" stroke="none">
                       {donutData.map((entry, i) => (
@@ -1077,7 +1077,7 @@ export const CentroControlPage: React.FC = () => {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="h-[300px] flex items-center justify-center text-neutral-400">Sin datos</div>
+              <div className="h-[250px] sm:h-[300px] flex items-center justify-center text-neutral-400">Sin datos</div>
             )}
             <div className="flex flex-wrap gap-3 mt-2 justify-center">
               {donutData.map((d, i) => (
@@ -1095,8 +1095,8 @@ export const CentroControlPage: React.FC = () => {
           <CardHeader title="Manifiestos por Día" subtitle={`Últimos ${datePreset || 'N'} días`} />
           <CardContent>
             {sparklineData.length > 0 ? (
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height={300} minWidth={200} minHeight={200}>
+              <div className="h-[250px] sm:h-[300px]">
+                <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={80}>
                   <BarChart data={sparklineData} margin={{ left: 5, right: 20, top: 5, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                     <XAxis dataKey="fecha" tick={{ fontSize: 10 }} stroke="#94a3b8" interval="preserveStartEnd" />
@@ -1107,7 +1107,7 @@ export const CentroControlPage: React.FC = () => {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="h-[300px] flex items-center justify-center text-neutral-400">Sin datos del período</div>
+              <div className="h-[250px] sm:h-[300px] flex items-center justify-center text-neutral-400">Sin datos del período</div>
             )}
           </CardContent>
         </Card>

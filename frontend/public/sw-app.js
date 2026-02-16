@@ -65,6 +65,9 @@ self.addEventListener('fetch', (event) => {
   // Only handle GET requests
   if (request.method !== 'GET') return;
 
+  // Only handle http/https schemes (filter chrome-extension://, etc.)
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+
   // Never cache API calls — let the app handle offline via IndexedDB
   if (url.pathname.startsWith('/api/')) return;
 
@@ -74,12 +77,17 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          // Cache the index.html on successful navigation
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put('/app/index.html', clone);
-          });
-          return response;
+          if (response.ok) {
+            // Only cache successful responses as the SPA shell
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put('/app/index.html', clone);
+            });
+            return response;
+          }
+          // Non-OK (404, 500): fall back to cached SPA shell so React Router handles the route
+          return caches.match('/app/index.html')
+            .then((cached) => cached || response);
         })
         .catch(() => {
           // Offline: serve the cached SPA shell so React can render with offline data
