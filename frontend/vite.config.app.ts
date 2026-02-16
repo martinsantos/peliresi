@@ -25,8 +25,61 @@ function renameAppHtml(): Plugin {
   }
 }
 
+// Plugin para generar precache manifest y versionar el SW
+function pwaPrecachePlugin(): Plugin {
+  return {
+    name: 'pwa-precache',
+    closeBundle() {
+      const outDir = path.resolve(__dirname, 'dist-app')
+      const assetsDir = path.join(outDir, 'assets')
+
+      // Build version from timestamp
+      const version = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14)
+
+      // Collect app shell assets (NOT lazy-loaded page chunks)
+      const precacheUrls: string[] = []
+
+      if (fs.existsSync(assetsDir)) {
+        const files = fs.readdirSync(assetsDir)
+        for (const file of files) {
+          // Precache: vendor, main, ui bundles + CSS (the app shell)
+          // Skip: page-specific chunks (lazy loaded on demand)
+          if (
+            file.match(/^(vendor|main|ui)-.*\.(js|css)$/) ||
+            file.match(/^index\..*\.css$/)
+          ) {
+            precacheUrls.push(`/app/assets/${file}`)
+          }
+        }
+      }
+
+      // Add icon files if they exist
+      for (const icon of ['icon-192.png', 'icon-512.png']) {
+        if (fs.existsSync(path.join(outDir, icon))) {
+          precacheUrls.push(`/app/${icon}`)
+        }
+      }
+
+      // Write precache manifest
+      const manifestContent = `// Auto-generated precache manifest — ${version}\nself.__PRECACHE_MANIFEST = ${JSON.stringify(precacheUrls, null, 2)};\n`
+      fs.writeFileSync(path.join(outDir, 'sw-precache-manifest.js'), manifestContent)
+
+      // Copy and version sw-app.js into dist-app
+      const swSrc = path.join(__dirname, 'public', 'sw-app.js')
+      const swDest = path.join(outDir, 'sw-app.js')
+      if (fs.existsSync(swSrc)) {
+        let swContent = fs.readFileSync(swSrc, 'utf-8')
+        swContent = swContent.replace(/__SW_VERSION__/g, version)
+        fs.writeFileSync(swDest, swContent)
+      }
+
+      console.log(`[PWA] Precache manifest: ${precacheUrls.length} assets, version ${version}`)
+    }
+  }
+}
+
 export default defineConfig({
-  plugins: [react(), renameAppHtml()],
+  plugins: [react(), renameAppHtml(), pwaPrecachePlugin()],
 
   base: '/app/',
 

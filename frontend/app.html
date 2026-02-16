@@ -21,32 +21,12 @@
     <script type="module" src="/src-v6/main-app.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        // Clean up old caches from previous SW versions
-        if ('caches' in window) {
-          caches.keys().then(function(names) {
-            names.forEach(function(name) {
-              if (name.indexOf('v9') === -1) {
-                caches.delete(name);
-                console.log('[SW-App] Cleaned old cache:', name);
-              }
-            });
-          });
-        }
         window.addEventListener('load', function() {
           navigator.serviceWorker.register('/app/sw-app.js', { scope: '/app/' })
             .then(function(reg) {
               console.log('[SW-App] Registered', reg.scope);
-              reg.addEventListener('updatefound', function() {
-                var newWorker = reg.installing;
-                if (newWorker) {
-                  newWorker.addEventListener('statechange', function() {
-                    if (newWorker.state === 'activated') {
-                      console.log('[SW-App] New version activated, reloading...');
-                      window.location.reload();
-                    }
-                  });
-                }
-              });
+              // Check for updates periodically
+              setInterval(function() { reg.update(); }, 60 * 60 * 1000); // hourly
             })
             .catch(function(err) { console.warn('[SW-App] Registration failed:', err); });
         });

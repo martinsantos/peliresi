@@ -30,7 +30,7 @@ echo "--- Authenticating ---"
 
 LOGIN_RESP=$($CURL -s -X POST "$API/auth/login" \
   -H "Content-Type: application/json" \
-  -d '{"email":"juan.perez@dgfa.gob.ar","password":"admin123"}')
+  -d '{"email":"admin@dgfa.mendoza.gov.ar","password":"admin123"}')
 
 TOKEN=$(echo "$LOGIN_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data']['tokens']['accessToken'])" 2>/dev/null)
 
@@ -102,7 +102,7 @@ test_public "GET" "/health" "200"
 echo ""
 echo "--- Auth ---"
 test_public "GET" "/auth/test" "200"
-test_public "POST" "/auth/login" "200" '{"email":"juan.perez@dgfa.gob.ar","password":"admin123"}'
+test_public "POST" "/auth/login" "200" '{"email":"admin@dgfa.mendoza.gov.ar","password":"admin123"}'
 test_public "POST" "/auth/login" "401" '{"email":"fake@test.com","password":"wrong"}'
 test_endpoint "GET" "/auth/profile" "200"
 test_endpoint "POST" "/auth/change-password" "400" '{"currentPassword":"wrong","newPassword":"NewPass123"}'

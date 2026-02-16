@@ -6,6 +6,8 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { authService } from '../services/auth.service';
+import { clearUserOfflineData } from '../services/offline-sync';
+import { clearSyncQueue } from '../services/indexeddb';
 import { getAccessToken, clearTokens } from '../services/api';
 import type { Usuario } from '../types/models';
 
@@ -45,12 +47,13 @@ export interface AuthContextType {
 
 // ========================================
 // DEMO CREDENTIALS - for quick-switch buttons
+// Must match actual seeded users in backend/prisma/seed.ts
 // ========================================
 export const DEMO_CREDENTIALS: Record<number, { email: string; password: string }> = {
-  1:  { email: 'juan.perez@dgfa.gob.ar', password: 'admin123' },
-  5:  { email: 'm.gonzalez@hospitalcentral.gob.ar', password: 'generador123' },
-  13: { email: 'c.rodriguez@transportesandes.com', password: 'transportista123' },
-  19: { email: 'ana.martinez@plantalasheras.com', password: 'operador123' },
+  1:  { email: 'admin@dgfa.mendoza.gov.ar', password: 'admin123' },
+  5:  { email: 'quimica.mendoza@industria.com', password: 'gen123' },
+  13: { email: 'transportes.andes@logistica.com', password: 'trans123' },
+  19: { email: 'tratamiento.residuos@planta.com', password: 'op123' },
 };
 
 // ========================================
@@ -60,12 +63,12 @@ export const MOCK_USERS: User[] = [
   // Administradores
   {
     id: 1,
-    nombre: 'Juan Perez',
-    email: 'juan.perez@dgfa.gob.ar',
+    nombre: 'Administrador DGFA',
+    email: 'admin@dgfa.mendoza.gov.ar',
     rol: 'ADMIN',
     sector: 'DGFA',
-    avatar: 'JP',
-    telefono: '+54 261 412-3456',
+    avatar: 'AD',
+    telefono: '',
     ubicacion: 'Ciudad, Mendoza',
     permisos: ['*'],
   },
@@ -81,75 +84,75 @@ export const MOCK_USERS: User[] = [
     permisos: ['*'],
   },
 
-  // Generadores - Hospital
+  // Generadores
   {
     id: 5,
-    nombre: 'Maria Gonzalez',
-    email: 'm.gonzalez@hospitalcentral.gob.ar',
+    nombre: 'Roberto Gómez',
+    email: 'quimica.mendoza@industria.com',
     rol: 'GENERADOR',
-    sector: 'Hospital Central',
-    avatar: 'MG',
-    telefono: '+54 261 423-4567',
-    ubicacion: 'Ciudad, Mendoza',
+    sector: 'Química Mendoza S.A.',
+    avatar: 'RG',
+    telefono: '2614251234',
+    ubicacion: 'Av. San Martín 1200, Mendoza',
     permisos: ['manifiestos.read', 'manifiestos.create', 'manifiestos.edit', 'reportes.read'],
   },
   {
     id: 6,
-    nombre: 'Pedro Sanchez',
-    email: 'p.sanchez@hospitalpediatrico.gob.ar',
+    nombre: 'María López',
+    email: 'petroquimica.andes@industria.com',
     rol: 'GENERADOR',
-    sector: 'Hospital Pediatrico',
-    avatar: 'PS',
-    telefono: '+54 261 456-7890',
-    ubicacion: 'Ciudad, Mendoza',
+    sector: 'Petroquímica Andes S.A.',
+    avatar: 'ML',
+    telefono: '2614859876',
+    ubicacion: 'Ruta Nacional 7, Guaymallén',
     permisos: ['manifiestos.read', 'manifiestos.create', 'manifiestos.edit', 'reportes.read'],
   },
 
   // Transportistas
   {
     id: 13,
-    nombre: 'Carlos Rodriguez',
-    email: 'c.rodriguez@transportesandes.com',
+    nombre: 'Pedro Martínez',
+    email: 'transportes.andes@logistica.com',
     rol: 'TRANSPORTISTA',
-    sector: 'Transportes Andes S.A.',
-    avatar: 'CR',
-    telefono: '+54 261 434-5678',
-    ubicacion: 'Guaymallen, Mendoza',
+    sector: 'Transportes Andes S.R.L.',
+    avatar: 'PM',
+    telefono: '2614123456',
+    ubicacion: 'Acceso Este 1500, Mendoza',
     permisos: ['manifiestos.read', 'manifiestos.transport', 'tracking.update', 'vehiculos.read'],
   },
   {
     id: 14,
-    nombre: 'Elena Vargas',
-    email: 'e.vargas@ecotransportear.com',
+    nombre: 'Ana González',
+    email: 'logistica.cuyo@transporte.com',
     rol: 'TRANSPORTISTA',
-    sector: 'EcoTransporte AR',
-    avatar: 'EV',
-    telefono: '+54 261 578-9012',
-    ubicacion: 'Ciudad, Mendoza',
+    sector: 'Logística Cuyo S.A.',
+    avatar: 'AG',
+    telefono: '2614789123',
+    ubicacion: 'Ruta Provincial 60, Maipú',
     permisos: ['manifiestos.read', 'manifiestos.transport', 'tracking.update', 'vehiculos.read'],
   },
 
   // Operadores
   {
     id: 19,
-    nombre: 'Ana Martinez',
-    email: 'ana.martinez@plantalasheras.com',
+    nombre: 'Miguel Fernández',
+    email: 'tratamiento.residuos@planta.com',
     rol: 'OPERADOR',
-    sector: 'Planta Las Heras',
-    avatar: 'AM',
-    telefono: '+54 261 445-6789',
-    ubicacion: 'Las Heras, Mendoza',
+    sector: 'Tratamiento de Residuos Mendoza S.A.',
+    avatar: 'MF',
+    telefono: '2614321987',
+    ubicacion: 'Parque Industrial Mendoza',
     permisos: ['manifiestos.read', 'manifiestos.receive', 'manifiestos.treat', 'reportes.read', 'reportes.create'],
   },
   {
     id: 20,
-    nombre: 'Bruno Acosta',
-    email: 'b.acosta@incineradoraeco.com',
+    nombre: 'Laura Díaz',
+    email: 'eco.ambiental@reciclado.com',
     rol: 'OPERADOR',
-    sector: 'Incineradora Eco',
-    avatar: 'BA',
-    telefono: '+54 261 623-4567',
-    ubicacion: 'Godoy Cruz, Mendoza',
+    sector: 'Eco Ambiental S.R.L.',
+    avatar: 'LD',
+    telefono: '2614765432',
+    ubicacion: 'Luján de Cuyo, Mendoza',
     permisos: ['manifiestos.read', 'manifiestos.receive', 'manifiestos.treat', 'reportes.read', 'reportes.create'],
   },
 
@@ -300,10 +303,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
       keysToClean.forEach(k => localStorage.removeItem(k));
+      // Clear IndexedDB offline data and sync queue for this user
+      if (currentUser) {
+        clearUserOfflineData(currentUser.id).catch(() => {});
+      }
+      clearSyncQueue().catch(() => {});
       setCurrentUser(null);
       setIsDemo(false);
     }
-  }, [isDemo]);
+  }, [isDemo, currentUser]);
 
   // Switch user (demo mode or real login for quick-switch)
   const switchUser = useCallback(async (userId: number) => {

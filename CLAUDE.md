@@ -35,16 +35,27 @@ Permite el seguimiento completo del ciclo de vida de manifiestos: desde la gener
 
 ## Latest Build & Test Status
 
-**Last Successful Build**: 2026-02-13 (CRUD Enhancements)
-- ✅ Main Frontend: Built in 6.25s → `dist/` (2826 modules transformed)
-- ✅ PWA App: Built in 5.42s → `dist-app/` (2818 modules transformed)
+**Last Successful Build**: 2026-02-15 (Cross-Platform Test + Data Consistency)
+- ✅ Main Frontend: Built in 17.95s → `dist/`
+- ✅ PWA App: Built in 16.82s → `dist-app/`
 - ✅ Smoke Test: **44/44 endpoints PASS** (100% coverage)
   - Health (1), Auth (6), Manifiestos (7), Catalogos (9), Actores (6)
   - Admin Usuarios (3), Reportes (3), PDF (1), Analytics (4)
   - Centro de Control (1), Notificaciones (1), QR Verification (2)
+- ✅ Cross-Platform Workflow Test: **59/59 PASS** (full lifecycle)
+  - 4-role auth (ADMIN, GENERADOR, TRANSPORTISTA, OPERADOR)
+  - Complete manifest lifecycle: BORRADOR → APROBADO → EN_TRANSITO → ENTREGADO → RECIBIDO → EN_TRATAMIENTO → TRATADO
+  - GPS tracking (3 updates + route verification)
+  - Incidents (avería + pausa + reanudación)
+  - Timeline (10 events), workflow dates, PDF, certificate, QR public verification
+  - Role enforcement (negative tests: wrong-role blocked, unauthenticated blocked)
 - ✅ Production API: All systems operational at https://sitrep.ultimamilla.com.ar/api
 
 **Recent Enhancements**:
+- ✅ Cross-platform workflow test script: `backend/tests/cross-platform-workflow-test.sh` (59 tests)
+- ✅ Demo credentials aligned: Frontend DEMO_CREDENTIALS + MOCK_USERS match actual seeded DB users
+- ✅ GPS persistence fix: Pending updates no longer create duplicates on app restart
+- ✅ Seed data enriched: All 7 actors with real Mendoza GPS coordinates, enrichment fields, unique vehicles/choferes, fresh vencimientos (2027), differentiated tratamientos per operador
 - ✅ TransportistaDetallePage: Added full CRUD (edit/delete) for Vehículos and Conductores tables
 - ✅ AdminTratamientosPage: Redesigned with spectacular visual design + full CRUD functionality
 - ✅ All Admin CRUD pages verified with consistent edit/delete functionality
