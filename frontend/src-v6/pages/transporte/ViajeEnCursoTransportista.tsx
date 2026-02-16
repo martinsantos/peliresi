@@ -35,6 +35,7 @@ import {
 import { manifiestoService } from '../../services/manifiesto.service';
 import { EstadoManifiesto } from '../../types/models';
 import { formatDateTime, formatWeight } from '../../utils/formatters';
+import { offlineSafeMutation } from '../../utils/offline-mutation';
 
 // Recenter map when position changes
 function RecenterMap({ position }: { position: [number, number] | null }) {
@@ -137,7 +138,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
     }
   }, [id]);
 
-  // C2: Restore pending GPS updates from localStorage on mount and flush them
+  // C2: Restore pending GPS updates from localStorage on mount and flush in order
   useEffect(() => {
     if (!id) return;
     const savedPending = localStorage.getItem(`gps_pending_${id}`);
@@ -145,17 +146,26 @@ const ViajeEnCursoTransportista: React.FC = () => {
       try {
         const parsed = JSON.parse(savedPending);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Flush saved pending updates to backend
-          Promise.all(
-            parsed.map((p: any) =>
-              manifiestoService.actualizarUbicacion(id, p.lat, p.lng, p.speed, p.heading).catch(() => null)
-            )
-          ).then((results) => {
-            const allSent = results.every(r => r !== null);
-            if (allSent) {
-              localStorage.removeItem(`gps_pending_${id}`);
+          pendingUpdatesRef.current = parsed;
+          // Flush in order (sequential, not parallel — preserves route)
+          (async () => {
+            let flushed = 0;
+            for (const p of parsed) {
+              try {
+                await manifiestoService.actualizarUbicacion(id, p.lat, p.lng, p.speed, p.heading);
+                flushed++;
+              } catch {
+                break; // stop on first failure
+              }
             }
-          });
+            if (flushed === parsed.length) {
+              pendingUpdatesRef.current = [];
+              localStorage.removeItem(`gps_pending_${id}`);
+            } else {
+              pendingUpdatesRef.current = parsed.slice(flushed);
+              localStorage.setItem(`gps_pending_${id}`, JSON.stringify(pendingUpdatesRef.current));
+            }
+          })();
         }
       } catch {
         localStorage.removeItem(`gps_pending_${id}`);
@@ -242,10 +252,8 @@ const ViajeEnCursoTransportista: React.FC = () => {
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
     );
 
-    // FIX 7: Send full GPS data (speed, heading) to backend every 30s
-    // Strategy: collect current position, try to send it along with any
-    // previously failed points. On success, clear all pending. On failure,
-    // keep only the latest point in pending (backend only needs current pos).
+    // GPS send interval: every 30s, send current position + flush any pending
+    // Offline: accumulate ALL points (capped at 500 ≈ 4h) for later flush
     sendIntervalRef.current = setInterval(async () => {
       if (!currentPosition || !id) return;
 
@@ -257,19 +265,44 @@ const ViajeEnCursoTransportista: React.FC = () => {
       };
 
       try {
-        // Send current position to backend
+        // First flush any accumulated pending points in order
+        if (pendingUpdatesRef.current.length > 0) {
+          const remaining: typeof pendingUpdatesRef.current = [];
+          for (const p of pendingUpdatesRef.current) {
+            try {
+              await manifiestoService.actualizarUbicacion(id, p.lat, p.lng, p.speed, p.heading);
+            } catch {
+              remaining.push(p);
+              break; // stop on first failure to preserve order
+            }
+          }
+          // Keep unflushed items + any items after the failed one
+          const flushed = pendingUpdatesRef.current.length - remaining.length;
+          if (remaining.length > 0) {
+            pendingUpdatesRef.current = [...remaining, ...pendingUpdatesRef.current.slice(flushed + 1)];
+          } else {
+            pendingUpdatesRef.current = [];
+          }
+        }
+
+        // Now send current position
         await manifiestoService.actualizarUbicacion(id, point.lat, point.lng, point.speed, point.heading);
-        // Success: clear any pending failures
+        // Full success: clear pending
         pendingUpdatesRef.current = [];
         localStorage.removeItem(`gps_pending_${id}`);
         setGpsSendStatus('ok');
       } catch {
-        // Failure: save current point for offline recovery
-        // Only keep the latest position (avoids unbounded growth + duplicates on flush)
-        pendingUpdatesRef.current = [point];
+        // Failure: append current point to pending queue
+        pendingUpdatesRef.current.push(point);
+        // Cap at 500 points (~4 hours of tracking at 30s intervals)
+        if (pendingUpdatesRef.current.length > 500) {
+          pendingUpdatesRef.current = pendingUpdatesRef.current.slice(-500);
+        }
         localStorage.setItem(`gps_pending_${id}`, JSON.stringify(pendingUpdatesRef.current));
         setGpsSendStatus('error');
-        toast.warning('No se pudo enviar la ubicación. Se reintentará.');
+        if (pendingUpdatesRef.current.length === 1) {
+          toast.warning('Sin conexión GPS. Los puntos se guardan localmente.');
+        }
       }
     }, 30000);
 
@@ -297,30 +330,48 @@ const ViajeEnCursoTransportista: React.FC = () => {
     return `${h}:${min}:${s}`;
   };
 
-  // FIX 5: Confirmar Retiro with GPS coordinates
+  // Confirmar Retiro with GPS coordinates + offline queue
   const handleConfirmarRetiro = async () => {
     try {
-      await confirmarRetiro.mutateAsync({
-        id: id!,
-        latitud: currentPosition?.[0],
-        longitud: currentPosition?.[1],
-        observaciones: 'Retiro confirmado desde app móvil',
-      });
+      const result = await offlineSafeMutation(
+        () => confirmarRetiro.mutateAsync({
+          id: id!,
+          latitud: currentPosition?.[0],
+          longitud: currentPosition?.[1],
+          observaciones: 'Retiro confirmado desde app móvil',
+        }),
+        { type: 'POST', endpoint: `/manifiestos/${id}/confirmar-retiro`, data: { latitud: currentPosition?.[0], longitud: currentPosition?.[1], observaciones: 'Retiro confirmado desde app móvil' } }
+      );
+      if (result === 'QUEUED') {
+        toast.info('Sin conexión — El retiro se confirmará al reconectar');
+        return;
+      }
       toast.success('Retiro confirmado — viaje iniciado');
     } catch (err: any) {
       toast.error('Error', err?.response?.data?.message || 'No se pudo confirmar el retiro');
     }
   };
 
-  // FIX 5: Confirmar Entrega with GPS coordinates
+  // Confirmar Entrega with GPS coordinates + offline queue
   const handleConfirmarEntrega = async () => {
     try {
-      await confirmarEntrega.mutateAsync({
-        id: id!,
-        latitud: currentPosition?.[0],
-        longitud: currentPosition?.[1],
-        observaciones: 'Entrega confirmada desde app móvil',
-      });
+      const result = await offlineSafeMutation(
+        () => confirmarEntrega.mutateAsync({
+          id: id!,
+          latitud: currentPosition?.[0],
+          longitud: currentPosition?.[1],
+          observaciones: 'Entrega confirmada desde app móvil',
+        }),
+        { type: 'POST', endpoint: `/manifiestos/${id}/confirmar-entrega`, data: { latitud: currentPosition?.[0], longitud: currentPosition?.[1], observaciones: 'Entrega confirmada desde app móvil' } }
+      );
+      if (result === 'QUEUED') {
+        toast.info('Sin conexión — La entrega se confirmará al reconectar');
+        // Optimistically update local state so the UI reflects the intent
+        if (id) localStorage.setItem(`viaje_status_${id}`, 'COMPLETED');
+        cleanupGps();
+        setShowFinalizarModal(false);
+        return;
+      }
       toast.success('Entrega confirmada exitosamente');
       // Stop GPS — use robust cleanup
       cleanupGps();

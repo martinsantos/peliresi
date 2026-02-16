@@ -6,6 +6,8 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { authService } from '../services/auth.service';
+import { clearUserOfflineData } from '../services/offline-sync';
+import { clearSyncQueue } from '../services/indexeddb';
 import { getAccessToken, clearTokens } from '../services/api';
 import type { Usuario } from '../types/models';
 
@@ -301,10 +303,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
       keysToClean.forEach(k => localStorage.removeItem(k));
+      // Clear IndexedDB offline data and sync queue for this user
+      if (currentUser) {
+        clearUserOfflineData(currentUser.id).catch(() => {});
+      }
+      clearSyncQueue().catch(() => {});
       setCurrentUser(null);
       setIsDemo(false);
     }
-  }, [isDemo]);
+  }, [isDemo, currentUser]);
 
   // Switch user (demo mode or real login for quick-switch)
   const switchUser = useCallback(async (userId: number) => {

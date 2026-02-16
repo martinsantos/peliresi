@@ -17,7 +17,10 @@ export interface SyncAction {
   endpoint: string;
   data: unknown;
   createdAt: string;
+  userId?: string | number;
 }
+
+const MAX_SYNC_QUEUE_SIZE = 500;
 
 // ========================================
 // DB CONNECTION
@@ -117,8 +120,18 @@ export async function removeOffline(store: StoreName, key: string | number): Pro
 
 /**
  * Agrega una acción pendiente a la cola de sincronización.
+ * Enforces MAX_SYNC_QUEUE_SIZE to prevent unbounded growth.
  */
 export async function addToSyncQueue(action: Omit<SyncAction, 'id' | 'createdAt'>): Promise<void> {
+  // Check queue size before adding
+  const queue = await getSyncQueue();
+  if (queue.length >= MAX_SYNC_QUEUE_SIZE) {
+    // Drop oldest items to make room
+    const toRemove = queue.slice(0, queue.length - MAX_SYNC_QUEUE_SIZE + 1);
+    for (const item of toRemove) {
+      if (item.id != null) await removeOffline('sync_queue', item.id);
+    }
+  }
   await saveOffline('sync_queue', {
     ...action,
     createdAt: new Date().toISOString(),
@@ -151,9 +164,10 @@ export async function clearSyncQueue(): Promise<void> {
 
 /**
  * Procesa la cola de sincronización replayando las llamadas API.
+ * If currentUserId is provided, skips actions from other users.
  * Retorna la cantidad de acciones procesadas con éxito.
  */
-export async function processSyncQueue(): Promise<number> {
+export async function processSyncQueue(currentUserId?: string | number): Promise<number> {
   const queue = await getSyncQueue();
   if (queue.length === 0) return 0;
 
@@ -162,6 +176,11 @@ export async function processSyncQueue(): Promise<number> {
   let processed = 0;
 
   for (const action of queue) {
+    // Skip actions from other users (prevents cross-user data leakage)
+    if (currentUserId && action.userId && action.userId !== currentUserId) {
+      continue;
+    }
+
     try {
       switch (action.type) {
         case 'POST':
@@ -185,9 +204,8 @@ export async function processSyncQueue(): Promise<number> {
         await removeOffline('sync_queue', action.id);
       }
       processed++;
-    } catch (err) {
+    } catch {
       // Detenerse en el primer error para mantener el orden
-      // Sync queue error - stop processing to maintain order
       break;
     }
   }

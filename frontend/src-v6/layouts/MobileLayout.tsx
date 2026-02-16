@@ -41,12 +41,14 @@ import {
 import { Badge } from '../components/ui/BadgeV2';
 import { NotificationBell } from '../components/NotificationBell';
 import { ConnectivityIndicator } from '../components/ConnectivityIndicator';
+import { SWUpdateBanner } from '../components/SWUpdateBanner';
 import { InstallPWAButton } from '../components/InstallPWAButton';
 import { InstallPWAModal } from '../components/InstallPWAModal';
 import { useAuth } from '../contexts/AuthContext';
 import type { UserRole } from '../contexts/AuthContext';
 import { useMobilePrefix } from '../hooks/useMobilePrefix';
 import { useActiveTripRecovery } from '../hooks/useActiveTripRecovery';
+import { useOfflineSync } from '../hooks/useOfflineSync';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -111,6 +113,9 @@ export const MobileLayout: React.FC = () => {
 
   // Recover active trip from API after reinstall/crash
   useActiveTripRecovery();
+
+  // Auto-sync data to IndexedDB for offline use
+  useOfflineSync();
 
   const config = currentUser ? roleConfig[currentUser.rol] : roleConfig.ADMIN;
 
@@ -266,6 +271,9 @@ export const MobileLayout: React.FC = () => {
 
       {/* Connectivity indicator - always visible at top */}
       <ConnectivityIndicator />
+
+      {/* SW update banner - shown when new version available */}
+      <SWUpdateBanner />
 
       {/* Header */}
       <header className="sticky top-0 z-40 sidebar-polished safe-area-top">

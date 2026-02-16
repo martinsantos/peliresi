@@ -14,7 +14,10 @@ import {
   ScanLine,
 } from 'lucide-react';
 import { Button } from '../../components/ui/ButtonV2';
+import { toast } from '../../components/ui/Toast';
 import QRScanner from '../../components/QRScanner';
+import { getCachedManifiestos } from '../../services/offline-sync';
+import { useAuth } from '../../contexts/AuthContext';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -101,9 +104,26 @@ const EscanerQRPage: React.FC = () => {
     setRawData('');
   };
 
-  const handleViewManifiesto = () => {
+  const { currentUser } = useAuth();
+
+  const handleViewManifiesto = async () => {
     if (!scanResult) return;
     const isMobile = window.location.pathname.includes('/mobile') || window.location.pathname.includes('/app');
+
+    // Offline check: verify we have this manifiesto cached before navigating
+    if (!navigator.onLine && currentUser?.id) {
+      const cached = await getCachedManifiestos(currentUser.id);
+      const found = cached.find(m => m.numero === scanResult || m.id === scanResult);
+      if (!found) {
+        toast.info('Sin conexión — Se verificará cuando haya conexión');
+        // Save for later verification
+        const pending = JSON.parse(localStorage.getItem('sitrep_pending_qr') || '[]');
+        if (!pending.includes(scanResult)) pending.push(scanResult);
+        localStorage.setItem('sitrep_pending_qr', JSON.stringify(pending));
+        return;
+      }
+    }
+
     navigate(isMobile ? `/mobile/manifiestos/${scanResult}` : `/manifiestos/${scanResult}`);
   };
 
