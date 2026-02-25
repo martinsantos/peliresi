@@ -10,7 +10,8 @@
     "test": "jest",
     "db:migrate": "npx prisma migrate dev",
     "db:generate": "npx prisma generate",
-    "db:seed": "ts-node prisma/seed.ts"
+    "db:seed": "ts-node prisma/seed.ts",
+    "seed:transportistas": "ts-node prisma/seed-transportistas-reales.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.6.0",
