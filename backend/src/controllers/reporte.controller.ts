@@ -156,7 +156,7 @@ export const reporteResiduosTratados = async (req: AuthRequest, res: Response, n
             where.operadorId = req.user.operador.id;
         }
 
-        const [manifiestos, totalCount] = await Promise.all([
+        const [manifiestos, totalCount, totalResiduosAgg] = await Promise.all([
             prisma.manifiesto.findMany({
                 where,
                 include: {
@@ -174,6 +174,10 @@ export const reporteResiduosTratados = async (req: AuthRequest, res: Response, n
                 take: limitNum,
             }),
             prisma.manifiesto.count({ where }),
+            prisma.manifiestoResiduo.aggregate({
+                where: { manifiesto: where },
+                _sum: { cantidad: true },
+            }),
         ]);
 
         // Agrupar por generador
@@ -195,9 +199,7 @@ export const reporteResiduosTratados = async (req: AuthRequest, res: Response, n
             data: {
                 resumen: {
                     totalManifiestosTratados: totalCount,
-                    totalResiduosTratados: manifiestos.reduce((acc, m) =>
-                        acc + m.residuos.reduce((sum, r) => sum + r.cantidad, 0), 0
-                    ),
+                    totalResiduosTratados: totalResiduosAgg._sum.cantidad || 0,
                     periodo: {
                         desde: fechaInicio || 'Sin límite',
                         hasta: fechaFin || 'Sin límite'
@@ -234,10 +236,10 @@ export const reporteResiduosTratados = async (req: AuthRequest, res: Response, n
 // Reporte de transporte — with pagination + _count aggregation
 export const reporteTransporte = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const { fechaInicio, fechaFin, page = '1', limit = '50' } = req.query;
+        const { fechaInicio, fechaFin, page = '1', limit = '500' } = req.query;
 
         const pageNum = Math.max(1, Number(page));
-        const limitNum = Math.min(200, Math.max(1, Number(limit)));
+        const limitNum = Math.min(500, Math.max(1, Number(limit)));
         const skip = (pageNum - 1) * limitNum;
 
         const manifiestoWhere: any = {};

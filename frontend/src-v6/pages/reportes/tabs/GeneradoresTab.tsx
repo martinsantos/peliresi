@@ -13,20 +13,21 @@ import { CHART_COLORS } from '../../../utils/chart-colors';
 import { ChartTooltip } from '../../../components/charts/ChartTooltip';
 import { KpiCard } from '../../../components/charts/KpiCard';
 import { getDepartamento } from '../../../utils/mendoza-departamentos';
-import type { CentroControlData } from '../../../hooks/useCentroControl';
+import { useGeneradores } from '../../../hooks/useActores';
 
 export default function GeneradoresTab({
-  ccData,
   periodoLabel,
 }: {
-  ccData: CentroControlData | null;
+  ccData?: any; // Keep for compatibility but unused
   periodoLabel: string;
 }) {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [categoriaFilter, setCategoriaFilter] = useState('');
 
-  const generadores = ccData?.generadores || [];
+  // Fetch ALL generadores from database (not filtered by activity or GPS coords)
+  const { data: paginatedData, isLoading } = useGeneradores({ limit: 500 } as any);
+  const generadores: any[] = paginatedData?.items || [];
 
   const filtered = useMemo(() => {
     let list = generadores;
@@ -69,7 +70,7 @@ export default function GeneradoresTab({
       .slice(0, 10);
   }, [generadores]);
 
-  if (!ccData) {
+  if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-24">
         <div className="w-16 h-16 rounded-full border-4 border-primary-100 border-t-primary-500 animate-spin" />
@@ -83,7 +84,7 @@ export default function GeneradoresTab({
       <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl">
         <Calendar size={14} className="text-amber-600 shrink-0" />
         <span className="text-xs font-medium text-amber-800">
-          Generadores filtrados por: <strong>{periodoLabel}</strong>
+          Mostrando: <strong>Todos los generadores registrados ({generadores.length})</strong>
         </span>
       </div>
 
@@ -91,7 +92,7 @@ export default function GeneradoresTab({
         <KpiCard icon={Factory} label="Total Generadores" value={generadores.length} color="from-purple-600 to-purple-700" />
         <KpiCard icon={Package} label="Categorías" value={byCategoria.length} color="from-indigo-600 to-indigo-700" sub="tipos" />
         <KpiCard icon={MapPin} label="Departamentos" value={byDep.length} color="from-violet-600 to-violet-700" sub="con presencia" />
-        <KpiCard icon={FileText} label="Manifiestos" value={generadores.reduce((s, g) => s + g.cantManifiestos, 0)} color="from-emerald-600 to-emerald-700" sub="generados" />
+        <KpiCard icon={FileText} label="Manifiestos" value={generadores.reduce((s: number, g: any) => s + (g._count?.manifiestos || 0), 0)} color="from-emerald-600 to-emerald-700" sub="generados" />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
@@ -185,14 +186,14 @@ export default function GeneradoresTab({
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
-                {filtered.slice(0, 100).map((g, i) => (
+                {filtered.slice(0, 200).map((g: any, i: number) => (
                   <tr key={`${g.id}-${i}`} className="hover:bg-primary-50/30 transition-colors cursor-pointer" onClick={() => g.id && navigate(`/admin/actores/generadores/${g.id}`)}>
                     <td className="px-4 py-3 text-sm font-medium text-neutral-900 max-w-[200px] truncate">{g.razonSocial}</td>
                     <td className="px-4 py-3 text-sm text-neutral-600 font-mono text-xs">{g.cuit}</td>
                     <td className="px-4 py-3 text-sm text-neutral-600 hidden md:table-cell">{g.categoria || '-'}</td>
                     <td className="px-4 py-3 text-sm text-neutral-600 hidden md:table-cell">{getDepartamento(g.latitud, g.longitud)}</td>
                     <td className="px-4 py-3 text-center">
-                      <Badge variant="soft" color="primary">{g.cantManifiestos}</Badge>
+                      <Badge variant="soft" color="primary">{g._count?.manifiestos || 0}</Badge>
                     </td>
                   </tr>
                 ))}
@@ -204,9 +205,9 @@ export default function GeneradoresTab({
               </tbody>
             </table>
           </div>
-          {filtered.length > 100 && (
+          {filtered.length > 200 && (
             <div className="px-4 py-3 bg-neutral-50/50 border-t border-neutral-100 text-center">
-              <p className="text-sm text-neutral-500">Mostrando 100 de {filtered.length}</p>
+              <p className="text-sm text-neutral-500">Mostrando 200 de {filtered.length}</p>
             </div>
           )}
         </CardContent>

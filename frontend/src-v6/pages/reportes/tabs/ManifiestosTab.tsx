@@ -135,7 +135,7 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
-                  {manifiestosList.slice(0, 50).map((m: any, i: number) => (
+                  {manifiestosList.slice(0, 200).map((m: any, i: number) => (
                     <tr key={i} className="hover:bg-primary-50/30 transition-colors cursor-pointer" onClick={() => m.id && navigate(`/manifiestos/${m.id}`)}>
                       <td className="px-4 py-3 text-sm font-semibold text-primary-600">{m.numero}</td>
                       <td className="px-4 py-3">
@@ -156,9 +156,9 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
                 </tbody>
               </table>
             </div>
-            {manifiestosList.length > 50 && (
+            {manifiestosList.length > 200 && (
               <div className="px-4 py-3 bg-neutral-50/50 border-t border-neutral-100 text-center">
-                <p className="text-sm text-neutral-500">Mostrando 50 de {manifiestosList.length} registros — Exporte para ver todos</p>
+                <p className="text-sm text-neutral-500">Mostrando 200 de {manifiestosList.length} registros — Exporte para ver todos</p>
               </div>
             )}
           </CardContent>

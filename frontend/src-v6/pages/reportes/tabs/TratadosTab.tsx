@@ -125,7 +125,7 @@ export default function TratadosTab({ data, periodo, onExportPDF }: { data: any;
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
-                  {detalle.slice(0, 50).map((d: any, i: number) => (
+                  {detalle.slice(0, 200).map((d: any, i: number) => (
                     <tr key={i} className="hover:bg-primary-50/30 transition-colors cursor-pointer" onClick={() => d.id && navigate(`/manifiestos/${d.id}`)}>
                       <td className="px-4 py-3 text-sm font-semibold text-primary-600">{d.numero}</td>
                       <td className="px-4 py-3 text-sm text-neutral-900 max-w-[200px] truncate">{d.generador}</td>

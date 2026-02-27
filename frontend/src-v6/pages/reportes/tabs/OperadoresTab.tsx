@@ -201,7 +201,7 @@ export default function OperadoresTab({
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
-                {filtered.slice(0, 50).map((o: any, i: number) => (
+                {filtered.slice(0, 200).map((o: any, i: number) => (
                   <tr key={`${o.id}-${i}`} className="hover:bg-primary-50/30 transition-colors cursor-pointer" onClick={() => o.id && navigate(`/admin/actores/operadores/${o.id}`)}>
                     <td className="px-4 py-3 text-sm font-medium text-neutral-900 max-w-[250px] truncate" title={o.razonSocial}>
                       {o.razonSocial}
@@ -229,9 +229,9 @@ export default function OperadoresTab({
               </tbody>
             </table>
           </div>
-          {filtered.length > 50 && (
+          {filtered.length > 200 && (
             <div className="px-4 py-3 bg-neutral-50/50 border-t border-neutral-100 text-center">
-              <p className="text-sm text-neutral-500">Mostrando 50 de {filtered.length}</p>
+              <p className="text-sm text-neutral-500">Mostrando 200 de {filtered.length}</p>
             </div>
           )}
         </CardContent>

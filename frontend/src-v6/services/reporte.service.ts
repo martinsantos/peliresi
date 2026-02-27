@@ -30,17 +30,17 @@ function mapFilters(filters?: ReporteFilters): Record<string, string | undefined
 
 export const reporteService = {
   async manifiestos(filters?: ReporteFilters): Promise<ReporteData> {
-    const { data } = await api.get('/reportes/manifiestos', { params: mapFilters(filters) });
+    const { data } = await api.get('/reportes/manifiestos', { params: { ...mapFilters(filters), limit: '500' } });
     return data.data;
   },
 
   async tratados(filters?: ReporteFilters): Promise<ReporteData> {
-    const { data } = await api.get('/reportes/tratados', { params: mapFilters(filters) });
+    const { data } = await api.get('/reportes/tratados', { params: { ...mapFilters(filters), limit: '500' } });
     return data.data;
   },
 
   async transporte(filters?: ReporteFilters): Promise<ReporteData> {
-    const { data } = await api.get('/reportes/transporte', { params: mapFilters(filters) });
+    const { data } = await api.get('/reportes/transporte', { params: { ...mapFilters(filters), limit: '500' } });
     return data.data;
   },
 
