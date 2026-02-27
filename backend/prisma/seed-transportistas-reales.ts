@@ -31,10 +31,15 @@
  * Idempotente: se puede ejecutar múltiples veces (upsert por CUIT y patente).
  */
 
+import dotenv from 'dotenv';
+import path from 'path';
+
+// Cargar .env antes de instanciar PrismaClient
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import fs from 'fs';
-import path from 'path';
 
 const prisma = new PrismaClient();
 
