@@ -378,7 +378,7 @@ const TransportePerfilPage: React.FC = () => {
                   {viajeEnCurso.residuos.map((residuo, index) => (
                     <div key={index} className="flex items-center justify-between p-3 bg-neutral-50 rounded-xl">
                       <div>
-                        <p className="font-medium text-neutral-900">{residuo.tipoResiduoId}</p>
+                        <p className="font-medium text-neutral-900">{(residuo as any).tipoResiduo?.nombre || residuo.tipoResiduoId}</p>
                       </div>
                       <span className="text-sm font-mono font-semibold text-primary-600">
                         {residuo.cantidad} {residuo.unidad}
@@ -386,6 +386,39 @@ const TransportePerfilPage: React.FC = () => {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Flota - vehicles and drivers from active trip's transportista */}
+            {viajeEnCurso && ((viajeEnCurso.transportista as any)?.vehiculos?.length > 0 || (viajeEnCurso.transportista as any)?.choferes?.length > 0) && (
+              <div className="bg-white rounded-2xl p-5 border border-neutral-200 shadow-sm">
+                <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-4">Flota Habilitada</h3>
+                {(viajeEnCurso.transportista as any)?.vehiculos?.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wide mb-2">Vehículos ({(viajeEnCurso.transportista as any).vehiculos.length})</p>
+                    <div className="space-y-2">
+                      {(viajeEnCurso.transportista as any).vehiculos.map((v: any, i: number) => (
+                        <div key={i} className="flex items-center justify-between p-2 bg-neutral-50 rounded-lg">
+                          <span className="font-mono text-sm font-semibold text-neutral-800">{v.patente}</span>
+                          <span className="text-xs text-neutral-500">{[v.marca, v.modelo].filter(Boolean).join(' ') || 'S/D'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {(viajeEnCurso.transportista as any)?.choferes?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wide mb-2">Conductores ({(viajeEnCurso.transportista as any).choferes.length})</p>
+                    <div className="space-y-2">
+                      {(viajeEnCurso.transportista as any).choferes.map((c: any, i: number) => (
+                        <div key={i} className="flex items-center justify-between p-2 bg-neutral-50 rounded-lg">
+                          <span className="text-sm font-semibold text-neutral-800">{[c.nombre, c.apellido].filter(Boolean).join(' ')}</span>
+                          {c.licencia && <span className="text-xs text-neutral-500 font-mono">Lic. {c.licencia}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

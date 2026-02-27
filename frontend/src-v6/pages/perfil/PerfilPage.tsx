@@ -13,7 +13,12 @@ import {
   Save,
   Key,
   Shield,
+  ExternalLink,
+  Truck,
+  Factory,
+  FlaskConical,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
@@ -23,8 +28,15 @@ import { useAuth } from '../../contexts/AuthContext';
 import { usuarioService } from '../../services/usuario.service';
 
 
+const ACTOR_CONFIG: Record<string, { label: string; icon: React.ReactNode; path: string; color: string }> = {
+  GENERADOR:     { label: 'Establecimiento Generador', icon: <Factory size={18} />,    path: '/admin/actores/generadores', color: 'text-purple-600' },
+  TRANSPORTISTA: { label: 'Empresa Transportista',     icon: <Truck size={18} />,      path: '/admin/actores/transportistas', color: 'text-orange-600' },
+  OPERADOR:      { label: 'Planta Operadora',           icon: <FlaskConical size={18} />, path: '/admin/actores/operadores', color: 'text-blue-600' },
+};
+
 const PerfilPage: React.FC = () => {
   const { currentUser } = useAuth();
+  const navigate = useNavigate();
   const [user, setUser] = useState({
     nombre: '',
     email: '',
@@ -44,7 +56,7 @@ const PerfilPage: React.FC = () => {
         nombre,
         email: currentUser.email || '',
         telefono: currentUser.telefono || '',
-        sector: currentUser.sector || 'DGFA Mendoza',
+        sector: currentUser.sector || '-',
         rol: currentUser.rol || 'USUARIO',
         avatar: nombre.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase(),
       });
@@ -173,6 +185,33 @@ const PerfilPage: React.FC = () => {
               )}
             </CardContent>
           </Card>
+          {/* Mi Empresa / Actor — only for non-ADMIN roles */}
+          {ACTOR_CONFIG[user.rol] && (
+            <Card>
+              <CardHeader
+                title={ACTOR_CONFIG[user.rol].label}
+                icon={<span className={ACTOR_CONFIG[user.rol].color}>{ACTOR_CONFIG[user.rol].icon}</span>}
+              />
+              <CardContent>
+                <div className="space-y-3 animate-fade-in">
+                  <div className="p-3 bg-neutral-50 rounded-xl">
+                    <div className="flex items-center gap-2 text-neutral-500 mb-1">
+                      <Building2 size={14} />
+                      <span className="text-xs font-medium uppercase">Empresa</span>
+                    </div>
+                    <p className="font-medium text-neutral-900">{user.sector || '-'}</p>
+                  </div>
+                  <button
+                    onClick={() => navigate(ACTOR_CONFIG[user.rol].path)}
+                    className="w-full flex items-center justify-between p-3 bg-primary-50 hover:bg-primary-100 rounded-xl transition-colors group"
+                  >
+                    <span className="text-sm font-medium text-primary-700">Ver perfil completo del actor</span>
+                    <ExternalLink size={16} className="text-primary-500 group-hover:text-primary-700 transition-colors" />
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
