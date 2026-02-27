@@ -18,12 +18,28 @@ def normalize(name):
 
 def buscar(nombre):
     query = urllib.parse.quote(nombre)
-    url = f'https://api.cuitonline.com/nombre/{query}'
+    url = f'https://www.cuitonline.com/search.php?q={query}&max=10'
     try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=10) as r:
-            return json.loads(r.read())
-    except Exception as e:
+        req = urllib.request.Request(url, headers={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        })
+        with urllib.request.urlopen(req, timeout=15) as r:
+            html = r.read().decode('utf-8', errors='replace')
+        # Los resultados están en <meta name="description" content="...">
+        # Formato: "nombre1 - 11digits; nombre2 - 11digits; ..."
+        m = re.search(r'<meta\s+name="description"\s+content="([^"]*)"', html, re.I)
+        if not m:
+            return []
+        desc = m.group(1)
+        results = []
+        for match in re.finditer(r'([^;.]+?)\s*-\s*(\d{11})\s*;', desc):
+            raw_name = match.group(1).strip()
+            cuit_digits = match.group(2)
+            # Formatear: 11 dígitos → XX-XXXXXXXX-X
+            cuit_fmt = f'{cuit_digits[0:2]}-{cuit_digits[2:10]}-{cuit_digits[10]}'
+            results.append({'denominacion': raw_name, 'cuit': cuit_fmt})
+        return results
+    except Exception:
         return []
 
 
@@ -57,7 +73,7 @@ def main():
         resultados.append(entry)
         icon = '✓' if estado == 'MATCH_PROBABLE' else '?'
         print(f'{icon} {caa:<12} {razon[:35]:<35} → {entry["cuit_sugerido"] or "NO ENCONTRADO"} ({best_sim:.0%})')
-        time.sleep(0.8)
+        time.sleep(2)
 
     with open('/tmp/cuits-encontrados.json', 'w') as out:
         for r in resultados:
