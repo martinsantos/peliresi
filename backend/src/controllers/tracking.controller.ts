@@ -8,6 +8,67 @@ import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import prisma from '../lib/prisma';
 
+// ── Coordinate fallback helpers ──────────────────────────────────────────────
+// Actors without lat/lng in DB receive a deterministic approximation based on
+// their domicilio string so they still appear on the map. After running
+// geocode-actors.ts on the server, real coordinates replace these fallbacks.
+
+const CENTROIDES: Record<string, { lat: number; lng: number }> = {
+  'capital':        { lat: -32.8908, lng: -68.8272 },
+  'godoy cruz':     { lat: -32.9214, lng: -68.8358 },
+  'guaymallen':     { lat: -32.8981, lng: -68.7931 },
+  'guaymallén':     { lat: -32.8981, lng: -68.7931 },
+  'las heras':      { lat: -32.8528, lng: -68.8113 },
+  'lujan de cuyo':  { lat: -33.0333, lng: -68.8833 },
+  'luján de cuyo':  { lat: -33.0333, lng: -68.8833 },
+  'maipu':          { lat: -32.9833, lng: -68.7500 },
+  'maipú':          { lat: -32.9833, lng: -68.7500 },
+  'san rafael':     { lat: -34.6167, lng: -68.3333 },
+  'general alvear': { lat: -34.9667, lng: -67.7000 },
+  'malargue':       { lat: -35.4667, lng: -69.5833 },
+  'malargüe':       { lat: -35.4667, lng: -69.5833 },
+  'san martin':     { lat: -33.3000, lng: -68.4667 },
+  'san martín':     { lat: -33.3000, lng: -68.4667 },
+  'rivadavia':      { lat: -33.1833, lng: -68.4667 },
+  'junin':          { lat: -33.1333, lng: -68.4833 },
+  'junín':          { lat: -33.1333, lng: -68.4833 },
+  'lavalle':        { lat: -32.7167, lng: -68.5833 },
+  'tunuyan':        { lat: -33.5667, lng: -69.0167 },
+  'tunuyán':        { lat: -33.5667, lng: -69.0167 },
+  'tupungato':      { lat: -33.3667, lng: -69.1500 },
+  'san carlos':     { lat: -33.7667, lng: -69.0500 },
+  'mendoza':        { lat: -32.8908, lng: -68.8272 },
+};
+
+function findCentroid(domicilio: string): { lat: number; lng: number } {
+  const lower = (domicilio || '').toLowerCase();
+  for (const [dept, coords] of Object.entries(CENTROIDES)) {
+    if (lower.includes(dept)) return coords;
+  }
+  return CENTROIDES['mendoza'];
+}
+
+/** Deterministic offset ±0.008° (~900 m) derived from actor id — stable across requests */
+function deterministicJitter(id: string, seed: number): number {
+  const hash = [...(id + String(seed))].reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  return ((hash % 1000) / 1000 - 0.5) * 0.016;
+}
+
+function resolveCoords(
+  latitud: number | null, longitud: number | null,
+  domicilio: string, id: string,
+): { lat: number; lng: number; coordsFallback: boolean } {
+  if (latitud != null && longitud != null) {
+    return { lat: latitud, lng: longitud, coordsFallback: false };
+  }
+  const centroid = findCentroid(domicilio);
+  return {
+    lat: centroid.lat + deterministicJitter(id, 0),
+    lng: centroid.lng + deterministicJitter(id, 1),
+    coordsFallback: true,
+  };
+}
+
 /**
  * GET /api/centro-control/actividad
  * Query params:
@@ -45,12 +106,11 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
       estadisticas: {},
     };
 
-    // ── Generadores layer (only those with activity in the period) ──
+    // ── Generadores layer ──
     if (layerList.includes('generadores')) {
       const generadores = await prisma.generador.findMany({
         where: {
           activo: true,
-          latitud: { not: null },
           ...(showAll ? {} : { manifiestos: { some: { fechaCreacion: dateFilter } } }),
         },
         select: {
@@ -60,6 +120,7 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
           categoria: true,
           latitud: true,
           longitud: true,
+          domicilio: true,
           _count: {
             select: {
               manifiestos: {
@@ -76,24 +137,27 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
         },
       });
 
-      result.generadores = generadores.map(g => ({
-        id: g.id,
-        razonSocial: g.razonSocial,
-        cuit: g.cuit,
-        categoria: g.categoria,
-        latitud: g.latitud,
-        longitud: g.longitud,
-        cantManifiestos: g._count.manifiestos,
-        ultimaActividad: g.manifiestos[0]?.fechaCreacion || null,
-      }));
+      result.generadores = generadores.map(g => {
+        const coords = resolveCoords(g.latitud, g.longitud, g.domicilio || '', g.id);
+        return {
+          id: g.id,
+          razonSocial: g.razonSocial,
+          cuit: g.cuit,
+          categoria: g.categoria,
+          latitud: coords.lat,
+          longitud: coords.lng,
+          coordsFallback: coords.coordsFallback,
+          cantManifiestos: g._count.manifiestos,
+          ultimaActividad: g.manifiestos[0]?.fechaCreacion || null,
+        };
+      });
     }
 
-    // ── Transportistas layer (only those with activity in the period) ──
+    // ── Transportistas layer ──
     if (layerList.includes('transportistas')) {
       const transportistas = await prisma.transportista.findMany({
         where: {
           activo: true,
-          latitud: { not: null },
           ...(showAll ? {} : { manifiestos: { some: { fechaCreacion: dateFilter } } }),
         },
         select: {
@@ -102,6 +166,7 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
           cuit: true,
           latitud: true,
           longitud: true,
+          domicilio: true,
           _count: {
             select: {
               vehiculos: { where: { activo: true } },
@@ -115,23 +180,26 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
         },
       });
 
-      result.transportistas = transportistas.map(t => ({
-        id: t.id,
-        razonSocial: t.razonSocial,
-        cuit: t.cuit,
-        latitud: t.latitud,
-        longitud: t.longitud,
-        vehiculosActivos: t._count.vehiculos,
-        enviosEnTransito: t.manifiestos.length,
-      }));
+      result.transportistas = transportistas.map(t => {
+        const coords = resolveCoords(t.latitud, t.longitud, t.domicilio || '', t.id);
+        return {
+          id: t.id,
+          razonSocial: t.razonSocial,
+          cuit: t.cuit,
+          latitud: coords.lat,
+          longitud: coords.lng,
+          coordsFallback: coords.coordsFallback,
+          vehiculosActivos: t._count.vehiculos,
+          enviosEnTransito: t.manifiestos.length,
+        };
+      });
     }
 
-    // ── Operadores layer (only those with activity in the period) ──
+    // ── Operadores layer ──
     if (layerList.includes('operadores')) {
       const operadores = await prisma.operador.findMany({
         where: {
           activo: true,
-          latitud: { not: null },
           ...(showAll ? {} : {
             manifiestos: {
               some: {
@@ -151,6 +219,7 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
           categoria: true,
           latitud: true,
           longitud: true,
+          domicilio: true,
           _count: {
             select: {
               manifiestos: {
@@ -171,16 +240,20 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
         },
       });
 
-      result.operadores = operadores.map(o => ({
-        id: o.id,
-        razonSocial: o.razonSocial,
-        cuit: o.cuit,
-        categoria: o.categoria,
-        latitud: o.latitud,
-        longitud: o.longitud,
-        cantRecibidos: o._count.manifiestos,
-        cantTratados: o.manifiestos.length,
-      }));
+      result.operadores = operadores.map(o => {
+        const coords = resolveCoords(o.latitud, o.longitud, o.domicilio || '', o.id);
+        return {
+          id: o.id,
+          razonSocial: o.razonSocial,
+          cuit: o.cuit,
+          categoria: o.categoria,
+          latitud: coords.lat,
+          longitud: coords.lng,
+          coordsFallback: coords.coordsFallback,
+          cantRecibidos: o._count.manifiestos,
+          cantTratados: o.manifiestos.length,
+        };
+      });
     }
 
     // ── En Tránsito layer — trips with real activity in the period ──

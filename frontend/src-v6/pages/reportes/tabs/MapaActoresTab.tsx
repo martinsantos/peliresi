@@ -48,6 +48,16 @@ export default function MapaActoresTab({
     return clusterMarkers(ccData.generadores as any[]);
   }, [ccData?.generadores]);
 
+  const transportistasClustered = useMemo(() => {
+    if (!ccData?.transportistas) return [];
+    return clusterMarkers(ccData.transportistas as any[]);
+  }, [ccData?.transportistas]);
+
+  const operadoresClustered = useMemo(() => {
+    if (!ccData?.operadores) return [];
+    return clusterMarkers(ccData.operadores as any[]);
+  }, [ccData?.operadores]);
+
   const totalGen = ccData?.generadores?.length || 0;
   const totalTrans = ccData?.transportistas?.length || 0;
   const totalOper = ccData?.operadores?.length || 0;
@@ -143,6 +153,7 @@ export default function MapaActoresTab({
                       <span className="text-xs text-neutral-500">CUIT: {g.cuit}</span><br />
                       <span className="text-xs text-neutral-500">Cat: {g.categoria}</span><br />
                       <span className="text-xs font-medium">Manifiestos: {g.cantManifiestos}</span><br />
+                      {g.coordsFallback && <span className="text-xs text-amber-600 block">⚠ Ubicación aproximada</span>}
                       <button
                         className="text-xs text-primary-600 hover:underline mt-1"
                         onClick={() => onSelectDep(getDepartamento(g.latitud, g.longitud))}
@@ -155,18 +166,21 @@ export default function MapaActoresTab({
               ))}
 
               {/* Transportistas */}
-              {layers.transportistas && ccData.transportistas?.map((t, idx) => (
+              {layers.transportistas && transportistasClustered.map((t: any, idx: number) => (
                 <Marker
                   key={`trans-${t.id}-${idx}`}
                   position={[t.latitud, t.longitud]}
-                  icon={ACTOR_ICONS.transportista}
+                  icon={t.count ? createClusterIcon(t.count, ACTOR_COLORS.transportista) : ACTOR_ICONS.transportista}
                 >
                   <Popup>
                     <div className="text-sm">
-                      <strong className="text-orange-700">{t.razonSocial}</strong><br />
+                      <strong className="text-orange-700">{t.razonSocial}</strong>
+                      {t.count && <span className="text-xs text-neutral-500 ml-1">({t.count} en zona)</span>}
+                      <br />
                       <span className="text-xs text-neutral-500">CUIT: {t.cuit}</span><br />
                       <span className="text-xs">Vehículos: {t.vehiculosActivos}</span><br />
                       <span className="text-xs font-medium">En tránsito: {t.enviosEnTransito}</span><br />
+                      {t.coordsFallback && <span className="text-xs text-amber-600 block">⚠ Ubicación aproximada</span>}
                       <button
                         className="text-xs text-primary-600 hover:underline mt-1"
                         onClick={() => onSelectDep(getDepartamento(t.latitud, t.longitud))}
@@ -179,18 +193,21 @@ export default function MapaActoresTab({
               ))}
 
               {/* Operadores */}
-              {layers.operadores && ccData.operadores?.map((o, idx) => (
+              {layers.operadores && operadoresClustered.map((o: any, idx: number) => (
                 <Marker
                   key={`oper-${o.id}-${idx}`}
                   position={[o.latitud, o.longitud]}
-                  icon={ACTOR_ICONS.operador}
+                  icon={o.count ? createClusterIcon(o.count, ACTOR_COLORS.operador) : ACTOR_ICONS.operador}
                 >
                   <Popup>
                     <div className="text-sm">
-                      <strong className="text-blue-700">{o.razonSocial}</strong><br />
+                      <strong className="text-blue-700">{o.razonSocial}</strong>
+                      {o.count && <span className="text-xs text-neutral-500 ml-1">({o.count} en zona)</span>}
+                      <br />
                       <span className="text-xs text-neutral-500">CUIT: {o.cuit}</span><br />
                       <span className="text-xs text-neutral-500">Cat: {o.categoria}</span><br />
                       <span className="text-xs">Recibidos: {o.cantRecibidos} | Tratados: {o.cantTratados}</span><br />
+                      {o.coordsFallback && <span className="text-xs text-amber-600 block">⚠ Ubicación aproximada</span>}
                       <button
                         className="text-xs text-primary-600 hover:underline mt-1"
                         onClick={() => onSelectDep(getDepartamento(o.latitud, o.longitud))}
@@ -209,6 +226,7 @@ export default function MapaActoresTab({
                 <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-purple-500" /> Generadores</span>
                 <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-orange-500" /> Transportistas</span>
                 <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Operadores</span>
+                <span className="flex items-center gap-1 text-amber-600">⚠ Ubic. aproximada</span>
               </div>
             </div>
           </div>
