@@ -211,7 +211,7 @@ const ReportesPage: React.FC = () => {
   const depModalData = useMemo(() => {
     if (!selectedDep || !ccData) return null;
     const genByDep = agruparPorDepartamento(ccData.generadores || []);
-    const transByDep = agruparPorDepartamento(ccData.transportistas || []);
+    const transByDep = agruparPorDepartamento((ccData.transportistas || []).filter(t => t.latitud != null && t.longitud != null) as any);
     const operByDep = agruparPorDepartamento(ccData.operadores || []);
     return {
       generadores: (genByDep[selectedDep] || []) as ActorGenerador[],

@@ -632,10 +632,10 @@ export const CentroControlPage: React.FC = () => {
                   ))}
 
                   {/* ── Transportistas ── */}
-                  {layers.transportistas && cc?.transportistas?.map((t, idx) => (
+                  {layers.transportistas && cc?.transportistas?.filter(t => t.latitud != null && t.longitud != null).map((t, idx) => (
                     <Marker
                       key={`trans-${t.id}-${idx}`}
-                      position={[t.latitud, t.longitud]}
+                      position={[t.latitud!, t.longitud!]}
                       icon={ACTOR_ICONS.transportista}
                     >
                       <Popup>
