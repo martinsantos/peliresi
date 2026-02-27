@@ -93,13 +93,13 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
       const transportistas = await prisma.transportista.findMany({
         where: {
           activo: true,
-          latitud: { not: null },
           ...(showAll ? {} : { manifiestos: { some: { fechaCreacion: dateFilter } } }),
         },
         select: {
           id: true,
           razonSocial: true,
           cuit: true,
+          domicilio: true,
           latitud: true,
           longitud: true,
           _count: {
@@ -119,6 +119,7 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
         id: t.id,
         razonSocial: t.razonSocial,
         cuit: t.cuit,
+        domicilio: t.domicilio,
         latitud: t.latitud,
         longitud: t.longitud,
         vehiculosActivos: t._count.vehiculos,
