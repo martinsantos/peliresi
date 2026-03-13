@@ -817,7 +817,7 @@ export const CentroControlPage: React.FC = () => {
         </div>
 
         {/* Viajes Activos + Realizados — accordion right of map */}
-        <div className="lg:fixed lg:top-[6.5rem] lg:right-8 lg:w-[min(28rem,calc((100vw-16rem)/3))] flex flex-col gap-0 max-h-[calc(100vh-8.5rem)] lg:z-10">
+        <div className="lg:fixed lg:top-[6.5rem] lg:right-8 lg:w-[min(28rem,calc((100vw-16rem)/3))] flex flex-col gap-0 max-h-[calc(100vh-8.5rem)] overflow-hidden lg:z-10">
           {/* ── Viajes Activos accordion ── */}
           <Card padding="none" className={`flex flex-col ${tripPanel === 'activos' ? 'flex-1 min-h-0' : ''}`}>
             <button
@@ -845,7 +845,7 @@ export const CentroControlPage: React.FC = () => {
                     />
                   </div>
                 </div>
-                <div className="divide-y divide-neutral-100 flex-1 overflow-y-auto">
+                <div className="divide-y divide-neutral-100 flex-1 min-h-0 overflow-y-auto">
                   {filteredEnTransito.map((m) => {
                     const isSelected = m.manifiestoId === selectedTripId;
                     return (
@@ -911,7 +911,7 @@ export const CentroControlPage: React.FC = () => {
               <ChevronDown size={18} className={`text-neutral-400 transition-transform duration-200 ${tripPanel === 'realizados' ? 'rotate-180' : ''}`} />
             </button>
             {tripPanel === 'realizados' && (
-              <div className="divide-y divide-neutral-100 flex-1 overflow-y-auto">
+              <div className="divide-y divide-neutral-100 flex-1 min-h-0 overflow-y-auto">
                 {viajesRealizados.map((m: any) => {
                   const isSelected = m.id === selectedRealizadoId;
                   return (
