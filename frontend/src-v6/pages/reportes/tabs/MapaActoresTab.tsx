@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Calendar, Layers, Eye, EyeOff,
 } from 'lucide-react';
@@ -8,9 +8,34 @@ import 'leaflet/dist/leaflet.css';
 import { Card } from '../../../components/ui/CardV2';
 import { Badge } from '../../../components/ui/BadgeV2';
 import { ACTOR_ICONS, ACTOR_COLORS, createClusterIcon } from '../../../utils/map-icons';
-import { getDepartamento } from '../../../utils/mendoza-departamentos';
+import { getDepartamento, DEPARTAMENTOS_MENDOZA } from '../../../utils/mendoza-departamentos';
 import { clusterMarkers } from './shared';
 import type { CentroControlData } from '../../../hooks/useCentroControl';
+
+// ── Geocoding helpers para transportistas sin coords ──
+
+/** Offset determinístico por ID para evitar superposición en mismo centroide */
+function hashOffset(seed: string, range: number): number {
+  const h = seed.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+  return ((h % 200) / 200 - 0.5) * 2 * range;
+}
+
+const MENDOZA_CAP: [number, number] = [-32.8908, -68.8272];
+
+/** Nivel 1: centroide del departamento inferido desde domicilio + jitter */
+function deptFallback(id: string, domicilio?: string): [number, number] {
+  if (domicilio) {
+    const lower = domicilio.toLowerCase();
+    const dept = DEPARTAMENTOS_MENDOZA.find(d => lower.includes(d.nombre.toLowerCase()));
+    if (dept) {
+      return [
+        dept.centro[0] + hashOffset(id, 0.018),
+        dept.centro[1] + hashOffset(id + 'lng', 0.018),
+      ];
+    }
+  }
+  return [MENDOZA_CAP[0] + hashOffset(id, 0.05), MENDOZA_CAP[1] + hashOffset(id + 'lng', 0.05)];
+}
 
 // ── Leaflet default icon fix ──
 const DefaultIcon = L.icon({
@@ -42,6 +67,58 @@ export default function MapaActoresTab({
   const toggleLayer = useCallback((layer: keyof typeof layers) => {
     setLayers(prev => ({ ...prev, [layer]: !prev[layer] }));
   }, []);
+
+  // Nivel 2: posiciones geocodificadas por Nominatim (mejoran el centroide de forma asíncrona)
+  const [geocodedPos, setGeocodedPos] = useState<Record<string, [number, number]>>({});
+
+  useEffect(() => {
+    if (!ccData?.transportistas) return;
+    const missing = ccData.transportistas.filter(
+      t => (t.latitud == null || t.longitud == null) && t.domicilio,
+    );
+    if (missing.length === 0) return;
+
+    // Cargar desde caché de sesión primero
+    const toFetch: typeof missing = [];
+    const fromCache: Record<string, [number, number]> = {};
+    for (const t of missing) {
+      const hit = sessionStorage.getItem(`geo_trans_${t.id}`);
+      if (hit) {
+        try { fromCache[t.id] = JSON.parse(hit); } catch { toFetch.push(t); }
+      } else {
+        toFetch.push(t);
+      }
+    }
+    if (Object.keys(fromCache).length > 0) {
+      setGeocodedPos(prev => ({ ...prev, ...fromCache }));
+    }
+    if (toFetch.length === 0) return;
+
+    // Geocodificar con Nominatim — max 1 req/seg (ToS)
+    let cancelled = false;
+    let idx = 0;
+    const next = async () => {
+      if (cancelled || idx >= toFetch.length) return;
+      const t = toFetch[idx++];
+      try {
+        const q = encodeURIComponent(`${t.domicilio}, Mendoza, Argentina`);
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&countrycodes=ar`,
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled && Array.isArray(data) && data.length > 0) {
+            const pos: [number, number] = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+            sessionStorage.setItem(`geo_trans_${t.id}`, JSON.stringify(pos));
+            setGeocodedPos(prev => ({ ...prev, [t.id]: pos }));
+          }
+        }
+      } catch { /* Nominatim falló — centroide de dpto ya visible */ }
+      if (!cancelled) setTimeout(next, 1100); // 1 req/seg
+    };
+    next();
+    return () => { cancelled = true; };
+  }, [ccData?.transportistas]);
 
   const generadoresClustered = useMemo(() => {
     if (!ccData?.generadores) return [];
@@ -154,29 +231,37 @@ export default function MapaActoresTab({
                 </Marker>
               ))}
 
-              {/* Transportistas */}
-              {layers.transportistas && ccData.transportistas?.map((t, idx) => (
-                <Marker
-                  key={`trans-${t.id}-${idx}`}
-                  position={[t.latitud, t.longitud]}
-                  icon={ACTOR_ICONS.transportista}
-                >
-                  <Popup>
-                    <div className="text-sm">
-                      <strong className="text-orange-700">{t.razonSocial}</strong><br />
-                      <span className="text-xs text-neutral-500">CUIT: {t.cuit}</span><br />
-                      <span className="text-xs">Vehículos: {t.vehiculosActivos}</span><br />
-                      <span className="text-xs font-medium">En tránsito: {t.enviosEnTransito}</span><br />
-                      <button
-                        className="text-xs text-primary-600 hover:underline mt-1"
-                        onClick={() => onSelectDep(getDepartamento(t.latitud, t.longitud))}
-                      >
-                        Ver departamento: {getDepartamento(t.latitud, t.longitud)}
-                      </button>
-                    </div>
-                  </Popup>
-                </Marker>
-              ))}
+              {/* Transportistas — coords reales > Nominatim geocoded > centroide de dpto */}
+              {layers.transportistas && ccData.transportistas?.map((t, idx) => {
+                const pos: [number, number] =
+                  geocodedPos[t.id] ??
+                  (t.latitud != null && t.longitud != null
+                    ? [t.latitud, t.longitud] as [number, number]
+                    : null) ??
+                  deptFallback(t.id, t.domicilio);
+                return (
+                  <Marker
+                    key={`trans-${t.id}-${idx}`}
+                    position={pos}
+                    icon={ACTOR_ICONS.transportista}
+                  >
+                    <Popup>
+                      <div className="text-sm">
+                        <strong className="text-orange-700">{t.razonSocial}</strong><br />
+                        <span className="text-xs text-neutral-500">CUIT: {t.cuit}</span><br />
+                        <span className="text-xs">Vehículos: {t.vehiculosActivos}</span><br />
+                        <span className="text-xs font-medium">En tránsito: {t.enviosEnTransito}</span><br />
+                        <button
+                          className="text-xs text-primary-600 hover:underline mt-1"
+                          onClick={() => onSelectDep(getDepartamento(pos[0], pos[1]))}
+                        >
+                          Ver departamento: {getDepartamento(pos[0], pos[1])}
+                        </button>
+                      </div>
+                    </Popup>
+                  </Marker>
+                );
+              })}
 
               {/* Operadores */}
               {layers.operadores && ccData.operadores?.map((o, idx) => (

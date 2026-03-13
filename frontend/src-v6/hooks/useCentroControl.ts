@@ -22,8 +22,9 @@ export interface ActorTransportista {
   id: string;
   razonSocial: string;
   cuit: string;
-  latitud: number;
-  longitud: number;
+  domicilio?: string;
+  latitud: number | null;
+  longitud: number | null;
   vehiculosActivos: number;
   enviosEnTransito: number;
 }
