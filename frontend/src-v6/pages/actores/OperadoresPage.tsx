@@ -334,7 +334,7 @@ const OperadoresPage: React.FC = () => {
                     <tr
                       key={op.id}
                       className="hover:bg-neutral-50 transition-colors cursor-pointer group"
-                      onClick={() => navigate(isMobile ? `/mobile/actores/operadores/${op.id}` : `/actores/operadores/${op.id}`)}
+                      onClick={() => navigate(isMobile ? `/mobile/admin/actores/operadores/${op.id}` : `/admin/actores/operadores/${op.id}`)}
                     >
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-3">
@@ -365,7 +365,7 @@ const OperadoresPage: React.FC = () => {
                       </td>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button variant="ghost" size="sm" className="p-2" onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/actores/operadores/${op.id}` : `/actores/operadores/${op.id}`); }}>
+                          <Button variant="ghost" size="sm" className="p-2" onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/admin/actores/operadores/${op.id}` : `/admin/actores/operadores/${op.id}`); }}>
                             <Eye size={16} />
                           </Button>
                           <Button variant="ghost" size="sm" className="p-2" onClick={(e) => { e.stopPropagation(); openEditar(op); }}>
@@ -392,7 +392,7 @@ const OperadoresPage: React.FC = () => {
               <Card
                 key={op.id}
                 className="p-5 hover:shadow-md transition-all cursor-pointer group"
-                onClick={() => navigate(isMobile ? `/mobile/actores/operadores/${op.id}` : `/actores/operadores/${op.id}`)}
+                onClick={() => navigate(isMobile ? `/mobile/admin/actores/operadores/${op.id}` : `/admin/actores/operadores/${op.id}`)}
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -434,7 +434,7 @@ const OperadoresPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2 pt-4 border-t border-neutral-100">
-                  <Button variant="outline" size="sm" className="flex-1" leftIcon={<Eye size={14} />} onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/actores/operadores/${op.id}` : `/actores/operadores/${op.id}`); }}>
+                  <Button variant="outline" size="sm" className="flex-1" leftIcon={<Eye size={14} />} onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/admin/actores/operadores/${op.id}` : `/admin/actores/operadores/${op.id}`); }}>
                     Ver
                   </Button>
                   <Button variant="outline" size="sm" className="flex-1" leftIcon={<Edit size={14} />} onClick={(e) => { e.stopPropagation(); openEditar(op); }}>

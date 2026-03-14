@@ -626,6 +626,23 @@ export const ActoresPage: React.FC = () => {
                 <p className="text-neutral-900">{actorSeleccionado.email}</p>
               </div>
             </div>
+            <div className="flex justify-end pt-2 border-t border-neutral-100">
+              <Button
+                leftIcon={<Eye size={16} />}
+                onClick={() => {
+                  const tipo = actorSeleccionado.tipo;
+                  const detailPath = tipo === 'generador'
+                    ? mp(`/admin/actores/generadores/${actorSeleccionado.id}`)
+                    : tipo === 'transportista'
+                    ? mp(`/admin/actores/transportistas/${actorSeleccionado.id}`)
+                    : mp(`/admin/actores/operadores/${actorSeleccionado.id}`);
+                  setModalDetalle(false);
+                  navigate(detailPath);
+                }}
+              >
+                Ver detalle completo
+              </Button>
+            </div>
           </div>
         )}
       </Modal>

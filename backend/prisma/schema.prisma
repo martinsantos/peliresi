@@ -82,6 +82,16 @@ model Transportista {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
+  // Campos regulatorios DPA Mendoza (migración 2026-03-13)
+  localidad               String?    // Municipio/ciudad (LOC. del Excel)
+  vencimientoHabilitacion DateTime?  // VTO. del certificado CAA
+  corrientesAutorizadas   String?    // Corrientes Basilea raw: "Y4/Y8/Y9/..."
+  expedienteDPA           String?    // Expediente DPA (EXPTE. DPA)
+  resolucionDPA           String?    // Resolución DPA (ej: "0359/24")
+  resolucionSSP           String?    // Resolución SSP
+  actaInspeccion          String?    // Acta de Inspección (ej: "rp-g000040")
+  actaInspeccion2         String?    // Segunda Acta de Inspección
+
   // Relaciones
   usuario       Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   vehiculos     Vehiculo[]

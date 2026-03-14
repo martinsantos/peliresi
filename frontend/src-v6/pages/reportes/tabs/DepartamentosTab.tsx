@@ -120,9 +120,9 @@ export function DepartamentoDetalleModal({
 
   const handleNavigateActor = (actor: ActorUnified) => {
     const routeMap: Record<string, string> = {
-      generador: '/actores',
-      transportista: '/actores/transportistas',
-      operador: '/actores/operadores',
+      generador: `/admin/actores/generadores/${actor.id}`,
+      transportista: `/admin/actores/transportistas/${actor.id}`,
+      operador: `/admin/actores/operadores/${actor.id}`,
     };
     navigate(routeMap[actor.tipo] || '/actores');
   };

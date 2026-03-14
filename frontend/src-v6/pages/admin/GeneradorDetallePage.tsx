@@ -4,7 +4,7 @@
  * Vista detalle de un generador con tabs: Info General + Residuos Inscriptos
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -18,12 +18,14 @@ import {
   AlertTriangle,
   Biohazard,
   Shield,
+  FileText,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Tabs, TabList, Tab, TabPanel } from '../../components/ui/Tabs';
 import { useGenerador } from '../../hooks/useActores';
+import { useManifiestos } from '../../hooks/useManifiestos';
 import { downloadCsv } from '../../utils/exportCsv';
 import { GENERADORES_DATA } from '../../data/generadores-enrichment';
 import { CORRIENTES_Y } from '../../data/corrientes-y';
@@ -34,7 +36,9 @@ const GeneradorDetallePage: React.FC = () => {
   const location = useLocation();
   const isMobile = location.pathname.startsWith('/mobile');
 
+  const [historialPage, setHistorialPage] = useState(1);
   const { data: apiGenerador, isLoading } = useGenerador(id || '');
+  const { data: manifiestoData } = useManifiestos({ generadorId: id, limit: 20, page: historialPage }, { enabled: !!id });
 
   const generador = apiGenerador ? {
     ...apiGenerador,
@@ -116,6 +120,7 @@ const GeneradorDetallePage: React.FC = () => {
         <TabList>
           <Tab id="info" icon={<Factory size={16} />}>Información General</Tab>
           <Tab id="residuos" icon={<Biohazard size={16} />}>Residuos Inscriptos</Tab>
+          <Tab id="historial" icon={<FileText size={16} />}>Historial</Tab>
         </TabList>
 
         {/* Tab: Info General */}
@@ -196,6 +201,68 @@ const GeneradorDetallePage: React.FC = () => {
               </div>
             </Card>
           )}
+        </TabPanel>
+
+        {/* Tab: Historial de Manifiestos */}
+        <TabPanel id="historial">
+          <Card>
+            <CardHeader title="Historial de Manifiestos" icon={<FileText size={20} />} />
+            <CardContent>
+              {(manifiestoData?.items?.length ?? 0) > 0 ? (
+                <table className="w-full table-fixed">
+                  <thead className="bg-neutral-50">
+                    <tr>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Número</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Estado</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '22%' }}>Transportista</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '18%' }}>Fecha</th>
+                      <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-100">
+                    {manifiestoData!.items.map((m: any) => (
+                      <tr key={m.id} className="hover:bg-neutral-50 transition-colors">
+                        <td className="px-3 py-2.5 font-mono text-sm font-semibold text-neutral-900">{m.numero}</td>
+                        <td className="px-3 py-2.5">
+                          <Badge variant="soft" color={
+                            m.estado === 'TRATADO' ? 'success' :
+                            m.estado === 'EN_TRANSITO' ? 'warning' :
+                            m.estado === 'CANCELADO' || m.estado === 'RECHAZADO' ? 'error' : 'neutral'
+                          }>
+                            {m.estado}
+                          </Badge>
+                        </td>
+                        <td className="px-3 py-2.5 text-sm text-neutral-700 hidden md:table-cell">{m.transportista?.razonSocial || '-'}</td>
+                        <td className="px-3 py-2.5 text-sm text-neutral-600 hidden md:table-cell">{m.createdAt ? new Date(m.createdAt).toLocaleDateString('es-AR') : '-'}</td>
+                        <td className="px-3 py-2.5 text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate(isMobile ? `/mobile/manifiestos/${m.id}` : `/manifiestos/${m.id}`)}
+                          >
+                            Ver
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="text-sm text-neutral-400 text-center py-6">Sin manifiestos registrados</p>
+              )}
+              {(manifiestoData?.totalPages ?? 0) > 1 && (
+                <div className="flex items-center justify-between pt-4 border-t border-neutral-100 mt-2">
+                  <p className="text-sm text-neutral-500">
+                    Página {manifiestoData!.page} de {manifiestoData!.totalPages} · {manifiestoData!.total} total
+                  </p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" disabled={historialPage === 1} onClick={() => setHistorialPage(p => p - 1)}>Anterior</Button>
+                    <Button variant="outline" size="sm" disabled={historialPage === manifiestoData!.totalPages} onClick={() => setHistorialPage(p => p + 1)}>Siguiente</Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabPanel>
       </Tabs>
     </div>

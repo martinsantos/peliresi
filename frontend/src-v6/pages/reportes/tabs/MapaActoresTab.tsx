@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Calendar, Layers, Eye, EyeOff,
 } from 'lucide-react';
@@ -58,6 +59,7 @@ export default function MapaActoresTab({
   incluirTodos?: boolean;
   onToggleIncluirTodos?: (value: boolean) => void;
 }) {
+  const navigate = useNavigate();
   const [layers, setLayers] = useState({
     generadores: true,
     transportistas: true,
@@ -165,38 +167,40 @@ export default function MapaActoresTab({
         )}
       </div>
 
-      {/* KPI + Layer toggles */}
-      <div className="flex flex-wrap items-center gap-3 p-4 bg-white rounded-2xl border border-neutral-100 shadow-sm">
-        <Layers size={16} className="text-neutral-400" />
-        {([
-          { key: 'generadores' as const, label: 'Generadores', color: 'bg-purple-500', count: totalGen },
-          { key: 'transportistas' as const, label: 'Transportistas', color: 'bg-orange-500', count: totalTrans },
-          { key: 'operadores' as const, label: 'Operadores', color: 'bg-blue-500', count: totalOper },
-        ]).map(l => (
-          <button
-            key={l.key}
-            onClick={() => toggleLayer(l.key)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-              layers[l.key]
-                ? 'bg-white border-neutral-200 text-neutral-700 shadow-sm'
-                : 'bg-neutral-50 border-transparent text-neutral-400'
-            }`}
-          >
-            <span className={`w-2 h-2 rounded-full ${layers[l.key] ? l.color : 'bg-neutral-300'}`} />
-            <span>{l.label}</span>
-            <Badge variant="soft" color="neutral" className="text-[10px] px-1.5 py-0 ml-1">{l.count}</Badge>
-            {layers[l.key] ? <Eye size={12} /> : <EyeOff size={12} />}
-          </button>
-        ))}
-        <div className="ml-auto text-xs text-neutral-500">
-          {totalGen + totalTrans + totalOper} actores totales
+      {/* KPI + Layer toggles — sticky below the date filter bar */}
+      <div className="sticky top-[92px] z-10 -mx-4 lg:-mx-8 px-4 lg:px-8 pb-3 bg-[#FAFAF8]">
+        <div className="flex flex-wrap items-center gap-3 p-3.5 bg-white rounded-2xl border border-neutral-100 shadow-sm">
+          <Layers size={16} className="text-neutral-400" />
+          {([
+            { key: 'generadores' as const, label: 'Generadores', color: 'bg-purple-500', activeClass: 'bg-purple-50 border-purple-300 text-purple-700 shadow-sm', count: totalGen },
+            { key: 'transportistas' as const, label: 'Transportistas', color: 'bg-orange-500', activeClass: 'bg-orange-50 border-orange-300 text-orange-700 shadow-sm', count: totalTrans },
+            { key: 'operadores' as const, label: 'Operadores', color: 'bg-blue-500', activeClass: 'bg-blue-50 border-blue-300 text-blue-700 shadow-sm', count: totalOper },
+          ]).map(l => (
+            <button
+              key={l.key}
+              onClick={() => toggleLayer(l.key)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                layers[l.key]
+                  ? l.activeClass
+                  : 'bg-neutral-50 border-transparent text-neutral-400'
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${layers[l.key] ? l.color : 'bg-neutral-300'}`} />
+              <span>{l.label}</span>
+              <Badge variant="soft" color="neutral" className="text-[10px] px-1.5 py-0 ml-1">{l.count}</Badge>
+              {layers[l.key] ? <Eye size={12} /> : <EyeOff size={12} />}
+            </button>
+          ))}
+          <div className="ml-auto text-xs text-neutral-500">
+            {totalGen + totalTrans + totalOper} actores totales
+          </div>
         </div>
       </div>
 
       {/* Map */}
       <Card padding="none">
         <div className="p-5">
-          <div className="h-[32rem] sm:h-[36rem] rounded-xl overflow-hidden border border-neutral-200 relative isolate">
+          <div className="h-[calc(100vh-22rem)] min-h-[28rem] max-h-[52rem] rounded-xl overflow-hidden border border-neutral-200 relative isolate">
             <MapContainer
               center={[-32.9287, -68.8535]}
               zoom={10}
@@ -220,12 +224,22 @@ export default function MapaActoresTab({
                       <span className="text-xs text-neutral-500">CUIT: {g.cuit}</span><br />
                       <span className="text-xs text-neutral-500">Cat: {g.categoria}</span><br />
                       <span className="text-xs font-medium">Manifiestos: {g.cantManifiestos}</span><br />
-                      <button
-                        className="text-xs text-primary-600 hover:underline mt-1"
-                        onClick={() => onSelectDep(getDepartamento(g.latitud, g.longitud))}
-                      >
-                        Ver departamento: {getDepartamento(g.latitud, g.longitud)}
-                      </button>
+                      <div className="flex items-center gap-3 mt-1">
+                        <button
+                          className="text-xs text-primary-600 hover:underline"
+                          onClick={() => onSelectDep(getDepartamento(g.latitud, g.longitud))}
+                        >
+                          Ver departamento
+                        </button>
+                        {!g.count && (
+                          <button
+                            className="text-xs text-primary-600 hover:underline font-medium"
+                            onClick={() => navigate(`/admin/actores/generadores/${g.id}`)}
+                          >
+                            Ver detalle →
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </Popup>
                 </Marker>
@@ -249,14 +263,42 @@ export default function MapaActoresTab({
                       <div className="text-sm">
                         <strong className="text-orange-700">{t.razonSocial}</strong><br />
                         <span className="text-xs text-neutral-500">CUIT: {t.cuit}</span><br />
-                        <span className="text-xs">Vehículos: {t.vehiculosActivos}</span><br />
+                        {(t as any).localidad && (
+                          <span className="text-xs text-neutral-500">📍 {(t as any).localidad}</span>
+                        )}
+                        {(t as any).vencimientoHabilitacion && (() => {
+                          const vto = new Date((t as any).vencimientoHabilitacion);
+                          const dias = Math.ceil((vto.getTime() - Date.now()) / 86400000);
+                          const emoji = dias <= 0 ? '🔴' : dias <= 30 ? '🟡' : '🟢';
+                          return <><br /><span className="text-xs">{emoji} Vto: {vto.toLocaleDateString('es-AR')}</span></>;
+                        })()}
+                        {(t as any).corrientesAutorizadas && (() => {
+                          const corrientes = (t as any).corrientesAutorizadas.split('/').filter(Boolean);
+                          const visible = corrientes.slice(0, 3);
+                          const resto = corrientes.length - visible.length;
+                          return (
+                            <><br /><span className="text-xs text-neutral-600">
+                              Corrientes: {visible.join(' ')}
+                              {resto > 0 ? ` +${resto} más` : ''}
+                            </span></>
+                          );
+                        })()}
+                        <br /><span className="text-xs">Vehículos: {t.vehiculosActivos}</span><br />
                         <span className="text-xs font-medium">En tránsito: {t.enviosEnTransito}</span><br />
-                        <button
-                          className="text-xs text-primary-600 hover:underline mt-1"
-                          onClick={() => onSelectDep(getDepartamento(pos[0], pos[1]))}
-                        >
-                          Ver departamento: {getDepartamento(pos[0], pos[1])}
-                        </button>
+                        <div className="flex items-center gap-3 mt-1">
+                          <button
+                            className="text-xs text-primary-600 hover:underline"
+                            onClick={() => onSelectDep(getDepartamento(pos[0], pos[1]))}
+                          >
+                            Ver departamento
+                          </button>
+                          <button
+                            className="text-xs text-primary-600 hover:underline font-medium"
+                            onClick={() => navigate(`/admin/actores/transportistas/${t.id}`)}
+                          >
+                            Ver detalle →
+                          </button>
+                        </div>
                       </div>
                     </Popup>
                   </Marker>
@@ -276,12 +318,20 @@ export default function MapaActoresTab({
                       <span className="text-xs text-neutral-500">CUIT: {o.cuit}</span><br />
                       <span className="text-xs text-neutral-500">Cat: {o.categoria}</span><br />
                       <span className="text-xs">Recibidos: {o.cantRecibidos} | Tratados: {o.cantTratados}</span><br />
-                      <button
-                        className="text-xs text-primary-600 hover:underline mt-1"
-                        onClick={() => onSelectDep(getDepartamento(o.latitud, o.longitud))}
-                      >
-                        Ver departamento: {getDepartamento(o.latitud, o.longitud)}
-                      </button>
+                      <div className="flex items-center gap-3 mt-1">
+                        <button
+                          className="text-xs text-primary-600 hover:underline"
+                          onClick={() => onSelectDep(getDepartamento(o.latitud, o.longitud))}
+                        >
+                          Ver departamento
+                        </button>
+                        <button
+                          className="text-xs text-primary-600 hover:underline font-medium"
+                          onClick={() => navigate(`/admin/actores/operadores/${o.id}`)}
+                        >
+                          Ver detalle →
+                        </button>
+                      </div>
                     </div>
                   </Popup>
                 </Marker>

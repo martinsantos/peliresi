@@ -110,6 +110,7 @@ function AppMobile() {
             <Route path="/actores" element={<ActoresPage />} />
             <Route path="/actores/operadores" element={<OperadoresPage />} />
             <Route path="/actores/operadores/:id" element={<OperadorDetallePage />} />
+            <Route path="/admin/actores/operadores/:id" element={<OperadorDetallePage />} />
             <Route path="/actores/transportistas" element={<TransportistasPage />} />
             <Route path="/actores/transportistas/:id" element={<TransportistaDetallePage />} />
             <Route path="/reportes" element={<ReportesPage />} />

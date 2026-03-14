@@ -23,6 +23,10 @@ import {
   Plus,
   Pencil,
   Trash2,
+  FileText,
+  FlaskConical,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -38,6 +42,7 @@ import {
   useUpdateChofer,
   useDeleteChofer,
 } from '../../hooks/useActores';
+import { useManifiestos } from '../../hooks/useManifiestos';
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from '../../components/ui/Toast';
 
@@ -51,14 +56,6 @@ const TransportistaDetallePage: React.FC = () => {
   const isMobile = location.pathname.startsWith('/mobile');
   const { isAdmin } = useAuth();
 
-  const { data: apiTransportista, isLoading } = useTransportista(id || '');
-  const createVehiculo = useCreateVehiculo();
-  const createChofer = useCreateChofer();
-  const updateVehiculo = useUpdateVehiculo();
-  const deleteVehiculo = useDeleteVehiculo();
-  const updateChofer = useUpdateChofer();
-  const deleteChofer = useDeleteChofer();
-
   const [showVehiculoModal, setShowVehiculoModal] = useState(false);
   const [showChoferModal, setShowChoferModal] = useState(false);
   const [vehiculoForm, setVehiculoForm] = useState(EMPTY_VEHICULO);
@@ -67,6 +64,17 @@ const TransportistaDetallePage: React.FC = () => {
   const [editingChofer, setEditingChofer] = useState<any>(null);
   const [deleteVehiculoItem, setDeleteVehiculoItem] = useState<any>(null);
   const [deleteChoferItem, setDeleteChoferItem] = useState<any>(null);
+  const [corrientesExpanded, setCorrientesExpanded] = useState(false);
+  const [historialPage, setHistorialPage] = useState(1);
+
+  const { data: apiTransportista, isLoading } = useTransportista(id || '');
+  const { data: manifiestoData } = useManifiestos({ transportistaId: id, limit: 20, page: historialPage }, { enabled: !!id });
+  const createVehiculo = useCreateVehiculo();
+  const createChofer = useCreateChofer();
+  const updateVehiculo = useUpdateVehiculo();
+  const deleteVehiculo = useDeleteVehiculo();
+  const updateChofer = useUpdateChofer();
+  const deleteChofer = useDeleteChofer();
 
   const transportista = apiTransportista ? {
     ...apiTransportista,
@@ -75,6 +83,16 @@ const TransportistaDetallePage: React.FC = () => {
     estado: (apiTransportista as any).activo !== false ? 'ACTIVO' : 'SUSPENDIDO',
     habilitacion: (apiTransportista as any).numeroHabilitacion || '-',
     vencimientoHab: (apiTransportista as any).vencimientoHab || '-',
+    vencimientoHabilitacion: (apiTransportista as any).vencimientoHabilitacion
+      ? new Date((apiTransportista as any).vencimientoHabilitacion)
+      : null,
+    localidad: (apiTransportista as any).localidad || null,
+    corrientesAutorizadas: (apiTransportista as any).corrientesAutorizadas || null,
+    expedienteDPA: (apiTransportista as any).expedienteDPA || null,
+    resolucionDPA: (apiTransportista as any).resolucionDPA || null,
+    resolucionSSP: (apiTransportista as any).resolucionSSP || null,
+    actaInspeccion: (apiTransportista as any).actaInspeccion || null,
+    actaInspeccion2: (apiTransportista as any).actaInspeccion2 || null,
     flota: (apiTransportista as any).vehiculos || [],
     conductores: (apiTransportista as any).choferes || [],
   } : null;
@@ -242,6 +260,21 @@ const TransportistaDetallePage: React.FC = () => {
   const diasHastaVencimiento = habVencimiento ? Math.ceil((habVencimiento.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
   const habProximaVencer = diasHastaVencimiento !== null && diasHastaVencimiento <= 90 && diasHastaVencimiento > 0;
 
+  // Vencimiento habilitación DPA
+  const vtoHab = transportista.vencimientoHabilitacion;
+  const diasVtoHab = vtoHab
+    ? Math.ceil((vtoHab.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : null;
+  const vtoStatus: 'vencida' | 'pronto' | 'vigente' | null = vtoHab
+    ? (diasVtoHab! <= 0 ? 'vencida' : diasVtoHab! <= 30 ? 'pronto' : 'vigente')
+    : null;
+
+  // Corrientes autorizadas — parseo
+  const corrientesList = transportista.corrientesAutorizadas
+    ? transportista.corrientesAutorizadas.split('/').map((s: string) => s.trim()).filter(Boolean)
+    : [];
+  const CORRIENTES_MAX_VISIBLE = 10;
+
   return (
     <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
       {/* Header */}
@@ -261,6 +294,12 @@ const TransportistaDetallePage: React.FC = () => {
                   {transportista.estado === 'ACTIVO' ? <CheckCircle2 size={12} className="mr-1" /> : <AlertCircle size={12} className="mr-1" />}
                   {transportista.estado === 'ACTIVO' ? 'Activo' : 'Suspendido'}
                 </Badge>
+                {vtoStatus === 'vencida' && (
+                  <Badge variant="soft" color="error"><AlertTriangle size={12} className="mr-1" />Habilitación VENCIDA</Badge>
+                )}
+                {vtoStatus === 'pronto' && (
+                  <Badge variant="soft" color="warning"><AlertTriangle size={12} className="mr-1" />Vence en {diasVtoHab} días</Badge>
+                )}
               </div>
               <span className="text-neutral-600 font-mono text-sm">CUIT: {transportista.cuit}</span>
             </div>
@@ -285,6 +324,7 @@ const TransportistaDetallePage: React.FC = () => {
         <TabList>
           <Tab id="info" icon={<Truck size={16} />}>Información General</Tab>
           <Tab id="flota" icon={<Users size={16} />}>Flota y Conductores</Tab>
+          <Tab id="historial" icon={<FileText size={16} />}>Historial</Tab>
         </TabList>
 
         {/* Tab: Info General */}
@@ -360,6 +400,119 @@ const TransportistaDetallePage: React.FC = () => {
               </CardContent>
             </Card>
           </div>
+
+          {/* Sección Regulatoria DPA */}
+          <Card>
+            <CardHeader title="Habilitación DPA" icon={<FileText size={20} />} />
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3 text-sm">
+                    <Shield size={16} className="text-neutral-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-neutral-500 text-xs">N° CAA</p>
+                      <p className="font-medium font-mono">{transportista.habilitacion}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 text-sm">
+                    <Calendar size={16} className="text-neutral-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-neutral-500 text-xs">Vencimiento habilitación</p>
+                      {vtoHab ? (
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{vtoHab.toLocaleDateString('es-AR')}</p>
+                          {vtoStatus === 'vencida' && (
+                            <Badge variant="soft" color="error" className="text-xs">VENCIDA</Badge>
+                          )}
+                          {vtoStatus === 'pronto' && (
+                            <Badge variant="soft" color="warning" className="text-xs">En {diasVtoHab} días</Badge>
+                          )}
+                          {vtoStatus === 'vigente' && (
+                            <Badge variant="soft" color="success" className="text-xs">VIGENTE</Badge>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-neutral-400">—</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 text-sm">
+                    <MapPin size={16} className="text-neutral-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-neutral-500 text-xs">Localidad</p>
+                      <p className="font-medium">{transportista.localidad || '—'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 text-sm">
+                    <FileText size={16} className="text-neutral-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-neutral-500 text-xs">Expediente DPA</p>
+                      <p className="font-medium font-mono">{transportista.expedienteDPA || '—'}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3 text-sm">
+                    <FileText size={16} className="text-neutral-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-neutral-500 text-xs">Resolución DPA</p>
+                      <p className="font-medium font-mono">{transportista.resolucionDPA || '—'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 text-sm">
+                    <FileText size={16} className="text-neutral-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-neutral-500 text-xs">Resolución SSP</p>
+                      <p className="font-medium font-mono">{transportista.resolucionSSP || '—'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 text-sm">
+                    <FileText size={16} className="text-neutral-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-neutral-500 text-xs">Acta Inspección</p>
+                      <p className="font-medium font-mono">{transportista.actaInspeccion || '—'}</p>
+                    </div>
+                  </div>
+                  {transportista.actaInspeccion2 && (
+                    <div className="flex items-start gap-3 text-sm">
+                      <FileText size={16} className="text-neutral-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-neutral-500 text-xs">Acta Inspección 2</p>
+                        <p className="font-medium font-mono">{transportista.actaInspeccion2}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Corrientes autorizadas */}
+              {corrientesList.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-neutral-100">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FlaskConical size={16} className="text-neutral-400" />
+                    <p className="text-sm text-neutral-500">Corrientes autorizadas para transporte</p>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(corrientesExpanded ? corrientesList : corrientesList.slice(0, CORRIENTES_MAX_VISIBLE)).map((c: string) => (
+                      <Badge key={c} variant="soft" color="info" className="font-mono text-xs">{c}</Badge>
+                    ))}
+                    {corrientesList.length > CORRIENTES_MAX_VISIBLE && (
+                      <button
+                        className="text-xs text-primary-600 hover:underline flex items-center gap-1 px-2 py-0.5"
+                        onClick={() => setCorrientesExpanded(prev => !prev)}
+                      >
+                        {corrientesExpanded ? (
+                          <><ChevronUp size={12} />Mostrar menos</>
+                        ) : (
+                          <><ChevronDown size={12} />+{corrientesList.length - CORRIENTES_MAX_VISIBLE} más</>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabPanel>
 
         {/* Tab: Flota y Conductores */}
@@ -499,6 +652,68 @@ const TransportistaDetallePage: React.FC = () => {
               </CardContent>
             </Card>
           </div>
+        </TabPanel>
+
+        {/* Tab: Historial de Manifiestos */}
+        <TabPanel id="historial">
+          <Card>
+            <CardHeader title="Historial de Manifiestos" icon={<FileText size={20} />} />
+            <CardContent>
+              {(manifiestoData?.items?.length ?? 0) > 0 ? (
+                <table className="w-full table-fixed">
+                  <thead className="bg-neutral-50">
+                    <tr>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Número</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Estado</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '22%' }}>Generador</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '18%' }}>Fecha</th>
+                      <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-100">
+                    {manifiestoData!.items.map((m: any) => (
+                      <tr key={m.id} className="hover:bg-neutral-50 transition-colors">
+                        <td className="px-3 py-2.5 font-mono text-sm font-semibold text-neutral-900">{m.numero}</td>
+                        <td className="px-3 py-2.5">
+                          <Badge variant="soft" color={
+                            m.estado === 'TRATADO' ? 'success' :
+                            m.estado === 'EN_TRANSITO' ? 'warning' :
+                            m.estado === 'CANCELADO' || m.estado === 'RECHAZADO' ? 'error' : 'neutral'
+                          }>
+                            {m.estado}
+                          </Badge>
+                        </td>
+                        <td className="px-3 py-2.5 text-sm text-neutral-700 hidden md:table-cell">{m.generador?.razonSocial || '-'}</td>
+                        <td className="px-3 py-2.5 text-sm text-neutral-600 hidden md:table-cell">{m.createdAt ? new Date(m.createdAt).toLocaleDateString('es-AR') : '-'}</td>
+                        <td className="px-3 py-2.5 text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate(isMobile ? `/mobile/manifiestos/${m.id}` : `/manifiestos/${m.id}`)}
+                          >
+                            Ver
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="text-sm text-neutral-400 text-center py-6">Sin manifiestos registrados</p>
+              )}
+              {(manifiestoData?.totalPages ?? 0) > 1 && (
+                <div className="flex items-center justify-between pt-4 border-t border-neutral-100 mt-2">
+                  <p className="text-sm text-neutral-500">
+                    Página {manifiestoData!.page} de {manifiestoData!.totalPages} · {manifiestoData!.total} total
+                  </p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" disabled={historialPage === 1} onClick={() => setHistorialPage(p => p - 1)}>Anterior</Button>
+                    <Button variant="outline" size="sm" disabled={historialPage === manifiestoData!.totalPages} onClick={() => setHistorialPage(p => p + 1)}>Siguiente</Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabPanel>
       </Tabs>
 

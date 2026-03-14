@@ -42,10 +42,11 @@ function applyClientFilters(items: Manifiesto[], filters?: ManifiestoFilters): M
   return result;
 }
 
-export function useManifiestos(filters?: ManifiestoFilters) {
+export function useManifiestos(filters?: ManifiestoFilters, options?: { enabled?: boolean }) {
   const { currentUser } = useAuth();
   return useQuery({
     queryKey: KEYS.list(filters),
+    enabled: options?.enabled ?? true,
     queryFn: async () => {
       try {
         return await manifiestoService.list(filters);

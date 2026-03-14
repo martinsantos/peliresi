@@ -172,6 +172,7 @@ export interface CreateTransportistaRequest {
   razonSocial: string;
   cuit: string;
   domicilio: string;
+  localidad?: string;
   telefono: string;
   numeroHabilitacion: string;
 }

@@ -2,189 +2,162 @@
  * seed-transportistas-reales.ts
  *
  * Importación de transportistas reales desde el registro oficial DPA Mendoza.
- * CSV: backend/prisma/transporte.csv (o /tmp/transporte.csv en el servidor)
+ * Lee directamente el Excel: "Registro Pcial de Transportistas de RRPP.xlsx"
+ * (buscado en ../../ relativo a backend/prisma/, o en /tmp/)
  *
- * Columnas del CSV:
- *  0: CAA               → Transportista.numeroHabilitacion (normalizado)
- *  1: RAZÓN SOCIAL      → Transportista.razonSocial + Usuario.nombre
- *  2: CUIT              → Transportista.cuit + Usuario.cuit (clave única)
- *  3: EXPTE. DPA        → ignorado (info registral extra)
- *  4: DOMICILIO         → Transportista.domicilio (base)
- *  5: LOC.              → Transportista.domicilio (sufijo)
- *  6: CORRIENTES AUTH.  → ignorado (no hay campo en modelo Transportista)
- *  7: VTO.              → Vehiculo.vencimiento (formato MM/DD/YYYY)
- *  8: Resol DPA         → ignorado
- *  9: Resol SSP         → ignorado
- * 10: VIGENCIA          → ignorado
- * 11: Unidades Habili.  → Vehiculo.patente (campo quoted multilínea)
- * 12-14: Actas/Obs.     → ignorado
+ * Columnas del Excel (índice 0-based):
+ *  0: CAA                    → Transportista.numeroHabilitacion (normalizado)
+ *  1: RAZÓN SOCIAL           → Transportista.razonSocial + Usuario.nombre
+ *  2: CUIT                   → Transportista.cuit (o placeholder si vacío)
+ *  3: EXPTE. DPA             → Transportista.expedienteDPA
+ *  4: DOMICILIO              → Transportista.domicilio
+ *  5: LOC.                   → Transportista.localidad + sufijo en domicilio
+ *  6: CORRIENTES AUTH.       → Transportista.corrientesAutorizadas
+ *  7: VTO.                   → Transportista.vencimientoHabilitacion (NO Vehiculo)
+ *  8: Resol DPA              → Transportista.resolucionDPA
+ *  9: Resol SSP              → Transportista.resolucionSSP
+ * 10: VIGENCIA               → ignorado (calculable desde vencimientoHabilitacion)
+ * 11: Unidades Habilitadas   → Vehiculo.patente[] (multilínea)
+ * 12: Acta Insp.             → Transportista.actaInspeccion
+ * 13: Acta Insp.2            → Transportista.actaInspeccion2
+ * 14: Observaciones          → ignorado (100% vacío)
  *
- * Campos sin datos en CSV (placeholders auditables):
- *  Transportista.telefono   → "S/D"
- *  Transportista.email      → transportista.{cuitDigits}@sitrep.local
- *  Vehiculo.marca           → "S/D"
- *  Vehiculo.modelo          → "S/D"
- *  Vehiculo.anio            → 2020
- *  Vehiculo.capacidad       → 0.0
- *  Vehiculo.numeroHabili.   → mismo CAA normalizado
+ * CUITs: si existe backend/prisma/cuits-encontrados.json, los CUITs confirmados
+ * reemplazan placeholders. Si no, se usa placeholder "CAA-T-XXXXXX".
  *
- * Idempotente: se puede ejecutar múltiples veces (upsert por CUIT y patente).
+ * Idempotente: upsert por CUIT y patente.
  */
 
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import fs from 'fs';
 import path from 'path';
+// xlsx es una dependencia dev; si no está instalada, el script falla con mensaje claro
+let XLSX: any;
+try {
+  XLSX = require('xlsx');
+} catch {
+  console.error('ERROR: xlsx no está instalado. Ejecutar: npm install --save-dev xlsx');
+  process.exit(1);
+}
 
 const prisma = new PrismaClient();
 
 // ============================================================
-// 1. CSV PARSER — maneja campos quoted con saltos de línea
-// ============================================================
-function parseCSV(content: string): string[][] {
-  const rows: string[][] = [];
-  let inQuotes = false;
-  let row: string[] = [];
-  let field = '';
-
-  for (let i = 0; i < content.length; i++) {
-    const ch = content[i];
-    const next = content[i + 1];
-
-    if (inQuotes) {
-      if (ch === '"' && next === '"') {
-        field += '"';
-        i++;
-      } else if (ch === '"') {
-        inQuotes = false;
-      } else {
-        field += ch;
-      }
-    } else {
-      if (ch === '"') {
-        inQuotes = true;
-      } else if (ch === ',') {
-        row.push(field);
-        field = '';
-      } else if (ch === '\n' || (ch === '\r' && next === '\n')) {
-        row.push(field);
-        field = '';
-        if (row.length > 1 || row[0] !== '') {
-          rows.push(row);
-        }
-        row = [];
-        if (ch === '\r') i++;
-      } else {
-        field += ch;
-      }
-    }
-  }
-  if (field || row.length > 0) {
-    row.push(field);
-    if (row.length > 1 || row[0] !== '') {
-      rows.push(row);
-    }
-  }
-  return rows;
-}
-
-// ============================================================
-// 2. NORMALIZACIÓN DE CAA
-// "T - 000014" → "T-000014"
+// 1. NORMALIZACIÓN DE CAA: "T – 000014" → "T-000014"
 // ============================================================
 function normalizeCAA(caa: string): string {
   return caa
     .trim()
-    .replace(/\s*[–—-]\s*/g, '-')  // normalizar guiones y espacios alrededor
-    .replace(/^T\s*-\s*/, 'T-')
+    .replace(/\s*[–—\-]\s*/g, '-')
     .replace(/^T-\s*/, 'T-');
 }
 
 // ============================================================
-// 3. PARSEO DE FECHA VTO. (MM/DD/YYYY → Date)
-// Devuelve null si no se puede parsear.
+// 2. PARSEO DE FECHA: acepta serial Excel (número) y string MM/DD/YYYY
 // ============================================================
-function parseVTO(vto: string): Date | null {
-  if (!vto || !vto.trim()) return null;
-  const parts = vto.trim().split('/');
-  if (parts.length !== 3) return null;
-  const [mm, dd, yyyy] = parts.map(p => parseInt(p, 10));
-  if (isNaN(mm) || isNaN(dd) || isNaN(yyyy)) return null;
-  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
-  return new Date(Date.UTC(yyyy, mm - 1, dd));
+function parseFecha(val: any): Date | null {
+  if (!val) return null;
+  // Excel serial number
+  if (typeof val === 'number') {
+    const d = XLSX.SSF.parse_date_code(val);
+    if (d) return new Date(Date.UTC(d.y, d.m - 1, d.d));
+    return null;
+  }
+  const s = String(val).trim();
+  if (!s) return null;
+  // MM/DD/YYYY
+  const parts = s.split('/');
+  if (parts.length === 3) {
+    const [mm, dd, yyyy] = parts.map((p: string) => parseInt(p, 10));
+    if (!isNaN(mm) && !isNaN(dd) && !isNaN(yyyy) && mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) {
+      return new Date(Date.UTC(yyyy, mm - 1, dd));
+    }
+  }
+  // Intento genérico
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
 }
 
 // ============================================================
-// 4. PARSEO DE PATENTES (campo multilínea)
-// Cada línea puede ser una patente distinta.
-// Normaliza: trim + uppercase + elimina líneas vacías.
+// 3. PARSEO DE PATENTES (campo multilínea)
 // ============================================================
-function parsePatentes(raw: string): string[] {
-  if (!raw || !raw.trim()) return [];
-  return raw
-    .split('\n')
-    .map(line => line.trim().toUpperCase())
-    .filter(line => line.length > 0 && line !== '-' && !/^\s*$/.test(line));
+function parsePatentes(raw: any): string[] {
+  if (!raw) return [];
+  return String(raw)
+    .split(/[\n\r]+/)
+    .map((line: string) => line.trim().toUpperCase())
+    .filter((line: string) => line.length > 0 && line !== '-');
 }
 
 // ============================================================
-// 5. PARSEO DE FILA CSV
+// 4. NORMALIZAR CUIT: "30-12345678-9" → mantener formato, limpiar espacios
 // ============================================================
-interface CSVRow {
-  caa: string;            // col 0
-  razonSocial: string;    // col 1
-  cuit: string;           // col 2
-  expteDPA: string;       // col 3
-  domicilio: string;      // col 4
-  localidad: string;      // col 5
-  corrientes: string;     // col 6
-  vto: string;            // col 7
-  unidades: string;       // col 11
-}
-
-function parseRow(row: string[]): CSVRow {
-  return {
-    caa:         (row[0]  || '').trim(),
-    razonSocial: (row[1]  || '').trim(),
-    cuit:        (row[2]  || '').trim(),
-    expteDPA:    (row[3]  || '').trim(),
-    domicilio:   (row[4]  || '').trim(),
-    localidad:   (row[5]  || '').trim(),
-    corrientes:  (row[6]  || '').trim(),
-    vto:         (row[7]  || '').trim(),
-    unidades:    (row[11] || '').trim(),
-  };
+function normalizeCUIT(raw: any): string {
+  if (!raw) return '';
+  return String(raw).trim().replace(/\s+/g, '');
 }
 
 // ============================================================
-// 6. MAIN
+// 5. MAIN
 // ============================================================
 async function main() {
   console.log('=== MIGRACIÓN DE TRANSPORTISTAS REALES (DPA Mendoza) ===\n');
 
-  // --- Localizar CSV ---
-  const localPath = path.join(__dirname, 'transporte.csv');
-  const tmpPath   = '/tmp/transporte.csv';
-  let csvPath: string;
-
-  if (fs.existsSync(localPath)) {
-    csvPath = localPath;
-    console.log(`CSV encontrado en: ${localPath}`);
-  } else if (fs.existsSync(tmpPath)) {
-    csvPath = tmpPath;
-    console.log(`CSV encontrado en: ${tmpPath}`);
-  } else {
-    console.error('ERROR: No se encontró transporte.csv en ./prisma/ ni en /tmp/');
+  // --- Localizar Excel ---
+  const excelName = 'Registro Pcial de Transportistas de RRPP.xlsx';
+  const candidates = [
+    path.join(__dirname, '../../', excelName),          // proyecto raíz
+    path.join(__dirname, '../../../', excelName),       // un nivel más arriba
+    path.join('/tmp', excelName),
+    path.join(__dirname, excelName),
+  ];
+  let excelPath: string | null = null;
+  for (const p of candidates) {
+    if (fs.existsSync(p)) { excelPath = p; break; }
+  }
+  if (!excelPath) {
+    console.error(`ERROR: No se encontró "${excelName}" en:\n${candidates.join('\n')}`);
     process.exit(1);
   }
+  console.log(`Excel encontrado: ${excelPath}`);
 
-  const csvContent = fs.readFileSync(csvPath, 'utf-8');
-  const allRows    = parseCSV(csvContent);
-  const header     = allRows[0];
-  const dataRows   = allRows.slice(1);
+  // --- Cargar CUITs confirmados (opcional) ---
+  const cuitsJsonPath = path.join(__dirname, 'cuits-encontrados.json');
+  const cuitsMap = new Map<string, string>(); // caa → cuit
+  if (fs.existsSync(cuitsJsonPath)) {
+    const cuitsData: Array<{ caa: string; cuitEncontrado: string | null }> = JSON.parse(
+      fs.readFileSync(cuitsJsonPath, 'utf-8')
+    );
+    for (const entry of cuitsData) {
+      if (entry.cuitEncontrado) {
+        cuitsMap.set(normalizeCAA(entry.caa), normalizeCUIT(entry.cuitEncontrado));
+      }
+    }
+    console.log(`CUITs confirmados cargados: ${cuitsMap.size}`);
+  } else {
+    console.log('Aviso: cuits-encontrados.json no encontrado — se usarán placeholders para CUITs vacíos');
+  }
 
-  console.log(`CSV leído: ${dataRows.length} filas, ${header.length} columnas`);
-  console.log(`Columnas: ${header.join(' | ')}\n`);
+  // --- Leer Excel ---
+  const workbook = XLSX.readFile(excelPath, { cellDates: false, cellNF: false, raw: true });
+  const sheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+  const rawRows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+  // Encontrar fila de encabezado (buscar fila que contenga "CAA" o "RAZÓN")
+  let headerIdx = 0;
+  for (let i = 0; i < Math.min(5, rawRows.length); i++) {
+    const row = rawRows[i].map((c: any) => String(c).toUpperCase().trim());
+    if (row.some((c: string) => c.includes('CAA') || c.includes('RAZ'))) {
+      headerIdx = i;
+      break;
+    }
+  }
+  const dataRows = rawRows.slice(headerIdx + 1).filter(row =>
+    row.some((c: any) => c !== '' && c !== null && c !== undefined)
+  );
+  console.log(`Filas de datos: ${dataRows.length} (header en fila ${headerIdx})\n`);
 
   // --- Contadores ---
   let transportistasCreados   = 0;
@@ -193,97 +166,131 @@ async function main() {
   let vehiculosActualizados   = 0;
   let filasOmitidas           = 0;
   const errores: string[]     = [];
+  const warnings: string[]    = [];
 
-  // --- Procesar cada fila ---
   for (const rawRow of dataRows) {
-    const row = parseRow(rawRow);
+    const caaRaw         = String(rawRow[0]  || '').trim();
+    const razonSocial    = String(rawRow[1]  || '').trim();
+    const cuitRaw        = normalizeCUIT(rawRow[2]);
+    const expteDPA       = String(rawRow[3]  || '').trim() || null;
+    const domicilioBase  = String(rawRow[4]  || '').trim();
+    const localidad      = String(rawRow[5]  || '').trim() || null;
+    const corrientes     = String(rawRow[6]  || '').trim() || null;
+    const vtoRaw         = rawRow[7];
+    const resolucionDPA  = String(rawRow[8]  || '').trim() || null;
+    const resolucionSSP  = String(rawRow[9]  || '').trim() || null;
+    // col 10: VIGENCIA — ignorado
+    const unidadesRaw    = rawRow[11];
+    const actaInsp       = String(rawRow[12] || '').trim() || null;
+    const actaInsp2      = String(rawRow[13] || '').trim() || null;
 
     // Validación mínima
-    if (!row.cuit || !row.razonSocial) {
-      console.log(`  WARN: fila sin CUIT o razón social, omitida: "${row.razonSocial || '(vacío)'}"`);
+    if (!caaRaw && !razonSocial) {
+      filasOmitidas++;
+      continue;
+    }
+    if (!razonSocial) {
+      console.log(`  SKIP: fila sin razón social (CAA: "${caaRaw}")`);
       filasOmitidas++;
       continue;
     }
 
-    // Construir campos
-    const numeroHabilitacion = normalizeCAA(row.caa);
+    const numeroHabilitacion = normalizeCAA(caaRaw);
 
-    const domicilio = [row.domicilio, row.localidad]
+    // Determinar CUIT
+    let cuit = cuitRaw;
+    if (!cuit && cuitsMap.has(numeroHabilitacion)) {
+      cuit = cuitsMap.get(numeroHabilitacion)!;
+    }
+    if (!cuit) {
+      // Placeholder único por CAA
+      const caaNum = caaRaw.replace(/[^0-9]/g, '').padStart(6, '0');
+      cuit = `CAA-T-${caaNum}`;
+      warnings.push(`${razonSocial}: CUIT no disponible → placeholder ${cuit}`);
+    }
+
+    // Domicilio combinado
+    const domicilio = [domicilioBase, localidad]
       .filter(Boolean)
       .join(', ') || 'Sin datos';
 
-    const cuitDigits = row.cuit.replace(/[^0-9]/g, '');
-    const email      = `transportista.${cuitDigits}@sitrep.local`;
-    const password   = await bcrypt.hash(row.cuit, 10);
+    // Fechas
+    const vencimientoHabilitacion = parseFecha(vtoRaw);
+    // Fecha proxy para vehículos si no hay VTO individual
+    const vtoVehiculo = vencimientoHabilitacion ?? new Date('2026-12-31T00:00:00Z');
 
-    const vencimiento = parseVTO(row.vto) ?? new Date('2025-12-31T00:00:00Z');
-    const patentes    = parsePatentes(row.unidades);
+    // Patentes
+    const patentes = parsePatentes(unidadesRaw);
+
+    // Email y password
+    const cuitDigits = cuit.replace(/[^0-9]/g, '');
+    const email      = `transportista.${cuitDigits || numeroHabilitacion.replace(/[^A-Z0-9]/g, '').toLowerCase()}@sitrep.local`;
 
     try {
       // --------------------------------------------------------
       // A. Upsert Usuario (rol TRANSPORTISTA)
       // --------------------------------------------------------
-      let usuario = await prisma.usuario.findUnique({ where: { cuit: row.cuit } });
+      let usuario = await prisma.usuario.findUnique({ where: { cuit } });
 
       if (usuario) {
         usuario = await prisma.usuario.update({
           where: { id: usuario.id },
-          data: {
-            nombre: row.razonSocial,
-            rol: 'TRANSPORTISTA',
-          },
+          data: { nombre: razonSocial, rol: 'TRANSPORTISTA' },
         });
       } else {
-        // Verificar colisión de email
         const emailExistente = await prisma.usuario.findUnique({ where: { email } });
         const emailFinal = emailExistente
-          ? `transportista.${cuitDigits}.${Date.now()}@sitrep.local`
+          ? `transportista.${cuitDigits || Date.now()}.${Date.now()}@sitrep.local`
           : email;
-
         if (emailExistente) {
-          console.log(`  WARN: email ${email} ya existe, usando ${emailFinal}`);
+          warnings.push(`${razonSocial}: email ${email} ya existe, usando ${emailFinal}`);
         }
-
+        const password = await bcrypt.hash(cuit, 10);
         usuario = await prisma.usuario.create({
           data: {
             email: emailFinal,
             password,
             rol:      'TRANSPORTISTA',
-            cuit:     row.cuit,
-            nombre:   row.razonSocial,
+            cuit,
+            nombre:   razonSocial,
             apellido: '',
-            telefono: undefined,
           },
         });
       }
 
       // --------------------------------------------------------
-      // B. Upsert Transportista
+      // B. Upsert Transportista con todos los campos regulatorios
       // --------------------------------------------------------
-      let transportista = await prisma.transportista.findUnique({
-        where: { cuit: row.cuit },
-      });
+      const transportistaData = {
+        razonSocial,
+        domicilio,
+        numeroHabilitacion,
+        localidad,
+        corrientesAutorizadas: corrientes,
+        vencimientoHabilitacion,
+        expedienteDPA: expteDPA,
+        resolucionDPA,
+        resolucionSSP,
+        actaInspeccion: actaInsp,
+        actaInspeccion2: actaInsp2,
+      };
+
+      let transportista = await prisma.transportista.findUnique({ where: { cuit } });
 
       if (transportista) {
         transportista = await prisma.transportista.update({
           where: { id: transportista.id },
-          data: {
-            razonSocial:       row.razonSocial,
-            domicilio,
-            numeroHabilitacion,
-          },
+          data: transportistaData,
         });
         transportistasActualizados++;
       } else {
         transportista = await prisma.transportista.create({
           data: {
-            usuarioId:         usuario.id,
-            razonSocial:       row.razonSocial,
-            cuit:              row.cuit,
-            domicilio,
-            telefono:          'S/D',
-            email:             usuario.email,
-            numeroHabilitacion,
+            usuarioId: usuario.id,
+            cuit,
+            telefono:  'S/D',
+            email:     usuario.email,
+            ...transportistaData,
           },
         });
         transportistasCreados++;
@@ -300,7 +307,7 @@ async function main() {
         if (vehiculoExistente) {
           await prisma.vehiculo.update({
             where: { id: vehiculoExistente.id },
-            data: { vencimiento },
+            data: { vencimiento: vtoVehiculo },
           });
           vehiculosActualizados++;
         } else {
@@ -313,19 +320,22 @@ async function main() {
               anio:              2020,
               capacidad:         0.0,
               numeroHabilitacion,
-              vencimiento,
+              vencimiento:       vtoVehiculo,
             },
           });
           vehiculosCreados++;
         }
       }
 
+      const vtoStr = vencimientoHabilitacion
+        ? vencimientoHabilitacion.toISOString().split('T')[0]
+        : 'sin VTO';
       console.log(
-        `  ✓ ${row.razonSocial} (${row.cuit}) — CAA: ${numeroHabilitacion}, vehículos: ${patentes.length}`
+        `  ✓ ${razonSocial} (${cuit}) — ${numeroHabilitacion}, veh: ${patentes.length}, VTO: ${vtoStr}`
       );
 
     } catch (err: any) {
-      const msg = `ERROR ${row.razonSocial} (${row.cuit}): ${err.message}`;
+      const msg = `ERROR ${razonSocial} (${cuit}): ${err.message}`;
       errores.push(msg);
       console.error(`  ✗ ${msg}`);
     }
@@ -333,15 +343,19 @@ async function main() {
 
   // --- RESUMEN ---
   console.log('\n=== RESUMEN ===');
-  console.log(`Transportistas creados:    ${transportistasCreados}`);
+  console.log(`Transportistas creados:      ${transportistasCreados}`);
   console.log(`Transportistas actualizados: ${transportistasActualizados}`);
-  console.log(`Vehículos creados:         ${vehiculosCreados}`);
-  console.log(`Vehículos actualizados:    ${vehiculosActualizados}`);
-  console.log(`Filas omitidas:            ${filasOmitidas}`);
+  console.log(`Vehículos creados:           ${vehiculosCreados}`);
+  console.log(`Vehículos actualizados:      ${vehiculosActualizados}`);
+  console.log(`Filas omitidas:              ${filasOmitidas}`);
 
+  if (warnings.length > 0) {
+    console.log(`\nADVERTENCIAS (${warnings.length}):`);
+    for (const w of warnings) console.log(`  ⚠ ${w}`);
+  }
   if (errores.length > 0) {
     console.log(`\nERRORES (${errores.length}):`);
-    for (const e of errores) console.log(`  - ${e}`);
+    for (const e of errores) console.log(`  ✗ ${e}`);
   } else {
     console.log('\nSin errores.');
   }
@@ -350,10 +364,16 @@ async function main() {
   console.log('\n=== VERIFICACIÓN ===');
   const totalTransportistas = await prisma.transportista.count();
   const totalVehiculos      = await prisma.vehiculo.count();
-  const totalUsuariosTrans  = await prisma.usuario.count({ where: { rol: 'TRANSPORTISTA' } });
-  console.log(`Total Transportistas en DB:      ${totalTransportistas}`);
-  console.log(`Total Vehículos en DB:           ${totalVehiculos}`);
-  console.log(`Total Usuarios TRANSPORTISTA:    ${totalUsuariosTrans}`);
+  const totalConVTO         = await prisma.transportista.count({ where: { vencimientoHabilitacion: { not: null } } });
+  const totalConLocalidad   = await prisma.transportista.count({ where: { localidad: { not: null } } });
+  const totalConCorrientes  = await prisma.transportista.count({ where: { corrientesAutorizadas: { not: null } } });
+  const totalPlaceholder    = await prisma.transportista.count({ where: { cuit: { startsWith: 'CAA-T-' } } });
+  console.log(`Total Transportistas:        ${totalTransportistas}`);
+  console.log(`Total Vehículos:             ${totalVehiculos}`);
+  console.log(`Con vencimientoHabilitacion: ${totalConVTO}`);
+  console.log(`Con localidad:               ${totalConLocalidad}`);
+  console.log(`Con corrientes autorizadas:  ${totalConCorrientes}`);
+  console.log(`CUITs placeholder (CAA-T-):  ${totalPlaceholder}`);
 }
 
 main()

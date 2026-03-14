@@ -249,7 +249,12 @@ export const getTransportistaById = async (req: AuthRequest, res: Response, next
 
 export const createTransportista = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const { razonSocial, cuit, domicilio, numeroHabilitacion, telefono, email, vehiculos, choferes } = req.body;
+        const {
+            razonSocial, cuit, domicilio, numeroHabilitacion, telefono, email, vehiculos, choferes,
+            // Campos regulatorios DPA
+            localidad, vencimientoHabilitacion, corrientesAutorizadas,
+            expedienteDPA, resolucionDPA, resolucionSSP, actaInspeccion, actaInspeccion2,
+        } = req.body;
 
         const existente = await prisma.transportista.findFirst({ where: { cuit } });
         if (existente) {
@@ -276,6 +281,14 @@ export const createTransportista = async (req: AuthRequest, res: Response, next:
                 numeroHabilitacion,
                 telefono,
                 email,
+                ...(localidad !== undefined && { localidad }),
+                ...(vencimientoHabilitacion !== undefined && { vencimientoHabilitacion: new Date(vencimientoHabilitacion) }),
+                ...(corrientesAutorizadas !== undefined && { corrientesAutorizadas }),
+                ...(expedienteDPA !== undefined && { expedienteDPA }),
+                ...(resolucionDPA !== undefined && { resolucionDPA }),
+                ...(resolucionSSP !== undefined && { resolucionSSP }),
+                ...(actaInspeccion !== undefined && { actaInspeccion }),
+                ...(actaInspeccion2 !== undefined && { actaInspeccion2 }),
                 vehiculos: vehiculos ? {
                     create: vehiculos.map((v: any) => ({
                         patente: v.patente,
@@ -314,11 +327,28 @@ export const createTransportista = async (req: AuthRequest, res: Response, next:
 export const updateTransportista = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const { id } = req.params;
-        const { razonSocial, domicilio, numeroHabilitacion, telefono, email, activo } = req.body;
+        const {
+            razonSocial, domicilio, numeroHabilitacion, telefono, email, activo,
+            // Campos regulatorios DPA
+            localidad, vencimientoHabilitacion, corrientesAutorizadas,
+            expedienteDPA, resolucionDPA, resolucionSSP, actaInspeccion, actaInspeccion2,
+        } = req.body;
 
         const transportista = await prisma.transportista.update({
             where: { id },
-            data: { razonSocial, domicilio, numeroHabilitacion, telefono, email, activo }
+            data: {
+                razonSocial, domicilio, numeroHabilitacion, telefono, email, activo,
+                ...(localidad !== undefined && { localidad }),
+                ...(vencimientoHabilitacion !== undefined && {
+                    vencimientoHabilitacion: vencimientoHabilitacion ? new Date(vencimientoHabilitacion) : null,
+                }),
+                ...(corrientesAutorizadas !== undefined && { corrientesAutorizadas }),
+                ...(expedienteDPA !== undefined && { expedienteDPA }),
+                ...(resolucionDPA !== undefined && { resolucionDPA }),
+                ...(resolucionSSP !== undefined && { resolucionSSP }),
+                ...(actaInspeccion !== undefined && { actaInspeccion }),
+                ...(actaInspeccion2 !== undefined && { actaInspeccion2 }),
+            }
         });
 
         res.json({ success: true, data: { transportista } });

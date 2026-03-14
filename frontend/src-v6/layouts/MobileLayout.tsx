@@ -261,7 +261,7 @@ export const MobileLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F8F6] flex flex-col tap-transparent">
+    <div className="h-screen overflow-hidden bg-[#F8F8F6] flex flex-col tap-transparent">
       {/* Demo mode banner */}
       {isDemo && (
         <div className="bg-amber-500 text-white text-center text-xs sm:text-sm py-1 font-medium sticky top-0 z-50">

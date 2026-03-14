@@ -13,20 +13,24 @@ import { CHART_COLORS } from '../../../utils/chart-colors';
 import { ChartTooltip } from '../../../components/charts/ChartTooltip';
 import { KpiCard } from '../../../components/charts/KpiCard';
 import { getDepartamento } from '../../../utils/mendoza-departamentos';
-import type { CentroControlData } from '../../../hooks/useCentroControl';
+import { useGeneradores } from '../../../hooks/useActores';
 
 export default function GeneradoresTab({
-  ccData,
   periodoLabel,
 }: {
-  ccData: CentroControlData | null;
+  ccData?: any; // kept for API compatibility
   periodoLabel: string;
 }) {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [categoriaFilter, setCategoriaFilter] = useState('');
 
-  const generadores = ccData?.generadores || [];
+  // Fetch ALL generadores from DB directly (not via Centro Control which filters by latitud != null)
+  const { data: paginatedData, isLoading } = useGeneradores({ limit: 500 });
+  const generadores = (paginatedData?.items || []).map((g: any) => ({
+    ...g,
+    cantManifiestos: g._count?.manifiestos || 0,
+  }));
 
   const filtered = useMemo(() => {
     let list = generadores;
@@ -60,7 +64,7 @@ export default function GeneradoresTab({
   const byDep = useMemo(() => {
     const map: Record<string, number> = {};
     for (const g of generadores) {
-      const dep = getDepartamento(g.latitud, g.longitud);
+      const dep = (g.latitud && g.longitud) ? getDepartamento(g.latitud, g.longitud) : 'Sin coordenadas';
       map[dep] = (map[dep] || 0) + 1;
     }
     return Object.entries(map)
@@ -69,7 +73,7 @@ export default function GeneradoresTab({
       .slice(0, 10);
   }, [generadores]);
 
-  if (!ccData) {
+  if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-24">
         <div className="w-16 h-16 rounded-full border-4 border-primary-100 border-t-primary-500 animate-spin" />
@@ -173,9 +177,9 @@ export default function GeneradoresTab({
           }
         />
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
             <table className="w-full text-left">
-              <thead className="bg-neutral-50/80 border-b border-neutral-200">
+              <thead className="bg-neutral-50/80 border-b border-neutral-200 sticky top-0 z-10">
                 <tr>
                   <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Razón Social</th>
                   <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">CUIT</th>
@@ -190,7 +194,7 @@ export default function GeneradoresTab({
                     <td className="px-4 py-3 text-sm font-medium text-neutral-900 max-w-[200px] truncate">{g.razonSocial}</td>
                     <td className="px-4 py-3 text-sm text-neutral-600 font-mono text-xs">{g.cuit}</td>
                     <td className="px-4 py-3 text-sm text-neutral-600 hidden md:table-cell">{g.categoria || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-neutral-600 hidden md:table-cell">{getDepartamento(g.latitud, g.longitud)}</td>
+                    <td className="px-4 py-3 text-sm text-neutral-600 hidden md:table-cell">{(g.latitud && g.longitud) ? getDepartamento(g.latitud, g.longitud) : '—'}</td>
                     <td className="px-4 py-3 text-center">
                       <Badge variant="soft" color="primary">{g.cantManifiestos}</Badge>
                     </td>

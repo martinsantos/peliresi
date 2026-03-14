@@ -188,9 +188,9 @@ export default function OperadoresTab({
           }
         />
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
             <table className="w-full text-left">
-              <thead className="bg-neutral-50/80 border-b border-neutral-200">
+              <thead className="bg-neutral-50/80 border-b border-neutral-200 sticky top-0 z-10">
                 <tr>
                   <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Razón Social</th>
                   <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">CUIT</th>

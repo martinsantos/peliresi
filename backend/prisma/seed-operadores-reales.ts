@@ -143,17 +143,32 @@ function parseCorrientes(corrientesStr: string): string[] {
 // 5. MAIN MIGRATION
 // ============================================================
 async function main() {
-  console.log('=== MIGRACIÓN DE 47 OPERADORES REALES ===\n');
+  console.log('=== MIGRACIÓN DE OPERADORES REALES (DPA Mendoza) ===\n');
 
   // --- Read and parse CSV ---
-  const csvPath = path.join(__dirname, 'operadores-reales.csv');
-  const csvContent = fs.readFileSync(csvPath, 'utf-8');
+  // Buscar primero el archivo actualizado (v2 = operadores050226csv, 52 registros)
+  // Fallback al archivo anterior (47 registros)
+  const csvCandidates = [
+    path.join(__dirname, 'operadores-reales-v2.csv'),
+    path.join(__dirname, 'operadores-reales.csv'),
+  ];
+  let csvPath: string | null = null;
+  for (const p of csvCandidates) {
+    if (fs.existsSync(p)) { csvPath = p; break; }
+  }
+  if (!csvPath) {
+    console.error(`ERROR: No se encontró el archivo de operadores en:\n${csvCandidates.join('\n')}`);
+    console.error('\nSolución: copiar el archivo fuente a backend/prisma/operadores-reales-v2.csv');
+    process.exit(1);
+  }
+  console.log(`CSV encontrado: ${csvPath}`);
+  const csvContent = fs.readFileSync(csvPath!, 'utf-8');
   const allRows = parseCSV(csvContent);
 
   // First row is header
   const header = allRows[0];
   const dataRows = allRows.slice(1);
-  console.log(`CSV leído: ${dataRows.length} filas, ${header.length} columnas`);
+  console.log(`CSV leído: ${dataRows.length} filas de datos, ${header.length} columnas`);
   console.log(`Columnas: ${header.join(' | ')}\n`);
 
   // --- STEP 1: Upsert missing TipoResiduo ---
@@ -343,6 +358,9 @@ async function main() {
             email,
             numeroHabilitacion,
             categoria,
+            tipoOperador: first.categoria.trim() || null,
+            tecnologia: tecnologiaCompleta || null,
+            corrientesY: first.corrientes.trim() || null,
           },
         });
         operadoresActualizados++;
@@ -357,6 +375,9 @@ async function main() {
             email,
             numeroHabilitacion,
             categoria,
+            tipoOperador: first.categoria.trim() || null,
+            tecnologia: tecnologiaCompleta || null,
+            corrientesY: first.corrientes.trim() || null,
           },
         });
         operadoresCreados++;

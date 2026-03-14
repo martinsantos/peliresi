@@ -20,6 +20,8 @@ import {
   Trash2,
   Download,
   Loader2,
+  MapPin,
+  Clock,
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -41,6 +43,7 @@ const INITIAL_FORM = {
   razonSocial: '',
   cuit: '',
   domicilio: '',
+  localidad: '',
   telefono: '',
   email: '',
   password: '',
@@ -55,6 +58,7 @@ const TransportistasPage: React.FC = () => {
   const isMobile = location.pathname.startsWith('/mobile');
   const [busqueda, setBusqueda] = useState(searchParams.get('q') || '');
   const [filtroEstado, setFiltroEstado] = useState('todos');
+  const [filtroLocalidad, setFiltroLocalidad] = useState('todas');
   const [currentPage, setCurrentPage] = useState(1);
   const [modalCrear, setModalCrear] = useState(false);
   const [modalEditar, setModalEditar] = useState(false);
@@ -80,9 +84,11 @@ const TransportistasPage: React.FC = () => {
       razonSocial: t.razonSocial || '',
       cuit: t.cuit || '',
       domicilio: t.domicilio || '',
+      localidad: t.localidad || '',
       telefono: t.telefono || '',
       email: t.email || t.usuario?.email || '',
       numeroHabilitacion: t.numeroHabilitacion || '-',
+      vencimientoHabilitacion: t.vencimientoHabilitacion ? new Date(t.vencimientoHabilitacion) : null,
       vehiculosCount: Array.isArray(t.vehiculos) ? t.vehiculos.length : 0,
       choferesCount: Array.isArray(t.choferes) ? t.choferes.length : 0,
       activo: t.activo !== false,
@@ -91,19 +97,40 @@ const TransportistasPage: React.FC = () => {
     [transportistasData]
   );
 
+  // Localidades únicas para filtro
+  const localidadesUnicas = useMemo(() => {
+    const set = new Set(tableData.map(t => t.localidad).filter(Boolean));
+    return Array.from(set).sort();
+  }, [tableData]);
+
+  const hoy = new Date();
+  const en30dias = new Date(hoy.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+  function getVencimientoStatus(fecha: Date | null): 'vencida' | 'pronto' | 'vigente' | null {
+    if (!fecha) return null;
+    if (fecha < hoy) return 'vencida';
+    if (fecha < en30dias) return 'pronto';
+    return 'vigente';
+  }
+
   // Client-side filters
   const filteredData = tableData.filter((t) => {
     const matchesEstado = filtroEstado === 'todos' ||
                           (filtroEstado === 'activo' && t.activo) ||
                           (filtroEstado === 'inactivo' && !t.activo);
-    return matchesEstado;
+    const matchesLocalidad = filtroLocalidad === 'todas' || t.localidad === filtroLocalidad;
+    return matchesEstado && matchesLocalidad;
   });
+
+  const porVencer = tableData.filter(t =>
+    t.vencimientoHabilitacion && t.vencimientoHabilitacion < en30dias && t.vencimientoHabilitacion >= hoy
+  ).length;
 
   const stats = {
     total,
     activos: transportistasData.filter((t: any) => t.activo !== false).length,
     inactivos: transportistasData.filter((t: any) => t.activo === false).length,
-    filtrados: filteredData.length,
+    porVencer,
   };
 
   const updateField = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }));
@@ -141,6 +168,7 @@ const TransportistasPage: React.FC = () => {
           razonSocial: form.razonSocial,
           cuit: form.cuit,
           domicilio: form.domicilio,
+          localidad: form.localidad || undefined,
           telefono: form.telefono,
           email: form.email,
           numeroHabilitacion: form.numeroHabilitacion,
@@ -161,6 +189,7 @@ const TransportistasPage: React.FC = () => {
       razonSocial: row.razonSocial || '',
       cuit: row.cuit || '',
       domicilio: row.domicilio || '',
+      localidad: row.localidad || '',
       telefono: row.telefono || '',
       email: row.email || '',
       password: '',
@@ -211,7 +240,10 @@ const TransportistasPage: React.FC = () => {
         <Input label="Email" type="email" value={form.email} onChange={(e) => updateField('email', e.target.value)} placeholder="contacto@empresa.com" />
         <Input label="Teléfono" value={form.telefono} onChange={(e) => updateField('telefono', e.target.value)} placeholder="+54 261 ..." />
       </div>
-      <Input label="Domicilio" value={form.domicilio} onChange={(e) => updateField('domicilio', e.target.value)} placeholder="Av. Libertador 1234, Mendoza" />
+      <div className="grid grid-cols-2 gap-4">
+        <Input label="Domicilio" value={form.domicilio} onChange={(e) => updateField('domicilio', e.target.value)} placeholder="Av. Libertador 1234, Mendoza" />
+        <Input label="Localidad" value={form.localidad} onChange={(e) => updateField('localidad', e.target.value)} placeholder="Godoy Cruz, Mendoza" />
+      </div>
       <Input label="N° Habilitación" value={form.numeroHabilitacion} onChange={(e) => updateField('numeroHabilitacion', e.target.value)} placeholder="HAB-TR-2024-XXXX" />
       {!editId && (
         <div className="grid grid-cols-2 gap-4">
@@ -241,11 +273,43 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'habilitacion',
-      width: '14%',
+      width: '16%',
       header: 'Habilitación',
       hiddenBelow: 'md' as const,
+      render: (row: typeof tableData[0]) => {
+        const status = getVencimientoStatus(row.vencimientoHabilitacion);
+        return (
+          <div className="space-y-1">
+            <span className="text-sm font-mono text-neutral-700">{row.numeroHabilitacion}</span>
+            {status === 'vencida' && (
+              <Badge variant="soft" color="error"><AlertTriangle size={10} className="mr-1" />VENCIDA</Badge>
+            )}
+            {status === 'pronto' && (
+              <Badge variant="soft" color="warning"><Clock size={10} className="mr-1" />VENCE PRONTO</Badge>
+            )}
+            {status === 'vigente' && (
+              <Badge variant="soft" color="success"><CheckCircle size={10} className="mr-1" />VIGENTE</Badge>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'localidad',
+      width: '12%',
+      header: 'Localidad',
+      hiddenBelow: 'lg' as const,
       render: (row: typeof tableData[0]) => (
-        <span className="text-sm font-mono text-neutral-700">{row.numeroHabilitacion}</span>
+        <div className="flex items-center gap-1 text-xs text-neutral-600">
+          {row.localidad ? (
+            <>
+              <MapPin size={11} className="text-neutral-400 flex-shrink-0" />
+              <span className="truncate">{row.localidad}</span>
+            </>
+          ) : (
+            <span className="text-neutral-400">—</span>
+          )}
+        </div>
       ),
     },
     {
@@ -410,12 +474,12 @@ const TransportistasPage: React.FC = () => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-info-100 rounded-lg">
-                <Search size={20} className="text-info-600" />
+              <div className="p-2 bg-orange-100 rounded-lg">
+                <Clock size={20} className="text-orange-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-neutral-900">{stats.filtrados}</p>
-                <p className="text-sm text-neutral-600">Filtrados</p>
+                <p className="text-2xl font-bold text-neutral-900">{stats.porVencer}</p>
+                <p className="text-sm text-neutral-600">Vencen en 30 días</p>
               </div>
             </div>
           </CardContent>
@@ -443,6 +507,16 @@ const TransportistasPage: React.FC = () => {
                 <option value="todos">Todos los estados</option>
                 <option value="activo">Activo</option>
                 <option value="inactivo">Inactivo</option>
+              </select>
+              <select
+                value={filtroLocalidad}
+                onChange={(e) => { setFiltroLocalidad(e.target.value); setCurrentPage(1); }}
+                className="px-4 h-10 rounded-xl border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
+              >
+                <option value="todas">Todas las localidades</option>
+                {localidadesUnicas.map(loc => (
+                  <option key={loc} value={loc}>{loc}</option>
+                ))}
               </select>
             </div>
           </div>

@@ -255,6 +255,7 @@ export const reporteTransporte = async (req: AuthRequest, res: Response, next: N
                 skip,
                 take: limitNum,
                 select: {
+                    id: true,
                     razonSocial: true,
                     cuit: true,
                     _count: {
@@ -280,6 +281,7 @@ export const reporteTransporte = async (req: AuthRequest, res: Response, next: N
             const pendientes = t.manifiestos.filter(m => m.estado === 'APROBADO').length;
 
             return {
+                transportistaId: t.id,
                 transportista: t.razonSocial,
                 cuit: t.cuit,
                 totalViajes,

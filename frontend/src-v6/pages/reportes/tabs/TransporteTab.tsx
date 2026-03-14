@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Users, Truck, Activity, TrendingUp, FileDown,
 } from 'lucide-react';
@@ -11,6 +12,7 @@ import { ChartTooltip } from '../../../components/charts/ChartTooltip';
 import { KpiCard } from '../../../components/charts/KpiCard';
 
 export default function TransporteTab({ data, periodo, onExportPDF }: { data: any; periodo: string; onExportPDF: () => void }) {
+  const navigate = useNavigate();
   const resumen = data.resumen || {};
   const transportistas = data.transportistas || [];
 
@@ -112,9 +114,9 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
             }
           />
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
               <table className="w-full text-left">
-                <thead className="bg-neutral-50/80 border-b border-neutral-200">
+                <thead className="bg-neutral-50/80 border-b border-neutral-200 sticky top-0 z-10">
                   <tr>
                     <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Transportista</th>
                     <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Viajes</th>
@@ -129,7 +131,11 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
                   {transportistas.map((t: any, i: number) => {
                     const tasa = parseFloat(t.tasaCompletitud || '0');
                     return (
-                      <tr key={i} className="hover:bg-primary-50/30 transition-colors">
+                      <tr
+                        key={i}
+                        className="hover:bg-primary-50/30 transition-colors cursor-pointer"
+                        onClick={() => t.transportistaId && navigate(`/admin/actores/transportistas/${t.transportistaId}`)}
+                      >
                         <td className="px-4 py-3 text-sm font-medium text-neutral-900 max-w-[200px] truncate">{t.transportista}</td>
                         <td className="px-4 py-3 text-sm font-semibold text-neutral-900">{t.totalViajes}</td>
                         <td className="px-4 py-3 text-sm text-emerald-600 font-semibold">{t.completados}</td>
