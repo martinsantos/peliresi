@@ -28,8 +28,16 @@ const updateUsuarioSchema = z.object({
 
 export const getUsuarios = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { search, rol, activo, page = 1, limit = 10 } = req.query;
+    const { search, rol, activo, page = 1, limit = 10, sortBy, sortOrder } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
+    const order: 'asc' | 'desc' = sortOrder === 'desc' ? 'desc' : 'asc';
+    const USR_SORT: Record<string, any> = {
+      nombre: { nombre: order },
+      rol: { rol: order },
+      activo: { activo: order },
+      createdAt: { createdAt: order },
+    };
+    const orderBy = USR_SORT[sortBy as string] ?? { createdAt: 'desc' };
 
     const where: any = {};
     if (search) {
@@ -61,7 +69,7 @@ export const getUsuarios = async (req: AuthRequest, res: Response, next: NextFun
           transportista: { select: { id: true, razonSocial: true } },
           operador: { select: { id: true, razonSocial: true } },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy,
       }),
       prisma.usuario.count({ where }),
     ]);

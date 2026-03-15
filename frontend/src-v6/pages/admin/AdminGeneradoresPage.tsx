@@ -63,6 +63,8 @@ const AdminGeneradoresPage: React.FC = () => {
   const [filtroRubro, setFiltroRubro] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState<string | undefined>(undefined);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [modalCrear, setModalCrear] = useState(false);
   const [modalEditar, setModalEditar] = useState(false);
   const [modalEliminar, setModalEliminar] = useState(false);
@@ -71,7 +73,7 @@ const AdminGeneradoresPage: React.FC = () => {
   const [form, setForm] = useState(INITIAL_FORM);
 
   // API hooks
-  const { data: apiData, isLoading, isError, error } = useGeneradores({ page: currentPage, limit: 20, search: busqueda || undefined });
+  const { data: apiData, isLoading, isError, error } = useGeneradores({ page: currentPage, limit: 20, search: busqueda || undefined, sortBy, sortOrder });
   const createMutation = useCreateGenerador();
   const updateMutation = useUpdateGenerador();
   const deleteMutation = useDeleteGenerador();
@@ -110,15 +112,29 @@ const AdminGeneradoresPage: React.FC = () => {
     [generadoresData]
   );
 
-  // Client-side filters
-  const filteredData = tableData.filter((g) => {
-    if (filtroRubro && g.rubro !== filtroRubro) return false;
-    const matchesCategoria = !filtroCategoria || g.categoria.toLowerCase().includes(filtroCategoria.toLowerCase());
-    const matchesEstado = filtroEstado === 'todos' ||
-                          (filtroEstado === 'activo' && g.activo) ||
-                          (filtroEstado === 'inactivo' && !g.activo);
-    return matchesCategoria && matchesEstado;
-  });
+  // Client-side filters (rubro, categoria, estado); sort is server-side
+  const filteredData = useMemo(() => {
+    return tableData.filter((g) => {
+      if (filtroRubro && g.rubro !== filtroRubro) return false;
+      const matchesCategoria = !filtroCategoria || g.categoria.toLowerCase().includes(filtroCategoria.toLowerCase());
+      const matchesEstado = filtroEstado === 'todos' ||
+                            (filtroEstado === 'activo' && g.activo) ||
+                            (filtroEstado === 'inactivo' && !g.activo);
+      return matchesCategoria && matchesEstado;
+    });
+  }, [tableData, filtroRubro, filtroCategoria, filtroEstado]);
+
+  const GEN_COL_MAP: Record<string, string> = {
+    generador: 'razonSocial',
+    categoria: 'categoria',
+    estado: 'activo',
+  };
+
+  const handleSort = (key: string, direction: 'asc' | 'desc') => {
+    setSortBy(GEN_COL_MAP[key] ?? key);
+    setSortOrder(direction);
+    setCurrentPage(1);
+  };
 
   const stats = {
     total,
@@ -299,6 +315,7 @@ const AdminGeneradoresPage: React.FC = () => {
       key: 'generador',
       width: '20%',
       header: 'Generador',
+      sortable: true,
       render: (row: typeof tableData[0]) => (
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -320,6 +337,7 @@ const AdminGeneradoresPage: React.FC = () => {
       key: 'categoria',
       width: '12%',
       header: 'Categoría',
+      sortable: true,
       hiddenBelow: 'md' as const,
       render: (row: typeof tableData[0]) => {
         const cat = row.categoria !== '-' ? row.categoria : null;
@@ -400,6 +418,7 @@ const AdminGeneradoresPage: React.FC = () => {
       key: 'estado',
       width: '8%',
       header: 'Estado',
+      sortable: true,
       render: (row: typeof tableData[0]) => (
         <Badge variant="soft" color={row.activo ? 'success' : 'warning'}>
           {row.activo ? 'Activo' : 'Inactivo'}
@@ -412,7 +431,7 @@ const AdminGeneradoresPage: React.FC = () => {
       header: '',
       align: 'right' as const,
       render: (row: typeof tableData[0]) => (
-        <div className="flex items-center justify-end gap-1">
+        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
           <button
             className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
             onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/admin/actores/generadores/${row.id}` : `/admin/actores/generadores/${row.id}`); }}
@@ -582,6 +601,8 @@ const AdminGeneradoresPage: React.FC = () => {
               data={filteredData}
               columns={columns}
               keyExtractor={(row) => row.id}
+              sortable={true}
+              onSort={handleSort}
               onRowClick={(row) => navigate(isMobile ? `/mobile/admin/actores/generadores/${row.id}` : `/admin/actores/generadores/${row.id}`)}
               emptyMessage="No se encontraron generadores"
               stickyHeader

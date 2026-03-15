@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Factory, Package, MapPin, FileText, Calendar, Search,
+  Factory, Package, MapPin, FileText, Calendar, Search, ChevronUp, ChevronDown,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -24,6 +24,15 @@ export default function GeneradoresTab({
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [categoriaFilter, setCategoriaFilter] = useState('');
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+
+  const toggleSort = (key: string) => setSortConfig(prev =>
+    prev?.key === key ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' }
+  );
+  const SortIcon = ({ col }: { col: string }) => {
+    if (sortConfig?.key !== col) return <ChevronUp size={12} className="ml-1 opacity-30 inline" />;
+    return sortConfig.direction === 'asc' ? <ChevronUp size={12} className="ml-1 text-primary-600 inline" /> : <ChevronDown size={12} className="ml-1 text-primary-600 inline" />;
+  };
 
   // Fetch ALL generadores from DB directly (not via Centro Control which filters by latitud != null)
   const { data: paginatedData, isLoading } = useGeneradores({ limit: 500 });
@@ -42,8 +51,24 @@ export default function GeneradoresTab({
       const q = categoriaFilter.toLowerCase();
       list = list.filter(g => (g.categoria || '').toLowerCase().includes(q));
     }
+    if (sortConfig) {
+      list = [...list].sort((a, b) => {
+        const dir = sortConfig.direction === 'asc' ? 1 : -1;
+        switch (sortConfig.key) {
+          case 'razonSocial': return dir * (a.razonSocial || '').localeCompare(b.razonSocial || '', 'es');
+          case 'categoria': return dir * (a.categoria || '').localeCompare(b.categoria || '', 'es');
+          case 'departamento': {
+            const da = (a.latitud && a.longitud) ? getDepartamento(a.latitud, a.longitud) : 'Sin coordenadas';
+            const db = (b.latitud && b.longitud) ? getDepartamento(b.latitud, b.longitud) : 'Sin coordenadas';
+            return dir * da.localeCompare(db, 'es');
+          }
+          case 'manifiestos': return dir * (a.cantManifiestos - b.cantManifiestos);
+          default: return 0;
+        }
+      });
+    }
     return list;
-  }, [generadores, searchQuery, categoriaFilter]);
+  }, [generadores, searchQuery, categoriaFilter, sortConfig]);
 
   const byCategoria = useMemo(() => {
     const map: Record<string, number> = {};
@@ -181,11 +206,11 @@ export default function GeneradoresTab({
             <table className="w-full text-left">
               <thead className="bg-neutral-50/80 border-b border-neutral-200 sticky top-0 z-10">
                 <tr>
-                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Razón Social</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('razonSocial')}>Razón Social<SortIcon col="razonSocial" /></th>
                   <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">CUIT</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell">Categoría</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell">Departamento</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center">Manifiestos</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('categoria')}>Categoría<SortIcon col="categoria" /></th>
+                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('departamento')}>Departamento<SortIcon col="departamento" /></th>
+                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('manifiestos')}>Manifiestos<SortIcon col="manifiestos" /></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">

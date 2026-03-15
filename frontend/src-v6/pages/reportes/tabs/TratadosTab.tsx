@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Package, Activity, Users, FileDown,
+  Package, Activity, Users, FileDown, ChevronUp, ChevronDown,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -16,10 +16,34 @@ import { KpiCard } from '../../../components/charts/KpiCard';
 
 export default function TratadosTab({ data, periodo, onExportPDF }: { data: any; periodo: string; onExportPDF: () => void }) {
   const navigate = useNavigate();
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const resumen = data.resumen || {};
   const porGenerador = data.porGenerador || {};
   const totalPorTipo = data.totalPorTipo || {};
   const detalle = data.detalle || [];
+
+  const toggleSort = (key: string) => setSortConfig(prev =>
+    prev?.key === key ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' }
+  );
+  const SortIcon = ({ col }: { col: string }) => {
+    if (sortConfig?.key !== col) return <ChevronUp size={12} className="ml-1 opacity-30 inline" />;
+    return sortConfig.direction === 'asc' ? <ChevronUp size={12} className="ml-1 text-primary-600 inline" /> : <ChevronDown size={12} className="ml-1 text-primary-600 inline" />;
+  };
+
+  const sortedDetalle = useMemo(() => {
+    if (!sortConfig) return detalle;
+    return [...detalle].sort((a: any, b: any) => {
+      const dir = sortConfig.direction === 'asc' ? 1 : -1;
+      switch (sortConfig.key) {
+        case 'numero': return dir * (a.numero || '').localeCompare(b.numero || '', 'es');
+        case 'generador': return dir * (a.generador || '').localeCompare(b.generador || '', 'es');
+        case 'metodo': return dir * (a.metodoTratamiento || '').localeCompare(b.metodoTratamiento || '', 'es');
+        case 'residuos': return dir * ((a.residuos?.length || 0) - (b.residuos?.length || 0));
+        case 'fecha': return dir * (new Date(a.fechaTratamiento || 0).getTime() - new Date(b.fechaTratamiento || 0).getTime());
+        default: return 0;
+      }
+    });
+  }, [detalle, sortConfig]);
 
   const generadorData = useMemo(() =>
     Object.entries(porGenerador)
@@ -117,15 +141,15 @@ export default function TratadosTab({ data, periodo, onExportPDF }: { data: any;
               <table className="w-full text-left">
                 <thead className="bg-neutral-50/80 border-b border-neutral-200">
                   <tr>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Número</th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Generador</th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell">Método</th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Fecha</th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Residuos</th>
+                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('numero')}>Número<SortIcon col="numero" /></th>
+                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('generador')}>Generador<SortIcon col="generador" /></th>
+                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('metodo')}>Método<SortIcon col="metodo" /></th>
+                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('fecha')}>Fecha<SortIcon col="fecha" /></th>
+                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('residuos')}>Residuos<SortIcon col="residuos" /></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
-                  {detalle.slice(0, 50).map((d: any, i: number) => (
+                  {sortedDetalle.slice(0, 50).map((d: any, i: number) => (
                     <tr key={i} className="hover:bg-primary-50/30 transition-colors cursor-pointer" onClick={() => d.id && navigate(`/manifiestos/${d.id}`)}>
                       <td className="px-4 py-3 text-sm font-semibold text-primary-600">{d.numero}</td>
                       <td className="px-4 py-3 text-sm text-neutral-900 max-w-[200px] truncate">{d.generador}</td>

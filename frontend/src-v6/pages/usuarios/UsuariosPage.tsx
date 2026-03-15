@@ -110,9 +110,21 @@ function apiUserToLocal(u: any): UsuarioLocal {
 // ========================================
 // COMPONENTE PRINCIPAL
 // ========================================
+const USR_COL_MAP: Record<string, string> = { usuario: 'nombre', rol: 'rol', estado: 'activo', ultimoAcceso: 'createdAt' };
+
 const UsuariosPage: React.FC = () => {
+  const [busqueda, setBusqueda] = useState('');
+  const [filtroRol, setFiltroRol] = useState('todos');
+  const [filtroEstado, setFiltroEstado] = useState('todos');
+  const [vistaMode, setVistaMode] = useState<'grid' | 'list'>('list');
+  const [activeTab, setActiveTab] = useState('todos');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedRows, setSelectedRows] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<string | undefined>(undefined);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
   // Real API data
-  const { data: apiData, isLoading: apiLoading, isError: apiError } = useUsuarios();
+  const { data: apiData, isLoading: apiLoading, isError: apiError } = useUsuarios({ sortBy, sortOrder });
   const createMutation = useCreateUsuario();
   const deleteMutation = useDeleteUsuario();
   const updateMutation = useUpdateUsuario();
@@ -125,14 +137,6 @@ const UsuariosPage: React.FC = () => {
     }
     return [];
   }, [apiData]);
-
-  const [busqueda, setBusqueda] = useState('');
-  const [filtroRol, setFiltroRol] = useState('todos');
-  const [filtroEstado, setFiltroEstado] = useState('todos');
-  const [vistaMode, setVistaMode] = useState<'grid' | 'list'>('list');
-  const [activeTab, setActiveTab] = useState('todos');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [selectedRows, setSelectedRows] = useState<string[]>([]);
 
   // Modal states
   const [modalCrear, setModalCrear] = useState(false);
@@ -294,6 +298,7 @@ const UsuariosPage: React.FC = () => {
       key: 'usuario',
       width: '22%',
       header: 'Usuario',
+      sortable: true,
       render: (row: UsuarioLocal) => {
         const config = rolConfig[row.rol as keyof typeof rolConfig];
         return (
@@ -313,6 +318,7 @@ const UsuariosPage: React.FC = () => {
       key: 'rol',
       width: '13%',
       header: 'Rol',
+      sortable: true,
       hiddenBelow: 'sm' as const,
       render: (row: UsuarioLocal) => {
         const config = rolConfig[row.rol as keyof typeof rolConfig];
@@ -347,6 +353,7 @@ const UsuariosPage: React.FC = () => {
       key: 'estado',
       width: '10%',
       header: 'Estado',
+      sortable: true,
       render: (row: UsuarioLocal) => (
         <Badge
           variant="soft"
@@ -376,6 +383,7 @@ const UsuariosPage: React.FC = () => {
       width: '13%',
       hiddenBelow: 'md' as const,
       header: 'Ultimo Acceso',
+      sortable: true,
       render: (row: UsuarioLocal) => (
         <div className="flex items-center gap-1 text-sm text-neutral-600">
           <Clock size={12} />
@@ -389,12 +397,12 @@ const UsuariosPage: React.FC = () => {
       header: '',
       align: 'right' as const,
       render: (row: UsuarioLocal) => (
-        <div className="flex items-center justify-end gap-1">
+        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
           <Button
             variant="ghost"
             size="sm"
             className="p-2"
-            onClick={() => verUsuario(row)}
+            onClick={(e: any) => { e.stopPropagation(); verUsuario(row); }}
             title="Ver detalle"
           >
             <Eye size={16} />
@@ -403,7 +411,7 @@ const UsuariosPage: React.FC = () => {
             variant="ghost"
             size="sm"
             className="p-2 text-error-500"
-            onClick={() => { setUsuarioSeleccionado(row); setModalEliminar(true); }}
+            onClick={(e: any) => { e.stopPropagation(); setUsuarioSeleccionado(row); setModalEliminar(true); }}
           >
             <Trash2 size={16} />
           </Button>
@@ -587,6 +595,13 @@ const UsuariosPage: React.FC = () => {
               selectable
               selectedKeys={selectedRows}
               onSelectionChange={setSelectedRows}
+              sortable={true}
+              onSort={(key, dir) => {
+                setSortBy(USR_COL_MAP[key] ?? key);
+                setSortOrder(dir);
+                setCurrentPage(1);
+              }}
+              onRowClick={verUsuario}
               stickyHeader
             />
             <Pagination

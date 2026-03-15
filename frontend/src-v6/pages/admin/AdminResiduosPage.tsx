@@ -61,6 +61,7 @@ export const AdminResiduosPage: React.FC = () => {
   const [corrienteFilter, setCorrienteFilter] = useState('');
   const [peligrosidadFilter, setPeligrosidadFilter] = useState('');
   const [estadoFilter, setEstadoFilter] = useState('');
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
   // CRUD modal state
   const [modalCrear, setModalCrear] = useState(false);
@@ -132,21 +133,38 @@ export const AdminResiduosPage: React.FC = () => {
     return codes.size;
   }, [residuosData]);
 
-  // Filter
-  const filteredData = residuosData.filter(r => {
-    if (corrienteFilter && r.corrienteY !== corrienteFilter) return false;
-    if (peligrosidadFilter && r.peligrosidad !== peligrosidadFilter) return false;
-    if (estadoFilter === 'activo' && !r.activo) return false;
-    if (estadoFilter === 'inactivo' && r.activo) return false;
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      r.codigo.toLowerCase().includes(q) ||
-      r.descripcion.toLowerCase().includes(q) ||
-      r.categoria.toLowerCase().includes(q) ||
-      (r.corrienteY || '').toLowerCase().includes(q)
-    );
-  });
+  // Filter + sort
+  const filteredData = useMemo(() => {
+    let result = residuosData.filter(r => {
+      if (corrienteFilter && r.corrienteY !== corrienteFilter) return false;
+      if (peligrosidadFilter && r.peligrosidad !== peligrosidadFilter) return false;
+      if (estadoFilter === 'activo' && !r.activo) return false;
+      if (estadoFilter === 'inactivo' && r.activo) return false;
+      if (!searchQuery) return true;
+      const q = searchQuery.toLowerCase();
+      return (
+        r.codigo.toLowerCase().includes(q) ||
+        r.descripcion.toLowerCase().includes(q) ||
+        r.categoria.toLowerCase().includes(q) ||
+        (r.corrienteY || '').toLowerCase().includes(q)
+      );
+    });
+    if (sortConfig) {
+      const PELIGROSIDAD_ORDER: Record<string, number> = { alta: 3, media: 2, baja: 1, ninguna: 0 };
+      result = [...result].sort((a, b) => {
+        const dir = sortConfig.direction === 'asc' ? 1 : -1;
+        switch (sortConfig.key) {
+          case 'residuo': return dir * a.codigo.localeCompare(b.codigo, 'es');
+          case 'corrienteY': return dir * (a.corrienteY || '').localeCompare(b.corrienteY || '', 'es');
+          case 'peligrosidad': return dir * ((PELIGROSIDAD_ORDER[a.peligrosidad] || 0) - (PELIGROSIDAD_ORDER[b.peligrosidad] || 0));
+          case 'operadores': return dir * (a.operadoresCount - b.operadoresCount);
+          case 'estado': return dir * (Number(b.activo) - Number(a.activo));
+          default: return 0;
+        }
+      });
+    }
+    return result;
+  }, [residuosData, corrienteFilter, peligrosidadFilter, estadoFilter, searchQuery, sortConfig]);
 
   // Pagination
   const itemsPerPage = 15;
@@ -278,6 +296,7 @@ export const AdminResiduosPage: React.FC = () => {
       key: 'residuo',
       width: '28%',
       header: 'Residuo',
+      sortable: true,
       render: (row: ResiduoDisplay) => (
         <div className="flex items-center gap-3">
           <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
@@ -304,6 +323,7 @@ export const AdminResiduosPage: React.FC = () => {
       key: 'corrienteY',
       width: '8%',
       header: 'Corriente Y',
+      sortable: true,
       hiddenBelow: 'md' as const,
       render: (row: ResiduoDisplay) => row.corrienteY ? (
         <Badge variant="outline" color="warning" title={row.corrienteDesc || ''}>
@@ -317,6 +337,7 @@ export const AdminResiduosPage: React.FC = () => {
       key: 'peligrosidad',
       width: '10%',
       header: 'Peligrosidad',
+      sortable: true,
       render: (row: ResiduoDisplay) => {
         const colors: Record<string, string> = {
           alta: 'error',
@@ -335,6 +356,7 @@ export const AdminResiduosPage: React.FC = () => {
       key: 'operadores',
       width: '12%',
       header: 'Operadores',
+      sortable: true,
       hiddenBelow: 'lg' as const,
       render: (row: ResiduoDisplay) => row.operadoresCount > 0 ? (
         <div className="flex items-center gap-1.5">
@@ -350,6 +372,7 @@ export const AdminResiduosPage: React.FC = () => {
       key: 'estado',
       width: '8%',
       header: 'Estado',
+      sortable: true,
       render: (row: ResiduoDisplay) => (
         <Badge variant="soft" color={row.activo ? 'success' : 'neutral'}>
           {row.activo ? 'Activo' : 'Inactivo'}
@@ -361,7 +384,7 @@ export const AdminResiduosPage: React.FC = () => {
       width: '10%',
       header: 'Acciones',
       render: (row: ResiduoDisplay) => (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => openEditar(row)}
             className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-500 hover:text-primary-600 transition-colors"
@@ -553,6 +576,8 @@ export const AdminResiduosPage: React.FC = () => {
               data={paginatedData}
               columns={columns}
               keyExtractor={(row) => row.id}
+              sortable={true}
+              onSort={(key, dir) => setSortConfig({ key, direction: dir })}
               stickyHeader
             />
             <Pagination

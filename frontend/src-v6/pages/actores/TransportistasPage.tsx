@@ -60,6 +60,8 @@ const TransportistasPage: React.FC = () => {
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [filtroLocalidad, setFiltroLocalidad] = useState('todas');
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState<string | undefined>(undefined);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [modalCrear, setModalCrear] = useState(false);
   const [modalEditar, setModalEditar] = useState(false);
   const [modalEliminar, setModalEliminar] = useState(false);
@@ -68,7 +70,7 @@ const TransportistasPage: React.FC = () => {
   const [form, setForm] = useState(INITIAL_FORM);
 
   // API hooks
-  const { data: apiData, isLoading, isError, error } = useTransportistas({ page: currentPage, limit: 20, search: busqueda || undefined });
+  const { data: apiData, isLoading, isError, error } = useTransportistas({ page: currentPage, limit: 20, search: busqueda || undefined, sortBy, sortOrder });
   const createMutation = useCreateTransportista();
   const updateMutation = useUpdateTransportista();
   const deleteMutation = useDeleteTransportista();
@@ -113,14 +115,30 @@ const TransportistasPage: React.FC = () => {
     return 'vigente';
   }
 
-  // Client-side filters
-  const filteredData = tableData.filter((t) => {
-    const matchesEstado = filtroEstado === 'todos' ||
-                          (filtroEstado === 'activo' && t.activo) ||
-                          (filtroEstado === 'inactivo' && !t.activo);
-    const matchesLocalidad = filtroLocalidad === 'todas' || t.localidad === filtroLocalidad;
-    return matchesEstado && matchesLocalidad;
-  });
+  // Client-side filters (estado + localidad); sort is server-side
+  const filteredData = useMemo(() => {
+    return tableData.filter((t) => {
+      const matchesEstado = filtroEstado === 'todos' ||
+                            (filtroEstado === 'activo' && t.activo) ||
+                            (filtroEstado === 'inactivo' && !t.activo);
+      const matchesLocalidad = filtroLocalidad === 'todas' || t.localidad === filtroLocalidad;
+      return matchesEstado && matchesLocalidad;
+    });
+  }, [tableData, filtroEstado, filtroLocalidad]);
+
+  const TRANS_COL_MAP: Record<string, string> = {
+    transportista: 'razonSocial',
+    localidad: 'localidad',
+    flota: 'vehiculosCount',
+    choferes: 'choferesCount',
+    estado: 'activo',
+  };
+
+  const handleSort = (key: string, direction: 'asc' | 'desc') => {
+    setSortBy(TRANS_COL_MAP[key] ?? key);
+    setSortOrder(direction);
+    setCurrentPage(1);
+  };
 
   const porVencer = tableData.filter(t =>
     t.vencimientoHabilitacion && t.vencimientoHabilitacion < en30dias && t.vencimientoHabilitacion >= hoy
@@ -259,6 +277,7 @@ const TransportistasPage: React.FC = () => {
       key: 'transportista',
       width: '20%',
       header: 'Transportista',
+      sortable: true,
       render: (row: typeof tableData[0]) => (
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -298,6 +317,7 @@ const TransportistasPage: React.FC = () => {
       key: 'localidad',
       width: '12%',
       header: 'Localidad',
+      sortable: true,
       hiddenBelow: 'lg' as const,
       render: (row: typeof tableData[0]) => (
         <div className="flex items-center gap-1 text-xs text-neutral-600">
@@ -314,19 +334,27 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'flota',
-      width: '14%',
-      header: 'Flota',
+      width: '8%',
+      header: 'Vehículos',
+      sortable: true,
       hiddenBelow: 'md' as const,
       render: (row: typeof tableData[0]) => (
-        <div className="flex items-center gap-3">
-          <div className="text-center">
-            <p className="text-sm font-bold text-neutral-900">{row.vehiculosCount}</p>
-            <p className="text-[10px] text-neutral-500">Vehículos</p>
-          </div>
-          <div className="text-center">
-            <p className="text-sm font-bold text-neutral-900">{row.choferesCount}</p>
-            <p className="text-[10px] text-neutral-500">Choferes</p>
-          </div>
+        <div className="text-center">
+          <p className="text-sm font-bold text-neutral-900">{row.vehiculosCount}</p>
+          <p className="text-[10px] text-neutral-500">Vehículos</p>
+        </div>
+      ),
+    },
+    {
+      key: 'choferes',
+      width: '8%',
+      header: 'Choferes',
+      sortable: true,
+      hiddenBelow: 'md' as const,
+      render: (row: typeof tableData[0]) => (
+        <div className="text-center">
+          <p className="text-sm font-bold text-neutral-900">{row.choferesCount}</p>
+          <p className="text-[10px] text-neutral-500">Choferes</p>
         </div>
       ),
     },
@@ -368,6 +396,7 @@ const TransportistasPage: React.FC = () => {
       key: 'estado',
       width: '8%',
       header: 'Estado',
+      sortable: true,
       render: (row: typeof tableData[0]) => (
         <Badge variant="soft" color={row.activo ? 'success' : 'warning'}>
           {row.activo ? 'Activo' : 'Inactivo'}
@@ -540,6 +569,8 @@ const TransportistasPage: React.FC = () => {
               data={filteredData}
               columns={columns}
               keyExtractor={(row) => row.id}
+              sortable={true}
+              onSort={handleSort}
               onRowClick={(row) => navigate(isMobile ? `/mobile/actores/transportistas/${row.id}` : `/admin/actores/transportistas/${row.id}`)}
               emptyMessage="No se encontraron transportistas"
               stickyHeader

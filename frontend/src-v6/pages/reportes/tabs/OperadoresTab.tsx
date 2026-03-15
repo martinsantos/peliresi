@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  FlaskConical, Layers, MapPin, FileCheck, Calendar, Search,
+  FlaskConical, Layers, MapPin, FileCheck, Calendar, Search, ChevronUp, ChevronDown,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -22,6 +22,15 @@ export default function OperadoresTab({
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [categoriaFilter, setCategoriaFilter] = useState('');
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+
+  const toggleSort = (key: string) => setSortConfig(prev =>
+    prev?.key === key ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' }
+  );
+  const SortIcon = ({ col }: { col: string }) => {
+    if (sortConfig?.key !== col) return <ChevronUp size={12} className="ml-1 opacity-30 inline" />;
+    return sortConfig.direction === 'asc' ? <ChevronUp size={12} className="ml-1 text-primary-600 inline" /> : <ChevronDown size={12} className="ml-1 text-primary-600 inline" />;
+  };
 
   // Fetch ALL operadores from database (not filtered by activity)
   const { data: paginatedData, isLoading } = useOperadores({ limit: 500 });
@@ -41,8 +50,22 @@ export default function OperadoresTab({
       const q = categoriaFilter.toLowerCase();
       list = list.filter((o: any) => (o.categoria || '').toLowerCase().includes(q));
     }
+    if (sortConfig) {
+      list = [...list].sort((a: any, b: any) => {
+        const dir = sortConfig.direction === 'asc' ? 1 : -1;
+        switch (sortConfig.key) {
+          case 'razonSocial': return dir * (a.razonSocial || '').localeCompare(b.razonSocial || '', 'es');
+          case 'cuit': return dir * (a.cuit || '').localeCompare(b.cuit || '', 'es');
+          case 'habilitacion': return dir * (a.numeroHabilitacion || '').localeCompare(b.numeroHabilitacion || '', 'es');
+          case 'categoria': return dir * (a.categoria || '').localeCompare(b.categoria || '', 'es');
+          case 'tratamientos': return dir * ((a.tratamientos?.length || 0) - (b.tratamientos?.length || 0));
+          case 'estado': return dir * (Number(b.activo) - Number(a.activo));
+          default: return 0;
+        }
+      });
+    }
     return list;
-  }, [operadores, searchQuery, categoriaFilter]);
+  }, [operadores, searchQuery, categoriaFilter, sortConfig]);
 
   const byCategoria = useMemo(() => {
     const map: Record<string, number> = {};
@@ -192,12 +215,12 @@ export default function OperadoresTab({
             <table className="w-full text-left">
               <thead className="bg-neutral-50/80 border-b border-neutral-200 sticky top-0 z-10">
                 <tr>
-                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Razón Social</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">CUIT</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Habilitación</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell">Categoría</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center">Tratamientos</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center">Estado</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('razonSocial')}>Razón Social<SortIcon col="razonSocial" /></th>
+                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('cuit')}>CUIT<SortIcon col="cuit" /></th>
+                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('habilitacion')}>Habilitación<SortIcon col="habilitacion" /></th>
+                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('categoria')}>Categoría<SortIcon col="categoria" /></th>
+                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('tratamientos')}>Tratamientos<SortIcon col="tratamientos" /></th>
+                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('estado')}>Estado<SortIcon col="estado" /></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">

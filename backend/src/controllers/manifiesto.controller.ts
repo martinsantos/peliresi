@@ -90,6 +90,13 @@ const cerrarManifiestoSchema = z.object({
   observaciones: z.string().max(1000).optional(),
 });
 
+const actualizarUbicacionSchema = z.object({
+  latitud: z.number({ error: 'latitud es requerida y debe ser un número' }).min(-90, 'latitud debe ser >= -90').max(90, 'latitud debe ser <= 90'),
+  longitud: z.number({ error: 'longitud es requerida y debe ser un número' }).min(-180, 'longitud debe ser >= -180').max(180, 'longitud debe ser <= 180'),
+  velocidad: z.number().min(0, 'velocidad no puede ser negativa').optional(),
+  direccion: z.number().optional(),
+});
+
 // Generar número de manifiesto único
 const generarNumeroManifiesto = async (): Promise<string> => {
   const año = new Date().getFullYear();
@@ -334,54 +341,69 @@ export const firmarManifiesto = async (req: AuthRequest, res: Response, next: Ne
     const { id } = req.params;
     const userId = req.user.id;
 
-    const manifiesto = await prisma.manifiesto.findUnique({
-      where: { id }
+    // Generate QR before transaction (async, no DB write)
+    // We need manifiesto.numero first — fetch outside tx to avoid holding tx open during QR generation
+    const manifiestoPreview = await prisma.manifiesto.findUnique({
+      where: { id },
+      select: { id: true, numero: true, estado: true },
     });
 
-    if (!manifiesto) {
+    if (!manifiestoPreview) {
       throw new AppError('Manifiesto no encontrado', 404);
     }
 
-    if (manifiesto.estado !== 'BORRADOR') {
+    if (manifiestoPreview.estado !== 'BORRADOR') {
       throw new AppError('Solo se pueden firmar manifiestos en estado borrador', 400);
     }
 
-    // Generar código QR
     const qrData = JSON.stringify({
-      numero: manifiesto.numero,
-      id: manifiesto.id,
+      numero: manifiestoPreview.numero,
+      id: manifiestoPreview.id,
       timestamp: new Date().toISOString()
     });
     const qrCode = await QRCode.toDataURL(qrData);
 
-    // Actualizar manifiesto
-    const manifiestoActualizado = await prisma.manifiesto.update({
-      where: { id },
-      data: {
-        estado: 'APROBADO',
-        fechaFirma: new Date(),
-        qrCode
-      },
-      include: {
-        generador: true,
-        transportista: true,
-        operador: true,
-        residuos: {
+    // Atomic conditional update: WHERE { id, estado: 'BORRADOR' } ensures only one
+    // concurrent request can transition the state. If the manifest was already signed
+    // by a concurrent request, Prisma throws P2025 (record not found matching WHERE).
+    const manifiestoActualizado = await prisma.$transaction(async (tx) => {
+      let updated;
+      try {
+        updated = await tx.manifiesto.update({
+          where: { id, estado: 'BORRADOR' },
+          data: {
+            estado: 'APROBADO',
+            fechaFirma: new Date(),
+            qrCode
+          },
           include: {
-            tipoResiduo: true
+            generador: true,
+            transportista: true,
+            operador: true,
+            residuos: {
+              include: {
+                tipoResiduo: true
+              }
+            }
           }
+        });
+      } catch (err: any) {
+        if (err?.code === 'P2025') {
+          throw new AppError('Solo se pueden firmar manifiestos en estado borrador', 400);
         }
+        throw err;
       }
-    });
 
-    // Registrar evento
-    await prisma.eventoManifiesto.create({
-      data: {
-        manifiestoId: id,
-        tipo: 'FIRMA',
-        descripcion: 'Manifiesto firmado digitalmente por el generador',
-        usuarioId: userId
-      }
+      await tx.eventoManifiesto.create({
+        data: {
+          manifiestoId: id,
+          tipo: 'FIRMA',
+          descripcion: 'Manifiesto firmado digitalmente por el generador',
+          usuarioId: userId
+        }
+      });
+
+      return updated;
     });
 
     res.json({
@@ -404,37 +426,33 @@ export const confirmarRetiro = async (req: AuthRequest, res: Response, next: Nex
       throw new AppError('Solo los transportistas pueden confirmar retiros', 403);
     }
 
-    // Transaction to prevent race condition (double-tap / concurrent requests)
+    // Atomic conditional update: prevents double-tap race condition
     const manifiestoActualizado = await prisma.$transaction(async (tx) => {
-      const manifiesto = await tx.manifiesto.findUnique({
-        where: { id }
-      });
-
-      if (!manifiesto) {
-        throw new AppError('Manifiesto no encontrado', 404);
-      }
-
-      if (manifiesto.estado !== 'APROBADO') {
-        throw new AppError('El manifiesto debe estar aprobado para confirmar retiro', 400);
-      }
-
-      const updated = await tx.manifiesto.update({
-        where: { id },
-        data: {
-          estado: 'EN_TRANSITO',
-          fechaRetiro: new Date()
-        },
-        include: {
-          generador: true,
-          transportista: true,
-          operador: true,
-          residuos: {
-            include: {
-              tipoResiduo: true
+      let updated;
+      try {
+        updated = await tx.manifiesto.update({
+          where: { id, estado: 'APROBADO' },
+          data: {
+            estado: 'EN_TRANSITO',
+            fechaRetiro: new Date()
+          },
+          include: {
+            generador: true,
+            transportista: true,
+            operador: true,
+            residuos: {
+              include: {
+                tipoResiduo: true
+              }
             }
           }
+        });
+      } catch (err: any) {
+        if (err?.code === 'P2025') {
+          throw new AppError('El manifiesto debe estar aprobado para confirmar retiro', 400);
         }
-      });
+        throw err;
+      }
 
       await tx.eventoManifiesto.create({
         data: {
@@ -478,7 +496,12 @@ const EN_TRANSITO_CACHE_TTL = 30_000; // 30s — matches GPS send interval for P
 export const actualizarUbicacion = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { latitud, longitud, velocidad, direccion } = req.body;
+
+    const parsed = actualizarUbicacionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError(parsed.error.issues[0].message, 400);
+    }
+    const { latitud, longitud, velocidad, direccion } = parsed.data;
 
     // Check cache — skip DB lookup if we verified EN_TRANSITO recently
     const cached = _enTransitoCache.get(id);
@@ -525,32 +548,28 @@ export const confirmarEntrega = async (req: AuthRequest, res: Response, next: Ne
       throw new AppError('Solo los transportistas pueden confirmar entregas', 403);
     }
 
-    // Transaction to prevent race condition (double-tap / concurrent requests)
+    // Atomic conditional update: prevents double-tap race condition
     const manifiestoActualizado = await prisma.$transaction(async (tx) => {
-      const manifiesto = await tx.manifiesto.findUnique({
-        where: { id }
-      });
-
-      if (!manifiesto) {
-        throw new AppError('Manifiesto no encontrado', 404);
-      }
-
-      if (manifiesto.estado !== 'EN_TRANSITO') {
-        throw new AppError('El manifiesto debe estar en tránsito', 400);
-      }
-
-      const updated = await tx.manifiesto.update({
-        where: { id },
-        data: {
-          estado: 'ENTREGADO',
-          fechaEntrega: new Date()
-        },
-        include: {
-          generador: true,
-          transportista: true,
-          operador: true
+      let updated;
+      try {
+        updated = await tx.manifiesto.update({
+          where: { id, estado: 'EN_TRANSITO' },
+          data: {
+            estado: 'ENTREGADO',
+            fechaEntrega: new Date()
+          },
+          include: {
+            generador: true,
+            transportista: true,
+            operador: true
+          }
+        });
+      } catch (err: any) {
+        if (err?.code === 'P2025') {
+          throw new AppError('El manifiesto debe estar en tránsito', 400);
         }
-      });
+        throw err;
+      }
 
       await tx.eventoManifiesto.create({
         data: {
@@ -589,40 +608,39 @@ export const confirmarRecepcion = async (req: AuthRequest, res: Response, next: 
       throw new AppError('Solo los operadores pueden confirmar recepciones', 403);
     }
 
-    const manifiesto = await prisma.manifiesto.findUnique({
-      where: { id }
-    });
-
-    if (!manifiesto) {
-      throw new AppError('Manifiesto no encontrado', 404);
-    }
-
-    if (manifiesto.estado !== 'ENTREGADO') {
-      throw new AppError('El manifiesto debe estar en estado entregado', 400);
-    }
-
-    // Actualizar manifiesto
-    const manifiestoActualizado = await prisma.manifiesto.update({
-      where: { id },
-      data: {
-        estado: 'RECIBIDO',
-        fechaRecepcion: new Date()
-      },
-      include: {
-        generador: true,
-        transportista: true,
-        operador: true
+    // Atomic conditional update: prevents double-tap race condition
+    const manifiestoActualizado = await prisma.$transaction(async (tx) => {
+      let updated;
+      try {
+        updated = await tx.manifiesto.update({
+          where: { id, estado: 'ENTREGADO' },
+          data: {
+            estado: 'RECIBIDO',
+            fechaRecepcion: new Date()
+          },
+          include: {
+            generador: true,
+            transportista: true,
+            operador: true
+          }
+        });
+      } catch (err: any) {
+        if (err?.code === 'P2025') {
+          throw new AppError('El manifiesto debe estar en estado entregado', 400);
+        }
+        throw err;
       }
-    });
 
-    // Registrar evento
-    await prisma.eventoManifiesto.create({
-      data: {
-        manifiestoId: id,
-        tipo: 'RECEPCION',
-        descripcion: `Carga recibida. ${pesoReal ? `Peso registrado: ${pesoReal} kg` : ''} ${observaciones || ''}`,
-        usuarioId: userId
-      }
+      await tx.eventoManifiesto.create({
+        data: {
+          manifiestoId: id,
+          tipo: 'RECEPCION',
+          descripcion: `Carga recibida. ${pesoReal ? `Peso registrado: ${pesoReal} kg` : ''} ${observaciones || ''}`,
+          usuarioId: userId
+        }
+      });
+
+      return updated;
     });
 
     res.json({
@@ -649,45 +667,51 @@ export const cerrarManifiesto = async (req: AuthRequest, res: Response, next: Ne
       throw new AppError('Solo los operadores pueden cerrar manifiestos', 403);
     }
 
-    const manifiesto = await prisma.manifiesto.findUnique({
-      where: { id }
-    });
+    // Atomic conditional update: accepts RECIBIDO or EN_TRATAMIENTO as valid source states
+    const manifiestoActualizado = await prisma.$transaction(async (tx) => {
+      // First verify it exists and is in a valid state
+      const current = await tx.manifiesto.findUnique({ where: { id }, select: { estado: true } });
+      if (!current) throw new AppError('Manifiesto no encontrado', 404);
+      if (current.estado !== 'RECIBIDO' && current.estado !== 'EN_TRATAMIENTO') {
+        throw new AppError('El manifiesto debe estar recibido o en tratamiento', 400);
+      }
 
-    if (!manifiesto) {
-      throw new AppError('Manifiesto no encontrado', 404);
-    }
-
-    if (manifiesto.estado !== 'RECIBIDO' && manifiesto.estado !== 'EN_TRATAMIENTO') {
-      throw new AppError('El manifiesto debe estar recibido o en tratamiento', 400);
-    }
-
-    // Actualizar manifiesto
-    const manifiestoActualizado = await prisma.manifiesto.update({
-      where: { id },
-      data: {
-        estado: 'TRATADO',
-        fechaCierre: new Date()
-      },
-      include: {
-        generador: true,
-        transportista: true,
-        operador: true,
-        residuos: {
+      let updated;
+      try {
+        updated = await tx.manifiesto.update({
+          where: { id, estado: current.estado },
+          data: {
+            estado: 'TRATADO',
+            fechaCierre: new Date()
+          },
           include: {
-            tipoResiduo: true
+            generador: true,
+            transportista: true,
+            operador: true,
+            residuos: {
+              include: {
+                tipoResiduo: true
+              }
+            }
           }
+        });
+      } catch (err: any) {
+        if (err?.code === 'P2025') {
+          throw new AppError('El manifiesto debe estar recibido o en tratamiento', 400);
         }
+        throw err;
       }
-    });
 
-    // Registrar evento de cierre
-    await prisma.eventoManifiesto.create({
-      data: {
-        manifiestoId: id,
-        tipo: 'CIERRE',
-        descripcion: `Manifiesto cerrado${metodoTratamiento ? `. Tratamiento: ${metodoTratamiento}` : ''}${observaciones ? `. ${observaciones}` : ''}`,
-        usuarioId: userId
-      }
+      await tx.eventoManifiesto.create({
+        data: {
+          manifiestoId: id,
+          tipo: 'CIERRE',
+          descripcion: `Manifiesto cerrado${metodoTratamiento ? `. Tratamiento: ${metodoTratamiento}` : ''}${observaciones ? `. ${observaciones}` : ''}`,
+          usuarioId: userId
+        }
+      });
+
+      return updated;
     });
 
     res.json({
@@ -710,40 +734,39 @@ export const rechazarCarga = async (req: AuthRequest, res: Response, next: NextF
       throw new AppError('Solo los operadores pueden rechazar cargas', 403);
     }
 
-    const manifiesto = await prisma.manifiesto.findUnique({
-      where: { id }
-    });
-
-    if (!manifiesto) {
-      throw new AppError('Manifiesto no encontrado', 404);
-    }
-
-    if (manifiesto.estado !== 'ENTREGADO') {
-      throw new AppError('Solo se pueden rechazar cargas en estado entregado', 400);
-    }
-
-    // Actualizar manifiesto
-    const manifiestoActualizado = await prisma.manifiesto.update({
-      where: { id },
-      data: {
-        estado: 'RECHAZADO',
-        observaciones: `RECHAZADO: ${motivo}. ${descripcion || ''}`
-      },
-      include: {
-        generador: true,
-        transportista: true,
-        operador: true
+    // Atomic conditional update: prevents double-tap race condition
+    const manifiestoActualizado = await prisma.$transaction(async (tx) => {
+      let updated;
+      try {
+        updated = await tx.manifiesto.update({
+          where: { id, estado: 'ENTREGADO' },
+          data: {
+            estado: 'RECHAZADO',
+            observaciones: `RECHAZADO: ${motivo}. ${descripcion || ''}`
+          },
+          include: {
+            generador: true,
+            transportista: true,
+            operador: true
+          }
+        });
+      } catch (err: any) {
+        if (err?.code === 'P2025') {
+          throw new AppError('Solo se pueden rechazar cargas en estado entregado', 400);
+        }
+        throw err;
       }
-    });
 
-    // Registrar evento
-    await prisma.eventoManifiesto.create({
-      data: {
-        manifiestoId: id,
-        tipo: 'RECHAZO',
-        descripcion: `Carga rechazada. Motivo: ${motivo}. ${cantidadRechazada ? `Cantidad rechazada: ${cantidadRechazada}` : ''} ${descripcion || ''}`,
-        usuarioId: userId
-      }
+      await tx.eventoManifiesto.create({
+        data: {
+          manifiestoId: id,
+          tipo: 'RECHAZO',
+          descripcion: `Carga rechazada. Motivo: ${motivo}. ${cantidadRechazada ? `Cantidad rechazada: ${cantidadRechazada}` : ''} ${descripcion || ''}`,
+          usuarioId: userId
+        }
+      });
+
+      return updated;
     });
 
     res.json({
@@ -824,31 +847,27 @@ export const registrarTratamiento = async (req: AuthRequest, res: Response, next
       throw new AppError('Solo los operadores pueden registrar tratamientos', 403);
     }
 
-    // Transaction to prevent race condition (double-tap / concurrent requests)
+    // Atomic conditional update: prevents double-tap race condition
     const manifiestoActualizado = await prisma.$transaction(async (tx) => {
-      const manifiesto = await tx.manifiesto.findUnique({
-        where: { id }
-      });
-
-      if (!manifiesto) {
-        throw new AppError('Manifiesto no encontrado', 404);
-      }
-
-      if (manifiesto.estado !== 'RECIBIDO') {
-        throw new AppError('El manifiesto debe estar recibido para registrar tratamiento', 400);
-      }
-
-      const updated = await tx.manifiesto.update({
-        where: { id },
-        data: {
-          estado: 'EN_TRATAMIENTO'
-        },
-        include: {
-          generador: true,
-          transportista: true,
-          operador: true
+      let updated;
+      try {
+        updated = await tx.manifiesto.update({
+          where: { id, estado: 'RECIBIDO' },
+          data: {
+            estado: 'EN_TRATAMIENTO'
+          },
+          include: {
+            generador: true,
+            transportista: true,
+            operador: true
+          }
+        });
+      } catch (err: any) {
+        if (err?.code === 'P2025') {
+          throw new AppError('El manifiesto debe estar recibido para registrar tratamiento', 400);
         }
-      });
+        throw err;
+      }
 
       await tx.eventoManifiesto.create({
         data: {

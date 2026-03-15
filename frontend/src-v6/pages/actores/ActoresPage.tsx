@@ -78,6 +78,7 @@ export const ActoresPage: React.FC = () => {
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [vistaMode, setVistaMode] = useState<'grid' | 'list'>('list');
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [actorSeleccionado, setActorSeleccionado] = useState<any>(null);
   const [modalDetalle, setModalDetalle] = useState(false);
@@ -129,7 +130,7 @@ export const ActoresPage: React.FC = () => {
     operador: operadoresCount,
   };
 
-  // Filter by tab + estado
+  // Filter by tab + estado + sort
   const actoresFiltrados = useMemo(() => {
     let filtered = actoresData;
 
@@ -144,8 +145,24 @@ export const ActoresPage: React.FC = () => {
       });
     }
 
+    if (sortConfig) {
+      filtered = [...filtered].sort((a, b) => {
+        const dir = sortConfig.direction === 'asc' ? 1 : -1;
+        switch (sortConfig.key) {
+          case 'actor': return dir * (a.razonSocial || '').localeCompare(b.razonSocial || '', 'es');
+          case 'tipo': return dir * (a.tipo || '').localeCompare(b.tipo || '', 'es');
+          case 'estado': {
+            const aActivo = a.activo !== false && a.estado !== 'inactivo';
+            const bActivo = b.activo !== false && b.estado !== 'inactivo';
+            return dir * (Number(bActivo) - Number(aActivo));
+          }
+          default: return 0;
+        }
+      });
+    }
+
     return filtered;
-  }, [actoresData, activeTab, filtroEstado]);
+  }, [actoresData, activeTab, filtroEstado, sortConfig]);
 
   // Pagination
   const totalPages = Math.ceil(actoresFiltrados.length / itemsPerPage);
@@ -208,6 +225,7 @@ export const ActoresPage: React.FC = () => {
       key: 'actor',
       width: '28%',
       header: 'Actor',
+      sortable: true,
       render: (row: any) => {
         const config = tipoConfig[row.tipo as keyof typeof tipoConfig] || tipoConfig['generador'];
         const Icon = config.icon;
@@ -228,6 +246,7 @@ export const ActoresPage: React.FC = () => {
       key: 'tipo',
       width: '12%',
       header: 'Tipo',
+      sortable: true,
       render: (row: any) => {
         const config = tipoConfig[row.tipo as keyof typeof tipoConfig];
         return <Badge variant="soft" color={config?.color as any}>{config?.label}</Badge>;
@@ -255,6 +274,7 @@ export const ActoresPage: React.FC = () => {
       key: 'estado',
       width: '10%',
       header: 'Estado',
+      sortable: true,
       render: (row: any) => {
         const isActivo = row.activo !== false && row.estado !== 'inactivo';
         return (
@@ -484,6 +504,8 @@ export const ActoresPage: React.FC = () => {
               selectable
               selectedKeys={selectedRows}
               onSelectionChange={setSelectedRows}
+              sortable={true}
+              onSort={(key, dir) => setSortConfig({ key, direction: dir })}
               onRowClick={verDetalle}
               stickyHeader
               emptyMessage="No se encontraron actores"

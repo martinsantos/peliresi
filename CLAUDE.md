@@ -241,7 +241,7 @@ GET  /api/reportes/manifiestos       → porEstado, porTipoResiduo, manifiestos[
 GET  /api/reportes/tratados          → porGenerador, totalPorTipo, detalle[], pagination (params: fechaInicio, fechaFin, page, limit)
 GET  /api/reportes/transporte        → transportistas[] con tasaCompletitud, pagination (params: fechaInicio, fechaFin, page, limit). Usa _count en vez de cargar manifiestos completos.
 GET  /api/reportes/exportar/:tipo    → CSV blob (tipos: manifiestos, generadores, transportistas, operadores). Límite: 10,000 filas max.
-POST /api/manifiestos/:id/aprobar    → Cambiar estado BORRADOR → APROBADO
+POST /api/manifiestos/:id/firmar     → Cambiar estado BORRADOR → APROBADO
 POST /api/manifiestos/:id/confirmar-retiro → APROBADO → EN_TRANSITO
 POST /api/manifiestos/:id/entregar   → EN_TRANSITO → ENTREGADO
 POST /api/manifiestos/:id/recibir    → ENTREGADO → RECIBIDO

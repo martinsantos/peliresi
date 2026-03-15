@@ -198,6 +198,8 @@ export interface ActorFilters {
   activo?: boolean;
   page?: number;
   limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
 }
 
 // ========================================
@@ -287,6 +289,8 @@ export interface UsuarioFilters {
   search?: string;
   page?: number;
   limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
 }
 
 // ========================================

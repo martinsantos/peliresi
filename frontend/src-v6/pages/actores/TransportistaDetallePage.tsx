@@ -5,7 +5,7 @@
  * CRUD: Agregar vehículos y conductores (ADMIN only)
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -66,6 +66,8 @@ const TransportistaDetallePage: React.FC = () => {
   const [deleteChoferItem, setDeleteChoferItem] = useState<any>(null);
   const [corrientesExpanded, setCorrientesExpanded] = useState(false);
   const [historialPage, setHistorialPage] = useState(1);
+  const [flotaSort, setFlotaSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+  const [choferSort, setChoferSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
   const { data: apiTransportista, isLoading } = useTransportista(id || '');
   const { data: manifiestoData } = useManifiestos({ transportistaId: id, limit: 20, page: historialPage }, { enabled: !!id });
@@ -96,6 +98,49 @@ const TransportistaDetallePage: React.FC = () => {
     flota: (apiTransportista as any).vehiculos || [],
     conductores: (apiTransportista as any).choferes || [],
   } : null;
+
+  const rawFlota: any[] = transportista ? transportista.flota : [];
+  const rawChoferes: any[] = transportista ? transportista.conductores : [];
+
+  const sortedFlota = useMemo(() => {
+    if (!flotaSort) return rawFlota;
+    return [...rawFlota].sort((a: any, b: any) => {
+      const dir = flotaSort.direction === 'asc' ? 1 : -1;
+      switch (flotaSort.key) {
+        case 'patente': return dir * (a.patente || '').localeCompare(b.patente || '', 'es');
+        case 'estado': return dir * (Number(b.activo !== false) - Number(a.activo !== false));
+        case 'vencimiento': return dir * (new Date(a.vencimiento || 0).getTime() - new Date(b.vencimiento || 0).getTime());
+        default: return 0;
+      }
+    });
+  }, [rawFlota, flotaSort]);
+
+  const sortedChoferes = useMemo(() => {
+    if (!choferSort) return rawChoferes;
+    return [...rawChoferes].sort((a: any, b: any) => {
+      const dir = choferSort.direction === 'asc' ? 1 : -1;
+      switch (choferSort.key) {
+        case 'nombre': return dir * (`${a.nombre} ${a.apellido}`).localeCompare(`${b.nombre} ${b.apellido}`, 'es');
+        case 'vencimiento': return dir * (new Date(a.vencimiento || 0).getTime() - new Date(b.vencimiento || 0).getTime());
+        default: return 0;
+      }
+    });
+  }, [rawChoferes, choferSort]);
+
+  const toggleFlotaSort = (key: string) => setFlotaSort(prev =>
+    prev?.key === key ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' }
+  );
+  const toggleChoferSort = (key: string) => setChoferSort(prev =>
+    prev?.key === key ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' }
+  );
+  const FlotaSortIcon = ({ col }: { col: string }) => {
+    if (flotaSort?.key !== col) return <ChevronUp size={12} className="ml-1 opacity-30 inline" />;
+    return flotaSort.direction === 'asc' ? <ChevronUp size={12} className="ml-1 text-primary-600 inline" /> : <ChevronDown size={12} className="ml-1 text-primary-600 inline" />;
+  };
+  const ChoferSortIcon = ({ col }: { col: string }) => {
+    if (choferSort?.key !== col) return <ChevronUp size={12} className="ml-1 opacity-30 inline" />;
+    return choferSort.direction === 'asc' ? <ChevronUp size={12} className="ml-1 text-primary-600 inline" /> : <ChevronDown size={12} className="ml-1 text-primary-600 inline" />;
+  };
 
   const backPath = isMobile
     ? '/mobile/actores/transportistas'
@@ -529,17 +574,17 @@ const TransportistaDetallePage: React.FC = () => {
                   <table className="w-full table-fixed">
                     <thead className="bg-neutral-50">
                       <tr>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '15%' }}>Patente</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase cursor-pointer select-none hover:text-primary-600" style={{ width: '15%' }} onClick={() => toggleFlotaSort('patente')}>Patente<FlotaSortIcon col="patente" /></th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Marca / Modelo</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '12%' }}>Capacidad</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '10%' }}>Estado</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase cursor-pointer select-none hover:text-primary-600" style={{ width: '10%' }} onClick={() => toggleFlotaSort('estado')}>Estado<FlotaSortIcon col="estado" /></th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '13%' }}>Habilitación</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '12%' }}>Vencimiento</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell cursor-pointer select-none hover:text-primary-600" style={{ width: '12%' }} onClick={() => toggleFlotaSort('vencimiento')}>Vencimiento<FlotaSortIcon col="vencimiento" /></th>
                         {isAdmin && <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase" style={{ width: '18%' }}>Acciones</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-100">
-                      {transportista.flota.map((v: any) => (
+                      {sortedFlota.map((v: any) => (
                         <tr key={v.patente || v.id} className="hover:bg-neutral-50 transition-colors">
                           <td className="px-3 py-2.5 font-mono font-semibold text-neutral-900">{v.patente}</td>
                           <td className="px-3 py-2.5 text-neutral-700">{v.marca} {v.modelo}</td>
@@ -599,16 +644,16 @@ const TransportistaDetallePage: React.FC = () => {
                   <table className="w-full table-fixed">
                     <thead className="bg-neutral-50">
                       <tr>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '22%' }}>Nombre</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase cursor-pointer select-none hover:text-primary-600" style={{ width: '22%' }} onClick={() => toggleChoferSort('nombre')}>Nombre<ChoferSortIcon col="nombre" /></th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '15%' }}>DNI</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '15%' }}>Licencia</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '14%' }}>Teléfono</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '16%' }}>Vto. Licencia</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell cursor-pointer select-none hover:text-primary-600" style={{ width: '16%' }} onClick={() => toggleChoferSort('vencimiento')}>Vto. Licencia<ChoferSortIcon col="vencimiento" /></th>
                         {isAdmin && <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase" style={{ width: '18%' }}>Acciones</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-100">
-                      {transportista.conductores.map((c: any) => (
+                      {sortedChoferes.map((c: any) => (
                         <tr key={c.dni || c.id} className="hover:bg-neutral-50 transition-colors">
                           <td className="px-3 py-2.5 font-medium text-neutral-900">{c.nombre} {c.apellido || ''}</td>
                           <td className="px-3 py-2.5 font-mono text-neutral-700">{c.dni || '-'}</td>

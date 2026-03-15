@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Users, Truck, Activity, TrendingUp, FileDown,
+  Users, Truck, Activity, TrendingUp, FileDown, ChevronUp, ChevronDown,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -13,8 +13,34 @@ import { KpiCard } from '../../../components/charts/KpiCard';
 
 export default function TransporteTab({ data, periodo, onExportPDF }: { data: any; periodo: string; onExportPDF: () => void }) {
   const navigate = useNavigate();
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const resumen = data.resumen || {};
   const transportistas = data.transportistas || [];
+
+  const toggleSort = (key: string) => setSortConfig(prev =>
+    prev?.key === key ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' }
+  );
+  const SortIcon = ({ col }: { col: string }) => {
+    if (sortConfig?.key !== col) return <ChevronUp size={12} className="ml-1 opacity-30 inline" />;
+    return sortConfig.direction === 'asc' ? <ChevronUp size={12} className="ml-1 text-primary-600 inline" /> : <ChevronDown size={12} className="ml-1 text-primary-600 inline" />;
+  };
+
+  const sortedTransportistas = useMemo(() => {
+    if (!sortConfig) return transportistas;
+    return [...transportistas].sort((a: any, b: any) => {
+      const dir = sortConfig.direction === 'asc' ? 1 : -1;
+      switch (sortConfig.key) {
+        case 'transportista': return dir * (a.transportista || '').localeCompare(b.transportista || '', 'es');
+        case 'totalViajes': return dir * ((a.totalViajes || 0) - (b.totalViajes || 0));
+        case 'completados': return dir * ((a.completados || 0) - (b.completados || 0));
+        case 'enTransito': return dir * ((a.enTransito || 0) - (b.enTransito || 0));
+        case 'vehiculos': return dir * ((a.vehiculosRegistrados || 0) - (b.vehiculosRegistrados || 0));
+        case 'choferes': return dir * ((a.choferesRegistrados || 0) - (b.choferesRegistrados || 0));
+        case 'tasa': return dir * (parseFloat(a.tasaCompletitud || '0') - parseFloat(b.tasaCompletitud || '0'));
+        default: return 0;
+      }
+    });
+  }, [transportistas, sortConfig]);
 
   const chartData = useMemo(() =>
     transportistas
@@ -118,17 +144,17 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
               <table className="w-full text-left">
                 <thead className="bg-neutral-50/80 border-b border-neutral-200 sticky top-0 z-10">
                   <tr>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Transportista</th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Viajes</th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Completados</th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell">En Tránsito</th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell">Vehículos</th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden lg:table-cell">Choferes</th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell">Tasa</th>
+                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('transportista')}>Transportista<SortIcon col="transportista" /></th>
+                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('totalViajes')}>Viajes<SortIcon col="totalViajes" /></th>
+                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('completados')}>Completados<SortIcon col="completados" /></th>
+                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('enTransito')}>En Tránsito<SortIcon col="enTransito" /></th>
+                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('vehiculos')}>Vehículos<SortIcon col="vehiculos" /></th>
+                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden lg:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('choferes')}>Choferes<SortIcon col="choferes" /></th>
+                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('tasa')}>Tasa<SortIcon col="tasa" /></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
-                  {transportistas.map((t: any, i: number) => {
+                  {sortedTransportistas.map((t: any, i: number) => {
                     const tasa = parseFloat(t.tasaCompletitud || '0');
                     return (
                       <tr

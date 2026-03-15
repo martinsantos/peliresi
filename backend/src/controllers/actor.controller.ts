@@ -8,8 +8,15 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 
 export const getGeneradores = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const { search, activo, page = 1, limit = 10 } = req.query;
+        const { search, activo, page = 1, limit = 10, sortBy, sortOrder } = req.query;
         const skip = (Number(page) - 1) * Number(limit);
+        const order: 'asc' | 'desc' = sortOrder === 'desc' ? 'desc' : 'asc';
+        const GEN_SORT: Record<string, any> = {
+            razonSocial: { razonSocial: order },
+            categoria: { categoria: order },
+            activo: { activo: order },
+        };
+        const orderBy = GEN_SORT[sortBy as string] ?? { razonSocial: 'asc' };
 
         const where: any = {};
         if (search) {
@@ -31,7 +38,7 @@ export const getGeneradores = async (req: AuthRequest, res: Response, next: Next
                     usuario: { select: { email: true, nombre: true, apellido: true } },
                     _count: { select: { manifiestos: true } }
                 },
-                orderBy: { razonSocial: 'asc' }
+                orderBy
             }),
             prisma.generador.count({ where })
         ]);
@@ -182,8 +189,17 @@ export const deleteGenerador = async (req: AuthRequest, res: Response, next: Nex
 
 export const getTransportistas = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const { search, activo, page = 1, limit = 10 } = req.query;
+        const { search, activo, page = 1, limit = 10, sortBy, sortOrder } = req.query;
         const skip = (Number(page) - 1) * Number(limit);
+        const order: 'asc' | 'desc' = sortOrder === 'desc' ? 'desc' : 'asc';
+        const TRANS_SORT: Record<string, any> = {
+            razonSocial: { razonSocial: order },
+            localidad: { localidad: order },
+            activo: { activo: order },
+            vehiculosCount: { vehiculos: { _count: order } },
+            choferesCount: { choferes: { _count: order } },
+        };
+        const orderBy = TRANS_SORT[sortBy as string] ?? { razonSocial: 'asc' };
 
         const where: any = {};
         if (search) {
@@ -207,7 +223,7 @@ export const getTransportistas = async (req: AuthRequest, res: Response, next: N
                     choferes: true,
                     _count: { select: { manifiestos: true } }
                 },
-                orderBy: { razonSocial: 'asc' }
+                orderBy
             }),
             prisma.transportista.count({ where })
         ]);
@@ -545,8 +561,15 @@ export const deleteChofer = async (req: AuthRequest, res: Response, next: NextFu
 
 export const getOperadores = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const { search, activo, page = 1, limit = 10 } = req.query;
+        const { search, activo, page = 1, limit = 10, sortBy, sortOrder } = req.query;
         const skip = (Number(page) - 1) * Number(limit);
+        const order: 'asc' | 'desc' = sortOrder === 'desc' ? 'desc' : 'asc';
+        const OPER_SORT: Record<string, any> = {
+            razonSocial: { razonSocial: order },
+            categoria: { categoria: order },
+            activo: { activo: order },
+        };
+        const orderBy = OPER_SORT[sortBy as string] ?? { razonSocial: 'asc' };
 
         const where: any = {};
         if (search) {
@@ -569,7 +592,7 @@ export const getOperadores = async (req: AuthRequest, res: Response, next: NextF
                     tratamientos: { include: { tipoResiduo: true } },
                     _count: { select: { manifiestos: true } }
                 },
-                orderBy: { razonSocial: 'asc' }
+                orderBy
             }),
             prisma.operador.count({ where })
         ]);

@@ -109,7 +109,7 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
             },
           },
           manifiestos: {
-            where: { estado: 'EN_TRANSITO' },
+            where: { estado: 'EN_TRANSITO', fechaCreacion: dateFilter },
             select: { id: true },
           },
         },
@@ -224,15 +224,15 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
       result.enTransito = enTransito.map(m => ({
         manifiestoId: m.id,
         numero: m.numero,
-        transportista: m.transportista.razonSocial,
-        origen: m.generador.razonSocial,
-        origenLatLng: m.generador.latitud && m.generador.longitud
+        transportista: m.transportista?.razonSocial ?? null,
+        origen: m.generador?.razonSocial ?? null,
+        origenLatLng: m.generador?.latitud && m.generador?.longitud
           ? [m.generador.latitud, m.generador.longitud] : null,
-        destino: m.operador.razonSocial,
-        destinoLatLng: m.operador.latitud && m.operador.longitud
+        destino: m.operador?.razonSocial ?? null,
+        destinoLatLng: m.operador?.latitud && m.operador?.longitud
           ? [m.operador.latitud, m.operador.longitud] : null,
         ultimaPosicion: m.tracking[0] || null,
-        ruta: m.tracking.reverse().map(t => ({
+        ruta: [...m.tracking].reverse().map(t => ({
           lat: t.latitud,
           lng: t.longitud,
           velocidad: t.velocidad,

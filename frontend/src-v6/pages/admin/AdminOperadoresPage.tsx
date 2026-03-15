@@ -64,6 +64,8 @@ const AdminOperadoresPage: React.FC = () => {
   const [filtroCorriente, setFiltroCorriente] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState<string | undefined>(undefined);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [modalCrear, setModalCrear] = useState(false);
   const [modalEditar, setModalEditar] = useState(false);
   const [modalEliminar, setModalEliminar] = useState(false);
@@ -72,7 +74,7 @@ const AdminOperadoresPage: React.FC = () => {
   const [form, setForm] = useState(INITIAL_FORM);
 
   // API hooks
-  const { data: apiData, isLoading, isError, error } = useOperadores({ page: currentPage, limit: 20, search: busqueda || undefined });
+  const { data: apiData, isLoading, isError, error } = useOperadores({ page: currentPage, limit: 20, search: busqueda || undefined, sortBy, sortOrder });
   const createMutation = useCreateOperador();
   const updateMutation = useUpdateOperador();
   const deleteMutation = useDeleteOperador();
@@ -123,15 +125,29 @@ const AdminOperadoresPage: React.FC = () => {
     [operadoresData]
   );
 
-  // Client-side filters (on top of server-side search)
-  const filteredData = tableData.filter((o) => {
-    if (filtroTipo && o.tipoOperador !== filtroTipo) return false;
-    if (filtroCorriente && !o.corrientes.includes(filtroCorriente)) return false;
-    const matchesEstado = filtroEstado === 'todos' ||
-                          (filtroEstado === 'activo' && o.activo) ||
-                          (filtroEstado === 'inactivo' && !o.activo);
-    return matchesEstado;
-  });
+  // Client-side filters (tipo, corriente, estado); sort is server-side
+  const filteredData = useMemo(() => {
+    return tableData.filter((o) => {
+      if (filtroTipo && o.tipoOperador !== filtroTipo) return false;
+      if (filtroCorriente && !o.corrientes.includes(filtroCorriente)) return false;
+      const matchesEstado = filtroEstado === 'todos' ||
+                            (filtroEstado === 'activo' && o.activo) ||
+                            (filtroEstado === 'inactivo' && !o.activo);
+      return matchesEstado;
+    });
+  }, [tableData, filtroTipo, filtroCorriente, filtroEstado]);
+
+  const OPER_COL_MAP: Record<string, string> = {
+    operador: 'razonSocial',
+    tipo: 'categoria',
+    estado: 'activo',
+  };
+
+  const handleSort = (key: string, direction: 'asc' | 'desc') => {
+    setSortBy(OPER_COL_MAP[key] ?? key);
+    setSortOrder(direction);
+    setCurrentPage(1);
+  };
 
   const stats = {
     total,
@@ -338,6 +354,7 @@ const AdminOperadoresPage: React.FC = () => {
       key: 'operador',
       width: '20%',
       header: 'Operador',
+      sortable: true,
       render: (row: typeof tableData[0]) => (
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -359,6 +376,7 @@ const AdminOperadoresPage: React.FC = () => {
       key: 'tipo',
       width: '12%',
       header: 'Tipo',
+      sortable: true,
       hiddenBelow: 'md' as const,
       render: (row: typeof tableData[0]) => {
         const tipo = (row.tipoOperador || row.categoria) as string;
@@ -437,6 +455,7 @@ const AdminOperadoresPage: React.FC = () => {
       key: 'estado',
       width: '8%',
       header: 'Estado',
+      sortable: true,
       render: (row: typeof tableData[0]) => (
         <Badge variant="soft" color={row.activo ? 'success' : 'warning'}>
           {row.activo ? 'Activo' : 'Inactivo'}
@@ -449,7 +468,7 @@ const AdminOperadoresPage: React.FC = () => {
       header: '',
       align: 'right' as const,
       render: (row: typeof tableData[0]) => (
-        <div className="flex items-center justify-end gap-1">
+        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
           <button
             className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
             onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/admin/actores/operadores/${row.id}` : `/admin/actores/operadores/${row.id}`); }}
@@ -618,6 +637,8 @@ const AdminOperadoresPage: React.FC = () => {
               data={filteredData}
               columns={columns}
               keyExtractor={(row) => row.id}
+              sortable={true}
+              onSort={handleSort}
               onRowClick={(row) => navigate(isMobile ? `/mobile/admin/actores/operadores/${row.id}` : `/admin/actores/operadores/${row.id}`)}
               emptyMessage="No se encontraron operadores"
               stickyHeader

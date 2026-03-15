@@ -63,6 +63,8 @@ export const AdminVehiculosPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState('vehiculos');
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+  const [choferSortConfig, setChoferSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
   // Vehiculo edit/delete state
   const [editingVehiculo, setEditingVehiculo] = useState<VehiculoDisplay | null>(null);
@@ -145,11 +147,30 @@ export const AdminVehiculosPage: React.FC = () => {
     }
   }).length;
 
-  const filteredData = allVehicles.filter(v =>
-    String(v.patente || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    String(v.transportista || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    String(v.marca || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredData = useMemo(() => {
+    let result = allVehicles.filter(v =>
+      String(v.patente || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(v.transportista || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(v.marca || '').toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    if (sortConfig) {
+      result = [...result].sort((a, b) => {
+        const dir = sortConfig.direction === 'asc' ? 1 : -1;
+        switch (sortConfig.key) {
+          case 'vehiculo': return dir * a.patente.localeCompare(b.patente, 'es');
+          case 'transportista': return dir * a.transportista.localeCompare(b.transportista, 'es');
+          case 'estado': return dir * (Number(b.activo) - Number(a.activo));
+          case 'vtv': {
+            const aTime = a.vencimiento ? new Date(a.vencimiento).getTime() : 0;
+            const bTime = b.vencimiento ? new Date(b.vencimiento).getTime() : 0;
+            return dir * (aTime - bTime);
+          }
+          default: return 0;
+        }
+      });
+    }
+    return result;
+  }, [allVehicles, searchQuery, sortConfig]);
 
   // Pagination for vehicles
   const itemsPerPage = 10;
@@ -157,13 +178,27 @@ export const AdminVehiculosPage: React.FC = () => {
   const paginatedData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   // Filtered & paginated choferes
-  const filteredChoferes = allChoferes.filter(c =>
-    String(c.nombre || '').toLowerCase().includes(choferSearch.toLowerCase()) ||
-    String(c.apellido || '').toLowerCase().includes(choferSearch.toLowerCase()) ||
-    String(c.dni || '').toLowerCase().includes(choferSearch.toLowerCase()) ||
-    String(c.transportista || '').toLowerCase().includes(choferSearch.toLowerCase()) ||
-    String(c.licencia || '').toLowerCase().includes(choferSearch.toLowerCase())
-  );
+  const filteredChoferes = useMemo(() => {
+    let result = allChoferes.filter(c =>
+      String(c.nombre || '').toLowerCase().includes(choferSearch.toLowerCase()) ||
+      String(c.apellido || '').toLowerCase().includes(choferSearch.toLowerCase()) ||
+      String(c.dni || '').toLowerCase().includes(choferSearch.toLowerCase()) ||
+      String(c.transportista || '').toLowerCase().includes(choferSearch.toLowerCase()) ||
+      String(c.licencia || '').toLowerCase().includes(choferSearch.toLowerCase())
+    );
+    if (choferSortConfig) {
+      result = [...result].sort((a, b) => {
+        const dir = choferSortConfig.direction === 'asc' ? 1 : -1;
+        switch (choferSortConfig.key) {
+          case 'chofer': return dir * `${a.nombre} ${a.apellido}`.localeCompare(`${b.nombre} ${b.apellido}`, 'es');
+          case 'transportista': return dir * a.transportista.localeCompare(b.transportista, 'es');
+          case 'estado': return dir * (Number(b.activo) - Number(a.activo));
+          default: return 0;
+        }
+      });
+    }
+    return result;
+  }, [allChoferes, choferSearch, choferSortConfig]);
   const totalChoferPages = Math.max(1, Math.ceil(filteredChoferes.length / itemsPerPage));
   const paginatedChoferes = filteredChoferes.slice((choferPage - 1) * itemsPerPage, choferPage * itemsPerPage);
 
@@ -245,6 +280,7 @@ export const AdminVehiculosPage: React.FC = () => {
       key: 'vehiculo',
       width: '22%',
       header: 'Vehículo',
+      sortable: true,
       render: (row: VehiculoDisplay) => (
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
@@ -272,6 +308,7 @@ export const AdminVehiculosPage: React.FC = () => {
     {
       key: 'transportista',
       width: '20%',
+      sortable: true,
       hiddenBelow: 'md' as const,
       header: 'Transportista',
       render: (row: VehiculoDisplay) => (
@@ -281,6 +318,7 @@ export const AdminVehiculosPage: React.FC = () => {
     {
       key: 'vtv',
       width: '15%',
+      sortable: true,
       header: 'Vencimiento',
       render: (row: VehiculoDisplay) => {
         if (!row.vencimiento) {
@@ -316,6 +354,7 @@ export const AdminVehiculosPage: React.FC = () => {
     {
       key: 'estado',
       width: '12%',
+      sortable: true,
       header: 'Estado',
       render: (row: VehiculoDisplay) => {
         const estadoConfig: Record<string, { label: string; color: string }> = {
@@ -376,6 +415,7 @@ export const AdminVehiculosPage: React.FC = () => {
     {
       key: 'chofer',
       width: '22%',
+      sortable: true,
       header: 'Chofer',
       render: (row: ChoferDisplay) => (
         <div className="flex items-center gap-3">
@@ -401,6 +441,7 @@ export const AdminVehiculosPage: React.FC = () => {
     {
       key: 'transportista',
       width: '20%',
+      sortable: true,
       hiddenBelow: 'md' as const,
       header: 'Transportista',
       render: (row: ChoferDisplay) => (
@@ -445,6 +486,7 @@ export const AdminVehiculosPage: React.FC = () => {
     {
       key: 'estado',
       width: '12%',
+      sortable: true,
       header: 'Estado',
       render: (row: ChoferDisplay) => (
         <Badge variant="soft" color={row.activo ? 'success' : 'neutral'}>
@@ -600,6 +642,8 @@ export const AdminVehiculosPage: React.FC = () => {
                     data={paginatedData}
                     columns={columns}
                     keyExtractor={(row) => row.id}
+                    sortable={true}
+                    onSort={(key, dir) => setSortConfig({ key, direction: dir })}
                     onRowClick={(row) => navigate(isMobile ? `/mobile/admin/actores/transportistas/${row.transportistaId}` : `/admin/actores/transportistas/${row.transportistaId}`)}
                     stickyHeader
                   />
@@ -641,6 +685,8 @@ export const AdminVehiculosPage: React.FC = () => {
                     data={paginatedChoferes}
                     columns={choferColumns}
                     keyExtractor={(row) => row.id}
+                    sortable={true}
+                    onSort={(key, dir) => setChoferSortConfig({ key, direction: dir })}
                     onRowClick={(row) => navigate(isMobile ? `/mobile/admin/actores/transportistas/${row.transportistaId}` : `/admin/actores/transportistas/${row.transportistaId}`)}
                     stickyHeader
                   />

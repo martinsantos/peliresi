@@ -4,7 +4,7 @@
  * Gestion de operadores de tratamiento
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FlaskConical,
@@ -21,7 +21,9 @@ import {
   Edit,
   Trash2,
   Eye,
-  Factory
+  Factory,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 import { Card } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -58,6 +60,8 @@ const OperadoresPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('');
   const [vista, setVista] = useState<'grid' | 'lista'>('lista');
+  const [sortBy, setSortBy] = useState<string | undefined>(undefined);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [modalCrear, setModalCrear] = useState(false);
   const [modalEditar, setModalEditar] = useState(false);
   const [modalEliminar, setModalEliminar] = useState(false);
@@ -66,20 +70,45 @@ const OperadoresPage: React.FC = () => {
   const [form, setForm] = useState(INITIAL_FORM);
 
   // API hooks
-  const { data: apiData, isLoading } = useOperadores({ search: searchTerm || undefined });
+  const { data: apiData, isLoading } = useOperadores({ search: searchTerm || undefined, sortBy, sortOrder });
   const createMutation = useCreateOperador();
   const updateMutation = useUpdateOperador();
   const deleteMutation = useDeleteOperador();
 
   const operadoresData = Array.isArray(apiData?.items) ? apiData.items : [];
 
-  // Server handles search; client filters estado
-  const operadoresFiltrados = operadoresData.filter((op: any) => {
-    const matchesEstado = filtroEstado === '' ||
-      (filtroEstado === 'ACTIVO' && op.activo !== false) ||
-      (filtroEstado === 'INACTIVO' && op.activo === false);
-    return matchesEstado;
-  });
+  // Server handles search + sort; client filters estado only
+  const operadoresFiltrados = useMemo(() => {
+    return operadoresData.filter((op: any) => {
+      return filtroEstado === '' ||
+        (filtroEstado === 'ACTIVO' && op.activo !== false) ||
+        (filtroEstado === 'INACTIVO' && op.activo === false);
+    });
+  }, [operadoresData, filtroEstado]);
+
+  const OPER_PAGE_COL_MAP: Record<string, string> = {
+    razonSocial: 'razonSocial',
+    categoria: 'categoria',
+    estado: 'activo',
+  };
+
+  const toggleSort = (key: string) => {
+    const apiKey = OPER_PAGE_COL_MAP[key] ?? key;
+    if (sortBy === apiKey) {
+      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(apiKey);
+      setSortOrder('asc');
+    }
+  };
+
+  const SortIcon = ({ col }: { col: string }) => {
+    const apiKey = OPER_PAGE_COL_MAP[col] ?? col;
+    if (sortBy !== apiKey) return <ChevronUp size={12} className="ml-1 opacity-30 inline" />;
+    return sortOrder === 'asc'
+      ? <ChevronUp size={12} className="ml-1 text-primary-600 inline" />
+      : <ChevronDown size={12} className="ml-1 text-primary-600 inline" />;
+  };
 
   const isMobile = typeof window !== 'undefined' && window.location.pathname.includes('/mobile');
 
@@ -319,9 +348,9 @@ const OperadoresPage: React.FC = () => {
           <table className="w-full table-fixed">
               <thead className="bg-neutral-50 border-b border-neutral-200 sticky top-0 z-10">
                 <tr>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '30%' }}>Operador</th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '15%' }}>Estado</th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider hidden md:table-cell" style={{ width: '15%' }}>Categoria</th>
+                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" style={{ width: '30%' }} onClick={() => toggleSort('razonSocial')}>Operador<SortIcon col="razonSocial" /></th>
+                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" style={{ width: '15%' }} onClick={() => toggleSort('estado')}>Estado<SortIcon col="estado" /></th>
+                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" style={{ width: '15%' }} onClick={() => toggleSort('categoria')}>Categoria<SortIcon col="categoria" /></th>
                   <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider hidden md:table-cell" style={{ width: '22%' }}>Contacto</th>
                   <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '18%' }}>Acciones</th>
                 </tr>

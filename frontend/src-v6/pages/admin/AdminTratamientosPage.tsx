@@ -158,6 +158,7 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<TratamientoDB | null>(null);
   const [deleteItem, setDeleteItem] = useState<TratamientoDB | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const itemsPerPage = 15;
 
   // Form state
@@ -173,7 +174,7 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
 
   const filtered = useMemo(() => {
     const search = searchTerm.toLowerCase().trim();
-    return allTratamientos.filter(t => {
+    let result = allTratamientos.filter(t => {
       if (filtroOperador && t.operadorId !== filtroOperador) return false;
       if (search) {
         const haystack = `${t.operador?.razonSocial || ''} ${t.tipoResiduo?.codigo || ''} ${t.tipoResiduo?.nombre || ''} ${t.metodo} ${t.descripcion || ''}`.toLowerCase();
@@ -181,7 +182,19 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
       }
       return true;
     });
-  }, [allTratamientos, searchTerm, filtroOperador]);
+    if (sortConfig) {
+      result = [...result].sort((a, b) => {
+        const dir = sortConfig.direction === 'asc' ? 1 : -1;
+        switch (sortConfig.key) {
+          case 'operador': return dir * (a.operador?.razonSocial || '').localeCompare(b.operador?.razonSocial || '', 'es');
+          case 'residuo': return dir * (a.tipoResiduo?.codigo || '').localeCompare(b.tipoResiduo?.codigo || '', 'es');
+          case 'metodo': return dir * a.metodo.localeCompare(b.metodo, 'es');
+          default: return 0;
+        }
+      });
+    }
+    return result;
+  }, [allTratamientos, searchTerm, filtroOperador, sortConfig]);
 
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
   const paginados = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -261,6 +274,7 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
     {
       key: 'operador',
       header: 'Operador',
+      sortable: true,
       width: '30%',
       render: (t: TratamientoDB) => (
         <div className="flex items-start gap-3">
@@ -277,6 +291,7 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
     {
       key: 'residuo',
       header: 'Tipo Residuo',
+      sortable: true,
       width: '25%',
       render: (t: TratamientoDB) => (
         <div>
@@ -302,6 +317,7 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
     {
       key: 'metodo',
       header: 'Método y Capacidad',
+      sortable: true,
       width: '30%',
       render: (t: TratamientoDB) => (
         <div>
@@ -485,6 +501,8 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
             data={paginados}
             columns={columns}
             keyExtractor={(t) => t.id}
+            sortable={true}
+            onSort={(key, dir) => setSortConfig({ key, direction: dir })}
             stickyHeader
             emptyMessage="No hay tratamientos autorizados registrados"
           />
