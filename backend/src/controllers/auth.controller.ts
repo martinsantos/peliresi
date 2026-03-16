@@ -7,14 +7,6 @@ import { config } from '../config/config';
 import { AppError } from '../middlewares/errorHandler';
 import prisma from '../lib/prisma';
 
-// Demo mode accounts (relaxed password validation)
-const DEMO_EMAILS = [
-  'juan.perez@dgfa.gob.ar',
-  'm.gonzalez@hospitalcentral.gob.ar',
-  'c.rodriguez@transportesandes.com',
-  'ana.martinez@plantalasheras.com',
-];
-
 // Zod schemas
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -31,7 +23,7 @@ const registerSchema = z.object({
   telefono: z.string().optional(),
 });
 
-// Password strength validation for non-demo users
+// Password strength validation
 function validatePasswordStrength(password: string): string | null {
   if (password.length < 8) return 'La contraseña debe tener al menos 8 caracteres';
   if (!/[A-Z]/.test(password)) return 'La contraseña debe contener al menos una mayúscula';
@@ -60,13 +52,10 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
 
     const { email, password, rol, nombre, apellido, empresa, telefono } = parsed.data;
 
-    // Password strength check (skip for demo mode accounts)
-    const isDemoMode = process.env.DEMO_MODE === 'true';
-    if (!isDemoMode || !DEMO_EMAILS.includes(email)) {
-      const passwordError = validatePasswordStrength(password);
-      if (passwordError) {
-        throw new AppError(passwordError, 400);
-      }
+    // Password strength check
+    const passwordError = validatePasswordStrength(password);
+    if (passwordError) {
+      throw new AppError(passwordError, 400);
     }
 
     // Verificar si el usuario ya existe

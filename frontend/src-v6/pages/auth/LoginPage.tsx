@@ -44,23 +44,17 @@ const LoginPage: React.FC = () => {
   };
 
   const handleDemoUser = async (userId: number) => {
+    const creds = DEMO_CREDENTIALS[userId];
+    if (!creds) return;
     setLoading(true);
     setError(null);
-    const creds = DEMO_CREDENTIALS[userId];
-    if (creds) {
-      try {
-        await login(creds.email, creds.password);
-        navigate('/dashboard');
-      } catch {
-        // login() already handles demo fallback internally,
-        // so if it didn't throw, the user is logged in.
-        // If it threw, the error was set by AuthContext.
-        // But switchUser in context handles demo fallback silently,
-        // so let's try that path.
-        navigate('/dashboard');
-      } finally {
-        setLoading(false);
-      }
+    try {
+      await login(creds.email, creds.password);
+      navigate('/dashboard');
+    } catch (err: any) {
+      setError(authError || err?.response?.data?.message || 'Error al iniciar sesión.');
+    } finally {
+      setLoading(false);
     }
   };
 

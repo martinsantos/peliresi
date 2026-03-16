@@ -18,7 +18,7 @@ import {
   ChevronDown,
   X
 } from 'lucide-react';
-import { useAuth, MOCK_USERS } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import type { UserRole } from '../../contexts/AuthContext';
 import { Button } from './ButtonV2';
 import { Badge } from './BadgeV2';

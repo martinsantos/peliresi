@@ -151,9 +151,8 @@ export const getManifiestos = async (req: AuthRequest, res: Response, next: Next
     // Filtrar según el rol del usuario
     if (req.user.rol === 'GENERADOR' && req.user.generador) {
       where.generadorId = req.user.generador.id;
-    // DEMO MODE: transportista ve todos los manifiestos (sin filtro por transportistaId)
-    // } else if (req.user.rol === 'TRANSPORTISTA' && req.user.transportista) {
-    //   where.transportistaId = req.user.transportista.id;
+    } else if (req.user.rol === 'TRANSPORTISTA' && req.user.transportista) {
+      where.transportistaId = req.user.transportista.id;
     } else if (req.user.rol === 'OPERADOR' && req.user.operador) {
       where.operadorId = req.user.operador.id;
     }
@@ -1143,9 +1142,8 @@ export const getDashboardStats = async (req: AuthRequest, res: Response, next: N
     // Filtrar según rol
     if (req.user.rol === 'GENERADOR' && req.user.generador) {
       where.generadorId = req.user.generador.id;
-    // DEMO MODE: transportista ve todos los manifiestos (sin filtro por transportistaId)
-    // } else if (req.user.rol === 'TRANSPORTISTA' && req.user.transportista) {
-    //   where.transportistaId = req.user.transportista.id;
+    } else if (req.user.rol === 'TRANSPORTISTA' && req.user.transportista) {
+      where.transportistaId = req.user.transportista.id;
     } else if (req.user.rol === 'OPERADOR' && req.user.operador) {
       where.operadorId = req.user.operador.id;
     }

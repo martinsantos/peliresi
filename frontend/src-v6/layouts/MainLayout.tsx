@@ -50,7 +50,7 @@ export const MainLayout: React.FC = () => {
   const [showTour, setShowTour] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, canAccess, isLoading, isDemo } = useAuth();
+  const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, canAccess, isLoading } = useAuth();
 
   // Guard: show loading or redirect if no user
   if (isLoading) {
@@ -141,13 +141,6 @@ export const MainLayout: React.FC = () => {
 
   return (
     <div className="h-screen bg-[#F8F8F6] flex flex-col overflow-hidden">
-      {/* Demo mode banner */}
-      {isDemo && (
-        <div className="bg-amber-500 text-white text-center text-xs sm:text-sm py-1 font-medium sticky top-0 z-50">
-          Modo Demo — Los datos no son reales
-        </div>
-      )}
-
       {/* Connectivity indicator - always visible at top */}
       <ConnectivityIndicator />
 
@@ -242,7 +235,7 @@ export const MainLayout: React.FC = () => {
           {/* User Switcher en Sidebar */}
           <div className="mt-6 pt-6 border-t border-white/15">
             <p className="px-3 text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">
-              Demo
+              Acceso Rápido
             </p>
             <NavLink
               to="/switch-user"
