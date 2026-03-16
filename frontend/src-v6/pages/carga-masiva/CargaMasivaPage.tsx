@@ -15,7 +15,8 @@ import {
   FileSpreadsheet,
   Trash2,
   RefreshCw,
-  Loader2
+  Loader2,
+  Construction,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -187,6 +188,17 @@ const CargaMasivaPage: React.FC = () => {
         </p>
       </div>
 
+      {/* Banner En Desarrollo */}
+      <div className="flex items-start gap-3 p-4 bg-warning-50 border border-warning-200 rounded-xl">
+        <Construction size={20} className="text-warning-600 shrink-0 mt-0.5" />
+        <div>
+          <p className="font-semibold text-warning-900">Funcionalidad en desarrollo</p>
+          <p className="text-sm text-warning-700 mt-0.5">
+            La carga masiva estará disponible próximamente. Por ahora, ingrese los datos manualmente desde las secciones correspondientes (Generadores, Transportistas, Operadores).
+          </p>
+        </div>
+      </div>
+
       {/* Plantillas */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {TEMPLATE_TYPES.map(tmpl => (
@@ -206,9 +218,10 @@ const CargaMasivaPage: React.FC = () => {
                 size="sm"
                 fullWidth
                 leftIcon={<Download size={14} />}
-                onClick={() => descargarPlantilla(tmpl.tipo)}
+                disabled
+                title="Próximamente disponible"
               >
-                Descargar
+                Próximamente
               </Button>
             </CardContent>
           </Card>
@@ -298,8 +311,8 @@ const CargaMasivaPage: React.FC = () => {
                     <Button variant="outline" onClick={() => setArchivo(null)} leftIcon={<Trash2 size={16} />}>
                       Eliminar
                     </Button>
-                    <Button onClick={procesarArchivo} leftIcon={<RefreshCw size={16} />}>
-                      Procesar
+                    <Button disabled leftIcon={<RefreshCw size={16} />} title="Funcionalidad en desarrollo">
+                      En desarrollo
                     </Button>
                   </div>
                 )}

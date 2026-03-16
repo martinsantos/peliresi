@@ -27,6 +27,7 @@ import { Badge } from '../../components/ui/BadgeV2';
 import { toast } from '../../components/ui/Toast';
 import { useQuery } from '@tanstack/react-query';
 import { reporteService } from '../../services/reporte.service';
+import { downloadCsv } from '../reportes/tabs/shared';
 
 // Log entry type
 type LogEntry = {
@@ -74,6 +75,7 @@ const AuditoriaPage: React.FC = () => {
 
   const [busqueda, setBusqueda] = useState('');
   const [filtroAccion, setFiltroAccion] = useState('todas');
+  const [diasFiltro, setDiasFiltro] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -83,7 +85,13 @@ const AuditoriaPage: React.FC = () => {
       String(log.detalle || '').toLowerCase().includes(busqueda.toLowerCase()) ||
       String(log.modulo || '').toLowerCase().includes(busqueda.toLowerCase());
     const matchAccion = filtroAccion === 'todas' || log.accion === filtroAccion;
-    return matchBusqueda && matchAccion;
+    let matchFecha = true;
+    if (diasFiltro) {
+      const since = new Date(Date.now() - diasFiltro * 24 * 60 * 60 * 1000);
+      const logDate = log.fecha ? new Date(log.fecha) : null;
+      matchFecha = logDate ? logDate >= since : true;
+    }
+    return matchBusqueda && matchAccion && matchFecha;
   });
 
   const totalPages = Math.ceil(logsFiltrados.length / itemsPerPage);
@@ -113,19 +121,15 @@ const AuditoriaPage: React.FC = () => {
     };
   }, [apiData, logsData, logsFiltrados]);
 
-  const handleExportar = async () => {
-    try {
-      const blob = await reporteService.exportar('auditoria', 'excel');
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `auditoria_${new Date().toISOString().split('T')[0]}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success('Exportado', 'El reporte de auditoria fue descargado');
-    } catch {
-      toast.warning('Exportación local', 'Los cambios se aplicaron localmente');
+  const handleExportar = () => {
+    if (logsFiltrados.length === 0) {
+      toast.warning('Sin datos', 'No hay registros para exportar');
+      return;
     }
+    const headers = ['Fecha', 'Usuario', 'Rol', 'Accion', 'Modulo', 'Detalle', 'IP'];
+    const rows = logsFiltrados.map(l => [l.fecha, l.usuario, l.rol, l.accion, l.modulo, l.detalle, l.ip]);
+    downloadCsv(`auditoria_${new Date().toISOString().split('T')[0]}.csv`, headers, rows);
+    toast.success('Exportado', 'Los registros de auditoría fueron descargados');
   };
 
   return (
@@ -148,8 +152,12 @@ const AuditoriaPage: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" leftIcon={<Calendar size={18} />}>
-            Ultimos 7 dias
+          <Button
+            variant={diasFiltro === 7 ? 'primary' : 'outline'}
+            leftIcon={<Calendar size={18} />}
+            onClick={() => setDiasFiltro(diasFiltro === 7 ? null : 7)}
+          >
+            Últimos 7 días
           </Button>
           <Button variant="outline" leftIcon={<Download size={18} />} onClick={handleExportar}>
             Exportar Logs

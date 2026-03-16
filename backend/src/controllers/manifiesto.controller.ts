@@ -4,6 +4,9 @@ import { z } from 'zod';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import prisma from '../lib/prisma';
+import { anomaliaDetector } from './notification.controller';
+import { domainEvents } from '../services/domainEvent.service';
+import { distanciaPuntoSegmento } from '../utils/geo';
 
 // Verificar manifiesto públicamente (sin auth) — usado por QR codes
 export const verificarManifiesto = async (req: Request, res: Response, next: NextFunction) => {
@@ -410,6 +413,15 @@ export const firmarManifiesto = async (req: AuthRequest, res: Response, next: Ne
       success: true,
       data: { manifiesto: manifiestoActualizado }
     });
+
+    domainEvents.emit({
+      type: 'MANIFIESTO_ESTADO_CAMBIADO',
+      manifiestoId: manifiestoActualizado.id,
+      estadoAnterior: 'BORRADOR',
+      estadoNuevo: 'APROBADO',
+      numero: manifiestoActualizado.numero,
+      userId,
+    });
   } catch (error) {
     next(error);
   }
@@ -482,20 +494,40 @@ export const confirmarRetiro = async (req: AuthRequest, res: Response, next: Nex
       success: true,
       data: { manifiesto: manifiestoActualizado }
     });
+
+    domainEvents.emit({
+      type: 'MANIFIESTO_ESTADO_CAMBIADO',
+      manifiestoId: manifiestoActualizado.id,
+      estadoAnterior: 'APROBADO',
+      estadoNuevo: 'EN_TRANSITO',
+      numero: manifiestoActualizado.numero,
+      userId,
+    });
   } catch (error) {
     next(error);
   }
 };
 
 // Actualizar ubicación GPS — optimized for high-frequency calls (30 clients × every 30s)
-// Uses a lightweight SELECT(id, estado) instead of full row, and skips it if the
-// manifiesto was validated recently (in-memory cache per PM2 instance, 60s TTL).
-const _enTransitoCache = new Map<string, number>(); // manifiestoId → timestamp
-const EN_TRANSITO_CACHE_TTL = 30_000; // 30s — matches GPS send interval for PM2 cluster cache coherence
+// Uses a lightweight SELECT instead of full row, and skips it if the
+// manifiesto was validated recently (in-memory cache per PM2 instance, 30s TTL).
+type GpsCacheEntry = {
+  ts: number;
+  fechaRetiro: Date | null;
+  numero: string;
+  genLat: number | null;
+  genLon: number | null;
+  opLat: number | null;
+  opLon: number | null;
+};
+const _enTransitoCache = new Map<string, GpsCacheEntry>(); // manifiestoId → entry
+const EN_TRANSITO_CACHE_TTL = 30_000; // 30s — matches GPS send interval
+const _gpsUpdateCounter = new Map<string, number>(); // manifiestoId → GPS update count for anomaly sampling
 
 export const actualizarUbicacion = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    const userId = req.user.id;
 
     const parsed = actualizarUbicacionSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -504,34 +536,85 @@ export const actualizarUbicacion = async (req: AuthRequest, res: Response, next:
     const { latitud, longitud, velocidad, direccion } = parsed.data;
 
     // Check cache — skip DB lookup if we verified EN_TRANSITO recently
-    const cached = _enTransitoCache.get(id);
-    if (!cached || Date.now() - cached > EN_TRANSITO_CACHE_TTL) {
+    let cacheEntry = _enTransitoCache.get(id);
+    if (!cacheEntry || Date.now() - cacheEntry.ts > EN_TRANSITO_CACHE_TTL) {
       const manifiesto = await prisma.manifiesto.findUnique({
         where: { id },
-        select: { id: true, estado: true },
+        select: {
+          id: true,
+          estado: true,
+          numero: true,
+          fechaRetiro: true,
+          generador: { select: { latitud: true, longitud: true } },
+          operador: { select: { latitud: true, longitud: true } },
+        },
       });
 
       if (!manifiesto || manifiesto.estado !== 'EN_TRANSITO') {
         _enTransitoCache.delete(id);
         throw new AppError('Manifiesto no encontrado o no está en tránsito', 404);
       }
-      _enTransitoCache.set(id, Date.now());
+      cacheEntry = {
+        ts: Date.now(),
+        fechaRetiro: manifiesto.fechaRetiro,
+        numero: manifiesto.numero,
+        genLat: manifiesto.generador?.latitud ?? null,
+        genLon: manifiesto.generador?.longitud ?? null,
+        opLat: manifiesto.operador?.latitud ?? null,
+        opLon: manifiesto.operador?.longitud ?? null,
+      };
+      _enTransitoCache.set(id, cacheEntry);
     }
 
     const tracking = await prisma.trackingGPS.create({
-      data: {
-        manifiestoId: id,
-        latitud,
-        longitud,
-        velocidad,
-        direccion
-      }
+      data: { manifiestoId: id, latitud, longitud, velocidad, direccion },
     });
 
-    res.json({
-      success: true,
-      data: { tracking }
-    });
+    res.json({ success: true, data: { tracking } });
+
+    // Detección TIEMPO_EXCESIVO: >24h desde retiro
+    if (cacheEntry.fechaRetiro) {
+      const horasTransito = (Date.now() - cacheEntry.fechaRetiro.getTime()) / 3_600_000;
+      if (horasTransito > 24) {
+        domainEvents.emit({
+          type: 'TIEMPO_EXCESIVO',
+          manifiestoId: id,
+          horasTransito,
+          numero: cacheEntry.numero,
+          userId,
+        });
+      }
+    }
+
+    // Detección DESVIO_RUTA: >50 km del corredor generador↔operador
+    if (
+      cacheEntry.genLat !== null && cacheEntry.genLon !== null &&
+      cacheEntry.opLat !== null && cacheEntry.opLon !== null
+    ) {
+      const distKm = distanciaPuntoSegmento(
+        latitud, longitud,
+        cacheEntry.genLat, cacheEntry.genLon,
+        cacheEntry.opLat, cacheEntry.opLon,
+      );
+      if (distKm > 50) {
+        domainEvents.emit({
+          type: 'DESVIO_RUTA',
+          manifiestoId: id,
+          distanciaKm: distKm,
+          numero: cacheEntry.numero,
+          userId,
+          latActual: latitud,
+          lonActual: longitud,
+        });
+      }
+    }
+
+    // Sample every 10 GPS updates for anomaly detection (avoids overhead on every update)
+    const gpsCount = (_gpsUpdateCounter.get(id) ?? 0) + 1;
+    _gpsUpdateCounter.set(id, gpsCount);
+    if (gpsCount % 10 === 0) {
+      setImmediate(() => anomaliaDetector.detectarAnomalias(id, userId).catch(() => {}));
+    }
   } catch (error) {
     next(error);
   }
@@ -587,10 +670,20 @@ export const confirmarEntrega = async (req: AuthRequest, res: Response, next: Ne
 
     // Invalidate GPS cache — trip is no longer EN_TRANSITO
     _enTransitoCache.delete(id);
+    _gpsUpdateCounter.delete(id);
 
     res.json({
       success: true,
       data: { manifiesto: manifiestoActualizado }
+    });
+
+    domainEvents.emit({
+      type: 'MANIFIESTO_ESTADO_CAMBIADO',
+      manifiestoId: manifiestoActualizado.id,
+      estadoAnterior: 'EN_TRANSITO',
+      estadoNuevo: 'ENTREGADO',
+      numero: manifiestoActualizado.numero,
+      userId,
     });
   } catch (error) {
     next(error);
@@ -646,6 +739,15 @@ export const confirmarRecepcion = async (req: AuthRequest, res: Response, next: 
     res.json({
       success: true,
       data: { manifiesto: manifiestoActualizado }
+    });
+
+    domainEvents.emit({
+      type: 'MANIFIESTO_ESTADO_CAMBIADO',
+      manifiestoId: manifiestoActualizado.id,
+      estadoAnterior: 'ENTREGADO',
+      estadoNuevo: 'RECIBIDO',
+      numero: manifiestoActualizado.numero,
+      userId,
     });
   } catch (error) {
     next(error);
@@ -718,6 +820,15 @@ export const cerrarManifiesto = async (req: AuthRequest, res: Response, next: Ne
       success: true,
       data: { manifiesto: manifiestoActualizado }
     });
+
+    domainEvents.emit({
+      type: 'MANIFIESTO_ESTADO_CAMBIADO',
+      manifiestoId: manifiestoActualizado.id,
+      estadoAnterior: 'EN_TRATAMIENTO',
+      estadoNuevo: 'TRATADO',
+      numero: manifiestoActualizado.numero,
+      userId,
+    });
   } catch (error) {
     next(error);
   }
@@ -772,6 +883,14 @@ export const rechazarCarga = async (req: AuthRequest, res: Response, next: NextF
     res.json({
       success: true,
       data: { manifiesto: manifiestoActualizado }
+    });
+
+    domainEvents.emit({
+      type: 'RECHAZO_CARGA',
+      manifiestoId: manifiestoActualizado.id,
+      motivo,
+      numero: manifiestoActualizado.numero,
+      userId,
     });
   } catch (error) {
     next(error);
@@ -830,6 +949,16 @@ export const registrarIncidente = async (req: AuthRequest, res: Response, next: 
       success: true,
       data: { evento }
     });
+
+    domainEvents.emit({
+      type: 'INCIDENTE_REGISTRADO',
+      manifiestoId: id,
+      tipoIncidente: tipoFinal ?? '',
+      descripcion: descripcion ?? '',
+      userId,
+      latitud,
+      longitud,
+    });
   } catch (error) {
     next(error);
   }
@@ -884,6 +1013,15 @@ export const registrarTratamiento = async (req: AuthRequest, res: Response, next
     res.json({
       success: true,
       data: { manifiesto: manifiestoActualizado }
+    });
+
+    domainEvents.emit({
+      type: 'MANIFIESTO_ESTADO_CAMBIADO',
+      manifiestoId: manifiestoActualizado.id,
+      estadoAnterior: 'RECIBIDO',
+      estadoNuevo: 'EN_TRATAMIENTO',
+      numero: manifiestoActualizado.numero,
+      userId,
     });
   } catch (error) {
     next(error);
@@ -972,6 +1110,14 @@ export const registrarPesaje = async (req: AuthRequest, res: Response, next: Nex
           descripcion: `Diferencia de peso significativa detectada (${porcentajeDif}%)`,
           usuarioId: userId
         }
+      });
+      domainEvents.emit({
+        type: 'DIFERENCIA_PESO',
+        manifiestoId: id,
+        pesoDeclarado: pesoDeclaradoTotal,
+        pesoReal: pesoRealTotal,
+        delta: `${porcentajeDif}%`,
+        userId,
       });
     }
 

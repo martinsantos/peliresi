@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { TipoNotificacion, PrioridadNotificacion, EventoAlerta, EstadoAlerta, TipoAnomalia, SeveridadAnomalia } from '@prisma/client';
 import prisma from '../lib/prisma';
+import { emailService } from '../services/email.service';
+import { domainEvents } from '../services/domainEvent.service';
 
 // ============ SERVICIO DE NOTIFICACIONES ============
 
@@ -98,6 +100,11 @@ class NotificationService {
                 titulo: '⚠️ Carga Rechazada',
                 mensaje: `La carga del manifiesto ${manifiesto.numero} ha sido rechazada`,
                 tipo: 'MANIFIESTO_RECHAZADO'
+            },
+            'EN_TRATAMIENTO': {
+                titulo: 'Tratamiento Iniciado',
+                mensaje: `El manifiesto ${manifiesto.numero} ha iniciado el proceso de tratamiento`,
+                tipo: 'INFO_GENERAL'
             }
         };
 
@@ -129,6 +136,132 @@ class NotificationService {
             });
         }
     }
+    // Disparar alerta para un evento — llamar desde manifiesto.controller.ts con setImmediate()
+    // Nunca lanza excepciones — los errores se loguean y se ignoran
+    async dispararAlertaEvento(params: {
+        evento: string;
+        manifiestoId: string;
+        realizadoPorId: string;
+        datos?: Record<string, any>;
+    }): Promise<void> {
+        try {
+            const { evento, manifiestoId, realizadoPorId, datos } = params;
+
+            if (evento === 'CAMBIO_ESTADO' && datos?.estadoNuevo) {
+                await this.notificarCambioEstado(manifiestoId, datos.estadoNuevo, realizadoPorId);
+            } else if (evento === 'INCIDENTE') {
+                const m = await prisma.manifiesto.findUnique({
+                    where: { id: manifiestoId },
+                    select: { numero: true, operador: { select: { usuario: { select: { id: true } } } } }
+                });
+                if (m) {
+                    const destinatarios: string[] = [];
+                    const opUserId = m.operador?.usuario?.id;
+                    if (opUserId && opUserId !== realizadoPorId) destinatarios.push(opUserId);
+                    const admins = await prisma.usuario.findMany({ where: { rol: 'ADMIN', activo: true }, select: { id: true } });
+                    admins.forEach(a => { if (!destinatarios.includes(a.id) && a.id !== realizadoPorId) destinatarios.push(a.id); });
+                    for (const usuarioId of destinatarios) {
+                        await this.crearNotificacion({
+                            usuarioId,
+                            tipo: 'INCIDENTE_REPORTADO',
+                            titulo: '⚠️ Incidente en Tránsito',
+                            mensaje: `Incidente reportado en manifiesto ${m.numero}${datos?.descripcion ? ': ' + datos.descripcion : ''}`,
+                            manifiestoId,
+                            prioridad: 'ALTA'
+                        });
+                    }
+                }
+            } else if (evento === 'RECHAZO_CARGA') {
+                const m = await prisma.manifiesto.findUnique({
+                    where: { id: manifiestoId },
+                    select: { numero: true, generador: { select: { usuario: { select: { id: true } } } } }
+                });
+                if (m) {
+                    const destinatarios: string[] = [];
+                    const genUserId = m.generador?.usuario?.id;
+                    if (genUserId && genUserId !== realizadoPorId) destinatarios.push(genUserId);
+                    const admins = await prisma.usuario.findMany({ where: { rol: 'ADMIN', activo: true }, select: { id: true } });
+                    admins.forEach(a => { if (!destinatarios.includes(a.id) && a.id !== realizadoPorId) destinatarios.push(a.id); });
+                    for (const usuarioId of destinatarios) {
+                        await this.crearNotificacion({
+                            usuarioId,
+                            tipo: 'MANIFIESTO_RECHAZADO',
+                            titulo: '❌ Carga Rechazada',
+                            mensaje: `La carga del manifiesto ${m.numero} fue rechazada`,
+                            manifiestoId,
+                            prioridad: 'ALTA'
+                        });
+                    }
+                }
+            } else if (evento === 'DIFERENCIA_PESO') {
+                const m = await prisma.manifiesto.findUnique({
+                    where: { id: manifiestoId },
+                    select: { numero: true, generador: { select: { usuario: { select: { id: true } } } } }
+                });
+                if (m) {
+                    const destinatarios: string[] = [];
+                    const genUserId = m.generador?.usuario?.id;
+                    if (genUserId && genUserId !== realizadoPorId) destinatarios.push(genUserId);
+                    const admins = await prisma.usuario.findMany({ where: { rol: 'ADMIN', activo: true }, select: { id: true } });
+                    admins.forEach(a => { if (!destinatarios.includes(a.id) && a.id !== realizadoPorId) destinatarios.push(a.id); });
+                    for (const usuarioId of destinatarios) {
+                        await this.crearNotificacion({
+                            usuarioId,
+                            tipo: 'ALERTA_SISTEMA',
+                            titulo: '⚖️ Diferencia de Peso Detectada',
+                            mensaje: `El manifiesto ${m.numero} presenta diferencia de peso${datos?.delta ? ' del ' + datos.delta : ''}`,
+                            manifiestoId,
+                            prioridad: 'ALTA'
+                        });
+                    }
+                }
+            }
+
+            // Crear AlertaGenerada para cada regla activa que coincida (log global para ADMIN)
+            const reglas = await prisma.reglaAlerta.findMany({
+                where: { evento: evento as EventoAlerta, activa: true }
+            });
+            for (const regla of reglas) {
+                await prisma.alertaGenerada.create({
+                    data: {
+                        reglaId: regla.id,
+                        manifiestoId,
+                        datos: JSON.stringify(datos ?? {}),
+                        estado: 'PENDIENTE'
+                    }
+                });
+
+                // Notificar a destinatarios configurados en la regla
+                let destList: string[] = [];
+                try {
+                    destList = JSON.parse(regla.destinatarios || '[]');
+                } catch { /* malformed JSON, skip */ }
+
+                const roles = destList.filter((d: string) => !d.startsWith('email:'));
+                const emails = destList
+                    .filter((d: string) => d.startsWith('email:'))
+                    .map((d: string) => d.replace('email:', ''));
+
+                for (const rol of roles) {
+                    await this.notificarPorRol(rol, {
+                        tipo: 'ALERTA_SISTEMA' as TipoNotificacion,
+                        titulo: regla.nombre,
+                        mensaje: `Regla activada: ${regla.nombre}${datos?.descripcion ? ' — ' + datos.descripcion : ''}`,
+                        manifiestoId,
+                        prioridad: 'ALTA' as PrioridadNotificacion
+                    });
+                }
+
+                if (emails.length > 0) {
+                    await emailService.sendAlertEmail(emails, regla, manifiestoId, datos ?? {});
+                }
+            }
+
+            console.log(`[ALERTA] evento=${evento} manifiestoId=${manifiestoId}`);
+        } catch (err) {
+            console.error(`[ALERTA] Error disparando evento ${params.evento}:`, err);
+        }
+    }
 }
 
 export const notificationService = new NotificationService();
@@ -139,11 +272,11 @@ export const notificationService = new NotificationService();
 export const getNotificaciones = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const usuarioId = (req as any).user.id;
-        const { leidas, limit = 20, offset = 0 } = req.query;
+        const { leida, limit = 20, offset = 0 } = req.query;
 
         const where: any = { usuarioId };
-        if (leidas === 'false') where.leida = false;
-        if (leidas === 'true') where.leida = true;
+        if (leida === 'false') where.leida = false;
+        if (leida === 'true') where.leida = true;
 
         const [notificaciones, total, noLeidas] = await Promise.all([
             prisma.notificacion.findMany({
@@ -392,7 +525,7 @@ class AnomaliaDetector {
     }
 
     // Detectar anomalías en la ruta
-    async detectarAnomalias(manifiestoId: string): Promise<any[]> {
+    async detectarAnomalias(manifiestoId: string, userId?: string): Promise<any[]> {
         const anomaliasDetectadas: any[] = [];
 
         // Obtener tracking del manifiesto
@@ -476,13 +609,14 @@ class AnomaliaDetector {
                 }
             });
 
-            // Generar notificación para admins
-            await notificationService.notificarPorRol('ADMIN', {
-                tipo: 'ANOMALIA_DETECTADA',
-                titulo: `⚠️ Anomalía Detectada`,
-                mensaje: anomalia.descripcion,
+            // Emitir evento de dominio para que el alertaSubscriber maneje notificaciones y alertas
+            domainEvents.emit({
+                type: 'ANOMALIA_GPS',
                 manifiestoId,
-                prioridad: anomalia.severidad === 'ALTA' ? 'URGENTE' : 'ALTA'
+                tipoAnomalia: anomalia.tipo,
+                descripcion: anomalia.descripcion,
+                severidad: anomalia.severidad,
+                userId: userId ?? manifiestoId,
             });
         }
 
@@ -517,13 +651,13 @@ class AnomaliaDetector {
                 }
             });
 
-            // Notificar
-            await notificationService.notificarPorRol('ADMIN', {
-                tipo: 'ANOMALIA_DETECTADA',
-                titulo: '⏰ Tiempo de Tránsito Excesivo',
-                mensaje: `El manifiesto ${manifiesto.numero} lleva ${horasTransito.toFixed(1)} horas en tránsito`,
+            // Emitir evento de dominio
+            domainEvents.emit({
+                type: 'TIEMPO_EXCESIVO',
                 manifiestoId,
-                prioridad: 'URGENTE'
+                horasTransito,
+                numero: manifiesto.numero,
+                userId: manifiestoId, // userId no disponible en este contexto
             });
 
             return true;

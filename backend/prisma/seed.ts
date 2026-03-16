@@ -449,6 +449,25 @@ async function main() {
     }
   }
 
+  // ========================================
+  // REGLAS DE ALERTA POR DEFECTO
+  // ========================================
+  const reglaCount = await prisma.reglaAlerta.count();
+  if (reglaCount === 0) {
+    await prisma.reglaAlerta.createMany({
+      data: [
+        { nombre: 'Cambios de estado', evento: 'CAMBIO_ESTADO' as any, condicion: JSON.stringify({}), destinatarios: JSON.stringify(['ADMIN', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR']), activa: true, creadoPorId: admin.id },
+        { nombre: 'Incidentes en tránsito', evento: 'INCIDENTE' as any, condicion: JSON.stringify({}), destinatarios: JSON.stringify(['ADMIN', 'OPERADOR']), activa: true, creadoPorId: admin.id },
+        { nombre: 'Rechazo de carga', evento: 'RECHAZO_CARGA' as any, condicion: JSON.stringify({}), destinatarios: JSON.stringify(['ADMIN', 'GENERADOR']), activa: true, creadoPorId: admin.id },
+        { nombre: 'Diferencia de peso', evento: 'DIFERENCIA_PESO' as any, condicion: JSON.stringify({ tolerancia: 5 }), destinatarios: JSON.stringify(['ADMIN', 'GENERADOR']), activa: true, creadoPorId: admin.id },
+        { nombre: 'Anomalía GPS', evento: 'ANOMALIA_GPS' as any, condicion: JSON.stringify({}), destinatarios: JSON.stringify(['ADMIN']), activa: true, creadoPorId: admin.id },
+        { nombre: 'Tiempo de tránsito excesivo', evento: 'TIEMPO_EXCESIVO' as any, condicion: JSON.stringify({}), destinatarios: JSON.stringify(['ADMIN']), activa: true, creadoPorId: admin.id },
+        { nombre: 'Desvío de ruta', evento: 'DESVIO_RUTA' as any, condicion: JSON.stringify({}), destinatarios: JSON.stringify(['ADMIN']), activa: true, creadoPorId: admin.id },
+        { nombre: 'Vencimiento próximo', evento: 'VENCIMIENTO' as any, condicion: JSON.stringify({}), destinatarios: JSON.stringify(['ADMIN']), activa: true, creadoPorId: admin.id },
+      ],
+    });
+  }
+
   console.log('Seed completado exitosamente!');
   console.log('  - 1 Admin');
   console.log('  - 15 Tipos de residuos');

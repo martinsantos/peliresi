@@ -7,6 +7,7 @@ import {
   updateUsuario,
   deleteUsuario,
   toggleActivo,
+  ejecutarJobVencimientos,
 } from '../controllers/admin.controller';
 
 const router = Router();
@@ -22,5 +23,8 @@ router.post('/usuarios', createUsuario);
 router.put('/usuarios/:id', updateUsuario);
 router.delete('/usuarios/:id', deleteUsuario);
 router.patch('/usuarios/:id/toggle-activo', toggleActivo);
+
+// ===== JOBS =====
+router.post('/jobs/vencimientos', ejecutarJobVencimientos);
 
 export default router;

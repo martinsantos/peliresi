@@ -4,6 +4,7 @@ import { z } from 'zod';
 import prisma from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { verificarVencimientos } from '../jobs/vencimiento.job';
 
 // ============== USUARIOS CRUD (Admin) ==============
 
@@ -270,6 +271,17 @@ export const toggleActivo = async (req: AuthRequest, res: Response, next: NextFu
     });
 
     res.json({ success: true, data: { usuario: updated } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============== JOBS ADMIN ==============
+
+export const ejecutarJobVencimientos = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    await verificarVencimientos();
+    res.json({ success: true, mensaje: 'Job de vencimientos ejecutado' });
   } catch (error) {
     next(error);
   }

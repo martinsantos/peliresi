@@ -17,6 +17,10 @@ import trackingRoutes from './routes/tracking.routes';
 import adminRoutes from './routes/admin.routes';
 import { analyticsMiddleware, flushAnalytics } from './middlewares/analytics.middleware';
 import prisma from './lib/prisma';
+import { domainEvents } from './services/domainEvent.service';
+import { alertaSubscriber } from './subscribers/alerta.subscriber';
+import { eventoManifiestoSubscriber } from './subscribers/eventoManifiesto.subscriber';
+import { iniciarVencimientoJob } from './jobs/vencimiento.job';
 
 // Inicializar la aplicación Express
 const app = express();
@@ -102,6 +106,13 @@ app.use(notFoundHandler);
 
 // Manejador de errores global
 app.use(errorHandler);
+
+// Registrar suscriptores del bus de eventos de dominio
+domainEvents.subscribe(eventoManifiestoSubscriber);
+domainEvents.subscribe(alertaSubscriber);
+
+// Iniciar jobs cron
+iniciarVencimientoJob();
 
 // Iniciar el servidor
 const PORT = config.PORT;

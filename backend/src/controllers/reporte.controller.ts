@@ -186,7 +186,8 @@ export const reporteResiduosTratados = async (req: AuthRequest, res: Response, n
         const totalPorTipo: Record<string, number> = {};
         manifiestos.forEach(m => {
             m.residuos.forEach(r => {
-                totalPorTipo[r.tipoResiduo.codigo] = (totalPorTipo[r.tipoResiduo.codigo] || 0) + r.cantidad;
+                const key = r.tipoResiduo?.codigo ?? 'DESCONOCIDO';
+                totalPorTipo[key] = (totalPorTipo[key] || 0) + r.cantidad;
             });
         });
 

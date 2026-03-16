@@ -4,7 +4,7 @@
  * Dashboard de estadísticas y KPIs - Connected to real API data
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   TrendingUp,
@@ -15,7 +15,6 @@ import {
   Leaf,
   ArrowLeft,
   Download,
-  Calendar,
   Loader2,
   AlertCircle,
 } from 'lucide-react';
@@ -27,7 +26,6 @@ import { useExportarReporte } from '../../hooks/useReportes';
 
 const EstadisticasPage: React.FC = () => {
   const navigate = useNavigate();
-  const [periodo, setPeriodo] = useState<'semana' | 'mes' | 'año'>('mes');
 
   const { data: dashboardData, isLoading, isError } = useDashboardStats();
   const { data: generadoresData } = useGeneradores();
@@ -105,26 +103,6 @@ const EstadisticasPage: React.FC = () => {
           <Button variant="outline" leftIcon={<Download size={18} />} onClick={() => exportarMutation.mutate({ tipo: 'manifiestos', formato: 'csv' as const })} disabled={exportarMutation.isPending}>
             Exportar
           </Button>
-        </div>
-      </div>
-
-      {/* Period selector */}
-      <div className="flex items-center gap-2">
-        <Calendar size={18} className="text-neutral-500" />
-        <div className="flex bg-neutral-100 rounded-lg p-1">
-          {(['semana', 'mes', 'año'] as const).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPeriodo(p)}
-              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                periodo === p
-                  ? 'bg-white text-neutral-900 shadow-sm'
-                  : 'text-neutral-600 hover:text-neutral-900'
-              }`}
-            >
-              {p.charAt(0).toUpperCase() + p.slice(1)}
-            </button>
-          ))}
         </div>
       </div>
 

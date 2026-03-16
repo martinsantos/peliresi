@@ -7,14 +7,16 @@ import type { Notificacion } from '../types/models';
 import type { NotificacionFilters, PaginatedData } from '../types/api';
 
 export const notificacionService = {
-  async list(filters?: NotificacionFilters): Promise<PaginatedData<Notificacion>> {
+  async list(filters?: NotificacionFilters): Promise<PaginatedData<Notificacion> & { noLeidas: number }> {
     const { data } = await api.get('/notificaciones', { params: filters });
     const raw = data.data;
+    const noLeidas = raw.noLeidas ?? 0;
     return {
       items: raw.notificaciones || [],
-      total: raw.notificaciones?.length || 0,
+      total: raw.total ?? raw.notificaciones?.length ?? 0,
+      noLeidas,
       page: 1,
-      limit: 100,
+      limit: filters?.limit ?? 100,
       totalPages: 1,
     };
   },

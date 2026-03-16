@@ -2,18 +2,19 @@
  * SITREP v6 - NotificationBell Component
  * =======================================
  * Bell icon with unread count badge and dropdown panel
- * showing recent alertas. Polls using React Query.
+ * showing recent notifications. Polls using React Query.
+ * Works for all roles (ADMIN, GENERADOR, TRANSPORTISTA, OPERADOR).
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Check, AlertTriangle, Info, AlertCircle, CheckCircle2, X } from 'lucide-react';
+import { Bell, AlertTriangle, Info, AlertCircle, CheckCircle2, X } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { alertaService } from '../services/alerta.service';
+import { notificacionService } from '../services/notificacion.service';
 import { getAccessToken } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import type { AlertaGenerada } from '../types/models';
-import { EstadoAlerta, EventoAlerta } from '../types/models';
+import type { Notificacion } from '../types/models';
+import { TipoNotificacion } from '../types/models';
 
 // ========================================
 // HELPERS
@@ -21,20 +22,21 @@ import { EstadoAlerta, EventoAlerta } from '../types/models';
 
 type NotificationType = 'info' | 'warning' | 'error' | 'success';
 
-function getNotificationType(alerta: AlertaGenerada): NotificationType {
-  if (!alerta.regla) return 'info';
-  switch (alerta.regla.evento) {
-    case EventoAlerta.INCIDENTE:
-    case EventoAlerta.RECHAZO_CARGA:
+function getNotificationType(notif: Notificacion): NotificationType {
+  switch (notif.tipo) {
+    case TipoNotificacion.INCIDENTE_REPORTADO:
+    case TipoNotificacion.MANIFIESTO_RECHAZADO:
+    case TipoNotificacion.VENCIMIENTO_PROXIMO:
       return 'error';
-    case EventoAlerta.DESVIO_RUTA:
-    case EventoAlerta.TIEMPO_EXCESIVO:
-    case EventoAlerta.DIFERENCIA_PESO:
-    case EventoAlerta.ANOMALIA_GPS:
+    case TipoNotificacion.ANOMALIA_DETECTADA:
+    case TipoNotificacion.ALERTA_SISTEMA:
       return 'warning';
-    case EventoAlerta.CAMBIO_ESTADO:
+    case TipoNotificacion.MANIFIESTO_FIRMADO:
+    case TipoNotificacion.MANIFIESTO_EN_TRANSITO:
+    case TipoNotificacion.MANIFIESTO_ENTREGADO:
+    case TipoNotificacion.MANIFIESTO_RECIBIDO:
+    case TipoNotificacion.MANIFIESTO_TRATADO:
       return 'success';
-    case EventoAlerta.VENCIMIENTO:
     default:
       return 'info';
   }
@@ -65,20 +67,6 @@ function getTypeBg(type: NotificationType): string {
     case 'info':
     default:
       return 'bg-primary-50 border-primary-100';
-  }
-}
-
-function getTitle(alerta: AlertaGenerada): string {
-  if (alerta.regla?.nombre) return alerta.regla.nombre;
-  return 'Alerta del sistema';
-}
-
-function getMessage(alerta: AlertaGenerada): string {
-  try {
-    const datos = JSON.parse(alerta.datos);
-    return datos.mensaje || datos.descripcion || datos.message || alerta.datos;
-  } catch {
-    return alerta.datos;
   }
 }
 
@@ -114,21 +102,20 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ basePath = '
   const queryClient = useQueryClient();
   const { currentUser } = useAuth();
 
-  // Only poll when there is a valid JWT token (skip in demo mode)
   const hasToken = !!getAccessToken();
 
-  const { data: alertasData } = useQuery({
-    queryKey: ['alertas', 'notifications', { estado: EstadoAlerta.PENDIENTE, limit: 5 }],
-    queryFn: () =>
-      alertaService.listAlertas({ estado: EstadoAlerta.PENDIENTE, limit: 5 }),
+  // Fetch últimas 5 sin filtrar por leída; badge usa noLeidas del response
+  const { data } = useQuery({
+    queryKey: ['notificaciones', 'bell'],
+    queryFn: () => notificacionService.list({ limit: 5 }),
     refetchInterval: hasToken ? 30_000 : false,
     staleTime: 15_000,
-    enabled: hasToken && currentUser?.rol === 'ADMIN',
+    enabled: hasToken && !!currentUser,
   });
 
-  const alertas = Array.isArray(alertasData?.items) ? alertasData.items : (Array.isArray((alertasData as any)?.data) ? (alertasData as any).data : []);
-  const totalCount = alertasData?.total ?? alertas.length;
-  const unreadCount = currentUser?.rol === 'ADMIN' ? Math.min(totalCount, 99) : 0;
+  const items: Notificacion[] = data?.items ?? [];
+  // noLeidas viene en data.noLeidas via service; fallback a contar items no leídos
+  const unreadCount = Math.min((data as any)?.noLeidas ?? items.filter(i => !i.leida).length, 99);
 
   // Close on outside click
   useEffect(() => {
@@ -162,15 +149,13 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ basePath = '
   }, []);
 
   const handleNotificationClick = useCallback(
-    (alerta: AlertaGenerada) => {
-      // Mark as resolved (read) silently
-      alertaService.resolverAlerta(alerta.id).catch(() => {});
-      queryClient.invalidateQueries({ queryKey: ['alertas'] });
+    (notif: Notificacion) => {
+      notificacionService.marcarLeida(notif.id).catch(() => {});
+      queryClient.invalidateQueries({ queryKey: ['notificaciones'] });
       setIsOpen(false);
 
-      // Navigate to the alerta detail or manifesto if available
-      if (alerta.manifiestoId) {
-        navigate(`${basePath}/manifiestos/${alerta.manifiestoId}`);
+      if (notif.manifiestoId) {
+        navigate(`${basePath}/manifiestos/${notif.manifiestoId}`);
       } else {
         navigate(`${basePath}/alertas`);
       }
@@ -212,7 +197,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ basePath = '
               <h3 className="font-semibold text-neutral-900 text-sm">Notificaciones</h3>
               {unreadCount > 0 && (
                 <span className="px-1.5 py-0.5 bg-error-100 text-error-700 text-xs font-semibold rounded-full">
-                  {totalCount}
+                  {unreadCount}
                 </span>
               )}
             </div>
@@ -226,21 +211,21 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ basePath = '
 
           {/* Notifications List */}
           <div className="max-h-80 overflow-y-auto">
-            {alertas.length === 0 ? (
+            {items.length === 0 ? (
               <div className="py-10 text-center">
                 <Bell size={32} className="mx-auto text-neutral-300 mb-2" />
                 <p className="text-sm text-neutral-500">No hay notificaciones pendientes</p>
               </div>
             ) : (
               <div className="divide-y divide-neutral-50">
-                {(alertas as AlertaGenerada[]).map((alerta) => {
-                  const type = getNotificationType(alerta);
-                  const isUnread = alerta.estado === EstadoAlerta.PENDIENTE;
+                {items.map((notif) => {
+                  const type = getNotificationType(notif);
+                  const isUnread = !notif.leida;
 
                   return (
                     <button
-                      key={alerta.id}
-                      onClick={() => handleNotificationClick(alerta)}
+                      key={notif.id}
+                      onClick={() => handleNotificationClick(notif)}
                       className={`
                         w-full text-left px-4 py-3 hover:bg-neutral-50 transition-colors
                         ${isUnread ? 'bg-neutral-25' : ''}
@@ -253,17 +238,17 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ basePath = '
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
                             <p className={`text-sm leading-tight truncate ${isUnread ? 'font-semibold text-neutral-900' : 'font-medium text-neutral-700'}`}>
-                              {getTitle(alerta)}
+                              {notif.titulo}
                             </p>
                             {isUnread && (
                               <span className="w-2 h-2 bg-primary-500 rounded-full shrink-0 mt-1.5" />
                             )}
                           </div>
                           <p className="text-xs text-neutral-500 mt-0.5 line-clamp-2">
-                            {getMessage(alerta)}
+                            {notif.mensaje}
                           </p>
                           <p className="text-[11px] text-neutral-400 mt-1">
-                            {formatTimeAgo(alerta.createdAt)}
+                            {formatTimeAgo(notif.createdAt)}
                           </p>
                         </div>
                       </div>

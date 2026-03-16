@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   User,
   Shield,
@@ -36,7 +37,12 @@ const configSections = [
 ];
 
 const ConfiguracionPage: React.FC = () => {
-  const [activeSection, setActiveSection] = useState('perfil');
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const validSections = configSections.map(s => s.id);
+  const [activeSection, setActiveSection] = useState(
+    tabParam && validSections.includes(tabParam) ? tabParam : 'perfil'
+  );
   const [isSaving, setIsSaving] = useState(false);
   const { currentUser } = useAuth();
 
@@ -78,7 +84,7 @@ const ConfiguracionPage: React.FC = () => {
       }
       toast.success('Configuración guardada', 'Los cambios se han guardado correctamente.');
     } catch {
-      toast.warning('Cambios locales', 'Los cambios se aplicaron localmente');
+      toast.error('Error al guardar', 'No se pudieron guardar los cambios. Intenta nuevamente.');
     } finally {
       setIsSaving(false);
     }
@@ -129,7 +135,9 @@ const ConfiguracionPage: React.FC = () => {
                 label="Correo electrónico"
                 type="email"
                 value={profile.email}
-                onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+                readOnly
+                disabled
+                className="opacity-60 cursor-not-allowed"
               />
               <Input
                 label="Teléfono"

@@ -85,7 +85,7 @@ export const getAnalyticsSummary = async (req: Request, res: Response) => {
         // Requests per day
         const requestsPerDay = await prisma.$queryRaw`
       SELECT DATE(timestamp) as date, COUNT(*) as count
-      FROM "AnalyticsLog"
+      FROM "analytics_logs"
       WHERE timestamp >= ${startDate} AND timestamp <= ${endDate}
       GROUP BY DATE(timestamp)
       ORDER BY date DESC
@@ -232,7 +232,7 @@ export const getManifiestosPorMes = async (req: Request, res: Response) => {
         const datos = await prisma.$queryRaw<Array<{ mes: string; cantidad: bigint }>>`
             SELECT TO_CHAR(DATE_TRUNC('month', "createdAt"), 'YYYY-MM') as mes,
                    COUNT(*) as cantidad
-            FROM "Manifiesto"
+            FROM "manifiestos"
             WHERE "createdAt" >= NOW() - INTERVAL '12 months'
             GROUP BY DATE_TRUNC('month', "createdAt")
             ORDER BY mes ASC
@@ -247,7 +247,7 @@ export const getManifiestosPorMes = async (req: Request, res: Response) => {
         });
     } catch (error) {
         console.error('Error getting manifiestos por mes:', error);
-        res.json({ success: true, data: [] });
+        res.status(500).json({ success: false, data: [], error: 'Error al obtener manifiestos por mes' });
     }
 };
 
@@ -277,7 +277,7 @@ export const getResiduosPorTipo = async (req: Request, res: Response) => {
         });
     } catch (error) {
         console.error('Error getting residuos por tipo:', error);
-        res.json({ success: true, data: [] });
+        res.status(500).json({ success: false, data: [], error: 'Error al obtener residuos por tipo' });
     }
 };
 
@@ -298,7 +298,7 @@ export const getManifiestosPorEstado = async (req: Request, res: Response) => {
         });
     } catch (error) {
         console.error('Error getting manifiestos por estado:', error);
-        res.json({ success: true, data: [] });
+        res.status(500).json({ success: false, data: [], error: 'Error al obtener manifiestos por estado' });
     }
 };
 
@@ -345,6 +345,6 @@ export const getTiempoPromedioPorEtapa = async (req: Request, res: Response) => 
         res.json({ success: true, data: result });
     } catch (error) {
         console.error('Error getting tiempo promedio:', error);
-        res.json({ success: true, data: [] });
+        res.status(500).json({ success: false, data: [], error: 'Error al obtener tiempo promedio por etapa' });
     }
 };

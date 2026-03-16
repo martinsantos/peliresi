@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   User,
   Mail,
@@ -24,6 +25,7 @@ import { usuarioService } from '../../services/usuario.service';
 
 
 const PerfilPage: React.FC = () => {
+  const navigate = useNavigate();
   const { currentUser } = useAuth();
   const [user, setUser] = useState({
     nombre: '',
@@ -106,7 +108,7 @@ const PerfilPage: React.FC = () => {
                   <Key size={16} className="text-neutral-500" />
                   <span className="text-sm font-medium">Contraseña</span>
                 </div>
-                <Button variant="outline" size="sm">Cambiar</Button>
+                <Button variant="outline" size="sm" onClick={() => navigate('/configuracion?tab=seguridad')}>Cambiar</Button>
               </div>
             </CardContent>
           </Card>
