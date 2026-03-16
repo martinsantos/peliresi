@@ -383,13 +383,17 @@ export const crearReglaAlerta = async (req: Request, res: Response, next: NextFu
         const usuarioId = (req as any).user.id;
         const { nombre, descripcion, evento, condicion, destinatarios } = req.body;
 
+        // Frontend already sends condicion and destinatarios as JSON strings — do NOT re-stringify
+        const condicionStr = typeof condicion === 'string' ? condicion : JSON.stringify(condicion);
+        const destinatariosStr = typeof destinatarios === 'string' ? destinatarios : JSON.stringify(destinatarios);
+
         const regla = await prisma.reglaAlerta.create({
             data: {
                 nombre,
                 descripcion,
                 evento: evento as EventoAlerta,
-                condicion: JSON.stringify(condicion),
-                destinatarios: JSON.stringify(destinatarios),
+                condicion: condicionStr,
+                destinatarios: destinatariosStr,
                 creadoPorId: usuarioId
             }
         });
@@ -406,14 +410,22 @@ export const actualizarReglaAlerta = async (req: Request, res: Response, next: N
         const { id } = req.params;
         const { nombre, descripcion, evento, condicion, destinatarios, activa } = req.body;
 
+        // Frontend already sends condicion and destinatarios as JSON strings — do NOT re-stringify
+        const condicionStr = condicion
+            ? (typeof condicion === 'string' ? condicion : JSON.stringify(condicion))
+            : undefined;
+        const destinatariosStr = destinatarios
+            ? (typeof destinatarios === 'string' ? destinatarios : JSON.stringify(destinatarios))
+            : undefined;
+
         const regla = await prisma.reglaAlerta.update({
             where: { id },
             data: {
                 nombre,
                 descripcion,
                 evento: evento as EventoAlerta,
-                condicion: condicion ? JSON.stringify(condicion) : undefined,
-                destinatarios: destinatarios ? JSON.stringify(destinatarios) : undefined,
+                condicion: condicionStr,
+                destinatarios: destinatariosStr,
                 activa
             }
         });
