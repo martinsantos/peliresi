@@ -79,6 +79,41 @@ function getTipoFromEvento(evento: string | undefined, estado: string): AlertaLo
   }
 }
 
+function parseMensaje(datosRaw: string | undefined | null, evento?: string): string {
+  if (!datosRaw) return 'Sin detalles';
+  let d: Record<string, any> = {};
+  try {
+    d = typeof datosRaw === 'string' ? JSON.parse(datosRaw) : datosRaw;
+  } catch {
+    return String(datosRaw);
+  }
+  if (d.descripcion) return String(d.descripcion);
+  const num = d.numero ? `Manifiesto ${d.numero}` : '';
+  switch (evento) {
+    case 'CAMBIO_ESTADO': {
+      const de = d.estadoAnterior ? d.estadoAnterior.replace(/_/g, ' ') : '?';
+      const a = d.estadoNuevo ? d.estadoNuevo.replace(/_/g, ' ') : '?';
+      return `Cambio de estado: ${de} → ${a}${num ? ` (${num})` : ''}`;
+    }
+    case 'INCIDENTE':
+      return `Incidente en tránsito${num ? ` — ${num}` : ''}${d.tipo ? `: ${d.tipo}` : ''}`;
+    case 'RECHAZO_CARGA':
+      return `Rechazo de carga${num ? ` — ${num}` : ''}${d.motivo ? `: ${d.motivo}` : ''}`;
+    case 'DIFERENCIA_PESO':
+      return `Diferencia de peso${num ? ` — ${num}` : ''}${d.delta ? ` del ${d.delta}` : ''}`;
+    case 'TIEMPO_EXCESIVO':
+      return `Tiempo excesivo en tránsito${num ? ` — ${num}` : ''}`;
+    case 'ANOMALIA_GPS':
+      return `Anomalía GPS${num ? ` — ${num}` : ''}`;
+    case 'VENCIMIENTO':
+      return `Vencimiento próximo${num ? ` — ${num}` : ''}`;
+    case 'DESVIO_RUTA':
+      return `Desvío de ruta${num ? ` — ${num}` : ''}`;
+    default:
+      return num || 'Alerta registrada';
+  }
+}
+
 const EVENTO_OPTIONS = [
   { value: 'CAMBIO_ESTADO', label: 'Cambio de Estado' },
   { value: 'INCIDENTE', label: 'Incidente en Tránsito' },
@@ -156,13 +191,7 @@ export const AlertasPage: React.FC = () => {
           id: a.id,
           tipo: getTipoFromEvento(evento, estado),
           titulo: a.regla?.nombre || 'Alerta',
-          mensaje: (() => {
-            try {
-              return typeof a.datos === 'string' ? (JSON.parse(a.datos)?.descripcion || a.datos) : 'Sin detalles';
-            } catch {
-              return String(a.datos || 'Sin detalles');
-            }
-          })(),
+          mensaje: parseMensaje(a.datos, a.regla?.evento),
           fecha: a.createdAt,
           leida: estado !== 'PENDIENTE',
           manifiestoId: a.manifiestoId || a.manifiesto?.id,
