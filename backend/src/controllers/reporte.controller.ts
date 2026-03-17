@@ -108,7 +108,7 @@ export const reporteManifiestosPorPeriodo = async (req: AuthRequest, res: Respon
                     id: m.id,
                     numero: m.numero,
                     estado: m.estado,
-                    fechaCreacion: m.createdAt,
+                    createdAt: m.createdAt,
                     generador: m.generador.razonSocial,
                     transportista: m.transportista.razonSocial,
                     operador: m.operador.razonSocial,

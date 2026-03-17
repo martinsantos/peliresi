@@ -15,6 +15,7 @@ import notificationRoutes from './routes/notification.routes';
 import analyticsRoutes from './routes/analytics.routes';
 import trackingRoutes from './routes/tracking.routes';
 import adminRoutes from './routes/admin.routes';
+import searchRoutes from './routes/search.routes';
 import { analyticsMiddleware, flushAnalytics } from './middlewares/analytics.middleware';
 import prisma from './lib/prisma';
 import { domainEvents } from './services/domainEvent.service';
@@ -100,6 +101,7 @@ app.use('/api', notificationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/centro-control', trackingRoutes);
+app.use('/api/search', searchRoutes);
 
 // Manejador de rutas no encontradas
 app.use(notFoundHandler);

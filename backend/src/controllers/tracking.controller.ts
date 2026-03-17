@@ -51,7 +51,7 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
         where: {
           activo: true,
           latitud: { not: null },
-          ...(showAll ? {} : { manifiestos: { some: { fechaCreacion: dateFilter } } }),
+          ...(showAll ? {} : { manifiestos: { some: { createdAt: dateFilter } } }),
         },
         select: {
           id: true,
@@ -63,15 +63,15 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
           _count: {
             select: {
               manifiestos: {
-                where: { fechaCreacion: dateFilter },
+                where: { createdAt: dateFilter },
               },
             },
           },
           manifiestos: {
-            where: { fechaCreacion: dateFilter },
-            orderBy: { fechaCreacion: 'desc' },
+            where: { createdAt: dateFilter },
+            orderBy: { createdAt: 'desc' },
             take: 1,
-            select: { fechaCreacion: true },
+            select: { createdAt: true },
           },
         },
       });
@@ -84,7 +84,7 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
         latitud: g.latitud,
         longitud: g.longitud,
         cantManifiestos: g._count.manifiestos,
-        ultimaActividad: g.manifiestos[0]?.fechaCreacion || null,
+        ultimaActividad: g.manifiestos[0]?.createdAt || null,
       }));
     }
 
@@ -93,7 +93,7 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
       const transportistas = await prisma.transportista.findMany({
         where: {
           activo: true,
-          ...(showAll ? {} : { manifiestos: { some: { fechaCreacion: dateFilter } } }),
+          ...(showAll ? {} : { manifiestos: { some: { createdAt: dateFilter } } }),
         },
         select: {
           id: true,
@@ -105,11 +105,11 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
           _count: {
             select: {
               vehiculos: { where: { activo: true } },
-              manifiestos: { where: { fechaCreacion: dateFilter } },
+              manifiestos: { where: { createdAt: dateFilter } },
             },
           },
           manifiestos: {
-            where: { estado: 'EN_TRANSITO', fechaCreacion: dateFilter },
+            where: { estado: 'EN_TRANSITO', createdAt: dateFilter },
             select: { id: true },
           },
         },
@@ -139,7 +139,7 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
                 OR: [
                   { fechaRecepcion: dateFilter },
                   { fechaCierre: dateFilter },
-                  { fechaCreacion: dateFilter },
+                  { createdAt: dateFilter },
                 ],
               },
             },
@@ -191,7 +191,7 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
         where: {
           estado: 'EN_TRANSITO',
           OR: [
-            { fechaCreacion: dateFilter },
+            { createdAt: dateFilter },
             { tracking: { some: { timestamp: dateFilter } } },
           ],
         },
@@ -257,13 +257,13 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
       tratados,
       rechazados,
     ] = await Promise.all([
-      prisma.manifiesto.count({ where: { fechaCreacion: dateFilter } }),
+      prisma.manifiesto.count({ where: { createdAt: dateFilter } }),
       // KPI: EN_TRANSITO en el período (mismo criterio que pipeline — usa fechaRetiro)
       prisma.manifiesto.count({ where: { estado: 'EN_TRANSITO', fechaRetiro: dateFilter } }),
       prisma.generador.count({
         where: {
           activo: true,
-          manifiestos: { some: { fechaCreacion: dateFilter } },
+          manifiestos: { some: { createdAt: dateFilter } },
         },
       }),
       prisma.operador.count({
@@ -272,32 +272,32 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
           manifiestos: { some: { fechaRecepcion: dateFilter } },
         },
       }),
-      prisma.manifiesto.count({ where: { estado: 'BORRADOR', fechaCreacion: dateFilter } }),
-      prisma.manifiesto.count({ where: { estado: 'APROBADO', fechaCreacion: dateFilter } }),
+      prisma.manifiesto.count({ where: { estado: 'BORRADOR', createdAt: dateFilter } }),
+      prisma.manifiesto.count({ where: { estado: 'APROBADO', createdAt: dateFilter } }),
       // Pipeline EN_TRANSITO: use fechaRetiro (when transport confirmed pickup) as the period anchor
       prisma.manifiesto.count({ where: { estado: 'EN_TRANSITO', fechaRetiro: dateFilter } }),
-      prisma.manifiesto.count({ where: { estado: 'ENTREGADO', OR: [{ fechaCreacion: dateFilter }, { fechaEntrega: dateFilter }] } }),
-      prisma.manifiesto.count({ where: { estado: 'RECIBIDO', OR: [{ fechaCreacion: dateFilter }, { fechaRecepcion: dateFilter }] } }),
-      prisma.manifiesto.count({ where: { estado: 'EN_TRATAMIENTO', OR: [{ fechaCreacion: dateFilter }, { fechaRecepcion: dateFilter }] } }),
-      prisma.manifiesto.count({ where: { estado: 'TRATADO', OR: [{ fechaCreacion: dateFilter }, { fechaCierre: dateFilter }] } }),
-      prisma.manifiesto.count({ where: { estado: 'RECHAZADO', fechaCreacion: dateFilter } }),
+      prisma.manifiesto.count({ where: { estado: 'ENTREGADO', OR: [{ createdAt: dateFilter }, { fechaEntrega: dateFilter }] } }),
+      prisma.manifiesto.count({ where: { estado: 'RECIBIDO', OR: [{ createdAt: dateFilter }, { fechaRecepcion: dateFilter }] } }),
+      prisma.manifiesto.count({ where: { estado: 'EN_TRATAMIENTO', OR: [{ createdAt: dateFilter }, { fechaRecepcion: dateFilter }] } }),
+      prisma.manifiesto.count({ where: { estado: 'TRATADO', OR: [{ createdAt: dateFilter }, { fechaCierre: dateFilter }] } }),
+      prisma.manifiesto.count({ where: { estado: 'RECHAZADO', createdAt: dateFilter } }),
     ]);
 
     // Toneladas en el período (sum of cantidades in kg, convert)
     const residuosAgg = await prisma.manifiestoResiduo.aggregate({
       _sum: { cantidad: true },
       where: {
-        manifiesto: { fechaCreacion: dateFilter },
+        manifiesto: { createdAt: dateFilter },
         unidad: { in: ['kg', 'toneladas'] },
       },
     });
 
     // Manifiestos por día
     const manifiestosPorDia = await prisma.$queryRawUnsafe<Array<{ fecha: string; cantidad: bigint }>>(
-      `SELECT DATE("fechaCreacion") as fecha, COUNT(*)::bigint as cantidad
+      `SELECT DATE("createdAt") as fecha, COUNT(*)::bigint as cantidad
        FROM manifiestos
-       WHERE "fechaCreacion" >= $1 AND "fechaCreacion" <= $2
-       GROUP BY DATE("fechaCreacion")
+       WHERE "createdAt" >= $1 AND "createdAt" <= $2
+       GROUP BY DATE("createdAt")
        ORDER BY fecha ASC`,
       desde,
       hasta

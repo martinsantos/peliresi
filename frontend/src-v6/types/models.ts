@@ -211,7 +211,6 @@ export interface Manifiesto {
   creadoPorId: string;
   estado: EstadoManifiesto;
   observaciones: string | null;
-  fechaCreacion: string;
   fechaFirma: string | null;
   fechaRetiro: string | null;
   fechaEntrega: string | null;

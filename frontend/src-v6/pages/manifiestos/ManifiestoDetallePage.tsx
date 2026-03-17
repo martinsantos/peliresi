@@ -496,7 +496,7 @@ const ManifiestoDetailPage: React.FC = () => {
             )}
           </div>
           <p className="text-neutral-600 mt-1">
-            Creado el {m.fechaCreacion ? formatDateTime(m.fechaCreacion) : '-'}
+            Creado el {m.createdAt ? formatDateTime(m.createdAt) : '-'}
           </p>
         </div>
         <div className="flex gap-2">

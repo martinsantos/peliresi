@@ -283,10 +283,10 @@ const ViajeEnCursoPage: React.FC = () => {
           </div>
           <p className="text-neutral-600 mt-1 flex items-center gap-2">
             <span className="font-mono">{m.numero || id}</span>
-            {m.fechaCreacion && (
+            {m.createdAt && (
               <>
                 <span className="text-neutral-300">|</span>
-                <span className="text-sm">{formatDateTime(m.fechaCreacion)}</span>
+                <span className="text-sm">{formatDateTime(m.createdAt)}</span>
               </>
             )}
           </p>

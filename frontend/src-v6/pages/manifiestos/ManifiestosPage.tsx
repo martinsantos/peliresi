@@ -7,7 +7,7 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  FileText, Search, Filter, Plus, Eye, Edit, Trash2, Loader2, AlertTriangle,
+  FileText, Search, Filter, Plus, Eye, Edit, Trash2, Loader2, AlertTriangle, ChevronDown, X,
 } from 'lucide-react';
 import { Card } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -40,13 +40,20 @@ const ManifiestosPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
   const [estadoFilter, setEstadoFilter] = useState(searchParams.get('estado') || '');
+  const [fechaDesde, setFechaDesde] = useState(searchParams.get('fechaDesde') || '');
+  const [fechaHasta, setFechaHasta] = useState(searchParams.get('fechaHasta') || '');
+  const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; numero: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const filterCount = [fechaDesde, fechaHasta, estadoFilter].filter(Boolean).length;
+
   const { data: apiData, isLoading, isError, refetch } = useManifiestos({
     search: searchTerm || undefined,
     estado: (estadoFilter || undefined) as EstadoManifiesto | undefined,
+    fechaDesde: fechaDesde || undefined,
+    fechaHasta: fechaHasta || undefined,
     page,
     limit: 20,
   });
@@ -59,7 +66,7 @@ const ManifiestosPage: React.FC = () => {
         numero: m.numero,
         generadorNombre: m.generador?.razonSocial || 'Sin generador',
         estado: m.estado,
-        fecha: m.fechaCreacion,
+        fecha: m.createdAt,
         peso: Array.isArray(m.residuos) ? m.residuos.reduce((acc: number, r: any) => acc + (typeof r.cantidad === 'number' ? r.cantidad : 0), 0) : 0,
         unidad: Array.isArray(m.residuos) && m.residuos.length > 0 ? m.residuos[0]?.unidad || 'kg' : 'kg',
       }));
@@ -107,7 +114,7 @@ const ManifiestosPage: React.FC = () => {
 
       {/* Filters */}
       <Card padding="base">
-        <div className="flex flex-col md:flex-row gap-4">
+        <div className="flex flex-col md:flex-row gap-3">
           <div className="flex-1">
             <Input
               placeholder="Buscar por número o generador..."
@@ -133,8 +140,58 @@ const ManifiestosPage: React.FC = () => {
                 clearable
               />
             </div>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border transition-colors
+                ${showFilters || filterCount > 0
+                  ? 'bg-primary-50 text-primary-700 border-primary-200'
+                  : 'bg-neutral-50 text-neutral-600 border-neutral-200 hover:border-neutral-300'
+                }`}
+            >
+              <Filter size={15} />
+              Fechas
+              {filterCount > 0 && (
+                <span className="bg-primary-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                  {filterCount}
+                </span>
+              )}
+              <ChevronDown size={14} className={`transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+            </button>
           </div>
         </div>
+
+        {/* Expandible date filters */}
+        {showFilters && (
+          <div className="mt-3 pt-3 border-t border-neutral-100 flex flex-wrap gap-3 items-end">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-neutral-500">Desde</label>
+              <input
+                type="date"
+                value={fechaDesde}
+                onChange={(e) => { setFechaDesde(e.target.value); setPage(1); }}
+                className="text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-neutral-500">Hasta</label>
+              <input
+                type="date"
+                value={fechaHasta}
+                onChange={(e) => { setFechaHasta(e.target.value); setPage(1); }}
+                className="text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400"
+              />
+            </div>
+            {(fechaDesde || fechaHasta) && (
+              <button
+                onClick={() => { setFechaDesde(''); setFechaHasta(''); setPage(1); }}
+                className="flex items-center gap-1 text-xs text-neutral-500 hover:text-error-600 px-2 py-2"
+              >
+                <X size={13} />
+                Limpiar fechas
+              </button>
+            )}
+          </div>
+        )}
       </Card>
 
       {/* Loading */}

@@ -4,8 +4,9 @@
  * Layout principal con sidebar y header - Adaptado por rol
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { GlobalSearchPanel } from '../components/GlobalSearchPanel';
 import {
   LayoutDashboard,
   FileText,
@@ -48,6 +49,19 @@ export const MainLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showTour, setShowTour] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  // Cmd+K / Ctrl+K opens search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
   const location = useLocation();
   const navigate = useNavigate();
   const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, canAccess, isLoading } = useAuth();
@@ -365,25 +379,19 @@ export const MainLayout: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Search - navigates to manifiestos with query */}
-            <form
-              className="hidden md:flex items-center bg-neutral-100 rounded-xl px-4 py-2 gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const q = (e.currentTarget.elements.namedItem('globalSearch') as HTMLInputElement)?.value;
-                if (q?.trim()) {
-                  window.location.href = `/manifiestos?q=${encodeURIComponent(q.trim())}`;
-                }
-              }}
+            {/* Global search trigger */}
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="hidden md:flex items-center bg-neutral-100 hover:bg-neutral-200 rounded-xl px-4 py-2 gap-2 transition-colors w-52"
             >
-              <Search size={18} className="text-neutral-400" />
-              <input
-                name="globalSearch"
-                type="text"
-                placeholder="Buscar manifiestos..."
-                className="bg-transparent border-none outline-none text-sm w-48 placeholder:text-neutral-400"
-              />
-            </form>
+              <Search size={18} className="text-neutral-400 shrink-0" />
+              <span className="text-sm text-neutral-400 flex-1 text-left">Buscar...</span>
+              <kbd className="hidden lg:flex items-center text-[10px] text-neutral-400 bg-white rounded px-1.5 py-0.5 border border-neutral-200 font-mono">
+                ⌘K
+              </kbd>
+            </button>
+
+            {searchOpen && <GlobalSearchPanel onClose={() => setSearchOpen(false)} />}
 
             {/* Help / Tour restart */}
             <button

@@ -161,7 +161,7 @@ const ReportesPage: React.FC = () => {
         m.generador || '',
         m.transportista || '',
         m.operador || '',
-        m.fechaCreacion ? new Date(m.fechaCreacion).toLocaleDateString('es-AR') : '',
+        m.createdAt ? new Date(m.createdAt).toLocaleDateString('es-AR') : '',
       ]);
     } else if (activeTab === 'tratados') {
       const r: any = data.resumen || {};

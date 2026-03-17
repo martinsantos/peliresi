@@ -194,7 +194,6 @@ model Manifiesto {
   operadorId      String
   estado          EstadoManifiesto @default(BORRADOR)
   observaciones   String?
-  fechaCreacion   DateTime    @default(now())
   fechaFirma      DateTime?
   fechaRetiro     DateTime?
   fechaEntrega    DateTime?

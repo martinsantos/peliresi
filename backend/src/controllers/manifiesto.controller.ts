@@ -127,7 +127,7 @@ const generarNumeroManifiesto = async (): Promise<string> => {
 // Obtener todos los manifiestos
 export const getManifiestos = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { estado, generadorId, transportistaId, operadorId, search, page = 1, limit = 10 } = req.query;
+    const { estado, generadorId, transportistaId, operadorId, search, fechaDesde, fechaHasta, page = 1, limit = 10 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
     const where: any = {};
@@ -137,14 +137,27 @@ export const getManifiestos = async (req: AuthRequest, res: Response, next: Next
     if (transportistaId) where.transportistaId = transportistaId;
     if (operadorId) where.operadorId = operadorId;
 
+    if (fechaDesde || fechaHasta) {
+      where.createdAt = {};
+      if (fechaDesde) where.createdAt.gte = new Date(fechaDesde as string);
+      if (fechaHasta) {
+        const hasta = new Date(fechaHasta as string);
+        if (hasta.getUTCHours() === 0) hasta.setTime(hasta.getTime() + 86399999);
+        where.createdAt.lte = hasta;
+      }
+    }
+
     // Text search by numero or actor razón social
     if (search && typeof search === 'string' && search.trim()) {
       const q = search.trim();
       where.OR = [
         { numero: { contains: q, mode: 'insensitive' } },
         { generador: { razonSocial: { contains: q, mode: 'insensitive' } } },
+        { generador: { domicilio: { contains: q, mode: 'insensitive' } } },
         { transportista: { razonSocial: { contains: q, mode: 'insensitive' } } },
+        { transportista: { localidad: { contains: q, mode: 'insensitive' } } },
         { operador: { razonSocial: { contains: q, mode: 'insensitive' } } },
+        { operador: { domicilio: { contains: q, mode: 'insensitive' } } },
       ];
     }
 

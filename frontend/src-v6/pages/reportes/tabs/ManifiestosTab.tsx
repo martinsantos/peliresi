@@ -39,7 +39,7 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
         case 'generador': return dir * (a.generador || '').localeCompare(b.generador || '', 'es');
         case 'transportista': return dir * (a.transportista || '').localeCompare(b.transportista || '', 'es');
         case 'operador': return dir * (a.operador || '').localeCompare(b.operador || '', 'es');
-        case 'fecha': return dir * (new Date(a.fechaCreacion || 0).getTime() - new Date(b.fechaCreacion || 0).getTime());
+        case 'fecha': return dir * (new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
         default: return 0;
       }
     });
@@ -175,7 +175,7 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
                       <td className="px-4 py-3 text-sm text-neutral-900 max-w-[200px] truncate">{m.generador}</td>
                       <td className="px-4 py-3 text-sm text-neutral-700 max-w-[200px] truncate hidden md:table-cell">{m.transportista || '-'}</td>
                       <td className="px-4 py-3 text-sm text-neutral-700 max-w-[200px] truncate hidden lg:table-cell">{m.operador || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-neutral-500 hidden md:table-cell">{m.fechaCreacion ? new Date(m.fechaCreacion).toLocaleDateString('es-AR') : '-'}</td>
+                      <td className="px-4 py-3 text-sm text-neutral-500 hidden md:table-cell">{m.createdAt ? new Date(m.createdAt).toLocaleDateString('es-AR') : '-'}</td>
                     </tr>
                   ))}
                 </tbody>

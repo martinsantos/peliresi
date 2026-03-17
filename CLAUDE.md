@@ -285,7 +285,7 @@ La función `mapFilters()` en `reporte.service.ts` traduce entre ambos.
 |-----|--------|
 | `ADMIN` | Todo: dashboard, manifiestos, actores, reportes, auditoría, configuración, usuarios |
 | `GENERADOR` | Sus manifiestos (filtrado por generadorId), crear borradores, perfil |
-| `TRANSPORTISTA` | **DEMO MODE: ve TODOS los manifiestos** (filtro por transportistaId desactivado en `getManifiestos` y `getDashboardStats`). Tracking GPS, viaje en curso, "Tomar Viaje" desde perfil |
+| `TRANSPORTISTA` | Sus manifiestos (filtrado por transportistaId), tracking GPS, viaje en curso, "Tomar Viaje" desde perfil |
 | `OPERADOR` | Sus manifiestos (filtrado por operadorId), recibir, tratar |
 
 ---
@@ -593,18 +593,6 @@ bash backend/tests/smoke-test.sh http://localhost:3002
 - `createManifiesto` backend acepta `generadorId` del body para ADMIN (no requiere relación generador en el user)
 - `registrarIncidente` acepta tanto `tipo` como `tipoIncidente` del frontend
 - Certificado de Disposición (CU-O10): PDF generado por `pdf.controller.ts:generarCertificado` con Ley 24.051, datos completos, firma operador
-
-### Demo Mode — Filtro transportistaId desactivado
-
-En `manifiesto.controller.ts`, el filtro `where.transportistaId = req.user.transportista.id` está **comentado** en dos funciones para modo demo:
-- **`getManifiestos`** (~línea 144): cualquier transportista ve todos los manifiestos (no solo los asignados a su empresa)
-- **`getDashboardStats`** (~línea 981): estadísticas globales para cualquier transportista
-
-Esto permite que en demo cualquier usuario transportista (Carlos Rodriguez, Elena Vargas, etc.) vea y "tome" cualquier viaje APROBADO, sin importar a qué empresa transportista fue asignado el manifiesto.
-
-**Para restaurar filtro en producción**: descomentar las líneas marcadas con `DEMO MODE` en ambas funciones.
-
-**NOTA**: `getSyncInicial` (sincronización offline) **sigue filtrando** por `transportistaId` — no fue modificado.
 
 ---
 
