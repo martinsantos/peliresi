@@ -286,9 +286,9 @@ export const AdminVehiculosPage: React.FC = () => {
           <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
             <Truck size={20} className="text-primary-600" />
           </div>
-          <div>
-            <p className="font-medium text-neutral-900">{row.patente}</p>
-            <p className="text-xs text-neutral-500">{row.habilitacion || 'Sin habilitación'}</p>
+          <div className="min-w-0">
+            <p className="font-medium text-neutral-900 truncate">{row.patente}</p>
+            <p className="text-xs text-neutral-500 truncate">{row.habilitacion || 'Sin habilitación'}</p>
           </div>
         </div>
       ),
@@ -299,9 +299,9 @@ export const AdminVehiculosPage: React.FC = () => {
       hiddenBelow: 'md' as const,
       header: 'Detalles',
       render: (row: VehiculoDisplay) => (
-        <div className="text-sm">
-          <p className="text-neutral-900">{row.marca} {row.modelo}</p>
-          <p className="text-neutral-500">Año {row.anio} {row.capacidad ? `• ${row.capacidad}` : ''}</p>
+        <div className="text-sm min-w-0">
+          <p className="text-neutral-900 truncate">{row.marca} {row.modelo}</p>
+          <p className="text-neutral-500 truncate">Año {row.anio} {row.capacidad ? `• ${row.capacidad}` : ''}</p>
         </div>
       ),
     },
@@ -312,7 +312,7 @@ export const AdminVehiculosPage: React.FC = () => {
       hiddenBelow: 'md' as const,
       header: 'Transportista',
       render: (row: VehiculoDisplay) => (
-        <span className="text-sm text-neutral-700">{row.transportista}</span>
+        <span className="text-sm text-neutral-700 truncate block">{row.transportista}</span>
       ),
     },
     {
@@ -422,9 +422,9 @@ export const AdminVehiculosPage: React.FC = () => {
           <div className="w-10 h-10 bg-info-100 rounded-lg flex items-center justify-center">
             <User size={20} className="text-info-600" />
           </div>
-          <div>
-            <p className="font-medium text-neutral-900">{row.nombre} {row.apellido}</p>
-            <p className="text-xs text-neutral-500">DNI {row.dni}</p>
+          <div className="min-w-0">
+            <p className="font-medium text-neutral-900 truncate">{row.nombre} {row.apellido}</p>
+            <p className="text-xs text-neutral-500 truncate">DNI {row.dni}</p>
           </div>
         </div>
       ),
@@ -440,12 +440,12 @@ export const AdminVehiculosPage: React.FC = () => {
     },
     {
       key: 'transportista',
-      width: '20%',
+      width: '25%',
       sortable: true,
       hiddenBelow: 'md' as const,
       header: 'Transportista',
       render: (row: ChoferDisplay) => (
-        <span className="text-sm text-neutral-700">{row.transportista}</span>
+        <span className="text-sm text-neutral-700 truncate block">{row.transportista}</span>
       ),
     },
     {
@@ -646,6 +646,7 @@ export const AdminVehiculosPage: React.FC = () => {
                     onSort={(key, dir) => setSortConfig({ key, direction: dir })}
                     onRowClick={(row) => navigate(isMobile ? `/mobile/admin/actores/transportistas/${row.transportistaId}` : `/admin/actores/transportistas/${row.transportistaId}`)}
                     stickyHeader
+                    fixedLayout
                   />
                   <Pagination
                     currentPage={currentPage}
@@ -689,6 +690,7 @@ export const AdminVehiculosPage: React.FC = () => {
                     onSort={(key, dir) => setChoferSortConfig({ key, direction: dir })}
                     onRowClick={(row) => navigate(isMobile ? `/mobile/admin/actores/transportistas/${row.transportistaId}` : `/admin/actores/transportistas/${row.transportistaId}`)}
                     stickyHeader
+                    fixedLayout
                   />
                   <Pagination
                     currentPage={choferPage}

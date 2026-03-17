@@ -42,6 +42,7 @@ export interface TableProps<T> {
   compact?: boolean;
   bordered?: boolean;
   stickyHeader?: boolean;
+  fixedLayout?: boolean;
   className?: string;
   onRowClick?: (row: T) => void;
   renderExpandedRow?: (row: T) => React.ReactNode | null;
@@ -65,6 +66,7 @@ export function Table<T extends Record<string, any>>({
   compact = false,
   stickyHeader = false,
   bordered = false,
+  fixedLayout = false,
   className,
   onRowClick,
   renderExpandedRow,
@@ -118,7 +120,7 @@ export function Table<T extends Record<string, any>>({
 
   return (
     <div className={cn('overflow-hidden rounded-xl border border-neutral-200 bg-white', stickyHeader ? 'max-h-[70vh] overflow-y-auto' : '', className)}>
-        <table className="w-full text-left">
+        <table className={cn("w-full text-left", fixedLayout && "table-fixed")}>
           <thead className={cn('bg-neutral-50 border-b border-neutral-200', stickyHeader && 'sticky top-0 z-10')}>
             <tr>
               {selectable && (

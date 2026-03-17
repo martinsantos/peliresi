@@ -234,9 +234,9 @@ export const ActoresPage: React.FC = () => {
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center bg-${config.color}-100`}>
               <Icon size={18} className={`text-${config.color}-600`} />
             </div>
-            <div>
-              <p className="font-semibold text-neutral-900">{row.razonSocial}</p>
-              <p className="text-sm text-neutral-500 font-mono">{row.cuit}</p>
+            <div className="min-w-0">
+              <p className="font-semibold text-neutral-900 truncate">{row.razonSocial}</p>
+              <p className="text-sm text-neutral-500 font-mono truncate">{row.cuit}</p>
             </div>
           </div>
         );
@@ -261,7 +261,7 @@ export const ActoresPage: React.FC = () => {
         <div className="space-y-1">
           <div className="flex items-center gap-1 text-sm text-neutral-600">
             <Mail size={14} />
-            <span className="truncate max-w-[150px]">{row.email}</span>
+            <span className="truncate min-w-0 flex-1">{row.email}</span>
           </div>
           <div className="flex items-center gap-1 text-sm text-neutral-600">
             <Phone size={14} />

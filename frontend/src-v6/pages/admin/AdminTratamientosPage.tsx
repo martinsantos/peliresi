@@ -275,7 +275,7 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
       key: 'operador',
       header: 'Operador',
       sortable: true,
-      width: '30%',
+      width: '22%',
       render: (t: TratamientoDB) => (
         <div className="flex items-start gap-3">
           <div className="shrink-0 w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
@@ -283,7 +283,7 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
           </div>
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-neutral-900 truncate">{t.operador?.razonSocial || '-'}</p>
-            <p className="text-xs text-neutral-400 font-mono">{t.operador?.cuit || ''}</p>
+            <p className="text-xs text-neutral-400 font-mono truncate">{t.operador?.cuit || ''}</p>
           </div>
         </div>
       ),
@@ -292,7 +292,7 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
       key: 'residuo',
       header: 'Tipo Residuo',
       sortable: true,
-      width: '25%',
+      width: '28%',
       render: (t: TratamientoDB) => (
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -310,7 +310,7 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
               </Badge>
             )}
           </div>
-          <p className="text-sm text-neutral-600">{t.tipoResiduo?.nombre || ''}</p>
+          <p className="text-sm text-neutral-600 truncate">{t.tipoResiduo?.nombre || ''}</p>
         </div>
       ),
     },
@@ -318,12 +318,12 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
       key: 'metodo',
       header: 'Método y Capacidad',
       sortable: true,
-      width: '30%',
+      width: '38%',
       render: (t: TratamientoDB) => (
         <div>
-          <p className="font-medium text-neutral-900 mb-1">{t.metodo}</p>
+          <p className="font-medium text-neutral-900 mb-1 truncate">{t.metodo}</p>
           {t.descripcion && (
-            <p className="text-xs text-neutral-500 line-clamp-2 mb-1">{t.descripcion}</p>
+            <p className="text-xs text-neutral-500 line-clamp-1 mb-1">{t.descripcion}</p>
           )}
           {t.capacidad && (
             <div className="flex items-center gap-1.5">
@@ -339,18 +339,16 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
     {
       key: 'acciones',
       header: 'Acciones',
-      width: '15%',
+      width: '12%',
       render: (t: TratamientoDB) => (
         <div className="flex items-center justify-end gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            leftIcon={<Pencil size={14} />}
+          <button
             onClick={(e) => { e.stopPropagation(); openEdit(t); }}
-            className="!px-3 !py-1.5"
+            className="p-2 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-neutral-700 transition-colors"
+            title="Editar"
           >
-            Editar
-          </Button>
+            <Pencil size={16} />
+          </button>
           <button
             onClick={(e) => { e.stopPropagation(); setDeleteItem(t); }}
             className="p-2 rounded-lg hover:bg-red-50 text-neutral-400 hover:text-red-600 transition-colors"
@@ -504,6 +502,7 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
             sortable={true}
             onSort={(key, dir) => setSortConfig({ key, direction: dir })}
             stickyHeader
+            fixedLayout
             emptyMessage="No hay tratamientos autorizados registrados"
           />
         )}

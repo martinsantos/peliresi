@@ -5,7 +5,7 @@
  * operadores, en tránsito), filtros por fecha, clustering, estadísticas.
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Command,
   Activity,
@@ -189,6 +189,23 @@ export const CentroControlPage: React.FC = () => {
     }, 1000);
     return () => clearInterval(timer);
   }, [refetchStats, refetchCC]);
+
+  // ── Scroll lock: block page scroll over map, allow over viajes panel ──
+  const mapColRef = useRef<HTMLDivElement>(null);
+  const viajesRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const mapCol = mapColRef.current;
+    const viajesEl = viajesRef.current;
+    if (!mapCol || !viajesEl) return;
+    const handler = (e: WheelEvent) => {
+      // If the wheel is over the viajes panel, let it scroll naturally
+      if (viajesEl.contains(e.target as Node)) return;
+      e.preventDefault();
+    };
+    mapCol.addEventListener('wheel', handler, { passive: false });
+    return () => mapCol.removeEventListener('wheel', handler);
+  }, []);
 
   const handleManualRefresh = useCallback(() => {
     refetchStats();
@@ -579,7 +596,7 @@ export const CentroControlPage: React.FC = () => {
       {/* ══════ Mapa de Actividad + Viajes Activos ══════ */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Map */}
-        <div className="lg:col-span-2">
+        <div ref={mapColRef} className="lg:col-span-2">
           <Card padding="none">
             <div className="flex items-center justify-between p-5 border-b border-neutral-100">
               <div className="flex items-center gap-3">
@@ -817,7 +834,7 @@ export const CentroControlPage: React.FC = () => {
         </div>
 
         {/* Viajes Activos + Realizados — accordion right of map */}
-        <div className="lg:fixed lg:top-[6.5rem] lg:right-8 lg:w-[min(28rem,calc((100vw-16rem)/3))] flex flex-col gap-0 max-h-[calc(100vh-8.5rem)] overflow-hidden lg:z-10">
+        <div ref={viajesRef} className="flex flex-col gap-0 lg:sticky lg:top-[6.5rem] lg:self-start max-h-[calc(100vh-8.5rem)] overflow-hidden lg:z-10">
           {/* ── Viajes Activos accordion ── */}
           <Card padding="none" className={`flex flex-col ${tripPanel === 'activos' ? 'flex-1 min-h-0' : ''}`}>
             <button

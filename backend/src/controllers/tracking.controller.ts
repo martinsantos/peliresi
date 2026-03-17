@@ -30,9 +30,9 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
       ? new Date(hastaRaw.getTime() + 86399999)
       : hastaRaw;
 
-    // Layers to include
-    const layerList = capas
-      ? (capas as string).split(',').map(s => s.trim())
+    // Layers to include — empty string means zero layers (not all layers)
+    const layerList = capas !== undefined
+      ? (capas as string).split(',').map(s => s.trim()).filter(Boolean)
       : ['generadores', 'transportistas', 'operadores', 'transito'];
 
     const dateFilter = { gte: desde, lte: hasta };
@@ -258,15 +258,8 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
       rechazados,
     ] = await Promise.all([
       prisma.manifiesto.count({ where: { fechaCreacion: dateFilter } }),
-      prisma.manifiesto.count({
-        where: {
-          estado: 'EN_TRANSITO',
-          OR: [
-            { fechaCreacion: dateFilter },
-            { tracking: { some: { timestamp: dateFilter } } },
-          ],
-        },
-      }),
+      // KPI: EN_TRANSITO en el período (mismo criterio que pipeline — usa fechaRetiro)
+      prisma.manifiesto.count({ where: { estado: 'EN_TRANSITO', fechaRetiro: dateFilter } }),
       prisma.generador.count({
         where: {
           activo: true,
@@ -281,15 +274,8 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
       }),
       prisma.manifiesto.count({ where: { estado: 'BORRADOR', fechaCreacion: dateFilter } }),
       prisma.manifiesto.count({ where: { estado: 'APROBADO', fechaCreacion: dateFilter } }),
-      prisma.manifiesto.count({
-        where: {
-          estado: 'EN_TRANSITO',
-          OR: [
-            { fechaCreacion: dateFilter },
-            { tracking: { some: { timestamp: dateFilter } } },
-          ],
-        },
-      }),
+      // Pipeline EN_TRANSITO: use fechaRetiro (when transport confirmed pickup) as the period anchor
+      prisma.manifiesto.count({ where: { estado: 'EN_TRANSITO', fechaRetiro: dateFilter } }),
       prisma.manifiesto.count({ where: { estado: 'ENTREGADO', OR: [{ fechaCreacion: dateFilter }, { fechaEntrega: dateFilter }] } }),
       prisma.manifiesto.count({ where: { estado: 'RECIBIDO', OR: [{ fechaCreacion: dateFilter }, { fechaRecepcion: dateFilter }] } }),
       prisma.manifiesto.count({ where: { estado: 'EN_TRATAMIENTO', OR: [{ fechaCreacion: dateFilter }, { fechaRecepcion: dateFilter }] } }),

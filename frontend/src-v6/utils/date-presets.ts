@@ -14,10 +14,12 @@ export const DATE_PRESETS = [
 /** days=0 → empty strings (no date filter, returns all data) */
 export function computeDateRange(days: number): { desde: string; hasta: string } {
   if (days === 0) return { desde: '', hasta: '' };
+  const today = new Date().toISOString().split('T')[0];
+  if (days === 1) return { desde: today, hasta: today };
   const d = new Date();
   d.setDate(d.getDate() - days);
   return {
     desde: d.toISOString().split('T')[0],
-    hasta: new Date().toISOString().split('T')[0],
+    hasta: today,
   };
 }

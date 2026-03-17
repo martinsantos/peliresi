@@ -306,9 +306,9 @@ const UsuariosPage: React.FC = () => {
             <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm ${config?.bgColor || 'bg-neutral-100'} ${config?.textColor || 'text-neutral-700'}`}>
               {row.avatar}
             </div>
-            <div>
-              <p className="font-semibold text-neutral-900">{row.nombre}</p>
-              <p className="text-sm text-neutral-500">{row.email}</p>
+            <div className="min-w-0">
+              <p className="font-semibold text-neutral-900 truncate">{row.nombre}</p>
+              <p className="text-sm text-neutral-500 truncate">{row.email}</p>
             </div>
           </div>
         );
@@ -338,8 +338,8 @@ const UsuariosPage: React.FC = () => {
       hiddenBelow: 'md' as const,
       header: 'Sector/Empresa',
       render: (row: UsuarioLocal) => (
-        <div>
-          <p className="text-sm text-neutral-900">{row.sector}</p>
+        <div className="min-w-0">
+          <p className="text-sm text-neutral-900 truncate">{row.sector}</p>
           {row.ubicacion && (
             <p className="text-xs text-neutral-500 flex items-center gap-1">
               <MapPin size={10} />
