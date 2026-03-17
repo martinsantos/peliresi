@@ -87,12 +87,43 @@ export const ActoresPage: React.FC = () => {
   const [actorEliminar, setActorEliminar] = useState<{ id: string; tipo: string; razonSocial: string } | null>(null);
   const [form, setForm] = useState(INITIAL_FORM);
 
-  const itemsPerPage = 10;
+  const itemsPerPage = 20;
+
+  // Map UI sort keys → API field names
+  const ACTOR_SORT_MAP: Record<string, string> = {
+    actor: 'razonSocial',
+    estado: 'activo',
+  };
+
+  const isTodos = activeTab === 'todos';
+  const apiSortBy = sortConfig ? ACTOR_SORT_MAP[sortConfig.key] : undefined;
+  const apiSortOrder = sortConfig?.direction;
+  const genPage   = (!isTodos && activeTab === 'generador')     ? currentPage : 1;
+  const transPage = (!isTodos && activeTab === 'transportista') ? currentPage : 1;
+  const operPage  = (!isTodos && activeTab === 'operador')      ? currentPage : 1;
 
   // API hooks
-  const { data: generadoresData, isLoading: loadingGen } = useGeneradores({ search: busqueda || undefined });
-  const { data: transportistasData, isLoading: loadingTrans } = useTransportistas({ search: busqueda || undefined });
-  const { data: operadoresData, isLoading: loadingOp } = useOperadores({ search: busqueda || undefined });
+  const { data: generadoresData, isLoading: loadingGen } = useGeneradores({
+    search: busqueda || undefined,
+    sortBy: apiSortBy,
+    sortOrder: apiSortOrder,
+    page: genPage,
+    limit: isTodos ? 100 : itemsPerPage,
+  });
+  const { data: transportistasData, isLoading: loadingTrans } = useTransportistas({
+    search: busqueda || undefined,
+    sortBy: apiSortBy,
+    sortOrder: apiSortOrder,
+    page: transPage,
+    limit: isTodos ? 100 : itemsPerPage,
+  });
+  const { data: operadoresData, isLoading: loadingOp } = useOperadores({
+    search: busqueda || undefined,
+    sortBy: apiSortBy,
+    sortOrder: apiSortOrder,
+    page: operPage,
+    limit: isTodos ? 100 : itemsPerPage,
+  });
 
   const createGenerador = useCreateGenerador();
   const createTransportista = useCreateTransportista();
@@ -164,12 +195,21 @@ export const ActoresPage: React.FC = () => {
     return filtered;
   }, [actoresData, activeTab, filtroEstado, sortConfig]);
 
-  // Pagination
-  const totalPages = Math.ceil(actoresFiltrados.length / itemsPerPage);
-  const actoresPaginados = actoresFiltrados.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  // Pagination — server-side for specific tabs, client-side for 'todos'
+  const serverTotal =
+    activeTab === 'generador'     ? (generadoresData?.total ?? 0) :
+    activeTab === 'transportista' ? (transportistasData?.total ?? 0) :
+    activeTab === 'operador'      ? (operadoresData?.total ?? 0) :
+    actoresFiltrados.length;
+
+  const totalPages = isTodos
+    ? Math.ceil(actoresFiltrados.length / itemsPerPage)
+    : Math.ceil(serverTotal / itemsPerPage);
+
+  // For specific tabs the API already returns the correct page; for 'todos' slice client-side
+  const actoresPaginados = isTodos
+    ? actoresFiltrados.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+    : actoresFiltrados;
 
   const verDetalle = (actor: any) => {
     setActorSeleccionado(actor);
@@ -514,7 +554,7 @@ export const ActoresPage: React.FC = () => {
               <Pagination
                 currentPage={currentPage}
                 totalPages={totalPages}
-                totalItems={actoresFiltrados.length}
+                totalItems={serverTotal}
                 itemsPerPage={itemsPerPage}
                 onPageChange={setCurrentPage}
               />
@@ -587,7 +627,7 @@ export const ActoresPage: React.FC = () => {
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}
-            totalItems={actoresFiltrados.length}
+            totalItems={serverTotal}
             itemsPerPage={itemsPerPage}
             onPageChange={setCurrentPage}
           />
