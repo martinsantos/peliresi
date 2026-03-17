@@ -1,7 +1,5 @@
 /**
  * SITREP v6 - Alertas Page
- * ========================
- * Gestion de alertas y notificaciones - Real API + fallback mock
  */
 
 import React, { useState, useMemo } from 'react';
@@ -11,7 +9,6 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
-  Filter,
   Trash2,
   Check,
   AlertCircle,
@@ -24,8 +21,11 @@ import {
   ExternalLink,
   Mail,
   Users,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
 } from 'lucide-react';
-import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
+import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Modal, ConfirmModal } from '../../components/ui/Modal';
@@ -39,7 +39,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { alertaService } from '../../services/alerta.service';
 import { formatRelativeTime } from '../../utils/formatters';
 
-// Local alert shape used by UI
+// ─── Types ───────────────────────────────────────────────────────────────────
+
 interface AlertaLocal {
   id: string;
   tipo: 'critical' | 'warning' | 'info' | 'success';
@@ -53,14 +54,49 @@ interface AlertaLocal {
   estado: string;
 }
 
+// ─── Visual config ────────────────────────────────────────────────────────────
+
 const tipoConfig = {
-  critical: { label: 'Critica', icon: AlertCircle, color: 'error', bgColor: 'bg-error-50', borderColor: 'border-error-200', textColor: 'text-error-800' },
-  warning: { label: 'Advertencia', icon: AlertTriangle, color: 'warning', bgColor: 'bg-warning-50', borderColor: 'border-warning-200', textColor: 'text-warning-800' },
-  info: { label: 'Informacion', icon: Info, color: 'info', bgColor: 'bg-info-50', borderColor: 'border-info-200', textColor: 'text-info-800' },
-  success: { label: 'Resuelta', icon: CheckCircle, color: 'success', bgColor: 'bg-success-50', borderColor: 'border-success-200', textColor: 'text-success-800' },
+  critical: {
+    icon: AlertCircle,
+    dot: 'bg-error-500',
+    iconBg: 'bg-error-50',
+    iconColor: 'text-error-600',
+    border: 'border-l-error-500',
+    title: 'text-neutral-900',
+    badge: 'error' as const,
+  },
+  warning: {
+    icon: AlertTriangle,
+    dot: 'bg-warning-500',
+    iconBg: 'bg-warning-50',
+    iconColor: 'text-warning-600',
+    border: 'border-l-warning-500',
+    title: 'text-neutral-900',
+    badge: 'warning' as const,
+  },
+  info: {
+    icon: Info,
+    dot: 'bg-info-500',
+    iconBg: 'bg-info-50',
+    iconColor: 'text-info-600',
+    border: 'border-l-info-500',
+    title: 'text-neutral-900',
+    badge: 'info' as const,
+  },
+  success: {
+    icon: CheckCircle,
+    dot: 'bg-success-500',
+    iconBg: 'bg-success-50',
+    iconColor: 'text-success-600',
+    border: 'border-l-success-500',
+    title: 'text-neutral-500',
+    badge: 'success' as const,
+  },
 };
 
-// Mapear evento a tipo visual (no basado en estado PENDIENTE)
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
 function getTipoFromEvento(evento: string | undefined, estado: string): AlertaLocal['tipo'] {
   if (estado === 'RESUELTA' || estado === 'DESCARTADA') return 'success';
   switch (evento) {
@@ -72,8 +108,6 @@ function getTipoFromEvento(evento: string | undefined, estado: string): AlertaLo
     case 'TIEMPO_EXCESIVO':
     case 'DESVIO_RUTA':
       return 'warning';
-    case 'CAMBIO_ESTADO':
-    case 'VENCIMIENTO':
     default:
       return 'info';
   }
@@ -93,26 +127,61 @@ function parseMensaje(datosRaw: string | undefined | null, evento?: string): str
     case 'CAMBIO_ESTADO': {
       const de = d.estadoAnterior ? d.estadoAnterior.replace(/_/g, ' ') : '?';
       const a = d.estadoNuevo ? d.estadoNuevo.replace(/_/g, ' ') : '?';
-      return `Cambio de estado: ${de} → ${a}${num ? ` (${num})` : ''}`;
+      return `${de} → ${a}${num ? ` · ${num}` : ''}`;
     }
     case 'INCIDENTE':
-      return `Incidente en tránsito${num ? ` — ${num}` : ''}${d.tipo ? `: ${d.tipo}` : ''}`;
+      return `Incidente en tránsito${num ? ` · ${num}` : ''}${d.tipo ? ` — ${d.tipo}` : ''}`;
     case 'RECHAZO_CARGA':
-      return `Rechazo de carga${num ? ` — ${num}` : ''}${d.motivo ? `: ${d.motivo}` : ''}`;
+      return `Rechazo de carga${num ? ` · ${num}` : ''}${d.motivo ? ` — ${d.motivo}` : ''}`;
     case 'DIFERENCIA_PESO':
-      return `Diferencia de peso${num ? ` — ${num}` : ''}${d.delta ? ` del ${d.delta}` : ''}`;
+      return `Diferencia de peso${num ? ` · ${num}` : ''}${d.delta ? ` (${d.delta})` : ''}`;
     case 'TIEMPO_EXCESIVO':
-      return `Tiempo excesivo en tránsito${num ? ` — ${num}` : ''}`;
+      return `Tiempo excesivo en tránsito${num ? ` · ${num}` : ''}`;
     case 'ANOMALIA_GPS':
-      return `Anomalía GPS${num ? ` — ${num}` : ''}`;
+      return `Anomalía GPS detectada${num ? ` · ${num}` : ''}`;
     case 'VENCIMIENTO':
-      return `Vencimiento próximo${num ? ` — ${num}` : ''}`;
+      return `Vencimiento próximo${num ? ` · ${num}` : ''}`;
     case 'DESVIO_RUTA':
-      return `Desvío de ruta${num ? ` — ${num}` : ''}`;
+      return `Desvío de ruta${num ? ` · ${num}` : ''}`;
     default:
       return num || 'Alerta registrada';
   }
 }
+
+function formatDateLabel(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const alertDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+  if (alertDay.getTime() === today.getTime()) return 'Hoy';
+  if (alertDay.getTime() === yesterday.getTime()) return 'Ayer';
+
+  return d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+function groupByDay(alertas: AlertaLocal[]): { label: string; items: AlertaLocal[] }[] {
+  const groups: { label: string; items: AlertaLocal[] }[] = [];
+  const seen = new Map<string, AlertaLocal[]>();
+
+  for (const a of alertas) {
+    const d = new Date(a.fecha);
+    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    if (!seen.has(key)) {
+      const label = formatDateLabel(a.fecha);
+      seen.set(key, []);
+      groups.push({ label, items: seen.get(key)! });
+    }
+    seen.get(key)!.push(a);
+  }
+  return groups;
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const PAGE_SIZE = 10;
 
 const EVENTO_OPTIONS = [
   { value: 'CAMBIO_ESTADO', label: 'Cambio de Estado' },
@@ -136,6 +205,13 @@ const ROLES_DESTINATARIOS = [
   { value: 'OPERADOR', label: 'Operadores' },
 ];
 
+const PERIOD_OPTIONS = [
+  { value: 'hoy', label: 'Hoy' },
+  { value: '7d', label: '7 días' },
+  { value: '30d', label: '30 días' },
+  { value: 'todo', label: 'Todo' },
+];
+
 const defaultReglaForm = {
   nombre: '',
   descripcion: '',
@@ -154,32 +230,56 @@ function parseEmails(raw: string): string[] {
     .map(e => `email:${e}`);
 }
 
+function periodStart(period: string): Date | null {
+  const now = new Date();
+  if (period === 'hoy') {
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  }
+  if (period === '7d') {
+    const d = new Date(now);
+    d.setDate(d.getDate() - 7);
+    return d;
+  }
+  if (period === '30d') {
+    const d = new Date(now);
+    d.setDate(d.getDate() - 30);
+    return d;
+  }
+  return null;
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export const AlertasPage: React.FC = () => {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
 
-  // Real API data
   const { data: apiAlertas, isLoading, isError } = useAlertas();
   const resolverMutation = useResolverAlerta();
 
-  // Reglas hooks
   const { data: reglas } = useReglasAlerta();
   const createRegla = useCreateReglaAlerta();
   const updateRegla = useUpdateReglaAlerta();
   const deleteRegla = useDeleteReglaAlerta();
 
-  // Tabs & Reglas state
   const [activeTab, setActiveTab] = useState('alertas');
   const [showReglaModal, setShowReglaModal] = useState(false);
   const [editingRegla, setEditingRegla] = useState<any | null>(null);
   const [deletingRegla, setDeletingRegla] = useState<any | null>(null);
   const [reglaForm, setReglaForm] = useState(defaultReglaForm);
 
-  // Local state for optimistic updates
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
 
-  // Use only API data
+  // Filters
+  const [periodo, setPeriodo] = useState<string>('30d');
+  const [filtroEvento, setFiltroEvento] = useState<string>('');
+  const [filtroLeidas, setFiltroLeidas] = useState<string>('todas');
+  const [showClearModal, setShowClearModal] = useState(false);
+
+  // Pagination
+  const [page, setPage] = useState(1);
+
   const alertas: AlertaLocal[] = useMemo(() => {
     const items = Array.isArray(apiAlertas?.items) ? apiAlertas.items : [];
     return items
@@ -202,19 +302,31 @@ export const AlertasPage: React.FC = () => {
       });
   }, [apiAlertas, deletedIds, resolvedIds]);
 
-  const [filtroTipo, setFiltroTipo] = useState<string>('todas');
-  const [filtroLeidas, setFiltroLeidas] = useState<string>('todas');
-  const [showClearModal, setShowClearModal] = useState(false);
+  const alertasFiltradas = useMemo(() => {
+    const since = periodStart(periodo);
+    return alertas.filter(a => {
+      if (since && new Date(a.fecha) < since) return false;
+      if (filtroEvento && a.evento !== filtroEvento) return false;
+      if (filtroLeidas === 'no-leidas' && a.leida) return false;
+      if (filtroLeidas === 'leidas' && !a.leida) return false;
+      return true;
+    });
+  }, [alertas, periodo, filtroEvento, filtroLeidas]);
 
-  const alertasFiltradas = alertas.filter(alerta => {
-    const matchTipo = filtroTipo === 'todas' || alerta.tipo === filtroTipo;
-    const matchLeidas = filtroLeidas === 'todas' ||
-      (filtroLeidas === 'leidas' && alerta.leida) ||
-      (filtroLeidas === 'no-leidas' && !alerta.leida);
-    return matchTipo && matchLeidas;
-  });
+  // Reset page when filters change
+  const totalPages = Math.max(1, Math.ceil(alertasFiltradas.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const alertasPagina = alertasFiltradas.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const grupos = groupByDay(alertasPagina);
 
   const noLeidasCount = alertas.filter(a => !a.leida).length;
+
+  const changeFilter = (setter: (v: any) => void, v: any) => {
+    setter(v);
+    setPage(1);
+  };
+
+  // ─── Actions ───────────────────────────────────────────────────────────────
 
   const marcarComoLeida = (id: string) => {
     resolverMutation.mutate(
@@ -222,48 +334,42 @@ export const AlertasPage: React.FC = () => {
       {
         onSuccess: () => {
           setResolvedIds(prev => new Set(prev).add(id));
-          toast.success('Alerta resuelta', 'La alerta fue marcada como leida');
+          toast.success('Alerta resuelta', 'La alerta fue marcada como leída');
         },
         onError: () => {
           setResolvedIds(prev => new Set(prev).add(id));
-          toast.error('Error', 'No se pudo marcar la alerta como leida');
+          toast.error('Error', 'No se pudo marcar la alerta');
         },
       }
     );
   };
 
   const marcarTodasComoLeidas = () => {
-    const noLeidas = alertas.filter(a => !a.leida);
-    noLeidas.forEach(a => {
+    alertas.filter(a => !a.leida).forEach(a => {
       resolverMutation.mutate(
         { id: a.id, notas: 'Marcada como leida (batch)' },
-        {
-          onSuccess: () => setResolvedIds(prev => new Set(prev).add(a.id)),
-          onError: () => setResolvedIds(prev => new Set(prev).add(a.id)),
-        }
+        { onSuccess: () => setResolvedIds(prev => new Set(prev).add(a.id)) }
       );
     });
-    toast.success('Alertas marcadas', 'Todas las alertas fueron marcadas como leidas');
+    toast.success('Listo', 'Todas las alertas fueron marcadas como leídas');
   };
 
   const eliminarAlerta = (id: string) => {
     alertaService.resolverAlerta(id, 'Eliminada por usuario').then(() => {
       setDeletedIds(prev => new Set(prev).add(id));
-      toast.success('Alerta eliminada', 'La alerta fue eliminada correctamente');
     }).catch(() => {
       setDeletedIds(prev => new Set(prev).add(id));
-      toast.error('Error', 'No se pudo eliminar la alerta en el servidor');
     });
   };
 
   const limpiarTodas = () => {
-    const allIds = new Set(alertas.map(a => a.id));
-    setDeletedIds(allIds);
+    setDeletedIds(new Set(alertas.map(a => a.id)));
     setShowClearModal(false);
-    toast.success('Alertas limpiadas', 'Todas las alertas fueron eliminadas');
+    toast.success('Alertas limpiadas', 'Se eliminaron todas las alertas');
   };
 
-  // --- Reglas handlers ---
+  // ─── Reglas handlers ───────────────────────────────────────────────────────
+
   const openCreateRegla = () => {
     setEditingRegla(null);
     setReglaForm(defaultReglaForm);
@@ -272,16 +378,13 @@ export const AlertasPage: React.FC = () => {
 
   const openEditRegla = (regla: any) => {
     setEditingRegla(regla);
-    // Parse existing destinatarios
     let destList: string[] = [];
     try {
       const parsed = JSON.parse(regla.destinatarios || '[]');
       destList = Array.isArray(parsed) ? parsed : [];
     } catch { /* noop */ }
     const roles = destList.filter((d: string) => !d.startsWith('email:'));
-    const emailList = destList
-      .filter((d: string) => d.startsWith('email:'))
-      .map((d: string) => d.replace('email:', ''));
+    const emailList = destList.filter((d: string) => d.startsWith('email:')).map((d: string) => d.replace('email:', ''));
     setReglaForm({
       nombre: regla.nombre || '',
       descripcion: regla.descripcion || '',
@@ -296,7 +399,7 @@ export const AlertasPage: React.FC = () => {
 
   const handleSaveRegla = () => {
     if (!reglaForm.nombre.trim() || !reglaForm.evento || !reglaForm.condicion.trim()) {
-      toast.error('Campos requeridos', 'Nombre, evento y condicion son obligatorios');
+      toast.error('Campos requeridos', 'Nombre, evento y condición son obligatorios');
       return;
     }
     const destinatariosJson = JSON.stringify([
@@ -315,19 +418,13 @@ export const AlertasPage: React.FC = () => {
       updateRegla.mutate(
         { id: editingRegla.id, data: payload },
         {
-          onSuccess: () => {
-            toast.success('Regla actualizada', 'La regla fue actualizada correctamente');
-            setShowReglaModal(false);
-          },
+          onSuccess: () => { toast.success('Regla actualizada'); setShowReglaModal(false); },
           onError: () => toast.error('Error', 'No se pudo actualizar la regla'),
         }
       );
     } else {
       createRegla.mutate(payload, {
-        onSuccess: () => {
-          toast.success('Regla creada', 'La regla fue creada correctamente');
-          setShowReglaModal(false);
-        },
+        onSuccess: () => { toast.success('Regla creada'); setShowReglaModal(false); },
         onError: () => toast.error('Error', 'No se pudo crear la regla'),
       });
     }
@@ -336,10 +433,7 @@ export const AlertasPage: React.FC = () => {
   const handleDeleteRegla = () => {
     if (!deletingRegla) return;
     deleteRegla.mutate(deletingRegla.id, {
-      onSuccess: () => {
-        toast.success('Regla eliminada', 'La regla fue eliminada correctamente');
-        setDeletingRegla(null);
-      },
+      onSuccess: () => { toast.success('Regla eliminada'); setDeletingRegla(null); },
       onError: () => toast.error('Error', 'No se pudo eliminar la regla'),
     });
   };
@@ -353,15 +447,14 @@ export const AlertasPage: React.FC = () => {
     }));
   };
 
+  // ─── Reglas table ──────────────────────────────────────────────────────────
+
   const reglasColumns: Column<any>[] = [
     { key: 'nombre', header: 'Nombre', sortable: true },
     {
       key: 'evento',
       header: 'Evento',
-      render: (r) => {
-        const label = EVENTO_LABELS[r.evento] || r.evento;
-        return <Badge variant="soft" color="info" size="sm">{label}</Badge>;
-      },
+      render: (r) => <Badge variant="soft" color="info" size="sm">{EVENTO_LABELS[r.evento] || r.evento}</Badge>,
     },
     {
       key: 'destinatarios',
@@ -378,12 +471,8 @@ export const AlertasPage: React.FC = () => {
         if (destList.length === 0) return <span className="text-neutral-400 text-xs">Sin destinatarios</span>;
         return (
           <div className="flex items-center gap-1 flex-wrap">
-            {roles.map(rol => (
-              <Badge key={rol} variant="soft" color="neutral" size="sm">{rol}</Badge>
-            ))}
-            {emailCount > 0 && (
-              <Badge variant="soft" color="info" size="sm">+{emailCount} email{emailCount > 1 ? 's' : ''}</Badge>
-            )}
+            {roles.map(rol => <Badge key={rol} variant="soft" color="neutral" size="sm">{rol}</Badge>)}
+            {emailCount > 0 && <Badge variant="soft" color="info" size="sm">+{emailCount} email{emailCount > 1 ? 's' : ''}</Badge>}
           </div>
         );
       },
@@ -392,11 +481,7 @@ export const AlertasPage: React.FC = () => {
       key: 'activa',
       header: 'Activa',
       align: 'center',
-      render: (r) => (
-        <Badge variant="soft" color={r.activa ? 'success' : 'neutral'} size="sm">
-          {r.activa ? 'Si' : 'No'}
-        </Badge>
-      ),
+      render: (r) => <Badge variant="soft" color={r.activa ? 'success' : 'neutral'} size="sm">{r.activa ? 'Sí' : 'No'}</Badge>,
     },
     {
       key: 'acciones',
@@ -404,164 +489,233 @@ export const AlertasPage: React.FC = () => {
       align: 'right',
       render: (r) => (
         <div className="flex items-center justify-end gap-1">
-          <Button variant="ghost" size="sm" onClick={() => openEditRegla(r)}>
-            <Edit size={14} />
-          </Button>
-          <Button variant="ghost" size="sm" className="text-error-500" onClick={() => setDeletingRegla(r)}>
-            <Trash2 size={14} />
-          </Button>
+          <Button variant="ghost" size="sm" onClick={() => openEditRegla(r)}><Edit size={14} /></Button>
+          <Button variant="ghost" size="sm" className="text-error-500" onClick={() => setDeletingRegla(r)}><Trash2 size={14} /></Button>
         </div>
       ),
     },
   ];
 
-  // --- Alertas content ---
+  // ─── Alertas content ───────────────────────────────────────────────────────
+
   const alertasContent = (
-    <>
-      {/* Filtros */}
-      <Card padding="base">
-        <div className="flex flex-wrap gap-4">
-          <div className="flex items-center gap-2">
-            <Filter size={18} className="text-neutral-400" />
-            <select
-              value={filtroTipo}
-              onChange={(e) => setFiltroTipo(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
+    <div className="space-y-5">
+
+      {/* Filter bar */}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Period pills */}
+        <div className="flex items-center gap-1 bg-neutral-100 rounded-lg p-1">
+          <Calendar size={13} className="text-neutral-500 ml-1" />
+          {PERIOD_OPTIONS.map(p => (
+            <button
+              key={p.value}
+              onClick={() => changeFilter(setPeriodo, p.value)}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                periodo === p.value
+                  ? 'bg-white text-primary-700 shadow-sm'
+                  : 'text-neutral-500 hover:text-neutral-700'
+              }`}
             >
-              <option value="todas">Todas las alertas</option>
-              <option value="critical">Criticas</option>
-              <option value="warning">Advertencias</option>
-              <option value="info">Informacion</option>
-              <option value="success">Resueltas</option>
-            </select>
-          </div>
-          <select
-            value={filtroLeidas}
-            onChange={(e) => setFiltroLeidas(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
-          >
-            <option value="todas">Todas</option>
-            <option value="no-leidas">Pendientes</option>
-            <option value="leidas">Resueltas / leidas</option>
-          </select>
+              {p.label}
+            </button>
+          ))}
         </div>
-      </Card>
 
-      {/* Lista de alertas */}
-      <div className="space-y-3">
-        {alertasFiltradas.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <div className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Bell size={32} className="text-neutral-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-neutral-900 mb-2">No hay alertas</h3>
-              <p className="text-neutral-600">No se encontraron alertas con los filtros seleccionados</p>
-            </CardContent>
-          </Card>
-        ) : (
-          alertasFiltradas.map((alerta) => {
-            const config = tipoConfig[alerta.tipo];
-            const Icon = config.icon;
+        {/* Event type */}
+        <select
+          value={filtroEvento}
+          onChange={(e) => changeFilter(setFiltroEvento, e.target.value)}
+          className="px-3 py-1.5 rounded-lg border border-neutral-200 bg-white text-xs text-neutral-700 focus:border-primary-500 focus:outline-none"
+        >
+          <option value="">Todos los eventos</option>
+          {EVENTO_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
 
-            return (
-              <div
-                key={alerta.id}
-                className={`
-                  relative p-4 rounded-xl border-l-4 transition-all
-                  ${config.bgColor} ${config.borderColor}
-                  ${!alerta.leida ? 'shadow-sm' : 'opacity-75'}
-                `}
-              >
-                <div className="flex items-start gap-4">
-                  <div className={`p-2 rounded-lg bg-white ${config.textColor}`}>
-                    <Icon size={20} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <h4 className={`font-semibold ${config.textColor}`}>{alerta.titulo}</h4>
-                          {!alerta.leida && (
-                            <Badge variant="solid" color={config.color as any} size="sm">
-                              Nueva
-                            </Badge>
-                          )}
-                          {alerta.evento && (
-                            <Badge variant="outline" color="neutral" size="sm">
-                              {EVENTO_LABELS[alerta.evento] || alerta.evento}
-                            </Badge>
-                          )}
-                          {alerta.manifiestoNumero && (
-                            <button
-                              onClick={() => alerta.manifiestoId && navigate(`/manifiestos/${alerta.manifiestoId}`)}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-neutral-200 text-xs font-mono text-neutral-700 hover:border-primary-400 hover:text-primary-600 transition-colors"
-                            >
-                              {alerta.manifiestoNumero}
-                              <ExternalLink size={10} />
-                            </button>
-                          )}
-                        </div>
-                        <p className={`text-sm ${config.textColor} opacity-90`}>
-                          {alerta.mensaje}
-                        </p>
-                      </div>
-                      <span className="text-xs text-neutral-500 whitespace-nowrap flex items-center gap-1 shrink-0">
-                        <Clock size={12} />
-                        {formatRelativeTime(alerta.fecha)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 mt-3">
-                      {alerta.manifiestoId && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8"
-                          onClick={() => navigate(`/manifiestos/${alerta.manifiestoId}`)}
-                        >
-                          <ExternalLink size={14} className="mr-1" />
-                          Ver Manifiesto
-                        </Button>
-                      )}
-                      {!alerta.leida && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8"
-                          onClick={() => marcarComoLeida(alerta.id)}
-                          disabled={resolverMutation.isPending}
-                        >
-                          <Check size={14} className="mr-1" />
-                          Marcar leida
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 text-neutral-400 hover:text-error-500 ml-auto"
-                        onClick={() => eliminarAlerta(alerta.id)}
-                      >
-                        <X size={14} />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
+        {/* Read/unread */}
+        <select
+          value={filtroLeidas}
+          onChange={(e) => changeFilter(setFiltroLeidas, e.target.value)}
+          className="px-3 py-1.5 rounded-lg border border-neutral-200 bg-white text-xs text-neutral-700 focus:border-primary-500 focus:outline-none"
+        >
+          <option value="todas">Todas</option>
+          <option value="no-leidas">Pendientes</option>
+          <option value="leidas">Leídas</option>
+        </select>
+
+        <span className="ml-auto text-xs text-neutral-400">
+          {alertasFiltradas.length} alerta{alertasFiltradas.length !== 1 ? 's' : ''}
+        </span>
       </div>
-    </>
+
+      {/* List */}
+      {alertasFiltradas.length === 0 ? (
+        <div className="py-16 flex flex-col items-center gap-3 text-center">
+          <div className="w-14 h-14 rounded-full bg-neutral-100 flex items-center justify-center">
+            <Bell size={26} className="text-neutral-300" />
+          </div>
+          <p className="text-sm text-neutral-500">No hay alertas para los filtros seleccionados</p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {grupos.map((grupo) => (
+            <div key={grupo.label}>
+              {/* Day separator */}
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wide whitespace-nowrap">
+                  {grupo.label}
+                </span>
+                <div className="flex-1 h-px bg-neutral-100" />
+              </div>
+
+              {/* Cards for this day */}
+              <div className="space-y-2">
+                {grupo.items.map((alerta) => {
+                  const cfg = tipoConfig[alerta.tipo];
+                  const Icon = cfg.icon;
+                  return (
+                    <div
+                      key={alerta.id}
+                      className={`
+                        group relative bg-white rounded-xl border border-neutral-100 border-l-4 ${cfg.border}
+                        flex items-start gap-3 px-4 py-3
+                        transition-all hover:shadow-sm
+                        ${!alerta.leida ? '' : 'opacity-60'}
+                      `}
+                    >
+                      {/* Icon */}
+                      <div className={`mt-0.5 flex-shrink-0 w-8 h-8 rounded-lg ${cfg.iconBg} flex items-center justify-center`}>
+                        <Icon size={15} className={cfg.iconColor} />
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                              <span className="text-sm font-semibold text-neutral-800">{alerta.titulo}</span>
+                              {!alerta.leida && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-primary-100 text-primary-700 uppercase tracking-wide">
+                                  Nueva
+                                </span>
+                              )}
+                              {alerta.manifiestoNumero && (
+                                <button
+                                  onClick={() => alerta.manifiestoId && navigate(`/manifiestos/${alerta.manifiestoId}`)}
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-neutral-50 border border-neutral-200 text-[11px] font-mono text-neutral-500 hover:border-primary-300 hover:text-primary-600 transition-colors"
+                                >
+                                  {alerta.manifiestoNumero}
+                                  <ExternalLink size={9} />
+                                </button>
+                              )}
+                            </div>
+                            <p className="text-sm text-neutral-600 leading-snug">{alerta.mensaje}</p>
+                          </div>
+                          {/* Time + delete */}
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-xs text-neutral-400 flex items-center gap-1">
+                              <Clock size={11} />
+                              {formatRelativeTime(alerta.fecha)}
+                            </span>
+                            <button
+                              onClick={() => eliminarAlerta(alerta.id)}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-neutral-100 text-neutral-300 hover:text-neutral-500"
+                              title="Eliminar"
+                            >
+                              <X size={13} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Actions row */}
+                        {(alerta.manifiestoId || !alerta.leida) && (
+                          <div className="flex items-center gap-2 mt-2">
+                            {alerta.manifiestoId && (
+                              <button
+                                onClick={() => navigate(`/manifiestos/${alerta.manifiestoId}`)}
+                                className="inline-flex items-center gap-1.5 text-xs text-neutral-500 hover:text-primary-600 transition-colors"
+                              >
+                                <ExternalLink size={12} />
+                                Ver manifiesto
+                              </button>
+                            )}
+                            {!alerta.leida && (
+                              <button
+                                onClick={() => marcarComoLeida(alerta.id)}
+                                disabled={resolverMutation.isPending}
+                                className="inline-flex items-center gap-1.5 text-xs text-neutral-500 hover:text-success-600 transition-colors"
+                              >
+                                <Check size={12} />
+                                Marcar leída
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between pt-2 border-t border-neutral-100">
+          <span className="text-xs text-neutral-400">
+            Página {currentPage} de {totalPages}
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="p-1.5 rounded-lg border border-neutral-200 text-neutral-500 hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={15} />
+            </button>
+            {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+              const pg = totalPages <= 7 ? i + 1 : (
+                currentPage <= 4 ? i + 1 :
+                currentPage >= totalPages - 3 ? totalPages - 6 + i :
+                currentPage - 3 + i
+              );
+              return (
+                <button
+                  key={pg}
+                  onClick={() => setPage(pg)}
+                  className={`w-7 h-7 rounded-lg text-xs font-medium transition-colors ${
+                    pg === currentPage
+                      ? 'bg-primary-600 text-white'
+                      : 'text-neutral-500 hover:bg-neutral-100'
+                  }`}
+                >
+                  {pg}
+                </button>
+              );
+            })}
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="p-1.5 rounded-lg border border-neutral-200 text-neutral-500 hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight size={15} />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 
-  // --- Reglas content ---
+  // ─── Reglas content ────────────────────────────────────────────────────────
+
   const reglasContent = (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-neutral-600">
+        <p className="text-sm text-neutral-500">
           {Array.isArray(reglas) ? reglas.length : 0} reglas configuradas
         </p>
-        <Button variant="primary" size="sm" leftIcon={<Plus size={16} />} onClick={openCreateRegla}>
+        <Button variant="primary" size="sm" leftIcon={<Plus size={15} />} onClick={openCreateRegla}>
           Nueva Regla
         </Button>
       </div>
@@ -577,26 +731,33 @@ export const AlertasPage: React.FC = () => {
     </div>
   );
 
+  // ─── Render ────────────────────────────────────────────────────────────────
+
   return (
     <div className="space-y-6 animate-fade-in">
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <Bell size={28} className="text-neutral-700" />
+            <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center">
+              <Bell size={20} className="text-primary-600" />
+            </div>
             {noLeidasCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-error-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                {noLeidasCount}
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-error-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                {noLeidasCount > 99 ? '99+' : noLeidasCount}
               </span>
             )}
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-neutral-900">Alertas</h2>
-            <p className="text-neutral-600">
+            <h2 className="text-xl font-bold text-neutral-900">Alertas</h2>
+            <p className="text-sm text-neutral-500">
               {isLoading ? (
-                <span className="flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Cargando alertas...</span>
+                <span className="flex items-center gap-1.5">
+                  <Loader2 size={12} className="animate-spin" /> Cargando…
+                </span>
               ) : (
-                <>{noLeidasCount} alertas sin leer de {alertas.length} totales {isError ? '(error al cargar)' : ''}</>
+                `${noLeidasCount} pendiente${noLeidasCount !== 1 ? 's' : ''} · ${alertas.length} total${alertas.length !== 1 ? 'es' : ''}`
               )}
             </p>
           </div>
@@ -604,7 +765,8 @@ export const AlertasPage: React.FC = () => {
         <div className="flex gap-2">
           <Button
             variant="outline"
-            leftIcon={<Check size={18} />}
+            size="sm"
+            leftIcon={<Check size={15} />}
             onClick={marcarTodasComoLeidas}
             disabled={noLeidasCount === 0}
           >
@@ -612,7 +774,8 @@ export const AlertasPage: React.FC = () => {
           </Button>
           <Button
             variant="outline"
-            leftIcon={<Trash2 size={18} />}
+            size="sm"
+            leftIcon={<Trash2 size={15} />}
             onClick={() => setShowClearModal(true)}
             disabled={alertas.length === 0}
           >
@@ -621,48 +784,44 @@ export const AlertasPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Main content: Tabs for admin, direct list for non-admin */}
+      {/* Tabs (admin) or direct list */}
       {isAdmin ? (
         <Tabs activeTab={activeTab} onChange={setActiveTab}>
           <TabList>
             <Tab id="alertas">Alertas</Tab>
-            <Tab id="reglas"><Settings size={16} className="inline mr-1 -mt-0.5" />Reglas</Tab>
+            <Tab id="reglas"><Settings size={14} className="inline mr-1 -mt-0.5" />Reglas</Tab>
           </TabList>
           <TabPanel id="alertas">
-            <div className="space-y-4 mt-4">
-              {alertasContent}
-            </div>
+            <div className="mt-5">{alertasContent}</div>
           </TabPanel>
           <TabPanel id="reglas">
-            <div className="mt-4">
-              {reglasContent}
-            </div>
+            <div className="mt-5">{reglasContent}</div>
           </TabPanel>
         </Tabs>
       ) : (
         alertasContent
       )}
 
-      {/* Modal de confirmacion - Limpiar alertas */}
+      {/* Confirm clear */}
       <ConfirmModal
         isOpen={showClearModal}
         onClose={() => setShowClearModal(false)}
         onConfirm={limpiarTodas}
         title="Limpiar todas las alertas"
-        description="Estas seguro de que deseas eliminar todas las alertas? Esta accion no se puede deshacer."
-        confirmText="Si, limpiar"
+        description="¿Estás seguro de que deseas eliminar todas las alertas? Esta acción no se puede deshacer."
+        confirmText="Sí, limpiar"
         cancelText="Cancelar"
         variant="danger"
       />
 
-      {/* Modal crear/editar regla */}
+      {/* Modal crear/editar regla — con scroll interno */}
       <Modal
         isOpen={showReglaModal}
         onClose={() => setShowReglaModal(false)}
         title={editingRegla ? 'Editar Regla' : 'Nueva Regla'}
         size="base"
       >
-        <div className="space-y-4">
+        <div className="overflow-y-auto max-h-[calc(100vh-200px)] pr-1 space-y-4">
           <Input
             label="Nombre"
             placeholder="Nombre de la regla"
@@ -672,8 +831,8 @@ export const AlertasPage: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-neutral-700 mb-1">Descripción</label>
             <textarea
-              className="w-full px-3 py-2 rounded-lg border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none resize-y"
-              placeholder="Descripción opcional de la regla"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none resize-none"
+              placeholder="Descripción opcional"
               value={reglaForm.descripcion}
               onChange={(e) => setReglaForm(prev => ({ ...prev, descripcion: e.target.value }))}
               rows={2}
@@ -681,31 +840,30 @@ export const AlertasPage: React.FC = () => {
           </div>
           <Select
             label="Evento"
-            placeholder="Seleccionar evento..."
+            placeholder="Seleccionar evento…"
             options={EVENTO_OPTIONS}
             value={reglaForm.evento}
             onChange={(val) => setReglaForm(prev => ({ ...prev, evento: val }))}
           />
           <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">Condicion</label>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">Condición <span className="text-neutral-400 font-normal">(JSON)</span></label>
             <textarea
-              className="w-full px-3 py-2 rounded-lg border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none resize-y min-h-[80px]"
-              placeholder="Condicion de la regla (ej: cantidad > 100)"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-200 bg-neutral-50 text-sm font-mono focus:border-primary-500 focus:outline-none resize-none"
+              placeholder="{}"
               value={reglaForm.condicion}
               onChange={(e) => setReglaForm(prev => ({ ...prev, condicion: e.target.value }))}
-              rows={3}
+              rows={2}
             />
           </div>
 
-          {/* Destinatarios por rol */}
           <div>
             <label className="block text-sm font-medium text-neutral-700 mb-2">
-              <Users size={14} className="inline mr-1 -mt-0.5" />
-              Destinatarios (notificaciones in-app)
+              <Users size={13} className="inline mr-1 -mt-0.5 text-neutral-400" />
+              Destinatarios
             </label>
             <div className="grid grid-cols-2 gap-2">
               {ROLES_DESTINATARIOS.map(rol => (
-                <label key={rol.value} className="flex items-center gap-2 cursor-pointer p-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 transition-colors">
+                <label key={rol.value} className="flex items-center gap-2.5 cursor-pointer p-2.5 rounded-lg border border-neutral-200 hover:bg-neutral-50 transition-colors">
                   <input
                     type="checkbox"
                     checked={reglaForm.destinatarios.includes(rol.value)}
@@ -713,31 +871,30 @@ export const AlertasPage: React.FC = () => {
                     className="w-4 h-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
                   />
                   <div>
-                    <p className="text-sm font-medium text-neutral-800">{rol.value}</p>
-                    <p className="text-xs text-neutral-500">{rol.label}</p>
+                    <p className="text-xs font-semibold text-neutral-800">{rol.value}</p>
+                    <p className="text-xs text-neutral-400">{rol.label}</p>
                   </div>
                 </label>
               ))}
             </div>
           </div>
 
-          {/* Emails adicionales */}
           <div>
             <label className="block text-sm font-medium text-neutral-700 mb-1">
-              <Mail size={14} className="inline mr-1 -mt-0.5" />
-              Emails adicionales (uno por línea o separados por coma)
+              <Mail size={13} className="inline mr-1 -mt-0.5 text-neutral-400" />
+              Emails adicionales
             </label>
             <textarea
-              className="w-full px-3 py-2 rounded-lg border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none resize-y"
-              placeholder="coordinador@empresa.com&#10;supervisor@empresa.com"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none resize-none"
+              placeholder="uno@empresa.com, otro@empresa.com"
               value={reglaForm.emails}
               onChange={(e) => setReglaForm(prev => ({ ...prev, emails: e.target.value }))}
-              rows={3}
+              rows={2}
             />
             <p className="text-xs text-neutral-400 mt-1">Requiere Postfix configurado en el servidor</p>
           </div>
 
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="flex items-center gap-2 cursor-pointer py-1">
             <input
               type="checkbox"
               checked={reglaForm.activa}
@@ -747,28 +904,29 @@ export const AlertasPage: React.FC = () => {
             <span className="text-sm text-neutral-700">Regla activa</span>
           </label>
 
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setShowReglaModal(false)}>Cancelar</Button>
+          <div className="flex justify-end gap-2 pt-2 border-t border-neutral-100">
+            <Button variant="outline" size="sm" onClick={() => setShowReglaModal(false)}>Cancelar</Button>
             <Button
               variant="primary"
+              size="sm"
               onClick={handleSaveRegla}
               disabled={createRegla.isPending || updateRegla.isPending}
             >
-              {(createRegla.isPending || updateRegla.isPending) && <Loader2 size={14} className="animate-spin mr-1" />}
-              {editingRegla ? 'Guardar' : 'Crear'}
+              {(createRegla.isPending || updateRegla.isPending) && <Loader2 size={13} className="animate-spin mr-1" />}
+              {editingRegla ? 'Guardar cambios' : 'Crear regla'}
             </Button>
           </div>
         </div>
       </Modal>
 
-      {/* Modal confirmar eliminacion de regla */}
+      {/* Confirm delete regla */}
       <ConfirmModal
         isOpen={!!deletingRegla}
         onClose={() => setDeletingRegla(null)}
         onConfirm={handleDeleteRegla}
         title="Eliminar regla"
-        description={`Estas seguro de que deseas eliminar la regla "${deletingRegla?.nombre}"? Esta accion no se puede deshacer.`}
-        confirmText="Si, eliminar"
+        description={`¿Estás seguro de que deseas eliminar la regla "${deletingRegla?.nombre}"?`}
+        confirmText="Sí, eliminar"
         cancelText="Cancelar"
         variant="danger"
       />
