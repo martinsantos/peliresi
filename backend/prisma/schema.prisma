@@ -303,7 +303,7 @@ model TratamientoAutorizado {
   tipoResiduoId   String
   metodo          String
   descripcion     String?
-  capacidad       Float
+  capacidad       Float?
   activo          Boolean     @default(true)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
@@ -339,12 +339,12 @@ model Auditoria {
   datosDespues    String?
   ip              String?
   userAgent       String?
-  usuarioId       String
+  usuarioId       String?
   manifiestoId    String?
   createdAt       DateTime    @default(now())
 
   // Relaciones
-  usuario     Usuario     @relation("UsuarioAuditorias", fields: [usuarioId], references: [id])
+  usuario     Usuario?    @relation("UsuarioAuditorias", fields: [usuarioId], references: [id], onDelete: SetNull)
   manifiesto  Manifiesto? @relation(fields: [manifiestoId], references: [id])
 
   @@index([manifiestoId])
