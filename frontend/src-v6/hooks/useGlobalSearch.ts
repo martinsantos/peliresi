@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { searchService, SearchResult } from '../services/search.service';
+import { searchService } from '../services/search.service';
+import type { SearchResult } from '../services/search.service';
 
 const RECENT_KEY = 'sitrep_recent_searches';
 const MAX_RECENT = 5;

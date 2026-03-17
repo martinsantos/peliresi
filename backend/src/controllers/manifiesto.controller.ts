@@ -127,7 +127,7 @@ const generarNumeroManifiesto = async (): Promise<string> => {
 // Obtener todos los manifiestos
 export const getManifiestos = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { estado, generadorId, transportistaId, operadorId, search, fechaDesde, fechaHasta, page = 1, limit = 10 } = req.query;
+    const { estado, generadorId, transportistaId, operadorId, search, fechaDesde, fechaHasta, page = 1, limit = 10, sortBy, sortOrder } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
     const where: any = {};
@@ -170,12 +170,16 @@ export const getManifiestos = async (req: AuthRequest, res: Response, next: Next
       where.operadorId = req.user.operador.id;
     }
 
-    // Smart ordering: for completed states, order by the state-specific date
-    const orderBy: any =
-      estado === 'ENTREGADO' ? { fechaEntrega: 'desc' } :
-      estado === 'RECIBIDO' ? { fechaRecepcion: 'desc' } :
-      estado === 'TRATADO' ? { fechaCierre: 'desc' } :
-      { createdAt: 'desc' };
+    // Ordering: explicit sortBy/sortOrder take precedence over smart state-based ordering
+    const dir = sortOrder === 'asc' ? 'asc' : 'desc';
+    const orderBy: any = sortBy === 'numero'
+      ? { numero: dir }
+      : sortBy === 'createdAt'
+        ? { createdAt: dir }
+        : estado === 'ENTREGADO' ? { fechaEntrega: 'desc' }
+        : estado === 'RECIBIDO' ? { fechaRecepcion: 'desc' }
+        : estado === 'TRATADO' ? { fechaCierre: 'desc' }
+        : { createdAt: 'desc' };
 
     const [manifiestos, total] = await Promise.all([
       prisma.manifiesto.findMany({

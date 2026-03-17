@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Search, FileText, Factory, Truck, FlaskConical, Clock, X } from 'lucide-react';
-import { useGlobalSearch, FlatResult } from '../hooks/useGlobalSearch';
+import { useGlobalSearch } from '../hooks/useGlobalSearch';
+import type { FlatResult } from '../hooks/useGlobalSearch';
 import { ESTADO_LABELS, ESTADO_COLORS } from '../utils/constants';
 import { EstadoManifiesto } from '../types/models';
 

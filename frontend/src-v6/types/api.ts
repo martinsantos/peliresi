@@ -136,6 +136,8 @@ export interface ManifiestoFilters {
   search?: string;
   page?: number;
   limit?: number;
+  sortBy?: 'createdAt' | 'numero';
+  sortOrder?: 'asc' | 'desc';
 }
 
 export interface ManifiestoDashboard {
