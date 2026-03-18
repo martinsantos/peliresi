@@ -25,6 +25,7 @@ model Usuario {
   dosFaSecret     String?
   dosFaVerificado Boolean     @default(false)
   notifNuevoRegistro      Boolean   @default(true)
+  notifEmail              Boolean   @default(true)
   emailVerified           Boolean   @default(false)
   emailVerificationToken  String?
   passwordResetToken      String?

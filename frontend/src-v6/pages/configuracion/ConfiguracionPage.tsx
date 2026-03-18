@@ -47,6 +47,7 @@ const ConfiguracionPage: React.FC = () => {
   );
   const [isSaving, setIsSaving] = useState(false);
   const [notifNuevoRegistro, setNotifNuevoRegistro] = useState(true);
+  const [notifEmail, setNotifEmail] = useState(true);
   const [savingNotif, setSavingNotif] = useState(false);
   const { currentUser, isAdmin } = useAuth();
 
@@ -71,6 +72,9 @@ const ConfiguracionPage: React.FC = () => {
       authService.getMe().then(u => {
         if ((u as any).notifNuevoRegistro !== undefined) {
           setNotifNuevoRegistro((u as any).notifNuevoRegistro);
+        }
+        if ((u as any).notifEmail !== undefined) {
+          setNotifEmail((u as any).notifEmail);
         }
       }).catch(() => {});
     }
@@ -256,29 +260,55 @@ const ConfiguracionPage: React.FC = () => {
 
       case 'notificaciones':
         return (
-          <div className="space-y-4 animate-fade-in">
+          <div className="space-y-6 animate-fade-in">
+            {/* Visible a todos los usuarios */}
             <div>
-              <h4 className="font-medium text-neutral-900 mb-1">Avisos de nuevos registros</h4>
+              <h4 className="font-medium text-neutral-900 mb-1">Alertas del sistema</h4>
               <p className="text-sm text-neutral-500 mb-4">
-                Configurá si querés recibir un email cuando un usuario verifique su dirección
-                y quede pendiente de tu aprobación.
+                Configurá si querés recibir una copia por email de las alertas que te corresponden según tu rol.
               </p>
               <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-neutral-200">
                 <div>
-                  <p className="font-medium text-neutral-900 text-sm">Nuevos usuarios pendientes de aprobación</p>
+                  <p className="font-medium text-neutral-900 text-sm">Recibir alertas por email</p>
                   <p className="text-xs text-neutral-500 mt-0.5">
-                    Recibir email cuando un usuario verifica su cuenta y espera ser activado
+                    Las alertas del sistema también llegarán a tu correo registrado
                   </p>
                 </div>
                 <button
                   disabled={savingNotif}
-                  onClick={() => handleToggleNotif(!notifNuevoRegistro)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${notifNuevoRegistro ? 'bg-[#1B5E3C]' : 'bg-neutral-300'}`}
+                  onClick={() => handleToggleNotif('notifEmail', !notifEmail)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${notifEmail ? 'bg-[#1B5E3C]' : 'bg-neutral-300'}`}
                 >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${notifNuevoRegistro ? 'translate-x-6' : 'translate-x-1'}`} />
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${notifEmail ? 'translate-x-6' : 'translate-x-1'}`} />
                 </button>
               </div>
             </div>
+
+            {/* Solo para ADMIN */}
+            {isAdmin && (
+              <div>
+                <h4 className="font-medium text-neutral-900 mb-1">Avisos de nuevos registros</h4>
+                <p className="text-sm text-neutral-500 mb-4">
+                  Configurá si querés recibir un email cuando un usuario verifique su dirección
+                  y quede pendiente de tu aprobación.
+                </p>
+                <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-neutral-200">
+                  <div>
+                    <p className="font-medium text-neutral-900 text-sm">Nuevos usuarios pendientes de aprobación</p>
+                    <p className="text-xs text-neutral-500 mt-0.5">
+                      Recibir email cuando un usuario verifica su cuenta y espera ser activado
+                    </p>
+                  </div>
+                  <button
+                    disabled={savingNotif}
+                    onClick={() => handleToggleNotif('notifNuevoRegistro', !notifNuevoRegistro)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${notifNuevoRegistro ? 'bg-[#1B5E3C]' : 'bg-neutral-300'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${notifNuevoRegistro ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         );
 
@@ -289,15 +319,20 @@ const ConfiguracionPage: React.FC = () => {
 
   const configSections = [
     ...BASE_SECTIONS,
-    ...(isAdmin ? [{ id: 'notificaciones', label: 'Notificaciones', icon: Bell }] : []),
+    { id: 'notificaciones', label: 'Notificaciones', icon: Bell },
   ];
 
-  const handleToggleNotif = async (val: boolean) => {
+  const handleToggleNotif = async (field: 'notifNuevoRegistro' | 'notifEmail', val: boolean) => {
     setSavingNotif(true);
     try {
-      await api.put('/admin/preferencias-notificacion', { notifNuevoRegistro: val });
-      setNotifNuevoRegistro(val);
-      toast.success('Preferencia guardada', val ? 'Recibirás emails de nuevos registros.' : 'No recibirás emails de nuevos registros.');
+      await api.put('/admin/preferencias-notificacion', { [field]: val });
+      if (field === 'notifNuevoRegistro') {
+        setNotifNuevoRegistro(val);
+        toast.success('Preferencia guardada', val ? 'Recibirás emails de nuevos registros.' : 'No recibirás emails de nuevos registros.');
+      } else {
+        setNotifEmail(val);
+        toast.success('Preferencia guardada', val ? 'Recibirás alertas por email.' : 'No recibirás alertas por email.');
+      }
     } catch {
       toast.error('Error', 'No se pudo guardar la preferencia.');
     } finally {

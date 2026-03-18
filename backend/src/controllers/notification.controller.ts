@@ -242,6 +242,8 @@ class NotificationService {
                     .filter((d: string) => d.startsWith('email:'))
                     .map((d: string) => d.replace('email:', ''));
 
+                // Recopilar todos los emails: explícitos de la regla + usuarios del rol con notifEmail activo
+                const allEmailsSet = new Set<string>(emails);
                 for (const rol of roles) {
                     await this.notificarPorRol(rol, {
                         tipo: 'ALERTA_SISTEMA' as TipoNotificacion,
@@ -250,10 +252,16 @@ class NotificationService {
                         manifiestoId,
                         prioridad: 'ALTA' as PrioridadNotificacion
                     });
+                    // Añadir emails de usuarios del rol que tienen notifEmail activo
+                    const usuariosConEmail = await prisma.usuario.findMany({
+                        where: { rol: rol as any, activo: true, notifEmail: true },
+                        select: { email: true },
+                    });
+                    usuariosConEmail.forEach(u => allEmailsSet.add(u.email));
                 }
 
-                if (emails.length > 0) {
-                    await emailService.sendAlertEmail(emails, regla, manifiestoId, datos ?? {});
+                if (allEmailsSet.size > 0) {
+                    await emailService.sendAlertEmail(Array.from(allEmailsSet), regla, manifiestoId, datos ?? {});
                 }
             }
 

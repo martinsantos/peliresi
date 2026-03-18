@@ -323,6 +323,7 @@ export const getProfile = async (req: Request & { user?: any }, res: Response, n
         id: true, email: true, rol: true, nombre: true, apellido: true,
         empresa: true, telefono: true, activo: true, createdAt: true,
         generador: true, transportista: true, operador: true,
+        notifNuevoRegistro: true, notifEmail: true,
       },
     });
     if (!user) throw new AppError('Usuario no encontrado', 404);

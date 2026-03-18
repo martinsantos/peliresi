@@ -292,7 +292,8 @@ export const toggleActivo = async (req: AuthRequest, res: Response, next: NextFu
 // ============== PREFERENCIAS NOTIFICACIÓN ==============
 
 const preferenciaSchema = z.object({
-  notifNuevoRegistro: z.boolean(),
+  notifNuevoRegistro: z.boolean().optional(),
+  notifEmail: z.boolean().optional(),
 });
 
 export const updatePreferenciasNotificacion = async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -305,7 +306,7 @@ export const updatePreferenciasNotificacion = async (req: AuthRequest, res: Resp
     const updated = await prisma.usuario.update({
       where: { id: req.user!.id },
       data: parsed.data,
-      select: { id: true, notifNuevoRegistro: true },
+      select: { id: true, notifNuevoRegistro: true, notifEmail: true },
     });
 
     res.json({ success: true, data: { usuario: updated } });
