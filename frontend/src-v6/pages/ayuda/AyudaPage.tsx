@@ -72,10 +72,10 @@ const faqs = [
 
 // Videos data
 const videos = [
-  { title: 'Crear tu primer manifiesto', duration: '5:30', thumbnail: '📹' },
-  { title: 'Gestión de transportistas', duration: '4:15', thumbnail: '🚛' },
-  { title: 'Uso del escáner QR', duration: '3:45', thumbnail: '📱' },
-  { title: 'Reportes avanzados', duration: '7:20', thumbnail: '📊' },
+  { title: 'Crear tu primer manifiesto', duration: '5:30', icon: FileText, color: 'bg-primary-100 text-primary-600' },
+  { title: 'Gestión de transportistas', duration: '4:15', icon: MessageCircle, color: 'bg-orange-100 text-orange-600' },
+  { title: 'Uso del escáner QR', duration: '3:45', icon: Phone, color: 'bg-info-100 text-info-600' },
+  { title: 'Reportes avanzados', duration: '7:20', icon: BookOpen, color: 'bg-success-100 text-success-600' },
 ];
 
 const AyudaPage: React.FC = () => {
@@ -249,7 +249,9 @@ const AyudaPage: React.FC = () => {
                   className="group cursor-pointer"
                 >
                   <div className="relative aspect-video bg-neutral-100 rounded-lg mb-2 flex items-center justify-center overflow-hidden">
-                    <span className="text-4xl">{video.thumbnail}</span>
+                    <div className={`w-14 h-14 ${video.color} rounded-xl flex items-center justify-center`}>
+                      <video.icon size={28} />
+                    </div>
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                       <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
                         <Play className="text-primary-600 ml-1" size={20} />

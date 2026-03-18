@@ -155,9 +155,11 @@ const ConfiguracionPage: React.FC = () => {
                 onChange={(e) => setProfile({ ...profile, telefono: e.target.value })}
               />
               <Input
-                label="Cargo"
+                label="Cargo / Rol"
                 value={profile.cargo}
-                onChange={(e) => setProfile({ ...profile, cargo: e.target.value })}
+                readOnly
+                disabled
+                className="opacity-60 cursor-not-allowed"
               />
             </div>
           </div>

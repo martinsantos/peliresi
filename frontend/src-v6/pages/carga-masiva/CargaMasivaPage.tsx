@@ -16,7 +16,6 @@ import {
   Trash2,
   RefreshCw,
   Loader2,
-  Construction,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -80,13 +79,13 @@ const CargaMasivaPage: React.FC = () => {
 
   const descargarPlantilla = async (tipo: string) => {
     try {
-      const { data } = await api.get(`/carga-masiva/plantilla/${tipo}`, {
+      const { data } = await api.get(`/notificaciones/carga-masiva/plantilla/${tipo}`, {
         responseType: 'blob',
       });
       const url = URL.createObjectURL(data);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `plantilla_${tipo}.xlsx`;
+      a.download = `plantilla_${tipo}.csv`;
       a.click();
       URL.revokeObjectURL(url);
       toast.success('Descargado', `Plantilla de ${tipo} descargada`);
@@ -135,7 +134,7 @@ const CargaMasivaPage: React.FC = () => {
         // Add auth token
         const token = localStorage.getItem('sitrep_access_token');
         const apiBase = import.meta.env.VITE_API_URL || '/api';
-        xhr.open('POST', `${apiBase}/carga-masiva/${tipoSeleccionado}`);
+        xhr.open('POST', `${apiBase}/notificaciones/carga-masiva/${tipoSeleccionado}`);
         if (token) {
           xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         }
@@ -188,17 +187,6 @@ const CargaMasivaPage: React.FC = () => {
         </p>
       </div>
 
-      {/* Banner En Desarrollo */}
-      <div className="flex items-start gap-3 p-4 bg-warning-50 border border-warning-200 rounded-xl">
-        <Construction size={20} className="text-warning-600 shrink-0 mt-0.5" />
-        <div>
-          <p className="font-semibold text-warning-900">Funcionalidad en desarrollo</p>
-          <p className="text-sm text-warning-700 mt-0.5">
-            La carga masiva estará disponible próximamente. Por ahora, ingrese los datos manualmente desde las secciones correspondientes (Generadores, Transportistas, Operadores).
-          </p>
-        </div>
-      </div>
-
       {/* Plantillas */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {TEMPLATE_TYPES.map(tmpl => (
@@ -218,10 +206,9 @@ const CargaMasivaPage: React.FC = () => {
                 size="sm"
                 fullWidth
                 leftIcon={<Download size={14} />}
-                disabled
-                title="Próximamente disponible"
+                onClick={() => descargarPlantilla(tmpl.tipo)}
               >
-                Próximamente
+                Descargar plantilla
               </Button>
             </CardContent>
           </Card>
@@ -261,7 +248,7 @@ const CargaMasivaPage: React.FC = () => {
               type="file"
               id="file-upload"
               className="hidden"
-              accept=".xlsx,.xls,.csv"
+              accept=".csv"
               onChange={handleChange}
             />
 
@@ -277,7 +264,7 @@ const CargaMasivaPage: React.FC = () => {
                   o <span className="text-primary-600 font-medium">haz clic para seleccionar</span>
                 </p>
                 <p className="text-sm text-neutral-500">
-                  Formatos soportados: .xlsx, .xls, .csv (Max. 10MB)
+                  Formato soportado: .csv (Max. 10MB)
                 </p>
               </label>
             ) : (
@@ -311,8 +298,8 @@ const CargaMasivaPage: React.FC = () => {
                     <Button variant="outline" onClick={() => setArchivo(null)} leftIcon={<Trash2 size={16} />}>
                       Eliminar
                     </Button>
-                    <Button disabled leftIcon={<RefreshCw size={16} />} title="Funcionalidad en desarrollo">
-                      En desarrollo
+                    <Button onClick={procesarArchivo} isLoading={procesando} leftIcon={<RefreshCw size={16} />}>
+                      Procesar archivo
                     </Button>
                   </div>
                 )}
