@@ -66,6 +66,9 @@ const roleConfig: Record<UserRole, { label: string; icon: React.ElementType; col
     bgColor: 'bg-info-100',
     borderColor: 'border-info-200'
   },
+  ADMIN_TRANSPORTISTA: { label: 'Adm. Transportistas', icon: User, color: 'text-slate-700', bgColor: 'bg-slate-100', borderColor: 'border-slate-200' },
+  ADMIN_GENERADOR: { label: 'Adm. Generadores', icon: User, color: 'text-green-700', bgColor: 'bg-green-100', borderColor: 'border-green-200' },
+  ADMIN_OPERADOR: { label: 'Adm. Operadores', icon: User, color: 'text-teal-700', bgColor: 'bg-teal-100', borderColor: 'border-teal-200' },
 };
 
 // ========================================

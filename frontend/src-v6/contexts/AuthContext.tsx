@@ -5,16 +5,17 @@
  */
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import OnboardingWizard from '../components/OnboardingWizard';
 import { authService } from '../services/auth.service';
 import { clearUserOfflineData } from '../services/offline-sync';
 import { clearSyncQueue } from '../services/indexeddb';
-import { getAccessToken, clearTokens } from '../services/api';
+import { getAccessToken, getRefreshToken, setTokens, clearTokens, api } from '../services/api';
 import type { Usuario } from '../types/models';
 
 // ========================================
 // TYPES
 // ========================================
-export type UserRole = 'ADMIN' | 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR' | 'AUDITOR';
+export type UserRole = 'ADMIN' | 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR' | 'AUDITOR' | 'ADMIN_TRANSPORTISTA' | 'ADMIN_GENERADOR' | 'ADMIN_OPERADOR';
 
 export interface User {
   id: number | string;
@@ -26,6 +27,14 @@ export interface User {
   telefono: string;
   ubicacion: string;
   permisos: string[];
+  actorId?: string;
+}
+
+export interface ImpersonationData {
+  adminToken: string;
+  adminRefreshToken: string;
+  adminUser: User;
+  impersonatedUser: User;
 }
 
 export interface AuthContextType {
@@ -37,12 +46,21 @@ export interface AuthContextType {
   isGenerador: boolean;
   isTransportista: boolean;
   isOperador: boolean;
+  isAdminTransportista: boolean;
+  isAdminGenerador: boolean;
+  isAdminOperador: boolean;
+  isAnyAdmin: boolean;
   canAccess: (permission: string) => boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  impersonateUser: (userId: string) => Promise<void>;
+  exitImpersonation: () => void;
+  impersonationData: ImpersonationData | null;
   isDemo: boolean;
   isLoading: boolean;
   authError: string | null;
+  showOnboarding: boolean;
+  dismissOnboarding: () => void;
 }
 
 // ========================================
@@ -71,6 +89,9 @@ function apiUserToUser(u: Usuario): User {
     GENERADOR: ['manifiestos.read', 'manifiestos.create', 'manifiestos.edit', 'reportes.read'],
     TRANSPORTISTA: ['manifiestos.read', 'manifiestos.transport', 'tracking.update', 'vehiculos.read'],
     OPERADOR: ['manifiestos.read', 'manifiestos.receive', 'manifiestos.treat', 'reportes.read', 'reportes.create'],
+    ADMIN_TRANSPORTISTA: ['actores.transportistas', 'actores.vehiculos', 'manifiestos.read', 'reportes.read'],
+    ADMIN_GENERADOR: ['actores.generadores', 'catalogo.residuos', 'manifiestos.read', 'reportes.read'],
+    ADMIN_OPERADOR: ['actores.operadores', 'catalogo.tratamientos', 'manifiestos.read', 'reportes.read'],
   };
 
   return {
@@ -79,12 +100,18 @@ function apiUserToUser(u: Usuario): User {
     email: u.email,
     rol: u.rol as UserRole,
     sector: u.empresa || u.generador?.razonSocial || u.transportista?.razonSocial || u.operador?.razonSocial || '',
+    actorId: u.generador?.id || u.transportista?.id || u.operador?.id,
     avatar: initials,
     telefono: u.telefono || '',
     ubicacion: '',
     permisos: rolPermisos[u.rol] || [],
   };
 }
+
+// ========================================
+// IMPERSONATION STORAGE KEY
+// ========================================
+const IMPERSONATION_KEY = 'sitrep_impersonation';
 
 // ========================================
 // CONTEXT
@@ -98,20 +125,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [impersonationData, setImpersonationData] = useState<ImpersonationData | null>(null);
 
-  // On mount: check for existing token and validate it
+  // On mount: check for existing token and validate it; restore impersonation state
   useEffect(() => {
     const initAuth = async () => {
       const token = getAccessToken();
       if (token) {
         try {
           const apiUser = await authService.getMe();
-          setCurrentUser(apiUserToUser(apiUser));
+          const mapped = apiUserToUser(apiUser);
+          setCurrentUser(mapped);
+
+          // Restore impersonation if active (survives page reload)
+          const saved = localStorage.getItem(IMPERSONATION_KEY);
+          if (saved) {
+            try {
+              const parsed = JSON.parse(saved);
+              setImpersonationData({
+                adminToken: parsed.adminToken,
+                adminRefreshToken: parsed.adminRefreshToken,
+                adminUser: parsed.adminUser,
+                impersonatedUser: mapped, // fresh data from current JWT
+              });
+            } catch {
+              localStorage.removeItem(IMPERSONATION_KEY);
+            }
+          }
+
           setIsLoading(false);
           return;
         } catch {
           // Token invalid, clear it
           clearTokens();
+          localStorage.removeItem(IMPERSONATION_KEY);
         }
       }
       setIsLoading(false);
@@ -120,14 +168,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initAuth();
   }, []);
 
-  // Real login via API
-  const login = useCallback(async (email: string, password: string) => {
+  // Real login via API — accepts email or CUIT
+  const login = useCallback(async (identifier: string, password: string) => {
     setAuthError(null);
     setIsLoading(true);
     try {
-      const response = await authService.login({ email, password });
+      const isCuit = /^\d{2}-\d{8}-\d$/.test(identifier.trim());
+      const credentials = isCuit
+        ? { cuit: identifier.trim(), password }
+        : { email: identifier.trim(), password };
+      const response = await authService.login(credentials);
       const user = apiUserToUser(response.user);
       setCurrentUser(user);
+      const isFirstSession = !localStorage.getItem(`sitrep_onboarding_${user.id}`);
+      const isPostReset = localStorage.getItem('sitrep_post_reset') === '1';
+      if (isFirstSession || isPostReset) setShowOnboarding(true);
     } catch (err: any) {
       clearTokens();
       const message = err.response?.data?.message || 'Credenciales incorrectas o API no disponible.';
@@ -146,7 +201,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // ignore logout errors
     } finally {
       clearTokens();
-      // Clean up trip-related localStorage to prevent data leaking to next user
+      // Clean up impersonation and trip-related localStorage
+      localStorage.removeItem(IMPERSONATION_KEY);
       localStorage.removeItem('sitrep_active_trip_id');
       const keysToClean: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
@@ -164,6 +220,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentUser(null);
     }
   }, [currentUser]);
+
+  const dismissOnboarding = useCallback(() => {
+    setShowOnboarding(false);
+  }, []);
+
+  // Impersonar usuario (solo ADMIN) — full page reload clears React Query cache
+  const impersonateUser = useCallback(async (userId: string) => {
+    const adminToken = getAccessToken() || '';
+    const adminRefreshToken = getRefreshToken() || '';
+    const adminUser = currentUser!;
+
+    const resp = await api.post(`/admin/impersonate/${userId}`);
+    const { user: targetUser, tokens } = resp.data.data;
+
+    // Persist admin tokens in localStorage BEFORE reload (survives page unload)
+    localStorage.setItem(IMPERSONATION_KEY, JSON.stringify({
+      adminToken,
+      adminRefreshToken,
+      adminUser,
+    }));
+
+    // Set the impersonated user's tokens
+    setTokens(tokens.accessToken, tokens.refreshToken);
+
+    // Full page reload: clears React Query cache + initAuth runs with new JWT
+    window.location.href = '/dashboard';
+  }, [currentUser]);
+
+  // Salir de impersonación — full page reload to restore admin state cleanly
+  const exitImpersonation = useCallback(() => {
+    if (!impersonationData) return;
+
+    // Restore admin tokens
+    setTokens(impersonationData.adminToken, impersonationData.adminRefreshToken);
+
+    // Clear impersonation from localStorage
+    localStorage.removeItem(IMPERSONATION_KEY);
+
+    // Full page reload to admin usuarios panel
+    window.location.href = '/admin/usuarios';
+  }, [impersonationData]);
 
   // Switch user — real API login with known credentials
   const switchUser = useCallback(async (userId: number) => {
@@ -222,17 +319,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isGenerador: currentUser?.rol === 'GENERADOR',
     isTransportista: currentUser?.rol === 'TRANSPORTISTA',
     isOperador: currentUser?.rol === 'OPERADOR',
+    isAdminTransportista: currentUser?.rol === 'ADMIN_TRANSPORTISTA',
+    isAdminGenerador: currentUser?.rol === 'ADMIN_GENERADOR',
+    isAdminOperador: currentUser?.rol === 'ADMIN_OPERADOR',
+    isAnyAdmin: ['ADMIN', 'ADMIN_TRANSPORTISTA', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR'].includes(currentUser?.rol ?? ''),
     canAccess,
     login,
     logout,
+    impersonateUser,
+    exitImpersonation,
+    impersonationData,
     isDemo: false,
     isLoading,
     authError,
+    showOnboarding,
+    dismissOnboarding,
   };
 
   return (
     <AuthContext.Provider value={value}>
       {children}
+      {showOnboarding && currentUser && (
+        <OnboardingWizard
+          rol={currentUser.rol}
+          userId={currentUser.id}
+          onDismiss={dismissOnboarding}
+        />
+      )}
     </AuthContext.Provider>
   );
 };

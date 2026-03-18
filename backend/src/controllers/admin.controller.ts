@@ -5,6 +5,8 @@ import prisma from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { verificarVencimientos } from '../jobs/vencimiento.job';
+import { emailService } from '../services/email.service';
+import { generateTokens } from './auth.controller';
 
 // ============== USUARIOS CRUD (Admin) ==============
 
@@ -13,7 +15,7 @@ const createUsuarioSchema = z.object({
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
   nombre: z.string().min(1, 'El nombre es requerido'),
   apellido: z.string().optional(),
-  rol: z.enum(['ADMIN', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR']),
+  rol: z.enum(['ADMIN', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR']),
   empresa: z.string().optional(),
   telefono: z.string().optional(),
   cuit: z.string().optional(),
@@ -22,9 +24,13 @@ const createUsuarioSchema = z.object({
 const updateUsuarioSchema = z.object({
   nombre: z.string().min(1).optional(),
   apellido: z.string().optional(),
+  email: z.string().email().optional(),
   empresa: z.string().optional(),
   telefono: z.string().optional(),
+  cuit: z.string().optional(),
   activo: z.boolean().optional(),
+  emailVerified: z.boolean().optional(),
+  rol: z.enum(['ADMIN', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR']).optional(),
 });
 
 export const getUsuarios = async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -65,6 +71,8 @@ export const getUsuarios = async (req: AuthRequest, res: Response, next: NextFun
           empresa: true,
           telefono: true,
           activo: true,
+          emailVerified: true,
+          notifNuevoRegistro: true,
           createdAt: true,
           generador: { select: { id: true, razonSocial: true } },
           transportista: { select: { id: true, razonSocial: true } },
@@ -270,7 +278,91 @@ export const toggleActivo = async (req: AuthRequest, res: Response, next: NextFu
       },
     });
 
+    // Si se activa la cuenta (false → true), notificar al usuario
+    if (!usuario.activo && updated.activo) {
+      emailService.sendCuentaAprobadaEmail(updated.email, updated.nombre).catch(console.error);
+    }
+
     res.json({ success: true, data: { usuario: updated } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============== PREFERENCIAS NOTIFICACIÓN ==============
+
+const preferenciaSchema = z.object({
+  notifNuevoRegistro: z.boolean(),
+});
+
+export const updatePreferenciasNotificacion = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const parsed = preferenciaSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError(parsed.error.issues[0].message, 400);
+    }
+
+    const updated = await prisma.usuario.update({
+      where: { id: req.user!.id },
+      data: parsed.data,
+      select: { id: true, notifNuevoRegistro: true },
+    });
+
+    res.json({ success: true, data: { usuario: updated } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============== IMPERSONATE ==============
+
+export const impersonateUsuario = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { userId } = req.params;
+
+    const target = await prisma.usuario.findUnique({
+      where: { id: userId },
+      include: { generador: true, transportista: true, operador: true },
+    });
+
+    if (!target) throw new AppError('Usuario no encontrado', 404);
+    if (!target.activo) throw new AppError('Usuario inactivo', 400);
+    if (target.id === req.user.id) throw new AppError('No podés impersonarte a vos mismo', 400);
+
+    const { accessToken, refreshToken } = generateTokens(target.id);
+
+    try {
+      await prisma.auditoria.create({
+        data: {
+          usuarioId: req.user.id,
+          accion: 'IMPERSONATION',
+          modulo: 'AUTH',
+          ip: req.ip || req.headers['x-forwarded-for']?.toString() || 'unknown',
+          userAgent: req.headers['user-agent'] || 'unknown',
+          datosDespues: JSON.stringify({
+            impersonatedUserId: target.id,
+            impersonatedEmail: target.email,
+            impersonatedRol: target.rol,
+            adminId: req.user.id,
+            timestamp: new Date().toISOString(),
+          }),
+        },
+      });
+    } catch { /* ignore audit errors */ }
+
+    res.json({
+      success: true,
+      data: {
+        user: {
+          id: target.id, email: target.email, rol: target.rol,
+          nombre: target.nombre, apellido: target.apellido,
+          empresa: target.empresa, activo: target.activo,
+          generador: target.generador, transportista: target.transportista, operador: target.operador,
+        },
+        tokens: { accessToken, refreshToken },
+        impersonatedBy: { id: req.user.id, nombre: req.user.nombre, email: req.user.email },
+      },
+    });
   } catch (error) {
     next(error);
   }

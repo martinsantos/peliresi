@@ -29,6 +29,7 @@ import { Modal, ConfirmModal } from '../../components/ui/Modal';
 import { Table, Pagination } from '../../components/ui/Table';
 import { SearchInput } from '../../components/ui/SearchInput';
 import { toast } from '../../components/ui/Toast';
+import { useAuth } from '../../contexts/AuthContext';
 import { downloadCsv } from '../../utils/exportCsv';
 import {
   useOperadores,
@@ -59,6 +60,7 @@ const AdminOperadoresPage: React.FC = () => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const isMobile = location.pathname.startsWith('/mobile');
+  const { isAdmin, impersonateUser } = useAuth();
   const [busqueda, setBusqueda] = useState(searchParams.get('q') || '');
   const [filtroTipo, setFiltroTipo] = useState('');
   const [filtroCorriente, setFiltroCorriente] = useState('');
@@ -469,6 +471,19 @@ const AdminOperadoresPage: React.FC = () => {
       align: 'right' as const,
       render: (row: typeof tableData[0]) => (
         <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+          {isAdmin && row._raw?.usuarioId && row.activo && (
+            <button
+              className="p-1.5 text-amber-500 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
+              title="Acceso Comodín — ver como este operador"
+              onClick={async (e) => {
+                e.stopPropagation();
+                try { await impersonateUser(row._raw.usuarioId); }
+                catch (err: any) { toast.error(err?.response?.data?.message || 'No se pudo acceder como este usuario'); }
+              }}
+            >
+              <Eye size={16} />
+            </button>
+          )}
           <button
             className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
             onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/admin/actores/operadores/${row.id}` : `/admin/actores/operadores/${row.id}`); }}

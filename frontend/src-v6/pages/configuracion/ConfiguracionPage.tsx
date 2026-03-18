@@ -10,6 +10,7 @@ import {
   User,
   Shield,
   Palette,
+  Bell,
   Save,
   ChevronRight,
   Download,
@@ -27,10 +28,11 @@ import { useAuth } from '../../contexts/AuthContext';
 import { InstallPWAButton } from '../../components/InstallPWAButton';
 import { usePWAInstall } from '../../hooks/usePWAInstall';
 import { authService } from '../../services/auth.service';
+import api from '../../services/api';
 import { usuarioService } from '../../services/usuario.service';
 
-// Secciones de configuración
-const configSections = [
+// Secciones base de configuración
+const BASE_SECTIONS = [
   { id: 'perfil', label: 'Perfil', icon: User },
   { id: 'seguridad', label: 'Seguridad', icon: Shield },
   { id: 'apariencia', label: 'Apariencia', icon: Palette },
@@ -39,12 +41,14 @@ const configSections = [
 const ConfiguracionPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const validSections = configSections.map(s => s.id);
+  const validSections = [...BASE_SECTIONS, { id: 'notificaciones' }].map(s => s.id);
   const [activeSection, setActiveSection] = useState(
     tabParam && validSections.includes(tabParam) ? tabParam : 'perfil'
   );
   const [isSaving, setIsSaving] = useState(false);
-  const { currentUser } = useAuth();
+  const [notifNuevoRegistro, setNotifNuevoRegistro] = useState(true);
+  const [savingNotif, setSavingNotif] = useState(false);
+  const { currentUser, isAdmin } = useAuth();
 
   // Profile form state
   const [profile, setProfile] = useState({
@@ -63,6 +67,12 @@ const ConfiguracionPage: React.FC = () => {
         telefono: currentUser.telefono || '',
         cargo: currentUser.rol || '',
       });
+      // Cargar preferencia de notificaciones desde API (el profile trae el campo)
+      authService.getMe().then(u => {
+        if ((u as any).notifNuevoRegistro !== undefined) {
+          setNotifNuevoRegistro((u as any).notifNuevoRegistro);
+        }
+      }).catch(() => {});
     }
   }, [currentUser]);
 
@@ -242,8 +252,54 @@ const ConfiguracionPage: React.FC = () => {
           </div>
         );
 
+      case 'notificaciones':
+        return (
+          <div className="space-y-4 animate-fade-in">
+            <div>
+              <h4 className="font-medium text-neutral-900 mb-1">Avisos de nuevos registros</h4>
+              <p className="text-sm text-neutral-500 mb-4">
+                Configurá si querés recibir un email cuando un usuario verifique su dirección
+                y quede pendiente de tu aprobación.
+              </p>
+              <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-neutral-200">
+                <div>
+                  <p className="font-medium text-neutral-900 text-sm">Nuevos usuarios pendientes de aprobación</p>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    Recibir email cuando un usuario verifica su cuenta y espera ser activado
+                  </p>
+                </div>
+                <button
+                  disabled={savingNotif}
+                  onClick={() => handleToggleNotif(!notifNuevoRegistro)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${notifNuevoRegistro ? 'bg-[#1B5E3C]' : 'bg-neutral-300'}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${notifNuevoRegistro ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+
       default:
         return null;
+    }
+  };
+
+  const configSections = [
+    ...BASE_SECTIONS,
+    ...(isAdmin ? [{ id: 'notificaciones', label: 'Notificaciones', icon: Bell }] : []),
+  ];
+
+  const handleToggleNotif = async (val: boolean) => {
+    setSavingNotif(true);
+    try {
+      await api.put('/admin/preferencias-notificacion', { notifNuevoRegistro: val });
+      setNotifNuevoRegistro(val);
+      toast.success('Preferencia guardada', val ? 'Recibirás emails de nuevos registros.' : 'No recibirás emails de nuevos registros.');
+    } catch {
+      toast.error('Error', 'No se pudo guardar la preferencia.');
+    } finally {
+      setSavingNotif(false);
     }
   };
 

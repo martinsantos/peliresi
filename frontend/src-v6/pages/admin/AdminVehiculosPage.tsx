@@ -28,6 +28,7 @@ import { Tabs, TabList, Tab, TabPanel } from '../../components/ui/Tabs';
 import { Modal, ConfirmModal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { useTransportistas, useUpdateVehiculo, useDeleteVehiculo, useUpdateChofer, useDeleteChofer } from '../../hooks/useActores';
+import { useAuth } from '../../contexts/AuthContext';
 import { toast } from '../../components/ui/Toast';
 import { downloadCsv } from '../../utils/exportCsv';
 
@@ -83,10 +84,15 @@ export const AdminVehiculosPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = location.pathname.startsWith('/mobile');
+  const { currentUser, isTransportista } = useAuth();
 
   const { data: transportistasData, isLoading, isError, error } = useTransportistas({ limit: 100, search: searchQuery || undefined });
 
-  const transportistas = Array.isArray(transportistasData?.items) ? transportistasData.items : [];
+  const allTransportistas = Array.isArray(transportistasData?.items) ? transportistasData.items : [];
+  // TRANSPORTISTA role: only show their own company's vehicles/choferes
+  const transportistas = isTransportista && currentUser?.actorId
+    ? allTransportistas.filter((t: any) => t.id === currentUser.actorId)
+    : allTransportistas;
 
   // Mutations
   const updateVehiculoMut = useUpdateVehiculo();

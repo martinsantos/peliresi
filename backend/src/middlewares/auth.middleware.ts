@@ -71,3 +71,11 @@ export const hasRole = (...roles: string[]) => {
     next();
   };
 };
+
+// Alias semánticos para sub-admins
+export const requireRole = (roles: string[]) => hasRole(...roles);
+
+export const requireAnyAdmin        = hasRole('ADMIN', 'ADMIN_TRANSPORTISTA', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR');
+export const requireAdminOrTransportista = hasRole('ADMIN', 'ADMIN_TRANSPORTISTA');
+export const requireAdminOrGenerador     = hasRole('ADMIN', 'ADMIN_GENERADOR');
+export const requireAdminOrOperador      = hasRole('ADMIN', 'ADMIN_OPERADOR');

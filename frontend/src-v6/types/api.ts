@@ -41,7 +41,8 @@ export type PaginatedResponse<T> = ApiSuccessResponse<PaginatedData<T>>;
 // ========================================
 
 export interface LoginRequest {
-  email: string;
+  email?: string;
+  cuit?: string;
   password: string;
 }
 

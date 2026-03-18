@@ -27,6 +27,11 @@ import { MobileLayout } from './layouts/MobileLayout';
 
 // Auth
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
+const LandingPage = lazy(() => import('./pages/auth/LandingPage'));
+const RegistroPage = lazy(() => import('./pages/auth/RegistroPage'));
+const VerificarEmailPage = lazy(() => import('./pages/auth/VerificarEmailPage'));
+const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
 
 // Dashboard & Centro de Control
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'));
@@ -150,9 +155,13 @@ function App() {
     <AuthProvider>
     <Suspense fallback={<PageLoader />}>
       <Routes>
-        {/* Auth Routes */}
+        {/* Public Routes */}
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/registro" element={<RegistroPage />} />
+          <Route path="/verificar-email" element={<VerificarEmailPage />} />
+          <Route path="/recuperar" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
         </Route>
 
         {/* Mobile Routes - Protected */}
@@ -183,20 +192,43 @@ function App() {
           </Route>
         </Route>
 
-        {/* Admin Mobile Routes - Protected (ADMIN only) */}
+        {/* Admin Mobile Routes - ADMIN only */}
         <Route element={<ProtectedRoute roles={['ADMIN']} />}>
           <Route element={<MobileLayout />}>
             <Route path="/mobile/admin/actores" element={<ActoresPage />} />
-            <Route path="/mobile/admin/actores/generadores" element={<AdminGeneradoresPage />} />
-            <Route path="/mobile/admin/actores/generadores/:id" element={<GeneradorDetallePage />} />
-            <Route path="/mobile/admin/actores/operadores" element={<AdminOperadoresPage />} />
-            <Route path="/mobile/admin/actores/operadores/:id" element={<OperadorDetallePage />} />
-            <Route path="/mobile/admin/actores/transportistas" element={<TransportistasPage />} />
-            <Route path="/mobile/admin/actores/transportistas/:id" element={<TransportistaDetallePage />} />
-            <Route path="/mobile/admin/vehiculos" element={<AdminVehiculosPage />} />
-            <Route path="/mobile/admin/residuos" element={<AdminResiduosPage />} />
             <Route path="/mobile/admin/auditoria" element={<AuditoriaPage />} />
             <Route path="/mobile/admin/carga-masiva" element={<CargaMasivaPage />} />
+          </Route>
+        </Route>
+
+        {/* Sub-Admin Transportista Mobile */}
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_TRANSPORTISTA']} />}>
+          <Route element={<MobileLayout />}>
+            <Route path="/mobile/admin/actores/transportistas" element={<TransportistasPage />} />
+            <Route path="/mobile/admin/actores/transportistas/:id" element={<TransportistaDetallePage />} />
+          </Route>
+        </Route>
+        {/* Vehículos Mobile: ADMIN + ADMIN_TRANSPORTISTA + TRANSPORTISTA */}
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_TRANSPORTISTA', 'TRANSPORTISTA']} />}>
+          <Route element={<MobileLayout />}>
+            <Route path="/mobile/admin/vehiculos" element={<AdminVehiculosPage />} />
+          </Route>
+        </Route>
+
+        {/* Sub-Admin Generador Mobile */}
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR']} />}>
+          <Route element={<MobileLayout />}>
+            <Route path="/mobile/admin/actores/generadores" element={<AdminGeneradoresPage />} />
+            <Route path="/mobile/admin/actores/generadores/:id" element={<GeneradorDetallePage />} />
+            <Route path="/mobile/admin/residuos" element={<AdminResiduosPage />} />
+          </Route>
+        </Route>
+
+        {/* Sub-Admin Operador Mobile */}
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_OPERADOR']} />}>
+          <Route element={<MobileLayout />}>
+            <Route path="/mobile/admin/actores/operadores" element={<AdminOperadoresPage />} />
+            <Route path="/mobile/admin/actores/operadores/:id" element={<OperadorDetallePage />} />
           </Route>
         </Route>
 
@@ -232,29 +264,45 @@ function App() {
           </Route>
         </Route>
 
-        {/* Admin Routes - Protected (ADMIN only) */}
+        {/* Admin Routes - ADMIN only */}
         <Route element={<ProtectedRoute roles={['ADMIN']} />}>
           <Route element={<MainLayout />}>
-            {/* Admin - Usuarios */}
             <Route path="/admin/usuarios" element={<UsuariosPage />} />
-
-            {/* Admin - Actores (vista unificada) */}
             <Route path="/admin/actores" element={<ActoresPage />} />
-            <Route path="/admin/actores/generadores" element={<AdminGeneradoresPage />} />
-            <Route path="/admin/actores/generadores/:id" element={<GeneradorDetallePage />} />
-            <Route path="/admin/actores/operadores" element={<AdminOperadoresPage />} />
-            <Route path="/admin/actores/operadores/:id" element={<OperadorDetallePage />} />
+            <Route path="/admin/auditoria" element={<AuditoriaPage />} />
+            <Route path="/admin/carga-masiva" element={<CargaMasivaPage />} />
+          </Route>
+        </Route>
+
+        {/* Sub-Admin Transportista */}
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_TRANSPORTISTA']} />}>
+          <Route element={<MainLayout />}>
             <Route path="/admin/actores/transportistas" element={<TransportistasPage />} />
             <Route path="/admin/actores/transportistas/:id" element={<TransportistaDetallePage />} />
+          </Route>
+        </Route>
+        {/* Vehículos: ADMIN + ADMIN_TRANSPORTISTA + TRANSPORTISTA */}
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_TRANSPORTISTA', 'TRANSPORTISTA']} />}>
+          <Route element={<MainLayout />}>
             <Route path="/admin/vehiculos" element={<AdminVehiculosPage />} />
+          </Route>
+        </Route>
+
+        {/* Sub-Admin Generador */}
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR']} />}>
+          <Route element={<MainLayout />}>
+            <Route path="/admin/actores/generadores" element={<AdminGeneradoresPage />} />
+            <Route path="/admin/actores/generadores/:id" element={<GeneradorDetallePage />} />
             <Route path="/admin/residuos" element={<AdminResiduosPage />} />
+          </Route>
+        </Route>
+
+        {/* Sub-Admin Operador */}
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_OPERADOR']} />}>
+          <Route element={<MainLayout />}>
+            <Route path="/admin/actores/operadores" element={<AdminOperadoresPage />} />
+            <Route path="/admin/actores/operadores/:id" element={<OperadorDetallePage />} />
             <Route path="/admin/tratamientos" element={<AdminTratamientosPage />} />
-
-            {/* Auditoría */}
-            <Route path="/admin/auditoria" element={<AuditoriaPage />} />
-
-            {/* Carga Masiva */}
-            <Route path="/admin/carga-masiva" element={<CargaMasivaPage />} />
           </Route>
         </Route>
 
@@ -268,7 +316,7 @@ function App() {
         <Route path="/switch-user" element={<UserSwitcherPage />} />
 
         {/* Redirects */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/" element={<LandingPage />} />
 
         {/* Legacy actores redirects */}
         <Route path="/actores" element={<Navigate to="/admin/actores" replace />} />

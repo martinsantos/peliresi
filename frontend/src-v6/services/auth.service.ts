@@ -31,8 +31,22 @@ export const authService = {
     await api.post('/auth/change-password', req);
   },
 
-  async register(userData: LoginRequest & { nombre: string; rol: string }): Promise<Usuario> {
-    const { data } = await api.post<{ success: true; data: Usuario }>('/auth/register', userData);
-    return data.data;
+  async register(userData: any): Promise<{ message: string }> {
+    const { data } = await api.post<{ success: true; message: string }>('/auth/register', userData);
+    return { message: data.message };
+  },
+
+  async verifyEmail(token: string): Promise<{ message: string }> {
+    const { data } = await api.get<{ success: true; message: string }>(`/auth/verify-email?token=${token}`);
+    return { message: data.message };
+  },
+
+  async forgotPassword(payload: { email?: string; cuit?: string }): Promise<void> {
+    await api.post('/auth/forgot-password', payload);
+  },
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    await api.post('/auth/reset-password', { token, newPassword });
+    localStorage.setItem('sitrep_post_reset', '1');
   },
 };

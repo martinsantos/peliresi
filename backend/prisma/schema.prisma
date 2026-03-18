@@ -24,6 +24,11 @@ model Usuario {
   activo          Boolean     @default(true)
   dosFaSecret     String?
   dosFaVerificado Boolean     @default(false)
+  notifNuevoRegistro      Boolean   @default(true)
+  emailVerified           Boolean   @default(false)
+  emailVerificationToken  String?
+  passwordResetToken      String?
+  passwordResetExpires    DateTime?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -357,6 +362,9 @@ enum Rol {
   GENERADOR
   TRANSPORTISTA
   OPERADOR
+  ADMIN_TRANSPORTISTA
+  ADMIN_GENERADOR
+  ADMIN_OPERADOR
 }
 
 enum EstadoManifiesto {

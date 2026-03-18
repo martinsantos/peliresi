@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { isAuthenticated, hasRole } from '../middlewares/auth.middleware';
+import { isAuthenticated, requireAdminOrGenerador, requireAdminOrOperador } from '../middlewares/auth.middleware';
 import {
     getTiposResiduos,
     createTipoResiduo,
@@ -36,15 +36,15 @@ router.get('/transportistas/:transportistaId/vehiculos', getVehiculos);
 router.get('/transportistas/:transportistaId/choferes', getChoferes);
 router.get('/operadores/:operadorId/tratamientos', getTratamientos);
 
-// CRUD tipos-residuos (ADMIN only)
-router.post('/tipos-residuos', hasRole('ADMIN'), createTipoResiduo);
-router.put('/tipos-residuos/:id', hasRole('ADMIN'), updateTipoResiduo);
-router.delete('/tipos-residuos/:id', hasRole('ADMIN'), deleteTipoResiduo);
+// CRUD tipos-residuos (ADMIN o ADMIN_GENERADOR)
+router.post('/tipos-residuos', requireAdminOrGenerador, createTipoResiduo);
+router.put('/tipos-residuos/:id', requireAdminOrGenerador, updateTipoResiduo);
+router.delete('/tipos-residuos/:id', requireAdminOrGenerador, deleteTipoResiduo);
 
-// Tratamientos autorizados
-router.get('/tratamientos', hasRole('ADMIN'), getAllTratamientos);
-router.post('/tratamientos', hasRole('ADMIN'), createTratamiento);
-router.put('/tratamientos/:id', hasRole('ADMIN'), updateTratamiento);
-router.delete('/tratamientos/:id', hasRole('ADMIN'), deleteTratamiento);
+// Tratamientos autorizados (ADMIN o ADMIN_OPERADOR)
+router.get('/tratamientos', requireAdminOrOperador, getAllTratamientos);
+router.post('/tratamientos', requireAdminOrOperador, createTratamiento);
+router.put('/tratamientos/:id', requireAdminOrOperador, updateTratamiento);
+router.delete('/tratamientos/:id', requireAdminOrOperador, deleteTratamiento);
 
 export default router;

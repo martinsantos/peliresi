@@ -154,7 +154,11 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ basePath = '
       queryClient.invalidateQueries({ queryKey: ['notificaciones'] });
       setIsOpen(false);
 
-      if (notif.manifiestoId) {
+      // Notificaciones de nuevo registro → ir a gestión de usuarios
+      const datos = notif.datos ? (() => { try { return JSON.parse(notif.datos!); } catch { return null; } })() : null;
+      if (datos?.tipo === 'nuevo_registro') {
+        navigate(`${basePath}/admin/usuarios`);
+      } else if (notif.manifiestoId) {
         navigate(`${basePath}/manifiestos/${notif.manifiestoId}`);
       } else {
         navigate(`${basePath}/alertas`);

@@ -196,8 +196,8 @@ export const getTransportistas = async (req: AuthRequest, res: Response, next: N
             razonSocial: { razonSocial: order },
             localidad: { localidad: order },
             activo: { activo: order },
-            vehiculosCount: { _count: { vehiculos: order } },
-            choferesCount: { _count: { choferes: order } },
+            vehiculosCount: { vehiculos: { _count: order } },
+            choferesCount: { choferes: { _count: order } },
         };
         const orderBy = TRANS_SORT[sortBy as string] ?? { razonSocial: 'asc' };
 

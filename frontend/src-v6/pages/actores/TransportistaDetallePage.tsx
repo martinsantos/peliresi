@@ -133,11 +133,13 @@ const TransportistaDetallePage: React.FC = () => {
   const toggleChoferSort = (key: string) => setChoferSort(prev =>
     prev?.key === key ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' }
   );
-  const FlotaSortIcon = ({ col }: { col: string }) => {
+  // Plain functions (not React components) to avoid component-inside-component anti-pattern
+  // Using JSX components inside render functions causes React to unmount/remount on every state update
+  const flotaSortIcon = (col: string) => {
     if (flotaSort?.key !== col) return <ChevronUp size={12} className="ml-1 opacity-30 inline" />;
     return flotaSort.direction === 'asc' ? <ChevronUp size={12} className="ml-1 text-primary-600 inline" /> : <ChevronDown size={12} className="ml-1 text-primary-600 inline" />;
   };
-  const ChoferSortIcon = ({ col }: { col: string }) => {
+  const choferSortIcon = (col: string) => {
     if (choferSort?.key !== col) return <ChevronUp size={12} className="ml-1 opacity-30 inline" />;
     return choferSort.direction === 'asc' ? <ChevronUp size={12} className="ml-1 text-primary-600 inline" /> : <ChevronDown size={12} className="ml-1 text-primary-600 inline" />;
   };
@@ -574,12 +576,12 @@ const TransportistaDetallePage: React.FC = () => {
                   <table className="w-full table-fixed">
                     <thead className="bg-neutral-50">
                       <tr>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase cursor-pointer select-none hover:text-primary-600" style={{ width: '15%' }} onClick={() => toggleFlotaSort('patente')}>Patente<FlotaSortIcon col="patente" /></th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase cursor-pointer select-none hover:text-primary-600" style={{ width: '15%' }} onClick={() => toggleFlotaSort('patente')}>Patente{flotaSortIcon('patente')}</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Marca / Modelo</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '12%' }}>Capacidad</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase cursor-pointer select-none hover:text-primary-600" style={{ width: '10%' }} onClick={() => toggleFlotaSort('estado')}>Estado<FlotaSortIcon col="estado" /></th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase cursor-pointer select-none hover:text-primary-600" style={{ width: '10%' }} onClick={() => toggleFlotaSort('estado')}>Estado{flotaSortIcon('estado')}</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '13%' }}>Habilitación</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell cursor-pointer select-none hover:text-primary-600" style={{ width: '12%' }} onClick={() => toggleFlotaSort('vencimiento')}>Vencimiento<FlotaSortIcon col="vencimiento" /></th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell cursor-pointer select-none hover:text-primary-600" style={{ width: '12%' }} onClick={() => toggleFlotaSort('vencimiento')}>Vencimiento{flotaSortIcon('vencimiento')}</th>
                         {isAdmin && <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase" style={{ width: '18%' }}>Acciones</th>}
                       </tr>
                     </thead>
@@ -644,11 +646,11 @@ const TransportistaDetallePage: React.FC = () => {
                   <table className="w-full table-fixed">
                     <thead className="bg-neutral-50">
                       <tr>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase cursor-pointer select-none hover:text-primary-600" style={{ width: '22%' }} onClick={() => toggleChoferSort('nombre')}>Nombre<ChoferSortIcon col="nombre" /></th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase cursor-pointer select-none hover:text-primary-600" style={{ width: '22%' }} onClick={() => toggleChoferSort('nombre')}>Nombre{choferSortIcon('nombre')}</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '15%' }}>DNI</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '15%' }}>Licencia</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '14%' }}>Teléfono</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell cursor-pointer select-none hover:text-primary-600" style={{ width: '16%' }} onClick={() => toggleChoferSort('vencimiento')}>Vto. Licencia<ChoferSortIcon col="vencimiento" /></th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell cursor-pointer select-none hover:text-primary-600" style={{ width: '16%' }} onClick={() => toggleChoferSort('vencimiento')}>Vto. Licencia{choferSortIcon('vencimiento')}</th>
                         {isAdmin && <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase" style={{ width: '18%' }}>Acciones</th>}
                       </tr>
                     </thead>

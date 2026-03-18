@@ -41,6 +41,7 @@ import { ConnectivityIndicator } from '../components/ConnectivityIndicator';
 import { OnboardingTour, resetOnboardingTour } from '../components/OnboardingTour';
 import { DemoAppOnboarding } from '../components/DemoAppOnboarding';
 import { useAuth } from '../contexts/AuthContext';
+import { ImpersonationBanner } from '../components/ImpersonationBanner';
 
 // ========================================
 // COMPONENT
@@ -64,7 +65,7 @@ export const MainLayout: React.FC = () => {
   }, []);
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, canAccess, isLoading } = useAuth();
+  const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isAdminTransportista, isAdminGenerador, isAdminOperador, canAccess, isLoading, impersonationData, exitImpersonation } = useAuth();
 
   // Guard: show loading or redirect if no user
   if (isLoading) {
@@ -106,8 +107,8 @@ export const MainLayout: React.FC = () => {
     // Dashboard para todos
     items.push({ path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' });
     
-    // Centro de Control para Admin y Transportista
-    if (isAdmin || isTransportista) {
+    // Centro de Control para Admin, Transportista y Admin Transportista
+    if (isAdmin || isTransportista || isAdminTransportista) {
       items.push({ path: '/centro-control', icon: Command, label: 'Centro de Control' });
     }
 
@@ -133,28 +134,44 @@ export const MainLayout: React.FC = () => {
     const items = [];
 
     if (isAdmin) {
-      items.push({ path: '/admin/actores', icon: Building2, label: 'Actores' });
-      items.push({ path: '/admin/actores/generadores', icon: Factory, label: 'Admin Generadores' });
-      items.push({ path: '/admin/actores/operadores', icon: FlaskConical, label: 'Admin Operadores' });
-      items.push({ path: '/admin/actores/transportistas', icon: Truck, label: 'Admin Transporte' });
-      items.push({ path: '/admin/residuos', icon: FlaskConical, label: 'Catálogo Residuos' });
-      items.push({ path: '/admin/tratamientos', icon: BarChart3, label: 'Tratamientos' });
-      items.push({ path: '/admin/auditoria', icon: Shield, label: 'Auditoría' });
-      items.push({ path: '/admin/carga-masiva', icon: Upload, label: 'Carga Masiva' });
+      items.push({ path: '/admin/actores',                icon: Building2,    label: 'Actores' });
+      items.push({ path: '/admin/actores/generadores',    icon: Factory,      label: 'Admin Generadores' });
+      items.push({ path: '/admin/actores/operadores',     icon: FlaskConical, label: 'Admin Operadores' });
+      items.push({ path: '/admin/actores/transportistas', icon: Truck,        label: 'Admin Transporte' });
+      items.push({ path: '/admin/residuos',               icon: FlaskConical, label: 'Catálogo Residuos' });
+      items.push({ path: '/admin/tratamientos',           icon: BarChart3,    label: 'Tratamientos' });
+      items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
+      items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
+    } else if (isAdminGenerador) {
+      items.push({ path: '/admin/actores/generadores',    icon: Factory,      label: 'Mis Generadores' });
+      items.push({ path: '/admin/residuos',               icon: FlaskConical, label: 'Catálogo Residuos' });
+    } else if (isAdminTransportista) {
+      items.push({ path: '/admin/actores/transportistas', icon: Truck,        label: 'Mis Transportistas' });
+      items.push({ path: '/admin/vehiculos',              icon: Truck,        label: 'Vehículos' });
+    } else if (isAdminOperador) {
+      items.push({ path: '/admin/actores/operadores',     icon: FlaskConical, label: 'Mis Operadores' });
+      items.push({ path: '/admin/tratamientos',           icon: BarChart3,    label: 'Tratamientos' });
     } else if (isTransportista) {
-      // Transportista ve sus vehículos
-      items.push({ path: '/admin/vehiculos', icon: Truck, label: 'Mis Vehículos' });
+      items.push({ path: '/admin/vehiculos',              icon: Truck,        label: 'Mis Vehículos' });
     }
 
     return items;
-  }, [isAdmin, isTransportista]);
+  }, [isAdmin, isAdminGenerador, isAdminTransportista, isAdminOperador, isTransportista]);
 
   // Get current page title
   const currentPage = navItems.find(item => item.path === location.pathname)?.label || 
     adminItems.find(item => item.path === location.pathname)?.label || 'SITREP';
 
   return (
-    <div className="h-screen bg-[#F8F8F6] flex flex-col overflow-hidden">
+    <div className={`h-screen bg-[#F8F8F6] flex flex-col overflow-hidden ${impersonationData ? 'pt-10' : ''}`}>
+      {/* Impersonation banner — amber bar above everything */}
+      {impersonationData && (
+        <ImpersonationBanner
+          user={impersonationData.impersonatedUser}
+          onExit={exitImpersonation}
+        />
+      )}
+
       {/* Connectivity indicator - always visible at top */}
       <ConnectivityIndicator />
 

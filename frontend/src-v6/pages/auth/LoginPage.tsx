@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Leaf, AlertCircle } from 'lucide-react';
 import { useAuth, DEMO_CREDENTIALS } from '../../contexts/AuthContext';
 
@@ -114,12 +114,12 @@ const LoginPage: React.FC = () => {
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-neutral-700 mb-1.5">Correo electronico</label>
+          <label className="block text-sm font-medium text-neutral-700 mb-1.5">Email o CUIT</label>
           <div className="relative">
             <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
             <input
-              type="email"
-              placeholder="tu@email.com"
+              type="text"
+              placeholder="tu@email.com o 20-12345678-9"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full h-11 pl-10 pr-4 border border-neutral-200 rounded-xl text-sm focus:border-[#1B5E3C] focus:ring-4 focus:ring-[#1B5E3C]/15 outline-none transition-all"
@@ -148,6 +148,12 @@ const LoginPage: React.FC = () => {
           </div>
         </div>
 
+        <div className="flex justify-end">
+          <Link to="/recuperar" className="text-sm text-[#1B5E3C] hover:underline">
+            ¿Olvidaste tu contraseña?
+          </Link>
+        </div>
+
         <button
           type="submit"
           disabled={loading}
@@ -163,6 +169,13 @@ const LoginPage: React.FC = () => {
           )}
         </button>
       </form>
+
+      <p className="mt-6 text-center text-sm text-neutral-600">
+        ¿No tenés cuenta?{' '}
+        <Link to="/registro" className="text-[#1B5E3C] font-semibold hover:underline">
+          Registrate
+        </Link>
+      </p>
     </div>
   );
 };

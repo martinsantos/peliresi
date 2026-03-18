@@ -1,30 +1,25 @@
-import { Router, Request, Response, NextFunction } from 'express';
-import { register, login, getProfile, logout, refreshToken, changePassword } from '../controllers/auth.controller';
+import { Router, Request, Response } from 'express';
+import { register, login, getProfile, logout, refreshToken, changePassword, verifyEmail, forgotPassword, resetPassword } from '../controllers/auth.controller';
 import { isAuthenticated } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-// Ruta de prueba
+// Test
 router.get('/test', (req: Request, res: Response) => {
   res.json({ message: 'Ruta de autenticación funcionando' });
 });
 
-// Registrar nuevo usuario
+// Públicas
 router.post('/register', register);
-
-// Iniciar sesión
 router.post('/login', login);
-
-// Refrescar tokens (no requiere autenticación — el access token ya expiró)
 router.post('/refresh-token', refreshToken);
+router.get('/verify-email', verifyEmail);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 
-// Obtener perfil (protegida)
+// Protegidas
 router.get('/profile', isAuthenticated, getProfile);
-
-// Cambiar contraseña (protegida)
 router.post('/change-password', isAuthenticated, changePassword);
-
-// Cerrar sesión (protegida)
 router.post('/logout', isAuthenticated, logout);
 
 export default router;

@@ -63,6 +63,9 @@ const roleConfig: Record<UserRole, { label: string; color: string; bgColor: stri
   TRANSPORTISTA: { label: 'Transportista', color: 'text-orange-600', bgColor: 'bg-orange-500' },
   OPERADOR: { label: 'Operador', color: 'text-blue-600', bgColor: 'bg-blue-500' },
   AUDITOR: { label: 'Auditor', color: 'text-info-600', bgColor: 'bg-info-500' },
+  ADMIN_TRANSPORTISTA: { label: 'Adm. Transportistas', color: 'text-slate-600', bgColor: 'bg-slate-500' },
+  ADMIN_GENERADOR: { label: 'Adm. Generadores', color: 'text-green-600', bgColor: 'bg-green-600' },
+  ADMIN_OPERADOR: { label: 'Adm. Operadores', color: 'text-teal-600', bgColor: 'bg-teal-500' },
 };
 
 // ========================================

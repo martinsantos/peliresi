@@ -44,6 +44,7 @@ import { Table, Pagination } from '../../components/ui/Table';
 import { Tabs, TabList, Tab } from '../../components/ui/Tabs';
 import { useUsuarios, useCreateUsuario, useDeleteUsuario, useUpdateUsuario, useToggleUsuarioActivo } from '../../hooks/useUsuarios';
 import { downloadCsv } from '../../utils/exportCsv';
+import { useAuth } from '../../contexts/AuthContext';
 import type { Rol } from '../../types/models';
 
 
@@ -66,12 +67,13 @@ type UsuarioLocal = {
 // CONFIGURACION DE ROLES
 // ========================================
 const rolConfig = {
-  ADMIN: { label: 'Administrador General', icon: Shield, color: 'primary', bgColor: 'bg-primary-100', textColor: 'text-primary-700', borderColor: 'border-primary-200' },
-  GENERADOR: { label: 'Admin de Generadores', icon: Factory, color: 'purple', bgColor: 'bg-purple-100', textColor: 'text-purple-700', borderColor: 'border-purple-200' },
-  TRANSPORTISTA: { label: 'Admin de Transporte', icon: Truck, color: 'orange', bgColor: 'bg-orange-100', textColor: 'text-orange-700', borderColor: 'border-orange-200' },
-  OPERADOR: { label: 'Admin de Operadores', icon: FlaskConical, color: 'blue', bgColor: 'bg-blue-100', textColor: 'text-blue-700', borderColor: 'border-blue-200' },
-  AUDITOR: { label: 'Admin Auditor', icon: User, color: 'info', bgColor: 'bg-info-100', textColor: 'text-info-700', borderColor: 'border-info-200' },
-  CONSULTOR: { label: 'Consultor', icon: User, color: 'neutral', bgColor: 'bg-neutral-100', textColor: 'text-neutral-700', borderColor: 'border-neutral-200' },
+  ADMIN:               { label: 'Super Administrador',    icon: Shield,       color: 'primary', bgColor: 'bg-primary-100',  textColor: 'text-primary-700',  borderColor: 'border-primary-200' },
+  ADMIN_GENERADOR:     { label: 'Admin de Generadores',   icon: Factory,      color: 'purple',  bgColor: 'bg-purple-100',   textColor: 'text-purple-700',   borderColor: 'border-purple-200' },
+  ADMIN_TRANSPORTISTA: { label: 'Admin de Transporte',    icon: Truck,        color: 'orange',  bgColor: 'bg-orange-100',   textColor: 'text-orange-700',   borderColor: 'border-orange-200' },
+  ADMIN_OPERADOR:      { label: 'Admin de Operadores',    icon: FlaskConical, color: 'blue',    bgColor: 'bg-blue-100',     textColor: 'text-blue-700',     borderColor: 'border-blue-200' },
+  GENERADOR:           { label: 'Generador',              icon: Factory,      color: 'emerald', bgColor: 'bg-emerald-100',  textColor: 'text-emerald-700',  borderColor: 'border-emerald-200' },
+  TRANSPORTISTA:       { label: 'Transportista',          icon: Truck,        color: 'amber',   bgColor: 'bg-amber-100',    textColor: 'text-amber-700',    borderColor: 'border-amber-200' },
+  OPERADOR:            { label: 'Operador',               icon: FlaskConical, color: 'sky',     bgColor: 'bg-sky-100',      textColor: 'text-sky-700',      borderColor: 'border-sky-200' },
 };
 
 /** Convert API Usuario to the local shape used in the UI */
@@ -98,7 +100,7 @@ function apiUserToLocal(u: any): UsuarioLocal {
     telefono: u.telefono || '',
     rol: u.rol,
     sector: u.empresa || u.generador?.razonSocial || u.transportista?.razonSocial || u.operador?.razonSocial || '',
-    estado: u.activo ? 'activo' : 'inactivo',
+    estado: u.activo ? 'activo' : (u.emailVerified ? 'pendiente' : 'inactivo'),
     ultimoAcceso: u.updatedAt ? timeSince(u.updatedAt) : 'Nunca',
     fechaRegistro: u.createdAt ? new Date(u.createdAt).toISOString().split('T')[0] : '',
     avatar: initials,
@@ -122,6 +124,8 @@ const UsuariosPage: React.FC = () => {
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<string | undefined>(undefined);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  const { isAdmin, currentUser, impersonateUser } = useAuth();
 
   // Real API data
   const { data: apiData, isLoading: apiLoading, isError: apiError } = useUsuarios({ sortBy, sortOrder });
@@ -160,13 +164,16 @@ const UsuariosPage: React.FC = () => {
     let filtered = usuarios;
 
     // Filtrar por tab
-    if (activeTab !== 'todos') {
-      filtered = filtered.filter(u => u.rol.toLowerCase() === activeTab ||
-        (activeTab === 'admin' && u.rol === 'ADMIN') ||
-        (activeTab === 'generador' && u.rol === 'GENERADOR') ||
-        (activeTab === 'transportista' && u.rol === 'TRANSPORTISTA') ||
-        (activeTab === 'operador' && u.rol === 'OPERADOR')
-      );
+    if (activeTab === 'admin') {
+      filtered = filtered.filter(u => u.rol === 'ADMIN');
+    } else if (activeTab === 'admins_grupo') {
+      filtered = filtered.filter(u => ['ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'].includes(u.rol));
+    } else if (activeTab === 'generador') {
+      filtered = filtered.filter(u => u.rol === 'GENERADOR');
+    } else if (activeTab === 'transportista') {
+      filtered = filtered.filter(u => u.rol === 'TRANSPORTISTA');
+    } else if (activeTab === 'operador') {
+      filtered = filtered.filter(u => u.rol === 'OPERADOR');
     }
 
     // Filtrar por busqueda
@@ -200,13 +207,15 @@ const UsuariosPage: React.FC = () => {
     currentPage * itemsPerPage
   );
 
+  const ADMIN_GRUPO_ROLES = ['ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'];
+
   // Stats
   const stats = {
     total: usuarios.length,
     activos: usuarios.filter(u => u.estado === 'activo').length,
     pendientes: usuarios.filter(u => u.estado === 'pendiente').length,
     inactivos: usuarios.filter(u => u.estado === 'inactivo').length,
-    admins: usuarios.filter(u => u.rol === 'ADMIN').length,
+    admins: usuarios.filter(u => u.rol === 'ADMIN' || ADMIN_GRUPO_ROLES.includes(u.rol)).length,
     generadores: usuarios.filter(u => u.rol === 'GENERADOR').length,
     transportistas: usuarios.filter(u => u.rol === 'TRANSPORTISTA').length,
     operadores: usuarios.filter(u => u.rol === 'OPERADOR').length,
@@ -216,6 +225,7 @@ const UsuariosPage: React.FC = () => {
   const tabCounts = {
     todos: usuarios.length,
     admin: usuarios.filter(u => u.rol === 'ADMIN').length,
+    admins_grupo: usuarios.filter(u => ADMIN_GRUPO_ROLES.includes(u.rol)).length,
     generador: usuarios.filter(u => u.rol === 'GENERADOR').length,
     transportista: usuarios.filter(u => u.rol === 'TRANSPORTISTA').length,
     operador: usuarios.filter(u => u.rol === 'OPERADOR').length,
@@ -361,6 +371,7 @@ const UsuariosPage: React.FC = () => {
         >
           {row.estado === 'activo' && <CheckCircle size={12} className="mr-1" />}
           {row.estado === 'inactivo' && <XCircle size={12} className="mr-1" />}
+          {row.estado === 'pendiente' && <span title="Email verificado — pendiente de aprobación del administrador" className="mr-1">⏳</span>}
           {row.estado.charAt(0).toUpperCase() + row.estado.slice(1)}
         </Badge>
       ),
@@ -398,6 +409,24 @@ const UsuariosPage: React.FC = () => {
       align: 'right' as const,
       render: (row: UsuarioLocal) => (
         <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+          {isAdmin && row.id !== currentUser?.id && row.estado === 'activo' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-2 text-amber-600 hover:bg-amber-50"
+              onClick={async (e: any) => {
+                e.stopPropagation();
+                try {
+                  await impersonateUser(row.id);
+                } catch (err: any) {
+                  toast.error(err?.response?.data?.message || 'No se pudo acceder como este usuario');
+                }
+              }}
+              title="Acceso Comodín — ver como este usuario"
+            >
+              <Eye size={16} />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -405,7 +434,7 @@ const UsuariosPage: React.FC = () => {
             onClick={(e: any) => { e.stopPropagation(); verUsuario(row); }}
             title="Ver detalle"
           >
-            <Eye size={16} />
+            <MoreHorizontal size={16} />
           </Button>
           <Button
             variant="ghost"
@@ -433,8 +462,12 @@ const UsuariosPage: React.FC = () => {
                   <Badge variant="soft" color="neutral" className="ml-2">{tabCounts.todos}</Badge>
                 </Tab>
                 <Tab id="admin">
-                  Admins
+                  Super Admin
                   <Badge variant="soft" color="primary" className="ml-2">{tabCounts.admin}</Badge>
+                </Tab>
+                <Tab id="admins_grupo">
+                  Admins de Grupo
+                  <Badge variant="soft" color="info" className="ml-2">{tabCounts.admins_grupo}</Badge>
                 </Tab>
                 <Tab id="generador">
                   Generadores

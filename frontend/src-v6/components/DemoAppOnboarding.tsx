@@ -141,6 +141,9 @@ const ROLE_SLIDES: Record<UserRole, Slide[]> = {
       color: 'bg-blue-50 text-blue-600',
     },
   ],
+  ADMIN_TRANSPORTISTA: [{ icon: Shield, title: 'Administrador de Transportistas', points: ['Gestioná transportistas, vehículos y choferes.'], color: 'bg-slate-100 text-slate-700' }],
+  ADMIN_GENERADOR: [{ icon: Shield, title: 'Administrador de Generadores', points: ['Gestioná generadores y catálogo de residuos.'], color: 'bg-green-100 text-green-700' }],
+  ADMIN_OPERADOR: [{ icon: Shield, title: 'Administrador de Operadores', points: ['Gestioná operadores y tratamientos autorizados.'], color: 'bg-teal-100 text-teal-700' }],
 };
 
 const storageKey = (role: string) => `sitrep_onboarding_${role}`;
