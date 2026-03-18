@@ -79,7 +79,7 @@ const CargaMasivaPage: React.FC = () => {
 
   const descargarPlantilla = async (tipo: string) => {
     try {
-      const { data } = await api.get(`/notificaciones/carga-masiva/plantilla/${tipo}`, {
+      const { data } = await api.get(`/carga-masiva/plantilla/${tipo}`, {
         responseType: 'blob',
       });
       const url = URL.createObjectURL(data);
@@ -134,7 +134,7 @@ const CargaMasivaPage: React.FC = () => {
         // Add auth token
         const token = localStorage.getItem('sitrep_access_token');
         const apiBase = import.meta.env.VITE_API_URL || '/api';
-        xhr.open('POST', `${apiBase}/notificaciones/carga-masiva/${tipoSeleccionado}`);
+        xhr.open('POST', `${apiBase}/carga-masiva/${tipoSeleccionado}`);
         if (token) {
           xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         }

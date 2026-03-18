@@ -205,6 +205,11 @@ function App() {
         <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_TRANSPORTISTA']} />}>
           <Route element={<MobileLayout />}>
             <Route path="/mobile/admin/actores/transportistas" element={<TransportistasPage />} />
+          </Route>
+        </Route>
+        {/* Transportista detail: ADMIN + ADMIN_TRANSPORTISTA + TRANSPORTISTA (own profile) */}
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_TRANSPORTISTA', 'TRANSPORTISTA']} />}>
+          <Route element={<MobileLayout />}>
             <Route path="/mobile/admin/actores/transportistas/:id" element={<TransportistaDetallePage />} />
           </Route>
         </Route>
@@ -278,6 +283,11 @@ function App() {
         <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_TRANSPORTISTA']} />}>
           <Route element={<MainLayout />}>
             <Route path="/admin/actores/transportistas" element={<TransportistasPage />} />
+          </Route>
+        </Route>
+        {/* Transportista detail: ADMIN + ADMIN_TRANSPORTISTA + TRANSPORTISTA (own profile) */}
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_TRANSPORTISTA', 'TRANSPORTISTA']} />}>
+          <Route element={<MainLayout />}>
             <Route path="/admin/actores/transportistas/:id" element={<TransportistaDetallePage />} />
           </Route>
         </Route>

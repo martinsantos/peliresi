@@ -23,6 +23,7 @@ import {
   Flag,
   Radio,
   Loader2,
+  Settings,
 } from 'lucide-react';
 import { Badge } from '../../components/ui/BadgeV2';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -308,6 +309,15 @@ const TransportePerfilPage: React.FC = () => {
                   Mensaje
                 </button>
               </div>
+              {(currentUser as any)?.transportista?.id && (
+                <button
+                  onClick={() => navigate(mp(`/admin/actores/transportistas/${(currentUser as any).transportista.id}`))}
+                  className="w-full flex items-center justify-center gap-2 mt-3 py-3 bg-primary-50 border border-primary-200 rounded-xl text-primary-700 font-medium hover:bg-primary-100 transition-colors"
+                >
+                  <Settings size={16} />
+                  Gestionar vehículos y conductores
+                </button>
+              )}
               {(currentUser?.telefono || currentUser?.ubicacion) && (
                 <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-neutral-100">
                   {currentUser.telefono && (
