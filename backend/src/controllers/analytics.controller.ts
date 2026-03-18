@@ -2,14 +2,14 @@
 import { Request, Response } from 'express';
 import prisma from '../lib/prisma';
 
-// Get super admin email from env
-const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || 'santosma@gmail.com';
+// Get super admin email from env — no fallback to avoid accidental access
+const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL;
 
 // Middleware to check superadmin access
 export const isSuperAdmin = (req: Request, res: Response, next: Function) => {
     const user = (req as any).user;
 
-    if (!user || user.email !== SUPER_ADMIN_EMAIL) {
+    if (!SUPER_ADMIN_EMAIL || !user || user.email !== SUPER_ADMIN_EMAIL) {
         return res.status(403).json({
             success: false,
             error: 'Acceso restringido a superadmin'

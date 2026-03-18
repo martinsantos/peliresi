@@ -7,6 +7,15 @@ import { domainEvents } from '../services/domainEvent.service';
 // ============ SERVICIO DE NOTIFICACIONES ============
 
 class NotificationService {
+    // Helper: get all active admin user IDs (reused across multiple event handlers)
+    private async getAdminIds(): Promise<string[]> {
+        const admins = await prisma.usuario.findMany({
+            where: { rol: 'ADMIN', activo: true },
+            select: { id: true }
+        });
+        return admins.map(a => a.id);
+    }
+
     // Crear notificación para un usuario
     async crearNotificacion(data: {
         usuarioId: string;
@@ -119,22 +128,19 @@ class NotificationService {
         ].filter(id => id !== actorId);
 
         // También notificar a admins
-        const admins = await prisma.usuario.findMany({
-            where: { rol: 'ADMIN', activo: true },
-            select: { id: true }
-        });
-        admins.forEach(a => {
-            if (!destinatarios.includes(a.id)) destinatarios.push(a.id);
+        const adminIds = await this.getAdminIds();
+        adminIds.forEach(id => {
+            if (!destinatarios.includes(id)) destinatarios.push(id);
         });
 
-        for (const usuarioId of destinatarios) {
-            await this.crearNotificacion({
+        await Promise.all(destinatarios.map(usuarioId =>
+            this.crearNotificacion({
                 usuarioId,
                 ...info,
                 manifiestoId,
                 prioridad: nuevoEstado === 'RECHAZADO' ? 'ALTA' : 'NORMAL'
-            });
-        }
+            })
+        ));
     }
     // Disparar alerta para un evento — llamar desde manifiesto.controller.ts con setImmediate()
     // Nunca lanza excepciones — los errores se loguean y se ignoran
@@ -158,18 +164,18 @@ class NotificationService {
                     const destinatarios: string[] = [];
                     const opUserId = m.operador?.usuario?.id;
                     if (opUserId && opUserId !== realizadoPorId) destinatarios.push(opUserId);
-                    const admins = await prisma.usuario.findMany({ where: { rol: 'ADMIN', activo: true }, select: { id: true } });
-                    admins.forEach(a => { if (!destinatarios.includes(a.id) && a.id !== realizadoPorId) destinatarios.push(a.id); });
-                    for (const usuarioId of destinatarios) {
-                        await this.crearNotificacion({
+                    const adminIds = await this.getAdminIds();
+                    adminIds.forEach(id => { if (!destinatarios.includes(id) && id !== realizadoPorId) destinatarios.push(id); });
+                    await Promise.all(destinatarios.map(usuarioId =>
+                        this.crearNotificacion({
                             usuarioId,
                             tipo: 'INCIDENTE_REPORTADO',
                             titulo: '⚠️ Incidente en Tránsito',
                             mensaje: `Incidente reportado en manifiesto ${m.numero}${datos?.descripcion ? ': ' + datos.descripcion : ''}`,
                             manifiestoId,
                             prioridad: 'ALTA'
-                        });
-                    }
+                        })
+                    ));
                 }
             } else if (evento === 'RECHAZO_CARGA') {
                 const m = await prisma.manifiesto.findUnique({
@@ -180,18 +186,18 @@ class NotificationService {
                     const destinatarios: string[] = [];
                     const genUserId = m.generador?.usuario?.id;
                     if (genUserId && genUserId !== realizadoPorId) destinatarios.push(genUserId);
-                    const admins = await prisma.usuario.findMany({ where: { rol: 'ADMIN', activo: true }, select: { id: true } });
-                    admins.forEach(a => { if (!destinatarios.includes(a.id) && a.id !== realizadoPorId) destinatarios.push(a.id); });
-                    for (const usuarioId of destinatarios) {
-                        await this.crearNotificacion({
+                    const adminIds = await this.getAdminIds();
+                    adminIds.forEach(id => { if (!destinatarios.includes(id) && id !== realizadoPorId) destinatarios.push(id); });
+                    await Promise.all(destinatarios.map(usuarioId =>
+                        this.crearNotificacion({
                             usuarioId,
                             tipo: 'MANIFIESTO_RECHAZADO',
                             titulo: '❌ Carga Rechazada',
                             mensaje: `La carga del manifiesto ${m.numero} fue rechazada`,
                             manifiestoId,
                             prioridad: 'ALTA'
-                        });
-                    }
+                        })
+                    ));
                 }
             } else if (evento === 'DIFERENCIA_PESO') {
                 const m = await prisma.manifiesto.findUnique({
@@ -202,18 +208,18 @@ class NotificationService {
                     const destinatarios: string[] = [];
                     const genUserId = m.generador?.usuario?.id;
                     if (genUserId && genUserId !== realizadoPorId) destinatarios.push(genUserId);
-                    const admins = await prisma.usuario.findMany({ where: { rol: 'ADMIN', activo: true }, select: { id: true } });
-                    admins.forEach(a => { if (!destinatarios.includes(a.id) && a.id !== realizadoPorId) destinatarios.push(a.id); });
-                    for (const usuarioId of destinatarios) {
-                        await this.crearNotificacion({
+                    const adminIds = await this.getAdminIds();
+                    adminIds.forEach(id => { if (!destinatarios.includes(id) && id !== realizadoPorId) destinatarios.push(id); });
+                    await Promise.all(destinatarios.map(usuarioId =>
+                        this.crearNotificacion({
                             usuarioId,
                             tipo: 'ALERTA_SISTEMA',
                             titulo: '⚖️ Diferencia de Peso Detectada',
                             mensaje: `El manifiesto ${m.numero} presenta diferencia de peso${datos?.delta ? ' del ' + datos.delta : ''}`,
                             manifiestoId,
                             prioridad: 'ALTA'
-                        });
-                    }
+                        })
+                    ));
                 }
             }
 
@@ -281,6 +287,7 @@ export const getNotificaciones = async (req: Request, res: Response, next: NextF
     try {
         const usuarioId = (req as any).user.id;
         const { leida, limit = 20, offset = 0 } = req.query;
+        const limitNum = Math.min(500, Math.max(1, parseInt(limit as string)));
 
         const where: any = { usuarioId };
         if (leida === 'false') where.leida = false;
@@ -290,7 +297,7 @@ export const getNotificaciones = async (req: Request, res: Response, next: NextF
             prisma.notificacion.findMany({
                 where,
                 orderBy: { createdAt: 'desc' },
-                take: parseInt(limit as string),
+                take: limitNum,
                 skip: parseInt(offset as string),
                 include: {
                     manifiesto: {
@@ -308,8 +315,8 @@ export const getNotificaciones = async (req: Request, res: Response, next: NextF
                 notificaciones,
                 total,
                 noLeidas,
-                pagina: Math.floor(parseInt(offset as string) / parseInt(limit as string)) + 1,
-                totalPaginas: Math.ceil(total / parseInt(limit as string))
+                pagina: Math.floor(parseInt(offset as string) / limitNum) + 1,
+                totalPaginas: Math.ceil(total / limitNum)
             }
         });
     } catch (error) {
@@ -463,6 +470,7 @@ export const eliminarReglaAlerta = async (req: Request, res: Response, next: Nex
 export const getAlertasGeneradas = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { estado, limit = 50, offset = 0 } = req.query;
+        const alertasLimit = Math.min(500, Math.max(1, parseInt(limit as string)));
 
         const where: any = {};
         if (estado) where.estado = estado;
@@ -471,7 +479,7 @@ export const getAlertasGeneradas = async (req: Request, res: Response, next: Nex
             prisma.alertaGenerada.findMany({
                 where,
                 orderBy: { createdAt: 'desc' },
-                take: parseInt(limit as string),
+                take: alertasLimit,
                 skip: parseInt(offset as string),
                 include: {
                     regla: { select: { nombre: true, evento: true } },
@@ -486,8 +494,8 @@ export const getAlertasGeneradas = async (req: Request, res: Response, next: Nex
             data: {
                 alertas,
                 total,
-                pagina: Math.floor(parseInt(offset as string) / parseInt(limit as string)) + 1,
-                totalPaginas: Math.ceil(total / parseInt(limit as string))
+                pagina: Math.floor(parseInt(offset as string) / alertasLimit) + 1,
+                totalPaginas: Math.ceil(total / alertasLimit)
             }
         });
     } catch (error) {

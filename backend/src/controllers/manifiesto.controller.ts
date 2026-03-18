@@ -553,7 +553,9 @@ export const actualizarUbicacion = async (req: AuthRequest, res: Response, next:
 
     // Check cache — skip DB lookup if we verified EN_TRANSITO recently
     let cacheEntry = _enTransitoCache.get(id);
-    if (!cacheEntry || Date.now() - cacheEntry.ts > EN_TRANSITO_CACHE_TTL) {
+    const cacheExpired = !cacheEntry || Date.now() - cacheEntry.ts > EN_TRANSITO_CACHE_TTL;
+    if (cacheExpired && cacheEntry) _enTransitoCache.delete(id); // evict stale entry
+    if (!cacheEntry || cacheExpired) {
       const manifiesto = await prisma.manifiesto.findUnique({
         where: { id },
         select: {

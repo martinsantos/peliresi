@@ -356,14 +356,8 @@ const ManifiestoDetailPage: React.FC = () => {
   };
 
   const handleDescargarPDF = async () => {
-    const apiUrl = import.meta.env.VITE_API_URL || '';
-    const token = localStorage.getItem('sitrep_access_token');
     try {
-      const res = await fetch(`${apiUrl}/pdf/manifiesto/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error('Error al descargar');
-      const blob = await res.blob();
+      const blob = await manifiestoService.downloadPdf(id!);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -376,14 +370,8 @@ const ManifiestoDetailPage: React.FC = () => {
   };
 
   const handleDescargarCertificado = async () => {
-    const apiUrl = import.meta.env.VITE_API_URL || '';
-    const token = localStorage.getItem('sitrep_access_token');
     try {
-      const res = await fetch(`${apiUrl}/pdf/certificado/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error('Error al descargar');
-      const blob = await res.blob();
+      const blob = await manifiestoService.downloadCertificado(id!);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

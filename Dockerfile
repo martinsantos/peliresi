@@ -33,18 +33,27 @@ RUN apk add --no-cache openssl
 
 WORKDIR /app
 
-# Copiar solo lo necesario desde builder
-COPY --from=builder /app/backend/node_modules ./node_modules
-COPY --from=builder /app/backend/dist ./dist
-COPY --from=builder /app/backend/prisma ./prisma
-COPY backend/package*.json ./
+# Usar usuario no-root por seguridad
+RUN chown -R node:node /app
+USER node
 
-# Exponer puerto
-EXPOSE 3000
+# Copiar solo lo necesario desde builder
+COPY --from=builder --chown=node:node /app/backend/node_modules ./node_modules
+COPY --from=builder --chown=node:node /app/backend/dist ./dist
+COPY --from=builder --chown=node:node /app/backend/prisma ./prisma
+COPY --chown=node:node backend/package*.json ./
+
+# Puerto real de la aplicación
+EXPOSE 3002
 
 # Variables de entorno por defecto
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=3002
 
-# Comando de inicio
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+  CMD wget -qO- http://localhost:3002/api/health || exit 1
+
+# Migración separada del CMD — ejecutar manualmente antes del deploy si hay schema changes:
+# docker run --rm <image> node -e "require('./node_modules/.bin/prisma').migrate.deploy()"
+CMD ["node", "dist/index.js"]

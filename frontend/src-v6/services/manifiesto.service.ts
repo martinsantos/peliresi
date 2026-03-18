@@ -117,4 +117,14 @@ export const manifiestoService = {
     const { data } = await api.post('/manifiestos/validar-qr', { code });
     return data.data;
   },
+
+  async downloadPdf(id: string): Promise<Blob> {
+    const { data } = await api.get(`/pdf/manifiesto/${id}`, { responseType: 'blob' });
+    return data;
+  },
+
+  async downloadCertificado(id: string): Promise<Blob> {
+    const { data } = await api.get(`/pdf/certificado/${id}`, { responseType: 'blob' });
+    return data;
+  },
 };

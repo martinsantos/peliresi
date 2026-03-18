@@ -97,8 +97,12 @@ export const getOperadores = async (req: Request, res: Response, next: NextFunct
 
         const where: any = {};
         if (activo !== undefined) where.activo = activo === 'true';
+        // Push tipoResiduoId filter to DB instead of filtering in JS (avoids loading all operadores)
+        if (tipoResiduoId) {
+            where.tratamientos = { some: { tipoResiduoId: tipoResiduoId as string } };
+        }
 
-        let operadores = await prisma.operador.findMany({
+        const operadores = await prisma.operador.findMany({
             where,
             orderBy: { razonSocial: 'asc' },
             include: {
@@ -116,13 +120,6 @@ export const getOperadores = async (req: Request, res: Response, next: NextFunct
                 }
             }
         });
-
-        // Filtrar por tipo de residuo si se especifica
-        if (tipoResiduoId) {
-            operadores = operadores.filter(op =>
-                op.tratamientos.some(t => t.tipoResiduoId === tipoResiduoId)
-            );
-        }
 
         res.json({
             success: true,

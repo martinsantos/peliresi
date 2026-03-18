@@ -312,8 +312,8 @@ export interface DashboardStats {
     tratados: number;
     total: number;
   };
-  recientes?: Array<any>;
-  enTransitoList?: Array<any>;
+  recientes?: Manifiesto[];
+  enTransitoList?: Manifiesto[];
   // Legacy frontend format (kept for compatibility)
   manifiestos?: {
     total: number;
@@ -345,13 +345,25 @@ export interface DashboardChart {
 // CATALOGOS
 // ========================================
 
+// CatalogoItem covers all actor/catalog types returned by /api/catalogos/*
+// The index signature is intentional: different actor types have different shapes.
 export interface CatalogoItem {
   id: string;
   nombre?: string;
   razonSocial?: string;
   label?: string;
   cuit?: string;
-  [key: string]: any;
+  telefono?: string;
+  domicilio?: string;
+  numeroInscripcion?: string;
+  numeroHabilitacion?: string;
+  categoria?: string;
+  activo?: boolean;
+  patente?: string;       // Vehiculo
+  licencia?: string;      // Chofer
+  metodo?: string;        // TratamientoAutorizado
+  usuario?: { email: string; nombre?: string };
+  [key: string]: unknown;
 }
 
 export interface CatalogosResponse {

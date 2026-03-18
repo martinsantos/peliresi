@@ -9,7 +9,8 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 export const getGeneradores = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const { search, activo, page = 1, limit = 10, sortBy, sortOrder } = req.query;
-        const skip = (Number(page) - 1) * Number(limit);
+        const limitNum = Math.min(500, Math.max(1, Number(limit)));
+        const skip = (Number(page) - 1) * limitNum;
         const order: 'asc' | 'desc' = sortOrder === 'desc' ? 'desc' : 'asc';
         const GEN_SORT: Record<string, any> = {
             razonSocial: { razonSocial: order },
@@ -33,7 +34,7 @@ export const getGeneradores = async (req: AuthRequest, res: Response, next: Next
             prisma.generador.findMany({
                 where,
                 skip,
-                take: Number(limit),
+                take: limitNum,
                 include: {
                     usuario: { select: { email: true, nombre: true, apellido: true } },
                     _count: { select: { manifiestos: true } }
@@ -47,7 +48,7 @@ export const getGeneradores = async (req: AuthRequest, res: Response, next: Next
             success: true,
             data: {
                 generadores,
-                pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) }
+                pagination: { page: Number(page), limit: limitNum, total, pages: Math.ceil(total / limitNum) }
             }
         });
     } catch (error) {
@@ -190,7 +191,8 @@ export const deleteGenerador = async (req: AuthRequest, res: Response, next: Nex
 export const getTransportistas = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const { search, activo, page = 1, limit = 10, sortBy, sortOrder } = req.query;
-        const skip = (Number(page) - 1) * Number(limit);
+        const limitNum = Math.min(500, Math.max(1, Number(limit)));
+        const skip = (Number(page) - 1) * limitNum;
         const order: 'asc' | 'desc' = sortOrder === 'desc' ? 'desc' : 'asc';
         const TRANS_SORT: Record<string, any> = {
             razonSocial: { razonSocial: order },
@@ -216,7 +218,7 @@ export const getTransportistas = async (req: AuthRequest, res: Response, next: N
             prisma.transportista.findMany({
                 where,
                 skip,
-                take: Number(limit),
+                take: limitNum,
                 include: {
                     usuario: { select: { email: true, nombre: true, apellido: true } },
                     vehiculos: true,
@@ -232,7 +234,7 @@ export const getTransportistas = async (req: AuthRequest, res: Response, next: N
             success: true,
             data: {
                 transportistas,
-                pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) }
+                pagination: { page: Number(page), limit: limitNum, total, pages: Math.ceil(total / limitNum) }
             }
         });
     } catch (error) {
@@ -562,7 +564,8 @@ export const deleteChofer = async (req: AuthRequest, res: Response, next: NextFu
 export const getOperadores = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const { search, activo, page = 1, limit = 10, sortBy, sortOrder } = req.query;
-        const skip = (Number(page) - 1) * Number(limit);
+        const limitNum = Math.min(500, Math.max(1, Number(limit)));
+        const skip = (Number(page) - 1) * limitNum;
         const order: 'asc' | 'desc' = sortOrder === 'desc' ? 'desc' : 'asc';
         const OPER_SORT: Record<string, any> = {
             razonSocial: { razonSocial: order },
@@ -586,7 +589,7 @@ export const getOperadores = async (req: AuthRequest, res: Response, next: NextF
             prisma.operador.findMany({
                 where,
                 skip,
-                take: Number(limit),
+                take: limitNum,
                 include: {
                     usuario: { select: { email: true, nombre: true, apellido: true } },
                     tratamientos: { include: { tipoResiduo: true } },
@@ -601,7 +604,7 @@ export const getOperadores = async (req: AuthRequest, res: Response, next: NextF
             success: true,
             data: {
                 operadores,
-                pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) }
+                pagination: { page: Number(page), limit: limitNum, total, pages: Math.ceil(total / limitNum) }
             }
         });
     } catch (error) {

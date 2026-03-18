@@ -50,7 +50,30 @@ jobs:
             bash /opt/scripts-cicd/deploy_sitrep_frontend_with_build.sh
           ENDSSH
 
+  validate-backend:
+    if: github.event_name == 'push' || github.event.inputs.deploy_target != 'frontend-only'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: cd backend && npm ci
+
+      - name: TypeScript type-check
+        run: cd backend && npx tsc --noEmit
+
+      - name: Build backend
+        run: cd backend && npm run build
+
   deploy-backend:
+    needs: validate-backend
     if: github.event_name == 'push' || github.event.inputs.deploy_target != 'frontend-only'
     runs-on: ubuntu-latest
     steps:

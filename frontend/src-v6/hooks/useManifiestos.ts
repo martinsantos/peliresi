@@ -47,6 +47,7 @@ export function useManifiestos(filters?: ManifiestoFilters, options?: { enabled?
   return useQuery({
     queryKey: KEYS.list(filters),
     enabled: options?.enabled ?? true,
+    staleTime: 60_000, // 1 min — avoids refetch on every focus/mount
     queryFn: async () => {
       try {
         return await manifiestoService.list(filters);

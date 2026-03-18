@@ -10,17 +10,19 @@ dotenv.config({
 export const config = {
   // Configuración del servidor
   NODE_ENV: process.env.NODE_ENV || 'development',
-  PORT: parseInt(process.env.PORT || '3001', 10),
-  
+  PORT: parseInt(process.env.PORT || '3002', 10),
+
   // Base de datos
-  DATABASE_URL: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/trazabilidad_rrpp?schema=public',
-  
+  // Default apunta a trazabilidad_dev para evitar conexiones accidentales a producción
+  // sin un .env explícito.
+  DATABASE_URL: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/trazabilidad_dev?schema=public',
+
   // JWT
   JWT_SECRET: process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production',
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '24h',
-  
+
   // CORS
-  CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:3000'
+  CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:5173'
 };
 
 // Validar configuraciones requeridas
@@ -29,9 +31,10 @@ if (!config.DATABASE_URL) {
   process.exit(1);
 }
 
-// Warn if JWT_SECRET is the default insecure value in production
+// En producción: fallar rápido si JWT_SECRET es el valor inseguro por defecto
 if (config.NODE_ENV === 'production' && config.JWT_SECRET === 'your-super-secret-jwt-key-change-in-production') {
-  console.error('WARNING: JWT_SECRET is using the default insecure value in production! Set a strong secret in .env');
+  console.error('FATAL: JWT_SECRET is using the insecure default value in production. Set a strong secret in .env');
+  process.exit(1);
 }
 
 export default config;

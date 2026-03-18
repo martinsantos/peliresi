@@ -11,6 +11,7 @@ export function useReporteManifiestos(filters?: ReporteFilters) {
     queryKey: ['reportes', 'manifiestos', filters],
     queryFn: () => reporteService.manifiestos(filters),
     enabled: !!filters,
+    staleTime: 5 * 60_000, // 5 min — report data doesn't need real-time freshness
   });
 }
 
@@ -19,6 +20,7 @@ export function useReporteTratados(filters?: ReporteFilters) {
     queryKey: ['reportes', 'tratados', filters],
     queryFn: () => reporteService.tratados(filters),
     enabled: !!filters,
+    staleTime: 5 * 60_000,
   });
 }
 
@@ -27,6 +29,7 @@ export function useReporteTransporte(filters?: ReporteFilters) {
     queryKey: ['reportes', 'transporte', filters],
     queryFn: () => reporteService.transporte(filters),
     enabled: !!filters,
+    staleTime: 5 * 60_000,
   });
 }
 
