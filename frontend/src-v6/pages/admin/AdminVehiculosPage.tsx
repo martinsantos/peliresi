@@ -70,12 +70,12 @@ export const AdminVehiculosPage: React.FC = () => {
   // Vehiculo edit/delete state
   const [editingVehiculo, setEditingVehiculo] = useState<VehiculoDisplay | null>(null);
   const [deletingVehiculo, setDeletingVehiculo] = useState<{ id: string; transportistaId: string; patente: string } | null>(null);
-  const [vehiculoForm, setVehiculoForm] = useState({ patente: '', marca: '', modelo: '', anio: '', capacidad: '', activo: true });
+  const [vehiculoForm, setVehiculoForm] = useState({ patente: '', marca: '', modelo: '', anio: '', capacidad: '', numeroHabilitacion: '', vencimiento: '', activo: true });
 
   // Chofer edit/delete state
   const [editingChofer, setEditingChofer] = useState<ChoferDisplay | null>(null);
   const [deletingChofer, setDeletingChofer] = useState<{ id: string; transportistaId: string; nombre: string } | null>(null);
-  const [choferForm, setChoferForm] = useState({ nombre: '', apellido: '', dni: '', licencia: '', telefono: '', activo: true });
+  const [choferForm, setChoferForm] = useState({ nombre: '', apellido: '', dni: '', licencia: '', vencimiento: '', telefono: '', activo: true });
 
   // Choferes pagination
   const [choferPage, setChoferPage] = useState(1);
@@ -221,6 +221,8 @@ export const AdminVehiculosPage: React.FC = () => {
           modelo: vehiculoForm.modelo,
           anio: Number(vehiculoForm.anio),
           capacidad: Number(vehiculoForm.capacidad),
+          numeroHabilitacion: vehiculoForm.numeroHabilitacion || undefined,
+          vencimiento: vehiculoForm.vencimiento || undefined,
           activo: vehiculoForm.activo,
         },
       });
@@ -256,6 +258,7 @@ export const AdminVehiculosPage: React.FC = () => {
           apellido: choferForm.apellido,
           dni: choferForm.dni,
           licencia: choferForm.licencia,
+          vencimiento: choferForm.vencimiento || undefined,
           telefono: choferForm.telefono,
           activo: choferForm.activo,
         },
@@ -398,6 +401,8 @@ export const AdminVehiculosPage: React.FC = () => {
                 modelo: row.modelo,
                 anio: String(row.anio || ''),
                 capacidad: row.capacidad.replace(/[^\d]/g, ''),
+                numeroHabilitacion: row.habilitacion || '',
+                vencimiento: row.vencimiento ? new Date(row.vencimiento).toISOString().split('T')[0] : '',
                 activo: row.activo,
               });
             }}
@@ -524,6 +529,7 @@ export const AdminVehiculosPage: React.FC = () => {
                 apellido: row.apellido,
                 dni: row.dni,
                 licencia: row.licencia,
+                vencimiento: row.vencimiento ? new Date(row.vencimiento).toISOString().split('T')[0] : '',
                 telefono: row.telefono,
                 activo: row.activo,
               });
@@ -822,6 +828,10 @@ export const AdminVehiculosPage: React.FC = () => {
             <Input label="Año" type="number" value={vehiculoForm.anio} onChange={(e) => setVehiculoForm(f => ({ ...f, anio: e.target.value }))} />
           </div>
           <Input label="Capacidad (kg)" type="number" value={vehiculoForm.capacidad} onChange={(e) => setVehiculoForm(f => ({ ...f, capacidad: e.target.value }))} />
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="N° Habilitación" value={vehiculoForm.numeroHabilitacion} onChange={(e) => setVehiculoForm(f => ({ ...f, numeroHabilitacion: e.target.value }))} />
+            <Input label="Vencimiento Habilitación" type="date" value={vehiculoForm.vencimiento} onChange={(e) => setVehiculoForm(f => ({ ...f, vencimiento: e.target.value }))} />
+          </div>
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={vehiculoForm.activo} onChange={(e) => setVehiculoForm(f => ({ ...f, activo: e.target.checked }))} className="w-4 h-4 rounded border-neutral-300 text-primary-500" />
             <span className="text-sm text-neutral-700">Activo</span>
@@ -865,7 +875,10 @@ export const AdminVehiculosPage: React.FC = () => {
             <Input label="DNI" value={choferForm.dni} onChange={(e) => setChoferForm(f => ({ ...f, dni: e.target.value }))} />
             <Input label="Licencia" value={choferForm.licencia} onChange={(e) => setChoferForm(f => ({ ...f, licencia: e.target.value }))} />
           </div>
-          <Input label="Teléfono" value={choferForm.telefono} onChange={(e) => setChoferForm(f => ({ ...f, telefono: e.target.value }))} />
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="Teléfono" value={choferForm.telefono} onChange={(e) => setChoferForm(f => ({ ...f, telefono: e.target.value }))} />
+            <Input label="Venc. Licencia" type="date" value={choferForm.vencimiento} onChange={(e) => setChoferForm(f => ({ ...f, vencimiento: e.target.value }))} />
+          </div>
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={choferForm.activo} onChange={(e) => setChoferForm(f => ({ ...f, activo: e.target.checked }))} className="w-4 h-4 rounded border-neutral-300 text-primary-500" />
             <span className="text-sm text-neutral-700">Activo</span>

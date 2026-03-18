@@ -178,6 +178,7 @@ export interface CreateTransportistaRequest {
   localidad?: string;
   telefono: string;
   numeroHabilitacion: string;
+  vencimientoHabilitacion?: string;
 }
 
 export interface CreateOperadorRequest {

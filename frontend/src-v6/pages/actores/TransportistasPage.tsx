@@ -50,6 +50,7 @@ const INITIAL_FORM = {
   password: '',
   nombre: '',
   numeroHabilitacion: '',
+  vencimientoHabilitacion: '',
 };
 
 const TransportistasPage: React.FC = () => {
@@ -193,6 +194,7 @@ const TransportistasPage: React.FC = () => {
           telefono: form.telefono,
           email: form.email,
           numeroHabilitacion: form.numeroHabilitacion,
+          vencimientoHabilitacion: form.vencimientoHabilitacion || undefined,
         },
       });
       toast.success('Actualizado', `Transportista ${form.razonSocial} actualizado`);
@@ -216,6 +218,9 @@ const TransportistasPage: React.FC = () => {
       password: '',
       nombre: '',
       numeroHabilitacion: row.numeroHabilitacion !== '-' ? row.numeroHabilitacion : '',
+      vencimientoHabilitacion: row.vencimientoHabilitacion
+        ? new Date(row.vencimientoHabilitacion).toISOString().split('T')[0]
+        : '',
     });
     setModalEditar(true);
   };
@@ -265,7 +270,10 @@ const TransportistasPage: React.FC = () => {
         <Input label="Domicilio" value={form.domicilio} onChange={(e) => updateField('domicilio', e.target.value)} placeholder="Av. Libertador 1234, Mendoza" />
         <Input label="Localidad" value={form.localidad} onChange={(e) => updateField('localidad', e.target.value)} placeholder="Godoy Cruz, Mendoza" />
       </div>
-      <Input label="N° Habilitación" value={form.numeroHabilitacion} onChange={(e) => updateField('numeroHabilitacion', e.target.value)} placeholder="HAB-TR-2024-XXXX" />
+      <div className="grid grid-cols-2 gap-4">
+        <Input label="N° Habilitación" value={form.numeroHabilitacion} onChange={(e) => updateField('numeroHabilitacion', e.target.value)} placeholder="HAB-TR-2024-XXXX" />
+        <Input label="Vencimiento Habilitación" type="date" value={form.vencimientoHabilitacion} onChange={(e) => updateField('vencimientoHabilitacion', e.target.value)} />
+      </div>
       {!editId && (
         <div className="grid grid-cols-2 gap-4">
           <Input label="Nombre Responsable" value={form.nombre} onChange={(e) => updateField('nombre', e.target.value)} placeholder="Juan Perez" />
