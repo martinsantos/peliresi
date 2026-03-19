@@ -1,3 +1,86 @@
+// ── v2026.6: Auth guard — solo usuarios autenticados ──
+(function checkAuth() {
+  var token = localStorage.getItem('sitrep_access_token');
+  if (token) return;
+
+  var wall = document.createElement('div');
+  wall.className = 'auth-wall';
+
+  var logo = document.createElement('div');
+  logo.className = 'auth-logo';
+  logo.textContent = 'SITREP ';
+  var logoSpan = document.createElement('span');
+  logoSpan.textContent = 'Mendoza';
+  logo.appendChild(logoSpan);
+
+  var p1 = document.createElement('p');
+  p1.textContent = 'Este manual es exclusivo para usuarios registrados del sistema SITREP.';
+
+  var p2 = document.createElement('p');
+  p2.textContent = 'Inicia sesion para acceder a la documentacion completa.';
+
+  var btn = document.createElement('button');
+  btn.className = 'auth-btn';
+  btn.textContent = 'Iniciar Sesion';
+  btn.addEventListener('click', function() {
+    window.location.href = '/app/';
+  });
+
+  wall.appendChild(logo);
+  wall.appendChild(p1);
+  wall.appendChild(p2);
+  wall.appendChild(btn);
+  document.body.appendChild(wall);
+  document.body.style.overflow = 'hidden';
+
+  window.addEventListener('storage', function(e) {
+    if (e.key === 'sitrep_access_token' && e.newValue) {
+      wall.remove();
+      document.body.style.overflow = '';
+    }
+  });
+})();
+
+// ── v2026.6: Share manual ──
+function shareManual() {
+  var shareData = {
+    title: 'SITREP - Manual del Sistema',
+    text: 'Manual de Trazabilidad de Residuos Peligrosos - Provincia de Mendoza',
+    url: window.location.href
+  };
+
+  if (navigator.share) {
+    navigator.share(shareData).catch(function() {});
+  } else {
+    navigator.clipboard.writeText(window.location.href).then(function() {
+      showToast('Enlace copiado al portapapeles');
+    }).catch(function() {
+      var input = document.createElement('input');
+      input.value = window.location.href;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      document.body.removeChild(input);
+      showToast('Enlace copiado al portapapeles');
+    });
+  }
+}
+
+function showToast(msg) {
+  var existing = document.querySelector('.share-toast');
+  if (existing) existing.remove();
+  var toast = document.createElement('div');
+  toast.className = 'share-toast';
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(function() { toast.remove(); }, 3000);
+}
+
+// ── v2026.6: Export PDF (print) ──
+function exportPDF() {
+  window.print();
+}
+
 // ── v2026.5: Theme toggle ──
 function initTheme() {
   var saved = localStorage.getItem('sitrep-manual-theme');
@@ -76,8 +159,8 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
 
-    // Considerar anclas en-pagina dentro de secciones (proc-*, gal-*, flujo-*)
-    document.querySelectorAll('[id^="proc-"], [id^="gal-"], [id^="flujo-"]').forEach(function(el) {
+    // Considerar anclas en-pagina dentro de secciones (proc-*, gal-*, flujo-*, fa-*, fg-*, ft-*, fo-*)
+    document.querySelectorAll('[id^="proc-"], [id^="gal-"], [id^="flujo-"], [id^="fa-"], [id^="fg-"], [id^="ft-"], [id^="fo-"]').forEach(function(el) {
       var rect = el.getBoundingClientRect();
       if (rect.top <= 120) current = el.id;
     });
@@ -196,4 +279,48 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
   });
+
+  // ── v2026.6: Hero carousel ──
+  (function initHeroCarousel() {
+    var slides = document.querySelectorAll('.hero-slide');
+    var mobileSlides = document.querySelectorAll('.hero-slide-mobile');
+    if (!slides.length) return;
+
+    var current = 0, mCurrent = 0;
+
+    setInterval(function() {
+      slides[current].classList.remove('active');
+      current = (current + 1) % slides.length;
+      slides[current].classList.add('active');
+    }, 4000);
+
+    if (mobileSlides.length) {
+      setInterval(function() {
+        mobileSlides[mCurrent].classList.remove('active');
+        mCurrent = (mCurrent + 1) % mobileSlides.length;
+        mobileSlides[mCurrent].classList.add('active');
+      }, 8000);
+    }
+  })();
+
+  // ── v2026.6: Hero parallax on mouse move (desktop only) ──
+  (function initHeroParallax() {
+    var hero = document.getElementById('hero');
+    var desktop = document.querySelector('.device-desktop');
+    var mobile = document.querySelector('.device-mobile');
+    if (!hero || !desktop || window.innerWidth <= 900) return;
+
+    hero.addEventListener('mousemove', function(e) {
+      var rect = hero.getBoundingClientRect();
+      var x = (e.clientX - rect.left) / rect.width - 0.5;
+      var y = (e.clientY - rect.top) / rect.height - 0.5;
+      desktop.style.transform = 'rotateY(' + (x * -8 - 5) + 'deg) rotateX(' + (y * 5 + 2) + 'deg)';
+      if (mobile) mobile.style.transform = 'rotateY(' + (x * 5 + 5) + 'deg) rotateX(' + (y * -3) + 'deg)';
+    });
+
+    hero.addEventListener('mouseleave', function() {
+      desktop.style.transform = '';
+      if (mobile) mobile.style.transform = '';
+    });
+  })();
 });

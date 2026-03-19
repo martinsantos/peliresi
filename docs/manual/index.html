@@ -20,7 +20,15 @@
   <div class="logo">SITREP <span>Mendoza</span></div>
   <span class="version">v2026.6</span>
   <span class="doc-title">Manual del Sistema de Trazabilidad de Residuos Peligrosos</span>
-  <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" aria-label="Cambiar tema">&#127769;</button>
+  <div class="header-actions">
+    <button class="header-action-btn" id="btnShare" onclick="shareManual()" aria-label="Compartir" title="Compartir">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+    </button>
+    <button class="header-action-btn" id="btnPdf" onclick="exportPDF()" aria-label="Descargar PDF" title="Descargar PDF">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/></svg>
+    </button>
+    <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" aria-label="Cambiar tema">&#127769;</button>
+  </div>
 </header>
 
 <div class="reading-progress"><div class="reading-progress-bar" id="progressBar"></div></div>
@@ -68,9 +76,16 @@
   <div class="nav-group-items">
     <a href="#pwa-instalacion" class="nav-link">4.1 Instalacion</a>
     <a href="#pwa-navegacion" class="nav-link level-2">4.2 Navegacion</a>
-    <a href="#pwa-offline" class="nav-link level-2">4.3 Modo Offline</a>
-    <a href="#pwa-roles" class="nav-link level-2">4.4 Funciones por Rol</a>
-    <a href="#pwa-tour" class="nav-link level-2">4.5 Tour de Bienvenida</a>
+    <a href="#pwa-login" class="nav-link level-2">4.3 Login</a>
+    <a href="#pwa-admin" class="nav-link level-2" data-nav-role="admin">4.4 Administrador</a>
+    <a href="#pwa-generador" class="nav-link level-2" data-nav-role="generador">4.5 Generador</a>
+    <a href="#pwa-transportista" class="nav-link level-2" data-nav-role="transportista">4.6 Transportista</a>
+    <a href="#pwa-operador" class="nav-link level-2" data-nav-role="operador">4.7 Operador</a>
+    <a href="#pwa-gps" class="nav-link level-2" data-nav-role="transportista">4.8 Tracking GPS</a>
+    <a href="#pwa-qr" class="nav-link level-2">4.9 Escaner QR</a>
+    <a href="#pwa-offline" class="nav-link level-2">4.10 Modo Offline</a>
+    <a href="#pwa-tour" class="nav-link level-2">4.11 Tour Bienvenida</a>
+    <a href="#pwa-configuracion" class="nav-link level-2">4.12 Configuracion</a>
   </div>
 
   <div class="nav-section-title" onclick="toggleNavGroup(this)">5. Arquitectura</div>
@@ -1046,12 +1061,31 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 
 <section id="pwa-instalacion" data-role="all">
 <h2>4. Aplicacion Movil (PWA)</h2>
-<h3>4.1 Instalacion</h3>
+<h3>4.1 Instalacion y Requisitos</h3>
 <div class="section-intro">
-SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite instalarla en el dispositivo movil sin necesidad de tiendas de aplicaciones.
+SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite instalarla en el dispositivo movil sin necesidad de tiendas de aplicaciones. La PWA se ejecuta en modo standalone (sin barra de navegador) y ofrece una experiencia nativa con acceso a GPS, camara y notificaciones.
 </div>
 
-<h4>Android (Chrome)</h4>
+<div class="cu-screenshot-mobile">
+<a href="screenshots/mobile/M01_login_mobile.png" target="_blank">
+<img src="screenshots/mobile/M01_login_mobile.png" alt="Pantalla de entrada SITREP PWA" loading="lazy">
+</a>
+<div class="cu-screenshot-mobile-caption">Pantalla de acceso a la aplicacion movil SITREP</div>
+</div>
+
+<h4>Requisitos del Dispositivo</h4>
+<table>
+<thead><tr><th>Requisito</th><th>Minimo</th><th>Recomendado</th></tr></thead>
+<tbody>
+<tr><td>Navegador</td><td>Chrome 80+ / Safari 14+</td><td>Chrome 100+ / Safari 16+</td></tr>
+<tr><td>Pantalla</td><td>375px ancho</td><td>390px+ ancho</td></tr>
+<tr><td>GPS</td><td>Requerido para Transportista</td><td>Alta precision (A-GPS)</td></tr>
+<tr><td>Camara</td><td>Requerido para Escaner QR</td><td>Enfoque automatico</td></tr>
+<tr><td>Conexion</td><td>3G</td><td>4G/WiFi</td></tr>
+</tbody>
+</table>
+
+<h4>Instalacion en Android (Chrome)</h4>
 <ol>
 <li>Abrir <code>https://sitrep.ultimamilla.com.ar/app/</code> en Google Chrome.</li>
 <li>El navegador mostrara automaticamente un banner de instalacion despues de 45 segundos de uso (puede descartarse por 7 dias).</li>
@@ -1059,12 +1093,21 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <li>La aplicacion se instala como icono independiente en el launcher.</li>
 </ol>
 
-<h4>iOS (Safari)</h4>
+<h4>Instalacion en iOS (Safari)</h4>
 <ol>
 <li>Abrir <code>https://sitrep.ultimamilla.com.ar/app/</code> en Safari.</li>
 <li>Tocar el boton <strong>Compartir</strong> (icono de flecha hacia arriba).</li>
 <li>Seleccionar <strong>&quot;Agregar a la pantalla de inicio&quot;</strong>.</li>
 <li>Confirmar el nombre y tocar <strong>Agregar</strong>.</li>
+</ol>
+
+<h4>Primer Inicio</h4>
+<p>Al abrir la aplicacion instalada por primera vez:</p>
+<ol>
+<li>La PWA se abre en modo standalone (sin barra de direcciones del navegador).</li>
+<li>Se redirige automaticamente a <code>/app/</code> con la interfaz mobile optimizada.</li>
+<li>Se muestra la pantalla de login donde el usuario ingresa sus credenciales.</li>
+<li>Tras el primer login, se activa el <strong>Tour de Bienvenida</strong> (carrusel adaptado al rol del usuario).</li>
 </ol>
 
 <h4>Configuracion del Manifest</h4>
@@ -1082,67 +1125,638 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 
 <section id="pwa-navegacion" data-role="all">
 <h3>4.2 Navegacion Mobile</h3>
-<p>La interfaz mobile esta disenada para uso en campo con una mano, priorizando las acciones mas frecuentes de cada rol.</p>
+<p>La interfaz mobile esta disenada para uso en campo con una mano, priorizando las acciones mas frecuentes de cada rol. Cada perfil ve una navegacion adaptada a sus funciones.</p>
+
+<div class="screenshot-grid screenshot-grid-mobile">
+<div class="screenshot-card">
+<a href="screenshots/mobile/M02_dashboard_admin_mobile.png" target="_blank">
+<img src="screenshots/mobile/M02_dashboard_admin_mobile.png" alt="Dashboard Administrador mobile" loading="lazy">
+</a>
+<div class="screenshot-caption">
+<strong>Admin</strong>
+<span class="sc-badge sc-admin">Admin</span>
+<span class="sc-badge sc-mobile">Mobile</span>
+</div>
+</div>
+<div class="screenshot-card">
+<a href="screenshots/mobile/M10_dashboard_transportista_mobile.png" target="_blank">
+<img src="screenshots/mobile/M10_dashboard_transportista_mobile.png" alt="Dashboard Transportista mobile" loading="lazy">
+</a>
+<div class="screenshot-caption">
+<strong>Transportista</strong>
+<span class="sc-badge sc-transportista">Transportista</span>
+<span class="sc-badge sc-mobile">Mobile</span>
+</div>
+</div>
+<div class="screenshot-card">
+<a href="screenshots/mobile/M17_dashboard_operador_mobile.png" target="_blank">
+<img src="screenshots/mobile/M17_dashboard_operador_mobile.png" alt="Dashboard Operador mobile" loading="lazy">
+</a>
+<div class="screenshot-caption">
+<strong>Operador</strong>
+<span class="sc-badge sc-operador">Operador</span>
+<span class="sc-badge sc-mobile">Mobile</span>
+</div>
+</div>
+</div>
 
 <h4>Barra de Navegacion Inferior</h4>
-<p>Acceso rapido a las 4 secciones principales, siempre visible en la parte inferior de la pantalla:</p>
+<p>Acceso rapido a las secciones principales, siempre visible en la parte inferior de la pantalla. Los items varian segun el rol del usuario:</p>
 <table>
-<thead><tr><th>Icono</th><th>Seccion</th><th>Descripcion</th></tr></thead>
+<thead><tr><th>Icono</th><th>Seccion</th><th>Descripcion</th><th>Varia por rol</th></tr></thead>
 <tbody>
-<tr><td>Inicio</td><td>Dashboard</td><td>Pantalla principal con KPIs, banner de viaje (transportista), manifiestos recientes</td></tr>
-<tr><td>Documento</td><td>Manifiestos</td><td>Lista de manifiestos con busqueda y filtros adaptados a pantalla pequena</td></tr>
-<tr><td>Camion</td><td>Viaje</td><td>Panel de viaje en curso (solo transportista), tracking GPS, timer, controles</td></tr>
-<tr><td>Usuario</td><td>Perfil</td><td>Datos personales, configuracion, cerrar sesion</td></tr>
+<tr><td>Inicio</td><td>Dashboard</td><td>Pantalla principal con KPIs y actividad reciente</td><td>KPIs filtrados por rol; banner de viaje solo para Transportista</td></tr>
+<tr><td>Documento</td><td>Manifiestos</td><td>Lista de manifiestos con busqueda y filtros</td><td>Transportista ve &quot;Mis Viajes&quot;; Generador ve solo los suyos</td></tr>
+<tr><td>Control</td><td>Centro/Reportes</td><td>Panel de monitoreo o reportes</td><td>Admin ve Centro de Control; Operador ve Reportes</td></tr>
+<tr><td>Usuario</td><td>Perfil</td><td>Datos personales, configuracion, sesion</td><td>Transportista ve tabs Viaje/Info/Historial</td></tr>
 </tbody>
 </table>
 
 <h4>Menu Lateral (Drawer)</h4>
-<p>Acceso a la navegacion completa del sistema mediante gesto de deslizamiento desde la izquierda o boton hamburguesa. Incluye todas las secciones disponibles para el rol del usuario autenticado.</p>
+<p>Acceso a la navegacion completa mediante gesto de deslizamiento desde la izquierda o boton hamburguesa. Organizado en 5 secciones:</p>
+<table>
+<thead><tr><th>Grupo</th><th>Items</th><th>Acceso</th></tr></thead>
+<tbody>
+<tr><td><strong>Principal</strong></td><td>Dashboard, Manifiestos, Centro de Control</td><td>Segun rol</td></tr>
+<tr><td><strong>Admin</strong></td><td>Usuarios, Actores, Residuos, Vehiculos, Tratamientos</td><td>Solo ADMIN</td></tr>
+<tr><td><strong>Herramientas</strong></td><td>Escaner QR, Carga Masiva, Reportes</td><td>Segun rol</td></tr>
+<tr><td><strong>User Switcher</strong></td><td>Cambio rapido entre hasta 5 usuarios guardados</td><td>Todos</td></tr>
+<tr><td><strong>Cuenta</strong></td><td>Configuracion, Ayuda, Cerrar Sesion</td><td>Todos</td></tr>
+</tbody>
+</table>
+
+<h4>Boton Flotante (FAB)</h4>
+<p>Un boton circular <strong>&quot;+&quot;</strong> flotante en la esquina inferior derecha permite crear un nuevo manifiesto con un solo toque. Visible solo para usuarios con rol <strong>ADMIN</strong> o <strong>GENERADOR</strong>.</p>
+
+<h4>Banner de Viaje Activo</h4>
+<p>Los usuarios con rol <strong>TRANSPORTISTA</strong> que tienen un manifiesto en estado <code>EN_TRANSITO</code> ven un banner verde pulsante sobre la barra de navegacion inferior. Este banner permite acceder al panel de viaje en curso con un solo toque, sin importar en que pantalla se encuentre el usuario.</p>
 
 <h4>Elementos de Navegacion</h4>
 <ul>
-<li><strong>Breadcrumbs:</strong> Navegacion jerarquica en la parte superior de cada pantalla para mantener la orientacion dentro del sistema.</li>
-<li><strong>Layouts responsivos:</strong> Optimizados desde 375px de ancho en adelante. Las tablas se transforman en tarjetas apiladas verticalmente. Los formularios se reorganizan en columna unica.</li>
-<li><strong>Pull-to-refresh:</strong> En las listas principales, deslizar hacia abajo para recargar los datos.</li>
-<li><strong>Transiciones suaves:</strong> Animaciones de navegacion entre pantallas para una experiencia nativa.</li>
+<li><strong>Breadcrumbs:</strong> Navegacion jerarquica en la parte superior de cada pantalla para mantener orientacion.</li>
+<li><strong>Layouts responsivos:</strong> Optimizados desde 375px. Tablas se transforman en tarjetas apiladas. Formularios se reorganizan en columna unica.</li>
+<li><strong>Pull-to-refresh:</strong> En listas principales, deslizar hacia abajo para recargar datos.</li>
+<li><strong>Transiciones suaves:</strong> Animaciones de navegacion entre pantallas para experiencia nativa.</li>
 </ul>
+</section>
 
-<h4>Componentes PWA Especializados</h4>
+<section id="pwa-login" data-role="all">
+<h3>4.3 Login y Acceso</h3>
+<p>El acceso a la aplicacion movil requiere credenciales validas (email y contrasena). La sesion se mantiene activa mediante tokens JWT que se renuevan automaticamente.</p>
+
+<div class="cu-screenshot-mobile">
+<a href="screenshots/mobile/M01_login_mobile.png" target="_blank">
+<img src="screenshots/mobile/M01_login_mobile.png" alt="Pantalla de login mobile" loading="lazy">
+</a>
+<div class="cu-screenshot-mobile-caption">Formulario de acceso con email y contrasena</div>
+</div>
+
+<h4>Proceso de Login</h4>
+<ol>
+<li>Ingresar <strong>email</strong> y <strong>contrasena</strong> en el formulario.</li>
+<li>El sistema autentica contra el backend y genera un token JWT.</li>
+<li>El token se almacena en <code>localStorage</code> y se incluye automaticamente en todas las solicitudes.</li>
+<li>El usuario es redirigido al Dashboard correspondiente a su rol.</li>
+</ol>
+
+<h4>Selector de Perfil (User Switcher)</h4>
+<p>Para ambientes de demostracion o usuarios que manejan multiples roles, la aplicacion incluye un <strong>selector rapido de perfil</strong> accesible desde el menu lateral. Permite alternar entre hasta 5 usuarios guardados sin necesidad de cerrar sesion manualmente.</p>
+<div class="info-card">
+<p><strong>Sincronizacion cross-tab:</strong> Si el usuario tiene multiples pestanas abiertas, el token se sincroniza automaticamente entre todas ellas mediante el evento <code>storage</code> del navegador. Esto previene conflictos cuando se renueva un token en una pestana.</p>
+</div>
+
+<h4>Sesion y Seguridad</h4>
 <table>
-<thead><tr><th>Componente</th><th>Archivo</th><th>Funcion</th></tr></thead>
+<thead><tr><th>Aspecto</th><th>Detalle</th></tr></thead>
 <tbody>
-<tr><td>InstallPWAButton</td><td>components/InstallPWAButton.tsx</td><td>Boton compacto para instalar la PWA (detecta iOS y Android)</td></tr>
-<tr><td>InstallPWAModal</td><td>components/InstallPWAModal.tsx</td><td>Modal que aparece automaticamente despues de 45 segundos de uso. Puede descartarse por 7 dias.</td></tr>
-<tr><td>ConnectivityIndicator</td><td>components/ConnectivityIndicator.tsx</td><td>Barra de estado online/offline visible cuando se pierde la conexion</td></tr>
-<tr><td>DemoAppOnboarding</td><td>components/DemoAppOnboarding.tsx</td><td>Tour guiado de funcionalidades por rol para nuevos usuarios</td></tr>
+<tr><td>Duracion del token</td><td>Configurable en el backend (por defecto, varias horas)</td></tr>
+<tr><td>Renovacion</td><td>Automatica via <code>/api/auth/refresh</code></td></tr>
+<tr><td>Logout</td><td>Limpia tokens, estado de viaje, GPS pending, y snapshots de localStorage</td></tr>
+<tr><td>Inactividad</td><td>El token expira y el usuario es redirigido al login</td></tr>
 </tbody>
 </table>
 </section>
 
-<section id="pwa-offline" data-role="all">
-<h3>4.3 Modo Offline</h3>
-<div class="info-card">
-<p><strong>Estrategia:</strong> Network-first con fallback a cache. El Service Worker mantiene una version cacheada de los recursos estaticos.</p>
+<section id="pwa-admin" data-role="admin">
+<h3>4.4 Pantallas del Administrador</h3>
+<div class="info-card role-card-admin">
+<p><strong>Rol ADMIN:</strong> Acceso completo a todas las funciones del sistema. El administrador puede gestionar usuarios, monitorear la actividad en tiempo real, generar reportes y supervisar todo el ciclo de vida de los manifiestos.</p>
 </div>
+
+<div class="screenshot-grid screenshot-grid-mobile">
+<div class="screenshot-card">
+<a href="screenshots/mobile/M02_dashboard_admin_mobile.png" target="_blank">
+<img src="screenshots/mobile/M02_dashboard_admin_mobile.png" alt="Dashboard Admin mobile" loading="lazy">
+</a>
+<div class="screenshot-caption">
+<strong>Dashboard</strong>
+<span class="sc-badge sc-admin">Admin</span>
+<span class="sc-badge sc-mobile">Mobile</span>
+</div>
+</div>
+<div class="screenshot-card">
+<a href="screenshots/mobile/M03_alertas_mobile.png" target="_blank">
+<img src="screenshots/mobile/M03_alertas_mobile.png" alt="Alertas mobile" loading="lazy">
+</a>
+<div class="screenshot-caption">
+<strong>Alertas</strong>
+<span class="sc-badge sc-admin">Admin</span>
+<span class="sc-badge sc-mobile">Mobile</span>
+</div>
+</div>
+<div class="screenshot-card">
+<a href="screenshots/mobile/M04_reportes_mobile.png" target="_blank">
+<img src="screenshots/mobile/M04_reportes_mobile.png" alt="Reportes mobile" loading="lazy">
+</a>
+<div class="screenshot-caption">
+<strong>Reportes</strong>
+<span class="sc-badge sc-admin">Admin</span>
+<span class="sc-badge sc-mobile">Mobile</span>
+</div>
+</div>
+<div class="screenshot-card">
+<a href="screenshots/mobile/M05_usuarios_mobile.png" target="_blank">
+<img src="screenshots/mobile/M05_usuarios_mobile.png" alt="Usuarios mobile" loading="lazy">
+</a>
+<div class="screenshot-caption">
+<strong>Usuarios</strong>
+<span class="sc-badge sc-admin">Admin</span>
+<span class="sc-badge sc-mobile">Mobile</span>
+</div>
+</div>
+</div>
+
+<h4>Dashboard del Administrador</h4>
+<p>La pantalla principal muestra una vision global del sistema con KPIs en tiempo real:</p>
+<ul>
+<li><strong>KPIs principales:</strong> Total de manifiestos, borradores pendientes, en transito, tratados completados.</li>
+<li><strong>Actividad reciente:</strong> Ultimos manifiestos creados o actualizados en el sistema.</li>
+<li><strong>Acciones rapidas:</strong> Crear manifiesto, ver centro de control, generar reportes.</li>
+</ul>
+
+<h4>Alertas del Sistema</h4>
+<p>Panel de alertas con filtros por estado (pendiente, resuelta, descartada). El administrador recibe notificaciones de anomalias en el transporte, manifiestos vencidos y eventos criticos. Las alertas se pueden filtrar y gestionar directamente desde la interfaz mobile.</p>
+
+<h4>Centro de Reportes</h4>
+<p>Acceso a los 7 tabs de reportes con graficos interactivos (Recharts), tablas paginadas y exportacion a PDF/CSV. En mobile, los graficos se adaptan al ancho de pantalla y las tablas se transforman en tarjetas apiladas.</p>
+
+<h4>Gestion de Usuarios</h4>
+<p>CRUD completo de usuarios del sistema: crear, editar, eliminar y activar/desactivar cuentas. Cada tarjeta de usuario muestra nombre, email, rol (con badge de color) y estado activo/inactivo con toggle rapido.</p>
+
+<h4>Rutas Accesibles al Admin en Mobile</h4>
 <table>
-<thead><tr><th>Componente</th><th>Detalle</th></tr></thead>
+<thead><tr><th>Ruta</th><th>Funcion</th></tr></thead>
 <tbody>
-<tr><td>Service Worker</td><td>Estrategia network-first, cache <code>trazabilidad-rrpp-v4</code></td></tr>
-<tr><td>Pagina offline</td><td>Fallback personalizado en <code>/offline.html</code></td></tr>
-<tr><td>Indicador de conectividad</td><td>Componente <code>ConnectivityIndicator</code> muestra estado online/offline</td></tr>
-<tr><td>Cola de datos GPS</td><td>Datos almacenados en <code>localStorage</code> + <code>IndexedDB (sync_queue)</code></td></tr>
-<tr><td>Sincronizacion automatica</td><td>Al reconectar, el hook <code>useConnectivity</code> ejecuta flush de datos pendientes (health ping cada 30s)</td></tr>
+<tr><td>/app/dashboard</td><td>Dashboard con KPIs globales</td></tr>
+<tr><td>/app/manifiestos</td><td>Lista completa de manifiestos</td></tr>
+<tr><td>/app/centro-control</td><td>Mapa en tiempo real</td></tr>
+<tr><td>/app/reportes</td><td>Centro de reportes (7 tabs)</td></tr>
+<tr><td>/app/alertas</td><td>Alertas del sistema</td></tr>
+<tr><td>/app/usuarios</td><td>Gestion de usuarios</td></tr>
+<tr><td>/app/actores</td><td>Gestion de actores</td></tr>
+<tr><td>/app/admin/*</td><td>Catalogos (residuos, vehiculos, tratamientos)</td></tr>
+<tr><td>/app/carga-masiva</td><td>Importacion masiva CSV</td></tr>
+<tr><td>/app/auditoria</td><td>Registro de auditoria</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="pwa-generador" data-role="generador">
+<h3>4.5 Pantallas del Generador</h3>
+<div class="info-card role-card-generador">
+<p><strong>Rol GENERADOR:</strong> Responsable de crear manifiestos de residuos peligrosos, firmarlos para aprobar su despacho, y realizar seguimiento de la trazabilidad completa hasta el tratamiento final.</p>
+</div>
+
+<div class="screenshot-grid screenshot-grid-mobile">
+<div class="screenshot-card">
+<a href="screenshots/mobile/M06_dashboard_generador_mobile.png" target="_blank">
+<img src="screenshots/mobile/M06_dashboard_generador_mobile.png" alt="Dashboard Generador mobile" loading="lazy">
+</a>
+<div class="screenshot-caption">
+<strong>Dashboard</strong>
+<span class="sc-badge sc-generador">Generador</span>
+<span class="sc-badge sc-mobile">Mobile</span>
+</div>
+</div>
+<div class="screenshot-card">
+<a href="screenshots/mobile/M07_manifiestos_generador_mobile.png" target="_blank">
+<img src="screenshots/mobile/M07_manifiestos_generador_mobile.png" alt="Manifiestos Generador mobile" loading="lazy">
+</a>
+<div class="screenshot-caption">
+<strong>Manifiestos</strong>
+<span class="sc-badge sc-generador">Generador</span>
+<span class="sc-badge sc-mobile">Mobile</span>
+</div>
+</div>
+<div class="screenshot-card">
+<a href="screenshots/mobile/M09_nuevo_manifiesto_paso1_mobile.png" target="_blank">
+<img src="screenshots/mobile/M09_nuevo_manifiesto_paso1_mobile.png" alt="Nuevo Manifiesto paso 1 mobile" loading="lazy">
+</a>
+<div class="screenshot-caption">
+<strong>Nuevo Manifiesto</strong>
+<span class="sc-badge sc-generador">Generador</span>
+<span class="sc-badge sc-mobile">Mobile</span>
+</div>
+</div>
+<div class="screenshot-card">
+<a href="screenshots/mobile/M25_manifiesto_detalle_generador_mobile.png" target="_blank">
+<img src="screenshots/mobile/M25_manifiesto_detalle_generador_mobile.png" alt="Detalle Manifiesto Generador mobile" loading="lazy">
+</a>
+<div class="screenshot-caption">
+<strong>Detalle</strong>
+<span class="sc-badge sc-generador">Generador</span>
+<span class="sc-badge sc-mobile">Mobile</span>
+</div>
+</div>
+</div>
+
+<h4>Dashboard del Generador</h4>
+<p>Vision personalizada con KPIs filtrados a los manifiestos propios del generador:</p>
+<ul>
+<li><strong>Borradores:</strong> Manifiestos en preparacion que aun no fueron firmados.</li>
+<li><strong>En transito:</strong> Manifiestos cuyo residuo ya fue retirado por un transportista.</li>
+<li><strong>Tratados:</strong> Manifiestos cuyo ciclo se completo exitosamente.</li>
+<li><strong>Actividad reciente:</strong> Ultimos movimientos en los manifiestos del generador.</li>
+</ul>
+
+<h4>Lista de Manifiestos</h4>
+<p>Tabla con busqueda por numero y filtros por estado. En mobile, cada manifiesto se muestra como tarjeta con numero, estado (badge de color), transportista asignado y fecha de creacion. Toque en la tarjeta para acceder al detalle completo.</p>
+
+<h4>Nuevo Manifiesto (Formulario Multi-Paso)</h4>
+<p>Formulario optimizado para mobile dividido en pasos secuenciales:</p>
+<ol>
+<li><strong>Paso 1 - Actores:</strong> Seleccionar generador, transportista y operador. Al seleccionar un actor, se auto-completan automaticamente los campos de CUIT, telefono, domicilio y numero de habilitacion.</li>
+<li><strong>Paso 2 - Residuos:</strong> Agregar uno o mas residuos con tipo, cantidad y unidad.</li>
+<li><strong>Paso 3 - Confirmacion:</strong> Revisar todos los datos y crear el manifiesto en estado BORRADOR.</li>
+</ol>
+
+<h4>Detalle y Firma</h4>
+<p>Desde la pantalla de detalle, el generador puede:</p>
+<ul>
+<li><strong>Ver</strong> toda la informacion del manifiesto, residuos incluidos y timeline de eventos.</li>
+<li><strong>Firmar/Aprobar</strong> un manifiesto en estado BORRADOR para pasarlo a APROBADO.</li>
+<li><strong>Cancelar</strong> un manifiesto que aun no fue retirado.</li>
+<li><strong>Descargar PDF</strong> del manifiesto en cualquier estado.</li>
+<li><strong>Descargar Certificado</strong> de disposicion final cuando el manifiesto llega a estado TRATADO.</li>
+</ul>
+</section>
+
+<section id="pwa-transportista" data-role="transportista">
+<h3>4.6 Pantallas del Transportista</h3>
+<div class="info-card role-card-transportista">
+<p><strong>Rol TRANSPORTISTA:</strong> Responsable de retirar los residuos del generador, transportarlos con tracking GPS en tiempo real, y entregarlos al operador de tratamiento. La interfaz mobile esta especialmente optimizada para este rol, que opera exclusivamente desde el dispositivo movil durante los viajes.</p>
+</div>
+
+<div class="screenshot-grid screenshot-grid-mobile">
+<div class="screenshot-card">
+<a href="screenshots/mobile/M10_dashboard_transportista_mobile.png" target="_blank">
+<img src="screenshots/mobile/M10_dashboard_transportista_mobile.png" alt="Dashboard Transportista mobile" loading="lazy">
+</a>
+<div class="screenshot-caption">
+<strong>Dashboard</strong>
+<span class="sc-badge sc-transportista">Transportista</span>
+<span class="sc-badge sc-mobile">Mobile</span>
+</div>
+</div>
+<div class="screenshot-card">
+<a href="screenshots/mobile/M11_transporte_perfil_viaje_mobile.png" target="_blank">
+<img src="screenshots/mobile/M11_transporte_perfil_viaje_mobile.png" alt="Perfil Transportista - Tab Viaje" loading="lazy">
+</a>
+<div class="screenshot-caption">
+<strong>Perfil - Viaje</strong>
+<span class="sc-badge sc-transportista">Transportista</span>
+<span class="sc-badge sc-mobile">Mobile</span>
+</div>
+</div>
+<div class="screenshot-card">
+<a href="screenshots/mobile/M12_transporte_perfil_info_mobile.png" target="_blank">
+<img src="screenshots/mobile/M12_transporte_perfil_info_mobile.png" alt="Perfil Transportista - Tab Info" loading="lazy">
+</a>
+<div class="screenshot-caption">
+<strong>Perfil - Info</strong>
+<span class="sc-badge sc-transportista">Transportista</span>
+<span class="sc-badge sc-mobile">Mobile</span>
+</div>
+</div>
+<div class="screenshot-card">
+<a href="screenshots/mobile/M13_manifiestos_transportista_mobile.png" target="_blank">
+<img src="screenshots/mobile/M13_manifiestos_transportista_mobile.png" alt="Manifiestos Transportista mobile" loading="lazy">
+</a>
+<div class="screenshot-caption">
+<strong>Mis Viajes</strong>
+<span class="sc-badge sc-transportista">Transportista</span>
+<span class="sc-badge sc-mobile">Mobile</span>
+</div>
+</div>
+<div class="screenshot-card">
+<a href="screenshots/mobile/M21_tomar_viaje_mobile.png" target="_blank">
+<img src="screenshots/mobile/M21_tomar_viaje_mobile.png" alt="Tomar Viaje mobile" loading="lazy">
+</a>
+<div class="screenshot-caption">
+<strong>Tomar Viaje</strong>
+<span class="sc-badge sc-transportista">Transportista</span>
+<span class="sc-badge sc-mobile">Mobile</span>
+</div>
+</div>
+<div class="screenshot-card">
+<a href="screenshots/mobile/M22_viaje_gps_activo_mobile.png" target="_blank">
+<img src="screenshots/mobile/M22_viaje_gps_activo_mobile.png" alt="Viaje GPS Activo mobile" loading="lazy">
+</a>
+<div class="screenshot-caption">
+<strong>GPS Activo</strong>
+<span class="sc-badge sc-transportista">Transportista</span>
+<span class="sc-badge sc-mobile">Mobile</span>
+</div>
+</div>
+</div>
+
+<h4>Dashboard del Transportista</h4>
+<p>El dashboard del transportista incluye elementos exclusivos ademas de los KPIs:</p>
+<ul>
+<li><strong>Banner de viaje activo (EN_TRANSITO):</strong> Tarjeta verde pulsante con animacion que muestra el numero de manifiesto y boton &quot;Ir al viaje&quot;. Aparece entre el saludo y la grilla de KPIs.</li>
+<li><strong>Banner de viajes pendientes (APROBADO):</strong> Tarjeta de advertencia con lista de manifiestos aprobados listos para retirar.</li>
+<li><strong>KPIs propios:</strong> Viajes completados, en transito, pendientes de retiro.</li>
+</ul>
+
+<h4>Perfil del Transportista (3 Tabs)</h4>
+<p>La pantalla de perfil tiene tres pestanas con funcionalidad diferenciada:</p>
+<table>
+<thead><tr><th>Tab</th><th>Contenido</th><th>Acciones</th></tr></thead>
+<tbody>
+<tr><td><strong>Viaje</strong></td><td>Viaje activo EN_TRANSITO (con mapa y controles) o lista de viajes APROBADO</td><td>Ir al viaje activo, Tomar viaje pendiente</td></tr>
+<tr><td><strong>Info</strong></td><td>Datos de la empresa, vehiculos registrados, conductores/choferes</td><td>CRUD de vehiculos y conductores (agregar, editar, eliminar)</td></tr>
+<tr><td><strong>Historial</strong></td><td>Lista de viajes completados con fechas y estados finales</td><td>Ver detalle de viajes pasados</td></tr>
 </tbody>
 </table>
 
-<h4>Estrategia de Cache del Service Worker</h4>
-<p>El Service Worker implementa una estrategia <strong>network-first</strong>, lo que significa que:</p>
+<h4>Mis Viajes (Manifiestos)</h4>
+<p>Lista de manifiestos asignados al transportista, filtrados automaticamente por <code>transportistaId</code>. Cada tarjeta muestra numero de manifiesto, generador de origen, operador de destino, estado actual con badge de color y fecha.</p>
+
+<h4>Flujo &quot;Tomar Viaje&quot;</h4>
+<p>El flujo completo desde la asignacion hasta el inicio del tracking GPS:</p>
+
+<div class="cu-screenshot-mobile">
+<a href="screenshots/mobile/M21_tomar_viaje_mobile.png" target="_blank">
+<img src="screenshots/mobile/M21_tomar_viaje_mobile.png" alt="Flujo Tomar Viaje" loading="lazy">
+</a>
+<div class="cu-screenshot-mobile-caption">Pantalla de viaje asignado listo para iniciar</div>
+</div>
+
+<ol>
+<li><strong>Asignacion:</strong> Un manifiesto APROBADO aparece en el banner del Dashboard o en el Tab Viaje del perfil.</li>
+<li><strong>Seleccion:</strong> El transportista toca &quot;Tomar Viaje&quot; en la tarjeta del manifiesto.</li>
+<li><strong>Pantalla ViajeEnCurso:</strong> Se abre el panel de control del viaje con toda la informacion del manifiesto.</li>
+<li><strong>Confirmar Retiro:</strong> El transportista toca el boton &quot;Confirmar Retiro&quot; para cambiar el estado a EN_TRANSITO.</li>
+<li><strong>GPS Activo:</strong> Automaticamente se activa el tracking GPS y comienza la transmision de ubicacion cada 30 segundos.</li>
+</ol>
+
+<h4>Guard de Viaje Activo</h4>
+<p>Una proteccion automatica (<code>ActiveTripGuard</code>) valida el estado del manifiesto antes de redirigir al panel de viaje. Si el manifiesto ya alcanzo un estado terminal (ENTREGADO, TRATADO, CANCELADO), la redireccion se cancela para evitar bucles infinitos.</p>
+</section>
+
+<section id="pwa-operador" data-role="operador">
+<h3>4.7 Pantallas del Operador</h3>
+<div class="info-card role-card-operador">
+<p><strong>Rol OPERADOR:</strong> Responsable de recibir los residuos del transportista, verificar las cargas, registrar el pesaje, aplicar el tratamiento correspondiente y emitir el certificado de disposicion final. El operador cierra el ciclo de trazabilidad del manifiesto.</p>
+</div>
+
+<div class="screenshot-grid screenshot-grid-mobile">
+<div class="screenshot-card">
+<a href="screenshots/mobile/M17_dashboard_operador_mobile.png" target="_blank">
+<img src="screenshots/mobile/M17_dashboard_operador_mobile.png" alt="Dashboard Operador mobile" loading="lazy">
+</a>
+<div class="screenshot-caption">
+<strong>Dashboard</strong>
+<span class="sc-badge sc-operador">Operador</span>
+<span class="sc-badge sc-mobile">Mobile</span>
+</div>
+</div>
+<div class="screenshot-card">
+<a href="screenshots/mobile/M18_manifiestos_operador_mobile.png" target="_blank">
+<img src="screenshots/mobile/M18_manifiestos_operador_mobile.png" alt="Manifiestos Operador mobile" loading="lazy">
+</a>
+<div class="screenshot-caption">
+<strong>Manifiestos</strong>
+<span class="sc-badge sc-operador">Operador</span>
+<span class="sc-badge sc-mobile">Mobile</span>
+</div>
+</div>
+<div class="screenshot-card">
+<a href="screenshots/mobile/M23_manifiesto_entregado_operador_mobile.png" target="_blank">
+<img src="screenshots/mobile/M23_manifiesto_entregado_operador_mobile.png" alt="Manifiesto Entregado - Recepcion" loading="lazy">
+</a>
+<div class="screenshot-caption">
+<strong>Recepcion</strong>
+<span class="sc-badge sc-operador">Operador</span>
+<span class="sc-badge sc-mobile">Mobile</span>
+</div>
+</div>
+<div class="screenshot-card">
+<a href="screenshots/mobile/M24_pesaje_modal_mobile.png" target="_blank">
+<img src="screenshots/mobile/M24_pesaje_modal_mobile.png" alt="Modal de Pesaje mobile" loading="lazy">
+</a>
+<div class="screenshot-caption">
+<strong>Pesaje</strong>
+<span class="sc-badge sc-operador">Operador</span>
+<span class="sc-badge sc-mobile">Mobile</span>
+</div>
+</div>
+<div class="screenshot-card">
+<a href="screenshots/mobile/M20_reportes_operador_mobile.png" target="_blank">
+<img src="screenshots/mobile/M20_reportes_operador_mobile.png" alt="Reportes Operador mobile" loading="lazy">
+</a>
+<div class="screenshot-caption">
+<strong>Reportes</strong>
+<span class="sc-badge sc-operador">Operador</span>
+<span class="sc-badge sc-mobile">Mobile</span>
+</div>
+</div>
+</div>
+
+<h4>Dashboard del Operador</h4>
+<p>KPIs enfocados en la recepcion y tratamiento de residuos:</p>
+<ul>
+<li><strong>Manifiestos entrantes:</strong> Cantidad de manifiestos en estado ENTREGADO esperando recepcion.</li>
+<li><strong>En tratamiento:</strong> Manifiestos actualmente siendo procesados.</li>
+<li><strong>Tratados:</strong> Manifiestos completados con certificado emitido.</li>
+<li><strong>Actividad reciente:</strong> Ultimos manifiestos recibidos o procesados.</li>
+</ul>
+
+<h4>Lista de Manifiestos del Operador</h4>
+<p>Manifiestos filtrados automaticamente por <code>operadorId</code>. Las tarjetas muestran numero, generador de origen, transportista, tipo de residuo y estado actual. Los manifiestos en estado ENTREGADO se destacan visualmente para priorizar la recepcion.</p>
+
+<h4>Flujo de Recepcion y Tratamiento</h4>
+<p>El operador gestiona la etapa final del ciclo de vida del manifiesto:</p>
+
+<div class="cu-screenshot-mobile">
+<a href="screenshots/mobile/M23_manifiesto_entregado_operador_mobile.png" target="_blank">
+<img src="screenshots/mobile/M23_manifiesto_entregado_operador_mobile.png" alt="Recepcion de carga por el operador" loading="lazy">
+</a>
+<div class="cu-screenshot-mobile-caption">Pantalla de manifiesto ENTREGADO con opciones de recepcion</div>
+</div>
+
+<ol>
+<li><strong>Confirmar Recepcion:</strong> El operador verifica la carga y confirma la recepcion (ENTREGADO &rarr; RECIBIDO). Alternativamente, puede <strong>Rechazar Carga</strong> si hay discrepancias (ENTREGADO &rarr; RECHAZADO).</li>
+<li><strong>Registrar Pesaje:</strong> Modal para ingresar el peso real de cada residuo recibido. Los datos de pesaje se almacenan y se comparan con las cantidades declaradas por el generador.</li>
+<li><strong>Registrar Tratamiento:</strong> Indica que el residuo comenzo a ser procesado (RECIBIDO &rarr; EN_TRATAMIENTO).</li>
+<li><strong>Cerrar Manifiesto:</strong> Confirma que el tratamiento se completo exitosamente (EN_TRATAMIENTO &rarr; TRATADO). Esto habilita la generacion del Certificado de Disposicion Final.</li>
+</ol>
+
+<div class="cu-screenshot-mobile">
+<a href="screenshots/mobile/M24_pesaje_modal_mobile.png" target="_blank">
+<img src="screenshots/mobile/M24_pesaje_modal_mobile.png" alt="Modal de pesaje de residuos" loading="lazy">
+</a>
+<div class="cu-screenshot-mobile-caption">Modal de registro de pesaje para verificar cantidades recibidas</div>
+</div>
+
+<h4>Reportes del Operador</h4>
+<p>Acceso a reportes filtrados por el operador propio, con graficos de residuos recibidos por tipo, tasa de tratamiento, y exportacion a PDF/CSV.</p>
+
+<div class="cu-screenshot-mobile">
+<a href="screenshots/mobile/M20_reportes_operador_mobile.png" target="_blank">
+<img src="screenshots/mobile/M20_reportes_operador_mobile.png" alt="Reportes del operador mobile" loading="lazy">
+</a>
+<div class="cu-screenshot-mobile-caption">Centro de reportes adaptado a mobile con graficos y exportacion</div>
+</div>
+</section>
+
+<section id="pwa-gps" data-role="transportista">
+<h3>4.8 Tracking GPS y Viaje en Curso</h3>
+<div class="info-card role-card-transportista">
+<p><strong>Exclusivo para TRANSPORTISTA:</strong> El sistema de tracking GPS permite el monitoreo en tiempo real de la posicion del vehiculo durante el transporte de residuos peligrosos. Soporta hasta 50 viajes simultaneos con transmision cada 30 segundos.</p>
+</div>
+
+<div class="cu-screenshot-mobile">
+<a href="screenshots/mobile/M22_viaje_gps_activo_mobile.png" target="_blank">
+<img src="screenshots/mobile/M22_viaje_gps_activo_mobile.png" alt="Panel de viaje con GPS activo" loading="lazy">
+</a>
+<div class="cu-screenshot-mobile-caption">Panel de control del viaje con GPS activo, timer y controles</div>
+</div>
+
+<h4>Panel de Control del Viaje</h4>
+<p>La pantalla <code>ViajeEnCursoTransportista</code> muestra toda la informacion del viaje activo:</p>
+<ul>
+<li><strong>Timer:</strong> Tiempo transcurrido desde la fecha de retiro (<code>fechaRetiro</code> del servidor, no un contador local).</li>
+<li><strong>Velocidad:</strong> Velocidad actual reportada por el GPS del dispositivo.</li>
+<li><strong>Coordenadas:</strong> Latitud y longitud actuales.</li>
+<li><strong>Direccion:</strong> Rumbo de desplazamiento (heading).</li>
+<li><strong>Informacion del manifiesto:</strong> Numero, generador, operador, residuos.</li>
+</ul>
+
+<h4>Estado del GPS (Maquina de Estados)</h4>
+<p>El GPS del dispositivo pasa por diferentes estados durante el viaje:</p>
+<table>
+<thead><tr><th>Estado</th><th>Indicador</th><th>Descripcion</th></tr></thead>
+<tbody>
+<tr><td><code>checking</code></td><td>Gris</td><td>Verificando permisos de geolocalizacion</td></tr>
+<tr><td><code>acquiring</code></td><td>Amarillo pulsante</td><td>Obteniendo primera posicion GPS</td></tr>
+<tr><td><code>active</code></td><td>Verde</td><td>GPS activo, transmitiendo cada 30 segundos</td></tr>
+<tr><td><code>denied</code></td><td>Rojo</td><td>Permisos de GPS denegados por el usuario</td></tr>
+<tr><td><code>unavailable</code></td><td>Rojo</td><td>GPS no disponible en el dispositivo</td></tr>
+<tr><td><code>error</code></td><td>Rojo</td><td>Error en la obtencion de posicion</td></tr>
+</tbody>
+</table>
+
+<h4>Transmision de Datos</h4>
+<p>Cada 30 segundos, el dispositivo envia la posicion actual al backend:</p>
+<table>
+<thead><tr><th>Dato</th><th>Tipo</th><th>Requerido</th></tr></thead>
+<tbody>
+<tr><td>latitud</td><td>number</td><td>Si</td></tr>
+<tr><td>longitud</td><td>number</td><td>Si</td></tr>
+<tr><td>velocidad</td><td>number</td><td>No (puede ser null)</td></tr>
+<tr><td>direccion</td><td>number</td><td>No (heading en grados)</td></tr>
+</tbody>
+</table>
+
+<h4>Pausa y Reanudacion</h4>
+<p>El transportista puede pausar y reanudar el viaje durante el transporte. Cada accion registra un incidente (PAUSA o REANUDACION) en el backend y se persiste en <code>localStorage</code> para sobrevivir cierres accidentales de la aplicacion.</p>
+
+<h4>Registro de Incidentes</h4>
+<p>Durante un viaje EN_TRANSITO, el transportista puede registrar incidentes como:</p>
+<ul>
+<li><strong>Averia:</strong> Problema mecanico o del vehiculo.</li>
+<li><strong>Pausa:</strong> Detencion temporal planificada.</li>
+<li><strong>Reanudacion:</strong> Continuacion despues de una pausa.</li>
+</ul>
+<p>Cada incidente se registra con timestamp y se muestra en la timeline del manifiesto.</p>
+
+<h4>Confirmar Entrega</h4>
+<p>Al llegar al operador de destino, el transportista toca &quot;Confirmar Entrega&quot; para cambiar el estado del manifiesto de EN_TRANSITO a ENTREGADO. Esto detiene el tracking GPS y limpia el cache de verificacion del manifiesto.</p>
+
+<h4>Resiliencia y Modo Offline</h4>
+<p>El tracking GPS esta disenado para funcionar de manera robusta ante perdidas de conexion:</p>
+<table>
+<thead><tr><th>Mecanismo</th><th>Descripcion</th></tr></thead>
+<tbody>
+<tr><td><strong>Cola de pendientes</strong></td><td>Hasta 5 puntos GPS no enviados se almacenan en <code>pendingUpdatesRef</code></td></tr>
+<tr><td><strong>Persistencia localStorage</strong></td><td>La cola se guarda en <code>gps_pending_{id}</code> al cerrar o enviar a background la app</td></tr>
+<tr><td><strong>IndexedDB backup</strong></td><td>Cola respaldada en <code>sync_queue</code> de IndexedDB como segunda capa de seguridad</td></tr>
+<tr><td><strong>Flush al montar</strong></td><td>Al reabrir la app, los puntos guardados se envian automaticamente al backend</td></tr>
+<tr><td><strong>Cleanup de watchPosition</strong></td><td>Callback <code>cleanupGps</code> + listener <code>beforeunload</code> previene watchers zombie</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="pwa-qr" data-role="all">
+<h3>4.9 Escaner QR</h3>
+<p>La aplicacion incluye un escaner de codigos QR integrado que permite acceder rapidamente a la informacion de un manifiesto escaneando su codigo impreso.</p>
+
+<div class="cu-screenshot-mobile">
+<a href="screenshots/mobile/M15_escaner_qr_mobile.png" target="_blank">
+<img src="screenshots/mobile/M15_escaner_qr_mobile.png" alt="Escaner QR mobile" loading="lazy">
+</a>
+<div class="cu-screenshot-mobile-caption">Escaner QR utilizando la camara del dispositivo</div>
+</div>
+
+<h4>Como Funciona</h4>
+<ol>
+<li>Acceder al escaner desde el menu lateral (Herramientas &rarr; Escaner QR).</li>
+<li>La aplicacion solicita permiso para acceder a la camara del dispositivo.</li>
+<li>Apuntar la camara al codigo QR impreso en el manifiesto fisico.</li>
+<li>La libreria <code>html5-qrcode</code> decodifica el contenido del QR automaticamente.</li>
+<li>Se extrae el numero de manifiesto y se navega a la pantalla de verificacion publica.</li>
+</ol>
+
+<h4>Verificacion Publica</h4>
+<p>La verificacion de manifiesto via QR no requiere autenticacion. Cualquier persona puede escanear el codigo QR de un manifiesto y verificar su autenticidad y estado actual a traves del endpoint publico <code>/api/manifiestos/verificar/:numero</code>.</p>
+
+<h4>Comportamiento Offline</h4>
+<p>El escaner funciona sin conexion a internet (la decodificacion del QR es local). Sin embargo, la navegacion al detalle del manifiesto requiere conexion al servidor para obtener los datos actualizados.</p>
+</section>
+
+<section id="pwa-offline" data-role="all">
+<h3>4.10 Modo Offline</h3>
+<div class="info-card">
+<p><strong>Estrategia Network-First:</strong> El Service Worker prioriza siempre la red. Solo cuando la conexion no esta disponible se recurre al cache local. Las solicitudes a la API nunca se cachean para garantizar datos actualizados.</p>
+</div>
+
+<div class="cu-screenshot-mobile">
+<a href="screenshots/mobile/M16_configuracion_mobile.png" target="_blank">
+<img src="screenshots/mobile/M16_configuracion_mobile.png" alt="Configuracion y estado de conectividad" loading="lazy">
+</a>
+<div class="cu-screenshot-mobile-caption">Pantalla de configuracion mostrando estado de conectividad</div>
+</div>
+
+<h4>Service Worker</h4>
+<table>
+<thead><tr><th>Componente</th><th>Detalle</th></tr></thead>
+<tbody>
+<tr><td>Estrategia</td><td>Network-first con fallback a cache</td></tr>
+<tr><td>Cache name</td><td><code>trazabilidad-rrpp-v14</code></td></tr>
+<tr><td>Pagina offline</td><td>Fallback personalizado en <code>/offline.html</code></td></tr>
+<tr><td>Exclusiones</td><td>Solicitudes a <code>/api/</code> nunca se cachean</td></tr>
+<tr><td>Recursos cacheados</td><td>HTML, CSS, JS, imagenes, fuentes</td></tr>
+</tbody>
+</table>
+
+<h4>Estrategia de Cache</h4>
 <ol>
 <li>Primero intenta obtener el recurso de la red.</li>
 <li>Si la red no esta disponible, busca en el cache local.</li>
 <li>Si el recurso no esta en cache, muestra la pagina de fallback offline.</li>
 <li>Las solicitudes a la API (<code>/api/</code>) NO se cachean para garantizar datos actualizados.</li>
-<li>Los recursos estaticos (HTML, CSS, JS, imagenes) se cachean automaticamente.</li>
+<li>Los recursos estaticos se cachean automaticamente al ser visitados.</li>
 </ol>
 
 <h4>Comportamiento Offline por Tipo de Operacion</h4>
@@ -1150,72 +1764,104 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <thead><tr><th>Operacion</th><th>Disponible Offline</th><th>Comportamiento</th></tr></thead>
 <tbody>
 <tr><td>Ver pantallas cacheadas</td><td>Si</td><td>Se muestran desde el cache del Service Worker</td></tr>
-<tr><td>Enviar puntos GPS</td><td>Parcial</td><td>Se almacenan localmente y se envian al reconectar</td></tr>
+<tr><td>Enviar puntos GPS</td><td>Parcial</td><td>Se almacenan en localStorage + IndexedDB y se envian al reconectar</td></tr>
 <tr><td>Crear manifiestos</td><td>No</td><td>Requiere conexion al servidor</td></tr>
 <tr><td>Cambiar estados</td><td>No</td><td>Requiere conexion al servidor</td></tr>
 <tr><td>Ver reportes</td><td>No</td><td>Requiere datos actualizados del servidor</td></tr>
-<tr><td>Escanear QR</td><td>Parcial</td><td>El escaneo funciona, pero la navegacion al detalle requiere conexion</td></tr>
+<tr><td>Escanear QR</td><td>Parcial</td><td>Escaneo local funciona; detalle requiere conexion</td></tr>
 <tr><td>Ver notificaciones</td><td>No</td><td>Requiere polling al servidor</td></tr>
 </tbody>
 </table>
 
 <h4>Indicador de Conectividad</h4>
-<p>El componente <code>ConnectivityIndicator</code> se muestra automaticamente cuando se detecta perdida de conexion:</p>
+<p>El componente <code>ConnectivityIndicator</code> se muestra automaticamente segun el estado de la conexion:</p>
 <ul>
 <li><strong>Online:</strong> Sin indicador visible (comportamiento normal).</li>
-<li><strong>Offline:</strong> Barra amarilla en la parte superior de la pantalla con mensaje &quot;Sin conexion a internet&quot;.</li>
+<li><strong>Offline:</strong> Barra amarilla en la parte superior: &quot;Sin conexion a internet&quot;.</li>
 <li><strong>Reconectando:</strong> Barra con animacion pulsante indicando intento de reconexion.</li>
-<li><strong>Reconectado:</strong> Barra verde momentanea indicando que la conexion se restablecio. Desaparece tras 3 segundos.</li>
+<li><strong>Reconectado:</strong> Barra verde momentanea que desaparece tras 3 segundos.</li>
 </ul>
 
+<h4>Sincronizacion Automatica</h4>
+<p>El hook <code>useConnectivity</code> realiza un health ping al servidor cada 30 segundos. Al detectar reconexion, ejecuta automaticamente el flush de todos los datos pendientes (puntos GPS, estados de viaje) almacenados durante el periodo offline.</p>
+
 <h4>Persistencia de Estado del Viaje</h4>
-<p>Para transportistas, el estado del viaje se persiste localmente para sobrevivir reinicios de la aplicacion:</p>
+<p>Para transportistas, el estado del viaje se persiste localmente para sobrevivir reinicios:</p>
 <table>
 <thead><tr><th>Clave localStorage</th><th>Contenido</th><th>Uso</th></tr></thead>
 <tbody>
-<tr><td><code>sitrep_active_trip_id</code></td><td>ID del manifiesto con viaje activo</td><td>Redireccion automatica al viaje al abrir la app</td></tr>
-<tr><td><code>viaje_snapshot_{id}</code></td><td>Ultimo snapshot de datos del viaje</td><td>Mostrar datos del viaje mientras se recarga del servidor</td></tr>
-<tr><td><code>viaje_status_{id}</code></td><td>Estado del GPS (activo/pausa)</td><td>Reanudar correctamente el tracking tras reinicio</td></tr>
-<tr><td><code>gps_pending_{id}</code></td><td>Cola de puntos GPS no enviados</td><td>Flush al servidor al montar el componente de viaje</td></tr>
+<tr><td><code>sitrep_active_trip_id</code></td><td>ID del manifiesto activo</td><td>Redireccion automatica al viaje al abrir la app</td></tr>
+<tr><td><code>viaje_snapshot_{id}</code></td><td>Ultimo snapshot del viaje</td><td>Mostrar datos mientras se recarga del servidor</td></tr>
+<tr><td><code>viaje_status_{id}</code></td><td>Estado GPS (activo/pausa)</td><td>Reanudar tracking tras reinicio</td></tr>
+<tr><td><code>gps_pending_{id}</code></td><td>Cola de puntos GPS no enviados</td><td>Flush al servidor al montar el componente</td></tr>
 </tbody>
 </table>
 </section>
 
-<section id="pwa-roles" data-role="transportista">
-<h3>4.4 Funciones por Rol</h3>
-<div class="info-card role-card-transportista">
-<p><strong>Funcionalidades especificas para TRANSPORTISTA en mobile:</strong></p>
-</div>
-<ul>
-<li><strong>Banner de asignacion de viaje en Dashboard:</strong>
-  <ul>
-    <li>Viaje activo (EN_TRANSITO): tarjeta verde pulsante con boton &quot;Ir al viaje&quot;.</li>
-    <li>Viaje pendiente (APROBADO): tarjeta de advertencia con lista clickeable.</li>
-  </ul>
-</li>
-<li><strong>ViajeEnCursoTransportista:</strong> Panel de control GPS completo con temporizador, velocidad actual, boton de pausa/reanudacion y registro de incidentes.</li>
-<li><strong>Escaner QR:</strong> Lectura rapida de codigos QR para acceder al manifiesto correspondiente.</li>
-<li><strong>Guard de viaje activo:</strong> Proteccion que evita redireccion a viajes ya finalizados (valida estado contra estados terminales).</li>
-</ul>
-</section>
-
 <section id="pwa-tour" data-role="all">
-<h3>4.5 Tour de Bienvenida</h3>
-<p>SITREP incluye dos mecanismos de onboarding para guiar a los usuarios nuevos en su primer acceso:</p>
+<h3>4.11 Tour de Bienvenida</h3>
+<p>SITREP incluye dos mecanismos de onboarding complementarios para guiar a los usuarios nuevos en su primer acceso a la aplicacion.</p>
 
-<h4>OnboardingTour (Tour Interactivo)</h4>
-<p>Un tour guiado de 5 pasos con spotlight que resalta los elementos clave de la interfaz:</p>
+<h4>OnboardingTour (Tour Interactivo Desktop/Mobile)</h4>
+<p>Un tour guiado de 5 pasos con efecto spotlight que resalta los elementos clave de la interfaz:</p>
 <ol>
-<li><strong>Dashboard:</strong> Panel principal con KPIs y resumen de actividad.</li>
+<li><strong>Dashboard:</strong> Panel principal con KPIs y resumen de actividad del sistema.</li>
 <li><strong>Manifiestos:</strong> Listado y gestion de manifiestos de residuos peligrosos.</li>
-<li><strong>Centro de Control:</strong> Mapa en tiempo real con transportes activos.</li>
-<li><strong>Reportes:</strong> Analisis y exportacion de datos del sistema.</li>
+<li><strong>Centro de Control:</strong> Mapa en tiempo real con transportes activos y capas de datos.</li>
+<li><strong>Reportes:</strong> Analisis interactivo con graficos y exportacion PDF/CSV.</li>
 <li><strong>Configuracion:</strong> Preferencias personales y ajustes de notificaciones.</li>
 </ol>
-<p>El tour se activa automaticamente en el primer login y puede relanzarse desde la pagina de Ayuda.</p>
+<p>El tour se activa automaticamente en el primer login y puede relanzarse desde la pagina de <strong>Ayuda</strong>.</p>
 
-<h4>DemoAppOnboarding (Carrusel por Rol)</h4>
-<p>Al primer acceso desde la aplicacion movil, se muestra un carrusel de bienvenida con pantallas especificas segun el rol del usuario. Cada carrusel destaca las funcionalidades mas relevantes para ese perfil, permitiendo al usuario familiarizarse rapidamente con las herramientas a su disposicion.</p>
+<h4>DemoAppOnboarding (Carrusel por Rol - Mobile)</h4>
+<p>Al primer acceso desde la aplicacion movil PWA, se muestra un carrusel de bienvenida con slides especificos segun el rol del usuario:</p>
+
+<table>
+<thead><tr><th>Rol</th><th>Slides del Carrusel</th></tr></thead>
+<tbody>
+<tr><td><strong>ADMIN</strong></td><td>Vision general del sistema, herramientas avanzadas (impersonar usuarios, barra de comandos Cmd+K, importacion CSV masiva), Centro de Control en tiempo real</td></tr>
+<tr><td><strong>GENERADOR</strong></td><td>Como crear manifiestos paso a paso, trazabilidad completa del residuo desde generacion hasta tratamiento, descarga de certificados</td></tr>
+<tr><td><strong>TRANSPORTISTA</strong></td><td>Gestion de viajes asignados, tracking GPS en tiempo real, administracion de flota (vehiculos y choferes)</td></tr>
+<tr><td><strong>OPERADOR</strong></td><td>Recepcion y verificacion de cargas, registro de pesaje y tratamiento, emision de certificados de disposicion final</td></tr>
+</tbody>
+</table>
+
+<p>El carrusel puede relanzarse en cualquier momento desde la pagina de <strong>Ayuda</strong> dentro de la aplicacion.</p>
+</section>
+
+<section id="pwa-configuracion" data-role="all">
+<h3>4.12 Configuracion</h3>
+<p>La pantalla de configuracion permite al usuario personalizar su experiencia y gestionar su cuenta desde el dispositivo movil.</p>
+
+<div class="cu-screenshot-mobile">
+<a href="screenshots/mobile/M16_configuracion_mobile.png" target="_blank">
+<img src="screenshots/mobile/M16_configuracion_mobile.png" alt="Configuracion mobile" loading="lazy">
+</a>
+<div class="cu-screenshot-mobile-caption">Pantalla de configuracion con opciones de cuenta y preferencias</div>
+</div>
+
+<h4>Opciones Disponibles</h4>
+<table>
+<thead><tr><th>Opcion</th><th>Descripcion</th></tr></thead>
+<tbody>
+<tr><td><strong>Editar Perfil</strong></td><td>Modificar nombre y datos personales del usuario</td></tr>
+<tr><td><strong>Cambiar Contrasena</strong></td><td>Requiere ingresar la contrasena actual y la nueva (validacion de complejidad)</td></tr>
+<tr><td><strong>Notificaciones</strong></td><td>Toggle para activar/desactivar notificaciones por email</td></tr>
+<tr><td><strong>Ayuda</strong></td><td>Acceso a la documentacion y opcion de relanzar el Tour de Bienvenida</td></tr>
+<tr><td><strong>Cerrar Sesion</strong></td><td>Cierra la sesion activa y limpia todos los datos locales</td></tr>
+</tbody>
+</table>
+
+<h4>Comportamiento del Logout</h4>
+<p>Al cerrar sesion, la aplicacion realiza una limpieza completa de datos locales para garantizar la seguridad:</p>
+<ul>
+<li>Tokens JWT (access y refresh).</li>
+<li><code>sitrep_active_trip_id</code> — ID del viaje activo.</li>
+<li><code>viaje_snapshot_*</code> — Snapshots de datos de viaje.</li>
+<li><code>viaje_status_*</code> — Estado del GPS.</li>
+<li><code>gps_pending_*</code> — Cola de puntos GPS pendientes.</li>
+</ul>
+<p>Esto asegura que al iniciar sesion con otro usuario, no se mezclen datos de sesiones anteriores.</p>
 </section>
 
 <!-- ============================================================ -->
