@@ -98,6 +98,8 @@ test_public() {
 echo ""
 echo "--- Health ---"
 test_public "GET" "/health" "200"
+test_public "GET" "/health/live" "200"
+test_public "GET" "/health/ready" "200"
 
 echo ""
 echo "--- Auth ---"

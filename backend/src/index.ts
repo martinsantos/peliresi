@@ -129,6 +129,79 @@ app.get('/api/health', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * @openapi
+ * /health/live:
+ *   get:
+ *     tags: [Health]
+ *     summary: Liveness probe
+ *     description: Retorna 200 si el proceso está vivo y acepta requests.
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: Proceso vivo
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: alive }
+ *                 pid: { type: number, example: 12345 }
+ *                 uptime: { type: number, example: 3600 }
+ */
+// Liveness probe — process is alive and accepting requests
+app.get('/api/health/live', (_req: Request, res: Response) => {
+  res.json({ status: 'alive', pid: process.pid, uptime: process.uptime() });
+});
+
+/**
+ * @openapi
+ * /health/ready:
+ *   get:
+ *     tags: [Health]
+ *     summary: Readiness probe
+ *     description: Retorna 200 si DB conectada, memoria < 450MB y uptime > 10s. 503 si algún check falla.
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: Listo para recibir tráfico
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: ready }
+ *                 checks:
+ *                   type: object
+ *                   properties:
+ *                     db: { type: boolean }
+ *                     memory: { type: boolean }
+ *                     uptime: { type: boolean }
+ *                 memoryMB: { type: number, example: 98 }
+ *                 uptime: { type: number, example: 3600 }
+ *       503:
+ *         description: No listo (algún check falló)
+ */
+// Readiness probe — process is ready to serve traffic
+app.get('/api/health/ready', async (_req: Request, res: Response) => {
+  const memMB = process.memoryUsage().rss / 1024 / 1024;
+  const uptime = process.uptime();
+  const checks = { db: false, memory: memMB < 450, uptime: uptime > 10 };
+
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    checks.db = true;
+  } catch { /* db unreachable */ }
+
+  const ready = checks.db && checks.memory && checks.uptime;
+  res.status(ready ? 200 : 503).json({
+    status: ready ? 'ready' : 'not_ready',
+    checks,
+    memoryMB: Math.round(memMB),
+    uptime: Math.round(uptime),
+  });
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/manifiestos', manifiestoRoutes);
 app.use('/api/catalogos', catalogoRoutes);

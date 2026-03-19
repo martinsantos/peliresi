@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SITREP — Manual del Sistema | v2026.5</title>
+<title>SITREP — Manual del Sistema | v2026.6</title>
 <meta name="description" content="Manual completo del Sistema de Trazabilidad de Residuos Peligrosos - Provincia de Mendoza">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,7 +18,7 @@
     <span></span><span></span><span></span>
   </button>
   <div class="logo">SITREP <span>Mendoza</span></div>
-  <span class="version">v2026.5</span>
+  <span class="version">v2026.6</span>
   <span class="doc-title">Manual del Sistema de Trazabilidad de Residuos Peligrosos</span>
   <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" aria-label="Cambiar tema">&#127769;</button>
 </header>
@@ -143,9 +143,62 @@
   <div class="nav-section-title" onclick="toggleNavGroup(this)">14. Flujos por Perfil</div>
   <div class="nav-group-items">
     <a href="#flujo-admin" class="nav-link">14.1 Administrador</a>
+    <a href="#fa-1" class="nav-link level-3">Acceso</a>
+    <a href="#fa-2" class="nav-link level-3">Dashboard</a>
+    <a href="#fa-3" class="nav-link level-3">Centro de Control</a>
+    <a href="#fa-4" class="nav-link level-3">Gestión Usuarios</a>
+    <a href="#fa-5" class="nav-link level-3">Búsqueda Cmd+K</a>
+    <a href="#fa-6" class="nav-link level-3">Reportes</a>
+    <a href="#fa-7" class="nav-link level-3">Alertas</a>
+    <a href="#fa-8" class="nav-link level-3">Carga Masiva</a>
+    <a href="#fa-9" class="nav-link level-3">Auditoría</a>
+    <a href="#fa-10" class="nav-link level-3">Configuración</a>
     <a href="#flujo-generador" class="nav-link level-2">14.2 Generador</a>
+    <a href="#fg-1" class="nav-link level-3">Acceso</a>
+    <a href="#fg-2" class="nav-link level-3">Dashboard</a>
+    <a href="#fg-3" class="nav-link level-3">Crear Manifiesto P1</a>
+    <a href="#fg-4" class="nav-link level-3">Agregar Residuos</a>
+    <a href="#fg-5" class="nav-link level-3">Transportista y Operador</a>
+    <a href="#fg-6" class="nav-link level-3">Firmar y Aprobar</a>
+    <a href="#fg-7" class="nav-link level-3">Seguimiento</a>
+    <a href="#fg-8" class="nav-link level-3">Tratado — Descarga</a>
+    <a href="#fg-9" class="nav-link level-3">Mis Reportes</a>
     <a href="#flujo-transportista" class="nav-link level-2">14.3 Transportista</a>
+    <a href="#ft-1" class="nav-link level-3">Acceso</a>
+    <a href="#ft-2" class="nav-link level-3">Dashboard</a>
+    <a href="#ft-3" class="nav-link level-3">Manifiestos APROBADO</a>
+    <a href="#ft-4" class="nav-link level-3">Tomar Viaje</a>
+    <a href="#ft-5" class="nav-link level-3">Confirmar Retiro</a>
+    <a href="#ft-6" class="nav-link level-3">GPS Tracking</a>
+    <a href="#ft-7" class="nav-link level-3">Registrar Incidente</a>
+    <a href="#ft-8" class="nav-link level-3">Escanear QR</a>
+    <a href="#ft-9" class="nav-link level-3">Confirmar Entrega</a>
+    <a href="#ft-10" class="nav-link level-3">Gestionar Flota</a>
     <a href="#flujo-operador" class="nav-link level-2">14.4 Operador</a>
+    <a href="#fo-1" class="nav-link level-3">Acceso</a>
+    <a href="#fo-2" class="nav-link level-3">Dashboard Entrantes</a>
+    <a href="#fo-3" class="nav-link level-3">Ver ENTREGADO</a>
+    <a href="#fo-4" class="nav-link level-3">Confirmar Recepción</a>
+    <a href="#fo-5" class="nav-link level-3">Pesaje</a>
+    <a href="#fo-6" class="nav-link level-3">Rechazar</a>
+    <a href="#fo-7" class="nav-link level-3">Tratamiento</a>
+    <a href="#fo-8" class="nav-link level-3">Cerrar</a>
+    <a href="#fo-9" class="nav-link level-3">Certificado</a>
+  </div>
+
+  <div class="nav-section-title" onclick="toggleNavGroup(this)">15. Referencia DevOps</div>
+  <div class="nav-group-items">
+    <a href="#devops-stack" class="nav-link" data-nav-role="admin">15.1 Stack y Versiones</a>
+    <a href="#devops-deploy" class="nav-link level-2" data-nav-role="admin">15.2 Arquitectura Despliegue</a>
+    <a href="#devops-schema" class="nav-link level-2" data-nav-role="admin">15.3 Schema BD</a>
+    <a href="#devops-middleware" class="nav-link level-2" data-nav-role="admin">15.4 Middleware Pipeline</a>
+    <a href="#devops-auth" class="nav-link level-2" data-nav-role="admin">15.5 Autenticacion</a>
+    <a href="#devops-gps" class="nav-link level-2" data-nav-role="admin">15.6 GPS Tracking</a>
+    <a href="#devops-cicd" class="nav-link level-2" data-nav-role="admin">15.7 CI/CD</a>
+    <a href="#devops-monitoring" class="nav-link level-2" data-nav-role="admin">15.8 Monitoreo</a>
+    <a href="#devops-backups" class="nav-link level-2" data-nav-role="admin">15.9 Backups</a>
+    <a href="#devops-perf" class="nav-link level-2" data-nav-role="admin">15.10 Performance</a>
+    <a href="#devops-mejoras" class="nav-link level-2" data-nav-role="admin">15.11 Mejoras Propuestas</a>
   </div>
 </nav>
 
@@ -156,8 +209,64 @@
   <div class="print-logo">SITREP</div>
   <h1>Manual del Sistema de Trazabilidad<br>de Residuos Peligrosos</h1>
   <p class="print-subtitle">Provincia de Mendoza &mdash; Direccion General de Fiscalizacion Ambiental</p>
-  <p class="print-date">Version 2026.5 &mdash; Marzo 2026</p>
+  <p class="print-date">Version 2026.6 &mdash; Marzo 2026</p>
 </div>
+
+<!-- Hero Section — Apple Keynote Style -->
+<section class="hero" id="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-content">
+    <div class="hero-text">
+      <h1 class="hero-title">
+        <span class="hero-logo">SITREP</span>
+        <span class="hero-accent">Mendoza</span>
+      </h1>
+      <p class="hero-subtitle">Sistema de Trazabilidad de Residuos Peligrosos</p>
+      <p class="hero-tagline">Trazabilidad completa. Control en tiempo real. Cumplimiento normativo.</p>
+      <div class="hero-badges">
+        <span class="hero-badge">Ley 24.051</span>
+        <span class="hero-badge">GPS en Vivo</span>
+        <span class="hero-badge">110+ API Endpoints</span>
+        <span class="hero-badge">PWA Mobile</span>
+      </div>
+    </div>
+    <div class="hero-devices">
+      <div class="device-desktop">
+        <div class="device-frame">
+          <div class="device-notch">
+            <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+          </div>
+          <div class="device-screen">
+            <img class="hero-slide active" src="screenshots/desktop/04_dashboard_admin.png" alt="Dashboard">
+            <img class="hero-slide" src="screenshots/desktop/05_centro_control.png" alt="Centro de Control">
+            <img class="hero-slide" src="screenshots/desktop/07_manifiestos_lista.png" alt="Manifiestos">
+            <img class="hero-slide" src="screenshots/desktop/17_reportes_manifiestos.png" alt="Reportes">
+            <img class="hero-slide" src="screenshots/desktop/19_reportes_departamentos_mapa.png" alt="Mapa Departamentos">
+            <img class="hero-slide" src="screenshots/desktop/23_admin_usuarios.png" alt="Usuarios">
+            <img class="hero-slide" src="screenshots/desktop/25_busqueda_global_cmd_k.png" alt="Busqueda Global">
+            <img class="hero-slide" src="screenshots/desktop/36_carga_masiva.png" alt="Carga Masiva">
+            <div class="hero-cursor" id="heroCursor"></div>
+          </div>
+        </div>
+      </div>
+      <div class="device-mobile">
+        <div class="device-frame-mobile">
+          <div class="device-island"></div>
+          <div class="device-screen-mobile">
+            <img class="hero-slide-mobile active" src="screenshots/mobile/M02_dashboard_admin_mobile.png" alt="Dashboard Mobile">
+            <img class="hero-slide-mobile" src="screenshots/mobile/M10_dashboard_transportista_mobile.png" alt="Transportista Mobile">
+            <img class="hero-slide-mobile" src="screenshots/mobile/M15_escaner_qr_mobile.png" alt="QR Scanner">
+            <img class="hero-slide-mobile" src="screenshots/mobile/M04_reportes_mobile.png" alt="Reportes Mobile">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <a href="#roleTabs" class="hero-scroll-cta">
+    <span>Explorar Manual</span>
+    <div class="scroll-arrow"></div>
+  </a>
+</section>
 
 <!-- Role Filter Tabs -->
 <div class="role-tabs" id="roleTabs">
@@ -1121,20 +1230,25 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <table>
 <thead><tr><th>Capa</th><th>Tecnologia</th><th>Version</th></tr></thead>
 <tbody>
-<tr><td>Runtime</td><td>Node.js</td><td>20</td></tr>
-<tr><td>Framework Backend</td><td>Express.js</td><td>4.x</td></tr>
-<tr><td>Lenguaje</td><td>TypeScript</td><td>5.x</td></tr>
-<tr><td>ORM</td><td>Prisma</td><td>Latest</td></tr>
-<tr><td>Base de Datos</td><td>PostgreSQL</td><td>En Docker</td></tr>
-<tr><td>Framework Frontend</td><td>React</td><td>19</td></tr>
-<tr><td>Build Tool</td><td>Vite</td><td>7.2</td></tr>
-<tr><td>Estado/Data</td><td>TanStack Query</td><td>v5</td></tr>
-<tr><td>Graficos</td><td>Recharts</td><td>3.5.1</td></tr>
-<tr><td>Mapas</td><td>Leaflet + React Leaflet</td><td>1.9.4</td></tr>
-<tr><td>PDF</td><td>jsPDF + jspdf-autotable</td><td>4.1 / 5.0</td></tr>
-<tr><td>CSS</td><td>Tailwind CSS</td><td>Custom design system</td></tr>
-<tr><td>Iconos</td><td>Lucide React</td><td>Latest</td></tr>
-<tr><td>QR</td><td>html5-qrcode</td><td>Latest</td></tr>
+<tr><td>Runtime</td><td>Node.js</td><td>20.19.4</td></tr>
+<tr><td>Framework Backend</td><td>Express.js</td><td>^4.18.2</td></tr>
+<tr><td>Lenguaje Backend</td><td>TypeScript</td><td>^5.2.2</td></tr>
+<tr><td>ORM</td><td>Prisma</td><td>^5.6.0</td></tr>
+<tr><td>Base de Datos</td><td>PostgreSQL</td><td>15-alpine (Docker)</td></tr>
+<tr><td>Framework Frontend</td><td>React</td><td>^19.2.0</td></tr>
+<tr><td>Build Tool</td><td>Vite</td><td>^7.2.4</td></tr>
+<tr><td>Lenguaje Frontend</td><td>TypeScript</td><td>~5.9.3</td></tr>
+<tr><td>Estado/Data</td><td>TanStack React Query</td><td>^5.90.20</td></tr>
+<tr><td>Graficos</td><td>Recharts</td><td>^3.5.1</td></tr>
+<tr><td>Mapas</td><td>Leaflet + React Leaflet</td><td>^1.9.4 + ^5.0.0</td></tr>
+<tr><td>PDF (client)</td><td>jsPDF + jspdf-autotable</td><td>^4.1.0 + ^5.0.7</td></tr>
+<tr><td>PDF (server)</td><td>PDFKit</td><td>^0.17.2</td></tr>
+<tr><td>CSS</td><td>Tailwind CSS</td><td>^3.4.19</td></tr>
+<tr><td>Iconos</td><td>Lucide React</td><td>^0.555.0</td></tr>
+<tr><td>QR</td><td>qrcode.react + qrcode (server)</td><td>^4.2.0 + ^1.5.3</td></tr>
+<tr><td>HTTP Client</td><td>Axios</td><td>^1.13.2</td></tr>
+<tr><td>Router</td><td>React Router DOM</td><td>^7.10.1</td></tr>
+<tr><td>E2E Testing</td><td>Playwright</td><td>^1.58.2</td></tr>
 </tbody>
 </table>
 
@@ -4009,7 +4123,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">1</div>
   <div class="wf-step-body">
-    <h4>Acceso al Sistema</h4>
+    <h4 id="fa-1">Acceso al Sistema</h4>
     <p>Login con credenciales DGFA. Panel de acceso rápido con roles demo disponible para pruebas.</p>
     <a href="screenshots/desktop/01_login.png" target="_blank"><img src="screenshots/desktop/01_login.png" alt="Acceso al Sistema" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4017,7 +4131,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">2</div>
   <div class="wf-step-body">
-    <h4>Dashboard — Visión General</h4>
+    <h4 id="fa-2">Dashboard — Visión General</h4>
     <p>7 KPIs principales: borradores, aprobados, en tránsito, entregados, recibidos, tratados, total. Tabla de manifiestos recientes con links directos. Auto-refresco cada 30 segundos.</p>
     <a href="screenshots/desktop/04_dashboard_admin.png" target="_blank"><img src="screenshots/desktop/04_dashboard_admin.png" alt="Dashboard — Visión General" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4025,7 +4139,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">3</div>
   <div class="wf-step-body">
-    <h4>Centro de Control — Mapa en Vivo</h4>
+    <h4 id="fa-3">Centro de Control — Mapa en Vivo</h4>
     <p>Mapa Leaflet con capas: generadores (violeta), transportistas (naranja), operadores (azul), viajes activos (rojo pulsante). Presets de fecha: Hoy, 7d, 30d, 90d. Auto-refresco 30s.</p>
     <a href="screenshots/desktop/05_centro_control.png" target="_blank"><img src="screenshots/desktop/05_centro_control.png" alt="Centro de Control — Mapa en Vivo" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4033,7 +4147,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">4</div>
   <div class="wf-step-body">
-    <h4>Gestión de Usuarios</h4>
+    <h4 id="fa-4">Gestión de Usuarios</h4>
     <p>Crear, editar, activar/desactivar usuarios. Asignar 7 roles disponibles. Ícono ojo naranja para impersonación (Acceso Comodín). La columna de acciones muestra solo opciones permitidas.</p>
     <a href="screenshots/desktop/23_admin_usuarios.png" target="_blank"><img src="screenshots/desktop/23_admin_usuarios.png" alt="Gestión de Usuarios" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4041,7 +4155,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">5</div>
   <div class="wf-step-body">
-    <h4>Búsqueda Global Cmd+K</h4>
+    <h4 id="fa-5">Búsqueda Global Cmd+K</h4>
     <p>Atajo Cmd+K (Mac) / Ctrl+K (Windows) desde cualquier página. Resultados agrupados por tipo: manifiestos, actores, usuarios. Chips de filtro por estado de manifiesto.</p>
     <a href="screenshots/desktop/25_busqueda_global_cmd_k.png" target="_blank"><img src="screenshots/desktop/25_busqueda_global_cmd_k.png" alt="Búsqueda Global Cmd+K" loading="lazy" class="wf-step-img"></a>
 <div class="wf-tip">Tip: Escribe el número de manifiesto (ej: 2026-000042) para ir directamente al detalle.</div>
@@ -4050,7 +4164,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">6</div>
   <div class="wf-step-body">
-    <h4>Centro de Reportes</h4>
+    <h4 id="fa-6">Centro de Reportes</h4>
     <p>8 pestañas: Manifiestos, Residuos, Transporte, Establecimientos, Operadores, Departamentos, Mapa de Actores. Exportar a PDF client-side (jsPDF) o CSV (hasta 10.000 filas).</p>
     <a href="screenshots/desktop/17_reportes_manifiestos.png" target="_blank"><img src="screenshots/desktop/17_reportes_manifiestos.png" alt="Centro de Reportes" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4058,7 +4172,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">7</div>
   <div class="wf-step-body">
-    <h4>Gestión de Alertas</h4>
+    <h4 id="fa-7">Gestión de Alertas</h4>
     <p>Timeline con tarjetas coloreadas por criticidad (crítica, alta, media, baja). Tab Reglas para configurar alertas automáticas por condición: vencimiento, demora, anomalía.</p>
     <a href="screenshots/desktop/16_alertas_timeline.png" target="_blank"><img src="screenshots/desktop/16_alertas_timeline.png" alt="Gestión de Alertas" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4066,7 +4180,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">8</div>
   <div class="wf-step-body">
-    <h4>Carga Masiva de Datos</h4>
+    <h4 id="fa-8">Carga Masiva de Datos</h4>
     <p>Importación CSV de generadores, transportistas y operadores. Descarga de plantillas con formato exacto. Reporte por fila de éxitos y errores con descripción del problema.</p>
     <a href="screenshots/desktop/36_carga_masiva.png" target="_blank"><img src="screenshots/desktop/36_carga_masiva.png" alt="Carga Masiva de Datos" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4074,7 +4188,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">9</div>
   <div class="wf-step-body">
-    <h4>Auditoría del Sistema</h4>
+    <h4 id="fa-9">Auditoría del Sistema</h4>
     <p>Registro inmutable de todas las acciones: quién hizo qué, cuándo y desde qué IP. Filtros por usuario, acción y rango de fechas. No se puede modificar ni eliminar.</p>
     <a href="screenshots/desktop/35_admin_auditoria.png" target="_blank"><img src="screenshots/desktop/35_admin_auditoria.png" alt="Auditoría del Sistema" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4082,7 +4196,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">10</div>
   <div class="wf-step-body">
-    <h4>Configuración y Sub-roles</h4>
+    <h4 id="fa-10">Configuración y Sub-roles</h4>
     <p>Delegar administración con roles ADMIN_GENERADOR, ADMIN_TRANSPORTISTA, ADMIN_OPERADOR. Cada sub-rol ve solo su dominio en el menú lateral sin acceso a otros módulos.</p>
     <a href="screenshots/desktop/24_admin_usuario_crear_modal.png" target="_blank"><img src="screenshots/desktop/24_admin_usuario_crear_modal.png" alt="Configuración y Sub-roles" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4096,7 +4210,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">1</div>
   <div class="wf-step-body">
-    <h4>Acceso al Sistema</h4>
+    <h4 id="fg-1">Acceso al Sistema</h4>
     <p>Login con credenciales de generador. El sistema carga automáticamente con filtrado por tu generadorId. Solo ves tus propios manifiestos.</p>
     <a href="screenshots/desktop/01_login.png" target="_blank"><img src="screenshots/desktop/01_login.png" alt="Acceso al Sistema" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4104,7 +4218,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">2</div>
   <div class="wf-step-body">
-    <h4>Dashboard — Mis Manifiestos</h4>
+    <h4 id="fg-2">Dashboard — Mis Manifiestos</h4>
     <p>Vista rápida de manifiestos por estado. Acciones rápidas: Nuevo Manifiesto, Ver Reportes. Los manifiestos en tránsito se destacan para seguimiento inmediato.</p>
     <a href="screenshots/desktop/47_dashboard_generador.png" target="_blank"><img src="screenshots/desktop/47_dashboard_generador.png" alt="Dashboard — Mis Manifiestos" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4112,7 +4226,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">3</div>
   <div class="wf-step-body">
-    <h4>Crear Manifiesto — Paso 1</h4>
+    <h4 id="fg-3">Crear Manifiesto — Paso 1</h4>
     <p>Seleccionar generador de la lista. El sistema auto-completa CUIT, teléfono, domicilio y número de habilitación al seleccionar. Seleccionar tipo de residuo del catálogo Ley 24.051.</p>
     <a href="screenshots/desktop/14_nuevo_manifiesto_paso1.png" target="_blank"><img src="screenshots/desktop/14_nuevo_manifiesto_paso1.png" alt="Crear Manifiesto — Paso 1" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4120,7 +4234,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">4</div>
   <div class="wf-step-body">
-    <h4>Agregar Residuos</h4>
+    <h4 id="fg-4">Agregar Residuos</h4>
     <p>Seleccionar tipo de residuo del catálogo (codificación Y conforme Ley 24.051). Ingresar cantidad, unidad y descripción detallada. Múltiples residuos por manifiesto.</p>
     <a href="screenshots/desktop/62_manifiesto_nuevo_paso3_residuos.png" target="_blank"><img src="screenshots/desktop/62_manifiesto_nuevo_paso3_residuos.png" alt="Agregar Residuos" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4128,7 +4242,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">5</div>
   <div class="wf-step-body">
-    <h4>Seleccionar Transportista y Operador</h4>
+    <h4 id="fg-5">Seleccionar Transportista y Operador</h4>
     <p>Elegir transportista habilitado y operador de destino. El sistema muestra solo actores con habilitaciones vigentes. Se auto-completa información de contacto.</p>
     <a href="screenshots/desktop/15_nuevo_manifiesto_paso2.png" target="_blank"><img src="screenshots/desktop/15_nuevo_manifiesto_paso2.png" alt="Seleccionar Transportista y Operador" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4136,7 +4250,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">6</div>
   <div class="wf-step-body">
-    <h4>Firmar y Aprobar</h4>
+    <h4 id="fg-6">Firmar y Aprobar</h4>
     <p>El manifiesto en estado BORRADOR muestra el botón "Firmar/Aprobar". Al firmar, el estado cambia a APROBADO y se notifica automáticamente al transportista asignado.</p>
     <a href="screenshots/desktop/53_manifiesto_borrador_detalle.png" target="_blank"><img src="screenshots/desktop/53_manifiesto_borrador_detalle.png" alt="Firmar y Aprobar" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4144,7 +4258,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">7</div>
   <div class="wf-step-body">
-    <h4>Seguimiento del Transporte</h4>
+    <h4 id="fg-7">Seguimiento del Transporte</h4>
     <p>Ver posición GPS del vehículo en tiempo real desde la página del manifiesto. Timeline con cada evento del ciclo: retiro, incidentes, entrega, tratamiento.</p>
     <a href="screenshots/desktop/10_manifiestos_en_transito.png" target="_blank"><img src="screenshots/desktop/10_manifiestos_en_transito.png" alt="Seguimiento del Transporte" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4152,7 +4266,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">8</div>
   <div class="wf-step-body">
-    <h4>Manifiesto TRATADO — Descarga</h4>
+    <h4 id="fg-8">Manifiesto TRATADO — Descarga</h4>
     <p>Una vez completado el ciclo, descargar PDF del manifiesto (Ley 24.051) o el Certificado de Tratamiento y Disposición Final. Ambos documentos tienen membrete oficial SITREP.</p>
     <a href="screenshots/desktop/57_manifiesto_tratado_detalle.png" target="_blank"><img src="screenshots/desktop/57_manifiesto_tratado_detalle.png" alt="Manifiesto TRATADO — Descarga" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4160,7 +4274,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">9</div>
   <div class="wf-step-body">
-    <h4>Mis Reportes</h4>
+    <h4 id="fg-9">Mis Reportes</h4>
     <p>Reportes filtrados automáticamente por tu empresa: por estado, tipo de residuo, período. Gráficos interactivos (Recharts). Exportar a PDF/CSV para auditorías internas.</p>
     <a href="screenshots/desktop/52_reportes_operador.png" target="_blank"><img src="screenshots/desktop/52_reportes_operador.png" alt="Mis Reportes" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4174,7 +4288,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">1</div>
   <div class="wf-step-body">
-    <h4>Acceso — Web o PWA</h4>
+    <h4 id="ft-1">Acceso — Web o PWA</h4>
     <p>Login desde desktop o desde la PWA instalada en el celular. La PWA funciona offline y sincroniza datos cuando vuelve la conexión.</p>
     <a href="screenshots/desktop/01_login.png" target="_blank"><img src="screenshots/desktop/01_login.png" alt="Acceso — Web o PWA" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4182,7 +4296,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">2</div>
   <div class="wf-step-body">
-    <h4>Dashboard — Viajes Pendientes</h4>
+    <h4 id="ft-2">Dashboard — Viajes Pendientes</h4>
     <p>El dashboard muestra un banner con viajes activos (EN_TRANSITO) con botón directo "Ir al viaje". También lista los viajes APROBADO pendientes de tomar.</p>
     <a href="screenshots/desktop/41_dashboard_transportista.png" target="_blank"><img src="screenshots/desktop/41_dashboard_transportista.png" alt="Dashboard — Viajes Pendientes" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4190,7 +4304,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">3</div>
   <div class="wf-step-body">
-    <h4>Ver Manifiestos APROBADO</h4>
+    <h4 id="ft-3">Ver Manifiestos APROBADO</h4>
     <p>Lista de manifiestos asignados al transportista. Los APROBADO están destacados indicando que hay un viaje listo para retirar.</p>
     <a href="screenshots/desktop/45_manifiestos_transportista.png" target="_blank"><img src="screenshots/desktop/45_manifiestos_transportista.png" alt="Ver Manifiestos APROBADO" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4198,7 +4312,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">4</div>
   <div class="wf-step-body">
-    <h4>Tomar Viaje (desde móvil)</h4>
+    <h4 id="ft-4">Tomar Viaje (desde móvil)</h4>
     <p>En el perfil del transportista, la pestaña Viaje lista los manifiestos APROBADO. El botón "Tomar Viaje" navega a la pantalla de control del viaje.</p>
     <a href="screenshots/mobile/M21_tomar_viaje_mobile.png" target="_blank"><img src="screenshots/mobile/M21_tomar_viaje_mobile.png" alt="Tomar Viaje (desde móvil)" loading="lazy" class="wf-step-img-mobile"></a>
   </div>
@@ -4206,7 +4320,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">5</div>
   <div class="wf-step-body">
-    <h4>Confirmar Retiro</h4>
+    <h4 id="ft-5">Confirmar Retiro</h4>
     <p>En el detalle del manifiesto APROBADO, "Confirmar Retiro" registra la fecha y hora de retiro y cambia el estado a EN_TRANSITO. El GPS comienza a registrar posición.</p>
     <a href="screenshots/desktop/54_manifiesto_aprobado_detalle.png" target="_blank"><img src="screenshots/desktop/54_manifiesto_aprobado_detalle.png" alt="Confirmar Retiro" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4214,7 +4328,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">6</div>
   <div class="wf-step-body">
-    <h4>GPS Activo durante el Viaje</h4>
+    <h4 id="ft-6">GPS Activo durante el Viaje</h4>
     <p>La pantalla de viaje en curso muestra el mapa con la ruta, velocidad actual, tiempo transcurrido y controles: Pausar, Registrar Incidente, Confirmar Entrega.</p>
     <a href="screenshots/mobile/M22_viaje_gps_activo_mobile.png" target="_blank"><img src="screenshots/mobile/M22_viaje_gps_activo_mobile.png" alt="GPS Activo durante el Viaje" loading="lazy" class="wf-step-img-mobile"></a>
 <div class="wf-tip">El sistema envía la posición GPS cada 30 segundos. Los puntos se guardan aunque no haya conexión (hasta 5 puntos en cola offline).</div>
@@ -4223,7 +4337,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">7</div>
   <div class="wf-step-body">
-    <h4>Registrar Incidente (si aplica)</h4>
+    <h4 id="ft-7">Registrar Incidente (si aplica)</h4>
     <p>Si ocurre una avería o problema durante el traslado, "Registrar Incidente" crea un evento en el timeline del manifiesto. No cambia el estado — el viaje continúa.</p>
     <a href="screenshots/mobile/M22_viaje_gps_activo_mobile.png" target="_blank"><img src="screenshots/mobile/M22_viaje_gps_activo_mobile.png" alt="Registrar Incidente (si aplica)" loading="lazy" class="wf-step-img-mobile"></a>
   </div>
@@ -4231,7 +4345,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">8</div>
   <div class="wf-step-body">
-    <h4>Escanear QR en Destino</h4>
+    <h4 id="ft-8">Escanear QR en Destino</h4>
     <p>Al llegar a la planta operadora, escanear el QR del manifiesto para verificar la identidad del cargamento. Compatible con cámara de iOS y Android.</p>
     <a href="screenshots/desktop/46_escaner_qr_desktop.png" target="_blank"><img src="screenshots/desktop/46_escaner_qr_desktop.png" alt="Escanear QR en Destino" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4239,7 +4353,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">9</div>
   <div class="wf-step-body">
-    <h4>Confirmar Entrega</h4>
+    <h4 id="ft-9">Confirmar Entrega</h4>
     <p>"Confirmar Entrega" registra fecha/hora de entrega y cambia el estado a ENTREGADO. El operador de destino es notificado automáticamente.</p>
     <a href="screenshots/desktop/54_manifiesto_aprobado_detalle.png" target="_blank"><img src="screenshots/desktop/54_manifiesto_aprobado_detalle.png" alt="Confirmar Entrega" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4247,7 +4361,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">10</div>
   <div class="wf-step-body">
-    <h4>Gestionar mi Flota</h4>
+    <h4 id="ft-10">Gestionar mi Flota</h4>
     <p>Desde el perfil de transportista, gestionar vehículos (patente, habilitación, vencimiento) y conductores (DNI, licencia) de forma autónoma sin intervención del administrador.</p>
     <a href="screenshots/desktop/63_transportista_detalle_flota.png" target="_blank"><img src="screenshots/desktop/63_transportista_detalle_flota.png" alt="Gestionar mi Flota" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4261,7 +4375,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">1</div>
   <div class="wf-step-body">
-    <h4>Acceso al Sistema</h4>
+    <h4 id="fo-1">Acceso al Sistema</h4>
     <p>Login con credenciales de operador/planta. El sistema carga automáticamente filtrado por tu operadorId. Solo ves los manifiestos destinados a tu planta.</p>
     <a href="screenshots/desktop/01_login.png" target="_blank"><img src="screenshots/desktop/01_login.png" alt="Acceso al Sistema" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4269,7 +4383,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">2</div>
   <div class="wf-step-body">
-    <h4>Dashboard — Entrantes</h4>
+    <h4 id="fo-2">Dashboard — Entrantes</h4>
     <p>El dashboard muestra manifiestos ENTREGADO pendientes de recepción y KPIs del período: volumen total, tasa de tratamiento, tiempo promedio de procesamiento.</p>
     <a href="screenshots/desktop/50_dashboard_operador.png" target="_blank"><img src="screenshots/desktop/50_dashboard_operador.png" alt="Dashboard — Entrantes" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4277,7 +4391,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">3</div>
   <div class="wf-step-body">
-    <h4>Ver Manifiestos ENTREGADO</h4>
+    <h4 id="fo-3">Ver Manifiestos ENTREGADO</h4>
     <p>Lista filtrada por tu operadorId. Los manifiestos ENTREGADO aparecen destacados en naranja indicando acción requerida. Click en el número para ver el detalle completo.</p>
     <a href="screenshots/desktop/51_manifiestos_operador.png" target="_blank"><img src="screenshots/desktop/51_manifiestos_operador.png" alt="Ver Manifiestos ENTREGADO" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4285,7 +4399,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">4</div>
   <div class="wf-step-body">
-    <h4>Confirmar Recepción</h4>
+    <h4 id="fo-4">Confirmar Recepción</h4>
     <p>Al llegar el transportista, "Confirmar Recepción" cambia el estado a RECIBIDO. El sistema registra fecha, hora y usuario que confirmó. El generador es notificado.</p>
     <a href="screenshots/desktop/55_manifiesto_entregado_detalle.png" target="_blank"><img src="screenshots/desktop/55_manifiesto_entregado_detalle.png" alt="Confirmar Recepción" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4293,7 +4407,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">5</div>
   <div class="wf-step-body">
-    <h4>Registrar Pesaje Real</h4>
+    <h4 id="fo-5">Registrar Pesaje Real</h4>
     <p>Ingresar el peso real por tipo de residuo. El sistema compara con el peso declarado por el generador y alerta automáticamente sobre discrepancias mayores al 10%.</p>
     <a href="screenshots/desktop/56_manifiesto_recibido_detalle.png" target="_blank"><img src="screenshots/desktop/56_manifiesto_recibido_detalle.png" alt="Registrar Pesaje Real" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4301,7 +4415,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">6</div>
   <div class="wf-step-body">
-    <h4>Rechazar Carga (si aplica)</h4>
+    <h4 id="fo-6">Rechazar Carga (si aplica)</h4>
     <p>Si la carga no cumple los requisitos (embalaje inadecuado, residuo no autorizado), "Rechazar Carga" cambia el estado a RECHAZADO. El motivo queda registrado en el timeline.</p>
     <a href="screenshots/desktop/55_manifiesto_entregado_detalle.png" target="_blank"><img src="screenshots/desktop/55_manifiesto_entregado_detalle.png" alt="Rechazar Carga (si aplica)" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4309,7 +4423,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">7</div>
   <div class="wf-step-body">
-    <h4>Registrar Tratamiento</h4>
+    <h4 id="fo-7">Registrar Tratamiento</h4>
     <p>Seleccionar el tipo de tratamiento aplicado del catálogo autorizado para la planta. El estado avanza a EN_TRATAMIENTO. Se pueden registrar múltiples tratamientos por manifiesto.</p>
     <a href="screenshots/desktop/56_manifiesto_recibido_detalle.png" target="_blank"><img src="screenshots/desktop/56_manifiesto_recibido_detalle.png" alt="Registrar Tratamiento" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4317,7 +4431,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">8</div>
   <div class="wf-step-body">
-    <h4>Cerrar Manifiesto</h4>
+    <h4 id="fo-8">Cerrar Manifiesto</h4>
     <p>"Cerrar Manifiesto" finaliza el ciclo: estado TRATADO. El sistema notifica automáticamente al generador, al transportista y al administrador DGFA.</p>
     <a href="screenshots/desktop/57_manifiesto_tratado_detalle.png" target="_blank"><img src="screenshots/desktop/57_manifiesto_tratado_detalle.png" alt="Cerrar Manifiesto" loading="lazy" class="wf-step-img"></a>
   </div>
@@ -4325,7 +4439,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <div class="wf-step">
   <div class="wf-step-num">9</div>
   <div class="wf-step-body">
-    <h4>Certificado de Disposición</h4>
+    <h4 id="fo-9">Certificado de Disposición</h4>
     <p>PDF oficial con membrete SITREP, datos completos del tratamiento, firma del operador responsable, conforme Ley 24.051 y Decreto 831/93. Descargable por todos los actores.</p>
     <a href="screenshots/desktop/57_manifiesto_tratado_detalle.png" target="_blank"><img src="screenshots/desktop/57_manifiesto_tratado_detalle.png" alt="Certificado de Disposición" loading="lazy" class="wf-step-img"></a>
 <div class="wf-tip">El Certificado de Disposición Final es el documento legal que acredita el tratamiento correcto de los residuos peligrosos ante organismos de control.</div>
@@ -4333,6 +4447,640 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 </div>
 </div>
 
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════
+     SECCION 15: REFERENCIA TECNICA DEVOPS (solo ADMIN)
+     ════════════════════════════════════════════════════════════════ -->
+
+<section id="devops-stack" data-role="all">
+<h2>15. Referencia Tecnica DevOps <span class="cu-section-badge role-admin">Solo ADMIN</span></h2>
+<div class="info-card role-card-admin">
+<p><strong>Seccion exclusiva para Administradores y DevOps.</strong> Contiene datos tecnicos verificados directamente del codigo fuente del sistema. Ultima verificacion: Marzo 2026.</p>
+</div>
+
+<h3>15.1 Stack Completo con Versiones Exactas</h3>
+
+<h4>Backend (Node.js + Express)</h4>
+<table>
+<thead><tr><th>Dependencia</th><th>Version</th><th>Proposito</th></tr></thead>
+<tbody>
+<tr><td><code>express</code></td><td>^4.18.2</td><td>HTTP framework</td></tr>
+<tr><td><code>@prisma/client</code></td><td>^5.6.0</td><td>ORM PostgreSQL</td></tr>
+<tr><td><code>typescript</code></td><td>^5.2.2</td><td>Type safety (compilacion)</td></tr>
+<tr><td><code>jsonwebtoken</code></td><td>^9.0.2</td><td>JWT auth (sign + verify)</td></tr>
+<tr><td><code>bcryptjs</code></td><td>^2.4.3</td><td>Password hashing (10 salt rounds)</td></tr>
+<tr><td><code>compression</code></td><td>^1.7.4</td><td>gzip middleware (~5-10x reduccion)</td></tr>
+<tr><td><code>helmet</code></td><td>^7.1.0</td><td>Security headers (CSP, HSTS, X-Frame)</td></tr>
+<tr><td><code>express-rate-limit</code></td><td>^8.2.1</td><td>Rate limiting (600 req/min/IP)</td></tr>
+<tr><td><code>zod</code></td><td>^4.3.6</td><td>Schema validation (registro, usuarios)</td></tr>
+<tr><td><code>nodemailer</code></td><td>^6.9.7</td><td>Email SMTP (verificacion, alertas)</td></tr>
+<tr><td><code>pdfkit</code></td><td>^0.17.2</td><td>Server-side PDF (manifiestos, certificados)</td></tr>
+<tr><td><code>qrcode</code></td><td>^1.5.3</td><td>QR code generation (data URI)</td></tr>
+<tr><td><code>swagger-jsdoc</code></td><td>^6.2.8</td><td>OpenAPI spec from JSDoc</td></tr>
+<tr><td><code>swagger-ui-express</code></td><td>^5.0.1</td><td>API docs UI en /api/docs</td></tr>
+<tr><td><code>node-cron</code></td><td>^4.2.1</td><td>Scheduled jobs (alertas, limpieza)</td></tr>
+<tr><td><code>multer</code></td><td>^1.4.5-lts.1</td><td>File uploads (carga masiva CSV)</td></tr>
+<tr><td><code>uuid</code></td><td>^9.0.1</td><td>UUID generation</td></tr>
+<tr><td><code>cors</code></td><td>^2.8.5</td><td>Cross-origin (multi-domain via env)</td></tr>
+<tr><td><code>dotenv</code></td><td>^16.3.1</td><td>Environment variables</td></tr>
+<tr><td><code>ms</code></td><td>^2.1.3</td><td>Time string parsing</td></tr>
+</tbody>
+</table>
+
+<h4>Frontend (React + Vite)</h4>
+<table>
+<thead><tr><th>Dependencia</th><th>Version</th><th>Proposito</th></tr></thead>
+<tbody>
+<tr><td><code>react</code></td><td>^19.2.0</td><td>UI framework</td></tr>
+<tr><td><code>react-dom</code></td><td>^19.2.0</td><td>DOM rendering</td></tr>
+<tr><td><code>react-router-dom</code></td><td>^7.10.1</td><td>Client-side routing (SPA)</td></tr>
+<tr><td><code>vite</code></td><td>^7.2.4</td><td>Build tool + dev server (HMR)</td></tr>
+<tr><td><code>typescript</code></td><td>~5.9.3</td><td>Type checking</td></tr>
+<tr><td><code>@tanstack/react-query</code></td><td>^5.90.20</td><td>Server state management (queries + mutations)</td></tr>
+<tr><td><code>recharts</code></td><td>^3.5.1</td><td>Charts (BarChart, PieChart, Donut, Gauge)</td></tr>
+<tr><td><code>leaflet</code></td><td>^1.9.4</td><td>Interactive maps</td></tr>
+<tr><td><code>react-leaflet</code></td><td>^5.0.0</td><td>React bindings for Leaflet</td></tr>
+<tr><td><code>jspdf</code></td><td>^4.1.0</td><td>Client-side PDF export</td></tr>
+<tr><td><code>jspdf-autotable</code></td><td>^5.0.7</td><td>PDF table generation</td></tr>
+<tr><td><code>tailwindcss</code></td><td>^3.4.19</td><td>Utility-first CSS framework</td></tr>
+<tr><td><code>lucide-react</code></td><td>^0.555.0</td><td>Icons (stroke-based SVG)</td></tr>
+<tr><td><code>axios</code></td><td>^1.13.2</td><td>HTTP client (interceptors, refresh)</td></tr>
+<tr><td><code>qrcode.react</code></td><td>^4.2.0</td><td>QR React component</td></tr>
+<tr><td><code>clsx</code> + <code>tailwind-merge</code></td><td>^2.1.1 + ^3.4.0</td><td>Conditional classnames</td></tr>
+<tr><td><code>@playwright/test</code></td><td>^1.58.2</td><td>E2E testing framework</td></tr>
+</tbody>
+</table>
+
+<h4>Infraestructura</h4>
+<table>
+<thead><tr><th>Componente</th><th>Version/Config</th><th>Detalle</th></tr></thead>
+<tbody>
+<tr><td>Node.js</td><td>v20.19.4</td><td>LTS, runtime de produccion</td></tr>
+<tr><td>PostgreSQL</td><td>15-alpine</td><td>Docker container <code>directus-admin-database-1</code></td></tr>
+<tr><td>PM2</td><td>Cluster mode</td><td>2 instancias, 512MB/inst, port 3002</td></tr>
+<tr><td>Nginx</td><td>Reverse proxy</td><td>SSL Let's Encrypt, SPA fallback, gzip</td></tr>
+<tr><td>Docker</td><td>Solo PostgreSQL</td><td>Backend corre directo en PM2 (no Docker)</td></tr>
+<tr><td>Prisma binary targets</td><td>native + rhel-openssl-3.0.x</td><td>Build en Ubuntu, deploy en RHEL</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="devops-deploy" data-role="all">
+<h3>15.2 Arquitectura de Despliegue</h3>
+
+<pre>
+┌─────────────────────────────────────────────────────────────────────┐
+│                         INTERNET                                     │
+│                            │                                         │
+│                   ┌────────▼────────┐                               │
+│                   │  Let's Encrypt  │  SSL/TLS auto-renewal         │
+│                   └────────┬────────┘                               │
+│                   ┌────────▼────────┐                               │
+│                   │      Nginx      │  23.105.176.45:443            │
+│                   │  Reverse Proxy  │  trust_proxy: true            │
+│                   └──┬──────┬──┬────┘                               │
+│          ┌───────────┘      │  └──────────────┐                     │
+│          ▼                  ▼                  ▼                     │
+│  /var/www/sitrep/      /api/ proxy        /var/www/sitrep/app/      │
+│  Frontend SPA          localhost:3002      PWA Mobile App           │
+│  try_files → /index.html                  try_files → /app/app.html│
+│                            │                                         │
+│                   ┌────────▼────────┐                               │
+│                   │   PM2 Cluster   │  process: sitrep-backend      │
+│                   │  2x Node.js 20  │  512MB/instancia              │
+│                   │  Express ^4.18  │  port: 3002                   │
+│                   └────────┬────────┘                               │
+│                   ┌────────▼────────┐                               │
+│                   │  Prisma ^5.6.0  │  pool: 20/inst (40 total)     │
+│                   │  ORM + Client   │  timeout: 10s                 │
+│                   └────────┬────────┘                               │
+│                   ┌────────▼────────┐                               │
+│                   │ PostgreSQL 15   │  Docker: directus-admin-db-1  │
+│                   │ trazabilidad_   │  max_connections: 100         │
+│                   │ rrpp            │  Shared con Directus CMS      │
+│                   └─────────────────┘                               │
+└─────────────────────────────────────────────────────────────────────┘
+</pre>
+
+<h4>Rutas del Servidor</h4>
+<table>
+<thead><tr><th>Componente</th><th>Ruta</th></tr></thead>
+<tbody>
+<tr><td>Frontend principal</td><td><code>/var/www/sitrep/</code></td></tr>
+<tr><td>PWA App mobile</td><td><code>/var/www/sitrep/app/</code></td></tr>
+<tr><td>Manual (estatico)</td><td><code>/var/www/sitrep/manual/</code></td></tr>
+<tr><td>Backend (codigo)</td><td><code>/var/www/sitrep-backend/</code> (symlink a release activo)</td></tr>
+<tr><td>Backend .env</td><td><code>/home/demoambiente/.env</code> (symlink desde cada release)</td></tr>
+<tr><td>Releases</td><td><code>/var/www/sitrep-backend-releases/YYYYMMDD-HHMMSS/</code></td></tr>
+<tr><td>Nginx config</td><td><code>/etc/nginx/sites-available/sitrep.ultimamilla.com.ar</code></td></tr>
+<tr><td>PM2 logs</td><td><code>/root/.pm2/logs/sitrep-backend-*.log</code></td></tr>
+<tr><td>Deploy scripts</td><td><code>/opt/scripts-cicd/deploy_sitrep_backend.sh</code></td></tr>
+</tbody>
+</table>
+
+<h4>URLs de Produccion</h4>
+<table>
+<thead><tr><th>Recurso</th><th>URL</th></tr></thead>
+<tbody>
+<tr><td>Frontend</td><td><code>https://sitrep.ultimamilla.com.ar/</code></td></tr>
+<tr><td>PWA App</td><td><code>https://sitrep.ultimamilla.com.ar/app/</code></td></tr>
+<tr><td>API REST</td><td><code>https://sitrep.ultimamilla.com.ar/api/</code></td></tr>
+<tr><td>API Docs (Swagger)</td><td><code>https://sitrep.ultimamilla.com.ar/api/docs</code></td></tr>
+<tr><td>Health Check</td><td><code>https://sitrep.ultimamilla.com.ar/api/health</code></td></tr>
+<tr><td>Manual</td><td><code>https://sitrep.ultimamilla.com.ar/manual/</code></td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="devops-schema" data-role="all">
+<h3>15.3 Schema de Base de Datos (Prisma)</h3>
+
+<h4>Entidades del Sistema (20 modelos)</h4>
+<table>
+<thead><tr><th>Modelo</th><th>Campos principales</th><th>Relaciones</th></tr></thead>
+<tbody>
+<tr><td><strong>Usuario</strong></td><td>id, email, password, rol, cuit, nombre, apellido, empresa, telefono, activo, emailVerified, verificationToken</td><td>1:1 Generador/Transportista/Operador, 1:N Auditoria, RefreshToken, Notificacion, AnalyticsLog</td></tr>
+<tr><td><strong>Generador</strong></td><td>id, usuarioId, razonSocial, cuit, domicilio, telefono, email, numeroInscripcion, categoria, lat, lng</td><td>1:N Manifiesto (como generador)</td></tr>
+<tr><td><strong>Transportista</strong></td><td>id, usuarioId, razonSocial, cuit, domicilio, telefono, email, numeroHabilitacion, lat, lng</td><td>1:N Manifiesto, 1:N Vehiculo, 1:N Chofer</td></tr>
+<tr><td><strong>Operador</strong></td><td>id, usuarioId, razonSocial, cuit, domicilio, telefono, email, numeroHabilitacion, categoria, lat, lng</td><td>1:N Manifiesto, 1:N TratamientoAutorizado</td></tr>
+<tr><td><strong>Vehiculo</strong></td><td>id, transportistaId, patente, marca, modelo, anio, capacidad, numeroHabilitacion, vencimiento, activo</td><td>N:1 Transportista</td></tr>
+<tr><td><strong>Chofer</strong></td><td>id, transportistaId, nombre, apellido, dni, licencia, vencimiento, telefono, activo</td><td>N:1 Transportista</td></tr>
+<tr><td><strong>TipoResiduo</strong></td><td>id, codigo, nombre, descripcion, categoria, caracteristicas, peligrosidad, activo</td><td>1:N ManifiestoResiduo, 1:N TratamientoAutorizado</td></tr>
+<tr><td><strong>Manifiesto</strong></td><td>id, numero, generadorId, transportistaId, operadorId, estado, qrCode, vehiculoId, choferId, fechaCreacion/Aprobacion/Retiro/Entrega/Recepcion/Tratamiento/Cierre, observaciones, metodoTratamiento</td><td>N:1 Generador/Transportista/Operador, 1:N ManifiestoResiduo, EventoManifiesto, TrackingGPS, Notificacion, AnomaliaTransporte, AlertaGenerada, Auditoria</td></tr>
+<tr><td><strong>ManifiestoResiduo</strong></td><td>id, manifiestoId, tipoResiduoId, cantidad, unidad, cantidadRecibida, tipoDiferencia, descripcion</td><td>N:1 Manifiesto, N:1 TipoResiduo</td></tr>
+<tr><td><strong>EventoManifiesto</strong></td><td>id, manifiestoId, tipo, descripcion, datos, ubicacion, lat, lng, usuarioId, createdAt</td><td>N:1 Manifiesto</td></tr>
+<tr><td><strong>TrackingGPS</strong></td><td>id, manifiestoId, latitud, longitud, velocidad, direccion, precision, timestamp</td><td>N:1 Manifiesto</td></tr>
+<tr><td><strong>TratamientoAutorizado</strong></td><td>id, operadorId, tipoResiduoId, metodo, descripcion, capacidad, activo</td><td>N:1 Operador, N:1 TipoResiduo</td></tr>
+<tr><td><strong>Notificacion</strong></td><td>id, usuarioId, tipo, titulo, mensaje, manifiestoId, leida, prioridad, createdAt</td><td>N:1 Usuario, N:1 Manifiesto</td></tr>
+<tr><td><strong>ReglaAlerta</strong></td><td>id, nombre, descripcion, evento, condicion, destinatarios, activa, createdAt</td><td>1:N AlertaGenerada</td></tr>
+<tr><td><strong>AlertaGenerada</strong></td><td>id, reglaId, manifiestoId, datos, estado, createdAt, resueltaAt, resueltaPor</td><td>N:1 ReglaAlerta, N:1 Manifiesto</td></tr>
+<tr><td><strong>AnomaliaTransporte</strong></td><td>id, manifiestoId, tipo, descripcion, lat, lng, severidad, resuelta, resueltaPor, createdAt</td><td>N:1 Manifiesto</td></tr>
+<tr><td><strong>Auditoria</strong></td><td>id, accion, modulo, datosAntes, datosDespues, ip, userAgent, usuarioId, manifiestoId, createdAt</td><td>N:1 Usuario, N:1 Manifiesto</td></tr>
+<tr><td><strong>AnalyticsLog</strong></td><td>id, endpoint, method, statusCode, responseTime, userId, ip, userAgent, createdAt</td><td>N:1 Usuario</td></tr>
+<tr><td><strong>RefreshToken</strong></td><td>id, token, userId, expiresAt, revoked, createdAt</td><td>N:1 Usuario</td></tr>
+<tr><td><strong>DemoAccess</strong></td><td>id, ip, userAgent, role, createdAt</td><td>(standalone)</td></tr>
+</tbody>
+</table>
+
+<h4>Enums (10 enums)</h4>
+<table>
+<thead><tr><th>Enum</th><th>Valores</th></tr></thead>
+<tbody>
+<tr><td><strong>Rol</strong></td><td>ADMIN, GENERADOR, TRANSPORTISTA, OPERADOR, AUDITOR, ADMIN_TRANSPORTISTA, ADMIN_GENERADOR, ADMIN_OPERADOR</td></tr>
+<tr><td><strong>EstadoManifiesto</strong></td><td>BORRADOR, APROBADO, EN_TRANSITO, ENTREGADO, RECIBIDO, EN_TRATAMIENTO, TRATADO, RECHAZADO, CANCELADO, VENCIDO, OBSERVADO, INCIDENTE, DEVUELTO</td></tr>
+<tr><td><strong>TipoDiferencia</strong></td><td>EXCESO, FALTANTE, COINCIDE</td></tr>
+<tr><td><strong>TipoNotificacion</strong></td><td>MANIFIESTO_CREADO, ESTADO_CAMBIADO, ALERTA_GENERADA, INCIDENTE_REPORTADO, GPS_ANOMALIA, SISTEMA, MANIFIESTO_ASIGNADO, MANIFIESTO_ENTREGADO, MANIFIESTO_RECIBIDO, MANIFIESTO_TRATADO, MANIFIESTO_CANCELADO, MANIFIESTO_RECHAZADO</td></tr>
+<tr><td><strong>PrioridadNotificacion</strong></td><td>BAJA, MEDIA, ALTA, CRITICA</td></tr>
+<tr><td><strong>EventoAlerta</strong></td><td>MANIFIESTO_CREADO, ESTADO_CAMBIADO, GPS_DESVIO, GPS_DETENCION, VENCIMIENTO_PROXIMO, INCIDENTE</td></tr>
+<tr><td><strong>EstadoAlerta</strong></td><td>ACTIVA, EN_REVISION, RESUELTA, DESCARTADA</td></tr>
+<tr><td><strong>TipoAnomalia</strong></td><td>DESVIO_RUTA, DETENCION_PROLONGADA, VELOCIDAD_EXCESIVA, ZONA_NO_AUTORIZADA, HORARIO_INUSUAL</td></tr>
+<tr><td><strong>SeveridadAnomalia</strong></td><td>BAJA, MEDIA, ALTA, CRITICA</td></tr>
+</tbody>
+</table>
+
+<h4>Indices de Rendimiento (16 indices custom)</h4>
+<table>
+<thead><tr><th>Tabla</th><th>Nombre del Indice</th><th>Columnas</th><th>Justificacion</th></tr></thead>
+<tbody>
+<tr><td>manifiestos</td><td>idx_manifiestos_generador</td><td>generadorId</td><td>Filtro por generador en listados</td></tr>
+<tr><td>manifiestos</td><td>idx_manifiestos_transportista</td><td>transportistaId</td><td>Filtro por transportista</td></tr>
+<tr><td>manifiestos</td><td>idx_manifiestos_operador</td><td>operadorId</td><td>Filtro por operador</td></tr>
+<tr><td>manifiestos</td><td>idx_manifiestos_estado</td><td>estado</td><td>Filtro por estado en dashboard/listados</td></tr>
+<tr><td>manifiestos</td><td>idx_manifiestos_created</td><td>createdAt</td><td>Ordenamiento cronologico</td></tr>
+<tr><td>manifiestos</td><td>idx_manifiestos_estado_created</td><td>estado, createdAt</td><td>Dashboard: manifiestos por estado + fecha (composite)</td></tr>
+<tr><td>manifiestos</td><td>idx_manifiestos_numero</td><td>numero</td><td>Busqueda por numero de manifiesto</td></tr>
+<tr><td>manifiestos</td><td>idx_manifiestos_trans_estado</td><td>transportistaId, estado</td><td>Transportista: mis viajes por estado (composite)</td></tr>
+<tr><td>manifiestos_residuos</td><td>idx_manif_residuos_manif</td><td>manifiestoId</td><td>Join con manifiesto</td></tr>
+<tr><td>eventos_manifiesto</td><td>idx_eventos_manifiesto</td><td>manifiestoId</td><td>Timeline del manifiesto</td></tr>
+<tr><td>eventos_manifiesto</td><td>idx_eventos_manif_tipo</td><td>manifiestoId, tipo</td><td>Filtro por tipo de evento</td></tr>
+<tr><td>tracking_gps</td><td>idx_tracking_manifiesto</td><td>manifiestoId</td><td>Puntos GPS de un viaje</td></tr>
+<tr><td>tracking_gps</td><td>idx_tracking_timestamp</td><td>timestamp</td><td>Ordenamiento temporal GPS</td></tr>
+<tr><td>tracking_gps</td><td>idx_tracking_manif_ts</td><td>manifiestoId, timestamp</td><td>Ruta GPS ordenada (composite)</td></tr>
+<tr><td>auditorias</td><td>idx_auditorias_manifiesto</td><td>manifiestoId</td><td>Historial de auditoria por manifiesto</td></tr>
+<tr><td>auditorias</td><td>idx_auditorias_created</td><td>createdAt</td><td>Ordenamiento cronologico de auditoria</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="devops-middleware" data-role="all">
+<h3>15.4 Express Middleware Pipeline (orden exacto)</h3>
+<p>Los middlewares se ejecutan en el orden exacto en que se registran. Este orden es critico para el correcto funcionamiento:</p>
+
+<table>
+<thead><tr><th>#</th><th>Middleware</th><th>Configuracion</th><th>Notas</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><code>helmet()</code></td><td>CSP disabled en dev, COEP disabled</td><td>Headers: HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy</td></tr>
+<tr><td>2</td><td><code>compression()</code></td><td>Default gzip/deflate</td><td>~5-10x reduccion de payload JSON. Actua en todas las respuestas.</td></tr>
+<tr><td>3</td><td><code>cors()</code></td><td>Origins via <code>CORS_ORIGIN</code> env (comma-split)</td><td>Multi-dominio: produccion + localhost dev</td></tr>
+<tr><td>4</td><td><code>express.json()</code></td><td><code>{ limit: '10mb' }</code></td><td>JSON body parser. 10MB para carga masiva CSV.</td></tr>
+<tr><td>5</td><td>Rate Limiter (general)</td><td>600 req/min/IP</td><td>Soporta 50+ telefonos detras de NAT/CGNAT</td></tr>
+<tr><td>6</td><td>Rate Limiter (auth)</td><td>5 req/min/IP</td><td>Solo en <code>/api/auth/login</code> y <code>/api/auth/register</code></td></tr>
+<tr><td>7</td><td>Analytics middleware</td><td>Batch: 30s o 10 items</td><td>Registra endpoint, method, status, responseTime. <strong>Excluye</strong> rutas GPS (<code>/ubicacion</code>, <code>/gps</code>)</td></tr>
+<tr><td>8</td><td>Request timeout</td><td>30 segundos</td><td>Protege contra consultas largas o conexiones colgadas</td></tr>
+<tr><td>9</td><td>Route handlers</td><td>11 archivos de rutas</td><td>auth, manifiestos, actores, catalogos, reportes, pdf, notificaciones, alertas, anomalias, centro-control, carga-masiva, admin, analytics</td></tr>
+<tr><td>10</td><td>Global error handler</td><td><code>AppError</code> + Prisma error mapping</td><td>Mapea errores Prisma (P2002, P2025, etc.) a HTTP status codes</td></tr>
+</tbody>
+</table>
+
+<h4>Orden de Archivos de Rutas</h4>
+<table>
+<thead><tr><th>Archivo de Rutas</th><th>Base Path</th><th>Auth requerida</th></tr></thead>
+<tbody>
+<tr><td><code>auth.routes.ts</code></td><td><code>/api/auth</code></td><td>Parcial (login/register publico)</td></tr>
+<tr><td><code>manifiesto.routes.ts</code></td><td><code>/api/manifiestos</code></td><td>Si (excepto verificacion publica)</td></tr>
+<tr><td><code>actor.routes.ts</code></td><td><code>/api/actores</code></td><td>Si</td></tr>
+<tr><td><code>catalogo.routes.ts</code></td><td><code>/api/catalogos</code></td><td>Si</td></tr>
+<tr><td><code>reporte.routes.ts</code></td><td><code>/api/reportes</code></td><td>Si</td></tr>
+<tr><td><code>pdf.routes.ts</code></td><td><code>/api/pdf</code></td><td>Si</td></tr>
+<tr><td><code>notification.routes.ts</code></td><td><code>/api/notificaciones</code></td><td>Si</td></tr>
+<tr><td><code>alerta.routes.ts</code></td><td><code>/api/alertas</code></td><td>Si</td></tr>
+<tr><td><code>tracking.routes.ts</code></td><td><code>/api/centro-control</code></td><td>Si</td></tr>
+<tr><td><code>admin.routes.ts</code></td><td><code>/api/admin</code></td><td>Si (ADMIN only)</td></tr>
+<tr><td><code>analytics.routes.ts</code></td><td><code>/api/analytics</code></td><td>Si</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="devops-auth" data-role="all">
+<h3>15.5 Autenticacion y Seguridad — Detalle Tecnico</h3>
+
+<h4>Flujo de Registro</h4>
+<ol>
+<li><strong>Validacion:</strong> Zod schema valida email, password (min 8 chars, 1 mayuscula, 1 numero), nombre, apellido, rol, cuit, empresa, telefono</li>
+<li><strong>Password strength:</strong> Minimo 8 caracteres, al menos 1 mayuscula y 1 numero</li>
+<li><strong>Hashing:</strong> <code>bcryptjs.hash(password, 10)</code> — 10 salt rounds</li>
+<li><strong>Email verification:</strong> Genera token via <code>crypto.randomBytes(32)</code> → SHA256 hash → almacena hash en DB</li>
+<li><strong>Estado inicial:</strong> Usuario creado con <code>activo: false</code>, requiere aprobacion del ADMIN</li>
+<li><strong>Notificacion:</strong> Email con link de verificacion enviado via nodemailer SMTP</li>
+</ol>
+
+<h4>Flujo de Login</h4>
+<ol>
+<li><strong>Input:</strong> <code>email|cuit</code> + <code>password</code></li>
+<li><strong>Busqueda:</strong> <code>prisma.usuario.findFirst({ where: { OR: [{ email }, { cuit }] } })</code></li>
+<li><strong>Verificacion:</strong> <code>bcrypt.compare(password, user.password)</code></li>
+<li><strong>Checks:</strong> Verifica <code>emailVerified === true</code> y <code>activo === true</code></li>
+<li><strong>Tokens:</strong> Genera par JWT:
+  <ul>
+    <li>Access token: 24 horas, contiene <code>{ userId, rol, email }</code></li>
+    <li>Refresh token: 7 dias, almacenado con hash en tabla <code>RefreshToken</code></li>
+  </ul>
+</li>
+<li><strong>Respuesta:</strong> <code>{ accessToken, refreshToken, user: { id, email, nombre, rol, ... } }</code></li>
+</ol>
+
+<h4>Flujo de Refresh</h4>
+<ol>
+<li>Frontend detecta 401 → envia refresh token a <code>POST /api/auth/refresh</code></li>
+<li>Backend verifica token → check <code>revoked === false</code> y <code>expiresAt > now</code></li>
+<li>Verifica usuario <code>activo === true</code></li>
+<li>Genera nuevo par de tokens, revoca el refresh token anterior</li>
+<li>Cross-tab sync: listener <code>storage</code> event sincroniza tokens entre pestanas</li>
+</ol>
+
+<h4>Flujo de Reset de Password</h4>
+<ol>
+<li><code>crypto.randomBytes(32)</code> → genera token aleatorio</li>
+<li>Hash SHA256 del token almacenado en DB con expiracion 24 horas</li>
+<li>Email con link <code>/reset-password?token={raw}</code></li>
+<li>En reset: verifica token via SHA256, valida nueva password, hash bcrypt, actualiza</li>
+</ol>
+
+<h4>Proteccion de Rate Limiting</h4>
+<table>
+<thead><tr><th>Endpoint</th><th>Limite</th><th>Ventana</th><th>Razon</th></tr></thead>
+<tbody>
+<tr><td>General (todas las rutas)</td><td>600 solicitudes</td><td>1 minuto</td><td>Soporta 50+ telefonos con GPS cada 30s detras de NAT</td></tr>
+<tr><td><code>/api/auth/login</code></td><td>5 intentos</td><td>1 minuto</td><td>Brute-force protection</td></tr>
+<tr><td><code>/api/auth/register</code></td><td>5 intentos</td><td>1 minuto</td><td>Spam protection</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="devops-gps" data-role="all">
+<h3>15.6 GPS Tracking — Arquitectura Tecnica</h3>
+
+<h4>Flujo de Datos GPS</h4>
+<pre>
+Telefono (watchPosition)
+    │  cada 30 segundos
+    ▼
+POST /api/manifiestos/:id/ubicacion
+    │  { latitud, longitud, velocidad?, direccion? }
+    ▼
+┌───────────────────────────┐
+│  In-memory cache check    │  TTL: 30s per manifiestoId
+│  (skip findUnique si hit) │  ~10x mas rapido en cache hit
+└───────────┬───────────────┘
+            ▼
+┌───────────────────────────┐
+│  Validar: manifiesto      │  Estado debe ser EN_TRANSITO
+│  existe y EN_TRANSITO     │  Auth: TRANSPORTISTA o ADMIN
+└───────────┬───────────────┘
+            ▼
+┌───────────────────────────┐
+│  INSERT tracking_gps      │  Indice: manifiestoId+timestamp
+│  (latitud, longitud, etc.)│  ~6,000 filas/hora a 50 viajes
+└───────────────────────────┘
+            ▼
+Centro de Control polling cada 30s
+GET /api/centro-control/actividad
+    → ultimos 50 puntos GPS por viaje EN_TRANSITO
+</pre>
+
+<h4>Resiliencia Offline (Frontend)</h4>
+<table>
+<thead><tr><th>Mecanismo</th><th>Archivo</th><th>Detalle</th></tr></thead>
+<tbody>
+<tr><td><strong>pendingUpdatesRef</strong></td><td>ViajeEnCursoTransportista.tsx</td><td>Cola de max 5 puntos GPS pendientes en memoria</td></tr>
+<tr><td><strong>localStorage persist</strong></td><td>ViajeEnCursoTransportista.tsx</td><td>Key: <code>gps_pending_{manifiestoId}</code>. Persiste al cerrar app/tab. Flush al mount.</td></tr>
+<tr><td><strong>IndexedDB sync_queue</strong></td><td>useOfflineSync.ts</td><td>Cola durable para sincronizacion offline-first</td></tr>
+<tr><td><strong>watchPosition cleanup</strong></td><td>ViajeEnCursoTransportista.tsx</td><td><code>cleanupGps</code> callback + <code>beforeunload</code> listener previene watchers zombi</td></tr>
+<tr><td><strong>Pausa/Reanudacion</strong></td><td>ViajeEnCursoTransportista.tsx</td><td>Registra incidentes PAUSA/REANUDACION via backend + localStorage backup</td></tr>
+</tbody>
+</table>
+
+<h4>GPS Status State Machine</h4>
+<pre>
+checking → acquiring → active
+                    → denied
+                    → unavailable
+                    → error
+</pre>
+
+<h4>Metricas de Capacidad GPS</h4>
+<table>
+<thead><tr><th>Parametro</th><th>Valor</th><th>Calculo</th></tr></thead>
+<tbody>
+<tr><td>Viajes concurrentes max</td><td>50+</td><td>Connection pool + indices + cache optimizados</td></tr>
+<tr><td>Intervalo de envio</td><td>30 segundos</td><td>1 request/30s por telefono</td></tr>
+<tr><td>Throughput peak</td><td>~100 req/min</td><td>50 telefonos x 2 req/min</td></tr>
+<tr><td>Latencia (cache hit)</td><td>~24ms</td><td>Skip findUnique, solo INSERT</td></tr>
+<tr><td>Latencia (cache miss)</td><td>~250ms</td><td>findUnique + validacion + INSERT</td></tr>
+<tr><td>Cache TTL</td><td>30 segundos</td><td>Coincide con intervalo GPS</td></tr>
+<tr><td>Crecimiento de datos</td><td>~6,000 filas/hora</td><td>50 viajes x 2 puntos/min x 60 min</td></tr>
+<tr><td>Cache invalidation</td><td>En <code>confirmarEntrega</code></td><td>Limpia cache al cambiar estado del viaje</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="devops-cicd" data-role="all">
+<h3>15.7 CI/CD Pipeline</h3>
+
+<h4>GitHub Actions Workflow</h4>
+<p>Archivo: <code>.github/workflows/deploy-production.yml</code></p>
+<p>Trigger: Push a <code>main</code> branch que modifique archivos en <code>backend/</code></p>
+
+<h4>Flujo de Deploy Atomico</h4>
+<ol>
+<li><strong>Build en cloud (GitHub Actions, Ubuntu):</strong>
+  <ul>
+    <li><code>npm ci</code> — instalacion deterministica de dependencias</li>
+    <li><code>npm run build</code> — compila TypeScript a <code>dist/</code></li>
+    <li>Empaqueta: <code>dist/</code> + <code>package.json</code> + <code>package-lock.json</code> + <code>prisma/</code> + <code>ecosystem.config.js</code></li>
+  </ul>
+</li>
+<li><strong>Transfer:</strong> <code>scp</code> del tarball al VPS (<code>/tmp/</code>)</li>
+<li><strong>Deploy script</strong> (<code>/opt/scripts-cicd/deploy_sitrep_backend.sh</code>):
+  <ul>
+    <li>Extrae a <code>/var/www/sitrep-backend-releases/YYYYMMDD-HHMMSS/</code></li>
+    <li>Copia <code>.env</code> desde release actual</li>
+    <li><code>npm ci --production</code> — instala solo dependencias de produccion</li>
+    <li><code>npx prisma generate</code> — <strong>regenera binarios para RHEL</strong> (fix critico 2026-02-15)</li>
+    <li>Symlink: <code>/var/www/sitrep-backend → nuevo release</code></li>
+    <li><code>pm2 restart sitrep-backend</code></li>
+  </ul>
+</li>
+<li><strong>Health check:</strong> <code>curl https://sitrep.ultimamilla.com.ar/api/health</code>
+  <ul>
+    <li>Espera respuesta <code>{"status":"ok","db":"connected"}</code></li>
+    <li>Si falla → <strong>ROLLBACK automatico</strong> al release anterior (2 segundos)</li>
+  </ul>
+</li>
+<li><strong>Cleanup:</strong> Elimina releases antiguos (conserva ultimos 5)</li>
+</ol>
+
+<h4>Prisma Binary Fix (critico)</h4>
+<div class="info-card role-card-admin">
+<p><strong>Problema:</strong> GitHub Actions corre en Ubuntu y genera binarios Prisma para <code>debian-openssl-3.0.x</code>. El servidor de produccion es RHEL y necesita <code>rhel-openssl-3.0.x</code>.</p>
+<p><strong>Solucion:</strong> El deploy script ejecuta <code>npx prisma generate</code> en el servidor, regenerando el Prisma Client con los binarios nativos correctos.</p>
+<p><strong>Binary targets en schema.prisma:</strong> <code>["native", "rhel-openssl-3.0.x"]</code></p>
+</div>
+
+<h4>Deploy Manual (Frontend)</h4>
+<pre>
+# Build
+cd frontend && npm run build
+npx vite build --config vite.config.app.ts
+
+# Package
+cd dist && tar czf /tmp/sitrep-frontend.tar.gz . && cd ..
+cd dist-app && tar czf /tmp/sitrep-app.tar.gz . && cd ..
+
+# Upload
+scp /tmp/sitrep-frontend.tar.gz /tmp/sitrep-app.tar.gz root@23.105.176.45:/tmp/
+
+# Deploy (preservar /manual/)
+ssh root@23.105.176.45 "\
+  cd /var/www/sitrep && \
+  find . -maxdepth 1 ! -name app ! -name manual ! -name . -exec rm -rf {} + && \
+  tar xzf /tmp/sitrep-frontend.tar.gz && chmod -R 755 ."
+ssh root@23.105.176.45 "\
+  cd /var/www/sitrep/app && rm -rf * && \
+  tar xzf /tmp/sitrep-app.tar.gz && chmod -R 755 ."
+</pre>
+</section>
+
+<section id="devops-monitoring" data-role="all">
+<h3>15.8 Monitoreo y Observabilidad</h3>
+
+<h4>Estado Actual</h4>
+<table>
+<thead><tr><th>Herramienta</th><th>Que monitorea</th><th>Acceso</th></tr></thead>
+<tbody>
+<tr><td><strong>PM2</strong></td><td>Procesos Node.js, CPU, memoria, restarts</td><td><code>pm2 list</code>, <code>pm2 show sitrep-backend</code></td></tr>
+<tr><td><strong>PM2 Logs</strong></td><td>stdout/stderr de la aplicacion</td><td><code>/root/.pm2/logs/sitrep-backend-*.log</code></td></tr>
+<tr><td><strong>Health Check</strong></td><td>Conectividad a DB, uptime</td><td><code>GET /api/health</code> → <code>{ status, db, uptime }</code></td></tr>
+<tr><td><strong>Analytics Middleware</strong></td><td>Metricas por endpoint (response time, status codes)</td><td>Tabla <code>AnalyticsLog</code> en DB</td></tr>
+<tr><td><strong>Swagger UI</strong></td><td>Documentacion interactiva de API</td><td><code>/api/docs</code></td></tr>
+<tr><td><strong>Smoke Test</strong></td><td>44 endpoints de produccion</td><td><code>bash backend/tests/smoke-test.sh</code></td></tr>
+<tr><td><strong>Cross-Platform Test</strong></td><td>59 tests de workflow completo</td><td><code>bash backend/tests/cross-platform-workflow-test.sh</code></td></tr>
+</tbody>
+</table>
+
+<h4>Comandos Utiles de Monitoreo</h4>
+<pre>
+# Estado de procesos PM2
+ssh root@23.105.176.45 "pm2 list"
+
+# Logs en tiempo real
+ssh root@23.105.176.45 "pm2 logs sitrep-backend --lines 100"
+
+# Metricas de proceso
+ssh root@23.105.176.45 "pm2 show sitrep-backend"
+
+# Health check
+curl -s https://sitrep.ultimamilla.com.ar/api/health | jq .
+
+# Estado de PostgreSQL
+ssh root@23.105.176.45 "docker exec directus-admin-database-1 \
+  psql -U directus -d trazabilidad_rrpp -c 'SELECT count(*) FROM pg_stat_activity;'"
+
+# Conexiones activas
+ssh root@23.105.176.45 "docker exec directus-admin-database-1 \
+  psql -U directus -d trazabilidad_rrpp -c \
+  \"SELECT state, count(*) FROM pg_stat_activity GROUP BY state;\""
+
+# Tamano de tablas
+ssh root@23.105.176.45 "docker exec directus-admin-database-1 \
+  psql -U directus -d trazabilidad_rrpp -c \
+  \"SELECT relname, n_tup_ins, n_tup_upd, n_tup_del \
+   FROM pg_stat_user_tables ORDER BY n_tup_ins DESC LIMIT 10;\""
+</pre>
+</section>
+
+<section id="devops-backups" data-role="all">
+<h3>15.9 Backups y Disaster Recovery</h3>
+
+<h4>Estado Actual de Backups</h4>
+<table>
+<thead><tr><th>Datos</th><th>Ubicacion</th><th>Frecuencia</th><th>Estado</th></tr></thead>
+<tbody>
+<tr><td><strong>SITREP Database</strong></td><td><code>/opt/sitrep-backups/</code></td><td>Diario 3 AM (cron)</td><td class="devops-status-ok">Automatizado — rotacion 30 dias</td></tr>
+<tr><td><strong>Directus Database</strong></td><td><code>/opt/directus-backups/</code></td><td>Diario 2 AM</td><td class="devops-status-ok">Automatizado</td></tr>
+<tr><td><strong>Codigo fuente</strong></td><td>GitHub</td><td>Push continuo</td><td class="devops-status-ok">Versionado</td></tr>
+<tr><td><strong>.env (configuracion)</strong></td><td><code>/home/demoambiente/.env</code></td><td>Incluido en backup diario</td><td class="devops-status-ok">Automatizado</td></tr>
+</tbody>
+</table>
+
+<h4>Script de Backup Automatizado (activo)</h4>
+<pre>
+#!/bin/bash
+# /opt/scripts-cicd/backup_sitrep.sh
+DATE=$(date +%Y%m%d-%H%M%S)
+BACKUP_DIR=/opt/sitrep-backups
+mkdir -p $BACKUP_DIR
+
+# Backup SITREP database
+docker exec directus-admin-database-1 \
+  pg_dump -U directus trazabilidad_rrpp \
+  | gzip > $BACKUP_DIR/sitrep-db-$DATE.sql.gz
+
+# Backup .env
+cp /home/demoambiente/.env $BACKUP_DIR/env-$DATE.bak
+
+# Cleanup: conservar ultimos 30 dias
+find $BACKUP_DIR -name "sitrep-db-*.sql.gz" -mtime +30 -delete
+find $BACKUP_DIR -name "env-*.bak" -mtime +30 -delete
+
+# Cross-server rsync (recomendado)
+# rsync -avz $BACKUP_DIR/ root@76.13.234.213:/backups/sitrep-prod/
+</pre>
+<p>Agregar a crontab: <code>0 3 * * * /opt/scripts-cicd/backup_sitrep.sh</code></p>
+
+<h4>Procedimiento de Disaster Recovery</h4>
+<ol>
+<li><strong>Restaurar DB:</strong> <code>gunzip -c backup.sql.gz | docker exec -i directus-admin-database-1 psql -U directus -d trazabilidad_rrpp</code></li>
+<li><strong>Restaurar .env:</strong> <code>cp env-backup.bak /home/demoambiente/.env</code></li>
+<li><strong>Re-deploy backend:</strong> Usar ultimo release en <code>/var/www/sitrep-backend-releases/</code> o CI/CD</li>
+<li><strong>Re-deploy frontend:</strong> Build local + scp + tar</li>
+<li><strong>Verificar:</strong> <code>curl https://sitrep.ultimamilla.com.ar/api/health</code></li>
+</ol>
+</section>
+
+<section id="devops-perf" data-role="all">
+<h3>15.10 Performance — Metricas Reales</h3>
+
+<h4>Build Performance</h4>
+<table>
+<thead><tr><th>Build</th><th>Tiempo</th><th>Output</th></tr></thead>
+<tbody>
+<tr><td>Frontend principal</td><td>17.95s</td><td><code>dist/</code></td></tr>
+<tr><td>PWA App</td><td>16.82s</td><td><code>dist-app/</code></td></tr>
+<tr><td>Backend TypeScript</td><td>~10s</td><td><code>dist/</code></td></tr>
+</tbody>
+</table>
+
+<h4>Bundle Sizes (gzipped)</h4>
+<table>
+<thead><tr><th>Chunk</th><th>Tamano</th><th>Carga</th></tr></thead>
+<tbody>
+<tr><td><code>vendor-react</code></td><td>~45KB</td><td>Siempre (critico path)</td></tr>
+<tr><td><code>vendor-query</code></td><td>~36KB</td><td>Siempre (critico path)</td></tr>
+<tr><td><code>vendor-charts</code></td><td>~369KB</td><td>Lazy (paginas con graficos)</td></tr>
+<tr><td><code>vendor-maps</code></td><td>~152KB</td><td>Lazy (paginas con mapas)</td></tr>
+<tr><td><code>vendor-pdf</code></td><td>~408KB</td><td>Lazy (exportacion PDF)</td></tr>
+<tr><td>Enrichment data</td><td>647KB → 541KB → 122KB gz</td><td>Lazy (per page)</td></tr>
+</tbody>
+</table>
+
+<h4>Test Coverage</h4>
+<table>
+<thead><tr><th>Suite</th><th>Tests</th><th>Resultado</th><th>Script</th></tr></thead>
+<tbody>
+<tr><td>Smoke Test API</td><td>44 endpoints</td><td>44/44 PASS (100%)</td><td><code>backend/tests/smoke-test.sh</code></td></tr>
+<tr><td>Cross-Platform Workflow</td><td>59 tests</td><td>59/59 PASS (100%)</td><td><code>backend/tests/cross-platform-workflow-test.sh</code></td></tr>
+</tbody>
+</table>
+<p>El cross-platform test cubre: autenticacion de 4 roles, ciclo completo del manifiesto (7 estados), GPS tracking (3 updates + verificacion de ruta), incidentes (averia + pausa + reanudacion), timeline (10 eventos), workflow dates, PDF, certificado, QR verificacion publica, y enforcement negativo de roles.</p>
+
+<h4>Latencias por Endpoint (tipicas)</h4>
+<table>
+<thead><tr><th>Operacion</th><th>Latencia</th><th>Notas</th></tr></thead>
+<tbody>
+<tr><td>GPS update (cache hit)</td><td>~24ms</td><td>In-memory cache, solo INSERT</td></tr>
+<tr><td>GPS update (cache miss)</td><td>~250ms</td><td>findUnique + validacion + INSERT</td></tr>
+<tr><td>Dashboard stats</td><td>~150ms</td><td>Multiples count queries paralelas</td></tr>
+<tr><td>Lista manifiestos (paginada)</td><td>~100ms</td><td>Con indices, limit 20</td></tr>
+<tr><td>Detalle manifiesto</td><td>~80ms</td><td>Include eventos + residuos + actores</td></tr>
+<tr><td>Reportes (periodo fijo)</td><td>~300-500ms</td><td>GroupBy + aggregation queries</td></tr>
+<tr><td>Health check</td><td>~10ms</td><td>Simple DB ping</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="devops-mejoras" data-role="all">
+<h3>15.11 Mejoras Propuestas a la Pila</h3>
+
+<h4>✅ Implementadas en Produccion</h4>
+<table>
+<thead><tr><th>Mejora</th><th>Implementacion</th><th>Fecha</th></tr></thead>
+<tbody>
+<tr><td><strong>HTTP/2</strong></td><td>Nginx <code>listen 443 ssl http2</code> — multiplexing activo</td><td>2026-01</td></tr>
+<tr><td><strong>Backup automatizado</strong></td><td>Cron diario 3 AM + rotacion 30 dias (<code>/opt/scripts-cicd/backup_sitrep.sh</code>)</td><td>2026-03</td></tr>
+<tr><td><strong>DB migrations</strong></td><td><code>prisma migrate</code> con 5 migraciones versionadas en <code>prisma/migrations/</code></td><td>2026-02</td></tr>
+<tr><td><strong>Rate limiting inteligente</strong></td><td>600/min general + 5/min auth endpoints (IP-based, sliding window)</td><td>2026-01</td></tr>
+<tr><td><strong>Health checks avanzados</strong></td><td>Liveness (<code>/api/health/live</code>) + readiness (<code>/api/health/ready</code>) con DB, memoria y uptime</td><td>2026-03</td></tr>
+</tbody>
+</table>
+
+<h4>Pendientes Priorizadas</h4>
+<table>
+<thead><tr><th>Mejora</th><th>Estado Actual</th><th>Propuesta</th><th>Impacto Estimado</th><th>Prioridad</th></tr></thead>
+<tbody>
+<tr><td><strong>Logging estructurado</strong></td><td>Console.log / PM2 logs (29 usos)</td><td>Pino → JSON → ELK o Loki</td><td>Busqueda, alertas, trazabilidad</td><td class="devops-prio-high">Alta</td></tr>
+<tr><td><strong>Redis cache</strong></td><td>In-memory 30s TTL solo GPS</td><td>Redis para dashboard, catalogos, reportes</td><td>-60% queries a DB</td><td class="devops-prio-high">Alta</td></tr>
+<tr><td><strong>APM (monitoring)</strong></td><td>Solo analytics middleware basico</td><td>Prometheus + Grafana o Datadog</td><td>Visibilidad completa de performance</td><td class="devops-prio-high">Alta</td></tr>
+<tr><td><strong>E2E tests completos</strong></td><td>Playwright setup, pocos tests</td><td>Suite completa por flujo de rol</td><td>Deteccion de regresiones</td><td class="devops-prio-high">Alta</td></tr>
+<tr><td><strong>Rotacion de backups + monitoreo disco</strong></td><td>Disco 87% usado, backups creciendo</td><td>Rotacion agresiva + alerta df > 90%</td><td>Prevencion de downtime por disco lleno</td><td class="devops-prio-critical">Critica</td></tr>
+<tr><td><strong>WebSocket</strong></td><td>Polling 30s (Centro de Control)</td><td>Socket.IO para tracking real-time</td><td>Latencia 30s → &lt;1s</td><td class="devops-prio-medium">Media</td></tr>
+<tr><td><strong>CDN</strong></td><td>Ninguno</td><td>CloudFlare para assets estaticos</td><td>-50% latencia global</td><td class="devops-prio-medium">Media</td></tr>
+<tr><td><strong>Full Docker Compose</strong></td><td>Backend en PM2, solo DB en Docker</td><td>Backend + DB + Redis en Docker Compose</td><td>Portabilidad, reproducibilidad</td><td class="devops-prio-medium">Media</td></tr>
+<tr><td><strong>DB read replicas</strong></td><td>Single PostgreSQL</td><td>Read replica para reportes pesados</td><td>Descargar master en 30-50%</td><td class="devops-prio-low">Baja</td></tr>
+<tr><td><strong>Secrets management</strong></td><td>.env file en servidor</td><td>Vault o AWS Secrets Manager</td><td>Rotacion automatica, auditoria</td><td class="devops-prio-low">Baja</td></tr>
+</tbody>
+</table>
+
+<div class="info-card role-card-admin">
+<p><strong>Recomendacion de implementacion por fases:</strong></p>
+<ul>
+<li><strong>Fase inmediata (1-2 semanas):</strong> Rotacion backups + monitoreo disco, logging estructurado</li>
+<li><strong>Fase corta (1-2 meses):</strong> Redis cache, APM, E2E tests completos</li>
+<li><strong>Fase media (3-6 meses):</strong> WebSocket, Docker Compose, CDN</li>
+<li><strong>Fase larga (6-12 meses):</strong> Read replicas, secrets management</li>
+</ul>
+</div>
 </section>
 
 </main>

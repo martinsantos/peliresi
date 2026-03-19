@@ -32,14 +32,16 @@ Permite el seguimiento completo del ciclo de vida de manifiestos: desde la gener
 | **PWA App** | https://sitrep.ultimamilla.com.ar/app/ |
 | **API** | https://sitrep.ultimamilla.com.ar/api/ |
 | **Health Check** | https://sitrep.ultimamilla.com.ar/api/health |
+| **Liveness Probe** | https://sitrep.ultimamilla.com.ar/api/health/live |
+| **Readiness Probe** | https://sitrep.ultimamilla.com.ar/api/health/ready |
 
 ## Latest Build & Test Status
 
 **Last Successful Build**: 2026-02-15 (Cross-Platform Test + Data Consistency)
 - ✅ Main Frontend: Built in 17.95s → `dist/`
 - ✅ PWA App: Built in 16.82s → `dist-app/`
-- ✅ Smoke Test: **44/44 endpoints PASS** (100% coverage)
-  - Health (1), Auth (6), Manifiestos (7), Catalogos (9), Actores (6)
+- ✅ Smoke Test: **46/46 endpoints PASS** (100% coverage)
+  - Health (3), Auth (6), Manifiestos (7), Catalogos (9), Actores (6)
   - Admin Usuarios (3), Reportes (3), PDF (1), Analytics (4)
   - Centro de Control (1), Notificaciones (1), QR Verification (2)
 - ✅ Cross-Platform Workflow Test: **59/59 PASS** (full lifecycle)
@@ -553,7 +555,7 @@ NuevoManifiestoPage auto-populates actor info cards (CUIT, teléfono, domicilio,
 ### Smoke Test
 
 ```bash
-# Run full API smoke test against production (44 endpoints)
+# Run full API smoke test against production (46 endpoints)
 bash backend/tests/smoke-test.sh
 
 # Run against local
@@ -561,7 +563,7 @@ bash backend/tests/smoke-test.sh http://localhost:3002
 ```
 
 - **Script**: `backend/tests/smoke-test.sh`
-- **Coverage**: 44 endpoints across all route groups (Health, Auth, Manifiestos, Catalogos, Actores, Admin, Reportes, PDF, Analytics, Centro de Control, Notificaciones, QR Verification)
+- **Coverage**: 46 endpoints across all route groups (Health, Auth, Manifiestos, Catalogos, Actores, Admin, Reportes, PDF, Analytics, Centro de Control, Notificaciones, QR Verification)
 - **Auth**: Logs in as admin (`juan.perez@dgfa.gob.ar` / `admin123`), uses JWT token for authenticated endpoints
 - **Dynamic IDs**: Fetches real IDs for detail/sub-resource tests (manifiestoId, transportistaId, operadorId)
 - **Exit code**: 0 on all pass, 1 on any failure
@@ -589,7 +591,7 @@ bash backend/tests/smoke-test.sh http://localhost:3002
 - Reportes usa Recharts para gráficos interactivos y jsPDF para exportación PDF client-side
 - Report endpoints usan paginación (`page`/`limit` params) y `Promise.all` para queries paralelas
 - CSV export limitado a 10,000 filas max por seguridad
-- Health check (`/api/health`) verifica conectividad a DB y retorna `{ status, db, uptime }`
+- Health check (`/api/health`) verifica conectividad a DB y retorna `{ status, db, uptime }`. Liveness probe (`/api/health/live`) siempre 200. Readiness probe (`/api/health/ready`) verifica DB + memory < 450MB + uptime > 10s
 - `createManifiesto` backend acepta `generadorId` del body para ADMIN (no requiere relación generador en el user)
 - `registrarIncidente` acepta tanto `tipo` como `tipoIncidente` del frontend
 - Certificado de Disposición (CU-O10): PDF generado por `pdf.controller.ts:generarCertificado` con Ley 24.051, datos completos, firma operador
@@ -772,7 +774,7 @@ POSIBLES PREOCUPACIONES:
 - ✅ Shared PostgreSQL with Directus: `directus-admin-database-1`
 - ✅ Database: `trazabilidad_rrpp`
 - ✅ Schema created via `prisma db push`
-- ⚠️ Backups: Manual only (NEEDS automation)
+- ✅ Backups: Automated daily 3 AM with 30-day rotation
 
 **Prisma Binary Fix (2026-02-15)**:
 ```bash
@@ -818,7 +820,7 @@ Connection from SITREP:
 ### Test SITREP Deployment
 
 ```bash
-# Smoke test (44 endpoints)
+# Smoke test (46 endpoints)
 cd backend
 bash tests/smoke-test.sh
 
@@ -833,38 +835,26 @@ Last comprehensive test: **18/18 passed** ✅ (2026-02-15 11:30)
 
 ---
 
-## Backup Strategy (CRITICAL - Updated 2026-02-15)
+## Backup Strategy (Updated 2026-03-19)
 
 ### Current Backups
 
-| Data | Location | Frequency | Last Backup | Status |
-|------|----------|-----------|-------------|--------|
-| **SITREP Database** | `/root/backups/sitrep_pre_scale_20260114_203611.sql` | ⚠️ Manual | 2026-01-14 | 🔴 OUTDATED |
-| **Directus Database** | `/opt/directus-backups/directus-db-*.sql.gz` | Daily 2 AM | 2026-02-15 11:19 | ✅ CURRENT |
+| Data | Location | Frequency | Status |
+|------|----------|-----------|--------|
+| **SITREP Database** | `/opt/sitrep-backups/sitrep-db-*.sql.gz` | Daily 3 AM (cron) | ✅ Automated + 30-day rotation |
+| **Directus Database** | `/opt/directus-backups/directus-db-*.sql.gz` | Daily 2 AM | ✅ Automated |
+| **.env config** | `/opt/sitrep-backups/env-*.bak` | Daily 3 AM (cron) | ✅ Automated |
 
-### ⚠️ URGENT: SITREP Automated Backup Needed
+### Backup Script
 
-**Recommendation**:
-```bash
-# Create backup script
-cat > /opt/scripts-cicd/backup_sitrep.sh << 'EOF'
-#!/bin/bash
-DATE=$(date +%Y%m%d-%H%M%S)
-BACKUP_DIR=/opt/sitrep-backups
-mkdir -p $BACKUP_DIR
+- **Script**: `/opt/scripts-cicd/backup_sitrep.sh`
+- **Cron**: `0 3 * * * /opt/scripts-cicd/backup_sitrep.sh`
+- **Retention**: 30 days (auto-cleanup via `find -mtime +30 -delete`)
+- **RPO**: 24 hours
 
-# Backup SITREP database
-docker exec directus-admin-database-1 pg_dump -U directus trazabilidad_rrpp | gzip > $BACKUP_DIR/sitrep-db-$DATE.sql.gz
+### ⚠️ Disk Space Alert
 
-# Cleanup old backups (keep last 30 days)
-find $BACKUP_DIR -name "sitrep-db-*.sql.gz" -mtime +30 -delete
-EOF
-
-# Add to cron (daily 3 AM)
-echo "0 3 * * * /opt/scripts-cicd/backup_sitrep.sh" | crontab -
-```
-
-**Cross-Server Backup** (recommended):
+Disco al 87% (11GB libres). Los backups crecen ~120MB/día. Monitorear con `df -h` y considerar cross-server rsync:
 ```bash
 # Rsync to Hostinger preview server (76.13.234.213)
 0 4 * * * rsync -avz /opt/sitrep-backups/ root@76.13.234.213:/backups/sitrep-prod/
