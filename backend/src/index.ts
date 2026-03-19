@@ -3,6 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
+import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec } from './config/swagger';
 import { config } from './config/config';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 import authRoutes from './routes/auth.routes';
@@ -80,7 +82,43 @@ app.use((req, res, next) => {
   next();
 });
 
+// OpenAPI docs
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'SITREP API Docs',
+}));
+app.get('/api/docs.json', (_req, res) => res.json(swaggerSpec));
+
 // Rutas
+/**
+ * @openapi
+ * /health:
+ *   get:
+ *     tags: [Health]
+ *     summary: Estado del sistema
+ *     description: Verifica conectividad a la base de datos y retorna uptime.
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: Sistema operativo
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: ok }
+ *                 db: { type: string, example: connected }
+ *                 uptime: { type: number, example: 3600 }
+ *       503:
+ *         description: Base de datos desconectada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: error }
+ *                 db: { type: string, example: disconnected }
+ */
 // Health Check with DB connectivity verification
 app.get('/api/health', async (req: Request, res: Response) => {
   try {
