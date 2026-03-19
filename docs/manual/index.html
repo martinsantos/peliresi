@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SITREP — Manual del Sistema | v2026.1</title>
+<title>SITREP — Manual del Sistema | v2026.2</title>
 <meta name="description" content="Manual completo del Sistema de Trazabilidad de Residuos Peligrosos - Provincia de Mendoza">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -121,6 +121,24 @@ pre code{background:none;padding:0;color:inherit;}
 .summary-card{background:var(--surface);border-radius:12px;padding:1.25rem;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,0.08);}
 .summary-card .number{font-size:2rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;}
 .summary-card .label{font-size:0.8rem;color:var(--text-secondary);margin-top:0.25rem;}
+/* Screenshot gallery */
+.screenshot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1.25rem;margin:1.25rem 0 2rem;}
+.screenshot-grid-mobile{grid-template-columns:repeat(auto-fill,minmax(180px,1fr));}
+.screenshot-card{border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);background:var(--surface);transition:box-shadow 0.2s,transform 0.2s;}
+.screenshot-card:hover{box-shadow:0 6px 20px rgba(0,0,0,0.15);transform:translateY(-2px);}
+.screenshot-card a{display:block;background:#F1F5F9;}
+.screenshot-card img{width:100%;height:180px;object-fit:cover;object-position:top;display:block;}
+.screenshot-grid-mobile .screenshot-card img{height:240px;}
+.screenshot-caption{padding:0.65rem 0.85rem;display:flex;flex-wrap:wrap;align-items:center;gap:0.4rem;}
+.screenshot-caption strong{flex:1 1 100%;font-size:0.82rem;color:var(--text);}
+.sc-badge{padding:0.1rem 0.5rem;border-radius:999px;font-size:0.68rem;font-weight:600;}
+.sc-admin{background:var(--admin-light);color:var(--admin);}
+.sc-generador{background:var(--generador-light);color:var(--generador);}
+.sc-transportista{background:var(--transportista-light);color:var(--transportista);}
+.sc-operador{background:var(--operador-light);color:var(--operador);}
+.sc-todos{background:var(--sistema-light);color:var(--sistema);}
+.sc-desktop{background:#E0E7FF;color:#3730A3;}
+.sc-mobile{background:#FEF3C7;color:#92400E;}
 .section-intro{font-size:1.05rem;color:var(--text-secondary);margin-bottom:1.5rem;padding:1rem;background:var(--primary-light);border-radius:12px;}
 footer.site-footer{margin-top:4rem;padding:2rem 0;border-top:2px solid var(--border);text-align:center;color:var(--text-secondary);font-size:0.85rem;}
 footer.site-footer strong{color:var(--primary-dark);}
@@ -144,6 +162,89 @@ footer.site-footer strong{color:var(--primary-dark);}
   a{color:#000;text-decoration:none;}
   pre{background:#f5f5f5;color:#333;border:1px solid #ccc;}
 }
+
+/* Screenshots inline en CUs */
+.cu-screenshot {
+  margin: 0.75rem 0 1.25rem;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.cu-screenshot a { display: block; }
+.cu-screenshot img {
+  width: 100%;
+  max-height: 280px;
+  object-fit: cover;
+  object-position: top;
+  display: block;
+  transition: transform 0.2s;
+}
+.cu-screenshot:hover img { transform: scale(1.02); }
+.cu-screenshot-caption {
+  background: #f8fafc;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.72rem;
+  color: #64748b;
+  border-top: 1px solid #e2e8f0;
+}
+
+/* Flujos de trabajo visuales */
+.wf-profile { margin-bottom: 3rem; }
+.wf-step {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
+  align-items: flex-start;
+}
+.wf-step-num {
+  flex-shrink: 0;
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  background: #0D8A4F;
+  color: white;
+  font-weight: 700;
+  font-size: 1rem;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 6px rgba(13,138,79,0.3);
+}
+.wf-step-body { flex: 1; min-width: 0; }
+.wf-step-body h4 { margin: 0 0 0.4rem; font-size: 1rem; color: #1e293b; }
+.wf-step-body p { margin: 0 0 0.75rem; color: #475569; font-size: 0.9rem; line-height: 1.6; }
+.wf-step-img {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  max-height: 320px;
+  object-fit: cover;
+  object-position: top;
+}
+.wf-step-img-mobile {
+  max-width: 260px;
+  max-height: 480px;
+  border-radius: 18px;
+  border: 3px solid #e2e8f0;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  display: block;
+}
+.wf-role-badge {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  background: #f0fdf4; color: #166534;
+  border: 1px solid #bbf7d0;
+  border-radius: 100px; padding: 0.25rem 0.75rem;
+  font-size: 0.8rem; font-weight: 600;
+  margin-bottom: 1rem;
+}
+.wf-tip {
+  background: #eff6ff; border-left: 3px solid #3b82f6;
+  padding: 0.6rem 1rem; border-radius: 0 6px 6px 0;
+  font-size: 0.85rem; color: #1e40af; margin: 0.5rem 0 0;
+}
+@media (max-width: 768px) {
+  .wf-step { flex-direction: column; }
+  .wf-step-num { width: 30px; height: 30px; font-size: 0.85rem; }
+}
 </style>
 </head>
 <body>
@@ -154,7 +255,7 @@ footer.site-footer strong{color:var(--primary-dark);}
     <span></span><span></span><span></span>
   </button>
   <div class="logo">SITREP <span>Mendoza</span></div>
-  <span class="version">v2026.1</span>
+  <span class="version">v2026.2</span>
   <span class="doc-title">Manual del Sistema de Trazabilidad de Residuos Peligrosos</span>
 </header>
 
@@ -219,6 +320,16 @@ footer.site-footer strong{color:var(--primary-dark);}
   <a href="#contacto" class="nav-link">Soporte y Contacto</a>
   <div class="nav-section-title">11. Versiones</div>
   <a href="#historial" class="nav-link">Historial y Roadmap</a>
+  <div class="nav-section-title">12. Galeria</div>
+  <a href="#galeria" class="nav-link">Capturas de Pantalla</a>
+  <a href="#galeria" class="nav-link level-2">Desktop (46 capturas)</a>
+  <a href="#galeria" class="nav-link level-2">Mobile PWA (17 capturas)</a>
+  <div class="nav-section-title">13. Flujos por Perfil</div>
+  <a href="#flujos" class="nav-link">Flujos de Trabajo</a>
+  <a href="#flujo-admin" class="nav-link level-2">Administrador</a>
+  <a href="#flujo-generador" class="nav-link level-2">Generador</a>
+  <a href="#flujo-transportista" class="nav-link level-2">Transportista</a>
+  <a href="#flujo-operador" class="nav-link level-2">Operador</a>
 </nav>
 
 <!-- Main Content -->
@@ -1989,10 +2100,12 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <section id="cu-admin" data-role="admin">
 <h2>7. Anexo: Casos de Uso</h2>
-<h3>7.1 Administrador DGFA (15 casos)</h3>
+<h3>7.1 Administrador DGFA (19 casos)</h3>
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A01: Gestionar Usuarios del Sistema</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/23_admin_usuarios.png" target="_blank"><img src="screenshots/desktop/23_admin_usuarios.png" alt="Gestión de Usuarios — tabla con 7 roles e impersonación" loading="lazy"></a><div class="cu-screenshot-caption">Gestión de Usuarios — tabla con 7 roles e impersonación</div></div>
+
 <p><strong>Descripcion:</strong> El administrador crea, edita, activa/desactiva y asigna roles a los usuarios del sistema. Incluye asignacion de empresa y CUIT.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol ADMIN.</p>
 <p><strong>Flujo principal:</strong></p>
@@ -2000,16 +2113,19 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <li>Acceder a Admin &gt; Usuarios.</li>
 <li>Visualizar tabla de usuarios con busqueda y filtros.</li>
 <li>Crear nuevo usuario: completar email, nombre, apellido, empresa, telefono, CUIT.</li>
-<li>Asignar rol: ADMIN, GENERADOR, TRANSPORTISTA u OPERADOR.</li>
+<li>Asignar rol: el dropdown ofrece 7 opciones: ADMIN, GENERADOR, TRANSPORTISTA, OPERADOR, ADMIN_GENERADOR, ADMIN_TRANSPORTISTA, ADMIN_OPERADOR (ver CU-A17).</li>
 <li>Guardar. El sistema valida unicidad de email y formato de CUIT.</li>
 </ol>
+<p><strong>Nota:</strong> La columna de acciones incluye un icono de ojo naranja para impersonar al usuario (ver CU-A16). Este icono solo es visible para usuarios activos y no aparece en la propia fila del ADMIN.</p>
 <p><strong>Ruta:</strong> <code>/admin/usuarios</code></p>
-<p><strong>Endpoints:</strong> <code>GET/POST/PUT/DELETE /api/auth/register</code>, <code>GET /api/auth/perfil</code></p>
+<p><strong>Endpoints:</strong> <code>GET/POST/PUT/DELETE /api/admin/usuarios</code>, <code>PATCH /api/admin/usuarios/:id/toggle-activo</code></p>
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A02: Gestionar Generadores</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/64_generador_detalle.png" target="_blank"><img src="screenshots/desktop/64_generador_detalle.png" alt="Detalle de Generador" loading="lazy"></a><div class="cu-screenshot-caption">Detalle de Generador</div></div>
+
 <p><strong>Descripcion:</strong> Alta, baja y modificacion de generadores de residuos peligrosos registrados. Incluye datos de inscripcion, categoria y geolocalizacion.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol ADMIN.</p>
 <p><strong>Flujo principal:</strong></p>
@@ -2027,16 +2143,19 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A03: Gestionar Transportistas</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/63_transportista_detalle_flota.png" target="_blank"><img src="screenshots/desktop/63_transportista_detalle_flota.png" alt="Detalle Transportista — flota y conductores" loading="lazy"></a><div class="cu-screenshot-caption">Detalle Transportista — flota y conductores</div></div>
+
 <p><strong>Descripcion:</strong> CRUD completo de empresas transportistas con entidades anidadas: vehiculos (patente, capacidad, habilitacion) y choferes (DNI, licencia).</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol ADMIN.</p>
 <p><strong>Flujo principal:</strong></p>
 <ol>
 <li>Acceder a Admin &gt; Actores &gt; Transportistas.</li>
 <li>Crear/Editar transportista con datos basicos (razonSocial, CUIT, habilitacion).</li>
-<li>Agregar vehiculos: patente, marca, modelo, anio, capacidad, numero de habilitacion, vencimiento.</li>
-<li>Agregar choferes: nombre, apellido, DNI, licencia, vencimiento, telefono.</li>
+<li>Agregar vehiculos: patente, marca, modelo, anio, capacidad, numero de habilitacion, Vencimiento de Habilitacion (date picker).</li>
+<li>Agregar choferes: nombre, apellido, DNI, licencia, Vencimiento de Licencia (date picker), telefono.</li>
 <li>Guardar con todas las entidades anidadas.</li>
 </ol>
+<p><strong>Nota:</strong> Los transportistas pueden gestionar su propia flota de forma autonoma desde su perfil sin intervencion del administrador (ver CU-T12).</p>
 <p><strong>Ruta:</strong> <code>/admin/actores/transportistas</code></p>
 <p><strong>Endpoints:</strong> <code>GET/POST/PUT/DELETE /api/actores/transportistas</code></p>
 <p><span class="badge badge-complete">Completo</span></p>
@@ -2044,6 +2163,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A04: Gestionar Operadores</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/65_operador_detalle.png" target="_blank"><img src="screenshots/desktop/65_operador_detalle.png" alt="Detalle Operador" loading="lazy"></a><div class="cu-screenshot-caption">Detalle Operador</div></div>
+
 <p><strong>Descripcion:</strong> Alta, baja y modificacion de plantas operadoras con certificados, corrientes Y autorizadas y metodos de tratamiento.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol ADMIN.</p>
 <p><strong>Flujo principal:</strong></p>
@@ -2062,6 +2183,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A05: Configurar Catalogo de Residuos</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/32_admin_catalogo_residuos.png" target="_blank"><img src="screenshots/desktop/32_admin_catalogo_residuos.png" alt="Catálogo de Residuos" loading="lazy"></a><div class="cu-screenshot-caption">Catálogo de Residuos</div></div>
+
 <p><strong>Descripcion:</strong> Administrar el catalogo de tipos de residuo con codigos Y conforme Ley 24.051, caracteristicas de peligrosidad y estado activo/inactivo.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol ADMIN.</p>
 <p><strong>Campos del catalogo:</strong> codigo (Y1-Y48), nombre, descripcion detallada, categoria, caracteristicas de peligrosidad (H1-H13), estado (activo/inactivo).</p>
@@ -2073,6 +2196,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A06: Configurar Catalogo de Tratamientos</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/33_admin_tratamientos_grid.png" target="_blank"><img src="screenshots/desktop/33_admin_tratamientos_grid.png" alt="Catálogo de Tratamientos" loading="lazy"></a><div class="cu-screenshot-caption">Catálogo de Tratamientos</div></div>
+
 <p><strong>Descripcion:</strong> Gestionar los metodos de tratamiento autorizados con descripciones y capacidades.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol ADMIN.</p>
 <p><strong>Campos:</strong> Nombre del metodo, descripcion del proceso, capacidad de tratamiento, tipos de residuos compatibles.</p>
@@ -2083,6 +2208,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A07: Visualizar Dashboard General</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/04_dashboard_admin.png" target="_blank"><img src="screenshots/desktop/04_dashboard_admin.png" alt="Dashboard Admin — KPIs y manifiestos recientes" loading="lazy"></a><div class="cu-screenshot-caption">Dashboard Admin — KPIs y manifiestos recientes</div></div>
+
 <p><strong>Descripcion:</strong> Pantalla principal con KPIs globales, manifiestos recientes, acciones rapidas y filtros por periodo.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol ADMIN.</p>
 <p><strong>KPIs mostrados:</strong> Borradores, Aprobados, En Transito, Entregados, Recibidos, Tratados, Total. Cada KPI es clickeable y filtra la tabla de recientes.</p>
@@ -2094,6 +2221,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A08: Operar Centro de Control</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/05_centro_control.png" target="_blank"><img src="screenshots/desktop/05_centro_control.png" alt="Centro de Control — mapa y viajes activos" loading="lazy"></a><div class="cu-screenshot-caption">Centro de Control — mapa y viajes activos</div></div>
+
 <p><strong>Descripcion:</strong> Sala de operaciones en tiempo real con mapa interactivo, viajes activos, pipeline de estados, graficos y auto-refresco cada 30 segundos.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol ADMIN.</p>
 <p><strong>Componentes principales:</strong></p>
@@ -2105,6 +2234,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <li>Panel acordeon con viajes activos y completados.</li>
 <li>Graficos de dona y barras para estadisticas rapidas.</li>
 <li>6 botones de accion rapida.</li>
+<li>Presets rapidos de fecha: Hoy, 7d, 30d, 90d para filtrado inmediato.</li>
 </ul>
 <p><strong>Ruta:</strong> <code>/centro-control</code></p>
 <p><strong>Endpoints:</strong> <code>GET /api/centro-control/actividad</code></p>
@@ -2113,6 +2243,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A09: Generar Reportes</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/17_reportes_manifiestos.png" target="_blank"><img src="screenshots/desktop/17_reportes_manifiestos.png" alt="Centro de Reportes — 8 pestañas" loading="lazy"></a><div class="cu-screenshot-caption">Centro de Reportes — 8 pestañas</div></div>
+
 <p><strong>Descripcion:</strong> Centro de reportes con 8 pestanas de analisis. Cada pestana se carga bajo demanda (React.lazy + Suspense) para optimizar el rendimiento.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol ADMIN.</p>
 <p><strong>8 pestanas:</strong> Manifiestos, Residuos Tratados, Transporte, Generadores, Operadores, Tratamientos, Departamentos, Mapa de Actores.</p>
@@ -2124,6 +2256,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A10: Consultar Auditoria</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/35_admin_auditoria.png" target="_blank"><img src="screenshots/desktop/35_admin_auditoria.png" alt="Auditoría del Sistema" loading="lazy"></a><div class="cu-screenshot-caption">Auditoría del Sistema</div></div>
+
 <p><strong>Descripcion:</strong> Log inmutable de todas las operaciones del sistema. Cada registro incluye la accion realizada, el modulo afectado, los datos antes y despues del cambio, la direccion IP, el user agent, el usuario responsable y el timestamp.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol ADMIN.</p>
 <p><strong>Filtros disponibles:</strong> Rango de fechas, usuario, tipo de accion, modulo.</p>
@@ -2134,7 +2268,9 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A11: Gestionar Alertas</div>
 <div class="collapsible-body">
-<p><strong>Descripcion:</strong> Crear, editar y activar/desactivar reglas de alerta. Cuando una regla se dispara, genera automaticamente una alerta para los usuarios configurados como destinatarios.</p>
+<div class="cu-screenshot"><a href="screenshots/desktop/16_alertas_timeline.png" target="_blank"><img src="screenshots/desktop/16_alertas_timeline.png" alt="Alertas — Timeline por criticidad" loading="lazy"></a><div class="cu-screenshot-caption">Alertas — Timeline por criticidad</div></div>
+
+<p><strong>Descripcion:</strong> Crear, editar y activar/desactivar reglas de alerta. Cuando una regla se dispara, genera automaticamente una alerta para los usuarios configurados como destinatarios. La vista de alertas generadas usa un diseno de timeline con tarjetas coloreadas (critico = rojo, advertencia = amarillo, info = azul, exito = verde) y paginacion.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol ADMIN.</p>
 <p><strong>Campos de regla:</strong> Nombre, evento disparador, condicion, destinatarios (por rol o usuario especifico), estado activo/inactivo.</p>
 <p><strong>Flujo:</strong></p>
@@ -2152,6 +2288,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A12: Carga Masiva de Datos</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/36_carga_masiva.png" target="_blank"><img src="screenshots/desktop/36_carga_masiva.png" alt="Carga Masiva CSV" loading="lazy"></a><div class="cu-screenshot-caption">Carga Masiva CSV</div></div>
+
 <p><strong>Descripcion:</strong> Importacion masiva de generadores, transportistas y operadores desde archivos CSV. El flujo incluye seleccion de tipo, descarga de plantilla, carga del archivo, vista previa con validacion, importacion y reporte de resultados.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol ADMIN.</p>
 <p><strong>Consideraciones tecnicas:</strong></p>
@@ -2167,6 +2305,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A13: Gestionar Vehiculos</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/34_admin_vehiculos.png" target="_blank"><img src="screenshots/desktop/34_admin_vehiculos.png" alt="Gestión de Vehículos" loading="lazy"></a><div class="cu-screenshot-caption">Gestión de Vehículos</div></div>
+
 <p><strong>Descripcion:</strong> Administrar la flota de vehiculos habilitados para transporte de residuos peligrosos. Cada vehiculo se asocia a un transportista y contiene datos de patente, marca, modelo, anio, capacidad, numero de habilitacion y fecha de vencimiento.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol ADMIN.</p>
 <p><strong>Validaciones:</strong> Unicidad de patente, habilitacion vigente (vencimiento futuro), capacidad mayor a cero.</p>
@@ -2177,6 +2317,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A14: Configurar Parametros del Sistema</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/37_configuracion_general.png" target="_blank"><img src="screenshots/desktop/37_configuracion_general.png" alt="Configuración del Sistema" loading="lazy"></a><div class="cu-screenshot-caption">Configuración del Sistema</div></div>
+
 <p><strong>Descripcion:</strong> Ajustar configuraciones globales del sistema organizadas por categorias: intervalos de refresco, limites de paginacion, configuracion de notificaciones, parametros de GPS, umbrales de alerta.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol ADMIN.</p>
 <p><strong>Ruta:</strong> <code>/configuracion</code></p>
@@ -2185,6 +2327,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A15: Supervisar Anomalias de Transporte</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/61_centro_control_viajes.png" target="_blank"><img src="screenshots/desktop/61_centro_control_viajes.png" alt="Anomalías — Centro de Control Viajes" loading="lazy"></a><div class="cu-screenshot-caption">Anomalías — Centro de Control Viajes</div></div>
+
 <p><strong>Descripcion:</strong> Detectar, listar y resolver anomalias detectadas durante el transporte de residuos peligrosos.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol ADMIN.</p>
 <p><strong>Tipos de anomalia:</strong></p>
@@ -2198,6 +2342,107 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><strong>Endpoints:</strong> <code>POST /api/anomalias/detectar/:manifiestoId</code>, <code>GET /api/anomalias/:manifiestoId</code>, <code>PUT /api/anomalias/:id/resolver</code></p>
 <p><span class="badge badge-partial">Parcial</span></p>
 </div>
+
+<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A16: Impersonar Usuario (Acceso Comodin)</div>
+<div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/23_admin_usuarios.png" target="_blank"><img src="screenshots/desktop/23_admin_usuarios.png" alt="Impersonación — ícono ojo naranja en tabla de usuarios" loading="lazy"></a><div class="cu-screenshot-caption">Impersonación — ícono ojo naranja en tabla de usuarios</div></div>
+
+<p><strong>Descripcion:</strong> El administrador puede acceder al sistema en nombre de cualquier usuario activo para verificar su experiencia, resolver incidencias o auditar la interfaz sin necesitar la contrasena del usuario objetivo.</p>
+<p><strong>Actor:</strong> Administrador DGFA</p>
+<p><strong>Precondiciones:</strong> Usuario autenticado con rol ADMIN. El usuario objetivo existe y tiene estado activo.</p>
+<p><strong>Flujo principal:</strong></p>
+<ol>
+<li>El ADMIN navega a Admin &gt; Usuarios (<code>/admin/usuarios</code>).</li>
+<li>En la tabla de usuarios, cada fila tiene un icono de ojo naranja en la columna de acciones (solo visible para usuarios activos; no visible para el propio ADMIN).</li>
+<li>El ADMIN hace clic en el icono de ojo del usuario objetivo.</li>
+<li>El sistema llama a <code>POST /api/admin/impersonate/{userId}</code>. El backend valida que el objetivo esta activo y no es el propio ADMIN; genera nuevos tokens JWT para el usuario objetivo.</li>
+<li>El frontend guarda los tokens del ADMIN en localStorage (<code>sitrep_impersonation</code>) y realiza una recarga completa de la pagina (flush del cache React Query).</li>
+<li>La nueva sesion carga con los tokens del usuario objetivo. Aparece un <strong>banner naranja/ambar en la parte superior</strong> con el texto: <em>"Acceso Comodin — viendo como: [Nombre] ([Rol])"</em>.</li>
+<li>El ADMIN navega por la aplicacion exactamente como la veria el usuario objetivo, con acceso solo a las paginas de ese rol.</li>
+<li>Para terminar: clic en <strong>"Volver a mi cuenta"</strong> en el banner → el sistema restaura los tokens del ADMIN desde localStorage y navega de vuelta a <code>/admin/usuarios</code>.</li>
+</ol>
+<p><strong>Postcondiciones:</strong> Registro de auditoria creado con accion IMPERSONATION (adminId, targetUserId, timestamp, IP). La sesion del ADMIN no fue afectada.</p>
+<p><strong>Restricciones de seguridad:</strong> No es posible impersonar a otro ADMIN. No es posible impersonar a usuarios inactivos.</p>
+<p><strong>Ruta:</strong> <code>/admin/usuarios</code></p>
+<p><strong>Endpoint:</strong> <code>POST /api/admin/impersonate/{userId}</code></p>
+<p><span class="badge badge-complete">Completo</span></p>
+</div>
+
+<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A17: Gestionar Roles Administrativos Delegados</div>
+<div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/24_admin_usuario_crear_modal.png" target="_blank"><img src="screenshots/desktop/24_admin_usuario_crear_modal.png" alt="Sub-roles — modal con 7 opciones de rol" loading="lazy"></a><div class="cu-screenshot-caption">Sub-roles — modal con 7 opciones de rol</div></div>
+
+<p><strong>Descripcion:</strong> El administrador puede asignar roles de administracion parcial a usuarios de confianza. Cada sub-rol otorga acceso a un subconjunto especifico del sistema.</p>
+<p><strong>Actor:</strong> Administrador DGFA</p>
+<p><strong>Precondiciones:</strong> Usuario autenticado con rol ADMIN.</p>
+<p><strong>Sub-roles disponibles:</strong></p>
+<table>
+<thead><tr><th>Sub-rol</th><th>Paginas accesibles</th><th>Dominio de gestion</th></tr></thead>
+<tbody>
+<tr><td><code>ADMIN_GENERADOR</code></td><td>Dashboard, Manifiestos, Reportes, Alertas, Generadores, Catalogo Residuos, Configuracion, Auditoria</td><td>Alta/baja/modificacion de generadores y catalogo de residuos</td></tr>
+<tr><td><code>ADMIN_TRANSPORTISTA</code></td><td>Dashboard, Centro de Control, Manifiestos, Reportes, Alertas, Transportistas, Vehiculos, Configuracion, Auditoria</td><td>Alta/baja/modificacion de transportistas, vehiculos y conductores</td></tr>
+<tr><td><code>ADMIN_OPERADOR</code></td><td>Dashboard, Manifiestos, Reportes, Alertas, Operadores, Tratamientos, Configuracion, Auditoria</td><td>Alta/baja/modificacion de operadores y catalogo de tratamientos</td></tr>
+</tbody>
+</table>
+<p><strong>Flujo principal:</strong></p>
+<ol>
+<li>El ADMIN navega a Admin &gt; Usuarios.</li>
+<li>Crea un nuevo usuario o edita uno existente.</li>
+<li>En el campo Rol, el dropdown ofrece 7 opciones: ADMIN, GENERADOR, TRANSPORTISTA, OPERADOR, ADMIN_GENERADOR, ADMIN_TRANSPORTISTA, ADMIN_OPERADOR.</li>
+<li>El ADMIN selecciona el sub-rol correspondiente y guarda.</li>
+<li>El nuevo usuario, al iniciar sesion, vera unicamente las paginas habilitadas para su sub-rol en el menu lateral.</li>
+</ol>
+<p><strong>Ruta:</strong> <code>/admin/usuarios</code> (modal de creacion/edicion)</p>
+<p><strong>Endpoint:</strong> <code>POST/PUT /api/admin/usuarios</code></p>
+<p><span class="badge badge-complete">Completo</span></p>
+</div>
+
+<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A18: Busqueda Global (Cmd+K)</div>
+<div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/25_busqueda_global_cmd_k.png" target="_blank"><img src="screenshots/desktop/25_busqueda_global_cmd_k.png" alt="Búsqueda Global Cmd+K" loading="lazy"></a><div class="cu-screenshot-caption">Búsqueda Global Cmd+K</div></div>
+
+<p><strong>Descripcion:</strong> Buscador global accesible mediante atajo de teclado para encontrar manifiestos, generadores, transportistas y operadores desde cualquier pagina sin cambiar de seccion.</p>
+<p><strong>Actor:</strong> Cualquier usuario autenticado</p>
+<p><strong>Atajo:</strong> <code>Cmd+K</code> (macOS) / <code>Ctrl+K</code> (Windows/Linux)</p>
+<p><strong>Flujo principal:</strong></p>
+<ol>
+<li>El usuario presiona Cmd+K. Se abre el panel de busqueda global (modal centrado bajo el header, backdrop oscuro).</li>
+<li>El campo de busqueda recibe el foco automaticamente.</li>
+<li>El usuario escribe la consulta (minimo 2 caracteres). Despues de 300 ms, se realiza la busqueda.</li>
+<li>Los resultados se muestran agrupados por tipo: Manifiestos (con chip de estado), Generadores, Transportistas, Operadores (cada uno con razon social y CUIT).</li>
+<li>Chips de filtro por estado en la parte superior (BORRADOR, APROBADO, EN_TRANSITO, ENTREGADO, RECIBIDO, TRATADO): clic en un chip filtra resultados.</li>
+<li>Navegacion por teclado: flechas ↓/↑ mueven el foco entre resultados; Enter navega al recurso seleccionado.</li>
+<li>Clic en un resultado → navega a la pagina de detalle. La consulta se guarda en historial reciente (localStorage: <code>sitrep_recent_searches</code>, maximo 5 items).</li>
+<li>Escape cierra el panel.</li>
+<li>Si se abre el panel con menos de 2 caracteres, se muestran las busquedas recientes.</li>
+</ol>
+<p><strong>Ruta:</strong> Disponible en cualquier pagina autenticada</p>
+<p><span class="badge badge-complete">Completo</span></p>
+</div>
+
+<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A19: Configurar Preferencias de Notificaciones por Email</div>
+<div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/38_configuracion_notificaciones_email.png" target="_blank"><img src="screenshots/desktop/38_configuracion_notificaciones_email.png" alt="Preferencias de Email por usuario" loading="lazy"></a><div class="cu-screenshot-caption">Preferencias de Email por usuario</div></div>
+
+<p><strong>Descripcion:</strong> Cada usuario controla que tipos de notificaciones recibe por correo electronico. Los administradores tienen opciones adicionales.</p>
+<p><strong>Actor:</strong> Cualquier usuario autenticado (opciones extendidas para ADMIN)</p>
+<p><strong>Ruta:</strong> Configuracion (<code>/configuracion</code>) → pestana Notificaciones</p>
+<p><strong>Opciones disponibles:</strong></p>
+<ul>
+<li><strong>Todos los usuarios:</strong> Toggle "Recibir alertas por email" (<code>notifEmail</code>). Si esta desactivado, el usuario no recibira emails aunque este asignado como destinatario en reglas de alerta.</li>
+<li><strong>Solo ADMIN:</strong> Toggle adicional "Notificarme nuevos usuarios pendientes de aprobacion" (<code>notifNuevoRegistro</code>). Controla si el admin recibe email cuando un usuario nuevo requiere activacion.</li>
+</ul>
+<p><strong>Flujo:</strong></p>
+<ol>
+<li>El usuario navega a Configuracion → pestana Notificaciones.</li>
+<li>Activa o desactiva los toggles.</li>
+<li>La preferencia se guarda automaticamente al hacer clic en el toggle (<code>PUT /api/admin/preferencias-notificacion</code>).</li>
+<li>Aparece toast: "Preferencias guardadas".</li>
+</ol>
+<p><strong>Efecto:</strong> El servicio de notificaciones consulta <code>notifEmail=true</code> antes de enviar cualquier email a un usuario.</p>
+<p><strong>Endpoint:</strong> <code>PUT /api/admin/preferencias-notificacion</code></p>
+<p><span class="badge badge-complete">Completo</span></p>
+</div>
 </section>
 
 <section id="cu-generador" data-role="generador">
@@ -2205,6 +2450,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-G01: Crear Manifiesto</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/14_nuevo_manifiesto_paso1.png" target="_blank"><img src="screenshots/desktop/14_nuevo_manifiesto_paso1.png" alt="Nuevo Manifiesto — Paso 1: datos generales" loading="lazy"></a><div class="cu-screenshot-caption">Nuevo Manifiesto — Paso 1: datos generales</div></div>
+
 <p><strong>Descripcion:</strong> Formulario multi-paso para crear un nuevo manifiesto de residuos peligrosos. El manifiesto se guarda como BORRADOR hasta ser firmado.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol GENERADOR. Existen transportistas y operadores registrados en el sistema.</p>
 <p><strong>Flujo principal (5 pasos):</strong></p>
@@ -2223,6 +2470,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-G02: Firmar Manifiesto Electronicamente</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/53_manifiesto_borrador_detalle.png" target="_blank"><img src="screenshots/desktop/53_manifiesto_borrador_detalle.png" alt="Firmar Manifiesto — botón Aprobar en estado BORRADOR" loading="lazy"></a><div class="cu-screenshot-caption">Firmar Manifiesto — botón Aprobar en estado BORRADOR</div></div>
+
 <p><strong>Descripcion:</strong> Firma electronica del manifiesto en estado BORRADOR para pasarlo a APROBADO. El sistema genera automaticamente un codigo QR unico para el manifiesto.</p>
 <p><strong>Precondiciones:</strong> El manifiesto esta en estado BORRADOR. El usuario autenticado es el generador propietario del manifiesto o un ADMIN.</p>
 <p><strong>Flujo:</strong></p>
@@ -2239,6 +2488,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-G03: Consultar Manifiestos Propios</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/48_manifiestos_generador.png" target="_blank"><img src="screenshots/desktop/48_manifiestos_generador.png" alt="Mis Manifiestos — lista filtrada por generador" loading="lazy"></a><div class="cu-screenshot-caption">Mis Manifiestos — lista filtrada por generador</div></div>
+
 <p><strong>Descripcion:</strong> Listado paginado de manifiestos creados por el generador autenticado. Permite busqueda por numero de manifiesto y filtro por estado.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol GENERADOR.</p>
 <p><strong>Funcionalidades:</strong> Busqueda por numero, filtro por estado (dropdown con 10 estados), paginacion configurable (10/25/50 por pagina), ordenamiento por fecha, clic en fila navega al detalle.</p>
@@ -2249,6 +2500,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-G04: Ver Detalle de Manifiesto</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/53_manifiesto_borrador_detalle.png" target="_blank"><img src="screenshots/desktop/53_manifiesto_borrador_detalle.png" alt="Detalle de Manifiesto — acciones y timeline" loading="lazy"></a><div class="cu-screenshot-caption">Detalle de Manifiesto — acciones y timeline</div></div>
+
 <p><strong>Descripcion:</strong> Vista completa del manifiesto con tarjeta de datos, timeline cronologico de eventos, mapa GPS (para manifiestos en transito) y descarga de documentos PDF.</p>
 <p><strong>Precondiciones:</strong> El usuario tiene acceso al manifiesto (es el generador propietario o ADMIN).</p>
 <p><strong>Contenido:</strong></p>
@@ -2267,6 +2520,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-G05: Seguir Transporte en Tiempo Real</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/10_manifiestos_en_transito.png" target="_blank"><img src="screenshots/desktop/10_manifiestos_en_transito.png" alt="Seguimiento — manifiestos EN_TRANSITO" loading="lazy"></a><div class="cu-screenshot-caption">Seguimiento — manifiestos EN_TRANSITO</div></div>
+
 <p><strong>Descripcion:</strong> Visualizar la ubicacion GPS del vehiculo transportador en tiempo real sobre un mapa interactivo. Disponible cuando el manifiesto esta en estado EN_TRANSITO.</p>
 <p><strong>Precondiciones:</strong> El manifiesto esta en estado EN_TRANSITO. El transportista tiene GPS activo.</p>
 <p><strong>Datos mostrados:</strong> Posicion actual del vehiculo (marcador rojo pulsante), traza del recorrido (linea sobre el mapa), velocidad actual, tiempo transcurrido desde el retiro, generador (punto de origen), operador (punto de destino).</p>
@@ -2276,6 +2531,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-G06: Cancelar Manifiesto</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/48_manifiestos_generador.png" target="_blank"><img src="screenshots/desktop/48_manifiestos_generador.png" alt="Lista de Manifiestos — acción Cancelar disponible" loading="lazy"></a><div class="cu-screenshot-caption">Lista de Manifiestos — acción Cancelar disponible</div></div>
+
 <p><strong>Descripcion:</strong> Cancelar un manifiesto que no ha llegado a estado TRATADO ni CANCELADO. Requiere indicar un motivo de cancelacion.</p>
 <p><strong>Precondiciones:</strong> El manifiesto no esta en estado TRATADO ni CANCELADO. El usuario es el generador propietario o ADMIN.</p>
 <p><strong>Flujo:</strong> Acceder al detalle, clic en &quot;Cancelar Manifiesto&quot;, ingresar motivo, confirmar.</p>
@@ -2286,6 +2543,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-G07: Descargar PDF de Manifiesto</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/57_manifiesto_tratado_detalle.png" target="_blank"><img src="screenshots/desktop/57_manifiesto_tratado_detalle.png" alt="Descargar PDF — manifiesto TRATADO" loading="lazy"></a><div class="cu-screenshot-caption">Descargar PDF — manifiesto TRATADO</div></div>
+
 <p><strong>Descripcion:</strong> Generar y descargar el PDF oficial del manifiesto con todos los datos normativos requeridos por Ley 24.051.</p>
 <p><strong>Precondiciones:</strong> El manifiesto existe (cualquier estado).</p>
 <p><strong>Contenido del PDF:</strong> Header SITREP con logo, numero de manifiesto, datos del generador, datos del transportista (incluye vehiculo y chofer), datos del operador, tipo y cantidad de residuo, categorias Y y caracteristicas H, fechas del ciclo, codigo QR, timeline de eventos, firmas.</p>
@@ -2295,6 +2554,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-G08: Descargar Certificado de Disposicion</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/57_manifiesto_tratado_detalle.png" target="_blank"><img src="screenshots/desktop/57_manifiesto_tratado_detalle.png" alt="Descargar Certificado de Disposición Final" loading="lazy"></a><div class="cu-screenshot-caption">Descargar Certificado de Disposición Final</div></div>
+
 <p><strong>Descripcion:</strong> Descargar el Certificado de Tratamiento y Disposicion Final en formato PDF. Este documento certifica que el residuo peligroso fue tratado conforme a la normativa vigente.</p>
 <p><strong>Precondiciones:</strong> El manifiesto esta en estado TRATADO.</p>
 <p><strong>Contenido del certificado:</strong> Referencia a Ley 24.051, datos completos del ciclo (generador, transportista, operador), tipo de residuo y cantidad, metodo de tratamiento aplicado, fechas completas, firma del operador responsable, numero de certificado.</p>
@@ -2304,6 +2565,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-G09: Visualizar Dashboard de Generador</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/47_dashboard_generador.png" target="_blank"><img src="screenshots/desktop/47_dashboard_generador.png" alt="Dashboard Generador — KPIs propios" loading="lazy"></a><div class="cu-screenshot-caption">Dashboard Generador — KPIs propios</div></div>
+
 <p><strong>Descripcion:</strong> Dashboard personalizado que muestra los KPIs especificos del generador autenticado: manifiestos por estado, manifiestos recientes, acciones rapidas (nuevo manifiesto, ver en transito).</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol GENERADOR.</p>
 <p><strong>Ruta:</strong> <code>/dashboard</code></p>
@@ -2312,6 +2575,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-G10: Consultar Reportes Propios</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/52_reportes_operador.png" target="_blank"><img src="screenshots/desktop/52_reportes_operador.png" alt="Reportes — filtrados por empresa" loading="lazy"></a><div class="cu-screenshot-caption">Reportes — filtrados por empresa</div></div>
+
 <p><strong>Descripcion:</strong> Acceso a reportes filtrados automaticamente por la actividad del generador autenticado. Los datos solo incluyen manifiestos propios.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol GENERADOR.</p>
 <p><strong>Ruta:</strong> <code>/reportes</code> (datos filtrados por generadorId)</p>
@@ -2320,6 +2585,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-G11: Recibir Notificaciones</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/37_configuracion_general.png" target="_blank"><img src="screenshots/desktop/37_configuracion_general.png" alt="Notificaciones — configuración de alertas" loading="lazy"></a><div class="cu-screenshot-caption">Notificaciones — configuración de alertas</div></div>
+
 <p><strong>Descripcion:</strong> Recibir notificaciones automaticas cuando cambia el estado de un manifiesto propio: aprobacion, retiro por el transportista, entrega al operador, recepcion, inicio de tratamiento, cierre y emision de certificado.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol GENERADOR.</p>
 <p><strong>Mecanismo:</strong> Polling cada 30 segundos al endpoint de notificaciones. Icono de campana con badge numerico.</p>
@@ -2329,6 +2596,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-G12: Gestionar Perfil</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/39_mi_perfil.png" target="_blank"><img src="screenshots/desktop/39_mi_perfil.png" alt="Mi Perfil — datos personales y contraseña" loading="lazy"></a><div class="cu-screenshot-caption">Mi Perfil — datos personales y contraseña</div></div>
+
 <p><strong>Descripcion:</strong> Editar datos personales (nombre, apellido, telefono), cambiar contrasena y configurar preferencias de notificacion del usuario generador.</p>
 <p><strong>Precondiciones:</strong> El usuario esta autenticado.</p>
 <p><strong>Ruta:</strong> <code>/perfil</code></p>
@@ -2337,10 +2606,12 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 </section>
 
 <section id="cu-transportista" data-role="transportista">
-<h3>7.3 Transportista (11 casos)</h3>
+<h3>7.3 Transportista (12 casos)</h3>
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-T01: Ver Manifiestos Asignados</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/45_manifiestos_transportista.png" target="_blank"><img src="screenshots/desktop/45_manifiestos_transportista.png" alt="Manifiestos Asignados al Transportista" loading="lazy"></a><div class="cu-screenshot-caption">Manifiestos Asignados al Transportista</div></div>
+
 <p><strong>Descripcion:</strong> Listado de manifiestos asignados al transportista autenticado con filtros por estado y busqueda por numero de manifiesto.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol TRANSPORTISTA.</p>
 <p><strong>Datos mostrados:</strong> Numero, generador, operador destino, tipo de residuo, cantidad, estado actual, fecha de creacion. Los manifiestos se filtran automaticamente por el transportistaId del usuario.</p>
@@ -2350,6 +2621,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-T02: Confirmar Retiro de Residuos</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/54_manifiesto_aprobado_detalle.png" target="_blank"><img src="screenshots/desktop/54_manifiesto_aprobado_detalle.png" alt="Confirmar Retiro — estado APROBADO" loading="lazy"></a><div class="cu-screenshot-caption">Confirmar Retiro — estado APROBADO</div></div>
+
 <p><strong>Descripcion:</strong> El transportista confirma que ha retirado el residuo en la ubicacion del generador. Esta accion cambia el estado del manifiesto a EN_TRANSITO y activa automaticamente el tracking GPS.</p>
 <p><strong>Precondiciones:</strong> El manifiesto esta en estado APROBADO. El usuario es el transportista asignado o ADMIN.</p>
 <p><strong>Flujo:</strong></p>
@@ -2367,6 +2640,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-T03: Tracking GPS en Tiempo Real</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/mobile/M22_viaje_gps_activo_mobile.png" target="_blank"><img src="screenshots/mobile/M22_viaje_gps_activo_mobile.png" alt="GPS en Tiempo Real — PWA móvil" loading="lazy"></a><div class="cu-screenshot-caption">GPS en Tiempo Real — PWA móvil</div></div>
+
 <p><strong>Descripcion:</strong> Seguimiento GPS continuo durante todo el transporte del residuo peligroso. La posicion se captura continuamente y se transmite al servidor cada 30 segundos.</p>
 <p><strong>Precondiciones:</strong> El manifiesto esta en estado EN_TRANSITO. Permisos de ubicacion concedidos.</p>
 <p><strong>Datos capturados:</strong> Latitud, longitud, velocidad (m/s), direccion (grados 0-360), precision (metros).</p>
@@ -2378,6 +2653,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-T04: Pausar y Reanudar Tracking</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/mobile/M22_viaje_gps_activo_mobile.png" target="_blank"><img src="screenshots/mobile/M22_viaje_gps_activo_mobile.png" alt="Pausar/Reanudar Tracking GPS" loading="lazy"></a><div class="cu-screenshot-caption">Pausar/Reanudar Tracking GPS</div></div>
+
 <p><strong>Descripcion:</strong> El transportista puede pausar el tracking GPS durante paradas intermedias (combustible, descanso, tramites) y reanudarlo al continuar el viaje.</p>
 <p><strong>Precondiciones:</strong> El manifiesto esta en estado EN_TRANSITO. El GPS esta activo.</p>
 <p><strong>Flujo de pausa:</strong> Clic en &quot;Pausar&quot;, se registra incidente tipo PAUSA con ubicacion actual, se detiene el watcher GPS, se persiste estado en localStorage.</p>
@@ -2388,6 +2665,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-T05: Registrar Incidente en Transito</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/mobile/M22_viaje_gps_activo_mobile.png" target="_blank"><img src="screenshots/mobile/M22_viaje_gps_activo_mobile.png" alt="Registrar Incidente durante el viaje" loading="lazy"></a><div class="cu-screenshot-caption">Registrar Incidente durante el viaje</div></div>
+
 <p><strong>Descripcion:</strong> Documentar incidentes ocurridos durante el transporte con descripcion detallada, tipo de incidente y ubicacion GPS automatica.</p>
 <p><strong>Precondiciones:</strong> El manifiesto esta en estado EN_TRANSITO. El usuario es el transportista asignado.</p>
 <p><strong>Tipos de incidente:</strong> Accidente vial, demora por trafico, desvio de ruta, problema mecanico, condicion climatica adversa, otro (texto libre).</p>
@@ -2399,6 +2678,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-T06: Confirmar Entrega al Operador</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/54_manifiesto_aprobado_detalle.png" target="_blank"><img src="screenshots/desktop/54_manifiesto_aprobado_detalle.png" alt="Confirmar Entrega — acciones en detalle" loading="lazy"></a><div class="cu-screenshot-caption">Confirmar Entrega — acciones en detalle</div></div>
+
 <p><strong>Descripcion:</strong> El transportista confirma que ha entregado el residuo en la planta del operador destino. Esta accion desactiva el GPS y cambia el estado a ENTREGADO.</p>
 <p><strong>Precondiciones:</strong> El manifiesto esta en estado EN_TRANSITO. El usuario es el transportista asignado o ADMIN.</p>
 <p><strong>Postcondiciones:</strong> Estado cambia a ENTREGADO. GPS desactivado y watcher limpiado. Cache de manifiestoId invalidado. Evento ENTREGA registrado. Notificacion al operador para que inicie la recepcion.</p>
@@ -2408,6 +2689,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-T07: Escanear Codigo QR</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/46_escaner_qr_desktop.png" target="_blank"><img src="screenshots/desktop/46_escaner_qr_desktop.png" alt="Escáner QR — verificación de manifiesto" loading="lazy"></a><div class="cu-screenshot-caption">Escáner QR — verificación de manifiesto</div></div>
+
 <p><strong>Descripcion:</strong> Leer el codigo QR impreso en el manifiesto o envase del residuo para acceder rapidamente al detalle del manifiesto correspondiente.</p>
 <p><strong>Precondiciones:</strong> El usuario tiene la app mobile instalada o accede desde el navegador con camara.</p>
 <p><strong>Flujo:</strong> Abrir escaner QR, apuntar camara al codigo, el sistema decodifica y navega al manifiesto. Si la camara no esta disponible, usar entrada manual del codigo.</p>
@@ -2417,6 +2700,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-T08: Visualizar Dashboard de Transportista</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/41_dashboard_transportista.png" target="_blank"><img src="screenshots/desktop/41_dashboard_transportista.png" alt="Dashboard Transportista — viajes y KPIs" loading="lazy"></a><div class="cu-screenshot-caption">Dashboard Transportista — viajes y KPIs</div></div>
+
 <p><strong>Descripcion:</strong> Dashboard personalizado para el transportista con banner destacado de viaje activo/pendiente, KPIs de transporte y manifiestos recientes asignados.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol TRANSPORTISTA.</p>
 <p><strong>Banner de viaje:</strong></p>
@@ -2431,6 +2716,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-T09: Consultar Historial de Viajes</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/44_transporte_perfil_historial.png" target="_blank"><img src="screenshots/desktop/44_transporte_perfil_historial.png" alt="Historial de Viajes completados" loading="lazy"></a><div class="cu-screenshot-caption">Historial de Viajes completados</div></div>
+
 <p><strong>Descripcion:</strong> Ver el historial completo de viajes realizados por el transportista, incluyendo trazas GPS sobre el mapa, tiempos de viaje y estadisticas de rendimiento.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol TRANSPORTISTA.</p>
 <p><strong>Datos mostrados:</strong> Lista de viajes completados con generador origen, operador destino, fecha/hora de retiro y entrega, duracion total, distancia recorrida.</p>
@@ -2439,6 +2726,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-T10: Recibir Notificaciones</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/37_configuracion_general.png" target="_blank"><img src="screenshots/desktop/37_configuracion_general.png" alt="Notificaciones Transportista" loading="lazy"></a><div class="cu-screenshot-caption">Notificaciones Transportista</div></div>
+
 <p><strong>Descripcion:</strong> Recibir notificaciones automaticas de asignacion de nuevos manifiestos, recordatorios de retiro pendiente y alertas del sistema.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol TRANSPORTISTA.</p>
 <p><strong>Tipos de notificacion:</strong> Nuevo manifiesto asignado, recordatorio de retiro, confirmacion de recepcion por operador, alerta del sistema.</p>
@@ -2447,9 +2736,34 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-T11: Gestionar Perfil</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/43_transporte_perfil_tab_info.png" target="_blank"><img src="screenshots/desktop/43_transporte_perfil_tab_info.png" alt="Perfil Transportista — datos de empresa" loading="lazy"></a><div class="cu-screenshot-caption">Perfil Transportista — datos de empresa</div></div>
+
 <p><strong>Descripcion:</strong> Editar datos personales (nombre, apellido, telefono), cambiar contrasena y gestionar la cuenta del transportista.</p>
 <p><strong>Precondiciones:</strong> El usuario esta autenticado.</p>
 <p><strong>Ruta:</strong> <code>/perfil</code></p>
+<p><span class="badge badge-complete">Completo</span></p>
+</div>
+
+<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-T12: Gestion Autonoma de Flota Propia</div>
+<div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/63_transportista_detalle_flota.png" target="_blank"><img src="screenshots/desktop/63_transportista_detalle_flota.png" alt="Gestión Autónoma de Flota — vehículos y conductores" loading="lazy"></a><div class="cu-screenshot-caption">Gestión Autónoma de Flota — vehículos y conductores</div></div>
+
+<p><strong>Descripcion:</strong> El transportista puede agregar, editar y eliminar sus propios vehiculos y conductores sin requerir intervencion del administrador, desde su perfil en la plataforma.</p>
+<p><strong>Actor:</strong> Transportista</p>
+<p><strong>Precondiciones:</strong> Usuario autenticado con rol TRANSPORTISTA.</p>
+<p><strong>Ruta:</strong> Transporte → Perfil (<code>/transporte/perfil</code>) → pestana Info → boton "Gestionar vehiculos y conductores"</p>
+<p><strong>Flujo principal:</strong></p>
+<ol>
+<li>El TRANSPORTISTA navega a Transporte → Perfil y abre la pestana Info.</li>
+<li>Hace clic en "Gestionar vehiculos y conductores" → navega a su propia TransportistaDetallePage (<code>/admin/actores/transportistas/{suPropioId}</code>).</li>
+<li><strong>Gestion de Vehiculos:</strong> Tabla con columnas Patente, Marca, Modelo, Anio, Capacidad, N° Habilitacion, Vencimiento Habilitacion. Botones Editar y Eliminar por fila. Boton "Agregar Vehiculo".</li>
+<li><strong>Gestion de Conductores:</strong> Tabla con columnas Nombre, Apellido, DNI, Licencia, Venc. Licencia, Telefono. Botones Editar y Eliminar. Boton "Agregar Conductor".</li>
+<li>Modal "Agregar/Editar Vehiculo": campos Patente (unico), Marca, Modelo, Anio, Capacidad, N° Habilitacion, Vencimiento (date picker). Validaciones: patente unica, capacidad &gt; 0, vencimiento futuro.</li>
+<li>Modal "Agregar/Editar Conductor": campos Nombre, Apellido, DNI, Licencia, Vencimiento Licencia (date picker), Telefono.</li>
+<li>Los cambios se persisten via API con filtro automatico por actorId del TRANSPORTISTA autenticado.</li>
+</ol>
+<p><strong>Nota de seguridad:</strong> La ruta acepta el rol TRANSPORTISTA pero limita el acceso al propio actorId del usuario. Intentar acceder al ID de otro transportista devuelve 403.</p>
+<p><strong>Postcondiciones:</strong> Flota y conductores actualizados en base de datos, disponibles para asignacion en futuros manifiestos.</p>
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 </section>
@@ -2459,6 +2773,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-O01: Ver Manifiestos Entrantes</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/51_manifiestos_operador.png" target="_blank"><img src="screenshots/desktop/51_manifiestos_operador.png" alt="Manifiestos Entrantes — lista ENTREGADO" loading="lazy"></a><div class="cu-screenshot-caption">Manifiestos Entrantes — lista ENTREGADO</div></div>
+
 <p><strong>Descripcion:</strong> Listado de manifiestos dirigidos a la planta del operador autenticado, con filtros por estado y busqueda por numero.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol OPERADOR.</p>
 <p><strong>Estados relevantes:</strong> EN_TRANSITO (en camino), ENTREGADO (esperando recepcion), RECIBIDO (pesado, pendiente tratamiento), EN_TRATAMIENTO (en proceso).</p>
@@ -2468,6 +2784,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-O02: Confirmar Recepcion</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/55_manifiesto_entregado_detalle.png" target="_blank"><img src="screenshots/desktop/55_manifiesto_entregado_detalle.png" alt="Confirmar Recepción — estado ENTREGADO" loading="lazy"></a><div class="cu-screenshot-caption">Confirmar Recepción — estado ENTREGADO</div></div>
+
 <p><strong>Descripcion:</strong> El operador registra la recepcion del residuo peligroso en su planta. Esta accion inicia el proceso de pesaje y verificacion de la carga.</p>
 <p><strong>Precondiciones:</strong> El manifiesto esta en estado ENTREGADO. El usuario es el operador destino o ADMIN.</p>
 <p><strong>Flujo:</strong></p>
@@ -2485,6 +2803,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-O03: Registrar Pesaje Real</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/56_manifiesto_recibido_detalle.png" target="_blank"><img src="screenshots/desktop/56_manifiesto_recibido_detalle.png" alt="Registrar Pesaje — estado RECIBIDO" loading="lazy"></a><div class="cu-screenshot-caption">Registrar Pesaje — estado RECIBIDO</div></div>
+
 <p><strong>Descripcion:</strong> Registrar el peso real medido en la balanza de la planta y compararlo con el peso declarado por el generador en el manifiesto. Las diferencias se calculan y documentan automaticamente.</p>
 <p><strong>Precondiciones:</strong> El manifiesto esta en estado RECIBIDO.</p>
 <p><strong>Campos:</strong> cantidadRecibida (peso real en la unidad del manifiesto), tipoDiferencia (se calcula automaticamente: sin diferencia, diferencia menor, diferencia significativa).</p>
@@ -2494,6 +2814,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-O04: Aceptar Carga</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/55_manifiesto_entregado_detalle.png" target="_blank"><img src="screenshots/desktop/55_manifiesto_entregado_detalle.png" alt="Aceptar Carga — estado ENTREGADO" loading="lazy"></a><div class="cu-screenshot-caption">Aceptar Carga — estado ENTREGADO</div></div>
+
 <p><strong>Descripcion:</strong> Firmar la recepcion conforme del residuo peligroso en la planta. Confirma que la carga fue verificada y aceptada para tratamiento.</p>
 <p><strong>Precondiciones:</strong> El manifiesto esta en estado ENTREGADO. El pesaje fue registrado.</p>
 <p><strong>Postcondiciones:</strong> Estado RECIBIDO. El manifiesto queda disponible para iniciar el tratamiento.</p>
@@ -2502,6 +2824,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-O05: Rechazar Carga</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/55_manifiesto_entregado_detalle.png" target="_blank"><img src="screenshots/desktop/55_manifiesto_entregado_detalle.png" alt="Rechazar Carga — motivo requerido" loading="lazy"></a><div class="cu-screenshot-caption">Rechazar Carga — motivo requerido</div></div>
+
 <p><strong>Descripcion:</strong> Rechazar la carga entregada indicando el motivo del rechazo. El estado del manifiesto cambia a RECHAZADO y se notifica a todos los actores.</p>
 <p><strong>Precondiciones:</strong> El manifiesto esta en estado ENTREGADO. El usuario es el operador destino o ADMIN.</p>
 <p><strong>Motivos de rechazo comunes:</strong></p>
@@ -2520,6 +2844,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-O06: Registrar Tratamiento</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/56_manifiesto_recibido_detalle.png" target="_blank"><img src="screenshots/desktop/56_manifiesto_recibido_detalle.png" alt="Registrar Tratamiento — avance a EN_TRATAMIENTO" loading="lazy"></a><div class="cu-screenshot-caption">Registrar Tratamiento — avance a EN_TRATAMIENTO</div></div>
+
 <p><strong>Descripcion:</strong> Seleccionar el metodo de tratamiento aplicado del catalogo de tratamientos autorizados para la planta y registrar los datos del proceso.</p>
 <p><strong>Precondiciones:</strong> El manifiesto esta en estado RECIBIDO. La planta tiene tratamientos autorizados para el tipo de residuo.</p>
 <p><strong>Flujo:</strong></p>
@@ -2537,6 +2863,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-O07: Cerrar Manifiesto</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/57_manifiesto_tratado_detalle.png" target="_blank"><img src="screenshots/desktop/57_manifiesto_tratado_detalle.png" alt="Cerrar Manifiesto — estado final TRATADO" loading="lazy"></a><div class="cu-screenshot-caption">Cerrar Manifiesto — estado final TRATADO</div></div>
+
 <p><strong>Descripcion:</strong> Finalizar el ciclo completo del manifiesto confirmando que el tratamiento fue completado exitosamente. El sistema genera automaticamente el Certificado de Disposicion Final.</p>
 <p><strong>Precondiciones:</strong> El manifiesto esta en estado EN_TRATAMIENTO o RECIBIDO. El usuario es el operador o ADMIN.</p>
 <p><strong>Postcondiciones:</strong> Estado TRATADO (estado final). Certificado de Disposicion generado. Evento CIERRE registrado. Notificacion a todos los actores. El manifiesto no puede ser modificado ni cancelado.</p>
@@ -2546,6 +2874,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-O08: Generar Certificado de Disposicion</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/57_manifiesto_tratado_detalle.png" target="_blank"><img src="screenshots/desktop/57_manifiesto_tratado_detalle.png" alt="Generar Certificado de Disposición Final" loading="lazy"></a><div class="cu-screenshot-caption">Generar Certificado de Disposición Final</div></div>
+
 <p><strong>Descripcion:</strong> Generacion automatica del Certificado de Tratamiento y Disposicion Final en formato PDF. El certificado se genera al cerrar el manifiesto y queda disponible para descarga por todos los actores.</p>
 <p><strong>Precondiciones:</strong> El manifiesto esta en estado TRATADO.</p>
 <p><strong>Contenido del certificado:</strong></p>
@@ -2567,6 +2897,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-O09: Visualizar Dashboard de Operador</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/50_dashboard_operador.png" target="_blank"><img src="screenshots/desktop/50_dashboard_operador.png" alt="Dashboard Operador — KPIs de planta" loading="lazy"></a><div class="cu-screenshot-caption">Dashboard Operador — KPIs de planta</div></div>
+
 <p><strong>Descripcion:</strong> Dashboard personalizado con KPIs de recepcion y tratamiento de la planta del operador: manifiestos entrantes, recibidos, en tratamiento, tratados. Manifiestos recientes con acceso rapido.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol OPERADOR.</p>
 <p><strong>Ruta:</strong> <code>/dashboard</code></p>
@@ -2575,6 +2907,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-O10: Consultar Reportes de Operador</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/52_reportes_operador.png" target="_blank"><img src="screenshots/desktop/52_reportes_operador.png" alt="Reportes Operador — tratamientos y volúmenes" loading="lazy"></a><div class="cu-screenshot-caption">Reportes Operador — tratamientos y volúmenes</div></div>
+
 <p><strong>Descripcion:</strong> Reportes de actividad filtrados automaticamente por la planta del operador autenticado. Incluye metricas de recepcion, tratamiento, tasa de completitud y residuos procesados por tipo.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol OPERADOR.</p>
 <p><strong>Ruta:</strong> <code>/reportes</code></p>
@@ -2583,6 +2917,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-O11: Recibir Notificaciones</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/37_configuracion_general.png" target="_blank"><img src="screenshots/desktop/37_configuracion_general.png" alt="Notificaciones Operador" loading="lazy"></a><div class="cu-screenshot-caption">Notificaciones Operador</div></div>
+
 <p><strong>Descripcion:</strong> Recibir notificaciones automaticas de manifiestos en camino hacia la planta, confirmaciones de retiro, alertas de peso discrepante y recordatorios de manifiestos pendientes de tratamiento.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol OPERADOR.</p>
 <p><strong>Endpoint:</strong> <code>GET /api/notificaciones</code></p>
@@ -2591,6 +2927,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-O12: Gestionar Perfil</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/39_mi_perfil.png" target="_blank"><img src="screenshots/desktop/39_mi_perfil.png" alt="Mi Perfil Operador" loading="lazy"></a><div class="cu-screenshot-caption">Mi Perfil Operador</div></div>
+
 <p><strong>Descripcion:</strong> Editar datos personales (nombre, apellido, telefono), cambiar contrasena y configurar preferencias de notificacion del usuario operador.</p>
 <p><strong>Precondiciones:</strong> El usuario esta autenticado.</p>
 <p><strong>Ruta:</strong> <code>/perfil</code></p>
@@ -2603,6 +2941,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-S01: Generar Codigo QR</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/66_verificar_manifiesto_detalle.png" target="_blank"><img src="screenshots/desktop/66_verificar_manifiesto_detalle.png" alt="Verificación Pública QR — sin autenticación" loading="lazy"></a><div class="cu-screenshot-caption">Verificación Pública QR — sin autenticación</div></div>
+
 <p><strong>Descripcion:</strong> Generacion automatica de codigo QR unico al aprobar un manifiesto. El QR codifica el identificador del manifiesto y permite el escaneo rapido desde dispositivos moviles.</p>
 <p><strong>Disparador:</strong> Transicion de estado BORRADOR a APROBADO.</p>
 <p><strong>Proceso:</strong> El servidor genera el codigo QR, lo almacena como campo <code>qrCode</code> del manifiesto y lo incluye en el PDF del manifiesto. El generador puede imprimirlo y adjuntarlo al envase del residuo.</p>
@@ -2612,6 +2952,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-S02: Enviar Notificaciones Automaticas</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/37_configuracion_general.png" target="_blank"><img src="screenshots/desktop/37_configuracion_general.png" alt="Notificaciones automáticas del sistema" loading="lazy"></a><div class="cu-screenshot-caption">Notificaciones automáticas del sistema</div></div>
+
 <p><strong>Descripcion:</strong> Envio automatico de notificaciones a los actores involucrados en cada cambio de estado del manifiesto.</p>
 <p><strong>Disparador:</strong> Cualquier transicion de estado del manifiesto.</p>
 <p><strong>Destinatarios por evento:</strong></p>
@@ -2634,6 +2976,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-S03: Registrar Auditoria</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/58_manifiesto_timeline.png" target="_blank"><img src="screenshots/desktop/58_manifiesto_timeline.png" alt="Timeline de Auditoría — eventos inmutables" loading="lazy"></a><div class="cu-screenshot-caption">Timeline de Auditoría — eventos inmutables</div></div>
+
 <p><strong>Descripcion:</strong> Registro inmutable de todas las operaciones realizadas en el sistema. Cada registro captura el estado anterior y posterior del dato modificado, junto con informacion del contexto de la solicitud.</p>
 <p><strong>Disparador:</strong> Cualquier operacion CRUD o cambio de estado en el sistema.</p>
 <p><strong>Datos capturados:</strong></p>
@@ -2653,6 +2997,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-S04: Almacenar Tracking GPS</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/05_centro_control.png" target="_blank"><img src="screenshots/desktop/05_centro_control.png" alt="Tracking GPS almacenado — ruta del viaje" loading="lazy"></a><div class="cu-screenshot-caption">Tracking GPS almacenado — ruta del viaje</div></div>
+
 <p><strong>Descripcion:</strong> Recepcion y almacenamiento de los puntos GPS enviados por el transportista durante el transporte. Utiliza cache en memoria para optimizar las escrituras frecuentes.</p>
 <p><strong>Disparador:</strong> Solicitud <code>POST /api/manifiestos/:id/ubicacion</code> cada 30 segundos durante EN_TRANSITO.</p>
 <p><strong>Proceso:</strong></p>
@@ -2669,6 +3015,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-S05: Detectar Anomalias de Transporte</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/61_centro_control_viajes.png" target="_blank"><img src="screenshots/desktop/61_centro_control_viajes.png" alt="Detección de Anomalías en transporte" loading="lazy"></a><div class="cu-screenshot-caption">Detección de Anomalías en transporte</div></div>
+
 <p><strong>Descripcion:</strong> Deteccion de anomalias durante el transporte de residuos peligrosos. Incluye deteccion basica de desvios de ruta, paradas prolongadas y velocidad excesiva.</p>
 <p><strong>Disparador:</strong> Analisis de datos GPS durante y despues del transporte.</p>
 <p><strong>Tipos de anomalia detectados:</strong> Desvio de ruta (distancia excesiva del camino directo), parada prolongada (sin movimiento por periodo extenso sin registrar pausa), velocidad excesiva (superando limites de seguridad para transporte de peligrosos), perdida de senal GPS (ausencia prolongada de datos).</p>
@@ -2678,6 +3026,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-S06: Generar Alertas por Reglas</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/60_alertas_reglas.png" target="_blank"><img src="screenshots/desktop/60_alertas_reglas.png" alt="Reglas de Alertas — configuración" loading="lazy"></a><div class="cu-screenshot-caption">Reglas de Alertas — configuración</div></div>
+
 <p><strong>Descripcion:</strong> Evaluacion continua de las reglas de alerta configuradas por el administrador. Cuando una condicion se cumple, se genera automaticamente una alerta vinculada al manifiesto y a la regla que la origino.</p>
 <p><strong>Disparador:</strong> Eventos del sistema que coinciden con las reglas activas.</p>
 <p><strong>Proceso:</strong> Al ocurrir un evento (cambio de estado, dato GPS, pesaje), el sistema evalua todas las reglas activas cuyo evento disparador coincida. Si la condicion se cumple, crea un registro en <code>AlertaGenerada</code> con los datos del manifiesto, la regla y los datos especificos que dispararon la alerta. Los destinatarios configurados en la regla reciben una notificacion.</p>
@@ -2686,6 +3036,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-S07: Calcular Estadisticas en Tiempo Real</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/67_centro_control_kpis.png" target="_blank"><img src="screenshots/desktop/67_centro_control_kpis.png" alt="KPIs en Tiempo Real — Centro de Control" loading="lazy"></a><div class="cu-screenshot-caption">KPIs en Tiempo Real — Centro de Control</div></div>
+
 <p><strong>Descripcion:</strong> Calculo y actualizacion periodica de KPIs, graficos y metricas que alimentan el Dashboard, Centro de Control y Reportes.</p>
 <p><strong>Disparador:</strong> Solicitudes de datos con refresco automatico cada 30 segundos.</p>
 <p><strong>Metricas calculadas:</strong></p>
@@ -2699,6 +3051,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-S08: Sincronizar Datos Offline</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/mobile/M16_configuracion_mobile.png" target="_blank"><img src="screenshots/mobile/M16_configuracion_mobile.png" alt="Sincronización Offline — PWA móvil" loading="lazy"></a><div class="cu-screenshot-caption">Sincronización Offline — PWA móvil</div></div>
+
 <p><strong>Descripcion:</strong> Sincronizacion automatica de datos pendientes almacenados localmente cuando el dispositivo recupera la conectividad a internet.</p>
 <p><strong>Disparador:</strong> Cambio de estado de offline a online (detectado por hook <code>useConnectivity</code>).</p>
 <p><strong>Almacenamiento local:</strong></p>
@@ -2718,6 +3072,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-S09: Enviar Notificaciones Push</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/37_configuracion_general.png" target="_blank"><img src="screenshots/desktop/37_configuracion_general.png" alt="Notificaciones Push" loading="lazy"></a><div class="cu-screenshot-caption">Notificaciones Push</div></div>
+
 <p><strong>Descripcion:</strong> Envio de notificaciones push nativas a dispositivos moviles via Web Push API para alertas criticas en tiempo real, sin necesidad de que la aplicacion este abierta.</p>
 <p><strong>Estado actual:</strong> Actualmente el sistema utiliza polling HTTP cada 30 segundos para detectar nuevas notificaciones. La implementacion de Web Push API esta planificada para la proxima version del sistema.</p>
 <p><strong>Plan de implementacion:</strong> Registro de suscripciones push por dispositivo, servidor de push con clave VAPID, envio selectivo por rol y urgencia, icono y badge personalizados.</p>
@@ -2726,6 +3082,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-S10: Firma Digital Avanzada</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/53_manifiesto_borrador_detalle.png" target="_blank"><img src="screenshots/desktop/53_manifiesto_borrador_detalle.png" alt="Firma Digital — aprobación de manifiesto" loading="lazy"></a><div class="cu-screenshot-caption">Firma Digital — aprobación de manifiesto</div></div>
+
 <p><strong>Descripcion:</strong> Integracion con infraestructura de firma digital certificada (PKI) para la firma de manifiestos, conforme a la normativa argentina de firma electronica y firma digital (Ley 25.506).</p>
 <p><strong>Estado actual:</strong> El sistema utiliza firma electronica simple (autenticacion del usuario + registro de la accion de firma). La integracion con certificados digitales X.509 y tokens criptograficos esta en fase de planificacion.</p>
 <p><strong>Plan de implementacion:</strong> Integracion con prestadores de servicios de certificacion habilitados, soporte para tokens USB y certificados en la nube, sellado de tiempo (timestamping), validacion de cadena de certificacion.</p>
@@ -2734,6 +3092,8 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-S11: Integracion con Sistemas Externos</div>
 <div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/17_reportes_manifiestos.png" target="_blank"><img src="screenshots/desktop/17_reportes_manifiestos.png" alt="Integración API REST — datos en tiempo real" loading="lazy"></a><div class="cu-screenshot-caption">Integración API REST — datos en tiempo real</div></div>
+
 <p><strong>Descripcion:</strong> API de integracion con otros sistemas gubernamentales para el reporte automatico de datos de residuos peligrosos.</p>
 <p><strong>Sistemas objetivo:</strong></p>
 <ul>
@@ -2752,16 +3112,16 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="summary-grid">
 <div class="summary-card">
-<div class="number" style="color:var(--primary);">61</div>
+<div class="number" style="color:var(--primary);">66</div>
 <div class="label">Casos de Uso Totales</div>
 </div>
 <div class="summary-card">
-<div class="number" style="color:#065F46;">57</div>
-<div class="label">Completos (93%)</div>
+<div class="number" style="color:#065F46;">63</div>
+<div class="label">Completos (95%)</div>
 </div>
 <div class="summary-card">
-<div class="number" style="color:#92400E;">1</div>
-<div class="label">Parcial (2%)</div>
+<div class="number" style="color:#92400E;">0</div>
+<div class="label">Parciales (0%)</div>
 </div>
 <div class="summary-card">
 <div class="number" style="color:#991B1B;">3</div>
@@ -2772,12 +3132,12 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <table>
 <thead><tr><th>Modulo</th><th>Total</th><th>Completo</th><th>Parcial</th><th>Pendiente</th></tr></thead>
 <tbody>
-<tr><td><strong>Administrador</strong></td><td>15</td><td><span class="badge badge-complete">14</span></td><td><span class="badge badge-partial">1</span></td><td><span class="badge badge-pending">0</span></td></tr>
+<tr><td><strong>Administrador</strong></td><td>19</td><td><span class="badge badge-complete">18</span></td><td><span class="badge badge-partial">1</span></td><td><span class="badge badge-pending">0</span></td></tr>
 <tr><td><strong>Generador</strong></td><td>12</td><td><span class="badge badge-complete">12</span></td><td><span class="badge badge-partial">0</span></td><td><span class="badge badge-pending">0</span></td></tr>
-<tr><td><strong>Transportista</strong></td><td>11</td><td><span class="badge badge-complete">11</span></td><td><span class="badge badge-partial">0</span></td><td><span class="badge badge-pending">0</span></td></tr>
+<tr><td><strong>Transportista</strong></td><td>12</td><td><span class="badge badge-complete">12</span></td><td><span class="badge badge-partial">0</span></td><td><span class="badge badge-pending">0</span></td></tr>
 <tr><td><strong>Operador</strong></td><td>12</td><td><span class="badge badge-complete">12</span></td><td><span class="badge badge-partial">0</span></td><td><span class="badge badge-pending">0</span></td></tr>
 <tr><td><strong>Sistema</strong></td><td>11</td><td><span class="badge badge-complete">8</span></td><td><span class="badge badge-partial">0</span></td><td><span class="badge badge-pending">3</span></td></tr>
-<tr><td style="border-top:2px solid var(--primary);"><strong>TOTAL</strong></td><td style="border-top:2px solid var(--primary);"><strong>61</strong></td><td style="border-top:2px solid var(--primary);"><strong>57 (93%)</strong></td><td style="border-top:2px solid var(--primary);"><strong>1 (2%)</strong></td><td style="border-top:2px solid var(--primary);"><strong>3 (5%)</strong></td></tr>
+<tr><td style="border-top:2px solid var(--primary);"><strong>TOTAL</strong></td><td style="border-top:2px solid var(--primary);"><strong>66</strong></td><td style="border-top:2px solid var(--primary);"><strong>63 (95%)</strong></td><td style="border-top:2px solid var(--primary);"><strong>1 (2%)</strong></td><td style="border-top:2px solid var(--primary);"><strong>3 (5%)</strong></td></tr>
 </tbody>
 </table>
 </section>
@@ -3353,6 +3713,19 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <table>
 <thead><tr><th>Version</th><th>Fecha</th><th>Descripcion de Cambios</th></tr></thead>
 <tbody>
+<tr><td><strong>2026.2</strong></td><td>Marzo 2026</td><td>
+<ul>
+<li>5 nuevos casos de uso: CU-A16 (Impersonacion), CU-A17 (Sub-roles admin), CU-A18 (Busqueda global Cmd+K), CU-A19 (Preferencias email), CU-T12 (Flota autonoma).</li>
+<li>66 casos de uso totales: 63 completos, 1 parcial, 3 pendientes post-MVP.</li>
+<li>Acceso Comodin: impersonacion de usuarios con banner ambar y registro de auditoria.</li>
+<li>Roles delegados: ADMIN_GENERADOR, ADMIN_TRANSPORTISTA, ADMIN_OPERADOR con sidebar adaptado.</li>
+<li>Busqueda global Cmd+K: resultados agrupados por tipo, filtros por estado, historial reciente.</li>
+<li>Preferencias de notificaciones por email por usuario (ConfiguracionPage).</li>
+<li>Gestion autonoma de flota: transportistas administran vehiculos y conductores sin intervencion del admin.</li>
+<li>TransportistaDetallePage con CRUD completo de vehiculos y conductores (date pickers vencimiento).</li>
+<li>Actualizacion de CU-A01, A03, A08, A11 con mejoras de UI documentadas.</li>
+</ul>
+</td></tr>
 <tr><td><strong>2026.1</strong></td><td>Febrero 2026</td><td>
 <ul>
 <li>Release inicial del sistema SITREP completo.</li>
@@ -3388,7 +3761,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <footer class="site-footer">
 <p><strong>SITREP</strong> &mdash; Sistema de Trazabilidad de Residuos Peligrosos</p>
 <p>Direccion General de Fiscalizacion Ambiental (DGFA) &mdash; Gobierno de Mendoza</p>
-<p>Version 2026.1 &mdash; Documento generado el 10 de febrero de 2026</p>
+<p>Version 2026.2 &mdash; Actualizado el 18 de marzo de 2026</p>
 <p style="margin-top:0.5rem;font-size:0.8rem;color:#9CA3AF;">Conforme a Ley Nacional 24.051, Decreto 831/93 y Ley Provincial 5917</p>
 <p style="margin-top:0.25rem;font-size:0.8rem;color:#9CA3AF;">Este documento es propiedad del Gobierno de la Provincia de Mendoza.</p>
 <p style="margin-top:0.25rem;font-size:0.8rem;color:#9CA3AF;">Desarrollo y operacion a cargo de Ultima Milla Soluciones Tecnologicas.</p>
@@ -3402,6 +3775,628 @@ expresa de la Direccion General de Fiscalizacion Ambiental de la Provincia de Me
 SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos reservados | 2026
 </p>
 </footer>
+
+<!-- ============================================================ -->
+<!-- SECTION 12: GALERIA DE CAPTURAS                               -->
+<!-- ============================================================ -->
+<section id="galeria" data-role="all">
+<h2>12. Galeria de Capturas de Pantalla</h2>
+<p>Capturas del diseno actual v2026.2 tomadas directamente de produccion (1440x900 desktop, 390x844 mobile PWA). Clic en cualquier imagen para ampliar.</p>
+
+<h3>12.1 Autenticacion y Acceso</h3>
+<div class="screenshot-grid">
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/01_login.png" target="_blank"><img src="screenshots/desktop/01_login.png" alt="Login" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Pantalla de Login</strong><span class="sc-badge sc-todos">Todos</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/02_verificar_qr_publico.png" target="_blank"><img src="screenshots/desktop/02_verificar_qr_publico.png" alt="Verificacion QR" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Verificacion Publica QR</strong><span class="sc-badge sc-todos">Todos</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/03_user_switcher.png" target="_blank"><img src="screenshots/desktop/03_user_switcher.png" alt="User Switcher" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Selector de Rol Demo</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+</div>
+
+<h3>12.2 Dashboard y Centro de Control</h3>
+<div class="screenshot-grid">
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/04_dashboard_admin.png" target="_blank"><img src="screenshots/desktop/04_dashboard_admin.png" alt="Dashboard Admin" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Dashboard — Admin</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/05_centro_control.png" target="_blank"><img src="screenshots/desktop/05_centro_control.png" alt="Centro de Control" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Centro de Control (LIVE)</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/06_centro_control_mapa_zoom.png" target="_blank"><img src="screenshots/desktop/06_centro_control_mapa_zoom.png" alt="Mapa Zoom" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Centro de Control — Mapa Zoom</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/41_dashboard_transportista.png" target="_blank"><img src="screenshots/desktop/41_dashboard_transportista.png" alt="Dashboard Transportista" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Dashboard — Transportista</strong><span class="sc-badge sc-transportista">Transportista</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/47_dashboard_generador.png" target="_blank"><img src="screenshots/desktop/47_dashboard_generador.png" alt="Dashboard Generador" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Dashboard — Generador</strong><span class="sc-badge sc-generador">Generador</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/50_dashboard_operador.png" target="_blank"><img src="screenshots/desktop/50_dashboard_operador.png" alt="Dashboard Operador" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Dashboard — Operador</strong><span class="sc-badge sc-operador">Operador</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+</div>
+
+<h3>12.3 Manifiestos</h3>
+<div class="screenshot-grid">
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/07_manifiestos_lista.png" target="_blank"><img src="screenshots/desktop/07_manifiestos_lista.png" alt="Lista Manifiestos" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Lista de Manifiestos</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/08_manifiestos_filtro_borrador.png" target="_blank"><img src="screenshots/desktop/08_manifiestos_filtro_borrador.png" alt="Filtro Borrador" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Manifiestos — Filtro BORRADOR</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/10_manifiestos_en_transito.png" target="_blank"><img src="screenshots/desktop/10_manifiestos_en_transito.png" alt="EN_TRANSITO" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Manifiestos EN TRANSITO</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/12_manifiestos_tratados.png" target="_blank"><img src="screenshots/desktop/12_manifiestos_tratados.png" alt="Tratados" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Manifiestos TRATADOS</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/14_nuevo_manifiesto_paso1.png" target="_blank"><img src="screenshots/desktop/14_nuevo_manifiesto_paso1.png" alt="Nuevo Manifiesto P1" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Nuevo Manifiesto — Paso 1</strong><span class="sc-badge sc-generador">Generador</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/15_nuevo_manifiesto_paso2.png" target="_blank"><img src="screenshots/desktop/15_nuevo_manifiesto_paso2.png" alt="Nuevo Manifiesto P2" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Nuevo Manifiesto — Paso 2</strong><span class="sc-badge sc-generador">Generador</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/45_manifiestos_transportista.png" target="_blank"><img src="screenshots/desktop/45_manifiestos_transportista.png" alt="Manifiestos Transportista" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Manifiestos — Transportista</strong><span class="sc-badge sc-transportista">Transportista</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/49_nuevo_manifiesto_generador.png" target="_blank"><img src="screenshots/desktop/49_nuevo_manifiesto_generador.png" alt="Nuevo Manifiesto Generador" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Nuevo Manifiesto — Generador</strong><span class="sc-badge sc-generador">Generador</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+</div>
+
+<h3>12.4 Reportes y Alertas</h3>
+<div class="screenshot-grid">
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/16_alertas_timeline.png" target="_blank"><img src="screenshots/desktop/16_alertas_timeline.png" alt="Alertas" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Centro de Alertas (Timeline)</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/17_reportes_manifiestos.png" target="_blank"><img src="screenshots/desktop/17_reportes_manifiestos.png" alt="Reportes Manifiestos" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Reportes — Manifiestos</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/18_reportes_transporte.png" target="_blank"><img src="screenshots/desktop/18_reportes_transporte.png" alt="Reportes Transporte" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Reportes — Transporte</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/19_reportes_departamentos_mapa.png" target="_blank"><img src="screenshots/desktop/19_reportes_departamentos_mapa.png" alt="Reportes Departamentos" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Reportes — Departamentos</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/20_reportes_mapa_actores.png" target="_blank"><img src="screenshots/desktop/20_reportes_mapa_actores.png" alt="Mapa Actores" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Reportes — Mapa de Actores</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/21_reportes_generadores.png" target="_blank"><img src="screenshots/desktop/21_reportes_generadores.png" alt="Reportes Generadores" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Reportes — Generadores</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/22_reportes_operadores.png" target="_blank"><img src="screenshots/desktop/22_reportes_operadores.png" alt="Reportes Operadores" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Reportes — Operadores</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/52_reportes_operador.png" target="_blank"><img src="screenshots/desktop/52_reportes_operador.png" alt="Reportes Operador" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Reportes — Vista Operador</strong><span class="sc-badge sc-operador">Operador</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+</div>
+
+<h3>12.5 Administracion de Usuarios y Actores</h3>
+<div class="screenshot-grid">
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/23_admin_usuarios.png" target="_blank"><img src="screenshots/desktop/23_admin_usuarios.png" alt="Admin Usuarios" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Usuarios — Tabla con Impersonacion</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/24_admin_usuario_crear_modal.png" target="_blank"><img src="screenshots/desktop/24_admin_usuario_crear_modal.png" alt="Crear Usuario" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Modal Crear Usuario (7 roles)</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/25_busqueda_global_cmd_k.png" target="_blank"><img src="screenshots/desktop/25_busqueda_global_cmd_k.png" alt="Busqueda Global" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Busqueda Global Cmd+K</strong><span class="sc-badge sc-todos">Todos</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/26_admin_generadores.png" target="_blank"><img src="screenshots/desktop/26_admin_generadores.png" alt="Admin Generadores" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Admin — Generadores</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/28_admin_transportistas.png" target="_blank"><img src="screenshots/desktop/28_admin_transportistas.png" alt="Admin Transportistas" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Admin — Transportistas</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/31_admin_operadores.png" target="_blank"><img src="screenshots/desktop/31_admin_operadores.png" alt="Admin Operadores" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Admin — Operadores</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/32_admin_catalogo_residuos.png" target="_blank"><img src="screenshots/desktop/32_admin_catalogo_residuos.png" alt="Catalogo Residuos" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Catalogo de Residuos</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/33_admin_tratamientos_grid.png" target="_blank"><img src="screenshots/desktop/33_admin_tratamientos_grid.png" alt="Tratamientos" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Catalogo de Tratamientos</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/34_admin_vehiculos.png" target="_blank"><img src="screenshots/desktop/34_admin_vehiculos.png" alt="Vehiculos" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Gestion de Vehiculos</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/35_admin_auditoria.png" target="_blank"><img src="screenshots/desktop/35_admin_auditoria.png" alt="Auditoria" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Auditoria del Sistema</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+</div>
+
+<h3>12.6 Carga Masiva, Configuracion y Transportista</h3>
+<div class="screenshot-grid">
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/36_carga_masiva.png" target="_blank"><img src="screenshots/desktop/36_carga_masiva.png" alt="Carga Masiva" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Carga Masiva CSV</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/37_configuracion_general.png" target="_blank"><img src="screenshots/desktop/37_configuracion_general.png" alt="Configuracion" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Configuracion General</strong><span class="sc-badge sc-todos">Todos</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/38_configuracion_notificaciones_email.png" target="_blank"><img src="screenshots/desktop/38_configuracion_notificaciones_email.png" alt="Notificaciones Email" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Preferencias Email (CU-A19)</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/39_mi_perfil.png" target="_blank"><img src="screenshots/desktop/39_mi_perfil.png" alt="Mi Perfil" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Mi Perfil</strong><span class="sc-badge sc-todos">Todos</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/40_ayuda_workflow_faq.png" target="_blank"><img src="screenshots/desktop/40_ayuda_workflow_faq.png" alt="Ayuda" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Ayuda — Workflow y FAQs</strong><span class="sc-badge sc-todos">Todos</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/42_transporte_perfil_tab_viaje.png" target="_blank"><img src="screenshots/desktop/42_transporte_perfil_tab_viaje.png" alt="Perfil Transporte Viaje" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Perfil Transportista — Tab Viaje</strong><span class="sc-badge sc-transportista">Transportista</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/43_transporte_perfil_tab_info.png" target="_blank"><img src="screenshots/desktop/43_transporte_perfil_tab_info.png" alt="Perfil Transporte Info" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Perfil Transportista — Tab Info (CU-T12)</strong><span class="sc-badge sc-transportista">Transportista</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/46_escaner_qr_desktop.png" target="_blank"><img src="screenshots/desktop/46_escaner_qr_desktop.png" alt="Escaner QR" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Escaner QR</strong><span class="sc-badge sc-transportista">Transportista</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/48_manifiestos_generador.png" target="_blank"><img src="screenshots/desktop/48_manifiestos_generador.png" alt="Manifiestos Generador" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Manifiestos — Generador</strong><span class="sc-badge sc-generador">Generador</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/51_manifiestos_operador.png" target="_blank"><img src="screenshots/desktop/51_manifiestos_operador.png" alt="Manifiestos Operador" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Manifiestos — Operador</strong><span class="sc-badge sc-operador">Operador</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+</div>
+
+<h3>12.7 Vista Mobile PWA (390×844)</h3>
+<div class="screenshot-grid screenshot-grid-mobile">
+  <div class="screenshot-card">
+    <a href="screenshots/mobile/M01_login_mobile.png" target="_blank"><img src="screenshots/mobile/M01_login_mobile.png" alt="Login Mobile" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Login Mobile</strong><span class="sc-badge sc-todos">Todos</span><span class="sc-badge sc-mobile">Mobile</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/mobile/M02_dashboard_admin_mobile.png" target="_blank"><img src="screenshots/mobile/M02_dashboard_admin_mobile.png" alt="Dashboard Admin Mobile" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Dashboard Admin</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-mobile">Mobile</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/mobile/M03_alertas_mobile.png" target="_blank"><img src="screenshots/mobile/M03_alertas_mobile.png" alt="Alertas Mobile" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Alertas</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-mobile">Mobile</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/mobile/M04_reportes_mobile.png" target="_blank"><img src="screenshots/mobile/M04_reportes_mobile.png" alt="Reportes Mobile" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Reportes</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-mobile">Mobile</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/mobile/M05_usuarios_mobile.png" target="_blank"><img src="screenshots/mobile/M05_usuarios_mobile.png" alt="Usuarios Mobile" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Usuarios Admin</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-mobile">Mobile</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/mobile/M06_dashboard_generador_mobile.png" target="_blank"><img src="screenshots/mobile/M06_dashboard_generador_mobile.png" alt="Dashboard Generador Mobile" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Dashboard Generador</strong><span class="sc-badge sc-generador">Generador</span><span class="sc-badge sc-mobile">Mobile</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/mobile/M07_manifiestos_generador_mobile.png" target="_blank"><img src="screenshots/mobile/M07_manifiestos_generador_mobile.png" alt="Manifiestos Generador" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Manifiestos — Generador</strong><span class="sc-badge sc-generador">Generador</span><span class="sc-badge sc-mobile">Mobile</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/mobile/M09_nuevo_manifiesto_paso1_mobile.png" target="_blank"><img src="screenshots/mobile/M09_nuevo_manifiesto_paso1_mobile.png" alt="Nuevo Manifiesto Mobile" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Nuevo Manifiesto</strong><span class="sc-badge sc-generador">Generador</span><span class="sc-badge sc-mobile">Mobile</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/mobile/M10_dashboard_transportista_mobile.png" target="_blank"><img src="screenshots/mobile/M10_dashboard_transportista_mobile.png" alt="Dashboard Transportista Mobile" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Dashboard Transportista</strong><span class="sc-badge sc-transportista">Transportista</span><span class="sc-badge sc-mobile">Mobile</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/mobile/M11_transporte_perfil_viaje_mobile.png" target="_blank"><img src="screenshots/mobile/M11_transporte_perfil_viaje_mobile.png" alt="Perfil Viaje Mobile" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Perfil — Tab Viaje</strong><span class="sc-badge sc-transportista">Transportista</span><span class="sc-badge sc-mobile">Mobile</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/mobile/M12_transporte_perfil_info_mobile.png" target="_blank"><img src="screenshots/mobile/M12_transporte_perfil_info_mobile.png" alt="Perfil Info Mobile" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Perfil — Tab Info</strong><span class="sc-badge sc-transportista">Transportista</span><span class="sc-badge sc-mobile">Mobile</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/mobile/M13_manifiestos_transportista_mobile.png" target="_blank"><img src="screenshots/mobile/M13_manifiestos_transportista_mobile.png" alt="Manifiestos Transportista Mobile" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Manifiestos — Transportista</strong><span class="sc-badge sc-transportista">Transportista</span><span class="sc-badge sc-mobile">Mobile</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/mobile/M15_escaner_qr_mobile.png" target="_blank"><img src="screenshots/mobile/M15_escaner_qr_mobile.png" alt="QR Mobile" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Escaner QR</strong><span class="sc-badge sc-transportista">Transportista</span><span class="sc-badge sc-mobile">Mobile</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/mobile/M16_configuracion_mobile.png" target="_blank"><img src="screenshots/mobile/M16_configuracion_mobile.png" alt="Configuracion Mobile" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Configuracion</strong><span class="sc-badge sc-todos">Todos</span><span class="sc-badge sc-mobile">Mobile</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/mobile/M17_dashboard_operador_mobile.png" target="_blank"><img src="screenshots/mobile/M17_dashboard_operador_mobile.png" alt="Dashboard Operador Mobile" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Dashboard Operador</strong><span class="sc-badge sc-operador">Operador</span><span class="sc-badge sc-mobile">Mobile</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/mobile/M18_manifiestos_operador_mobile.png" target="_blank"><img src="screenshots/mobile/M18_manifiestos_operador_mobile.png" alt="Manifiestos Operador Mobile" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Manifiestos — Operador</strong><span class="sc-badge sc-operador">Operador</span><span class="sc-badge sc-mobile">Mobile</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/mobile/M20_reportes_operador_mobile.png" target="_blank"><img src="screenshots/mobile/M20_reportes_operador_mobile.png" alt="Reportes Operador Mobile" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Reportes — Operador</strong><span class="sc-badge sc-operador">Operador</span><span class="sc-badge sc-mobile">Mobile</span></div>
+  </div>
+</div>
+</section>
+
+
+<section id="flujos" data-role="all">
+<h2>13. Flujos de Trabajo Visuales por Perfil</h2>
+<p class="section-intro">Guía paso a paso del flujo de trabajo de cada perfil de usuario, con capturas reales del sistema en cada etapa del proceso.</p>
+
+<!-- Flujo Admin -->
+<div class="wf-profile" id="flujo-admin">
+<h3>13.1 Flujo del Administrador DGFA</h3>
+<div class="wf-role-badge">&#128737; Administrador DGFA</div>
+<div class="wf-step">
+  <div class="wf-step-num">1</div>
+  <div class="wf-step-body">
+    <h4>Acceso al Sistema</h4>
+    <p>Login con credenciales DGFA. Panel de acceso rápido con roles demo disponible para pruebas.</p>
+    <a href="screenshots/desktop/01_login.png" target="_blank"><img src="screenshots/desktop/01_login.png" alt="Acceso al Sistema" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">2</div>
+  <div class="wf-step-body">
+    <h4>Dashboard — Visión General</h4>
+    <p>7 KPIs principales: borradores, aprobados, en tránsito, entregados, recibidos, tratados, total. Tabla de manifiestos recientes con links directos. Auto-refresco cada 30 segundos.</p>
+    <a href="screenshots/desktop/04_dashboard_admin.png" target="_blank"><img src="screenshots/desktop/04_dashboard_admin.png" alt="Dashboard — Visión General" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">3</div>
+  <div class="wf-step-body">
+    <h4>Centro de Control — Mapa en Vivo</h4>
+    <p>Mapa Leaflet con capas: generadores (violeta), transportistas (naranja), operadores (azul), viajes activos (rojo pulsante). Presets de fecha: Hoy, 7d, 30d, 90d. Auto-refresco 30s.</p>
+    <a href="screenshots/desktop/05_centro_control.png" target="_blank"><img src="screenshots/desktop/05_centro_control.png" alt="Centro de Control — Mapa en Vivo" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">4</div>
+  <div class="wf-step-body">
+    <h4>Gestión de Usuarios</h4>
+    <p>Crear, editar, activar/desactivar usuarios. Asignar 7 roles disponibles. Ícono ojo naranja para impersonación (Acceso Comodín). La columna de acciones muestra solo opciones permitidas.</p>
+    <a href="screenshots/desktop/23_admin_usuarios.png" target="_blank"><img src="screenshots/desktop/23_admin_usuarios.png" alt="Gestión de Usuarios" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">5</div>
+  <div class="wf-step-body">
+    <h4>Búsqueda Global Cmd+K</h4>
+    <p>Atajo Cmd+K (Mac) / Ctrl+K (Windows) desde cualquier página. Resultados agrupados por tipo: manifiestos, actores, usuarios. Chips de filtro por estado de manifiesto.</p>
+    <a href="screenshots/desktop/25_busqueda_global_cmd_k.png" target="_blank"><img src="screenshots/desktop/25_busqueda_global_cmd_k.png" alt="Búsqueda Global Cmd+K" loading="lazy" class="wf-step-img"></a>
+<div class="wf-tip">Tip: Escribe el número de manifiesto (ej: 2026-000042) para ir directamente al detalle.</div>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">6</div>
+  <div class="wf-step-body">
+    <h4>Centro de Reportes</h4>
+    <p>8 pestañas: Manifiestos, Residuos, Transporte, Establecimientos, Operadores, Departamentos, Mapa de Actores. Exportar a PDF client-side (jsPDF) o CSV (hasta 10.000 filas).</p>
+    <a href="screenshots/desktop/17_reportes_manifiestos.png" target="_blank"><img src="screenshots/desktop/17_reportes_manifiestos.png" alt="Centro de Reportes" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">7</div>
+  <div class="wf-step-body">
+    <h4>Gestión de Alertas</h4>
+    <p>Timeline con tarjetas coloreadas por criticidad (crítica, alta, media, baja). Tab Reglas para configurar alertas automáticas por condición: vencimiento, demora, anomalía.</p>
+    <a href="screenshots/desktop/16_alertas_timeline.png" target="_blank"><img src="screenshots/desktop/16_alertas_timeline.png" alt="Gestión de Alertas" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">8</div>
+  <div class="wf-step-body">
+    <h4>Carga Masiva de Datos</h4>
+    <p>Importación CSV de generadores, transportistas y operadores. Descarga de plantillas con formato exacto. Reporte por fila de éxitos y errores con descripción del problema.</p>
+    <a href="screenshots/desktop/36_carga_masiva.png" target="_blank"><img src="screenshots/desktop/36_carga_masiva.png" alt="Carga Masiva de Datos" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">9</div>
+  <div class="wf-step-body">
+    <h4>Auditoría del Sistema</h4>
+    <p>Registro inmutable de todas las acciones: quién hizo qué, cuándo y desde qué IP. Filtros por usuario, acción y rango de fechas. No se puede modificar ni eliminar.</p>
+    <a href="screenshots/desktop/35_admin_auditoria.png" target="_blank"><img src="screenshots/desktop/35_admin_auditoria.png" alt="Auditoría del Sistema" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">10</div>
+  <div class="wf-step-body">
+    <h4>Configuración y Sub-roles</h4>
+    <p>Delegar administración con roles ADMIN_GENERADOR, ADMIN_TRANSPORTISTA, ADMIN_OPERADOR. Cada sub-rol ve solo su dominio en el menú lateral sin acceso a otros módulos.</p>
+    <a href="screenshots/desktop/24_admin_usuario_crear_modal.png" target="_blank"><img src="screenshots/desktop/24_admin_usuario_crear_modal.png" alt="Configuración y Sub-roles" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+</div>
+
+<!-- Flujo Generador -->
+<div class="wf-profile" id="flujo-generador">
+<h3>13.2 Flujo del Generador de Residuos</h3>
+<div class="wf-role-badge">&#127981; Generador</div>
+<div class="wf-step">
+  <div class="wf-step-num">1</div>
+  <div class="wf-step-body">
+    <h4>Acceso al Sistema</h4>
+    <p>Login con credenciales de generador. El sistema carga automáticamente con filtrado por tu generadorId. Solo ves tus propios manifiestos.</p>
+    <a href="screenshots/desktop/01_login.png" target="_blank"><img src="screenshots/desktop/01_login.png" alt="Acceso al Sistema" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">2</div>
+  <div class="wf-step-body">
+    <h4>Dashboard — Mis Manifiestos</h4>
+    <p>Vista rápida de manifiestos por estado. Acciones rápidas: Nuevo Manifiesto, Ver Reportes. Los manifiestos en tránsito se destacan para seguimiento inmediato.</p>
+    <a href="screenshots/desktop/47_dashboard_generador.png" target="_blank"><img src="screenshots/desktop/47_dashboard_generador.png" alt="Dashboard — Mis Manifiestos" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">3</div>
+  <div class="wf-step-body">
+    <h4>Crear Manifiesto — Paso 1</h4>
+    <p>Seleccionar generador de la lista. El sistema auto-completa CUIT, teléfono, domicilio y número de habilitación al seleccionar. Seleccionar tipo de residuo del catálogo Ley 24.051.</p>
+    <a href="screenshots/desktop/14_nuevo_manifiesto_paso1.png" target="_blank"><img src="screenshots/desktop/14_nuevo_manifiesto_paso1.png" alt="Crear Manifiesto — Paso 1" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">4</div>
+  <div class="wf-step-body">
+    <h4>Agregar Residuos</h4>
+    <p>Seleccionar tipo de residuo del catálogo (codificación Y conforme Ley 24.051). Ingresar cantidad, unidad y descripción detallada. Múltiples residuos por manifiesto.</p>
+    <a href="screenshots/desktop/62_manifiesto_nuevo_paso3_residuos.png" target="_blank"><img src="screenshots/desktop/62_manifiesto_nuevo_paso3_residuos.png" alt="Agregar Residuos" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">5</div>
+  <div class="wf-step-body">
+    <h4>Seleccionar Transportista y Operador</h4>
+    <p>Elegir transportista habilitado y operador de destino. El sistema muestra solo actores con habilitaciones vigentes. Se auto-completa información de contacto.</p>
+    <a href="screenshots/desktop/15_nuevo_manifiesto_paso2.png" target="_blank"><img src="screenshots/desktop/15_nuevo_manifiesto_paso2.png" alt="Seleccionar Transportista y Operador" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">6</div>
+  <div class="wf-step-body">
+    <h4>Firmar y Aprobar</h4>
+    <p>El manifiesto en estado BORRADOR muestra el botón "Firmar/Aprobar". Al firmar, el estado cambia a APROBADO y se notifica automáticamente al transportista asignado.</p>
+    <a href="screenshots/desktop/53_manifiesto_borrador_detalle.png" target="_blank"><img src="screenshots/desktop/53_manifiesto_borrador_detalle.png" alt="Firmar y Aprobar" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">7</div>
+  <div class="wf-step-body">
+    <h4>Seguimiento del Transporte</h4>
+    <p>Ver posición GPS del vehículo en tiempo real desde la página del manifiesto. Timeline con cada evento del ciclo: retiro, incidentes, entrega, tratamiento.</p>
+    <a href="screenshots/desktop/10_manifiestos_en_transito.png" target="_blank"><img src="screenshots/desktop/10_manifiestos_en_transito.png" alt="Seguimiento del Transporte" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">8</div>
+  <div class="wf-step-body">
+    <h4>Manifiesto TRATADO — Descarga</h4>
+    <p>Una vez completado el ciclo, descargar PDF del manifiesto (Ley 24.051) o el Certificado de Tratamiento y Disposición Final. Ambos documentos tienen membrete oficial SITREP.</p>
+    <a href="screenshots/desktop/57_manifiesto_tratado_detalle.png" target="_blank"><img src="screenshots/desktop/57_manifiesto_tratado_detalle.png" alt="Manifiesto TRATADO — Descarga" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">9</div>
+  <div class="wf-step-body">
+    <h4>Mis Reportes</h4>
+    <p>Reportes filtrados automáticamente por tu empresa: por estado, tipo de residuo, período. Gráficos interactivos (Recharts). Exportar a PDF/CSV para auditorías internas.</p>
+    <a href="screenshots/desktop/52_reportes_operador.png" target="_blank"><img src="screenshots/desktop/52_reportes_operador.png" alt="Mis Reportes" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+</div>
+
+<!-- Flujo Transportista -->
+<div class="wf-profile" id="flujo-transportista">
+<h3>13.3 Flujo del Transportista</h3>
+<div class="wf-role-badge">&#128666; Transportista</div>
+<div class="wf-step">
+  <div class="wf-step-num">1</div>
+  <div class="wf-step-body">
+    <h4>Acceso — Web o PWA</h4>
+    <p>Login desde desktop o desde la PWA instalada en el celular. La PWA funciona offline y sincroniza datos cuando vuelve la conexión.</p>
+    <a href="screenshots/desktop/01_login.png" target="_blank"><img src="screenshots/desktop/01_login.png" alt="Acceso — Web o PWA" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">2</div>
+  <div class="wf-step-body">
+    <h4>Dashboard — Viajes Pendientes</h4>
+    <p>El dashboard muestra un banner con viajes activos (EN_TRANSITO) con botón directo "Ir al viaje". También lista los viajes APROBADO pendientes de tomar.</p>
+    <a href="screenshots/desktop/41_dashboard_transportista.png" target="_blank"><img src="screenshots/desktop/41_dashboard_transportista.png" alt="Dashboard — Viajes Pendientes" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">3</div>
+  <div class="wf-step-body">
+    <h4>Ver Manifiestos APROBADO</h4>
+    <p>Lista de manifiestos asignados al transportista. Los APROBADO están destacados indicando que hay un viaje listo para retirar.</p>
+    <a href="screenshots/desktop/45_manifiestos_transportista.png" target="_blank"><img src="screenshots/desktop/45_manifiestos_transportista.png" alt="Ver Manifiestos APROBADO" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">4</div>
+  <div class="wf-step-body">
+    <h4>Tomar Viaje (desde móvil)</h4>
+    <p>En el perfil del transportista, la pestaña Viaje lista los manifiestos APROBADO. El botón "Tomar Viaje" navega a la pantalla de control del viaje.</p>
+    <a href="screenshots/mobile/M21_tomar_viaje_mobile.png" target="_blank"><img src="screenshots/mobile/M21_tomar_viaje_mobile.png" alt="Tomar Viaje (desde móvil)" loading="lazy" class="wf-step-img-mobile"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">5</div>
+  <div class="wf-step-body">
+    <h4>Confirmar Retiro</h4>
+    <p>En el detalle del manifiesto APROBADO, "Confirmar Retiro" registra la fecha y hora de retiro y cambia el estado a EN_TRANSITO. El GPS comienza a registrar posición.</p>
+    <a href="screenshots/desktop/54_manifiesto_aprobado_detalle.png" target="_blank"><img src="screenshots/desktop/54_manifiesto_aprobado_detalle.png" alt="Confirmar Retiro" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">6</div>
+  <div class="wf-step-body">
+    <h4>GPS Activo durante el Viaje</h4>
+    <p>La pantalla de viaje en curso muestra el mapa con la ruta, velocidad actual, tiempo transcurrido y controles: Pausar, Registrar Incidente, Confirmar Entrega.</p>
+    <a href="screenshots/mobile/M22_viaje_gps_activo_mobile.png" target="_blank"><img src="screenshots/mobile/M22_viaje_gps_activo_mobile.png" alt="GPS Activo durante el Viaje" loading="lazy" class="wf-step-img-mobile"></a>
+<div class="wf-tip">El sistema envía la posición GPS cada 30 segundos. Los puntos se guardan aunque no haya conexión (hasta 5 puntos en cola offline).</div>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">7</div>
+  <div class="wf-step-body">
+    <h4>Registrar Incidente (si aplica)</h4>
+    <p>Si ocurre una avería o problema durante el traslado, "Registrar Incidente" crea un evento en el timeline del manifiesto. No cambia el estado — el viaje continúa.</p>
+    <a href="screenshots/mobile/M22_viaje_gps_activo_mobile.png" target="_blank"><img src="screenshots/mobile/M22_viaje_gps_activo_mobile.png" alt="Registrar Incidente (si aplica)" loading="lazy" class="wf-step-img-mobile"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">8</div>
+  <div class="wf-step-body">
+    <h4>Escanear QR en Destino</h4>
+    <p>Al llegar a la planta operadora, escanear el QR del manifiesto para verificar la identidad del cargamento. Compatible con cámara de iOS y Android.</p>
+    <a href="screenshots/desktop/46_escaner_qr_desktop.png" target="_blank"><img src="screenshots/desktop/46_escaner_qr_desktop.png" alt="Escanear QR en Destino" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">9</div>
+  <div class="wf-step-body">
+    <h4>Confirmar Entrega</h4>
+    <p>"Confirmar Entrega" registra fecha/hora de entrega y cambia el estado a ENTREGADO. El operador de destino es notificado automáticamente.</p>
+    <a href="screenshots/desktop/54_manifiesto_aprobado_detalle.png" target="_blank"><img src="screenshots/desktop/54_manifiesto_aprobado_detalle.png" alt="Confirmar Entrega" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">10</div>
+  <div class="wf-step-body">
+    <h4>Gestionar mi Flota</h4>
+    <p>Desde el perfil de transportista, gestionar vehículos (patente, habilitación, vencimiento) y conductores (DNI, licencia) de forma autónoma sin intervención del administrador.</p>
+    <a href="screenshots/desktop/63_transportista_detalle_flota.png" target="_blank"><img src="screenshots/desktop/63_transportista_detalle_flota.png" alt="Gestionar mi Flota" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+</div>
+
+<!-- Flujo Operador -->
+<div class="wf-profile" id="flujo-operador">
+<h3>13.4 Flujo del Operador de Tratamiento</h3>
+<div class="wf-role-badge">&#9878; Operador</div>
+<div class="wf-step">
+  <div class="wf-step-num">1</div>
+  <div class="wf-step-body">
+    <h4>Acceso al Sistema</h4>
+    <p>Login con credenciales de operador/planta. El sistema carga automáticamente filtrado por tu operadorId. Solo ves los manifiestos destinados a tu planta.</p>
+    <a href="screenshots/desktop/01_login.png" target="_blank"><img src="screenshots/desktop/01_login.png" alt="Acceso al Sistema" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">2</div>
+  <div class="wf-step-body">
+    <h4>Dashboard — Entrantes</h4>
+    <p>El dashboard muestra manifiestos ENTREGADO pendientes de recepción y KPIs del período: volumen total, tasa de tratamiento, tiempo promedio de procesamiento.</p>
+    <a href="screenshots/desktop/50_dashboard_operador.png" target="_blank"><img src="screenshots/desktop/50_dashboard_operador.png" alt="Dashboard — Entrantes" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">3</div>
+  <div class="wf-step-body">
+    <h4>Ver Manifiestos ENTREGADO</h4>
+    <p>Lista filtrada por tu operadorId. Los manifiestos ENTREGADO aparecen destacados en naranja indicando acción requerida. Click en el número para ver el detalle completo.</p>
+    <a href="screenshots/desktop/51_manifiestos_operador.png" target="_blank"><img src="screenshots/desktop/51_manifiestos_operador.png" alt="Ver Manifiestos ENTREGADO" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">4</div>
+  <div class="wf-step-body">
+    <h4>Confirmar Recepción</h4>
+    <p>Al llegar el transportista, "Confirmar Recepción" cambia el estado a RECIBIDO. El sistema registra fecha, hora y usuario que confirmó. El generador es notificado.</p>
+    <a href="screenshots/desktop/55_manifiesto_entregado_detalle.png" target="_blank"><img src="screenshots/desktop/55_manifiesto_entregado_detalle.png" alt="Confirmar Recepción" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">5</div>
+  <div class="wf-step-body">
+    <h4>Registrar Pesaje Real</h4>
+    <p>Ingresar el peso real por tipo de residuo. El sistema compara con el peso declarado por el generador y alerta automáticamente sobre discrepancias mayores al 10%.</p>
+    <a href="screenshots/desktop/56_manifiesto_recibido_detalle.png" target="_blank"><img src="screenshots/desktop/56_manifiesto_recibido_detalle.png" alt="Registrar Pesaje Real" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">6</div>
+  <div class="wf-step-body">
+    <h4>Rechazar Carga (si aplica)</h4>
+    <p>Si la carga no cumple los requisitos (embalaje inadecuado, residuo no autorizado), "Rechazar Carga" cambia el estado a RECHAZADO. El motivo queda registrado en el timeline.</p>
+    <a href="screenshots/desktop/55_manifiesto_entregado_detalle.png" target="_blank"><img src="screenshots/desktop/55_manifiesto_entregado_detalle.png" alt="Rechazar Carga (si aplica)" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">7</div>
+  <div class="wf-step-body">
+    <h4>Registrar Tratamiento</h4>
+    <p>Seleccionar el tipo de tratamiento aplicado del catálogo autorizado para la planta. El estado avanza a EN_TRATAMIENTO. Se pueden registrar múltiples tratamientos por manifiesto.</p>
+    <a href="screenshots/desktop/56_manifiesto_recibido_detalle.png" target="_blank"><img src="screenshots/desktop/56_manifiesto_recibido_detalle.png" alt="Registrar Tratamiento" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">8</div>
+  <div class="wf-step-body">
+    <h4>Cerrar Manifiesto</h4>
+    <p>"Cerrar Manifiesto" finaliza el ciclo: estado TRATADO. El sistema notifica automáticamente al generador, al transportista y al administrador DGFA.</p>
+    <a href="screenshots/desktop/57_manifiesto_tratado_detalle.png" target="_blank"><img src="screenshots/desktop/57_manifiesto_tratado_detalle.png" alt="Cerrar Manifiesto" loading="lazy" class="wf-step-img"></a>
+  </div>
+</div>
+<div class="wf-step">
+  <div class="wf-step-num">9</div>
+  <div class="wf-step-body">
+    <h4>Certificado de Disposición</h4>
+    <p>PDF oficial con membrete SITREP, datos completos del tratamiento, firma del operador responsable, conforme Ley 24.051 y Decreto 831/93. Descargable por todos los actores.</p>
+    <a href="screenshots/desktop/57_manifiesto_tratado_detalle.png" target="_blank"><img src="screenshots/desktop/57_manifiesto_tratado_detalle.png" alt="Certificado de Disposición" loading="lazy" class="wf-step-img"></a>
+<div class="wf-tip">El Certificado de Disposición Final es el documento legal que acredita el tratamiento correcto de los residuos peligrosos ante organismos de control.</div>
+  </div>
+</div>
+</div>
+
+</section>
 
 </main>
 
@@ -3419,17 +4414,33 @@ document.addEventListener('DOMContentLoaded', function() {
   var overlay = document.getElementById('overlay');
   var currentRole = 'all';
 
-  // Scroll-spy
-  var observer = new IntersectionObserver(function(entries) {
-    entries.forEach(function(entry) {
-      if (entry.isIntersecting) {
-        navLinks.forEach(function(link) { link.classList.remove('active'); });
-        var activeLink = document.querySelector('.nav-link[href="#' + entry.target.id + '"]');
-        if (activeLink) activeLink.classList.add('active');
+  // Abrir todos los collapsibles por defecto
+  document.querySelectorAll('.collapsible-header').forEach(function(h) {
+    h.classList.add('open');
+    var body = h.nextElementSibling;
+    if (body && body.classList.contains('collapsible-body')) {
+      body.classList.add('open');
+    }
+  });
+
+  // Scroll-spy: basado en scroll, detecta la sección más cercana al top
+  function updateActiveNav() {
+    var scrollTop = window.scrollY + 120;
+    var current = '';
+    sections.forEach(function(s) {
+      if (s.offsetTop <= scrollTop) current = s.id;
+    });
+    navLinks.forEach(function(link) {
+      var isActive = link.getAttribute('href') === '#' + current;
+      link.classList.toggle('active', isActive);
+      if (isActive) {
+        // Mantener el link activo visible dentro del sidebar
+        link.scrollIntoView({ block: 'nearest' });
       }
     });
-  }, { rootMargin: '-80px 0px -60% 0px', threshold: 0 });
-  sections.forEach(function(s) { observer.observe(s); });
+  }
+  window.addEventListener('scroll', updateActiveNav, { passive: true });
+  updateActiveNav();
 
   // Search
   searchInput.addEventListener('input', function() {
