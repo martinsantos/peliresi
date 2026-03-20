@@ -47,6 +47,7 @@ import { Badge } from '../../components/ui/BadgeV2';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Skeleton } from '../../components/ui/Skeleton';
+import BlockchainPanel from '../../components/BlockchainPanel';
 import { toast } from '../../components/ui/Toast';
 import {
   useManifiesto,
@@ -784,6 +785,15 @@ const ManifiestoDetailPage: React.FC = () => {
 
         {/* Sidebar */}
         <div className="space-y-6 animate-fade-in">
+          {/* Blockchain Certification */}
+          {m.estado !== 'BORRADOR' && (
+            <BlockchainPanel
+              manifiestoId={id!}
+              manifiestoEstado={m.estado as string}
+              blockchainStatus={m.blockchainStatus}
+            />
+          )}
+
           {/* QR Code */}
           <Card>
             <CardHeader title="QR de Control" icon={<QrCode size={20} />} />
@@ -1024,6 +1034,7 @@ const ManifiestoDetailPage: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+
         </div>
       </div>
 

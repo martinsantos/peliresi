@@ -62,6 +62,7 @@
   <div class="nav-group-items">
     <a href="#mod-dashboard" class="nav-link">3.1 Dashboard</a>
     <a href="#mod-manifiestos" class="nav-link level-2">3.2 Manifiestos</a>
+    <a href="#blockchain-firma" class="nav-link level-3">Certificacion Blockchain</a>
     <a href="#mod-centro-control" class="nav-link level-2">3.3 Centro de Control</a>
     <a href="#mod-reportes" class="nav-link level-2">3.4 Reportes</a>
     <a href="#mod-gps" class="nav-link level-2">3.5 Tracking GPS</a>
@@ -664,7 +665,59 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <li><strong>Fechas:</strong> Creacion, aprobacion, retiro, entrega, recepcion, tratamiento, cierre.</li>
 <li><strong>Codigo QR:</strong> Generado automaticamente al aprobar para acceso rapido via escaneo.</li>
 <li><strong>Timeline de eventos:</strong> Historial completo de cada accion realizada sobre el manifiesto.</li>
+<li><strong>Certificacion Blockchain:</strong> Registro inmutable del hash SHA-256 en la red Ethereum (ver seccion siguiente).</li>
 </ul>
+
+<h4 id="blockchain-firma">3.2.1 Certificacion Blockchain</h4>
+<div class="info-card" style="border-left-color:#0D8A4F;">
+<p><strong>Novedad:</strong> Cada manifiesto firmado puede ser certificado en la blockchain de Ethereum, garantizando que sus datos no fueron alterados despues de la aprobacion.</p>
+</div>
+
+<div style="text-align:center;margin:1.5rem 0;">
+<img src="screenshots/desktop/54_blockchain_panel_detalle.png" alt="Panel de Certificacion Blockchain verificado" style="max-width:340px;border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,0.12);border:1px solid #e0e0dc;">
+<p style="font-size:0.8rem;color:#666;margin-top:0.5rem;">Panel &ldquo;Verificado en Blockchain&rdquo; en el detalle de un manifiesto</p>
+</div>
+
+<p><strong>Que es la certificacion blockchain?</strong></p>
+<p>Al certificar un manifiesto en blockchain, el sistema calcula un hash criptografico (SHA-256) con los datos del manifiesto (numero, generador, transportista, operador, residuos, fecha de firma) y lo registra como una transaccion inmutable en la red Ethereum Sepolia. Este registro no puede ser alterado ni eliminado, proporcionando evidencia criptografica de la integridad del manifiesto.</p>
+
+<p><strong>Como funciona?</strong></p>
+<ol>
+<li>El generador firma el manifiesto electronicamente (BORRADOR &rarr; APROBADO).</li>
+<li>Desde la pagina de detalle del manifiesto, aparece un boton <strong>&ldquo;Certificar en Blockchain&rdquo;</strong> en el panel lateral.</li>
+<li>Al hacer clic, el sistema:
+  <ul>
+    <li>Calcula el hash SHA-256 con los datos canonicos del manifiesto.</li>
+    <li>Envia una transaccion al smart contract <code>SitrepRegistry</code> en Ethereum Sepolia.</li>
+    <li>Espera la confirmacion de la red (~15-30 segundos).</li>
+  </ul>
+</li>
+<li>Una vez confirmado, el panel muestra:
+  <ul>
+    <li>Sello verde <strong>&ldquo;Verificado en Blockchain&rdquo;</strong> con detalles tecnicos.</li>
+    <li>Hash SHA-256 del manifiesto.</li>
+    <li>TX Hash con enlace directo a Etherscan para verificacion publica.</li>
+    <li>Numero de bloque y timestamp de la red.</li>
+    <li>Direccion del smart contract.</li>
+  </ul>
+</li>
+</ol>
+
+<p><strong>Verificacion publica</strong></p>
+<p>Cualquier persona puede verificar un manifiesto certificado sin necesidad de cuenta en SITREP:</p>
+<ul>
+<li><strong>Via QR:</strong> Al escanear el codigo QR del manifiesto, la pagina de verificacion publica muestra el estado blockchain con enlace a Etherscan.</li>
+<li><strong>Via Etherscan:</strong> Acceder directamente al TX hash en <code>sepolia.etherscan.io</code> para ver la transaccion en la blockchain.</li>
+<li><strong>Via smart contract:</strong> Llamar la funcion <code>verificar(hash)</code> del contrato para confirmar si un hash existe en el registro.</li>
+</ul>
+
+<p><strong>En los documentos PDF</strong></p>
+<p>Los manifiestos y certificados de disposicion generados en formato PDF incluyen un sello visual de blockchain con el hash SHA-256, TX hash y la URL de verificacion en Etherscan.</p>
+
+<div class="info-card" style="border-left-color:#0D8A4F;">
+<p><strong>Nota tecnica:</strong> La blockchain utilizada es Ethereum Sepolia (testnet). En una implementacion productiva, se puede migrar a Ethereum mainnet o Polygon (Layer 2) cambiando unicamente la configuracion del servidor, sin modificar el codigo.</p>
+</div>
+
 </section>
 
 <section id="mod-centro-control" data-role="admin">

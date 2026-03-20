@@ -127,4 +127,19 @@ export const manifiestoService = {
     const { data } = await api.get(`/pdf/certificado/${id}`, { responseType: 'blob' });
     return data;
   },
+
+  async getBlockchainStatus(id: string) {
+    const { data } = await api.get(`/blockchain/manifiesto/${id}`);
+    return data.data.blockchain;
+  },
+
+  async verificarBlockchain(hash: string) {
+    const { data } = await api.get(`/blockchain/verificar/${hash}`);
+    return data.data;
+  },
+
+  async registrarBlockchain(id: string) {
+    const { data } = await api.post(`/blockchain/registrar/${id}`);
+    return data.data;
+  },
 };

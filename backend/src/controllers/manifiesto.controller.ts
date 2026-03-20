@@ -7,6 +7,7 @@ import prisma from '../lib/prisma';
 import { anomaliaDetector } from './notification.controller';
 import { domainEvents } from '../services/domainEvent.service';
 import { distanciaPuntoSegmento } from '../utils/geo';
+// blockchain registration is on-demand via /api/blockchain/registrar/:id
 
 // Verificar manifiesto públicamente (sin auth) — usado por QR codes
 export const verificarManifiesto = async (req: Request, res: Response, next: NextFunction) => {
@@ -28,6 +29,11 @@ export const verificarManifiesto = async (req: Request, res: Response, next: Nex
         fechaEntrega: true,
         fechaRecepcion: true,
         fechaCierre: true,
+        blockchainHash: true,
+        blockchainTxHash: true,
+        blockchainBlockNumber: true,
+        blockchainTimestamp: true,
+        blockchainStatus: true,
         generador: {
           select: { razonSocial: true }
         },
@@ -438,6 +444,7 @@ export const firmarManifiesto = async (req: AuthRequest, res: Response, next: Ne
       numero: manifiestoActualizado.numero,
       userId,
     });
+
   } catch (error) {
     next(error);
   }

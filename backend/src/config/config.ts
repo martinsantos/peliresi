@@ -22,7 +22,12 @@ export const config = {
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '24h',
 
   // CORS
-  CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:5173'
+  CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:5173',
+
+  // Blockchain
+  BLOCKCHAIN_ENABLED: process.env.BLOCKCHAIN_ENABLED === 'true',
+  BLOCKCHAIN_RPC_URL: process.env.BLOCKCHAIN_RPC_URL || '',
+  BLOCKCHAIN_CONTRACT_ADDRESS: process.env.BLOCKCHAIN_CONTRACT_ADDRESS || ''
 };
 
 // Validar configuraciones requeridas

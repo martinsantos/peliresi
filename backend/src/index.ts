@@ -24,6 +24,8 @@ import { domainEvents } from './services/domainEvent.service';
 import { alertaSubscriber } from './subscribers/alerta.subscriber';
 import { eventoManifiestoSubscriber } from './subscribers/eventoManifiesto.subscriber';
 import { iniciarVencimientoJob } from './jobs/vencimiento.job';
+import { iniciarBlockchainJob } from './jobs/blockchain.job';
+import blockchainRoutes from './routes/blockchain.routes';
 
 // Inicializar la aplicación Express
 const app = express();
@@ -208,6 +210,7 @@ app.use('/api/catalogos', catalogoRoutes);
 app.use('/api/pdf', pdfRoutes);
 app.use('/api/reportes', reporteRoutes);
 app.use('/api/actores', actorRoutes);
+app.use('/api/blockchain', blockchainRoutes);
 app.use('/api', notificationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/analytics', analyticsRoutes);
@@ -226,6 +229,7 @@ domainEvents.subscribe(alertaSubscriber);
 
 // Iniciar jobs cron
 iniciarVencimientoJob();
+iniciarBlockchainJob();
 
 // Iniciar el servidor
 const PORT = config.PORT;

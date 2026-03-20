@@ -22,6 +22,11 @@ interface VerificacionData {
   fechaEntrega: string | null;
   fechaRecepcion: string | null;
   fechaCierre: string | null;
+  blockchainHash: string | null;
+  blockchainTxHash: string | null;
+  blockchainBlockNumber: number | null;
+  blockchainTimestamp: string | null;
+  blockchainStatus: string | null;
   generador: { razonSocial: string };
   transportista: { razonSocial: string };
   operador: { razonSocial: string };
@@ -201,6 +206,26 @@ const VerificarManifiestoPage: React.FC = () => {
             </>)}
           </div>
         </div>
+
+        {/* Blockchain */}
+        {data.blockchainStatus === 'CONFIRMADO' && data.blockchainTxHash && (
+          <div className="px-6 py-4 border-b border-neutral-100">
+            <div className="flex items-center gap-2 px-3 py-2.5 bg-emerald-50 rounded-lg border border-emerald-200">
+              <Shield size={16} className="text-emerald-600" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-emerald-700">Verificado en Blockchain</p>
+                <a
+                  href={`https://sepolia.etherscan.io/tx/${data.blockchainTxHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-emerald-600 hover:underline font-mono"
+                >
+                  {data.blockchainTxHash.slice(0, 10)}...{data.blockchainTxHash.slice(-8)}
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* CTA */}
         <div className="px-6 py-5 text-center">

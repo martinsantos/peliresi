@@ -217,6 +217,11 @@ export interface Manifiesto {
   fechaRecepcion: string | null;
   fechaCierre: string | null;
   qrCode: string | null;
+  blockchainHash: string | null;
+  blockchainTxHash: string | null;
+  blockchainBlockNumber: number | null;
+  blockchainTimestamp: string | null;
+  blockchainStatus: string | null;
   createdAt: string;
   updatedAt: string;
   generador?: Generador;

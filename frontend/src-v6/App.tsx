@@ -76,6 +76,7 @@ const AdminOperadoresPage = lazy(() => import('./pages/admin/AdminOperadoresPage
 const AdminVehiculosPage = lazy(() => import('./pages/admin/AdminVehiculosPage'));
 const AdminResiduosPage = lazy(() => import('./pages/admin/AdminResiduosPage'));
 const AdminTratamientosPage = lazy(() => import('./pages/admin/AdminTratamientosPage'));
+const AdminBlockchainPage = lazy(() => import('./pages/admin/AdminBlockchainPage'));
 
 // Auditoría
 const AuditoriaPage = lazy(() => import('./pages/auditoria/AuditoriaPage'));
@@ -106,6 +107,7 @@ const VerificarManifiestoPage = lazy(() => import('./pages/manifiestos/Verificar
 
 // Estadísticas
 const EstadisticasPage = lazy(() => import('./pages/estadisticas/EstadisticasPage'));
+
 
 // 404
 const NotFoundPage = lazy(() => import('./pages/shared/NotFoundPage'));
@@ -266,6 +268,10 @@ function App() {
 
             {/* Perfil */}
             <Route path="/mi-perfil" element={<PerfilPage />} />
+
+            {/* Ayuda */}
+            <Route path="/ayuda" element={<AyudaPage />} />
+
           </Route>
         </Route>
 
@@ -274,6 +280,7 @@ function App() {
           <Route element={<MainLayout />}>
             <Route path="/admin/usuarios" element={<UsuariosPage />} />
             <Route path="/admin/actores" element={<ActoresPage />} />
+            <Route path="/admin/blockchain" element={<AdminBlockchainPage />} />
             <Route path="/admin/auditoria" element={<AuditoriaPage />} />
             <Route path="/admin/carga-masiva" element={<CargaMasivaPage />} />
           </Route>

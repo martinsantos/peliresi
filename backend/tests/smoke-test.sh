@@ -229,6 +229,13 @@ fi
 test_public "GET" "/manifiestos/verificar/NONEXISTENT" "404"
 
 echo ""
+echo "--- Blockchain ---"
+if [ -n "$MANIFIESTO_ID" ]; then
+  test_endpoint "GET" "/blockchain/manifiesto/$MANIFIESTO_ID" "200"
+fi
+test_public "GET" "/blockchain/verificar/0000000000000000000000000000000000000000000000000000000000000000" "200"
+
+echo ""
 echo "============================================"
 echo "RESULTS"
 echo "============================================"

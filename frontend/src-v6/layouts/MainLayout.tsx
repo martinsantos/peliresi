@@ -24,6 +24,7 @@ import {
   BarChart3,
   AlertTriangle,
   Shield,
+  ShieldCheck,
   Upload,
   Truck,
   FlaskConical,
@@ -32,6 +33,7 @@ import {
   SwitchCamera,
   QrCode,
   HelpCircle,
+  BookOpen,
 } from 'lucide-react';
 import { Button } from '../components/ui/ButtonV2';
 import { Badge } from '../components/ui/BadgeV2';
@@ -140,6 +142,7 @@ export const MainLayout: React.FC = () => {
       items.push({ path: '/admin/actores/transportistas', icon: Truck,        label: 'Admin Transporte' });
       items.push({ path: '/admin/residuos',               icon: FlaskConical, label: 'Catálogo Residuos' });
       items.push({ path: '/admin/tratamientos',           icon: BarChart3,    label: 'Tratamientos' });
+      items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Registro Blockchain' });
       items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
       items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
     } else if (isAdminGenerador) {
@@ -285,7 +288,7 @@ export const MainLayout: React.FC = () => {
             </NavLink>
           </div>
           
-          {/* Configuración al final */}
+          {/* Configuración y Ayuda al final */}
           <div className="mt-2">
             <NavLink
               to="/configuracion"
@@ -302,6 +305,28 @@ export const MainLayout: React.FC = () => {
               <Settings size={20} />
               Configuración
             </NavLink>
+            <NavLink
+              to="/ayuda"
+              onClick={() => setSidebarOpen(false)}
+              className={({ isActive }) => `
+                flex items-center gap-3 px-3 py-2.5 rounded-xl
+                font-medium text-sm transition-all duration-200
+                ${isActive
+                  ? 'bg-white/20 text-white'
+                  : 'text-white/70 hover:bg-white/10 hover:text-white'
+                }
+              `}
+            >
+              <HelpCircle size={20} />
+              Ayuda
+            </NavLink>
+            <a
+              href="/manual/"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 text-white/70 hover:bg-white/10 hover:text-white"
+            >
+              <BookOpen size={20} />
+              Manual
+            </a>
           </div>
         </nav>
 

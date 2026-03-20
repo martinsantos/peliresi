@@ -206,6 +206,12 @@ model Manifiesto {
   fechaRecepcion  DateTime?
   fechaCierre     DateTime?
   qrCode          String?
+  blockchainHash        String?
+  blockchainTxHash      String?
+  blockchainBlockNumber Int?
+  blockchainTimestamp   DateTime?
+  blockchainStatus      String?
+  blockchainRetries     Int       @default(0)
   isDemoData      Boolean     @default(false)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
