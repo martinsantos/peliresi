@@ -138,7 +138,7 @@ const ManifiestosPage: React.FC = () => {
             />
           </div>
           <div className="flex gap-2 items-center">
-            <div className="w-48">
+            <div className="w-full md:w-48">
               <Select
                 value={estadoFilter}
                 onChange={(val) => { setEstadoFilter(val); setPage(1); }}

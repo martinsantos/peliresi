@@ -207,7 +207,7 @@ export const MobileDashboardPage: React.FC = () => {
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (

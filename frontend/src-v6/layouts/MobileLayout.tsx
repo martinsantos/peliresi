@@ -356,7 +356,7 @@ export const MobileLayout: React.FC = () => {
             onClick={() => setIsMenuOpen(false)}
           />
           <div
-            className="fixed top-0 left-0 bottom-0 w-[300px] bg-white z-50 animate-slide-in-left flex flex-col shadow-xl"
+            className="fixed top-0 left-0 bottom-0 w-[min(300px,85vw)] bg-white z-50 animate-slide-in-left flex flex-col shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Drawer Header */}

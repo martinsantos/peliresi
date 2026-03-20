@@ -465,40 +465,42 @@ const ManifiestoDetailPage: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link to={isMobile ? "/mobile/manifiestos" : "/manifiestos"}>
-          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />}>
-            Volver
-          </Button>
-        </Link>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-bold text-neutral-900">{m.numero || id}</h2>
-            <Badge variant="soft" color={getEstadoBadgeColor(m.estado || EstadoManifiesto.BORRADOR)}>
-              {formatEstado(m.estado || EstadoManifiesto.BORRADOR)}
-            </Badge>
-            {isError && (
-              <Badge variant="soft" color="warning">
-                <AlertCircle size={12} className="mr-1" />
-                Error al cargar
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <Link to={isMobile ? "/mobile/manifiestos" : "/manifiestos"} className="shrink-0">
+            <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />}>
+              Volver
+            </Button>
+          </Link>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 truncate">{m.numero || id}</h2>
+              <Badge variant="soft" color={getEstadoBadgeColor(m.estado || EstadoManifiesto.BORRADOR)} className="shrink-0">
+                {formatEstado(m.estado || EstadoManifiesto.BORRADOR)}
               </Badge>
-            )}
+              {isError && (
+                <Badge variant="soft" color="warning" className="shrink-0">
+                  <AlertCircle size={12} className="mr-1" />
+                  Error al cargar
+                </Badge>
+              )}
+            </div>
+            <p className="text-neutral-600 mt-1 text-sm sm:text-base">
+              Creado el {m.createdAt ? formatDateTime(m.createdAt) : '-'}
+            </p>
           </div>
-          <p className="text-neutral-600 mt-1">
-            Creado el {m.createdAt ? formatDateTime(m.createdAt) : '-'}
-          </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" leftIcon={<Download size={16} />} onClick={handleDescargarPDF}>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" leftIcon={<Download size={16} />} onClick={handleDescargarPDF}>
             Descargar PDF
           </Button>
           {m.estado === EstadoManifiesto.TRATADO && (
-            <Button variant="outline" leftIcon={<Award size={16} />} onClick={handleDescargarCertificado} className="!border-success-300 !text-success-700 hover:!bg-success-50">
+            <Button variant="outline" size="sm" leftIcon={<Award size={16} />} onClick={handleDescargarCertificado} className="!border-success-300 !text-success-700 hover:!bg-success-50">
               Certificado
             </Button>
           )}
           {m.estado === EstadoManifiesto.BORRADOR && (isAdmin || userRol === 'GENERADOR') && (
-            <Button onClick={() => navigate(isMobile ? `/mobile/manifiestos/${id}/editar` : `/manifiestos/${id}/editar`)}>
+            <Button size="sm" onClick={() => navigate(isMobile ? `/mobile/manifiestos/${id}/editar` : `/manifiestos/${id}/editar`)}>
               Editar
             </Button>
           )}
@@ -1041,7 +1043,7 @@ const ManifiestoDetailPage: React.FC = () => {
       {/* Pesaje Modal */}
       {showPesajeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-lg w-full mx-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-lg w-full mx-2 sm:mx-4">
             <h3 className="text-lg font-bold text-neutral-900 mb-4 flex items-center gap-2">
               <Scale size={20} /> Registrar Pesaje
             </h3>
@@ -1088,7 +1090,7 @@ const ManifiestoDetailPage: React.FC = () => {
       {/* Tratamiento Modal */}
       {showTratamientoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full mx-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full mx-2 sm:mx-4">
             <h3 className="text-lg font-bold text-neutral-900 mb-4 flex items-center gap-2">
               <Beaker size={20} /> Registrar Tratamiento
             </h3>
@@ -1141,7 +1143,7 @@ const ManifiestoDetailPage: React.FC = () => {
       {/* Rechazar Modal */}
       {showRechazarModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full mx-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full mx-2 sm:mx-4">
             <h3 className="text-lg font-bold text-neutral-900 mb-4 flex items-center gap-2">
               <XCircle size={20} className="text-error-500" /> Rechazar Carga
             </h3>
@@ -1189,7 +1191,7 @@ const ManifiestoDetailPage: React.FC = () => {
       {/* Incidente Modal */}
       {showIncidenteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full mx-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full mx-2 sm:mx-4">
             <h3 className="text-lg font-bold text-neutral-900 mb-4 flex items-center gap-2">
               <AlertCircle size={20} className="text-warning-500" /> Registrar Incidente
             </h3>
@@ -1237,7 +1239,7 @@ const ManifiestoDetailPage: React.FC = () => {
       {/* Cancel Confirmation Modal */}
       {showCancelModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full mx-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full mx-2 sm:mx-4">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-error-50 rounded-full flex items-center justify-center">
                 <XCircle size={20} className="text-error-500" />
@@ -1265,7 +1267,7 @@ const ManifiestoDetailPage: React.FC = () => {
       {/* Reversion Modal */}
       {showReversionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full mx-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full mx-2 sm:mx-4">
             <h3 className="text-lg font-bold text-neutral-900 mb-4 flex items-center gap-2">
               <RotateCcw size={20} className="text-amber-500" /> Revertir Estado
             </h3>
@@ -1318,7 +1320,7 @@ const ManifiestoDetailPage: React.FC = () => {
       {/* Firma Digital Modal */}
       {showFirmaModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-lg w-full mx-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-lg w-full mx-2 sm:mx-4">
             <h3 className="text-lg font-bold text-neutral-900 mb-4 flex items-center gap-2">
               <PenTool size={20} className="text-primary-600" /> Firma Digital del Manifiesto
             </h3>
