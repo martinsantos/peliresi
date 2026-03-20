@@ -222,6 +222,8 @@ export interface Manifiesto {
   blockchainBlockNumber: number | null;
   blockchainTimestamp: string | null;
   blockchainStatus: string | null;
+  rollingHash: string | null;
+  sellosBlockchain?: BlockchainSello[];
   createdAt: string;
   updatedAt: string;
   generador?: Generador;
@@ -257,6 +259,7 @@ export interface EventoManifiesto {
   latitud: number | null;
   longitud: number | null;
   usuarioId: string;
+  integrityHash: string | null;
   createdAt: string;
   usuario?: Usuario;
 }
@@ -341,6 +344,15 @@ export interface AnomaliaTransporte {
   fechaResolucion: string | null;
   notas: string | null;
   createdAt: string;
+}
+
+export interface BlockchainSello {
+  tipo: 'GENESIS' | 'CIERRE';
+  hash: string;
+  txHash: string | null;
+  blockNumber: number | null;
+  blockTimestamp: string | null;
+  status: 'PENDIENTE' | 'CONFIRMADO' | 'ERROR';
 }
 
 export interface Auditoria {

@@ -1190,6 +1190,49 @@ El sistema verifica que todos los pasos estén completos:
 | Cerrado | Operador | - (Final) |
 | Rechazado | Operador | Retorno a origen |
 
+## 8.3 Certificacion Blockchain de Integridad
+
+El sistema SITREP utiliza la blockchain de Ethereum (red Sepolia) para garantizar la inmutabilidad de los manifiestos a lo largo de todo su ciclo de vida. Se emplean **2 sellos blockchain** combinados con una **cadena de hashes acumulativos (rolling hash)** que protege cada cambio de estado.
+
+### Modelo de 2 Sellos
+
+| Sello | Momento | Que protege |
+|-------|---------|-------------|
+| **Sello Genesis** | Al firmar el manifiesto (BORRADOR -> APROBADO) | Identidad: numero, CUITs de generador/transportista/operador, residuos, fecha de firma |
+| **Sello de Cierre** | Al cerrar el manifiesto (-> TRATADO) | Ciclo de vida completo: todas las fechas, estados intermedios, eventos, observaciones |
+
+### Rolling Hash Chain (cadena de integridad)
+
+En cada cambio de estado del manifiesto, el sistema calcula un hash acumulativo que depende del hash anterior. Esto crea una cadena criptografica donde modificar cualquier dato intermedio rompe la cadena completa.
+
+**Datos incluidos en cada eslabón:**
+- Hash anterior (cadena)
+- Timestamp del sello genesis en blockchain (imposible de predecir)
+- Estado del manifiesto
+- Fecha de la transición
+- Cantidad de eventos registrados
+- Observaciones del manifiesto
+
+### Verificación de Integridad
+
+**Individual:** Desde la página de detalle de cualquier manifiesto, el panel de Blockchain muestra ambos sellos con links a Etherscan para verificación independiente.
+
+**Masiva:** El administrador puede ejecutar una verificación de integridad desde la página **Admin > Blockchain** que recalcula todos los hashes y verifica contra los sellos almacenados en blockchain.
+
+| Resultado | Significado |
+|-----------|-------------|
+| Integridad Completa | Genesis + rolling chain + cierre verificados |
+| Integridad Parcial | Solo sello genesis (manifiesto aún en proceso) |
+| Integridad Fallida | Discrepancia detectada entre datos y blockchain |
+
+### Verificación Pública via QR
+
+Al escanear el código QR de un manifiesto, la página pública de verificación muestra los sellos blockchain asociados, permitiendo a cualquier parte interesada confirmar la autenticidad del documento sin necesidad de autenticación.
+
+### Costos
+
+El sistema opera sobre la red de prueba Sepolia (ETH gratuito via faucet). Solo se realizan 2 transacciones blockchain por manifiesto (genesis + cierre), minimizando el uso de la red.
+
 ---
 
 # 9. ANEXOS

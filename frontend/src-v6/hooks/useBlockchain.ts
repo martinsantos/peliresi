@@ -7,8 +7,12 @@ export function useBlockchainStatus(manifiestoId: string, enabled = true) {
     queryFn: () => manifiestoService.getBlockchainStatus(manifiestoId),
     enabled: enabled && !!manifiestoId,
     refetchInterval: (query) => {
-      const status = query.state.data?.blockchainStatus;
-      return status === 'PENDIENTE' ? 10_000 : false;
+      const data = query.state.data;
+      // Refetch if legacy status is PENDIENTE
+      if (data?.blockchainStatus === 'PENDIENTE') return 10_000;
+      // Refetch if any sello is PENDIENTE
+      if (data?.sellos?.some((s: { status: string }) => s.status === 'PENDIENTE')) return 10_000;
+      return false;
     },
     staleTime: 30_000,
   });

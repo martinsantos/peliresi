@@ -7,7 +7,7 @@ import prisma from '../lib/prisma';
 import { anomaliaDetector } from './notification.controller';
 import { domainEvents } from '../services/domainEvent.service';
 import { distanciaPuntoSegmento } from '../utils/geo';
-// blockchain registration is on-demand via /api/blockchain/registrar/:id
+import { computeRollingHash, computeClosureHash, hashManifiesto, registrarSello } from '../services/blockchain.service';
 
 // Verificar manifiesto públicamente (sin auth) — usado por QR codes
 export const verificarManifiesto = async (req: Request, res: Response, next: NextFunction) => {
@@ -34,6 +34,10 @@ export const verificarManifiesto = async (req: Request, res: Response, next: Nex
         blockchainBlockNumber: true,
         blockchainTimestamp: true,
         blockchainStatus: true,
+        rollingHash: true,
+        sellosBlockchain: {
+          select: { tipo: true, hash: true, txHash: true, blockNumber: true, blockTimestamp: true, status: true }
+        },
         generador: {
           select: { razonSocial: true }
         },
@@ -105,6 +109,47 @@ const actualizarUbicacionSchema = z.object({
   velocidad: z.number().min(0, 'velocidad no puede ser negativa').optional(),
   direccion: z.number().optional(),
 });
+
+/**
+ * Compute rolling hash and save it on the manifiesto + evento inside a $transaction.
+ * `tx` is the Prisma transaction client.
+ */
+async function updateRollingHash(
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+  manifiestoId: string,
+  estado: string,
+  fecha: Date,
+  observaciones: string | null,
+  eventoId: string,
+) {
+  // Fetch current rolling hash + genesis blockchain timestamp
+  const current = await tx.manifiesto.findUnique({
+    where: { id: manifiestoId },
+    select: { rollingHash: true, blockchainTimestamp: true },
+  });
+  const eventCount = await tx.eventoManifiesto.count({ where: { manifiestoId } });
+
+  const newRollingHash = computeRollingHash({
+    previousHash: current?.rollingHash ?? null,
+    genesisBlockchainTimestamp: current?.blockchainTimestamp?.toISOString() ?? null,
+    estado,
+    fecha: fecha.toISOString(),
+    eventCount,
+    observaciones,
+  });
+
+  await tx.manifiesto.update({
+    where: { id: manifiestoId },
+    data: { rollingHash: newRollingHash },
+  });
+
+  await tx.eventoManifiesto.update({
+    where: { id: eventoId },
+    data: { integrityHash: newRollingHash },
+  });
+
+  return newRollingHash;
+}
 
 // Generar número de manifiesto único
 const generarNumeroManifiesto = async (): Promise<string> => {
@@ -419,7 +464,7 @@ export const firmarManifiesto = async (req: AuthRequest, res: Response, next: Ne
         throw err;
       }
 
-      await tx.eventoManifiesto.create({
+      const evento = await tx.eventoManifiesto.create({
         data: {
           manifiestoId: id,
           tipo: 'FIRMA',
@@ -427,6 +472,8 @@ export const firmarManifiesto = async (req: AuthRequest, res: Response, next: Ne
           usuarioId: userId
         }
       });
+
+      await updateRollingHash(tx, id, 'APROBADO', updated.fechaFirma!, updated.observaciones, evento.id);
 
       return updated;
     });
@@ -443,6 +490,12 @@ export const firmarManifiesto = async (req: AuthRequest, res: Response, next: Ne
       estadoNuevo: 'APROBADO',
       numero: manifiestoActualizado.numero,
       userId,
+    });
+
+    // Sello GENESIS — fire-and-forget
+    setImmediate(() => {
+      const hash = hashManifiesto(manifiestoActualizado);
+      registrarSello(id, 'GENESIS', hash).catch(() => {});
     });
 
   } catch (error) {
@@ -489,7 +542,7 @@ export const confirmarRetiro = async (req: AuthRequest, res: Response, next: Nex
         throw err;
       }
 
-      await tx.eventoManifiesto.create({
+      const evento = await tx.eventoManifiesto.create({
         data: {
           manifiestoId: id,
           tipo: 'RETIRO',
@@ -509,6 +562,8 @@ export const confirmarRetiro = async (req: AuthRequest, res: Response, next: Nex
           }
         });
       }
+
+      await updateRollingHash(tx, id, 'EN_TRANSITO', updated.fechaRetiro!, updated.observaciones, evento.id);
 
       return updated;
     });
@@ -679,7 +734,7 @@ export const confirmarEntrega = async (req: AuthRequest, res: Response, next: Ne
         throw err;
       }
 
-      await tx.eventoManifiesto.create({
+      const evento = await tx.eventoManifiesto.create({
         data: {
           manifiestoId: id,
           tipo: 'ENTREGA',
@@ -689,6 +744,8 @@ export const confirmarEntrega = async (req: AuthRequest, res: Response, next: Ne
           usuarioId: userId
         }
       });
+
+      await updateRollingHash(tx, id, 'ENTREGADO', updated.fechaEntrega!, updated.observaciones, evento.id);
 
       return updated;
     });
@@ -749,7 +806,7 @@ export const confirmarRecepcion = async (req: AuthRequest, res: Response, next: 
         throw err;
       }
 
-      await tx.eventoManifiesto.create({
+      const evento = await tx.eventoManifiesto.create({
         data: {
           manifiestoId: id,
           tipo: 'RECEPCION',
@@ -757,6 +814,8 @@ export const confirmarRecepcion = async (req: AuthRequest, res: Response, next: 
           usuarioId: userId
         }
       });
+
+      await updateRollingHash(tx, id, 'RECIBIDO', updated.fechaRecepcion!, updated.observaciones, evento.id);
 
       return updated;
     });
@@ -795,7 +854,7 @@ export const cerrarManifiesto = async (req: AuthRequest, res: Response, next: Ne
     }
 
     // Atomic conditional update: accepts RECIBIDO or EN_TRATAMIENTO as valid source states
-    const manifiestoActualizado = await prisma.$transaction(async (tx) => {
+    const { manifiesto: manifiestoActualizado, estadoAnterior } = await prisma.$transaction(async (tx) => {
       // First verify it exists and is in a valid state
       const current = await tx.manifiesto.findUnique({ where: { id }, select: { estado: true } });
       if (!current) throw new AppError('Manifiesto no encontrado', 404);
@@ -829,7 +888,7 @@ export const cerrarManifiesto = async (req: AuthRequest, res: Response, next: Ne
         throw err;
       }
 
-      await tx.eventoManifiesto.create({
+      const evento = await tx.eventoManifiesto.create({
         data: {
           manifiestoId: id,
           tipo: 'CIERRE',
@@ -838,7 +897,9 @@ export const cerrarManifiesto = async (req: AuthRequest, res: Response, next: Ne
         }
       });
 
-      return updated;
+      await updateRollingHash(tx, id, 'TRATADO', updated.fechaCierre!, updated.observaciones, evento.id);
+
+      return { manifiesto: updated, estadoAnterior: current.estado };
     });
 
     res.json({
@@ -849,10 +910,47 @@ export const cerrarManifiesto = async (req: AuthRequest, res: Response, next: Ne
     domainEvents.emit({
       type: 'MANIFIESTO_ESTADO_CAMBIADO',
       manifiestoId: manifiestoActualizado.id,
-      estadoAnterior: 'EN_TRATAMIENTO',
+      estadoAnterior,
       estadoNuevo: 'TRATADO',
       numero: manifiestoActualizado.numero,
       userId,
+    });
+
+    // Sello CIERRE — fire-and-forget
+    setImmediate(async () => {
+      try {
+        const fresh = await prisma.manifiesto.findUnique({
+          where: { id },
+          include: {
+            generador: { select: { cuit: true } },
+            transportista: { select: { cuit: true } },
+            operador: { select: { cuit: true } },
+            residuos: { select: { tipoResiduoId: true, cantidad: true, unidad: true } },
+            sellosBlockchain: { where: { tipo: 'GENESIS' } },
+          },
+        });
+        if (!fresh || !fresh.rollingHash || !fresh.fechaCierre) return;
+        const genesisSello = fresh.sellosBlockchain[0];
+        if (!genesisSello) return;
+
+        const eventCount = await prisma.eventoManifiesto.count({ where: { manifiestoId: id } });
+        const closureHash = computeClosureHash({
+          genesisHash: genesisSello.hash,
+          rollingHash: fresh.rollingHash,
+          numero: fresh.numero,
+          generadorCuit: fresh.generador.cuit,
+          transportistaCuit: fresh.transportista.cuit,
+          operadorCuit: fresh.operador.cuit,
+          residuos: fresh.residuos,
+          fechaFirma: fresh.fechaFirma?.toISOString() ?? '',
+          fechaRetiro: fresh.fechaRetiro?.toISOString() ?? null,
+          fechaEntrega: fresh.fechaEntrega?.toISOString() ?? null,
+          fechaRecepcion: fresh.fechaRecepcion?.toISOString() ?? null,
+          fechaCierre: fresh.fechaCierre.toISOString(),
+          eventCount,
+        });
+        await registrarSello(id, 'CIERRE', closureHash);
+      } catch { /* fire-and-forget */ }
     });
   } catch (error) {
     next(error);
@@ -893,7 +991,7 @@ export const rechazarCarga = async (req: AuthRequest, res: Response, next: NextF
         throw err;
       }
 
-      await tx.eventoManifiesto.create({
+      const evento = await tx.eventoManifiesto.create({
         data: {
           manifiestoId: id,
           tipo: 'RECHAZO',
@@ -901,6 +999,8 @@ export const rechazarCarga = async (req: AuthRequest, res: Response, next: NextF
           usuarioId: userId
         }
       });
+
+      await updateRollingHash(tx, id, 'RECHAZADO', new Date(), updated.observaciones, evento.id);
 
       return updated;
     });
@@ -1023,7 +1123,7 @@ export const registrarTratamiento = async (req: AuthRequest, res: Response, next
         throw err;
       }
 
-      await tx.eventoManifiesto.create({
+      const evento = await tx.eventoManifiesto.create({
         data: {
           manifiestoId: id,
           tipo: 'TRATAMIENTO',
@@ -1031,6 +1131,8 @@ export const registrarTratamiento = async (req: AuthRequest, res: Response, next
           usuarioId: userId
         }
       });
+
+      await updateRollingHash(tx, id, 'EN_TRATAMIENTO', new Date(), updated.observaciones, evento.id);
 
       return updated;
     });

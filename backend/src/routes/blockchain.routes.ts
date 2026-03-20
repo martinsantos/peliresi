@@ -1,7 +1,14 @@
 import { Router } from 'express';
 import { isAuthenticated } from '../middlewares/auth.middleware';
 import { hasRole } from '../middlewares/auth.middleware';
-import { getBlockchainStatus, registrarBlockchain, verificarBlockchainPublico, getRegistroBlockchain } from '../controllers/blockchain.controller';
+import {
+  getBlockchainStatus,
+  registrarBlockchain,
+  verificarBlockchainPublico,
+  getRegistroBlockchain,
+  getVerificarIntegridad,
+  getVerificarLote,
+} from '../controllers/blockchain.controller';
 
 const router = Router();
 
@@ -16,5 +23,11 @@ router.post('/registrar/:id', isAuthenticated, registrarBlockchain);
 
 // Admin: list all blockchain registrations
 router.get('/registro', isAuthenticated, hasRole('ADMIN'), getRegistroBlockchain);
+
+// Admin: verify integrity of a single manifest
+router.get('/verificar-integridad/:id', isAuthenticated, hasRole('ADMIN'), getVerificarIntegridad);
+
+// Admin: batch integrity verification
+router.get('/verificar-lote', isAuthenticated, hasRole('ADMIN'), getVerificarLote);
 
 export default router;

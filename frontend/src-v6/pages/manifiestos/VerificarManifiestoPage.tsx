@@ -13,6 +13,15 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 
+interface SelloData {
+  tipo: string;
+  hash: string;
+  txHash: string | null;
+  blockNumber: number | null;
+  blockTimestamp: string | null;
+  status: string;
+}
+
 interface VerificacionData {
   numero: string;
   estado: string;
@@ -27,6 +36,8 @@ interface VerificacionData {
   blockchainBlockNumber: number | null;
   blockchainTimestamp: string | null;
   blockchainStatus: string | null;
+  rollingHash: string | null;
+  sellosBlockchain?: SelloData[];
   generador: { razonSocial: string };
   transportista: { razonSocial: string };
   operador: { razonSocial: string };
@@ -207,23 +218,48 @@ const VerificarManifiestoPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Blockchain */}
-        {data.blockchainStatus === 'CONFIRMADO' && data.blockchainTxHash && (
-          <div className="px-6 py-4 border-b border-neutral-100">
-            <div className="flex items-center gap-2 px-3 py-2.5 bg-emerald-50 rounded-lg border border-emerald-200">
-              <Shield size={16} className="text-emerald-600" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-emerald-700">Verificado en Blockchain</p>
-                <a
-                  href={`https://sepolia.etherscan.io/tx/${data.blockchainTxHash}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-emerald-600 hover:underline font-mono"
-                >
-                  {data.blockchainTxHash.slice(0, 10)}...{data.blockchainTxHash.slice(-8)}
-                </a>
+        {/* Blockchain Sellos */}
+        {(data.sellosBlockchain?.length || (data.blockchainStatus === 'CONFIRMADO' && data.blockchainTxHash)) && (
+          <div className="px-6 py-4 border-b border-neutral-100 space-y-2">
+            <p className="text-xs text-neutral-500 mb-2">Certificacion Blockchain</p>
+            {data.sellosBlockchain?.map((sello, i) => (
+              <div key={i} className="flex items-center gap-2 px-3 py-2.5 bg-emerald-50 rounded-lg border border-emerald-200">
+                <Shield size={16} className={sello.status === 'CONFIRMADO' ? 'text-emerald-600' : 'text-amber-500'} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-emerald-700">
+                    {sello.tipo === 'GENESIS' ? 'Sello Genesis' : 'Sello de Cierre'}
+                    {sello.status === 'CONFIRMADO' ? ' — Verificado' : sello.status === 'PENDIENTE' ? ' — Pendiente' : ' — Error'}
+                  </p>
+                  {sello.txHash && (
+                    <a
+                      href={`https://sepolia.etherscan.io/tx/${sello.txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-emerald-600 hover:underline font-mono"
+                    >
+                      {sello.txHash.slice(0, 10)}...{sello.txHash.slice(-8)}
+                    </a>
+                  )}
+                </div>
               </div>
-            </div>
+            ))}
+            {/* Legacy fallback: show old blockchain data if no sellos */}
+            {!data.sellosBlockchain?.length && data.blockchainTxHash && (
+              <div className="flex items-center gap-2 px-3 py-2.5 bg-emerald-50 rounded-lg border border-emerald-200">
+                <Shield size={16} className="text-emerald-600" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-emerald-700">Verificado en Blockchain</p>
+                  <a
+                    href={`https://sepolia.etherscan.io/tx/${data.blockchainTxHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-emerald-600 hover:underline font-mono"
+                  >
+                    {data.blockchainTxHash.slice(0, 10)}...{data.blockchainTxHash.slice(-8)}
+                  </a>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

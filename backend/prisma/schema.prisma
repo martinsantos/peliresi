@@ -212,6 +212,7 @@ model Manifiesto {
   blockchainTimestamp   DateTime?
   blockchainStatus      String?
   blockchainRetries     Int       @default(0)
+  rollingHash           String?
   isDemoData      Boolean     @default(false)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
@@ -229,6 +230,7 @@ model Manifiesto {
   notificaciones  Notificacion[]
   alertas         AlertaGenerada[]
   anomalias       AnomaliaTransporte[]
+  sellosBlockchain BlockchainSello[]
 
   @@index([generadorId])
   @@index([transportistaId])
@@ -277,6 +279,7 @@ model EventoManifiesto {
   latitud         Float?
   longitud        Float?
   usuarioId       String
+  integrityHash   String?
   isDemoData      Boolean     @default(false)
   createdAt       DateTime    @default(now())
 
@@ -549,6 +552,28 @@ model AnalyticsLog {
   @@index([userId])
   @@index([path])
   @@map("analytics_logs")
+}
+
+// ========== BLOCKCHAIN SELLOS ==========
+
+model BlockchainSello {
+  id              String    @id @default(cuid())
+  manifiestoId    String
+  tipo            String    // "GENESIS" | "CIERRE"
+  hash            String
+  txHash          String?
+  blockNumber     Int?
+  blockTimestamp  DateTime?
+  status          String    @default("PENDIENTE") // PENDIENTE | CONFIRMADO | ERROR
+  retries         Int       @default(0)
+  createdAt       DateTime  @default(now())
+  manifiesto      Manifiesto @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
+
+  @@index([manifiestoId])
+  @@index([status])
+  @@index([hash])
+  @@unique([manifiestoId, tipo])
+  @@map("blockchain_sellos")
 }
 
 // ========== DEMO ACCESS CONTROL ==========

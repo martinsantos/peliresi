@@ -3,7 +3,12 @@ import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import prisma from '../lib/prisma';
 import { config } from '../config/config';
-import { verificarEnBlockchain, registrarEnBlockchain } from '../services/blockchain.service';
+import {
+  verificarEnBlockchain,
+  registrarEnBlockchain,
+  verificarIntegridad,
+  verificarLote,
+} from '../services/blockchain.service';
 
 /**
  * GET /api/blockchain/manifiesto/:id
@@ -13,16 +18,31 @@ export const getBlockchainStatus = async (req: AuthRequest, res: Response, next:
   try {
     const { id } = req.params;
 
-    const manifiesto = await prisma.manifiesto.findUnique({
-      where: { id },
-      select: {
-        blockchainHash: true,
-        blockchainTxHash: true,
-        blockchainBlockNumber: true,
-        blockchainTimestamp: true,
-        blockchainStatus: true,
-      },
-    });
+    const [manifiesto, sellos] = await Promise.all([
+      prisma.manifiesto.findUnique({
+        where: { id },
+        select: {
+          blockchainHash: true,
+          blockchainTxHash: true,
+          blockchainBlockNumber: true,
+          blockchainTimestamp: true,
+          blockchainStatus: true,
+          rollingHash: true,
+        },
+      }),
+      prisma.blockchainSello.findMany({
+        where: { manifiestoId: id },
+        select: {
+          tipo: true,
+          hash: true,
+          txHash: true,
+          blockNumber: true,
+          blockTimestamp: true,
+          status: true,
+        },
+        orderBy: { tipo: 'asc' },
+      }),
+    ]);
 
     if (!manifiesto) {
       throw new AppError('Manifiesto no encontrado', 404);
@@ -33,6 +53,7 @@ export const getBlockchainStatus = async (req: AuthRequest, res: Response, next:
       data: {
         blockchain: {
           ...manifiesto,
+          sellos,
           enabled: config.BLOCKCHAIN_ENABLED,
           network: 'Ethereum Sepolia',
           contractAddress: config.BLOCKCHAIN_CONTRACT_ADDRESS || null,
@@ -137,7 +158,10 @@ export const getRegistroBlockchain = async (req: AuthRequest, res: Response, nex
     const status = req.query.status as string;
 
     const where: any = {
-      blockchainHash: { not: null },
+      OR: [
+        { blockchainHash: { not: null } },
+        { sellosBlockchain: { some: {} } },
+      ],
     };
     if (status) {
       where.blockchainStatus = status;
@@ -156,6 +180,9 @@ export const getRegistroBlockchain = async (req: AuthRequest, res: Response, nex
           blockchainBlockNumber: true,
           blockchainTimestamp: true,
           blockchainStatus: true,
+          sellosBlockchain: {
+            select: { tipo: true, hash: true, txHash: true, blockNumber: true, blockTimestamp: true, status: true },
+          },
           generador: { select: { razonSocial: true } },
           operador: { select: { razonSocial: true } },
         },
@@ -178,6 +205,44 @@ export const getRegistroBlockchain = async (req: AuthRequest, res: Response, nex
         network: 'Ethereum Sepolia',
       },
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/blockchain/verificar-integridad/:id
+ * Verificacion completa de integridad de un manifiesto.
+ */
+export const getVerificarIntegridad = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const result = await verificarIntegridad(id);
+
+    if (!result) {
+      throw new AppError('Manifiesto no encontrado', 404);
+    }
+
+    res.json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/blockchain/verificar-lote
+ * Verificacion masiva de integridad.
+ */
+export const getVerificarLote = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { fechaDesde, fechaHasta, estado } = req.query;
+    const result = await verificarLote({
+      fechaDesde: fechaDesde as string | undefined,
+      fechaHasta: fechaHasta as string | undefined,
+      estado: estado as string | undefined,
+    });
+
+    res.json({ success: true, data: result });
   } catch (error) {
     next(error);
   }

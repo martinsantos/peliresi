@@ -54,6 +54,7 @@ Permite el seguimiento completo del ciclo de vida de manifiestos: desde la gener
 - ✅ Production API: All systems operational at https://sitrep.ultimamilla.com.ar/api
 
 **Recent Enhancements**:
+- ✅ **Blockchain Integridad Completa (2026-03-20):** 2 sellos blockchain (Genesis + Cierre) + rolling hash chain en cada cambio de estado. Tabla `blockchain_sellos`, endpoints verificar-integridad/verificar-lote, BlockchainPanel rediseñado con 2 sellos, badge ShieldCheck en lista manifiestos, panel verificación masiva en AdminBlockchainPage. 7 manifiestos migrados.
 - ✅ Cross-platform workflow test script: `backend/tests/cross-platform-workflow-test.sh` (59 tests)
 - ✅ Demo credentials aligned: Frontend DEMO_CREDENTIALS + MOCK_USERS match actual seeded DB users
 - ✅ GPS persistence fix: Pending updates no longer create duplicates on app restart
@@ -125,7 +126,7 @@ cd dist-app && tar czf /tmp/sitrep-app.tar.gz . && cd ..
 scp /tmp/sitrep-frontend.tar.gz /tmp/sitrep-app.tar.gz root@23.105.176.45:/tmp/
 
 # 5. Deploy on server
-ssh root@23.105.176.45 "cd /var/www/sitrep && find . -maxdepth 1 ! -name app ! -name . -exec rm -rf {} + && tar xzf /tmp/sitrep-frontend.tar.gz && chmod -R 755 ."
+ssh root@23.105.176.45 "cd /var/www/sitrep && find . -maxdepth 1 ! -name app ! -name manual ! -name . -exec rm -rf {} + && tar xzf /tmp/sitrep-frontend.tar.gz && chmod -R 755 ."
 ssh root@23.105.176.45 "cd /var/www/sitrep/app && rm -rf * && tar xzf /tmp/sitrep-app.tar.gz && chmod -R 755 ."
 ```
 
@@ -155,7 +156,7 @@ cd backend && tar czf /tmp/sitrep-backend.tar.gz dist package.json package-lock.
 scp /tmp/sitrep-frontend.tar.gz /tmp/sitrep-app.tar.gz /tmp/sitrep-backend.tar.gz root@23.105.176.45:/tmp/
 
 # Deploy frontend
-ssh root@23.105.176.45 "cd /var/www/sitrep && find . -maxdepth 1 ! -name app ! -name . -exec rm -rf {} + && tar xzf /tmp/sitrep-frontend.tar.gz && chmod -R 755 ."
+ssh root@23.105.176.45 "cd /var/www/sitrep && find . -maxdepth 1 ! -name app ! -name manual ! -name . -exec rm -rf {} + && tar xzf /tmp/sitrep-frontend.tar.gz && chmod -R 755 ."
 ssh root@23.105.176.45 "cd /var/www/sitrep/app && rm -rf * && tar xzf /tmp/sitrep-app.tar.gz && chmod -R 755 ."
 
 # Deploy backend
@@ -215,6 +216,7 @@ ssh root@23.105.176.45 "docker exec directus-admin-database-1 psql -U directus -
 - **auditorias**: manifiestoId, createdAt
 - **alertas_generadas**: manifiestoId, estado
 - **anomalias_transporte**: manifiestoId
+- **blockchain_sellos**: manifiestoId, status, hash, [manifiestoId+tipo] (unique)
 
 ---
 
@@ -234,6 +236,7 @@ ssh root@23.105.176.45 "docker exec directus-admin-database-1 psql -U directus -
 | `/api/admin/*` | admin.controller | CRUD usuarios (solo ADMIN): listar, crear, editar, eliminar, toggle activo |
 | `/api/pdf/*` | pdf.controller | Generación de PDF de manifiestos y certificados de disposición |
 | `/api/centro-control/*` | tracking.controller | Centro de Control: actividad por capas, mapa, estadísticas |
+| `/api/blockchain/*` | blockchain.controller | Certificación blockchain: status, registrar, verificar hash, registro, verificar-integridad, verificar-lote |
 
 ### Key API Endpoints
 
@@ -273,7 +276,13 @@ POST /api/admin/usuarios              → Crear usuario (Zod validation, hash bc
 PUT  /api/admin/usuarios/:id          → Editar usuario (email, nombre, rol, etc.)
 DEL  /api/admin/usuarios/:id          → Eliminar usuario (verifica sin manifiestos asociados)
 PATCH /api/admin/usuarios/:id/toggle-activo → Toggle campo activo del usuario
-GET  /api/manifiestos/verificar/:numero → Verificación pública de manifiesto por número (sin auth)
+GET  /api/manifiestos/verificar/:numero → Verificación pública de manifiesto por número (sin auth, incluye sellosBlockchain)
+GET  /api/blockchain/manifiesto/:id    → Estado blockchain + sellos GENESIS/CIERRE (auth)
+POST /api/blockchain/registrar/:id     → Registrar manifiesto en blockchain on-demand (auth)
+GET  /api/blockchain/verificar/:hash   → Verificar hash en smart contract (público, sin auth)
+GET  /api/blockchain/registro          → Lista manifiestos con blockchain (ADMIN, paginado, incluye sellos)
+GET  /api/blockchain/verificar-integridad/:id → Verificación completa: genesis + rolling chain + cierre (ADMIN)
+GET  /api/blockchain/verificar-lote    → Verificación masiva de integridad (ADMIN, params: fechaDesde, fechaHasta, estado)
 ```
 
 ### Frontend Filter Mapping
@@ -377,6 +386,66 @@ The GPS tracking system enables real-time position monitoring for up to **50 sim
 - **ADMIN**: Sees all EN_TRANSITO trips
 - **TRANSPORTISTA**: Filtered by `currentUser.sector` (company name match against transportista)
 - **Alertas**: Only queried for ADMIN role (`useAlertas(filters, isAdmin)`)
+
+---
+
+## Blockchain Integrity System (Updated 2026-03-20)
+
+### Architecture: 2 Sellos + Rolling Hash Chain
+
+**Modelo:** En vez de 7 transacciones blockchain (una por estado), el sistema usa un enfoque híbrido:
+- **Rolling hash en DB** en cada cambio de estado (costo: $0, solo UPDATE en Postgres)
+- **2 sellos blockchain** en los momentos legalmente significativos:
+  1. **Genesis (APROBADO):** Sella identidad del manifiesto al momento de la firma legal
+  2. **Cierre (TRATADO):** Sella el rolling hash final que encapsula TODO el ciclo de vida
+
+**Por que funciona:** Cada hash intermedio depende del anterior. Un atacante que modifique CUALQUIER dato intermedio rompe la cadena → el hash de cierre no coincide con blockchain.
+
+### Database: BlockchainSello table
+
+```
+blockchain_sellos (max 2 filas por manifiesto):
+  id, manifiestoId, tipo (GENESIS|CIERRE), hash (SHA-256),
+  txHash, blockNumber, blockTimestamp, status (PENDIENTE|CONFIRMADO|ERROR),
+  retries, createdAt
+  @@unique([manifiestoId, tipo])
+```
+
+Campos adicionales en Manifiesto: `rollingHash` (hash acumulativo actual)
+Campos adicionales en EventoManifiesto: `integrityHash` (snapshot del rollingHash al momento del evento)
+
+### Rolling Hash en workflow (manifiesto.controller.ts)
+
+Cada cambio de estado (7 funciones) computa `computeRollingHash()` dentro del `$transaction` y guarda:
+- `rollingHash` en el manifiesto
+- `integrityHash` en el EventoManifiesto
+
+Sellos blockchain (fire-and-forget via `setImmediate`):
+- `firmarManifiesto`: → `registrarSello(id, 'GENESIS', hashManifiesto(...))`
+- `cerrarManifiesto`: → `registrarSello(id, 'CIERRE', computeClosureHash(...))`
+
+### Hash Functions (blockchain.service.ts)
+
+| Función | Input | Uso |
+|---------|-------|-----|
+| `hashManifiesto()` | numero, CUITs, residuos, fechaFirma | Sello GENESIS |
+| `computeRollingHash()` | previousHash, genesisTs, estado, fecha, eventCount, observaciones | Cada cambio de estado |
+| `computeClosureHash()` | genesisHash, rollingHash, todas las fechas, CUITs, residuos, eventCount | Sello CIERRE |
+
+### Hardening
+
+1. **Binding genesis timestamp:** Rolling hash incluye `blockchainTimestamp` del sello genesis (asignado por miners)
+2. **Event count:** Rolling hash incluye conteo de eventos — borrar un evento rompe la cadena
+3. **Testigos via API:** Cada EventoManifiesto almacena `integrityHash` vigente
+
+### Verificación de Integridad
+
+- `verificarIntegridad(id)`: Recalcula genesis hash + replays rolling chain + verifica cierre → retorna integridad: COMPLETA|PARCIAL|FALLIDA
+- `verificarLote(filtros)`: Verificación masiva, hasta 200 manifiestos, recalcula hashes localmente (rápido)
+
+### Legacy Compatibility
+
+Los campos `blockchainHash`, `blockchainTxHash`, `blockchainBlockNumber`, `blockchainTimestamp`, `blockchainStatus` en Manifiesto se mantienen como cache para el sello GENESIS (backwards compatibility). `procesarPendientes()` maneja tanto legacy como nuevos sellos.
 
 ---
 

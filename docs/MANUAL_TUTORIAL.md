@@ -437,6 +437,21 @@ Alertas automáticas por:
 **Dirección de Gestión y Fiscalización Ambiental**  
 Gobierno de Mendoza
 
+## 4.4 Certificacion Blockchain de Integridad
+
+El sistema utiliza la blockchain de Ethereum (Sepolia) para garantizar inmutabilidad mediante **2 sellos blockchain** + **rolling hash chain**:
+
+- **Sello Genesis (APROBADO):** Certifica la identidad del manifiesto al momento de la firma
+- **Sello de Cierre (TRATADO):** Certifica el ciclo de vida completo (todas las fechas, estados, eventos)
+- **Rolling Hash:** En cada cambio de estado, un hash acumulativo encadena los datos — cualquier modificación rompe la cadena
+
+La verificacion puede realizarse individualmente (panel blockchain en detalle del manifiesto) o masivamente (Admin > Blockchain > Verificar Integridad).
+
+Endpoints asociados:
+- `GET /api/blockchain/manifiesto/:id` — Estado blockchain con sellos
+- `GET /api/blockchain/verificar-integridad/:id` — Verificacion completa (ADMIN)
+- `GET /api/blockchain/verificar-lote` — Verificacion masiva (ADMIN)
+
 ---
 
-*Documento generado automáticamente - Diciembre 2025*
+*Documento generado automáticamente - Marzo 2026*

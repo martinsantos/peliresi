@@ -1043,14 +1043,176 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <section id="mod-blockchain" data-role="all">
 <h3>3.10 Certificacion Blockchain</h3>
 <div class="section-intro">
-SITREP incluye un modulo de certificacion blockchain que permite registrar manifiestos en la red Ethereum como prueba inmutable de integridad. La certificacion genera un hash criptografico (SHA-256) del contenido del manifiesto y lo almacena en un smart contract publico, creando un sello temporal verificable por cualquier persona.
+SITREP implementa un sistema de certificacion blockchain basado en <strong>2 sellos + cadena de hashes acumulativos</strong> que garantiza la integridad de todo el ciclo de vida de un manifiesto, desde su firma legal hasta el cierre por tratamiento. Los sellos se registran en la red Ethereum como prueba inmutable y publica, verificable por cualquier persona sin costo.
 </div>
 
 <div class="info-card">
-<p><strong>Nota:</strong> La certificacion blockchain <strong>no reemplaza</strong> la firma digital regulada por la normativa argentina (ver CU-S10). Es un mecanismo complementario de integridad de datos que garantiza que el contenido del manifiesto no fue alterado despues de su certificacion.</p>
+<p><strong>Nota:</strong> La certificacion blockchain <strong>no reemplaza</strong> la firma digital regulada por la normativa argentina (ver CU-S10). Es un mecanismo complementario de integridad de datos que crea una prueba criptografica de que ningun dato fue alterado despues de su certificacion.</p>
 </div>
 
-<h4 id="blockchain-red">3.10.1 Red y Contrato Inteligente</h4>
+<!-- ── 3.10.1 Modelo de Certificacion ── -->
+<h4 id="blockchain-modelo">3.10.1 Modelo de Certificacion: 2 Sellos + Rolling Hash Chain</h4>
+<p>En lugar de registrar cada cambio de estado en la blockchain (lo cual seria costoso e innecesario), SITREP usa un enfoque hibrido eficiente:</p>
+<ul>
+<li><strong>Rolling hash en base de datos</strong> en cada cambio de estado (costo: $0, solo un UPDATE en PostgreSQL).</li>
+<li><strong>2 sellos blockchain</strong> en los dos momentos legalmente significativos del manifiesto.</li>
+</ul>
+
+<table>
+<thead><tr><th>Sello</th><th>Momento</th><th>Que fija</th></tr></thead>
+<tbody>
+<tr><td><strong>Genesis</strong></td><td>Cuando el manifiesto pasa a APROBADO (firma legal)</td><td>Identidad del manifiesto: numero, actores (CUITs), residuos declarados y fecha de firma</td></tr>
+<tr><td><strong>Cierre</strong></td><td>Cuando el manifiesto pasa a TRATADO (fin del ciclo)</td><td>Todo el ciclo de vida: hash genesis + rolling hash final + todas las fechas + conteo de eventos</td></tr>
+</tbody>
+</table>
+
+<p><strong>Por que funciona:</strong> Cada hash intermedio (rolling hash) depende del anterior, formando una cadena. Si un atacante modificara <em>cualquier</em> dato en <em>cualquier</em> punto intermedio del proceso, la cadena se romperia y el hash de cierre ya no coincidiria con lo registrado en blockchain.</p>
+
+<p>La analogia mas simple: <strong>es como una cadena de eslabones donde cada eslabon contiene al anterior</strong>. Romper un eslabon intermedio rompe todos los siguientes, y el ultimo eslabon (que esta sellado en blockchain) ya no coincide.</p>
+
+<div class="workflow-diagram">
+<div class="wf-step"><div class="wf-number">1</div><div class="wf-step-body"><h4>Firma Legal (APROBADO)</h4><p>Se genera el <strong>hash genesis</strong> con los datos de identidad del manifiesto y se registra en blockchain como <strong>Sello Genesis</strong>.</p></div></div>
+<div class="wf-arrow">&darr;</div>
+<div class="wf-step"><div class="wf-number">2</div><div class="wf-step-body"><h4>Cada Cambio de Estado</h4><p>En cada transicion (EN_TRANSITO, ENTREGADO, RECIBIDO, EN_TRATAMIENTO...) se calcula un <strong>rolling hash</strong> que acumula el hash anterior + datos del nuevo estado. Se guarda en BD (sin blockchain, costo $0).</p></div></div>
+<div class="wf-arrow">&darr;</div>
+<div class="wf-step"><div class="wf-number">3</div><div class="wf-step-body"><h4>Fin del Ciclo (TRATADO)</h4><p>Se genera el <strong>hash de cierre</strong> combinando: hash genesis + rolling hash final + todas las fechas + CUITs + residuos + conteo de eventos. Se registra en blockchain como <strong>Sello de Cierre</strong>.</p></div></div>
+<div class="wf-arrow">&darr;</div>
+<div class="wf-step"><div class="wf-number">4</div><div class="wf-step-body"><h4>Verificacion</h4><p>En cualquier momento, el sistema puede <strong>recalcular toda la cadena</strong> desde cero y comparar contra los hashes en blockchain. Si algun dato fue alterado, la verificacion falla.</p></div></div>
+</div>
+
+<!-- ── 3.10.2 Que Certifica Cada Sello ── -->
+<h4 id="blockchain-sellos">3.10.2 Que Certifica Cada Sello</h4>
+
+<p><strong>Sello Genesis &mdash; la identidad del manifiesto</strong></p>
+<p>El sello genesis se calcula cuando el generador firma el manifiesto (transicion a APROBADO). Fija de manera inmutable <em>quien</em> declara <em>que</em> residuos, con <em>que</em> actores intervienen, y <em>cuando</em> se firmo. Los campos incluidos en el hash son:</p>
+
+<table>
+<thead><tr><th>Campo</th><th>Descripcion</th><th>Por que se incluye</th></tr></thead>
+<tbody>
+<tr><td><code>numero</code></td><td>Numero del manifiesto (ej: 2026-000064)</td><td>Identifica univocamente al manifiesto</td></tr>
+<tr><td><code>generadorCuit</code></td><td>CUIT del generador</td><td>Fija quien genera los residuos</td></tr>
+<tr><td><code>transportistaCuit</code></td><td>CUIT del transportista</td><td>Fija quien los transporta</td></tr>
+<tr><td><code>operadorCuit</code></td><td>CUIT del operador</td><td>Fija quien los trata</td></tr>
+<tr><td><code>residuos</code></td><td>Array ordenado: tipo, cantidad y unidad</td><td>Fija la declaracion de residuos</td></tr>
+<tr><td><code>fechaFirma</code></td><td>Fecha de firma en formato ISO 8601</td><td>Fija el momento de la firma legal</td></tr>
+</tbody>
+</table>
+<p>El resultado es <strong>determinista</strong>: los mismos datos siempre generan el mismo hash SHA-256 de 64 caracteres hexadecimales. Si alguien modificara un CUIT, cambiara una cantidad o alterara la fecha de firma, el hash recalculado seria diferente al registrado en blockchain.</p>
+
+<p><strong>Rolling Hash &mdash; la cadena de integridad</strong></p>
+<p>En cada cambio de estado del workflow (EN_TRANSITO, ENTREGADO, RECIBIDO, EN_TRATAMIENTO), el backend calcula un nuevo hash acumulativo que incluye:</p>
+<ul>
+<li>El <strong>hash anterior</strong> (o el hash genesis si es el primer cambio)</li>
+<li>El <strong>timestamp del sello genesis</strong> en blockchain (asignado por los mineros, no manipulable)</li>
+<li>El <strong>nuevo estado</strong> del manifiesto</li>
+<li>La <strong>fecha del cambio</strong></li>
+<li>El <strong>conteo de eventos</strong> registrados hasta ese momento</li>
+<li>Las <strong>observaciones</strong> del cambio (si las hay)</li>
+</ul>
+<p>Este hash se guarda en la columna <code>rollingHash</code> del manifiesto y como <code>integrityHash</code> en cada evento del timeline. No va a blockchain &mdash; se almacena solo en la base de datos, y es la pieza que conecta el sello genesis con el sello de cierre.</p>
+
+<p><strong>Sello de Cierre &mdash; el ciclo completo</strong></p>
+<p>El sello de cierre se calcula cuando el operador cierra el manifiesto (transicion a TRATADO). Encapsula <em>todo</em> lo que sucedio durante el ciclo de vida:</p>
+<ul>
+<li><strong>Hash genesis</strong> (la identidad del manifiesto)</li>
+<li><strong>Rolling hash final</strong> (la cadena acumulativa de todos los estados)</li>
+<li><strong>Todas las fechas de transicion:</strong> firma, retiro, entrega, recepcion, cierre</li>
+<li><strong>CUITs</strong> de los 3 actores</li>
+<li><strong>Residuos</strong> declarados</li>
+<li><strong>Conteo de eventos</strong> en el timeline</li>
+</ul>
+<p>Este hash se registra en el smart contract como segundo y ultimo sello. A partir de ese momento, <strong>todo el historial del manifiesto queda cristalizado</strong>: si se cambiara cualquier fecha, observacion, o incluso se borrara un evento del timeline, la verificacion fallaria.</p>
+
+<!-- ── 3.10.3 Que Protege ── -->
+<h4 id="blockchain-proteccion">3.10.3 Que Protege: Ataques y Defensas</h4>
+<p>La combinacion de sellos blockchain + rolling hash chain protege contra las siguientes manipulaciones:</p>
+
+<table>
+<thead><tr><th>Ataque</th><th>Ejemplo</th><th>Defensa</th></tr></thead>
+<tbody>
+<tr><td><strong>Datos de identidad modificados</strong></td><td>Cambiar el CUIT del transportista o la cantidad de residuos despues de la firma</td><td>El hash genesis recalculado no coincide con el sello en blockchain</td></tr>
+<tr><td><strong>Fechas alteradas</strong></td><td>Cambiar la fecha de retiro o de entrega para ocultar retrasos</td><td>El rolling hash depende de las fechas; el cierre recalculado no coincide</td></tr>
+<tr><td><strong>Eventos borrados</strong></td><td>Eliminar un incidente del timeline para ocultar un accidente</td><td>El conteo de eventos esta incluido en el rolling hash; la cadena se rompe</td></tr>
+<tr><td><strong>Observaciones cambiadas</strong></td><td>Modificar el texto de una observacion registrada</td><td>Las observaciones se incluyen en el rolling hash; la cadena se rompe</td></tr>
+<tr><td><strong>Estado intermedio eliminado</strong></td><td>Borrar la transicion a EN_TRANSITO para ocultar que hubo transporte</td><td>Cada hash depende del anterior; borrar un eslabon rompe toda la cadena</td></tr>
+<tr><td><strong>Reemplazo total de datos</strong></td><td>Reemplazar todos los datos del manifiesto por otros fabricados</td><td>El sello genesis y el de cierre estan en blockchain; ambos fallarian la verificacion</td></tr>
+</tbody>
+</table>
+
+<!-- ── 3.10.4 Panel de Certificacion ── -->
+<h4 id="blockchain-panel">3.10.4 Panel de Certificacion en Detalle del Manifiesto</h4>
+<p>El componente <code>BlockchainPanel</code> se muestra en la pagina de detalle de cada manifiesto. Presenta hasta <strong>3 elementos</strong>: el sello genesis, el indicador de cadena de integridad, y el sello de cierre.</p>
+
+<div class="cu-screenshot-duo">
+<div class="cu-screenshot">
+<a href="screenshots/desktop/68_blockchain_panel_genesis.png" target="_blank">
+<img src="screenshots/desktop/68_blockchain_panel_genesis.png" alt="BlockchainPanel con sello genesis confirmado - vista desktop" loading="lazy">
+</a>
+<div class="cu-screenshot-caption">Panel de certificacion blockchain mostrando sello genesis verificado</div>
+</div>
+<div class="cu-screenshot-mobile">
+<a href="screenshots/mobile/M26_blockchain_panel_genesis_mobile.png" target="_blank">
+<img src="screenshots/mobile/M26_blockchain_panel_genesis_mobile.png" alt="BlockchainPanel con sello genesis - vista mobile" loading="lazy">
+</a>
+<div class="cu-screenshot-mobile-caption">Vista mobile del panel blockchain</div>
+</div>
+</div>
+
+<p>El panel muestra los siguientes estados visuales:</p>
+<table>
+<thead><tr><th>Estado</th><th>Visual</th><th>Comportamiento</th></tr></thead>
+<tbody>
+<tr><td><strong>No certificado</strong></td><td>Borde punteado verde, icono escudo, boton &ldquo;Certificar en Blockchain&rdquo;</td><td>Solo visible si el manifiesto no es BORRADOR ni CANCELADO. Al hacer clic inicia el registro.</td></tr>
+<tr><td><strong>PENDIENTE</strong></td><td>Fondo ambar, spinner animado</td><td>Muestra TX Hash como link a Etherscan. Auto-refresh.</td></tr>
+<tr><td><strong>ERROR</strong></td><td>Fondo rojo, icono alerta, boton &ldquo;Reintentar&rdquo;</td><td>Permite reintentar manualmente el registro.</td></tr>
+<tr><td><strong>1 sello CONFIRMADO</strong></td><td>Banner verde gradiente, sello genesis con SHA-256, TX, bloque</td><td>Debajo: leyenda explicativa + indicador &ldquo;CADENA DE INTEGRIDAD &middot; CHAIN ACTIVA&rdquo;</td></tr>
+<tr><td><strong>2 sellos CONFIRMADOS</strong></td><td>Banner verde, sello genesis + cadena + sello de cierre</td><td>Integridad completa: todo el ciclo de vida esta cristalizado en blockchain</td></tr>
+</tbody>
+</table>
+
+<p><strong>Indicador &ldquo;CADENA DE INTEGRIDAD &middot; CHAIN ACTIVA&rdquo;:</strong> Aparece entre el sello genesis y el de cierre. Indica que el rolling hash esta activo y que cada cambio de estado del manifiesto se esta encadenando criptograficamente. Incluye una leyenda explicativa que describe como funciona la cadena.</p>
+<p><strong>Leyendas explicativas:</strong> Debajo de cada sello confirmado se muestra un texto en gris que explica al usuario exactamente que datos estan siendo certificados y protegidos por ese sello.</p>
+
+<!-- ── 3.10.5 Registro de Certificaciones ── -->
+<h4 id="blockchain-registro">3.10.5 Registro de Certificaciones (<code>/admin/blockchain</code>)</h4>
+<p>Pagina exclusiva para el rol ADMIN que lista todas las certificaciones blockchain del sistema.</p>
+
+<div class="cu-screenshot-duo">
+<div class="cu-screenshot">
+<a href="screenshots/desktop/69_blockchain_admin_registro.png" target="_blank">
+<img src="screenshots/desktop/69_blockchain_admin_registro.png" alt="Pagina admin de certificacion blockchain - desktop" loading="lazy">
+</a>
+<div class="cu-screenshot-caption">Registro de certificaciones blockchain (vista admin desktop)</div>
+</div>
+<div class="cu-screenshot-mobile">
+<a href="screenshots/mobile/M27_blockchain_admin_registro_mobile.png" target="_blank">
+<img src="screenshots/mobile/M27_blockchain_admin_registro_mobile.png" alt="Pagina admin de certificacion blockchain - mobile" loading="lazy">
+</a>
+<div class="cu-screenshot-mobile-caption">Vista mobile admin blockchain</div>
+</div>
+</div>
+
+<ul>
+<li><strong>Tabla paginada</strong> con 15 registros por pagina.</li>
+<li><strong>Columnas:</strong> Manifiesto #, Generador, Sellos (Genesis / Cierre con estado), Hash, TX Hash (link a Etherscan), Bloque, Fecha.</li>
+<li><strong>Filtros por pestanas:</strong> Todos, Confirmados, Pendientes, Con Error.</li>
+<li><strong>Boton &ldquo;Ver Contrato&rdquo;:</strong> Link directo a la direccion del contrato en Etherscan.</li>
+<li><strong>Boton &ldquo;Verificar Integridad&rdquo;:</strong> Recalcula la cadena de hashes y verifica contra blockchain. Resultado: COMPLETA, PARCIAL o FALLIDA.</li>
+<li><strong>Verificacion masiva:</strong> Permite verificar multiples manifiestos a la vez filtrando por fecha y estado (hasta 200 por lote).</li>
+<li>Cada fila es clickeable y navega al detalle del manifiesto.</li>
+</ul>
+
+<!-- ── 3.10.6 Verificacion Publica ── -->
+<h4 id="blockchain-verificacion">3.10.6 Verificacion Publica</h4>
+<p>La pagina de verificacion publica (<code>/verificar/:numero</code>) muestra los sellos blockchain cuando el manifiesto tiene certificacion. El endpoint <code>GET /api/blockchain/verificar/:hash</code> permite verificar un hash SHA-256 contra el smart contract sin autenticacion ni costo de gas.</p>
+<p>Cualquier persona que conozca el numero de manifiesto puede verificar en la pagina publica que los sellos genesis y de cierre coinciden con lo registrado en la blockchain de Ethereum, garantizando que los datos no fueron manipulados.</p>
+
+<!-- ── 3.10.7 Sello en PDFs ── -->
+<h4 id="blockchain-pdf">3.10.7 Sello Blockchain en PDFs</h4>
+<p>Cuando un manifiesto tiene certificacion blockchain CONFIRMADA, los PDFs (manifiesto y certificado de disposicion final) incluyen un sello verde con el hash SHA-256, TX Hash y link a Etherscan. Si el manifiesto tiene ambos sellos (genesis + cierre), el PDF refleja la integridad completa del ciclo.</p>
+
+<!-- ── 3.10.8 Red y Contrato Inteligente ── -->
+<h4 id="blockchain-red">3.10.8 Red y Contrato Inteligente</h4>
 <p>El sistema opera sobre <strong>Ethereum Sepolia</strong>, una red de prueba (testnet) publica y gratuita que es identica en funcionamiento a la red principal de Ethereum (mainnet). La testnet permite validar completamente la tecnologia sin incurrir en costos de gas reales.</p>
 
 <table>
@@ -1071,70 +1233,9 @@ SITREP incluye un modulo de certificacion blockchain que permite registrar manif
 <tr><td><code>verificar(hash)</code></td><td>Publico (lectura gratuita)</td><td>Retorna <code>(exists, timestamp)</code>. No consume gas.</td></tr>
 </tbody>
 </table>
+
 <p>El patron <code>onlyOwner</code> asegura que solo la wallet del sistema pueda escribir en el contrato, mientras que cualquier persona puede verificar hashes sin costo.</p>
-
-<h4 id="blockchain-proceso">3.10.2 Proceso de Certificacion</h4>
-<p>La certificacion es <strong>bajo demanda</strong>: el usuario hace clic en &ldquo;Certificar en Blockchain&rdquo; desde la pagina de detalle del manifiesto. No es automatica.</p>
-<p><strong>Prerequisito:</strong> El manifiesto debe estar en estado APROBADO o posterior. No se pueden certificar manifiestos en estado BORRADOR ni CANCELADO.</p>
-
-<div class="workflow-diagram">
-<div class="wf-step"><div class="wf-number">1</div><div class="wf-step-body"><h4>Solicitud</h4><p>Usuario hace clic en &ldquo;Certificar en Blockchain&rdquo; → <code>POST /api/blockchain/registrar/:id</code></p></div></div>
-<div class="wf-arrow">&darr;</div>
-<div class="wf-step"><div class="wf-number">2</div><div class="wf-step-body"><h4>Hash</h4><p>Backend genera hash SHA-256 del JSON canonico del manifiesto. Estado → <strong>PENDIENTE</strong></p></div></div>
-<div class="wf-arrow">&darr;</div>
-<div class="wf-step"><div class="wf-number">3</div><div class="wf-step-body"><h4>Transaccion</h4><p>Envia TX al smart contract <code>registrar(hash)</code>. Guarda <code>txHash</code> en BD.</p></div></div>
-<div class="wf-arrow">&darr;</div>
-<div class="wf-step"><div class="wf-number">4</div><div class="wf-step-body"><h4>Confirmacion</h4><p>Espera 1 confirmacion de la red. Estado → <strong>CONFIRMADO</strong> (guarda bloque + timestamp).</p></div></div>
-</div>
-
-<p><strong>Cron de reintentos:</strong> Un job automatico se ejecuta cada 60 segundos y procesa registros en estado PENDIENTE o ERROR. Maximo 3 reintentos por manifiesto. Solo corre en la instancia PM2 0 para evitar duplicacion en modo cluster.</p>
-
-<h4 id="blockchain-hash">3.10.3 Datos Certificados (Hash Canonico)</h4>
-<p>El hash SHA-256 se calcula sobre un JSON canonico con los siguientes campos, siempre en el mismo orden:</p>
-<table>
-<thead><tr><th>Campo</th><th>Descripcion</th></tr></thead>
-<tbody>
-<tr><td><code>numero</code></td><td>Numero del manifiesto (ej: 2026-000147)</td></tr>
-<tr><td><code>generadorId</code></td><td>ID del generador</td></tr>
-<tr><td><code>generadorCuit</code></td><td>CUIT del generador</td></tr>
-<tr><td><code>transportistaId</code></td><td>ID del transportista</td></tr>
-<tr><td><code>transportistaCuit</code></td><td>CUIT del transportista</td></tr>
-<tr><td><code>operadorId</code></td><td>ID del operador</td></tr>
-<tr><td><code>operadorCuit</code></td><td>CUIT del operador</td></tr>
-<tr><td><code>residuos</code></td><td>Array de residuos (sorted por tipoResiduoId): tipoResiduoId, cantidad, unidad</td></tr>
-<tr><td><code>fechaFirma</code></td><td>Fecha de firma en formato ISO 8601</td></tr>
-</tbody>
-</table>
-<p>Los residuos se ordenan alfabeticamente por <code>tipoResiduoId</code>. El resultado es <strong>determinista</strong>: los mismos datos siempre generan el mismo hash SHA-256 de 64 caracteres hexadecimales.</p>
-
-<h4 id="blockchain-panel">3.10.4 Panel de Certificacion en Detalle del Manifiesto</h4>
-<p>El componente <code>BlockchainPanel</code> se muestra en la pagina de detalle de cada manifiesto y presenta cuatro estados visuales:</p>
-
-<table>
-<thead><tr><th>Estado</th><th>Visual</th><th>Comportamiento</th></tr></thead>
-<tbody>
-<tr><td><strong>No certificado</strong></td><td>Borde punteado verde, icono escudo, boton &ldquo;Certificar en Blockchain&rdquo;</td><td>Solo visible si el manifiesto no es BORRADOR ni CANCELADO. Al hacer clic inicia el registro.</td></tr>
-<tr><td><strong>PENDIENTE</strong></td><td>Fondo ambar, spinner animado, texto &ldquo;Esperando confirmacion&rdquo;</td><td>Muestra TX Hash como link a Etherscan. Auto-refresh cada 10 segundos.</td></tr>
-<tr><td><strong>ERROR</strong></td><td>Fondo rojo, icono alerta, boton &ldquo;Reintentar&rdquo;</td><td>Permite reintentar manualmente el registro.</td></tr>
-<tr><td><strong>CONFIRMADO</strong></td><td>Banner verde gradiente, escudo verificado, barra SHA-256</td><td>Detalles expandibles: TX Hash (link Etherscan), bloque, timestamp, contrato. Boton copiar hash.</td></tr>
-</tbody>
-</table>
-
-<h4 id="blockchain-registro">3.10.5 Registro de Certificaciones (<code>/admin/blockchain</code>)</h4>
-<p>Pagina exclusiva para el rol ADMIN que lista todas las certificaciones blockchain del sistema.</p>
-<ul>
-<li><strong>Tabla paginada</strong> con 15 registros por pagina.</li>
-<li><strong>Columnas:</strong> Manifiesto #, Generador, Estado blockchain, Hash SHA-256, TX Hash (link a Etherscan), Bloque, Fecha de registro.</li>
-<li><strong>Filtros por pestanas:</strong> Todos, Confirmados, Pendientes, Con Error.</li>
-<li><strong>Boton &ldquo;Ver Contrato&rdquo;:</strong> Link directo a la direccion del contrato en Etherscan.</li>
-<li>Cada fila es clickeable y navega al detalle del manifiesto.</li>
-</ul>
-
-<h4 id="blockchain-verificacion">3.10.6 Verificacion Publica</h4>
-<p>La pagina de verificacion publica (<code>/verificar/:numero</code>) muestra un badge de blockchain cuando el manifiesto tiene estado CONFIRMADO. El endpoint <code>GET /api/blockchain/verificar/:hash</code> permite verificar un hash SHA-256 contra el smart contract sin autenticacion.</p>
-
-<h4 id="blockchain-pdf">3.10.7 Sello Blockchain en PDFs</h4>
-<p>Cuando un manifiesto tiene certificacion blockchain CONFIRMADA, los PDFs (manifiesto y certificado de disposicion final) incluyen un sello verde con el hash SHA-256, TX Hash y link a Etherscan.</p>
+<p><strong>Cron de reintentos:</strong> Un job automatico se ejecuta cada 60 segundos y procesa sellos en estado PENDIENTE o ERROR. Maximo 3 reintentos por sello. Solo corre en la instancia PM2 0 para evitar duplicacion en modo cluster.</p>
 </section>
 
 <section id="mod-estadisticas" data-role="admin">

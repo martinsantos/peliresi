@@ -6,6 +6,7 @@ import {
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useBlockchainStatus } from '../hooks/useBlockchain';
 import { manifiestoService } from '../services/manifiesto.service';
+import type { BlockchainSello } from '../types/models';
 
 const ETHERSCAN_BASE = 'https://sepolia.etherscan.io';
 
@@ -28,6 +29,74 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+function SelloCard({ sello, label }: { sello: BlockchainSello; label: string }) {
+  if (sello.status === 'PENDIENTE') {
+    return (
+      <div className="px-4 py-3 bg-amber-50/60 rounded-xl border border-amber-200/50">
+        <div className="flex items-center gap-2 mb-1">
+          <Loader2 size={14} className="text-amber-500 animate-spin" />
+          <span className="text-xs font-semibold text-amber-800">{label}</span>
+          <span className="ml-auto text-[10px] text-amber-500 font-medium px-1.5 py-0.5 bg-amber-100 rounded-full">Pendiente</span>
+        </div>
+        {sello.txHash && (
+          <a href={`${ETHERSCAN_BASE}/tx/${sello.txHash}`} target="_blank" rel="noopener noreferrer"
+            className="font-mono text-[11px] text-amber-600 hover:underline">
+            Tx: {truncateHash(sello.txHash, 6)} <ExternalLink size={10} className="inline" />
+          </a>
+        )}
+      </div>
+    );
+  }
+
+  if (sello.status === 'ERROR') {
+    return (
+      <div className="px-4 py-3 bg-red-50/60 rounded-xl border border-red-200/50">
+        <div className="flex items-center gap-2">
+          <AlertTriangle size={14} className="text-red-500" />
+          <span className="text-xs font-semibold text-red-800">{label}</span>
+          <span className="ml-auto text-[10px] text-red-500 font-medium px-1.5 py-0.5 bg-red-100 rounded-full">Error</span>
+        </div>
+      </div>
+    );
+  }
+
+  // CONFIRMADO
+  return (
+    <div className="px-4 py-3 bg-emerald-50/40 rounded-xl border border-emerald-200/50">
+      <div className="flex items-center gap-2 mb-2">
+        <ShieldCheck size={14} className="text-emerald-600" />
+        <span className="text-xs font-semibold text-emerald-900">{label}</span>
+        <span className="ml-auto text-[10px] text-emerald-600 font-medium px-1.5 py-0.5 bg-emerald-100 rounded-full">Verificado</span>
+      </div>
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-neutral-400 uppercase tracking-wider shrink-0 w-12">SHA-256</span>
+          <code className="font-mono text-[11px] text-neutral-700 truncate">{truncateHash(sello.hash, 8)}</code>
+          <CopyButton text={sello.hash} />
+        </div>
+        {sello.txHash && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-neutral-400 uppercase tracking-wider shrink-0 w-12">Tx</span>
+            <a href={`${ETHERSCAN_BASE}/tx/${sello.txHash}`} target="_blank" rel="noopener noreferrer"
+              className="font-mono text-[11px] text-emerald-600 hover:underline truncate">
+              {truncateHash(sello.txHash, 6)}
+            </a>
+            <ExternalLink size={10} className="text-neutral-400 shrink-0" />
+          </div>
+        )}
+        <div className="flex items-center gap-3 text-[11px] text-neutral-500">
+          {sello.blockNumber != null && (
+            <span>Bloque: <span className="font-mono text-neutral-700">{sello.blockNumber.toLocaleString()}</span></span>
+          )}
+          {sello.blockTimestamp && (
+            <span>{new Date(sello.blockTimestamp).toLocaleString('es-AR')}</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface BlockchainPanelProps {
   manifiestoId: string;
   manifiestoEstado: string;
@@ -47,23 +116,20 @@ export default function BlockchainPanel({ manifiestoId, manifiestoEstado, blockc
     },
   });
 
+  const sellos: BlockchainSello[] = data?.sellos || [];
+  const genesisSello = sellos.find(s => s.tipo === 'GENESIS');
+  const cierreSello = sellos.find(s => s.tipo === 'CIERRE');
   const status = data?.blockchainStatus || initialStatus;
-  const canCertify = !status && !isLoading && manifiestoEstado !== 'BORRADOR' && manifiestoEstado !== 'CANCELADO';
+  const canCertify = !status && !genesisSello && !isLoading && manifiestoEstado !== 'BORRADOR' && manifiestoEstado !== 'CANCELADO';
 
-  // While loading, show nothing (prevents flash of "Certificar" button)
-  if (isLoading && !status) return null;
+  // While loading, show nothing
+  if (isLoading && !status && sellos.length === 0) return null;
 
   // If no status and can't certify, don't show
-  if (!status && !canCertify) return null;
-
-  const hash = data?.blockchainHash;
-  const txHash = data?.blockchainTxHash;
-  const blockNumber = data?.blockchainBlockNumber;
-  const timestamp = data?.blockchainTimestamp;
-  const contractAddress = data?.contractAddress;
+  if (!status && !canCertify && sellos.length === 0) return null;
 
   // --- NOT CERTIFIED YET: Show CTA button ---
-  if (!status && canCertify) {
+  if (!genesisSello && canCertify) {
     return (
       <div className="rounded-2xl border-2 border-dashed border-emerald-300 bg-emerald-50/50 p-5 text-center">
         <Shield size={32} className="mx-auto text-emerald-400 mb-2" />
@@ -89,136 +155,128 @@ export default function BlockchainPanel({ manifiestoId, manifiestoEstado, blockc
     );
   }
 
-  // --- PENDING ---
-  if (status === 'PENDIENTE') {
-    return (
-      <div className="rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 p-5">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
-            <Loader2 size={22} className="text-amber-600 animate-spin" />
-          </div>
-          <div>
-            <p className="text-sm font-bold text-amber-900">Registrando en Blockchain</p>
-            <p className="text-xs text-amber-600">Esperando confirmacion de la red Ethereum...</p>
-          </div>
-        </div>
-        {txHash && (
-          <div className="mt-2 px-3 py-2 bg-white/60 rounded-lg">
-            <p className="text-[10px] text-amber-500 mb-0.5">TX Hash</p>
-            <a href={`${ETHERSCAN_BASE}/tx/${txHash}`} target="_blank" rel="noopener noreferrer"
-              className="font-mono text-xs text-amber-700 hover:underline">
-              {truncateHash(txHash)} <ExternalLink size={10} className="inline" />
-            </a>
-          </div>
-        )}
-      </div>
-    );
-  }
+  // Count confirmed sellos for header
+  const confirmedCount = sellos.filter(s => s.status === 'CONFIRMADO').length;
+  const hasPending = sellos.some(s => s.status === 'PENDIENTE');
+  const hasError = sellos.some(s => s.status === 'ERROR');
 
-  // --- ERROR ---
-  if (status === 'ERROR') {
-    return (
-      <div className="rounded-2xl bg-gradient-to-br from-red-50 to-rose-50 border border-red-200 p-5">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
-            <AlertTriangle size={22} className="text-red-500" />
-          </div>
-          <div>
-            <p className="text-sm font-bold text-red-900">Error de Registro</p>
-            <p className="text-xs text-red-600">No se pudo registrar en blockchain</p>
-          </div>
-        </div>
-        <button
-          onClick={() => registrarMutation.mutate()}
-          disabled={registrarMutation.isPending}
-          className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-xs font-medium transition-colors"
-        >
-          {registrarMutation.isPending ? <Loader2 size={12} className="animate-spin" /> : <Link2 size={12} />}
-          Reintentar
-        </button>
-      </div>
-    );
-  }
-
-  // --- CONFIRMED: The main visual ---
+  // --- MAIN PANEL: 2 sellos + chain ---
   return (
     <div className="rounded-2xl overflow-hidden shadow-lg shadow-emerald-100">
-      {/* Header banner with gradient */}
-      <div className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 px-5 py-4">
+      {/* Header banner */}
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 px-5 py-4 text-left"
+      >
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center ring-2 ring-white/30">
-            <ShieldCheck size={28} className="text-white drop-shadow" />
-          </div>
-          <div>
-            <p className="text-white font-bold text-base tracking-tight">Verificado en Blockchain</p>
-            <p className="text-emerald-100 text-xs">Ethereum Sepolia &middot; Inmutable</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Hash highlight bar */}
-      <div className="bg-emerald-800 px-5 py-2.5 flex items-center gap-2">
-        <span className="text-[10px] text-emerald-300 uppercase tracking-wider font-semibold shrink-0">SHA-256</span>
-        <code className="font-mono text-xs text-emerald-100 truncate flex-1">{hash ? truncateHash(hash, 10) : '...'}</code>
-        {hash && <CopyButton text={hash} />}
-      </div>
-
-      {/* Technical details */}
-      <div className="bg-white border border-emerald-100 border-t-0">
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="w-full flex items-center justify-between px-5 py-2.5 text-xs text-emerald-700 hover:bg-emerald-50/50 transition-colors"
-        >
-          <span className="font-medium">{expanded ? 'Ocultar detalles' : 'Ver detalles tecnicos'}</span>
-          {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </button>
-
-        {expanded && !isLoading && (
-          <div className="px-5 pb-4 space-y-3 border-t border-emerald-50">
-            {txHash && (
-              <div className="pt-3">
-                <p className="text-[10px] text-neutral-400 uppercase tracking-wider mb-1">Transaccion</p>
-                <div className="flex items-center gap-1.5">
-                  <a href={`${ETHERSCAN_BASE}/tx/${txHash}`} target="_blank" rel="noopener noreferrer"
-                    className="font-mono text-xs text-emerald-600 hover:underline">
-                    {truncateHash(txHash)}
-                  </a>
-                  <ExternalLink size={11} className="text-neutral-400" />
-                </div>
-              </div>
+          <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center ring-2 ring-white/30">
+            {hasPending ? (
+              <Loader2 size={22} className="text-white animate-spin" />
+            ) : hasError ? (
+              <AlertTriangle size={22} className="text-white" />
+            ) : (
+              <ShieldCheck size={22} className="text-white drop-shadow" />
             )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-white font-bold text-sm tracking-tight">
+              {confirmedCount > 0 ? 'Certificacion Blockchain' : 'Blockchain'}
+            </p>
+            <p className="text-emerald-100 text-xs">
+              Ethereum Sepolia
+              {confirmedCount > 0 && ` \u00b7 ${confirmedCount} sello${confirmedCount > 1 ? 's' : ''} verificado${confirmedCount > 1 ? 's' : ''}`}
+            </p>
+          </div>
+          {expanded ? <ChevronUp size={16} className="text-white/70" /> : <ChevronDown size={16} className="text-white/70" />}
+        </div>
+      </button>
 
-            <div className="grid grid-cols-2 gap-3">
-              {blockNumber != null && (
-                <div>
-                  <p className="text-[10px] text-neutral-400 uppercase tracking-wider mb-0.5">Bloque</p>
-                  <p className="font-mono text-xs text-neutral-800">{blockNumber.toLocaleString()}</p>
-                </div>
+      {expanded && (
+        <div className="bg-white border border-emerald-100 border-t-0 p-4 space-y-3">
+          {/* Genesis sello */}
+          {genesisSello ? (
+            <>
+              <SelloCard sello={genesisSello} label="Sello Genesis (APROBADO)" />
+              {genesisSello.status === 'CONFIRMADO' && (
+                <p className="text-xs text-neutral-500 leading-relaxed px-4 -mt-1">
+                  Este sello certifica la identidad del manifiesto al momento de su firma legal: numero, CUIT del generador,
+                  transportista y operador, residuos declarados y fecha de firma. Cualquier modificacion posterior a estos datos
+                  seria detectable.
+                </p>
               )}
-              {timestamp && (
-                <div>
-                  <p className="text-[10px] text-neutral-400 uppercase tracking-wider mb-0.5">Timestamp</p>
-                  <p className="text-xs text-neutral-800">{new Date(timestamp).toLocaleString('es-AR')}</p>
-                </div>
-              )}
+            </>
+          ) : status === 'PENDIENTE' ? (
+            <div className="px-4 py-3 bg-amber-50/60 rounded-xl border border-amber-200/50">
+              <div className="flex items-center gap-2">
+                <Loader2 size={14} className="text-amber-500 animate-spin" />
+                <span className="text-xs font-semibold text-amber-800">Registrando sello genesis...</span>
+              </div>
             </div>
+          ) : status === 'ERROR' ? (
+            <div className="px-4 py-3 bg-red-50/60 rounded-xl border border-red-200/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle size={14} className="text-red-500" />
+                  <span className="text-xs font-semibold text-red-800">Error en registro</span>
+                </div>
+                <button
+                  onClick={() => registrarMutation.mutate()}
+                  disabled={registrarMutation.isPending}
+                  className="text-[11px] text-red-600 hover:text-red-800 font-medium"
+                >
+                  {registrarMutation.isPending ? 'Reintentando...' : 'Reintentar'}
+                </button>
+              </div>
+            </div>
+          ) : null}
 
-            {contractAddress && (
-              <div>
-                <p className="text-[10px] text-neutral-400 uppercase tracking-wider mb-0.5">Contrato</p>
-                <a href={`${ETHERSCAN_BASE}/address/${contractAddress}`} target="_blank" rel="noopener noreferrer"
-                  className="font-mono text-xs text-emerald-600 hover:underline">
-                  {truncateHash(contractAddress)}
+          {/* Chain indicator */}
+          {genesisSello && genesisSello.status === 'CONFIRMADO' && (
+            <div className="px-4 py-2 space-y-1.5">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 border-t border-dashed border-emerald-300" />
+                <span className="text-[10px] text-emerald-500 font-medium uppercase tracking-wider shrink-0">
+                  cadena de integridad
+                  {data?.rollingHash && ' \u00b7 chain activa'}
+                </span>
+                <div className="flex-1 border-t border-dashed border-emerald-300" />
+              </div>
+              <p className="text-xs text-neutral-500 leading-relaxed">
+                En cada cambio de estado se calcula un hash acumulativo que encadena todos los datos anteriores.
+                Si alguien modificara cualquier dato intermedio, la cadena se romperia y el sello de cierre no
+                coincidiria con blockchain.
+              </p>
+            </div>
+          )}
+
+          {/* Cierre sello */}
+          {cierreSello && (
+            <>
+              <SelloCard sello={cierreSello} label="Sello de Cierre (TRATADO)" />
+              {cierreSello.status === 'CONFIRMADO' && (
+                <p className="text-xs text-neutral-500 leading-relaxed px-4 -mt-1">
+                  Este sello certifica el ciclo de vida completo del manifiesto: todas las fechas de transicion
+                  (retiro, entrega, recepcion, cierre), estados intermedios, eventos registrados y observaciones.
+                  Garantiza que ningun dato fue alterado durante todo el proceso.
+                </p>
+              )}
+            </>
+          )}
+
+          {/* Contract info */}
+          {data?.contractAddress && (
+            <div className="pt-2 border-t border-neutral-100 px-1">
+              <div className="flex items-center justify-between text-[10px] text-neutral-400">
+                <span>Red: Ethereum Sepolia (Testnet)</span>
+                <a href={`${ETHERSCAN_BASE}/address/${data.contractAddress}`} target="_blank" rel="noopener noreferrer"
+                  className="text-emerald-500 hover:underline">
+                  Contrato: {truncateHash(data.contractAddress, 4)}
                 </a>
               </div>
-            )}
-
-            <div className="pt-2 border-t border-neutral-100">
-              <p className="text-[10px] text-neutral-400">Red: Ethereum Sepolia (Testnet)</p>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

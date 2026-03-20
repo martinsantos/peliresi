@@ -416,14 +416,18 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       }
 
-      // Find current open collapsible header above threshold
-      for (var j = 0; j < collapsibles.length; j++) {
-        var c = collapsibles[j];
-        if (!c.classList.contains('open')) continue;
-        var cTop = c.getBoundingClientRect().top;
-        if (cTop <= threshold) {
-          newCU = c.textContent.trim();
-          newCUEl = c;
+      // Find current open collapsible header above threshold — scoped to current section only
+      var currentSection = newH3El ? newH3El.closest('section') : (newH2El ? newH2El.closest('section') : null);
+      if (currentSection) {
+        var sectionCollapsibles = currentSection.querySelectorAll('.collapsible-header');
+        for (var j = 0; j < sectionCollapsibles.length; j++) {
+          var c = sectionCollapsibles[j];
+          if (!c.classList.contains('open')) continue;
+          var cTop = c.getBoundingClientRect().top;
+          if (cTop <= threshold) {
+            newCU = c.textContent.trim();
+            newCUEl = c;
+          }
         }
       }
 

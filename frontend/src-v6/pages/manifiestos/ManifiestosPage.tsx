@@ -8,6 +8,7 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   FileText, Search, Filter, Plus, Eye, Edit, Trash2, Loader2, AlertTriangle, ChevronDown, X, ArrowUpDown, ArrowUp, ArrowDown,
+  ShieldCheck,
 } from 'lucide-react';
 import { Card } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -83,6 +84,7 @@ const ManifiestosPage: React.FC = () => {
         fecha: m.createdAt,
         peso: Array.isArray(m.residuos) ? m.residuos.reduce((acc: number, r: any) => acc + (typeof r.cantidad === 'number' ? r.cantidad : 0), 0) : 0,
         unidad: Array.isArray(m.residuos) && m.residuos.length > 0 ? m.residuos[0]?.unidad || 'kg' : 'kg',
+        blockchainStatus: m.blockchainStatus || null,
       }));
     }
     return [];
@@ -255,6 +257,15 @@ const ManifiestosPage: React.FC = () => {
                         <span className="font-mono font-semibold text-neutral-900 group-hover:text-primary-600 transition-colors">
                           {m.numero}
                         </span>
+                        {m.blockchainStatus === 'CONFIRMADO' && (
+                          <span title="Verificado en blockchain"><ShieldCheck size={14} className="text-emerald-500 shrink-0" /></span>
+                        )}
+                        {m.blockchainStatus === 'PENDIENTE' && (
+                          <span title="Registro blockchain pendiente"><ShieldCheck size={14} className="text-amber-400 animate-pulse shrink-0" /></span>
+                        )}
+                        {m.blockchainStatus === 'ERROR' && (
+                          <span title="Error en registro blockchain"><ShieldCheck size={14} className="text-red-400 shrink-0" /></span>
+                        )}
                       </div>
                     </td>
                     <td className="px-3 py-2.5 text-neutral-700 truncate">{m.generadorNombre}</td>
