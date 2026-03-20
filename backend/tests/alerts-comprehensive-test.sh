@@ -13,7 +13,7 @@ ADMIN_PASS="admin123"
 TRANSPORTISTA_EMAIL="transportes.andes@logistica.com"
 TRANSPORTISTA_PASS="trans123"
 OPERADOR_EMAIL="tratamiento.residuos@planta.com"
-OPERADOR_PASS="oper123"
+OPERADOR_PASS="op123"
 GENERADOR_EMAIL="quimica.mendoza@industria.com"
 GENERADOR_PASS="gen123"
 
