@@ -142,7 +142,7 @@ export const MainLayout: React.FC = () => {
       items.push({ path: '/admin/actores/transportistas', icon: Truck,        label: 'Admin Transporte' });
       items.push({ path: '/admin/residuos',               icon: FlaskConical, label: 'Catálogo Residuos' });
       items.push({ path: '/admin/tratamientos',           icon: BarChart3,    label: 'Tratamientos' });
-      items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Registro Blockchain' });
+      items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
       items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
       items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
     } else if (isAdminGenerador) {

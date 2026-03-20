@@ -1,15 +1,32 @@
 # Estado de Implementación - Casos de Uso
 
-## 🎯 Resumen Ejecutivo - ACTUALIZADO
+## 🎯 Resumen Ejecutivo - ACTUALIZADO (v2026.3 — Marzo 2026)
 
 | Módulo | Total CU | Completos | Parciales | Pendientes |
 |--------|----------|-----------|-----------|------------|
-| **Administrador** | 15 | 14 (93%) | 1 (7%) | 0 |
+| **Administrador** | 20 | 19 (95%) | 1 (5%) | 0 |
 | **Generador** | 12 | 12 (100%) | 0 | 0 |
-| **Transportista** | 11 | 11 (100%) | 0 | 0 |
+| **Transportista** | 12 | 12 (100%) | 0 | 0 |
 | **Operador** | 12 | 12 (100%) | 0 | 0 |
-| **Sistema** | 11 | 8 (73%) | 0 | 3 (27%) |
-| **TOTAL** | **61** | **57 (93%)** | **1 (2%)** | **3 (5%)** |
+| **Sistema** | 12 | 9 (75%) | 0 | 3 (25%) |
+| **TOTAL** | **68** | **64 (94%)** | **1 (1%)** | **3 (4%)** |
+
+### Nuevos CU (v2026.2)
+
+| ID | Nombre | Estado |
+|----|--------|--------|
+| CU-A16 | Impersonar Usuario (Acceso Comodín) | ✅ Completo |
+| CU-A17 | Gestionar Roles Administrativos Delegados (ADMIN_GENERADOR, ADMIN_TRANSPORTISTA, ADMIN_OPERADOR) | ✅ Completo |
+| CU-A18 | Búsqueda Global (Cmd+K / Ctrl+K) | ✅ Completo |
+| CU-A19 | Configurar Preferencias de Notificaciones por Email | ✅ Completo |
+| CU-T12 | Gestión Autónoma de Flota Propia (Transportista) | ✅ Completo |
+
+### Nuevos CU (v2026.3)
+
+| ID | Nombre | Estado |
+|----|--------|--------|
+| CU-A20 | Certificación Blockchain de Manifiestos | ✅ Completo |
+| CU-S12 | Reintentar Certificaciones Blockchain (Cron Job) | ✅ Completo |
 
 ---
 
@@ -103,6 +120,7 @@
 | CU-A13 | Configurar Alertas | ✅ **Completo** | **NUEVO** - Página completa |
 | CU-A14 | Gestionar Parámetros Sistema | ✅ **Completo** | Tab en Configuración |
 | CU-A15 | Carga Masiva de Datos | ✅ **Completo** | **NUEVO** - Importador CSV |
+| CU-A20 | Certificación Blockchain de Manifiestos | ✅ **Completo** | **NUEVO** - Registro inmutable en Ethereum Sepolia + página admin |
 
 ---
 
@@ -177,6 +195,7 @@
 | CU-S09 | Backup Automático | ✅ **Completo** | PostgreSQL |
 | CU-S10 | Orquestación Motor BPMN | ⏳ **Post-MVP** | **NUEVO** - Prioridad BAJA |
 | CU-S11 | Firma Digital Conjunta | ⏳ **Post-MVP** | **NUEVO** - Prioridad BAJA |
+| CU-S12 | Reintentar Certificaciones Blockchain | ✅ **Completo** | **NUEVO** - Cron job cada 60s, max 3 reintentos, solo instancia PM2 0 |
 
 ---
 
@@ -211,6 +230,14 @@ POST   /api/carga-masiva/operadores
 GET    /api/carga-masiva/plantilla/:tipo
 ```
 
+### Blockchain ✨ NUEVO (2026-03-20)
+```
+GET    /api/blockchain/verificar/:hash    # Verificación pública de hash (sin auth)
+GET    /api/blockchain/manifiesto/:id     # Estado blockchain de un manifiesto
+POST   /api/blockchain/registrar/:id      # Registrar manifiesto en blockchain
+GET    /api/blockchain/registro           # Lista paginada de certificaciones (ADMIN)
+```
+
 ### Soporte Offline ✨ NUEVO (2025-12-06)
 ```
 GET    /api/manifiestos/sync-inicial    # CU-T01 - Sincronización inicial para operación offline
@@ -242,12 +269,12 @@ POST   /api/manifiestos/validar-qr      # CU-T08 - Validar código QR de manifie
 
 | Métrica | Anterior | Ahora | Cambio |
 |---------|----------|-------|--------|
-| Total Casos de Uso | 59 | 61 | +2 (nuevos CU-S10, CU-S11) |
-| Casos Completos | 57 (97%) | 57 (93%) | % ajustado por nuevos CUs |
-| Casos Parciales | 1 (2%) | 1 (2%) | Sin cambio |
-| Casos Pendientes | 1 (2%) | 3 (5%) | +2 nuevos CUs BAJA prioridad |
-| Endpoints API | ~50 | ~50 | Sin cambio |
-| Páginas Frontend | 12 | 12 | Sin cambio |
+| Total Casos de Uso | 66 | 68 | +2 (CU-A20, CU-S12) |
+| Casos Completos | 63 (95%) | 64 (94%) | +1 (CU-A20) + 1 (CU-S12) |
+| Casos Parciales | 1 (2%) | 1 (1%) | Sin cambio |
+| Casos Pendientes | 3 (5%) | 3 (4%) | Sin cambio |
+| Endpoints API | ~50 | ~54 | +4 blockchain |
+| Páginas Frontend | 12 | 13 | +1 admin/blockchain |
 
 ---
 
@@ -273,4 +300,4 @@ POST   /api/manifiestos/validar-qr      # CU-T08 - Validar código QR de manifie
 
 ---
 
-*Última actualización: 2025-12-06 16:00*
+*Última actualización: 2026-03-20*

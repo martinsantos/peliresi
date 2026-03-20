@@ -2,7 +2,7 @@
 
 ## Sistema de Trazabilidad de Residuos Peligrosos
 
-**Version 2026.1** | Direccion General de Fiscalizacion Ambiental | Provincia de Mendoza, Argentina
+**Version 2026.3** | Direccion General de Fiscalizacion Ambiental | Provincia de Mendoza, Argentina
 
 ---
 
@@ -18,6 +18,7 @@
 1. [Vision General](#1-vision-general)
 2. [Guia Rapida por Rol](#2-guia-rapida-por-rol)
 3. [Modulos del Sistema](#3-modulos-del-sistema)
+   - 3.10 [Certificacion Blockchain](#310-certificacion-blockchain)
 4. [Aplicacion Movil (PWA)](#4-aplicacion-movil-pwa)
 5. [Arquitectura y Datos](#5-arquitectura-y-datos)
 6. [Referencia de Workflow](#6-referencia-de-workflow)
@@ -38,6 +39,7 @@ El sistema digitaliza el proceso que anteriormente se gestionaba mediante manifi
 - **Centro de Control operativo:** Una sala de situacion digital donde la autoridad ambiental puede supervisar todas las operaciones activas de forma simultanea.
 - **Generacion automatica de documentos:** Manifiestos en formato PDF, codigos QR para verificacion en campo, y certificados de disposicion final.
 - **Reportes y estadisticas:** Ocho modulos de reportes con graficos interactivos, mapas coropleticos por departamento y exportacion CSV.
+- **Certificacion blockchain:** Registro inmutable de manifiestos en Ethereum para garantizar la integridad de los datos.
 - **Aplicacion movil (PWA):** Acceso desde cualquier dispositivo, con soporte offline para transportistas en zonas sin cobertura.
 
 SITREP atiende a cuatro tipos de actores del ecosistema de gestion de residuos peligrosos y se despliega como una solucion integral que reemplaza al circuito administrativo tradicional.
@@ -484,6 +486,121 @@ Incluye filtros por:
 - Definicion de condiciones, umbrales y destinatarios.
 - Las alertas generadas se muestran en el dashboard y en el Centro de Control.
 
+### 3.10 Certificacion Blockchain
+
+SITREP incluye un modulo de certificacion blockchain que permite registrar manifiestos en la red Ethereum como prueba inmutable de integridad. La certificacion genera un hash criptografico (SHA-256) del contenido del manifiesto y lo almacena en un smart contract publico, creando un sello temporal verificable por cualquier persona.
+
+> **Nota:** La certificacion blockchain **no reemplaza** a la firma digital regulada por la normativa argentina (ver CU-S11, pendiente). Es un mecanismo complementario de integridad de datos que garantiza que el contenido del manifiesto no fue alterado despues de su certificacion.
+
+#### 3.10.1 Red y contrato inteligente
+
+El sistema opera sobre **Ethereum Sepolia**, una red de prueba (testnet) publica y gratuita que es identica en funcionamiento a la red principal de Ethereum (mainnet). La testnet permite validar completamente la tecnologia sin incurrir en costos de gas reales. Si en el futuro se requiere pasar a mainnet, el unico cambio necesario es la configuracion de la URL del nodo RPC y la direccion del contrato.
+
+| Parametro | Valor |
+|-----------|-------|
+| **Red** | Ethereum Sepolia (testnet, chain ID 11155111) |
+| **Contrato** | `SitrepRegistry` |
+| **Direccion** | `0xbe4680934B675c80E2e6C2BD5Ae8Bf32aD42e241` |
+| **Explorador** | https://sepolia.etherscan.io/address/0xbe4680934B675c80E2e6C2BD5Ae8Bf32aD42e241 |
+
+El contrato `SitrepRegistry` expone dos funciones:
+
+| Funcion | Acceso | Descripcion |
+|---------|--------|-------------|
+| `registrar(hash)` | Solo owner (wallet del sistema) | Almacena un hash bytes32 con su timestamp. Falla si el hash ya existe. Emite evento `ManifiestoRegistrado`. |
+| `verificar(hash)` | Publico (lectura gratuita) | Retorna `(exists: bool, timestamp: uint256)`. No consume gas. |
+
+El patron `onlyOwner` asegura que solo la wallet del sistema pueda escribir en el contrato, mientras que cualquier persona puede verificar hashes sin costo.
+
+#### 3.10.2 Proceso de certificacion
+
+La certificacion es **bajo demanda**: el usuario hace clic en "Certificar en Blockchain" desde la pagina de detalle del manifiesto. No es automatica.
+
+**Prerequisito:** El manifiesto debe estar en estado APROBADO o posterior. No se pueden certificar manifiestos en estado BORRADOR ni CANCELADO.
+
+```
+Usuario hace clic en "Certificar en Blockchain"
+    |
+    | POST /api/blockchain/registrar/:id
+    v
+Backend genera hash SHA-256 del JSON canonico
+    |
+    | Guarda hash + estado PENDIENTE en BD
+    v
+Envia transaccion al smart contract (registrar)
+    |
+    | Guarda txHash en BD (antes de confirmacion)
+    v
+Espera 1 confirmacion de la red
+    |
+    +--- OK -----> Estado CONFIRMADO
+    |              (guarda blockNumber, timestamp)
+    |
+    +--- Error --> Estado ERROR
+                   (incrementa contador de reintentos)
+```
+
+**Cron de reintentos:** Un job automatico se ejecuta cada 60 segundos y procesa registros en estado PENDIENTE o ERROR. Maximo 3 reintentos por manifiesto. El cron solo corre en la instancia 0 de PM2 para evitar duplicacion en modo cluster.
+
+#### 3.10.3 Datos certificados (hash canonico)
+
+El hash SHA-256 se calcula sobre un JSON canonico con los siguientes campos, siempre en el mismo orden:
+
+```json
+{
+  "numero": "2026-000147",
+  "generadorId": "...",
+  "generadorCuit": "30-71234567-8",
+  "transportistaId": "...",
+  "transportistaCuit": "30-71234568-9",
+  "operadorId": "...",
+  "operadorCuit": "30-71234569-0",
+  "residuos": [
+    { "tipoResiduoId": "Y1", "cantidad": 500, "unidad": "kg" }
+  ],
+  "fechaFirma": "2026-03-20T14:30:00.000Z"
+}
+```
+
+- Los residuos se ordenan alfabeticamente por `tipoResiduoId` antes de serializar.
+- El resultado es **determinista**: los mismos datos siempre generan el mismo hash.
+- Algoritmo: SHA-256 (256 bits, 64 caracteres hexadecimales).
+
+#### 3.10.4 Panel de certificacion en detalle del manifiesto
+
+El componente `BlockchainPanel` se muestra en la pagina de detalle de cada manifiesto y presenta cuatro estados visuales:
+
+| Estado | Visual | Comportamiento |
+|--------|--------|----------------|
+| **No certificado** | Borde punteado verde, icono escudo, boton "Certificar en Blockchain" | Solo visible si el manifiesto no es BORRADOR ni CANCELADO. Al hacer clic inicia el registro. |
+| **PENDIENTE** | Fondo ambar, spinner animado, texto "Esperando confirmacion..." | Muestra el TX Hash como link a Etherscan si esta disponible. Auto-refresh cada 10 segundos. |
+| **ERROR** | Fondo rojo, icono de alerta, boton "Reintentar" | Permite reintentar manualmente el registro. |
+| **CONFIRMADO** | Banner verde con gradiente, icono escudo verificado, barra SHA-256 | Muestra detalles tecnicos expandibles: TX Hash (link Etherscan), numero de bloque, timestamp, direccion del contrato. Boton de copiar hash. |
+
+#### 3.10.5 Registro de certificaciones (`/admin/blockchain`)
+
+Pagina exclusiva para el rol ADMIN que lista todas las certificaciones blockchain del sistema.
+
+- **Tabla paginada** con 15 registros por pagina.
+- **Columnas:** Manifiesto #, Generador, Estado blockchain, Hash SHA-256, TX Hash (link a Etherscan), Bloque, Fecha de registro.
+- **Filtros por pestanas:** Todos, Confirmados, Pendientes, Con Error.
+- **Boton "Ver Contrato":** Link directo a la direccion del contrato en Etherscan.
+- Cada fila es clickeable y navega al detalle del manifiesto.
+
+#### 3.10.6 Verificacion publica
+
+La pagina de verificacion publica (`/verificar/:numero`) muestra un badge de blockchain cuando el manifiesto tiene estado CONFIRMADO, permitiendo a cualquier persona verificar la integridad del documento.
+
+Adicionalmente, el endpoint `GET /api/blockchain/verificar/:hash` permite verificar directamente un hash SHA-256 contra el smart contract sin requerir autenticacion. Retorna si el hash existe y su timestamp de registro.
+
+#### 3.10.7 Sello blockchain en PDFs
+
+Cuando un manifiesto tiene certificacion blockchain CONFIRMADA, los PDFs generados por el sistema (manifiesto y certificado de disposicion final) incluyen un sello verde con la siguiente informacion:
+
+- Hash SHA-256 del manifiesto
+- TX Hash de la transaccion en Ethereum
+- Link a Etherscan para verificacion independiente
+
 ---
 
 ## 4. APLICACION MOVIL (PWA)
@@ -732,7 +849,7 @@ Se han definido 16 indices para optimizar las consultas mas frecuentes:
 
 ### 5.3 Esquema de Servicios API
 
-La API REST esta organizada en 9 modulos funcionales, todos bajo el prefijo `/api/`.
+La API REST esta organizada en 10 modulos funcionales, todos bajo el prefijo `/api/`.
 
 #### Modulo 1: Autenticacion (`/api/auth`)
 
@@ -838,6 +955,15 @@ La API REST esta organizada en 9 modulos funcionales, todos bajo el prefijo `/ap
 |--------|------|-------|-------------|
 | GET | `/api/analytics/dashboard` | Autenticado | Estadisticas del dashboard |
 
+#### Modulo 10: Blockchain (`/api/blockchain`)
+
+| Metodo | Ruta | Roles | Descripcion |
+|--------|------|-------|-------------|
+| GET | `/api/blockchain/verificar/:hash` | Publico | Verificacion publica de hash en blockchain |
+| GET | `/api/blockchain/manifiesto/:id` | Autenticado | Estado de certificacion de un manifiesto |
+| POST | `/api/blockchain/registrar/:id` | Autenticado | Registrar manifiesto en blockchain (bajo demanda) |
+| GET | `/api/blockchain/registro` | ADMIN | Lista paginada de certificaciones |
+
 ### 5.4 Seguridad
 
 SITREP implementa multiples capas de seguridad:
@@ -868,6 +994,13 @@ SITREP implementa multiples capas de seguridad:
 | CORS | Configurado para permitir solo origenes autorizados |
 | SSL/TLS | Let's Encrypt con renovacion automatica a traves de Nginx |
 | Docker isolation | La base de datos PostgreSQL corre en contenedor aislado |
+
+#### Integridad de datos
+
+| Mecanismo | Configuracion |
+|-----------|---------------|
+| Certificacion blockchain | Hash SHA-256 de manifiestos registrado en smart contract en Ethereum Sepolia. Prueba inmutable de integridad verificable por terceros. |
+| Smart contract | Patron `onlyOwner` para escritura (solo la wallet del sistema puede registrar hashes). Lectura libre y gratuita para verificacion publica. |
 
 ### 5.5 Capacidad Actual
 
@@ -939,7 +1072,7 @@ BORRADOR
     |
     | [Firmar/Aprobar] (GENERADOR, ADMIN)
     v
-APROBADO
+APROBADO ------> [Certificar en Blockchain] (bajo demanda, no cambia estado)
     |
     | [Confirmar Retiro] (TRANSPORTISTA, ADMIN)
     v
@@ -1009,6 +1142,7 @@ La siguiente matriz muestra las acciones disponibles en cada estado del manifies
 | Descargar certificado | TRATADO | (descarga) | Si | Si | Si | Si |
 | Ver timeline | Cualquiera | (visualizacion) | Si | Si (propios) | Si (asignados) | Si (asignados) |
 | Ver mapa GPS | EN_TRANSITO / ENTREGADO+ | (visualizacion) | Si | Si (propios) | Si (asignados) | No |
+| Certificar en Blockchain | Cualquiera (excepto BORRADOR/CANCELADO) | (registro async) | Si | Si | Si | Si |
 
 ### 6.3 Flujo GPS completo
 
@@ -1080,7 +1214,7 @@ El flujo de GPS comprende tres etapas: captura en el cliente, procesamiento en e
 
 ## 7. ANEXO: CASOS DE USO
 
-### 7.1 Administrador (15 Casos de Uso)
+### 7.1 Administrador (16 Casos de Uso)
 
 | ID | Nombre | Estado | Descripcion |
 |----|--------|--------|-------------|
@@ -1099,6 +1233,7 @@ El flujo de GPS comprende tres etapas: captura en el cliente, procesamiento en e
 | CU-A13 | Configurar Alertas | **Completo** | Pagina de reglas de alerta con CRUD. Definicion de eventos disparadores, condiciones, umbrales y destinatarios. |
 | CU-A14 | Parametros del Sistema | **Completo** | Pestana en Configuracion para ajustar parametros operativos: intervalos de actualizacion, limites de validacion, umbrales de anomalias. |
 | CU-A15 | Carga Masiva de Datos | **Completo** | Importador CSV en `/admin/carga-masiva`. Validacion previa del formato, reporte de errores por fila, soporte para importacion de los tres tipos de actores. |
+| CU-A20 | Certificacion Blockchain de Manifiestos | **Completo** | Registro inmutable de manifiestos en Ethereum Sepolia. El usuario certifica bajo demanda desde el detalle del manifiesto (boton "Certificar en Blockchain"). La pagina `/admin/blockchain` permite al admin consultar todas las certificaciones con filtros por estado, tabla paginada con TX Hash, bloque y links a Etherscan. |
 
 ### 7.2 Generador (12 Casos de Uso)
 
@@ -1150,7 +1285,7 @@ El flujo de GPS comprende tres etapas: captura en el cliente, procesamiento en e
 | CU-O11 | Consultar Historial | **Completo** | Pestana en la aplicacion movil con historial de manifiestos procesados. Filtros por fecha, estado y tipo de residuo. |
 | CU-O12 | Generar Reportes | **Completo** | Acceso a la pagina compartida de reportes (`/reportes`) con estadisticas de residuos recibidos, tratados, certificados emitidos y tiempos de procesamiento. |
 
-### 7.5 Sistema (11 Casos de Uso)
+### 7.5 Sistema (12 Casos de Uso)
 
 | ID | Nombre | Estado | Descripcion |
 |----|--------|--------|-------------|
@@ -1165,17 +1300,18 @@ El flujo de GPS comprende tres etapas: captura en el cliente, procesamiento en e
 | CU-S09 | Backup Automatico | **Completo** | Respaldo automatico de la base de datos PostgreSQL. Configuracion mediante herramientas nativas de PostgreSQL (pg_dump) y politicas de retencion. |
 | CU-S10 | Orquestacion BPMN | **Pendiente** | Motor de workflow BPMN para orquestar las transiciones de estado del manifiesto de forma configurable. Clasificado como POST-MVP. Actualmente las transiciones estan implementadas con logica directa en los endpoints. |
 | CU-S11 | Firma Digital Conjunta | **Pendiente** | Firma digital conjunta del manifiesto por multiples actores (generador + transportista + operador). Requiere integracion con infraestructura de firma digital de la Provincia. Clasificado como POST-MVP. |
+| CU-S12 | Reintentar Certificaciones Blockchain | **Completo** | Cron job que se ejecuta cada 60 segundos y procesa registros blockchain en estado PENDIENTE o ERROR. Maximo 3 reintentos por manifiesto. Solo se ejecuta en la instancia PM2 0 para evitar duplicacion en modo cluster. |
 
 ### Resumen de implementacion
 
 | Modulo | Total CU | Completos | Parciales | Pendientes | % Completo |
 |--------|----------|-----------|-----------|------------|------------|
-| Administrador | 15 | 14 | 1 | 0 | 93% |
+| Administrador | 16 | 15 | 1 | 0 | 94% |
 | Generador | 12 | 12 | 0 | 0 | 100% |
 | Transportista | 11 | 11 | 0 | 0 | 100% |
 | Operador | 12 | 12 | 0 | 0 | 100% |
-| Sistema | 11 | 8 | 0 | 3 | 73% |
-| **TOTAL** | **61** | **57** | **1** | **3** | **93%** |
+| Sistema | 12 | 9 | 0 | 3 | 75% |
+| **TOTAL** | **63** | **59** | **1** | **3** | **94%** |
 
 **Detalle de pendientes:**
 
@@ -1193,6 +1329,7 @@ El flujo de GPS comprende tres etapas: captura en el cliente, procesamiento en e
 | Version | Fecha | Descripcion |
 |---------|-------|-------------|
 | 2026.1 | Febrero 2026 | Version inicial del manual integral del sistema |
+| 2026.3 | Marzo 2026 | Modulo de Certificacion Blockchain: seccion 3.10, API modulo 10, CU-A20 y CU-S12, actualizacion de workflow y seguridad |
 
 ---
 

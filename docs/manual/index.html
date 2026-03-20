@@ -62,7 +62,6 @@
   <div class="nav-group-items">
     <a href="#mod-dashboard" class="nav-link">3.1 Dashboard</a>
     <a href="#mod-manifiestos" class="nav-link level-2">3.2 Manifiestos</a>
-    <a href="#blockchain-firma" class="nav-link level-3">Certificacion Blockchain</a>
     <a href="#mod-centro-control" class="nav-link level-2">3.3 Centro de Control</a>
     <a href="#mod-reportes" class="nav-link level-2">3.4 Reportes</a>
     <a href="#mod-gps" class="nav-link level-2">3.5 Tracking GPS</a>
@@ -70,7 +69,8 @@
     <a href="#mod-catalogos" class="nav-link level-2">3.7 Catalogos</a>
     <a href="#mod-usuarios" class="nav-link level-2">3.8 Usuarios y Seguridad</a>
     <a href="#mod-herramientas" class="nav-link level-2">3.9 Herramientas</a>
-    <a href="#mod-estadisticas" class="nav-link level-2">3.10 Estadisticas</a>
+    <a href="#mod-blockchain" class="nav-link level-2">3.10 Certificacion Blockchain</a>
+    <a href="#mod-estadisticas" class="nav-link level-2">3.11 Estadisticas</a>
   </div>
 
   <div class="nav-section-title" onclick="toggleNavGroup(this)">4. Aplicacion Movil</div>
@@ -665,59 +665,8 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <li><strong>Fechas:</strong> Creacion, aprobacion, retiro, entrega, recepcion, tratamiento, cierre.</li>
 <li><strong>Codigo QR:</strong> Generado automaticamente al aprobar para acceso rapido via escaneo.</li>
 <li><strong>Timeline de eventos:</strong> Historial completo de cada accion realizada sobre el manifiesto.</li>
-<li><strong>Certificacion Blockchain:</strong> Registro inmutable del hash SHA-256 en la red Ethereum (ver seccion siguiente).</li>
+<li><strong>Certificacion Blockchain:</strong> Registro inmutable del hash SHA-256 en la red Ethereum (ver <a href="#mod-blockchain">seccion 3.10</a>).</li>
 </ul>
-
-<h4 id="blockchain-firma">3.2.1 Certificacion Blockchain</h4>
-<div class="info-card" style="border-left-color:#0D8A4F;">
-<p><strong>Novedad:</strong> Cada manifiesto firmado puede ser certificado en la blockchain de Ethereum, garantizando que sus datos no fueron alterados despues de la aprobacion.</p>
-</div>
-
-<div style="text-align:center;margin:1.5rem 0;">
-<img src="screenshots/desktop/54_blockchain_panel_detalle.png" alt="Panel de Certificacion Blockchain verificado" style="max-width:340px;border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,0.12);border:1px solid #e0e0dc;">
-<p style="font-size:0.8rem;color:#666;margin-top:0.5rem;">Panel &ldquo;Verificado en Blockchain&rdquo; en el detalle de un manifiesto</p>
-</div>
-
-<p><strong>Que es la certificacion blockchain?</strong></p>
-<p>Al certificar un manifiesto en blockchain, el sistema calcula un hash criptografico (SHA-256) con los datos del manifiesto (numero, generador, transportista, operador, residuos, fecha de firma) y lo registra como una transaccion inmutable en la red Ethereum Sepolia. Este registro no puede ser alterado ni eliminado, proporcionando evidencia criptografica de la integridad del manifiesto.</p>
-
-<p><strong>Como funciona?</strong></p>
-<ol>
-<li>El generador firma el manifiesto electronicamente (BORRADOR &rarr; APROBADO).</li>
-<li>Desde la pagina de detalle del manifiesto, aparece un boton <strong>&ldquo;Certificar en Blockchain&rdquo;</strong> en el panel lateral.</li>
-<li>Al hacer clic, el sistema:
-  <ul>
-    <li>Calcula el hash SHA-256 con los datos canonicos del manifiesto.</li>
-    <li>Envia una transaccion al smart contract <code>SitrepRegistry</code> en Ethereum Sepolia.</li>
-    <li>Espera la confirmacion de la red (~15-30 segundos).</li>
-  </ul>
-</li>
-<li>Una vez confirmado, el panel muestra:
-  <ul>
-    <li>Sello verde <strong>&ldquo;Verificado en Blockchain&rdquo;</strong> con detalles tecnicos.</li>
-    <li>Hash SHA-256 del manifiesto.</li>
-    <li>TX Hash con enlace directo a Etherscan para verificacion publica.</li>
-    <li>Numero de bloque y timestamp de la red.</li>
-    <li>Direccion del smart contract.</li>
-  </ul>
-</li>
-</ol>
-
-<p><strong>Verificacion publica</strong></p>
-<p>Cualquier persona puede verificar un manifiesto certificado sin necesidad de cuenta en SITREP:</p>
-<ul>
-<li><strong>Via QR:</strong> Al escanear el codigo QR del manifiesto, la pagina de verificacion publica muestra el estado blockchain con enlace a Etherscan.</li>
-<li><strong>Via Etherscan:</strong> Acceder directamente al TX hash en <code>sepolia.etherscan.io</code> para ver la transaccion en la blockchain.</li>
-<li><strong>Via smart contract:</strong> Llamar la funcion <code>verificar(hash)</code> del contrato para confirmar si un hash existe en el registro.</li>
-</ul>
-
-<p><strong>En los documentos PDF</strong></p>
-<p>Los manifiestos y certificados de disposicion generados en formato PDF incluyen un sello visual de blockchain con el hash SHA-256, TX hash y la URL de verificacion en Etherscan.</p>
-
-<div class="info-card" style="border-left-color:#0D8A4F;">
-<p><strong>Nota tecnica:</strong> La blockchain utilizada es Ethereum Sepolia (testnet). En una implementacion productiva, se puede migrar a Ethereum mainnet o Polygon (Layer 2) cambiando unicamente la configuracion del servidor, sin modificar el codigo.</p>
-</div>
-
 </section>
 
 <section id="mod-centro-control" data-role="admin">
@@ -1091,8 +1040,105 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <p>Cuando una regla se dispara, se crea un registro en <code>AlertaGenerada</code> vinculado al manifiesto y a la regla que la origino. Las alertas pueden ser resueltas manualmente por el administrador via <code>PUT /api/alertas/:id/resolver</code>.</p>
 </section>
 
+<section id="mod-blockchain" data-role="all">
+<h3>3.10 Certificacion Blockchain</h3>
+<div class="section-intro">
+SITREP incluye un modulo de certificacion blockchain que permite registrar manifiestos en la red Ethereum como prueba inmutable de integridad. La certificacion genera un hash criptografico (SHA-256) del contenido del manifiesto y lo almacena en un smart contract publico, creando un sello temporal verificable por cualquier persona.
+</div>
+
+<div class="info-card">
+<p><strong>Nota:</strong> La certificacion blockchain <strong>no reemplaza</strong> la firma digital regulada por la normativa argentina (ver CU-S10). Es un mecanismo complementario de integridad de datos que garantiza que el contenido del manifiesto no fue alterado despues de su certificacion.</p>
+</div>
+
+<h4 id="blockchain-red">3.10.1 Red y Contrato Inteligente</h4>
+<p>El sistema opera sobre <strong>Ethereum Sepolia</strong>, una red de prueba (testnet) publica y gratuita que es identica en funcionamiento a la red principal de Ethereum (mainnet). La testnet permite validar completamente la tecnologia sin incurrir en costos de gas reales.</p>
+
+<table>
+<thead><tr><th>Parametro</th><th>Valor</th></tr></thead>
+<tbody>
+<tr><td><strong>Red</strong></td><td>Ethereum Sepolia (testnet, chain ID 11155111)</td></tr>
+<tr><td><strong>Contrato</strong></td><td><code>SitrepRegistry</code></td></tr>
+<tr><td><strong>Direccion</strong></td><td><code>0xbe4680934B675c80E2e6C2BD5Ae8Bf32aD42e241</code></td></tr>
+<tr><td><strong>Explorador</strong></td><td><a href="https://sepolia.etherscan.io/address/0xbe4680934B675c80E2e6C2BD5Ae8Bf32aD42e241" target="_blank">Ver en Etherscan</a></td></tr>
+</tbody>
+</table>
+
+<p>El contrato <code>SitrepRegistry</code> expone dos funciones:</p>
+<table>
+<thead><tr><th>Funcion</th><th>Acceso</th><th>Descripcion</th></tr></thead>
+<tbody>
+<tr><td><code>registrar(hash)</code></td><td>Solo owner (wallet del sistema)</td><td>Almacena un hash bytes32 con su timestamp. Falla si el hash ya existe. Emite evento <code>ManifiestoRegistrado</code>.</td></tr>
+<tr><td><code>verificar(hash)</code></td><td>Publico (lectura gratuita)</td><td>Retorna <code>(exists, timestamp)</code>. No consume gas.</td></tr>
+</tbody>
+</table>
+<p>El patron <code>onlyOwner</code> asegura que solo la wallet del sistema pueda escribir en el contrato, mientras que cualquier persona puede verificar hashes sin costo.</p>
+
+<h4 id="blockchain-proceso">3.10.2 Proceso de Certificacion</h4>
+<p>La certificacion es <strong>bajo demanda</strong>: el usuario hace clic en &ldquo;Certificar en Blockchain&rdquo; desde la pagina de detalle del manifiesto. No es automatica.</p>
+<p><strong>Prerequisito:</strong> El manifiesto debe estar en estado APROBADO o posterior. No se pueden certificar manifiestos en estado BORRADOR ni CANCELADO.</p>
+
+<div class="workflow-diagram">
+<div class="wf-step"><div class="wf-number">1</div><div class="wf-step-body"><h4>Solicitud</h4><p>Usuario hace clic en &ldquo;Certificar en Blockchain&rdquo; → <code>POST /api/blockchain/registrar/:id</code></p></div></div>
+<div class="wf-arrow">&darr;</div>
+<div class="wf-step"><div class="wf-number">2</div><div class="wf-step-body"><h4>Hash</h4><p>Backend genera hash SHA-256 del JSON canonico del manifiesto. Estado → <strong>PENDIENTE</strong></p></div></div>
+<div class="wf-arrow">&darr;</div>
+<div class="wf-step"><div class="wf-number">3</div><div class="wf-step-body"><h4>Transaccion</h4><p>Envia TX al smart contract <code>registrar(hash)</code>. Guarda <code>txHash</code> en BD.</p></div></div>
+<div class="wf-arrow">&darr;</div>
+<div class="wf-step"><div class="wf-number">4</div><div class="wf-step-body"><h4>Confirmacion</h4><p>Espera 1 confirmacion de la red. Estado → <strong>CONFIRMADO</strong> (guarda bloque + timestamp).</p></div></div>
+</div>
+
+<p><strong>Cron de reintentos:</strong> Un job automatico se ejecuta cada 60 segundos y procesa registros en estado PENDIENTE o ERROR. Maximo 3 reintentos por manifiesto. Solo corre en la instancia PM2 0 para evitar duplicacion en modo cluster.</p>
+
+<h4 id="blockchain-hash">3.10.3 Datos Certificados (Hash Canonico)</h4>
+<p>El hash SHA-256 se calcula sobre un JSON canonico con los siguientes campos, siempre en el mismo orden:</p>
+<table>
+<thead><tr><th>Campo</th><th>Descripcion</th></tr></thead>
+<tbody>
+<tr><td><code>numero</code></td><td>Numero del manifiesto (ej: 2026-000147)</td></tr>
+<tr><td><code>generadorId</code></td><td>ID del generador</td></tr>
+<tr><td><code>generadorCuit</code></td><td>CUIT del generador</td></tr>
+<tr><td><code>transportistaId</code></td><td>ID del transportista</td></tr>
+<tr><td><code>transportistaCuit</code></td><td>CUIT del transportista</td></tr>
+<tr><td><code>operadorId</code></td><td>ID del operador</td></tr>
+<tr><td><code>operadorCuit</code></td><td>CUIT del operador</td></tr>
+<tr><td><code>residuos</code></td><td>Array de residuos (sorted por tipoResiduoId): tipoResiduoId, cantidad, unidad</td></tr>
+<tr><td><code>fechaFirma</code></td><td>Fecha de firma en formato ISO 8601</td></tr>
+</tbody>
+</table>
+<p>Los residuos se ordenan alfabeticamente por <code>tipoResiduoId</code>. El resultado es <strong>determinista</strong>: los mismos datos siempre generan el mismo hash SHA-256 de 64 caracteres hexadecimales.</p>
+
+<h4 id="blockchain-panel">3.10.4 Panel de Certificacion en Detalle del Manifiesto</h4>
+<p>El componente <code>BlockchainPanel</code> se muestra en la pagina de detalle de cada manifiesto y presenta cuatro estados visuales:</p>
+
+<table>
+<thead><tr><th>Estado</th><th>Visual</th><th>Comportamiento</th></tr></thead>
+<tbody>
+<tr><td><strong>No certificado</strong></td><td>Borde punteado verde, icono escudo, boton &ldquo;Certificar en Blockchain&rdquo;</td><td>Solo visible si el manifiesto no es BORRADOR ni CANCELADO. Al hacer clic inicia el registro.</td></tr>
+<tr><td><strong>PENDIENTE</strong></td><td>Fondo ambar, spinner animado, texto &ldquo;Esperando confirmacion&rdquo;</td><td>Muestra TX Hash como link a Etherscan. Auto-refresh cada 10 segundos.</td></tr>
+<tr><td><strong>ERROR</strong></td><td>Fondo rojo, icono alerta, boton &ldquo;Reintentar&rdquo;</td><td>Permite reintentar manualmente el registro.</td></tr>
+<tr><td><strong>CONFIRMADO</strong></td><td>Banner verde gradiente, escudo verificado, barra SHA-256</td><td>Detalles expandibles: TX Hash (link Etherscan), bloque, timestamp, contrato. Boton copiar hash.</td></tr>
+</tbody>
+</table>
+
+<h4 id="blockchain-registro">3.10.5 Registro de Certificaciones (<code>/admin/blockchain</code>)</h4>
+<p>Pagina exclusiva para el rol ADMIN que lista todas las certificaciones blockchain del sistema.</p>
+<ul>
+<li><strong>Tabla paginada</strong> con 15 registros por pagina.</li>
+<li><strong>Columnas:</strong> Manifiesto #, Generador, Estado blockchain, Hash SHA-256, TX Hash (link a Etherscan), Bloque, Fecha de registro.</li>
+<li><strong>Filtros por pestanas:</strong> Todos, Confirmados, Pendientes, Con Error.</li>
+<li><strong>Boton &ldquo;Ver Contrato&rdquo;:</strong> Link directo a la direccion del contrato en Etherscan.</li>
+<li>Cada fila es clickeable y navega al detalle del manifiesto.</li>
+</ul>
+
+<h4 id="blockchain-verificacion">3.10.6 Verificacion Publica</h4>
+<p>La pagina de verificacion publica (<code>/verificar/:numero</code>) muestra un badge de blockchain cuando el manifiesto tiene estado CONFIRMADO. El endpoint <code>GET /api/blockchain/verificar/:hash</code> permite verificar un hash SHA-256 contra el smart contract sin autenticacion.</p>
+
+<h4 id="blockchain-pdf">3.10.7 Sello Blockchain en PDFs</h4>
+<p>Cuando un manifiesto tiene certificacion blockchain CONFIRMADA, los PDFs (manifiesto y certificado de disposicion final) incluyen un sello verde con el hash SHA-256, TX Hash y link a Etherscan.</p>
+</section>
+
 <section id="mod-estadisticas" data-role="admin">
-<h3>3.10 Estadisticas y Analytics</h3>
+<h3>3.11 Estadisticas y Analytics</h3>
 <p>El modulo de Estadisticas (<code>/estadisticas</code>) ofrece una vista consolidada de los indicadores clave del sistema, accesible por todos los usuarios autenticados. La pagina presenta cuatro paneles de analytics alimentados por endpoints dedicados del backend:</p>
 
 <table>
@@ -2387,6 +2433,17 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <tr><td><span class="method method-get">GET</span></td><td class="endpoint">/api/health</td><td>Health check: verifica DB y retorna <code>{ status, db, uptime }</code></td></tr>
 </tbody>
 </table>
+
+<h5>Blockchain</h5>
+<table>
+<thead><tr><th>Metodo</th><th>Endpoint</th><th>Descripcion</th></tr></thead>
+<tbody>
+<tr><td><span class="method method-get">GET</span></td><td class="endpoint">/api/blockchain/verificar/:hash</td><td>Verificacion publica de hash en blockchain (sin auth)</td></tr>
+<tr><td><span class="method method-get">GET</span></td><td class="endpoint">/api/blockchain/manifiesto/:id</td><td>Estado de certificacion de un manifiesto</td></tr>
+<tr><td><span class="method method-post">POST</span></td><td class="endpoint">/api/blockchain/registrar/:id</td><td>Registrar manifiesto en blockchain (bajo demanda)</td></tr>
+<tr><td><span class="method method-get">GET</span></td><td class="endpoint">/api/blockchain/registro</td><td>Lista paginada de certificaciones (solo ADMIN)</td></tr>
+</tbody>
+</table>
 </section>
 
 <section id="arq-seguridad" data-role="all">
@@ -2404,6 +2461,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <tr><td><strong>Timeout</strong></td><td>30 segundos maximo por solicitud</td></tr>
 <tr><td><strong>Transacciones</strong></td><td><code>prisma.$transaction()</code> en workflow criticos para prevenir condiciones de carrera</td></tr>
 <tr><td><strong>Auditoria</strong></td><td>Log inmutable de todas las operaciones con datos before/after</td></tr>
+<tr><td><strong>Certificacion Blockchain</strong></td><td>Hash SHA-256 de manifiestos registrado en smart contract Ethereum Sepolia. Prueba inmutable de integridad verificable por terceros via Etherscan.</td></tr>
 </tbody>
 </table>
 
@@ -2713,6 +2771,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <tr><td>Cerrar Manifiesto</td><td>EN_TRATAMIENTO / RECIBIDO</td><td>TRATADO</td><td>OPERADOR, ADMIN</td></tr>
 <tr><td>Cancelar Manifiesto</td><td>Cualquiera (excepto CANCELADO/TRATADO)</td><td>CANCELADO</td><td>GENERADOR, ADMIN</td></tr>
 <tr><td>Descargar Certificado</td><td>TRATADO</td><td><em>(descarga PDF)</em></td><td>TODOS</td></tr>
+<tr><td>Certificar en Blockchain</td><td>Cualquiera (excepto BORRADOR/CANCELADO)</td><td><em>(registro async)</em></td><td>TODOS</td></tr>
 </tbody>
 </table>
 </section>
@@ -2781,7 +2840,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <section id="cu-admin" data-role="admin">
 <h2>7. Anexo: Casos de Uso</h2>
-<h3 class="cu-section-title"><span class="cu-section-badge role-admin">Administrador</span>7.1 Administrador DGFA <span class="cu-section-count">(19 casos)</span></h3>
+<h3 class="cu-section-title"><span class="cu-section-badge role-admin">Administrador</span>7.1 Administrador DGFA <span class="cu-section-count">(20 casos)</span></h3>
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A01: Gestionar Usuarios del Sistema</div>
 <div class="collapsible-body">
@@ -3134,6 +3193,24 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 </ol>
 <p><strong>Efecto:</strong> El servicio de notificaciones consulta <code>notifEmail=true</code> antes de enviar cualquier email a un usuario.</p>
 <p><strong>Endpoint:</strong> <code>PUT /api/admin/preferencias-notificacion</code></p>
+<p><span class="badge badge-complete">Completo</span></p>
+</div>
+
+<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A20: Certificacion Blockchain de Manifiestos</div>
+<div class="collapsible-body">
+<p><strong>Descripcion:</strong> Registro inmutable de manifiestos en la blockchain de Ethereum Sepolia. El usuario certifica bajo demanda desde el detalle del manifiesto (boton &ldquo;Certificar en Blockchain&rdquo;). La pagina <code>/admin/blockchain</code> permite al administrador consultar todas las certificaciones con filtros por estado (Confirmados, Pendientes, Con Error), tabla paginada con TX Hash, numero de bloque y links a Etherscan.</p>
+<p><strong>Precondiciones:</strong> El manifiesto debe estar en estado APROBADO o posterior (no BORRADOR ni CANCELADO). Blockchain habilitado en configuracion del servidor.</p>
+<p><strong>Flujo principal:</strong></p>
+<ol>
+<li>El usuario accede al detalle de un manifiesto firmado.</li>
+<li>Hace clic en &ldquo;Certificar en Blockchain&rdquo; en el panel lateral.</li>
+<li>El sistema genera un hash SHA-256 del JSON canonico del manifiesto.</li>
+<li>Se envia una transaccion al smart contract <code>SitrepRegistry</code> en Ethereum Sepolia.</li>
+<li>El estado cambia a PENDIENTE (spinner animado) y luego a CONFIRMADO (badge verde con detalles tecnicos).</li>
+<li>Si falla, el estado cambia a ERROR con opcion de reintentar. Un cron job reintenta automaticamente cada 60 segundos (max 3 reintentos).</li>
+</ol>
+<p><strong>Ruta admin:</strong> <code>/admin/blockchain</code></p>
+<p><strong>Endpoints:</strong> <code>POST /api/blockchain/registrar/:id</code>, <code>GET /api/blockchain/manifiesto/:id</code>, <code>GET /api/blockchain/registro</code>, <code>GET /api/blockchain/verificar/:hash</code></p>
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 </section>
@@ -3672,7 +3749,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 </section>
 
 <section id="cu-sistema" data-role="all">
-<h3 class="cu-section-title"><span class="cu-section-badge role-sistema">Sistema</span>7.5 Sistema <span class="cu-section-count">(11 casos)</span></h3>
+<h3 class="cu-section-title"><span class="cu-section-badge role-sistema">Sistema</span>7.5 Sistema <span class="cu-section-count">(12 casos)</span></h3>
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-S01: Generar Codigo QR</div>
 <div class="collapsible-body">
@@ -3843,6 +3920,22 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><strong>Estado actual:</strong> La API REST de SITREP esta completamente funcional y documentada, lo que permite la integracion unidireccional (consulta de datos). La integracion bidireccional con sistemas externos especificos esta en fase de planificacion y depende de la disponibilidad de APIs por parte de los organismos nacionales.</p>
 <p><span class="badge badge-pending">Pendiente</span></p>
 </div>
+
+<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-S12: Reintentar Certificaciones Blockchain</div>
+<div class="collapsible-body">
+<p><strong>Descripcion:</strong> Cron job automatico que se ejecuta cada 60 segundos y procesa registros blockchain en estado PENDIENTE o ERROR. Garantiza que las certificaciones se completen incluso ante fallos transitorios de red.</p>
+<p><strong>Disparador:</strong> Cron <code>node-cron</code> cada 60 segundos (<code>*/1 * * * *</code>).</p>
+<p><strong>Proceso:</strong></p>
+<ol>
+<li>Busca manifiestos con <code>blockchainStatus</code> = PENDIENTE o ERROR y <code>blockchainRetries</code> &lt; 3.</li>
+<li>Para registros PENDIENTE con TX hash: verifica si la transaccion ya fue confirmada consultando el receipt.</li>
+<li>Si la transaccion esta confirmada: actualiza estado a CONFIRMADO con numero de bloque y timestamp.</li>
+<li>Si no: re-intenta el registro completo (nuevo hash + nueva TX).</li>
+<li>Despues de 3 intentos fallidos, el registro queda en estado ERROR para atencion manual.</li>
+</ol>
+<p><strong>Proteccion de concurrencia:</strong> Solo se ejecuta en la instancia PM2 0 (<code>pm_id === '0'</code>) para evitar duplicacion en modo cluster.</p>
+<p><span class="badge badge-complete">Completo</span></p>
+</div>
 </section>
 
 <section id="cu-resumen" data-role="all">
@@ -3850,12 +3943,12 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="summary-grid">
 <div class="summary-card">
-<div class="number" style="color:var(--primary);">66</div>
+<div class="number" style="color:var(--primary);">68</div>
 <div class="label">Casos de Uso Totales</div>
 </div>
 <div class="summary-card">
-<div class="number" style="color:#065F46;">63</div>
-<div class="label">Completos (95%)</div>
+<div class="number" style="color:#065F46;">65</div>
+<div class="label">Completos (96%)</div>
 </div>
 <div class="summary-card">
 <div class="number" style="color:#92400E;">0</div>
@@ -3863,19 +3956,19 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 </div>
 <div class="summary-card">
 <div class="number" style="color:#991B1B;">3</div>
-<div class="label">Pendientes (5%)</div>
+<div class="label">Pendientes (4%)</div>
 </div>
 </div>
 
 <table>
 <thead><tr><th>Modulo</th><th>Total</th><th>Completo</th><th>Parcial</th><th>Pendiente</th></tr></thead>
 <tbody>
-<tr><td><strong>Administrador</strong></td><td>19</td><td><span class="badge badge-complete">18</span></td><td><span class="badge badge-partial">1</span></td><td><span class="badge badge-pending">0</span></td></tr>
+<tr><td><strong>Administrador</strong></td><td>20</td><td><span class="badge badge-complete">19</span></td><td><span class="badge badge-partial">1</span></td><td><span class="badge badge-pending">0</span></td></tr>
 <tr><td><strong>Generador</strong></td><td>12</td><td><span class="badge badge-complete">12</span></td><td><span class="badge badge-partial">0</span></td><td><span class="badge badge-pending">0</span></td></tr>
 <tr><td><strong>Transportista</strong></td><td>12</td><td><span class="badge badge-complete">12</span></td><td><span class="badge badge-partial">0</span></td><td><span class="badge badge-pending">0</span></td></tr>
 <tr><td><strong>Operador</strong></td><td>12</td><td><span class="badge badge-complete">12</span></td><td><span class="badge badge-partial">0</span></td><td><span class="badge badge-pending">0</span></td></tr>
-<tr><td><strong>Sistema</strong></td><td>11</td><td><span class="badge badge-complete">8</span></td><td><span class="badge badge-partial">0</span></td><td><span class="badge badge-pending">3</span></td></tr>
-<tr><td style="border-top:2px solid var(--primary);"><strong>TOTAL</strong></td><td style="border-top:2px solid var(--primary);"><strong>66</strong></td><td style="border-top:2px solid var(--primary);"><strong>63 (95%)</strong></td><td style="border-top:2px solid var(--primary);"><strong>1 (2%)</strong></td><td style="border-top:2px solid var(--primary);"><strong>3 (5%)</strong></td></tr>
+<tr><td><strong>Sistema</strong></td><td>12</td><td><span class="badge badge-complete">9</span></td><td><span class="badge badge-partial">0</span></td><td><span class="badge badge-pending">3</span></td></tr>
+<tr><td style="border-top:2px solid var(--primary);"><strong>TOTAL</strong></td><td style="border-top:2px solid var(--primary);"><strong>68</strong></td><td style="border-top:2px solid var(--primary);"><strong>65 (96%)</strong></td><td style="border-top:2px solid var(--primary);"><strong>1 (1%)</strong></td><td style="border-top:2px solid var(--primary);"><strong>3 (4%)</strong></td></tr>
 </tbody>
 </table>
 </section>
@@ -4451,6 +4544,16 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <table>
 <thead><tr><th>Version</th><th>Fecha</th><th>Descripcion de Cambios</th></tr></thead>
 <tbody>
+<tr><td><strong>2026.6</strong></td><td>Marzo 2026</td><td>
+<ul>
+<li>Modulo de Certificacion Blockchain: nueva seccion 3.10 con 7 subsecciones (red, proceso, hash, panel, registro admin, verificacion, PDFs).</li>
+<li>API modulo 10: 4 endpoints blockchain (registrar, verificar, estado, lista).</li>
+<li>2 nuevos casos de uso: CU-A20 (Certificacion Blockchain), CU-S12 (Cron reintentos blockchain).</li>
+<li>Smart contract <code>SitrepRegistry</code> en Ethereum Sepolia.</li>
+<li>Actualizacion de workflow, seguridad y resumen de CUs (68 totales, 65 completos).</li>
+<li>Fix de scroll-margin en headings con IDs para navegacion precisa desde sidebar.</li>
+</ul>
+</td></tr>
 <tr><td><strong>2026.5</strong></td><td>Marzo 2026</td><td>
 <ul>
 <li>Refactorizacion completa del manual: CSS y JS extraidos a archivos externos</li>
@@ -4458,7 +4561,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <li>Print stylesheet profesional con portada institucional</li>
 <li>Barra de progreso de lectura</li>
 <li>Documentacion API interactiva OpenAPI/Swagger en /api/docs</li>
-<li>Nuevas secciones: 3.10 Estadisticas, 4.5 Tour de Bienvenida</li>
+<li>Nuevas secciones: 3.11 Estadisticas (previamente 3.10), 4.5 Tour de Bienvenida</li>
 <li>Correccion de numeracion de titulos (secciones 10-14)</li>
 <li>Actualizacion de contenido obsoleto (Service Worker v10, TrackingPage &rarr; Centro de Control)</li>
 </ul>
@@ -4511,7 +4614,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <footer class="site-footer">
 <p><strong>SITREP</strong> &mdash; Sistema de Trazabilidad de Residuos Peligrosos</p>
 <p>Direccion General de Fiscalizacion Ambiental (DGFA) &mdash; Gobierno de Mendoza</p>
-<p>Version 2026.5 &mdash; Actualizado el 19 de marzo de 2026</p>
+<p>Version 2026.6 &mdash; Actualizado el 20 de marzo de 2026</p>
 <p style="margin-top:0.5rem;font-size:0.8rem;color:#9CA3AF;">Conforme a Ley Nacional 24.051, Decreto 831/93 y Ley Provincial 5917</p>
 <p style="margin-top:0.25rem;font-size:0.8rem;color:#9CA3AF;">Este documento es propiedad del Gobierno de la Provincia de Mendoza.</p>
 <p style="margin-top:0.25rem;font-size:0.8rem;color:#9CA3AF;">Desarrollo y operacion a cargo de Ultima Milla Soluciones Tecnologicas.</p>

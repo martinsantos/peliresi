@@ -50,6 +50,7 @@ a:hover{text-decoration:underline;}
 .nav-link.level-3{padding-left:2.75rem;font-size:0.75rem;}
 .main-content{margin-left:var(--sidebar-width);margin-top:var(--header-height);padding:2rem 3rem;max-width:calc(var(--sidebar-width) + 960px);}
 section{scroll-margin-top:var(--scroll-offset);margin-bottom:2.5rem;}
+h3[id],h4[id]{scroll-margin-top:var(--scroll-offset);}
 section h2{font-size:clamp(1.4rem, 2.5vw, 1.75rem);border-bottom:3px solid var(--primary);padding-bottom:0.5rem;margin-bottom:1.25rem;letter-spacing:-0.01em;}
 section h3{font-size:clamp(1.1rem, 2vw, 1.35rem);color:var(--primary-dark);margin:1.75rem 0 0.75rem;letter-spacing:-0.01em;}
 section h4{font-size:clamp(0.95rem, 1.5vw, 1.1rem);color:var(--text);margin:1.25rem 0 0.5rem;font-weight:650;}
