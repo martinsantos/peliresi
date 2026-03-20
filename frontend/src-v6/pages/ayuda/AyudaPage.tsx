@@ -18,10 +18,12 @@ import {
   ArrowLeft,
   Play,
   ExternalLink,
-  HelpCircle
+  HelpCircle,
+  GitBranch
 } from 'lucide-react';
 import { Card } from '../../components/ui/CardV2';
 import { Input } from '../../components/ui/Input';
+import WorkflowDiagram from '../../components/docs/WorkflowDiagram';
 
 // FAQ data
 const faqs = [
@@ -30,41 +32,95 @@ const faqs = [
     questions: [
       {
         q: '¿Cómo creo un nuevo manifiesto?',
-        a: 'Ve a Manifiestos → Nuevo Manifiesto. Completa los datos del generador, los residuos y la información de transporte.'
+        a: 'Ve a Manifiestos → Nuevo Manifiesto. El formulario multi-paso te guiará: selecciona el tipo de residuo, ingresa la cantidad, elige el transportista y el operador destino, y revisa el resumen antes de guardar como Borrador.'
       },
       {
         q: '¿Qué estados puede tener un manifiesto?',
-        a: 'Borrador, Aprobado, En tránsito, Entregado, Recibido y Tratado. Cada estado representa una etapa del proceso.'
+        a: 'El ciclo completo es: Borrador → Aprobado → En tránsito → Entregado → Recibido → En tratamiento → Tratado. También puede ser Rechazado o Cancelado en determinadas condiciones.'
       },
       {
-        q: '¿Cómo imprimo un manifiesto?',
-        a: 'Abre el manifiesto y haz clic en el botón "Imprimir" en la parte superior derecha.'
+        q: '¿Cómo descargo el certificado de disposición final?',
+        a: 'El certificado solo está disponible cuando el manifiesto alcanza el estado TRATADO. Abre el detalle del manifiesto y haz clic en "Descargar Certificado" (botón verde).'
+      },
+      {
+        q: '¿Cómo edito un manifiesto?',
+        a: 'Solo los manifiestos en estado BORRADOR pueden editarse. Abre el detalle y usa el botón de edición. Una vez aprobado, el manifiesto no puede modificarse.'
+      },
+      {
+        q: '¿Cómo cancelo un manifiesto?',
+        a: 'Un manifiesto puede cancelarse desde cualquier estado, excepto CANCELADO o TRATADO. Abre el detalle y usa la opción "Cancelar Manifiesto". Se solicitará confirmación.'
+      },
+      {
+        q: '¿Cómo verifico un manifiesto con QR?',
+        a: 'Usa el escáner QR desde la app móvil o ingresa el número de manifiesto en /manifiestos/verificar. La verificación es pública y no requiere autenticación.'
       }
     ]
   },
   {
-    category: 'Cuenta',
+    category: 'Transporte y GPS',
+    questions: [
+      {
+        q: '¿Cómo inicio el tracking GPS de un viaje?',
+        a: 'El transportista debe ir a Transporte → Perfil → tab Viaje. Si hay manifiestos APROBADOS asignados, aparece el botón "Tomar Viaje". Al confirmar el retiro, el GPS comienza a registrar la posición cada 30 segundos.'
+      },
+      {
+        q: '¿Qué hago si el GPS falla durante el viaje?',
+        a: 'La app almacena los puntos GPS pendientes localmente y los envía automáticamente al recuperar la conexión. El viaje no se interrumpe. Si la señal es persistentemente baja, ve a Configuración del teléfono y activa el modo de ubicación de alta precisión.'
+      },
+      {
+        q: '¿Cómo registro un incidente durante el transporte?',
+        a: 'En la pantalla de Viaje en Curso, usa el botón "Registrar Incidente". Ingresa el tipo de incidente (avería, accidente, etc.) y una descripción. El incidente queda registrado en el timeline del manifiesto sin cambiar su estado.'
+      }
+    ]
+  },
+  {
+    category: 'Cuenta y Acceso',
     questions: [
       {
         q: '¿Cómo cambio mi contraseña?',
-        a: 'Ve a Configuración → Seguridad → Cambiar contraseña.'
+        a: 'Ve a Configuración → pestaña Seguridad → Cambiar contraseña. Necesitarás ingresar la contraseña actual y la nueva (mínimo 8 caracteres).'
       },
       {
-        q: '¿Puedo tener varios roles?',
-        a: 'No, cada usuario tiene un único rol asignado por el administrador.'
+        q: '¿Cuáles son los roles del sistema?',
+        a: 'Existen 4 roles principales (ADMIN, GENERADOR, TRANSPORTISTA, OPERADOR) y 3 sub-roles administrativos delegados (ADMIN_GENERADOR, ADMIN_TRANSPORTISTA, ADMIN_OPERADOR). Cada rol tiene acceso a un subconjunto diferente de páginas.'
+      },
+      {
+        q: '¿Qué es la función Acceso Comodín?',
+        a: 'El ADMIN puede "impersonar" a cualquier usuario activo para ver la aplicación exactamente como la ve ese usuario, sin necesitar su contraseña. Aparece un banner naranja durante la sesión de impersonación. Usar el botón "Volver a mi cuenta" para salir.'
+      },
+      {
+        q: '¿Cómo uso la búsqueda global (Cmd+K)?',
+        a: 'Presiona Cmd+K (macOS) o Ctrl+K (Windows/Linux) desde cualquier página autenticada. El panel de búsqueda global te permite encontrar manifiestos, generadores, transportistas y operadores de forma instantánea.'
       }
     ]
   },
   {
-    category: 'Reportes',
+    category: 'Reportes y Exportación',
     questions: [
       {
-        q: '¿Cómo exporto datos a Excel?',
-        a: 'En cualquier lista, usa el botón "Exportar" en la parte superior derecha.'
+        q: '¿Cómo exporto datos a CSV?',
+        a: 'En la sección Reportes, usa el botón "Exportar" en la barra superior. Puedes exportar manifiestos, generadores, transportistas u operadores. El límite es 10,000 filas por exportación.'
       },
       {
         q: '¿Qué reportes están disponibles?',
-        a: 'Manifiestos por período, residuos por tipo, actores activos, y más.'
+        a: 'Hay 8 pestañas en el Centro de Reportes: Manifiestos, Residuos Tratados, Transporte, Generadores, Operadores, Tratamientos, Departamentos (mapa coroplético), y Mapa de Actores (Leaflet). Todos con gráficos interactivos y exportación PDF/CSV.'
+      },
+      {
+        q: '¿Cómo configuro mis notificaciones por email?',
+        a: 'Ve a Configuración → pestaña Notificaciones. Activa o desactiva el toggle "Recibir alertas por email". Los administradores tienen un toggle adicional para notificaciones de nuevos usuarios pendientes.'
+      }
+    ]
+  },
+  {
+    category: 'Administración de Flota (Transportista)',
+    questions: [
+      {
+        q: '¿Cómo agrego un vehículo a mi flota?',
+        a: 'Ve a Transporte → Perfil → pestaña Info → "Gestionar vehículos y conductores". En la tabla de Vehículos, haz clic en "Agregar Vehículo". Completa patente, marca, modelo, año, capacidad y fecha de vencimiento de habilitación.'
+      },
+      {
+        q: '¿Necesito pedirle al administrador que agregue mis vehículos?',
+        a: 'No. Los transportistas pueden gestionar su propia flota de forma autónoma desde su perfil. Los cambios se reflejan inmediatamente en el sistema y están disponibles para futuros manifiestos.'
       }
     ]
   }
@@ -128,22 +184,37 @@ const AyudaPage: React.FC = () => {
       {/* Quick Links */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {[
-          { icon: BookOpen, label: 'Documentación', color: 'bg-primary-50 text-primary-600' },
-          { icon: Video, label: 'Tutoriales', color: 'bg-secondary-50 text-secondary-600' },
-          { icon: MessageCircle, label: 'Chat de ayuda', color: 'bg-info-50 text-info-600' },
-          { icon: FileText, label: 'Guías PDF', color: 'bg-success-50 text-success-600' },
+          { icon: BookOpen, label: 'Manual completo', color: 'bg-primary-50 text-primary-600', href: '/manual/' },
+          { icon: Video, label: 'Tutoriales', color: 'bg-secondary-50 text-secondary-600', href: undefined },
+          { icon: MessageCircle, label: 'Chat de ayuda', color: 'bg-info-50 text-info-600', href: undefined },
+          { icon: FileText, label: 'Guías PDF', color: 'bg-success-50 text-success-600', href: undefined },
         ].map((item) => (
-          <Card 
+          <Card
             key={item.label}
             className="p-4 cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => item.href && (window.location.href = item.href)}
           >
             <div className={`w-12 h-12 ${item.color} rounded-xl flex items-center justify-center mb-3`}>
               <item.icon size={24} />
             </div>
             <p className="font-medium text-neutral-900">{item.label}</p>
+            {item.href && (
+              <p className="text-xs text-neutral-400 mt-1 flex items-center gap-1">
+                <ChevronRight size={11} /> Ver manual del sistema
+              </p>
+            )}
           </Card>
         ))}
       </div>
+
+      {/* Workflow Diagram */}
+      <Card className="p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <GitBranch className="text-primary-500" size={22} />
+          <h3 className="text-lg font-semibold text-neutral-900">Ciclo de Vida del Manifiesto</h3>
+        </div>
+        <WorkflowDiagram />
+      </Card>
 
       {/* FAQ Section */}
       <div className="grid lg:grid-cols-3 gap-6">

@@ -35,30 +35,30 @@ const TOUR_STEPS: TourStep[] = [
     position: 'right',
   },
   {
-    title: 'Manifiestos',
+    title: 'Manifiestos + Búsqueda Global',
     description:
-      'Gestiona el ciclo de vida completo de los manifiestos de residuos peligrosos: creación, seguimiento, aprobación y cierre.',
+      'Gestiona el ciclo de vida completo de manifiestos de residuos peligrosos. Tip: usa Cmd+K (o Ctrl+K) para buscar cualquier manifiesto, generador o transportista desde cualquier página.',
     targetSelector: 'a[href="/manifiestos"]',
     position: 'right',
   },
   {
-    title: 'Tracking GPS',
+    title: 'Centro de Control',
     description:
-      'Monitorea en tiempo real la ubicación de los vehículos transportistas y el estado de los viajes en curso.',
-    targetSelector: 'a[href="/tracking"]',
+      'Monitorea en tiempo real la ubicación de los vehículos en el mapa, el estado de los viajes activos y estadísticas del pipeline. Con presets de fecha: Hoy, 7d, 30d, 90d.',
+    targetSelector: 'a[href="/centro-control"]',
     position: 'right',
   },
   {
     title: 'Reportes',
     description:
-      'Genera reportes detallados de manifiestos, residuos, operadores y transportistas. Exporta a PDF y Excel.',
+      'Genera reportes detallados de manifiestos, residuos, operadores y transportistas con 8 pestañas de análisis. Exporta a PDF y CSV.',
     targetSelector: 'a[href="/reportes"]',
     position: 'right',
   },
   {
     title: 'Configuración',
     description:
-      'Personaliza notificaciones, cambia tu contraseña y ajusta la apariencia del sistema según tus preferencias.',
+      'Personaliza tus preferencias de notificaciones por email, cambia tu contraseña y ajusta la apariencia del sistema. Los administradores tienen opciones adicionales.',
     targetSelector: 'a[href="/configuracion"]',
     position: 'right',
   },

@@ -439,15 +439,23 @@ export const MobileLayout: React.FC = () => {
                   </p>
                   <div className="space-y-1">
                     {toolsItems.map((item) => (
-                      <MenuItem 
+                      <MenuItem
                         key={item.to}
-                        to={item.to} 
-                        icon={item.icon} 
+                        to={item.to}
+                        icon={item.icon}
                         label={item.label}
                         onClick={() => setIsMenuOpen(false)}
                         activeColor={config.color}
                       />
                     ))}
+                    <a
+                      href="/manual/"
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-neutral-600 hover:bg-neutral-100"
+                    >
+                      <BookOpen size={20} />
+                      <span className="flex-1 font-medium">Manual</span>
+                      <ChevronRight size={16} className="text-neutral-400" />
+                    </a>
                   </div>
                 </>
               )}

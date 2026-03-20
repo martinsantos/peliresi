@@ -36,19 +36,19 @@ const ROLE_SLIDES: Record<UserRole, Slide[]> = {
       icon: Shield,
       title: 'Administrador del Sistema',
       points: [
-        'Gestiona usuarios y asigna roles a los actores del sistema.',
-        'Supervisa el estado de todos los manifiestos en tiempo real.',
-        'Genera reportes consolidados y audita la trazabilidad completa.',
+        'Gestiona usuarios y asigna roles: ADMIN, GENERADOR, TRANSPORTISTA, OPERADOR y sub-roles delegados.',
+        'Supervisa el estado de todos los manifiestos en tiempo real desde el Centro de Control.',
+        'Genera reportes consolidados y audita la trazabilidad completa del sistema.',
       ],
       color: 'bg-primary-100 text-primary-700',
     },
     {
       icon: Factory,
-      title: 'Gestiona Generadores',
+      title: 'Herramientas de Administración',
       points: [
-        'Alta y baja de generadores de residuos peligrosos.',
-        'Administra generadores, vehículos y catálogo de residuos.',
-        'Importa datos masivamente desde archivos CSV o Excel.',
+        'Acceso Comodín: impersoná a cualquier usuario para verificar su experiencia (icono ojo en Admin → Usuarios).',
+        'Búsqueda global instantánea con Cmd+K (o Ctrl+K): manifiestos, actores y más desde cualquier página.',
+        'Importación masiva de datos desde archivos CSV. Sub-roles delegados para cada dominio.',
       ],
       color: 'bg-primary-50 text-primary-600',
     },
@@ -81,17 +81,17 @@ const ROLE_SLIDES: Record<UserRole, Slide[]> = {
       title: 'Transportista',
       points: [
         'Gestiona los retiros asignados y planifica las rutas.',
-        'Actualiza el tracking GPS durante el viaje.',
+        'Actualiza el tracking GPS durante el viaje (cada 30 segundos, con resiliencia offline).',
         'Confirma entregas y registra novedades en ruta.',
       ],
       color: 'bg-orange-100 text-orange-700',
     },
     {
       icon: ClipboardCheck,
-      title: 'Control de Viajes',
+      title: 'Control de Viajes y Flota',
       points: [
-        'Escanea codigos QR para validar cargas.',
-        'Registra incidentes y adjunta evidencia fotografica.',
+        'Gestioná tu propia flota: agregá, editá y eliminá vehículos y conductores desde tu perfil (Transporte → Perfil → Info).',
+        'Escanea códigos QR para validar cargas y registra incidentes en ruta.',
         'Consulta tu historial completo de viajes realizados.',
       ],
       color: 'bg-orange-50 text-orange-600',
@@ -141,9 +141,42 @@ const ROLE_SLIDES: Record<UserRole, Slide[]> = {
       color: 'bg-blue-50 text-blue-600',
     },
   ],
-  ADMIN_TRANSPORTISTA: [{ icon: Shield, title: 'Administrador de Transportistas', points: ['Gestioná transportistas, vehículos y choferes.'], color: 'bg-slate-100 text-slate-700' }],
-  ADMIN_GENERADOR: [{ icon: Shield, title: 'Administrador de Generadores', points: ['Gestioná generadores y catálogo de residuos.'], color: 'bg-green-100 text-green-700' }],
-  ADMIN_OPERADOR: [{ icon: Shield, title: 'Administrador de Operadores', points: ['Gestioná operadores y tratamientos autorizados.'], color: 'bg-teal-100 text-teal-700' }],
+  ADMIN_TRANSPORTISTA: [
+    {
+      icon: Truck,
+      title: 'Administrador de Transportistas',
+      points: [
+        'Gestioná transportistas, vehículos y conductores de tu dominio.',
+        'Accedés al Centro de Control para supervisar viajes activos.',
+        'Tenés acceso a manifiestos, reportes y alertas relacionadas.',
+      ],
+      color: 'bg-orange-100 text-orange-700',
+    },
+  ],
+  ADMIN_GENERADOR: [
+    {
+      icon: Factory,
+      title: 'Administrador de Generadores',
+      points: [
+        'Gestioná generadores y el catálogo de residuos peligrosos.',
+        'Administrás altas, bajas y modificaciones de generadores.',
+        'Tenés acceso a manifiestos, reportes y alertas de tu dominio.',
+      ],
+      color: 'bg-purple-100 text-purple-700',
+    },
+  ],
+  ADMIN_OPERADOR: [
+    {
+      icon: FlaskConical,
+      title: 'Administrador de Operadores',
+      points: [
+        'Gestioná operadores y el catálogo de tratamientos autorizados.',
+        'Administrás altas, bajas y modificaciones de operadores.',
+        'Tenés acceso a manifiestos, reportes y alertas de tu dominio.',
+      ],
+      color: 'bg-teal-100 text-teal-700',
+    },
+  ],
 };
 
 const storageKey = (role: string) => `sitrep_onboarding_${role}`;
