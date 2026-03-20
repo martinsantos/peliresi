@@ -323,4 +323,140 @@ document.addEventListener('DOMContentLoaded', function() {
       if (mobile) mobile.style.transform = '';
     });
   })();
+
+  // ── v2026.6: Sticky section breadcrumb ──
+  (function stickyBreadcrumb() {
+    var bar = document.createElement('div');
+    bar.className = 'section-breadcrumb';
+
+    var sbSection = document.createElement('span');
+    sbSection.className = 'sb-section';
+    var sbSep = document.createElement('span');
+    sbSep.className = 'sb-sep';
+    sbSep.textContent = '\u203A'; // ›
+    var sbSub = document.createElement('span');
+    sbSub.className = 'sb-sub';
+    var sbSep2 = document.createElement('span');
+    sbSep2.className = 'sb-sep';
+    sbSep2.textContent = '\u203A';
+    var sbCU = document.createElement('span');
+    sbCU.className = 'sb-cu';
+
+    bar.appendChild(sbSection);
+    bar.appendChild(sbSep);
+    bar.appendChild(sbSub);
+    bar.appendChild(sbSep2);
+    bar.appendChild(sbCU);
+    document.body.appendChild(bar);
+
+    var headings = document.querySelectorAll('section h2, section h3');
+    var collapsibles = document.querySelectorAll('.collapsible-header');
+    var currentH2 = '';
+    var currentH3 = '';
+    var currentCU = '';
+    var currentH2El = null;
+    var currentH3El = null;
+    var currentCUEl = null;
+    var heroEl = document.getElementById('hero');
+    var heroBottom = heroEl ? heroEl.offsetTop + heroEl.offsetHeight : 0;
+    var headerHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--header-height')) || 64;
+    var breadcrumbHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--breadcrumb-height')) || 32;
+
+    // Click handlers — scroll to the heading's section
+    sbSection.addEventListener('click', function() {
+      if (currentH2El) currentH2El.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    sbSub.addEventListener('click', function() {
+      if (currentH3El) currentH3El.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    sbCU.addEventListener('click', function() {
+      if (currentCUEl) currentCUEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    var ticking = false;
+    window.addEventListener('scroll', function() {
+      if (!ticking) {
+        requestAnimationFrame(function() {
+          updateBreadcrumb();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    });
+
+    function updateBreadcrumb() {
+      var scrollY = window.scrollY;
+      var threshold = headerHeight + breadcrumbHeight + 20;
+
+      if (scrollY < heroBottom - headerHeight) {
+        bar.classList.remove('visible');
+        return;
+      }
+
+      var newH2 = '';
+      var newH3 = '';
+      var newCU = '';
+      var newH2El = null;
+      var newH3El = null;
+      var newCUEl = null;
+
+      for (var i = 0; i < headings.length; i++) {
+        var h = headings[i];
+        var top = h.getBoundingClientRect().top;
+        if (top <= threshold) {
+          if (h.tagName === 'H2') {
+            newH2 = h.textContent.trim();
+            newH2El = h;
+            newH3 = '';
+            newH3El = null;
+          } else {
+            newH3 = h.textContent.trim();
+            newH3El = h;
+          }
+        }
+      }
+
+      // Find current open collapsible header above threshold
+      for (var j = 0; j < collapsibles.length; j++) {
+        var c = collapsibles[j];
+        if (!c.classList.contains('open')) continue;
+        var cTop = c.getBoundingClientRect().top;
+        if (cTop <= threshold) {
+          newCU = c.textContent.trim();
+          newCUEl = c;
+        }
+      }
+
+      if (!newH2 && !newH3) {
+        bar.classList.remove('visible');
+        return;
+      }
+
+      if (newH2 !== currentH2 || newH3 !== currentH3 || newCU !== currentCU) {
+        currentH2 = newH2;
+        currentH3 = newH3;
+        currentCU = newCU;
+        currentH2El = newH2El;
+        currentH3El = newH3El;
+        currentCUEl = newCUEl;
+        sbSection.textContent = currentH2;
+        if (currentH3) {
+          sbSep.style.display = '';
+          sbSub.textContent = currentH3;
+        } else {
+          sbSep.style.display = 'none';
+          sbSub.textContent = '';
+        }
+        if (currentCU) {
+          sbSep2.style.display = '';
+          sbCU.textContent = currentCU;
+        } else {
+          sbSep2.style.display = 'none';
+          sbCU.textContent = '';
+        }
+      }
+
+      bar.classList.add('visible');
+    }
+  })();
 });
