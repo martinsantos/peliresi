@@ -84,23 +84,38 @@ export const getGeneradorById = async (req: AuthRequest, res: Response, next: Ne
 
 export const createGenerador = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const { razonSocial, cuit, domicilio, telefono, email, numeroInscripcion, categoria, actividad, rubro, corrientesControl } = req.body;
+        const { razonSocial, cuit, domicilio, telefono, email, password, nombre, numeroInscripcion, categoria, actividad, rubro, corrientesControl } = req.body;
 
-        // Verificar CUIT único
+        if (!razonSocial || !cuit || !email) {
+            throw new AppError('Razón social, CUIT y email son obligatorios', 400);
+        }
+
+        // Verificar CUIT único en generadores
         const existente = await prisma.generador.findFirst({ where: { cuit } });
         if (existente) {
             throw new AppError('Ya existe un generador con ese CUIT', 400);
         }
 
-        // Crear usuario asociado
-        const passwordHash = await bcrypt.hash(cuit, 10); // Password inicial = CUIT
+        // Verificar email único en usuarios
+        const existeEmail = await prisma.usuario.findUnique({ where: { email } });
+        if (existeEmail) {
+            throw new AppError('Ya existe un usuario con ese email', 400);
+        }
+
+        // Password: usar el proporcionado por el admin, o CUIT como fallback
+        const rawPassword = password || cuit;
+        const passwordHash = await bcrypt.hash(rawPassword, 10);
+
+        // Crear usuario asociado (admin-created → emailVerified + activo)
         const usuario = await prisma.usuario.create({
             data: {
                 email,
                 password: passwordHash,
-                nombre: razonSocial,
-                apellido: '',
-                rol: 'GENERADOR'
+                nombre: nombre || razonSocial,
+                cuit,
+                rol: 'GENERADOR',
+                activo: true,
+                emailVerified: true,
             }
         });
 
@@ -120,14 +135,14 @@ export const createGenerador = async (req: AuthRequest, res: Response, next: Nex
                 corrientesControl
             },
             include: {
-                usuario: { select: { email: true } }
+                usuario: { select: { email: true, nombre: true } }
             }
         });
 
         res.status(201).json({
             success: true,
             data: { generador },
-            message: 'Generador creado. Contraseña inicial: ' + cuit
+            message: `Generador creado. ${password ? 'Password: el definido en el formulario' : 'Password inicial: ' + cuit}`
         });
     } catch (error) {
         next(error);
