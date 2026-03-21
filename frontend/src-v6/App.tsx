@@ -73,6 +73,7 @@ const UsuariosPage = lazy(() => import('./pages/usuarios/UsuariosPage'));
 // Admin - Sectoriales
 const AdminGeneradoresPage = lazy(() => import('./pages/admin/AdminGeneradoresPage'));
 const GeneradorDetallePage = lazy(() => import('./pages/admin/GeneradorDetallePage'));
+const NuevoGeneradorPage = lazy(() => import('./pages/admin/NuevoGeneradorPage'));
 const AdminOperadoresPage = lazy(() => import('./pages/admin/AdminOperadoresPage'));
 const AdminVehiculosPage = lazy(() => import('./pages/admin/AdminVehiculosPage'));
 const AdminResiduosPage = lazy(() => import('./pages/admin/AdminResiduosPage'));
@@ -228,6 +229,8 @@ function App() {
         <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR']} />}>
           <Route element={<MobileLayout />}>
             <Route path="/mobile/admin/actores/generadores" element={<AdminGeneradoresPage />} />
+            <Route path="/mobile/admin/actores/generadores/nuevo" element={<NuevoGeneradorPage />} />
+            <Route path="/mobile/admin/actores/generadores/:id/editar" element={<NuevoGeneradorPage />} />
             <Route path="/mobile/admin/actores/generadores/:id" element={<GeneradorDetallePage />} />
             <Route path="/mobile/admin/residuos" element={<AdminResiduosPage />} />
           </Route>
@@ -311,6 +314,8 @@ function App() {
         <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR']} />}>
           <Route element={<MainLayout />}>
             <Route path="/admin/actores/generadores" element={<AdminGeneradoresPage />} />
+            <Route path="/admin/actores/generadores/nuevo" element={<NuevoGeneradorPage />} />
+            <Route path="/admin/actores/generadores/:id/editar" element={<NuevoGeneradorPage />} />
             <Route path="/admin/actores/generadores/:id" element={<GeneradorDetallePage />} />
             <Route path="/admin/residuos" element={<AdminResiduosPage />} />
           </Route>
