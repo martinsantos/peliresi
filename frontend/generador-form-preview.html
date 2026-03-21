@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Formulario Generador — SITREP</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: #f4f6f8;
+      color: #1a1a2e;
+      min-height: 100vh;
+      padding: 32px 16px 64px;
+    }
+
+    .page {
+      max-width: 800px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .btn-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border: 1.5px solid #d1d5db;
+      border-radius: 10px;
+      background: white;
+      font-size: 13px;
+      color: #374151;
+      cursor: pointer;
+      transition: background .15s;
+      text-decoration: none;
+    }
+    .btn-back:hover { background: #f9fafb; }
+    .header-icon {
+      width: 44px; height: 44px;
+      background: #ede9fe;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    .header-title h2 {
+      font-size: 22px; font-weight: 700; color: #111827;
+    }
+    .header-title p {
+      font-size: 13px; color: #6b7280; margin-top: 2px;
+    }
+
+    /* Card */
+    .card {
+      background: white;
+      border-radius: 16px;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid #f3f4f6;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-header-icon {
+      font-size: 16px;
+    }
+    .card-header h3 {
+      font-size: 15px; font-weight: 600; color: #111827;
+    }
+    .card-body {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Grid */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 600px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    /* Form fields */
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label {
+      font-size: 13px; font-weight: 500; color: #374151;
+    }
+    .field input,
+    .field select,
+    .field .fake-input {
+      height: 40px;
+      padding: 0 14px;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 10px;
+      font-size: 14px;
+      color: #111827;
+      background: white;
+      outline: none;
+      transition: border-color .15s;
+      width: 100%;
+    }
+    .field input:focus,
+    .field select:focus {
+      border-color: #0D8A4F;
+      box-shadow: 0 0 0 3px rgba(13,138,79,.1);
+    }
+    .field input::placeholder { color: #9ca3af; }
+    .field input[type="password"] { letter-spacing: 2px; }
+
+    /* Corrientes Y textarea style */
+    .corrientes-input {
+      height: 40px;
+      padding: 0 14px;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 10px;
+      font-size: 14px;
+      color: #111827;
+      background: white;
+      outline: none;
+      transition: border-color .15s;
+      width: 100%;
+    }
+    .corrientes-input:focus {
+      border-color: #0D8A4F;
+      box-shadow: 0 0 0 3px rgba(13,138,79,.1);
+    }
+
+    /* Badges */
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .badge-y {
+      font-size: 11px;
+      padding: 2px 7px;
+      background: #fffbeb;
+      color: #b45309;
+      border: 1px solid #fde68a;
+      border-radius: 6px;
+      font-family: monospace;
+    }
+
+    /* Hint text */
+    .hint {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 4px;
+    }
+
+    /* Actions */
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      padding-bottom: 8px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: background .15s, transform .1s;
+    }
+    .btn:active { transform: scale(.98); }
+    .btn-outline {
+      background: white;
+      border: 1.5px solid #d1d5db;
+      color: #374151;
+    }
+    .btn-outline:hover { background: #f9fafb; }
+    .btn-primary {
+      background: #0D8A4F;
+      color: white;
+    }
+    .btn-primary:hover { background: #0a7442; }
+
+    /* Section icons as emoji fallback */
+    .icon-id    { color: #7c3aed; }
+    .icon-map   { color: #2563eb; }
+    .icon-bio   { color: #d97706; }
+    .icon-lock  { color: #6b7280; }
+
+    /* Required asterisk */
+    .req { color: #ef4444; }
+
+    /* Tabs demo */
+    .mode-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .mode-tab {
+      padding: 6px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1.5px solid transparent;
+      background: white;
+      color: #6b7280;
+      border-color: #e5e7eb;
+    }
+    .mode-tab.active {
+      background: #0D8A4F;
+      color: white;
+      border-color: #0D8A4F;
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <a href="#" class="btn-back" onclick="return false">
+      ← Volver
+    </a>
+    <div class="header-icon">🏭</div>
+    <div class="header-title">
+      <h2 id="page-title">Nuevo Generador</h2>
+      <p id="page-subtitle">Registrar un nuevo generador de residuos peligrosos</p>
+    </div>
+  </div>
+
+  <!-- Mode toggle (demo) -->
+  <div class="mode-tabs">
+    <button class="mode-tab active" onclick="setMode('crear')">Crear</button>
+    <button class="mode-tab" onclick="setMode('editar')">Editar</button>
+  </div>
+
+  <!-- Sección 1: Identificación -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-header-icon icon-id">🏭</span>
+      <h3>Identificación</h3>
+    </div>
+    <div class="card-body">
+      <div class="grid-2">
+        <div class="field">
+          <label>Razón Social <span class="req">*</span></label>
+          <input type="text" placeholder="Empresa S.A." />
+        </div>
+        <div class="field">
+          <label>CUIT <span class="req">*</span></label>
+          <input type="text" placeholder="30-12345678-9" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Categoría</label>
+        <select>
+          <option value="">Seleccionar categoría...</option>
+          <option>Grandes Generadores</option>
+          <option>Medianos Generadores</option>
+          <option>Pequeños Generadores</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>N° Inscripción DGFA</label>
+        <input type="text" placeholder="G-000XXX" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Sección 2: Contacto -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-header-icon icon-map">📍</span>
+      <h3>Contacto</h3>
+    </div>
+    <div class="card-body">
+      <div class="field">
+        <label>Domicilio</label>
+        <input type="text" placeholder="Av. San Martín 1234, Mendoza" />
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Teléfono</label>
+          <input type="tel" placeholder="+54 261 4XX-XXXX" />
+        </div>
+        <div class="field">
+          <label>Email <span class="req">*</span></label>
+          <input type="email" placeholder="contacto@empresa.com" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sección 3: Actividad Regulatoria -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-header-icon icon-bio">☣️</span>
+      <h3>Actividad Regulatoria</h3>
+    </div>
+    <div class="card-body">
+      <div class="field">
+        <label>Rubro</label>
+        <input type="text" placeholder="Ej: INDUSTRIA QUIMICA" />
+      </div>
+      <div class="field">
+        <label>Actividad</label>
+        <input type="text" placeholder="Ej: Generación de energía eléctrica" />
+      </div>
+      <div class="field">
+        <label>Corrientes Y (Ley 24.051) — separadas por coma</label>
+        <input
+          class="corrientes-input"
+          type="text"
+          id="corrientes-input"
+          placeholder="Ej: Y8, Y9, Y12, Y48"
+          oninput="updateBadges(this.value)"
+        />
+        <div class="badge-row" id="badge-row"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sección 4: Acceso (solo creación) -->
+  <div class="card" id="card-acceso">
+    <div class="card-header">
+      <span class="card-header-icon icon-lock">🔒</span>
+      <h3>Acceso al Sistema</h3>
+    </div>
+    <div class="card-body">
+      <div class="grid-2">
+        <div class="field">
+          <label>Nombre del Responsable</label>
+          <input type="text" placeholder="Juan Pérez" />
+        </div>
+        <div class="field">
+          <label>Password Inicial <span class="req">*</span></label>
+          <input type="password" placeholder="Mínimo 8 caracteres" />
+        </div>
+      </div>
+      <p class="hint">El responsable podrá cambiar su contraseña desde su perfil al ingresar por primera vez.</p>
+    </div>
+  </div>
+
+  <!-- Acciones -->
+  <div class="actions">
+    <button class="btn btn-outline">Cancelar</button>
+    <button class="btn btn-primary" id="btn-submit">💾 Crear Generador</button>
+  </div>
+
+</div>
+
+<script>
+  function updateBadges(val) {
+    const row = document.getElementById('badge-row');
+    const codes = val.split(',').map(c => c.trim()).filter(Boolean);
+    row.innerHTML = codes.map(c => `<span class="badge-y">${c}</span>`).join('');
+  }
+
+  function setMode(mode) {
+    const tabs = document.querySelectorAll('.mode-tab');
+    tabs.forEach(t => t.classList.remove('active'));
+    event.target.classList.add('active');
+
+    const cardAcceso = document.getElementById('card-acceso');
+    const title = document.getElementById('page-title');
+    const subtitle = document.getElementById('page-subtitle');
+    const btnSubmit = document.getElementById('btn-submit');
+
+    if (mode === 'editar') {
+      cardAcceso.style.display = 'none';
+      title.textContent = 'Editar Generador';
+      subtitle.textContent = 'Modificar datos del generador';
+      btnSubmit.textContent = '💾 Guardar Cambios';
+    } else {
+      cardAcceso.style.display = '';
+      title.textContent = 'Nuevo Generador';
+      subtitle.textContent = 'Registrar un nuevo generador de residuos peligrosos';
+      btnSubmit.textContent = '💾 Crear Generador';
+    }
+  }
+</script>
+</body>
+</html>
