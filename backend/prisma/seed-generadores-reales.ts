@@ -149,6 +149,12 @@ async function main() {
       continue;
     }
 
+    // Validar formato CUIT: XX-XXXXXXXX-X
+    const cuitValido = /^\d{2}-\d{8}-\d$/.test(cuit);
+    if (!cuitValido) {
+      warnings.push(`${(row[2] || '').trim()}: CUIT malformado [${cuit}], importando con warning`);
+    }
+
     const razonSocial = (row[2] || '').trim() || `Generador ${cuit}`;
     const certificado = normalizeCertificado(row[0] || '');
     const actividad   = (row[4] || '').trim() || null;
@@ -180,9 +186,14 @@ async function main() {
       let usuario = await prisma.usuario.findUnique({ where: { cuit } });
 
       if (usuario) {
+        // No sobrescribir rol si usuario ya tiene otro rol (multi-rol)
+        const updateData: Record<string, any> = { nombre: razonSocial };
+        if (usuario.rol === 'GENERADOR' || !usuario.rol) {
+          updateData.rol = 'GENERADOR';
+        }
         usuario = await prisma.usuario.update({
           where: { id: usuario.id },
-          data: { nombre: razonSocial, rol: 'GENERADOR' },
+          data: updateData,
         });
       } else {
         // Verificar si email ya está tomado por otro CUIT

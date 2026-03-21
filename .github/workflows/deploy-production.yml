@@ -6,6 +6,8 @@ on:
     paths:
       - 'frontend/**'
       - 'backend/**'
+      - 'docs/manual/**'
+      - 'docs/screenshots/**'
   workflow_dispatch:
     inputs:
       deploy_target:
@@ -30,7 +32,7 @@ jobs:
 
       - name: Package Frontend Source
         run: |
-          tar czf /tmp/sitrep-frontend-source.tar.gz frontend/
+          tar czf /tmp/sitrep-frontend-source.tar.gz frontend/ docs/manual/ docs/screenshots/desktop/ docs/screenshots/mobile/
 
       - name: Setup SSH Key
         run: |

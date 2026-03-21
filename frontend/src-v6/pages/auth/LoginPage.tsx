@@ -171,9 +171,13 @@ const LoginPage: React.FC = () => {
       </form>
 
       <p className="mt-6 text-center text-sm text-neutral-600">
-        ¿No tenés cuenta?{' '}
+        ¿No tenes cuenta?{' '}
         <Link to="/registro" className="text-[#1B5E3C] font-semibold hover:underline">
           Registrate
+        </Link>
+        {' · '}
+        <Link to="/reclamar" className="text-[#1B5E3C] font-semibold hover:underline">
+          Reclama tu cuenta
         </Link>
       </p>
     </div>

@@ -32,6 +32,7 @@ const RegistroPage = lazy(() => import('./pages/auth/RegistroPage'));
 const VerificarEmailPage = lazy(() => import('./pages/auth/VerificarEmailPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
+const ReclamarCuentaPage = lazy(() => import('./pages/auth/ReclamarCuentaPage'));
 
 // Dashboard & Centro de Control
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'));
@@ -164,6 +165,7 @@ function App() {
           <Route path="/verificar-email" element={<VerificarEmailPage />} />
           <Route path="/recuperar" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/reclamar" element={<ReclamarCuentaPage />} />
         </Route>
 
         {/* Mobile Routes - Protected */}

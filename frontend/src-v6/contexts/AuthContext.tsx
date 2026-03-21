@@ -173,7 +173,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setAuthError(null);
     setIsLoading(true);
     try {
-      const isCuit = /^\d{2}-\d{8}-\d$/.test(identifier.trim());
+      const trimmed = identifier.trim();
+      const isCuit = /^\d{2}-\d{8}-\d$/.test(trimmed) || /^\d{11}$/.test(trimmed);
       const credentials = isCuit
         ? { cuit: identifier.trim(), password }
         : { email: identifier.trim(), password };

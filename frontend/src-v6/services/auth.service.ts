@@ -49,4 +49,9 @@ export const authService = {
     await api.post('/auth/reset-password', { token, newPassword });
     localStorage.setItem('sitrep_post_reset', '1');
   },
+
+  async claimAccount(data: { cuit: string; razonSocial: string; nuevoEmail: string; password: string }): Promise<{ message: string }> {
+    const { data: resp } = await api.post<{ success: true; message: string }>('/auth/claim-account', data);
+    return { message: resp.message };
+  },
 };

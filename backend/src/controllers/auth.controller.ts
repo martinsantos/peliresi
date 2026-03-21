@@ -9,6 +9,13 @@ import { AppError } from '../middlewares/errorHandler';
 import prisma from '../lib/prisma';
 import { emailService } from '../services/email.service';
 
+// CUIT normalization: accepts "30711235961" or "30-71123596-1" → "30-71123596-1"
+function normalizeCuit(raw: string): string | null {
+  const digits = raw.replace(/[^0-9]/g, '');
+  if (digits.length !== 11) return null;
+  return `${digits.slice(0, 2)}-${digits.slice(2, 10)}-${digits.slice(10)}`;
+}
+
 // Zod schemas
 const loginSchema = z.object({
   email: z.string().email('Email inválido').optional(),
@@ -56,58 +63,73 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
     const passwordError = validatePasswordStrength(password);
     if (passwordError) throw new AppError(passwordError, 400);
 
-    const existingUser = await prisma.usuario.findUnique({ where: { email } });
-    if (existingUser) throw new AppError('El correo electrónico ya está en uso', 400);
+    // Multi-rol: si el CUIT ya existe con el mismo email, reusar el usuario
+    const normalizedCuit = cuit ? (normalizeCuit(cuit) || cuit) : undefined;
+    const existingByCuit = normalizedCuit ? await prisma.usuario.findUnique({ where: { cuit: normalizedCuit } }) : null;
+    const existingByEmail = await prisma.usuario.findUnique({ where: { email } });
 
-    if (cuit) {
-      const existingCuit = await prisma.usuario.findUnique({ where: { cuit } });
-      if (existingCuit) throw new AppError('El CUIT ya está registrado', 400);
+    let user: { id: string; email: string; rol: string; nombre: string };
+    let isMultiRol = false;
+
+    if (existingByCuit && existingByEmail && existingByCuit.id === existingByEmail.id) {
+      // Mismo CUIT y mismo email → multi-rol legítimo
+      isMultiRol = true;
+      user = { id: existingByCuit.id, email: existingByCuit.email, rol, nombre: existingByCuit.nombre };
+    } else if (existingByCuit) {
+      // CUIT existe con otro email
+      throw new AppError('El CUIT ya está registrado con otro correo electrónico', 400);
+    } else if (existingByEmail) {
+      // Email existe con otro CUIT
+      throw new AppError('El correo electrónico ya está en uso', 400);
+    } else {
+      // Usuario nuevo
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password, salt);
+
+      const rawToken = crypto.randomBytes(32).toString('hex');
+      const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+      const created = await prisma.usuario.create({
+        data: {
+          email,
+          password: hashedPassword,
+          rol,
+          nombre,
+          apellido,
+          empresa,
+          telefono,
+          cuit: normalizedCuit || cuit,
+          activo: false,
+          emailVerified: false,
+          emailVerificationToken: hashedToken,
+        },
+        select: { id: true, email: true, rol: true, nombre: true },
+      });
+      user = created;
+
+      // Enviar email de verificación solo a usuarios nuevos
+      await emailService.sendEmailVerification(email, nombre, rawToken);
     }
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // Token de verificación de email (raw → hash guardado en DB)
-    const rawToken = crypto.randomBytes(32).toString('hex');
-    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
-
-    const user = await prisma.usuario.create({
-      data: {
-        email,
-        password: hashedPassword,
-        rol,
-        nombre,
-        apellido,
-        empresa,
-        telefono,
-        cuit,
-        activo: false,
-        emailVerified: false,
-        emailVerificationToken: hashedToken,
-      },
-      select: { id: true, email: true, rol: true, nombre: true },
-    });
-
-    // Enviar email de verificación
-    await emailService.sendEmailVerification(email, nombre, rawToken);
 
     // Auditoría de registro
     try {
       await prisma.auditoria.create({
         data: {
           usuarioId: user.id,
-          accion: 'REGISTRO',
+          accion: isMultiRol ? 'REGISTRO_MULTI_ROL' : 'REGISTRO',
           modulo: 'AUTH',
           ip: req.ip || req.headers['x-forwarded-for']?.toString() || 'unknown',
           userAgent: req.headers['user-agent'] || 'unknown',
-          datosDespues: JSON.stringify({ nombre: user.nombre, email: user.email, rol: user.rol, timestamp: new Date().toISOString() }),
+          datosDespues: JSON.stringify({ nombre: user.nombre, email: user.email, rol, isMultiRol, timestamp: new Date().toISOString() }),
         },
       });
     } catch { /* ignore audit errors */ }
 
     res.status(201).json({
       success: true,
-      message: 'Revisá tu email para verificar tu cuenta.',
+      message: isMultiRol
+        ? 'Solicitud de nuevo perfil registrada. Pendiente de aprobación del administrador.'
+        : 'Revisá tu email para verificar tu cuenta.',
     });
   } catch (error) {
     next(error);
@@ -202,8 +224,9 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
 
     const { email, cuit, password } = parsed.data;
 
+    const normalizedCuit = cuit ? (normalizeCuit(cuit) || cuit) : undefined;
     const user = await prisma.usuario.findFirst({
-      where: cuit ? { cuit } : { email },
+      where: normalizedCuit ? { cuit: normalizedCuit } : { email },
       include: { generador: true, transportista: true, operador: true },
     });
 
@@ -254,8 +277,9 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
     const { email, cuit } = req.body;
     if (!email && !cuit) throw new AppError('Indicá tu email o CUIT', 400);
 
+    const normalizedCuit = cuit ? (normalizeCuit(cuit) || cuit) : undefined;
     const user = await prisma.usuario.findFirst({
-      where: email ? { email } : { cuit },
+      where: email ? { email } : { cuit: normalizedCuit },
     });
 
     // Responder 200 siempre (no revelar existencia)
@@ -384,6 +408,119 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
     if (!user || !user.activo) throw new AppError('Usuario no encontrado o inactivo', 401);
 
     res.json({ success: true, data: generateTokens(user.id) });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ── CLAIM ACCOUNT (público) ──────────────────────────────────────
+const claimSchema = z.object({
+  cuit: z.string().min(8, 'CUIT es requerido'),
+  razonSocial: z.string().min(2, 'Razón Social es requerida'),
+  nuevoEmail: z.string().email('Email inválido'),
+  password: z.string().min(1, 'Contraseña es requerida'),
+});
+
+export const claimAccount = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = claimSchema.safeParse(req.body);
+    if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
+
+    const { cuit, razonSocial, nuevoEmail, password } = parsed.data;
+    const genericMsg = 'Si los datos coinciden con un registro existente, recibirás un email de verificación.';
+
+    const passwordError = validatePasswordStrength(password);
+    if (passwordError) throw new AppError(passwordError, 400);
+
+    const normalizedCuit = normalizeCuit(cuit) || cuit;
+
+    const user = await prisma.usuario.findFirst({
+      where: { cuit: normalizedCuit },
+      include: { generador: true, transportista: true, operador: true },
+    });
+
+    // Don't reveal whether the CUIT exists
+    if (!user) {
+      return res.json({ success: true, message: genericMsg });
+    }
+
+    // Verify razonSocial against linked actor (case-insensitive)
+    const actorRazonSocial =
+      user.generador?.razonSocial ||
+      user.transportista?.razonSocial ||
+      user.operador?.razonSocial ||
+      user.empresa;
+
+    if (!actorRazonSocial || actorRazonSocial.trim().toLowerCase() !== razonSocial.trim().toLowerCase()) {
+      return res.json({ success: true, message: genericMsg });
+    }
+
+    // Verify nuevoEmail is not used by another user
+    const existingEmail = await prisma.usuario.findUnique({ where: { email: nuevoEmail } });
+    if (existingEmail && existingEmail.id !== user.id) {
+      throw new AppError('El email ya está en uso por otro usuario', 400);
+    }
+
+    // Update user: new email, new password, deactivate until verified
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+    await prisma.usuario.update({
+      where: { id: user.id },
+      data: {
+        email: nuevoEmail,
+        password: hashedPassword,
+        emailVerified: false,
+        activo: false,
+        emailVerificationToken: hashedToken,
+      },
+    });
+
+    // Send verification email
+    await emailService.sendEmailVerification(nuevoEmail, user.nombre, rawToken);
+
+    // Notify admins via in-app notification
+    const admins = await prisma.usuario.findMany({
+      where: { rol: 'ADMIN', activo: true },
+      select: { id: true },
+    });
+    await Promise.all(admins.map(admin =>
+      prisma.notificacion.create({
+        data: {
+          usuarioId: admin.id,
+          tipo: 'ALERTA_SISTEMA',
+          titulo: 'Cuenta reclamada',
+          mensaje: `${user.nombre} (${user.rol}) reclamó su cuenta con el email ${nuevoEmail}.`,
+          prioridad: 'ALTA',
+          datos: JSON.stringify({
+            tipo: 'cuenta_reclamada',
+            usuarioId: user.id,
+            nombre: user.nombre,
+            cuit: normalizedCuit,
+            nuevoEmail,
+            rol: user.rol,
+          }),
+        },
+      })
+    ));
+
+    // Audit log
+    try {
+      await prisma.auditoria.create({
+        data: {
+          usuarioId: user.id,
+          accion: 'CLAIM_ACCOUNT',
+          modulo: 'AUTH',
+          ip: req.ip || req.headers['x-forwarded-for']?.toString() || 'unknown',
+          userAgent: req.headers['user-agent'] || 'unknown',
+          datosDespues: JSON.stringify({ cuit: normalizedCuit, nuevoEmail, rol: user.rol, timestamp: new Date().toISOString() }),
+        },
+      });
+    } catch { /* ignore audit errors */ }
+
+    res.json({ success: true, message: genericMsg });
   } catch (error) {
     next(error);
   }

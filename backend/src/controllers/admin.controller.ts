@@ -139,26 +139,41 @@ export const createUsuario = async (req: AuthRequest, res: Response, next: NextF
       throw new AppError(parsed.error.issues[0].message, 400);
     }
 
-    const { email, password, nombre, apellido, rol, empresa, telefono } = parsed.data;
+    const { email, password, nombre, apellido, rol, empresa, telefono, cuit } = parsed.data;
 
-    const existente = await prisma.usuario.findUnique({ where: { email } });
-    if (existente) {
+    // Multi-rol: si el CUIT ya existe con el mismo email, reusar el usuario
+    const existingByCuit = cuit ? await prisma.usuario.findUnique({ where: { cuit } }) : null;
+    const existingByEmail = await prisma.usuario.findUnique({ where: { email } });
+
+    let usuario;
+
+    if (existingByCuit && existingByEmail && existingByCuit.id === existingByEmail.id) {
+      // Mismo CUIT y mismo email → multi-rol, retornar usuario existente
+      usuario = existingByCuit;
+    } else if (existingByCuit) {
+      throw new AppError('El CUIT ya está registrado con otro email', 400);
+    } else if (existingByEmail) {
       throw new AppError('Ya existe un usuario con ese email', 400);
+    } else {
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password, salt);
+
+      usuario = await prisma.usuario.create({
+        data: {
+          email,
+          password: hashedPassword,
+          nombre,
+          apellido,
+          rol,
+          empresa,
+          telefono,
+          cuit,
+        },
+      });
     }
 
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    const usuario = await prisma.usuario.create({
-      data: {
-        email,
-        password: hashedPassword,
-        nombre,
-        apellido,
-        rol,
-        empresa,
-        telefono,
-      },
+    const result = await prisma.usuario.findUnique({
+      where: { id: usuario.id },
       select: {
         id: true,
         email: true,
@@ -172,7 +187,7 @@ export const createUsuario = async (req: AuthRequest, res: Response, next: NextF
       },
     });
 
-    res.status(201).json({ success: true, data: { usuario } });
+    res.status(201).json({ success: true, data: { usuario: result } });
   } catch (error) {
     next(error);
   }

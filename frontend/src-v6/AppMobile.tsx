@@ -12,6 +12,7 @@ import { MobileLayout } from './layouts/MobileLayout';
 
 // Pages - Lazy loaded
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
+const ReclamarCuentaPage = lazy(() => import('./pages/auth/ReclamarCuentaPage'));
 const MobileDashboardPage = lazy(() => import('./pages/mobile/MobileDashboardPage'));
 const CentroControlPage = lazy(() => import('./pages/centro-control/CentroControlPage'));
 const ManifiestosPage = lazy(() => import('./pages/manifiestos/ManifiestosPage'));
@@ -94,8 +95,9 @@ function AppMobile() {
     <AuthProvider>
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          {/* Login */}
+          {/* Login & Account Claim */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/reclamar" element={<ReclamarCuentaPage />} />
 
           {/* Mobile Routes - all use MobileLayout */}
           <Route element={<MobileLayout />}>

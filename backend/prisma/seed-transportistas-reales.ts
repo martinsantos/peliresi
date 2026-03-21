@@ -233,9 +233,14 @@ async function main() {
       let usuario = await prisma.usuario.findUnique({ where: { cuit } });
 
       if (usuario) {
+        // No sobrescribir rol si usuario ya tiene otro rol (multi-rol)
+        const updateData: Record<string, any> = { nombre: razonSocial };
+        if (usuario.rol === 'TRANSPORTISTA' || !usuario.rol) {
+          updateData.rol = 'TRANSPORTISTA';
+        }
         usuario = await prisma.usuario.update({
           where: { id: usuario.id },
-          data: { nombre: razonSocial, rol: 'TRANSPORTISTA' },
+          data: updateData,
         });
       } else {
         const emailExistente = await prisma.usuario.findUnique({ where: { email } });

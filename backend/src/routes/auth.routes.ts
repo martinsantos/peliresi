@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { register, login, getProfile, logout, refreshToken, changePassword, verifyEmail, forgotPassword, resetPassword } from '../controllers/auth.controller';
+import { register, login, getProfile, logout, refreshToken, changePassword, verifyEmail, forgotPassword, resetPassword, claimAccount } from '../controllers/auth.controller';
 import { isAuthenticated } from '../middlewares/auth.middleware';
 
 const router = Router();
@@ -196,6 +196,34 @@ router.post('/forgot-password', forgotPassword);
  *         description: Token invalido o expirado
  */
 router.post('/reset-password', resetPassword);
+
+/**
+ * @openapi
+ * /auth/claim-account:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Reclamar cuenta existente
+ *     description: Permite a usuarios con email placeholder reclamar su cuenta verificando CUIT y Razon Social.
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [cuit, razonSocial, nuevoEmail, password]
+ *             properties:
+ *               cuit: { type: string, example: "30-71123596-1" }
+ *               razonSocial: { type: string, example: "HUMBERTO MORILLAS S.A." }
+ *               nuevoEmail: { type: string, format: email, example: "contacto@empresa.com" }
+ *               password: { type: string, minLength: 8, example: "NuevaPass123" }
+ *     responses:
+ *       200:
+ *         description: Solicitud procesada (respuesta generica por seguridad)
+ *       400:
+ *         description: Datos invalidos
+ */
+router.post('/claim-account', claimAccount);
 
 /**
  * @openapi

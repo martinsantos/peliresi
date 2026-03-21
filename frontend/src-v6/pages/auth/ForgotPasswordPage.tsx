@@ -75,6 +75,13 @@ const ForgotPasswordPage: React.FC = () => {
               {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Enviar enlace'}
             </button>
           </form>
+
+          <p className="mt-4 text-center text-sm text-neutral-500">
+            ¿No tenes acceso al email registrado?{' '}
+            <Link to="/reclamar" className="text-[#1B5E3C] font-semibold hover:underline">
+              Reclama tu cuenta con CUIT y Razon Social
+            </Link>
+          </p>
         </>
       )}
     </div>

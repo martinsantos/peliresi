@@ -280,6 +280,7 @@ export interface CreateUsuarioRequest {
 }
 
 export interface UpdateUsuarioRequest {
+  email?: string;
   nombre?: string;
   apellido?: string;
   empresa?: string;

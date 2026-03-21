@@ -145,6 +145,7 @@ const UsuariosPage: React.FC = () => {
   // Modal states
   const [modalCrear, setModalCrear] = useState(false);
   const [modalVer, setModalVer] = useState(false);
+  const [modalEditar, setModalEditar] = useState(false);
   const [usuarioSeleccionado, setUsuarioSeleccionado] = useState<UsuarioLocal | null>(null);
   const [modalEliminar, setModalEliminar] = useState(false);
 
@@ -156,6 +157,12 @@ const UsuariosPage: React.FC = () => {
   const [formRol, setFormRol] = useState('');
   const [formSector, setFormSector] = useState('');
   const [formPassword, setFormPassword] = useState('');
+
+  // Form state for edit user
+  const [editEmail, setEditEmail] = useState('');
+  const [editNombre, setEditNombre] = useState('');
+  const [editTelefono, setEditTelefono] = useState('');
+  const [editEmpresa, setEditEmpresa] = useState('');
 
   const itemsPerPage = 10;
 
@@ -300,6 +307,36 @@ const UsuariosPage: React.FC = () => {
   const verUsuario = (usuario: UsuarioLocal) => {
     setUsuarioSeleccionado(usuario);
     setModalVer(true);
+  };
+
+  const abrirEditar = (usuario: UsuarioLocal) => {
+    setUsuarioSeleccionado(usuario);
+    setEditEmail(usuario.email);
+    setEditNombre(usuario.nombre);
+    setEditTelefono(usuario.telefono);
+    setEditEmpresa(usuario.sector);
+    setModalVer(false);
+    setModalEditar(true);
+  };
+
+  const guardarEdicion = () => {
+    if (!usuarioSeleccionado || !editEmail) {
+      toast.error('Error', 'El email es obligatorio');
+      return;
+    }
+    const [nombre, ...apellidoParts] = editNombre.split(' ');
+    updateMutation.mutate(
+      { id: usuarioSeleccionado.id, data: { email: editEmail, nombre: nombre || editNombre, apellido: apellidoParts.join(' ') || undefined, telefono: editTelefono || undefined, empresa: editEmpresa || undefined } },
+      {
+        onSuccess: () => {
+          setModalEditar(false);
+          toast.success('Usuario actualizado', 'Los datos se guardaron correctamente');
+        },
+        onError: (err: any) => {
+          toast.error('Error', err?.response?.data?.message || 'No se pudo actualizar el usuario');
+        },
+      }
+    );
   };
 
   // Columnas para la tabla
@@ -722,6 +759,7 @@ const UsuariosPage: React.FC = () => {
         footer={
           <>
             <Button variant="outline" onClick={() => setModalVer(false)}>Cerrar</Button>
+            {usuarioSeleccionado && <Button onClick={() => abrirEditar(usuarioSeleccionado)}>Editar</Button>}
           </>
         }
       >
@@ -798,6 +836,29 @@ const UsuariosPage: React.FC = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Modal Editar Usuario */}
+      <Modal
+        isOpen={modalEditar}
+        onClose={() => setModalEditar(false)}
+        title="Editar Usuario"
+        size="lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setModalEditar(false)}>Cancelar</Button>
+            <Button onClick={guardarEdicion} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? 'Guardando...' : 'Guardar cambios'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4 animate-fade-in">
+          <Input label="Email" type="email" placeholder="usuario@empresa.com" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
+          <Input label="Nombre completo" placeholder="Juan Perez" value={editNombre} onChange={(e) => setEditNombre(e.target.value)} />
+          <Input label="Telefono" placeholder="+54 261 123-4567" value={editTelefono} onChange={(e) => setEditTelefono(e.target.value)} />
+          <Input label="Empresa / Sector" placeholder="Razon social" value={editEmpresa} onChange={(e) => setEditEmpresa(e.target.value)} />
+        </div>
       </Modal>
 
       {/* Modal Crear Usuario */}
