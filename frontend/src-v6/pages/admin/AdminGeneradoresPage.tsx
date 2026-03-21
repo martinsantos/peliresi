@@ -23,9 +23,8 @@ import {
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
-import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/BadgeV2';
-import { Modal, ConfirmModal } from '../../components/ui/Modal';
+import { ConfirmModal } from '../../components/ui/Modal';
 import { Table, Pagination } from '../../components/ui/Table';
 import { SearchInput } from '../../components/ui/SearchInput';
 import { toast } from '../../components/ui/Toast';
@@ -33,27 +32,10 @@ import { downloadCsv } from '../../utils/exportCsv';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   useGeneradores,
-  useCreateGenerador,
-  useUpdateGenerador,
   useDeleteGenerador,
 } from '../../hooks/useActores';
 import { GENERADORES_DATA, TOP_RUBROS, type GeneradorEnriched } from '../../data/generadores-enrichment';
 import { CORRIENTES_Y } from '../../data/corrientes-y';
-
-const INITIAL_FORM = {
-  razonSocial: '',
-  cuit: '',
-  domicilio: '',
-  telefono: '',
-  email: '',
-  password: '',
-  nombre: '',
-  numeroInscripcion: '',
-  categoria: '',
-  actividad: '',
-  rubro: '',
-  corrientesControl: '',
-};
 
 const AdminGeneradoresPage: React.FC = () => {
   const navigate = useNavigate();
@@ -67,17 +49,11 @@ const AdminGeneradoresPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState<string | undefined>(undefined);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [modalCrear, setModalCrear] = useState(false);
-  const [modalEditar, setModalEditar] = useState(false);
   const [modalEliminar, setModalEliminar] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; razonSocial: string } | null>(null);
-  const [form, setForm] = useState(INITIAL_FORM);
 
   // API hooks
   const { data: apiData, isLoading, isError, error } = useGeneradores({ page: currentPage, limit: 20, search: busqueda || undefined, sortBy, sortOrder });
-  const createMutation = useCreateGenerador();
-  const updateMutation = useUpdateGenerador();
   const deleteMutation = useDeleteGenerador();
 
   const generadoresData = Array.isArray(apiData?.items) ? apiData.items : [];
@@ -145,80 +121,8 @@ const AdminGeneradoresPage: React.FC = () => {
     filtrados: filteredData.length,
   };
 
-  const updateField = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }));
-
-  const handleCrear = async () => {
-    if (!form.razonSocial || !form.cuit || !form.email) {
-      toast.error('Campos requeridos', 'Razón social, CUIT y email son obligatorios');
-      return;
-    }
-    try {
-      await createMutation.mutateAsync({
-        email: form.email,
-        password: form.password || 'TempPass123!',
-        nombre: form.nombre || form.razonSocial,
-        razonSocial: form.razonSocial,
-        cuit: form.cuit,
-        domicilio: form.domicilio,
-        telefono: form.telefono,
-        numeroInscripcion: form.numeroInscripcion,
-        categoria: form.categoria,
-        actividad: form.actividad,
-        rubro: form.rubro,
-        corrientesControl: form.corrientesControl,
-      });
-      toast.success('Creado', `Generador ${form.razonSocial} creado`);
-      setModalCrear(false);
-      setForm(INITIAL_FORM);
-    } catch (err: any) {
-      toast.error('Error', err?.response?.data?.message || 'No se pudo crear el generador');
-    }
-  };
-
-  const handleEditar = async () => {
-    if (!editId) return;
-    try {
-      await updateMutation.mutateAsync({
-        id: editId,
-        data: {
-          razonSocial: form.razonSocial,
-          cuit: form.cuit,
-          domicilio: form.domicilio,
-          telefono: form.telefono,
-          email: form.email,
-          numeroInscripcion: form.numeroInscripcion,
-          categoria: form.categoria,
-          actividad: form.actividad,
-          rubro: form.rubro,
-          corrientesControl: form.corrientesControl,
-        },
-      });
-      toast.success('Actualizado', `Generador ${form.razonSocial} actualizado`);
-      setModalEditar(false);
-      setEditId(null);
-      setForm(INITIAL_FORM);
-    } catch (err: any) {
-      toast.error('Error', err?.response?.data?.message || 'No se pudo actualizar');
-    }
-  };
-
   const openEditar = (row: typeof tableData[0]) => {
-    setEditId(row.id);
-    setForm({
-      razonSocial: row.razonSocial || '',
-      cuit: row.cuit || '',
-      domicilio: row.domicilio || '',
-      telefono: row.telefono || '',
-      email: row.email || '',
-      password: '',
-      nombre: '',
-      numeroInscripcion: row.numeroInscripcion !== '-' ? row.numeroInscripcion : '',
-      categoria: row.categoria !== '-' ? row.categoria : '',
-      actividad: row.actividad || '',
-      rubro: row.rubro || '',
-      corrientesControl: row.corrientesControlRaw || '',
-    });
-    setModalEditar(true);
+    navigate(isMobile ? `/mobile/admin/actores/generadores/${row.id}/editar` : `/admin/actores/generadores/${row.id}/editar`);
   };
 
   const handleEliminar = async () => {
@@ -255,62 +159,6 @@ const AdminGeneradoresPage: React.FC = () => {
     );
     toast.success('Exportar', 'CSV descargado');
   };
-
-  const renderForm = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <Input label="Razón Social" value={form.razonSocial} onChange={(e) => updateField('razonSocial', e.target.value)} placeholder="Empresa S.A." />
-        <Input label="CUIT" value={form.cuit} onChange={(e) => updateField('cuit', e.target.value)} placeholder="30-12345678-9" />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <Input label="Email" type="email" value={form.email} onChange={(e) => updateField('email', e.target.value)} placeholder="contacto@empresa.com" />
-        <Input label="Teléfono" value={form.telefono} onChange={(e) => updateField('telefono', e.target.value)} placeholder="+54 261 ..." />
-      </div>
-      <Input label="Domicilio" value={form.domicilio} onChange={(e) => updateField('domicilio', e.target.value)} placeholder="Av. San Martin 1234, Mendoza" />
-      <div className="grid grid-cols-2 gap-4">
-        <Input label="N° Inscripción" value={form.numeroInscripcion} onChange={(e) => updateField('numeroInscripcion', e.target.value)} placeholder="G-000XXX" />
-        <div>
-          <label className="block text-sm font-medium text-neutral-700 mb-1">Categoría</label>
-          <select
-            value={form.categoria}
-            onChange={(e) => updateField('categoria', e.target.value)}
-            className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm"
-          >
-            <option value="">Seleccionar...</option>
-            <option value="Grandes Generadores">Grandes Generadores</option>
-            <option value="Medianos Generadores">Medianos Generadores</option>
-            <option value="Pequeños Generadores">Pequeños Generadores</option>
-          </select>
-        </div>
-      </div>
-      <Input label="Actividad" value={form.actividad} onChange={(e) => updateField('actividad', e.target.value)} placeholder="Ej: generación de energía eléctrica" />
-      <Input label="Rubro" value={form.rubro} onChange={(e) => updateField('rubro', e.target.value)} placeholder="Ej: INDUSTRIA QUIMICA" />
-      <div>
-        <label className="block text-sm font-medium text-neutral-700 mb-1">Corrientes Y (separadas por coma)</label>
-        <input
-          value={form.corrientesControl}
-          onChange={(e) => updateField('corrientesControl', e.target.value)}
-          placeholder="Ej: Y8, Y9, Y12, Y48"
-          className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm"
-        />
-        {form.corrientesControl && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {form.corrientesControl.split(',').map(c => c.trim()).filter(Boolean).map(code => (
-              <span key={code} className="text-[11px] px-1.5 py-0.5 bg-warning-50 text-warning-700 border border-warning-200 rounded" title={CORRIENTES_Y[code] || code}>
-                {code}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-      {!editId && (
-        <div className="grid grid-cols-2 gap-4">
-          <Input label="Nombre Responsable" value={form.nombre} onChange={(e) => updateField('nombre', e.target.value)} placeholder="Juan Perez" />
-          <Input label="Password inicial" type="password" value={form.password} onChange={(e) => updateField('password', e.target.value)} placeholder="Min. 8 caracteres" />
-        </div>
-      )}
-    </div>
-  );
 
   const columns = [
     {
@@ -490,7 +338,7 @@ const AdminGeneradoresPage: React.FC = () => {
           <Button variant="outline" leftIcon={<Download size={18} />} onClick={handleExport}>
             Exportar
           </Button>
-          <Button leftIcon={<Plus size={18} />} onClick={() => { setForm(INITIAL_FORM); setModalCrear(true); }}>
+          <Button leftIcon={<Plus size={18} />} onClick={() => navigate(isMobile ? '/mobile/admin/actores/generadores/nuevo' : '/admin/actores/generadores/nuevo')}>
             Nuevo Generador
           </Button>
         </div>
@@ -632,42 +480,6 @@ const AdminGeneradoresPage: React.FC = () => {
           </>
         )}
       </Card>
-
-      {/* Modal crear */}
-      <Modal
-        isOpen={modalCrear}
-        onClose={() => { setModalCrear(false); setForm(INITIAL_FORM); }}
-        title="Nuevo Generador"
-        size="lg"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => { setModalCrear(false); setForm(INITIAL_FORM); }}>Cancelar</Button>
-            <Button onClick={handleCrear} disabled={createMutation.isPending}>
-              {createMutation.isPending ? 'Guardando...' : 'Crear Generador'}
-            </Button>
-          </>
-        }
-      >
-        {renderForm()}
-      </Modal>
-
-      {/* Modal editar */}
-      <Modal
-        isOpen={modalEditar}
-        onClose={() => { setModalEditar(false); setEditId(null); setForm(INITIAL_FORM); }}
-        title="Editar Generador"
-        size="lg"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => { setModalEditar(false); setEditId(null); setForm(INITIAL_FORM); }}>Cancelar</Button>
-            <Button onClick={handleEditar} disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? 'Guardando...' : 'Guardar Cambios'}
-            </Button>
-          </>
-        }
-      >
-        {renderForm()}
-      </Modal>
 
       {/* Modal eliminar */}
       <ConfirmModal
