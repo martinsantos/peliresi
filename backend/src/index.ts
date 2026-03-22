@@ -26,6 +26,8 @@ import { eventoManifiestoSubscriber } from './subscribers/eventoManifiesto.subsc
 import { iniciarVencimientoJob } from './jobs/vencimiento.job';
 import { iniciarBlockchainJob } from './jobs/blockchain.job';
 import blockchainRoutes from './routes/blockchain.routes';
+import renovacionRoutes from './routes/renovacion.routes';
+import solicitudRoutes from './routes/solicitud.routes';
 
 // Inicializar la aplicación Express
 const app = express();
@@ -211,11 +213,13 @@ app.use('/api/pdf', pdfRoutes);
 app.use('/api/reportes', reporteRoutes);
 app.use('/api/actores', actorRoutes);
 app.use('/api/blockchain', blockchainRoutes);
+app.use('/api/solicitudes', solicitudRoutes);
 app.use('/api', notificationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/centro-control', trackingRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/renovaciones', renovacionRoutes);
 
 // Manejador de rutas no encontradas
 app.use(notFoundHandler);

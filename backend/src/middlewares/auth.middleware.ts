@@ -23,8 +23,8 @@ export const isAuthenticated = async (
     const token = authHeader.split(' ')[1];
     
     // Verificar el token
-    const decoded = jwt.verify(token, config.JWT_SECRET as string) as { id: string };
-    
+    const decoded = jwt.verify(token, config.JWT_SECRET as string) as { id: string; restricted?: boolean };
+
     // Obtener el usuario de la base de datos
     const user = await prisma.usuario.findUnique({
       where: { id: decoded.id },
@@ -39,12 +39,17 @@ export const isAuthenticated = async (
       },
     });
 
-    if (!user || !user.activo) {
+    if (!user) {
+      throw new AppError('Usuario no autorizado', 401);
+    }
+
+    // Block inactive users UNLESS they have a restricted token
+    if (!user.activo && !decoded.restricted) {
       throw new AppError('Usuario no autorizado o inactivo', 401);
     }
 
-    // Adjuntar el usuario al objeto de solicitud
-    req.user = user;
+    // Adjuntar el usuario al objeto de solicitud (with restricted flag)
+    req.user = { ...user, restricted: decoded.restricted || false };
     next();
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {
@@ -79,3 +84,16 @@ export const requireAnyAdmin        = hasRole('ADMIN', 'ADMIN_TRANSPORTISTA', 'A
 export const requireAdminOrTransportista = hasRole('ADMIN', 'ADMIN_TRANSPORTISTA');
 export const requireAdminOrGenerador     = hasRole('ADMIN', 'ADMIN_GENERADOR');
 export const requireAdminOrOperador      = hasRole('ADMIN', 'ADMIN_OPERADOR');
+
+// Allow restricted users (candidates with pending solicitudes)
+export const allowRestricted = (_req: AuthRequest, _res: Response, next: NextFunction) => {
+  next();
+};
+
+// Block restricted users from full-access routes
+export const requireFullAccess = (req: AuthRequest, _res: Response, next: NextFunction) => {
+  if (req.user?.restricted) {
+    return next(new AppError('Acceso restringido - Tu solicitud esta siendo procesada', 403));
+  }
+  next();
+};

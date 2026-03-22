@@ -239,8 +239,58 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       throw new AppError('Verificá tu email antes de iniciar sesión', 403);
     }
 
+    // Restricted access for candidates with pending solicitudes
+    if (!user.activo && user.emailVerified) {
+      const solicitudPendiente = await prisma.solicitudInscripcion.findFirst({
+        where: {
+          usuarioId: user.id,
+          estado: { in: ['BORRADOR', 'ENVIADA', 'EN_REVISION', 'OBSERVADA'] },
+        },
+        select: { id: true },
+      });
+      if (solicitudPendiente) {
+        // Issue restricted token
+        const options: SignOptions = { expiresIn: config.JWT_EXPIRES_IN as StringValue };
+        const accessToken = jwt.sign({ id: user.id, restricted: true }, config.JWT_SECRET as string, options);
+        const refreshOptions: SignOptions = { expiresIn: '7d' as StringValue };
+        const refreshToken = jwt.sign({ id: user.id, restricted: true }, config.JWT_SECRET as string, refreshOptions);
+
+        const userData = {
+          id: user.id, email: user.email, rol: user.rol, nombre: user.nombre,
+          apellido: user.apellido, empresa: user.empresa, telefono: user.telefono,
+          activo: user.activo, generador: user.generador, transportista: user.transportista,
+          operador: user.operador, createdAt: user.createdAt,
+        };
+
+        // Audit restricted login
+        try {
+          await prisma.auditoria.create({
+            data: {
+              usuarioId: user.id,
+              accion: 'LOGIN_RESTRINGIDO',
+              modulo: 'AUTH',
+              ip: req.ip || req.headers['x-forwarded-for']?.toString() || 'unknown',
+              userAgent: req.headers['user-agent'] || 'unknown',
+              datosDespues: JSON.stringify({ email: user.email, rol: user.rol, solicitudId: solicitudPendiente.id, timestamp: new Date().toISOString() }),
+            },
+          });
+        } catch { /* ignore audit errors */ }
+
+        return res.json({
+          success: true,
+          data: {
+            user: userData,
+            tokens: { accessToken, refreshToken },
+            restricted: true,
+            solicitudId: solicitudPendiente.id,
+          },
+        });
+      }
+      throw new AppError('Tu cuenta esta pendiente de aprobacion del administrador', 403);
+    }
+
     if (!user.activo) {
-      throw new AppError('Tu cuenta está pendiente de aprobación del administrador', 403);
+      throw new AppError('Tu cuenta esta pendiente de aprobacion del administrador', 403);
     }
 
     const { accessToken, refreshToken } = generateTokens(user.id);
@@ -397,15 +447,29 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
     const { refreshToken: token } = req.body;
     if (!token) throw new AppError('Refresh token es requerido', 400);
 
-    let decoded: { id: string };
+    let decoded: { id: string; restricted?: boolean };
     try {
-      decoded = jwt.verify(token, config.JWT_SECRET as string) as { id: string };
+      decoded = jwt.verify(token, config.JWT_SECRET as string) as { id: string; restricted?: boolean };
     } catch {
       throw new AppError('Refresh token inválido o expirado', 401);
     }
 
     const user = await prisma.usuario.findUnique({ where: { id: decoded.id } });
-    if (!user || !user.activo) throw new AppError('Usuario no encontrado o inactivo', 401);
+    if (!user) throw new AppError('Usuario no encontrado o inactivo', 401);
+
+    // Allow refresh for restricted tokens (inactive users with pending solicitudes)
+    if (!user.activo && !decoded.restricted) {
+      throw new AppError('Usuario no encontrado o inactivo', 401);
+    }
+
+    if (decoded.restricted) {
+      // Re-issue restricted tokens
+      const options: SignOptions = { expiresIn: config.JWT_EXPIRES_IN as StringValue };
+      const accessToken = jwt.sign({ id: user.id, restricted: true }, config.JWT_SECRET as string, options);
+      const refreshOptions: SignOptions = { expiresIn: '7d' as StringValue };
+      const refreshToken = jwt.sign({ id: user.id, restricted: true }, config.JWT_SECRET as string, refreshOptions);
+      return res.json({ success: true, data: { accessToken, refreshToken } });
+    }
 
     res.json({ success: true, data: generateTokens(user.id) });
   } catch (error) {

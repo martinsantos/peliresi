@@ -75,6 +75,8 @@ const AdminGeneradoresPage = lazy(() => import('./pages/admin/AdminGeneradoresPa
 const GeneradorDetallePage = lazy(() => import('./pages/admin/GeneradorDetallePage'));
 const NuevoGeneradorPage = lazy(() => import('./pages/admin/NuevoGeneradorPage'));
 const AdminOperadoresPage = lazy(() => import('./pages/admin/AdminOperadoresPage'));
+const NuevoOperadorPage = lazy(() => import('./pages/admin/NuevoOperadorPage'));
+const AdminRenovacionesPage = lazy(() => import('./pages/admin/AdminRenovacionesPage'));
 const AdminVehiculosPage = lazy(() => import('./pages/admin/AdminVehiculosPage'));
 const AdminResiduosPage = lazy(() => import('./pages/admin/AdminResiduosPage'));
 const AdminTratamientosPage = lazy(() => import('./pages/admin/AdminTratamientosPage'));
@@ -110,6 +112,16 @@ const VerificarManifiestoPage = lazy(() => import('./pages/manifiestos/Verificar
 // Estadísticas
 const EstadisticasPage = lazy(() => import('./pages/estadisticas/EstadisticasPage'));
 
+// Inscripcion publica
+const InscripcionWizardPage = lazy(() => import('./pages/public/InscripcionWizardPage'));
+
+// Solicitudes
+const MiSolicitudPage = lazy(() => import('./pages/solicitud/MiSolicitudPage'));
+const AdminSolicitudesPage = lazy(() => import('./pages/admin/AdminSolicitudesPage'));
+const SolicitudDetallePage = lazy(() => import('./pages/admin/SolicitudDetallePage'));
+
+// Solicitar Cambios
+const SolicitarCambiosPage = lazy(() => import('./pages/perfil/SolicitarCambiosPage'));
 
 // 404
 const NotFoundPage = lazy(() => import('./pages/shared/NotFoundPage'));
@@ -167,6 +179,7 @@ function App() {
           <Route path="/recuperar" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/reclamar" element={<ReclamarCuentaPage />} />
+          <Route path="/inscripcion/:tipo" element={<InscripcionWizardPage />} />
         </Route>
 
         {/* Mobile Routes - Protected */}
@@ -231,6 +244,7 @@ function App() {
             <Route path="/mobile/admin/actores/generadores" element={<AdminGeneradoresPage />} />
             <Route path="/mobile/admin/actores/generadores/nuevo" element={<NuevoGeneradorPage />} />
             <Route path="/mobile/admin/actores/generadores/:id/editar" element={<NuevoGeneradorPage />} />
+            <Route path="/mobile/admin/actores/generadores/:id/renovar" element={<NuevoGeneradorPage />} />
             <Route path="/mobile/admin/actores/generadores/:id" element={<GeneradorDetallePage />} />
             <Route path="/mobile/admin/residuos" element={<AdminResiduosPage />} />
           </Route>
@@ -240,7 +254,11 @@ function App() {
         <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_OPERADOR']} />}>
           <Route element={<MobileLayout />}>
             <Route path="/mobile/admin/actores/operadores" element={<AdminOperadoresPage />} />
+            <Route path="/mobile/admin/actores/operadores/nuevo" element={<NuevoOperadorPage />} />
+            <Route path="/mobile/admin/actores/operadores/:id/editar" element={<NuevoOperadorPage />} />
+            <Route path="/mobile/admin/actores/operadores/:id/renovar" element={<NuevoOperadorPage />} />
             <Route path="/mobile/admin/actores/operadores/:id" element={<OperadorDetallePage />} />
+            <Route path="/mobile/admin/renovaciones" element={<AdminRenovacionesPage />} />
           </Route>
         </Route>
 
@@ -277,6 +295,18 @@ function App() {
             {/* Ayuda */}
             <Route path="/ayuda" element={<AyudaPage />} />
 
+            {/* Solicitudes */}
+            <Route path="/mi-solicitud" element={<MiSolicitudPage />} />
+            <Route path="/mi-perfil/solicitar-cambios" element={<SolicitarCambiosPage />} />
+
+          </Route>
+        </Route>
+
+        {/* Admin Solicitudes - ADMIN + sub-admins */}
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR']} />}>
+          <Route element={<MainLayout />}>
+            <Route path="/admin/solicitudes" element={<AdminSolicitudesPage />} />
+            <Route path="/admin/solicitudes/:id" element={<SolicitudDetallePage />} />
           </Route>
         </Route>
 
@@ -316,6 +346,7 @@ function App() {
             <Route path="/admin/actores/generadores" element={<AdminGeneradoresPage />} />
             <Route path="/admin/actores/generadores/nuevo" element={<NuevoGeneradorPage />} />
             <Route path="/admin/actores/generadores/:id/editar" element={<NuevoGeneradorPage />} />
+            <Route path="/admin/actores/generadores/:id/renovar" element={<NuevoGeneradorPage />} />
             <Route path="/admin/actores/generadores/:id" element={<GeneradorDetallePage />} />
             <Route path="/admin/residuos" element={<AdminResiduosPage />} />
           </Route>
@@ -325,8 +356,12 @@ function App() {
         <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_OPERADOR']} />}>
           <Route element={<MainLayout />}>
             <Route path="/admin/actores/operadores" element={<AdminOperadoresPage />} />
+            <Route path="/admin/actores/operadores/nuevo" element={<NuevoOperadorPage />} />
+            <Route path="/admin/actores/operadores/:id/editar" element={<NuevoOperadorPage />} />
+            <Route path="/admin/actores/operadores/:id/renovar" element={<NuevoOperadorPage />} />
             <Route path="/admin/actores/operadores/:id" element={<OperadorDetallePage />} />
             <Route path="/admin/tratamientos" element={<AdminTratamientosPage />} />
+            <Route path="/admin/renovaciones" element={<AdminRenovacionesPage />} />
           </Route>
         </Route>
 

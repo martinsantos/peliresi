@@ -157,4 +157,123 @@ export const emailService = {
     `);
     await send(email, '[SITREP] Restablecer contraseña', html);
   },
+
+  // ── Solicitud enviada — notificación al admin ─────────────────────
+  async sendSolicitudEnviadaAdmin(adminEmail: string, candidatoNombre: string, tipoActor: string): Promise<void> {
+    const link = `${FRONTEND_URL}/admin/solicitudes`;
+    const html = baseTemplate(`
+      <h3 style="color:#1B5E3C">Nueva solicitud de inscripción</h3>
+      <p>Se recibió una nueva solicitud de inscripción que requiere tu revisión:</p>
+      <ul>
+        <li><b>Nombre:</b> ${candidatoNombre}</li>
+        <li><b>Tipo de actor:</b> ${tipoActor}</li>
+      </ul>
+      <p style="text-align:center;margin:24px 0">
+        <a href="${link}" style="background:#1B5E3C;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block">
+          Revisar solicitudes
+        </a>
+      </p>
+    `);
+    await send(adminEmail, `[SITREP] Nueva solicitud de inscripción: ${candidatoNombre}`, html);
+  },
+
+  // ── Solicitud observada — notificación al candidato ───────────────
+  async sendSolicitudObservadaEmail(email: string, nombre: string, mensajeAdmin: string): Promise<void> {
+    const link = `${FRONTEND_URL}/mi-solicitud`;
+    const html = baseTemplate(`
+      <h3 style="color:#1B5E3C">Tu solicitud fue observada</h3>
+      <p>Hola <b>${nombre}</b>,</p>
+      <p>El administrador revisó tu solicitud de inscripción y realizó la siguiente observación:</p>
+      <div style="background:#fff;border-left:4px solid #1B5E3C;padding:12px 16px;margin:16px 0;border-radius:0 4px 4px 0">
+        <p style="margin:0;white-space:pre-wrap">${mensajeAdmin}</p>
+      </div>
+      <p>Por favor, ingresá al sistema para responder o corregir la información solicitada.</p>
+      <p style="text-align:center;margin:24px 0">
+        <a href="${link}" style="background:#1B5E3C;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block">
+          Ver mi solicitud
+        </a>
+      </p>
+    `);
+    await send(email, '[SITREP] Tu solicitud fue observada', html);
+  },
+
+  // ── Respuesta del candidato — notificación al admin ───────────────
+  async sendRespuestaCandidatoAdmin(adminEmail: string, candidatoNombre: string): Promise<void> {
+    const link = `${FRONTEND_URL}/admin/solicitudes`;
+    const html = baseTemplate(`
+      <h3 style="color:#1B5E3C">Respuesta a observación</h3>
+      <p>El candidato <b>${candidatoNombre}</b> respondió a tu observación sobre su solicitud de inscripción.</p>
+      <p style="text-align:center;margin:24px 0">
+        <a href="${link}" style="background:#1B5E3C;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block">
+          Revisar solicitudes
+        </a>
+      </p>
+    `);
+    await send(adminEmail, `[SITREP] ${candidatoNombre} respondió a tu observación`, html);
+  },
+
+  // ── Solicitud rechazada — notificación al candidato ───────────────
+  async sendSolicitudRechazadaEmail(email: string, nombre: string, motivoRechazo: string): Promise<void> {
+    const html = baseTemplate(`
+      <h3 style="color:#1B5E3C">Tu solicitud fue rechazada</h3>
+      <p>Hola <b>${nombre}</b>,</p>
+      <p>Lamentamos informarte que tu solicitud de inscripción en SITREP fue rechazada.</p>
+      <p><b>Motivo del rechazo:</b></p>
+      <div style="background:#fff;border-left:4px solid #dc2626;padding:12px 16px;margin:16px 0;border-radius:0 4px 4px 0">
+        <p style="margin:0;white-space:pre-wrap">${motivoRechazo}</p>
+      </div>
+      <p style="font-size:13px;color:#6b7280">Si considerás que se trata de un error, podés comunicarte con la Dirección General de Fiscalización Ambiental.</p>
+    `);
+    await send(email, '[SITREP] Tu solicitud fue rechazada', html);
+  },
+
+  // ── Modificación solicitada — notificación al admin ───────────────
+  async sendModificacionSolicitadaAdmin(adminEmail: string, actorNombre: string, tipoActor: string): Promise<void> {
+    const link = `${FRONTEND_URL}/admin/renovaciones`;
+    const html = baseTemplate(`
+      <h3 style="color:#1B5E3C">Solicitud de modificación de datos</h3>
+      <p>Un actor registrado solicita modificación de sus datos:</p>
+      <ul>
+        <li><b>Nombre:</b> ${actorNombre}</li>
+        <li><b>Tipo de actor:</b> ${tipoActor}</li>
+      </ul>
+      <p style="text-align:center;margin:24px 0">
+        <a href="${link}" style="background:#1B5E3C;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block">
+          Revisar solicitudes de modificación
+        </a>
+      </p>
+    `);
+    await send(adminEmail, `[SITREP] ${actorNombre} solicita modificación de datos`, html);
+  },
+
+  // ── Modificación aprobada — notificación al actor ─────────────────
+  async sendModificacionAprobadaEmail(email: string, nombre: string): Promise<void> {
+    const link = `${FRONTEND_URL}/login`;
+    const html = baseTemplate(`
+      <h3 style="color:#1B5E3C">Tu solicitud de cambio fue aprobada</h3>
+      <p>Hola <b>${nombre}</b>,</p>
+      <p>El administrador aprobó tu solicitud de modificación de datos. Los cambios ya están reflejados en el sistema.</p>
+      <p style="text-align:center;margin:24px 0">
+        <a href="${link}" style="background:#1B5E3C;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block">
+          Ingresar a SITREP
+        </a>
+      </p>
+    `);
+    await send(email, '[SITREP] Tu solicitud de cambio fue aprobada', html);
+  },
+
+  // ── Modificación rechazada — notificación al actor ────────────────
+  async sendModificacionRechazadaEmail(email: string, nombre: string, motivo: string): Promise<void> {
+    const html = baseTemplate(`
+      <h3 style="color:#1B5E3C">Tu solicitud de cambio fue rechazada</h3>
+      <p>Hola <b>${nombre}</b>,</p>
+      <p>El administrador rechazó tu solicitud de modificación de datos.</p>
+      <p><b>Motivo:</b></p>
+      <div style="background:#fff;border-left:4px solid #dc2626;padding:12px 16px;margin:16px 0;border-radius:0 4px 4px 0">
+        <p style="margin:0;white-space:pre-wrap">${motivo}</p>
+      </div>
+      <p style="font-size:13px;color:#6b7280">Si tenés consultas, podés comunicarte con la Dirección General de Fiscalización Ambiental.</p>
+    `);
+    await send(email, '[SITREP] Tu solicitud de cambio fue rechazada', html);
+  },
 };

@@ -56,6 +56,8 @@ export interface AuthContextType {
   impersonateUser: (userId: string) => Promise<void>;
   exitImpersonation: () => void;
   impersonationData: ImpersonationData | null;
+  isRestricted: boolean;
+  solicitudId: string | null;
   isDemo: boolean;
   isLoading: boolean;
   authError: string | null;
@@ -127,6 +129,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [authError, setAuthError] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [impersonationData, setImpersonationData] = useState<ImpersonationData | null>(null);
+  const [isRestricted, setIsRestricted] = useState(false);
+  const [solicitudId, setSolicitudId] = useState<string | null>(null);
 
   // On mount: check for existing token and validate it; restore impersonation state
   useEffect(() => {
@@ -179,6 +183,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ? { cuit: identifier.trim(), password }
         : { email: identifier.trim(), password };
       const response = await authService.login(credentials);
+      if ((response as any).restricted) {
+        setIsRestricted(true);
+        setSolicitudId((response as any).solicitudId || null);
+      }
       const user = apiUserToUser(response.user);
       setCurrentUser(user);
       const isFirstSession = !localStorage.getItem(`sitrep_onboarding_${user.id}`);
@@ -202,6 +210,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // ignore logout errors
     } finally {
       clearTokens();
+      setIsRestricted(false);
+      setSolicitudId(null);
       // Clean up impersonation and trip-related localStorage
       localStorage.removeItem(IMPERSONATION_KEY);
       localStorage.removeItem('sitrep_active_trip_id');
@@ -330,6 +340,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     impersonateUser,
     exitImpersonation,
     impersonationData,
+    isRestricted,
+    solicitudId,
     isDemo: false,
     isLoading,
     authError,

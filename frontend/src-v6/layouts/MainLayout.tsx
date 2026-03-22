@@ -34,6 +34,7 @@ import {
   QrCode,
   HelpCircle,
   BookOpen,
+  FileCheck,
 } from 'lucide-react';
 import { Button } from '../components/ui/ButtonV2';
 import { Badge } from '../components/ui/BadgeV2';
@@ -140,6 +141,7 @@ export const MainLayout: React.FC = () => {
       items.push({ path: '/admin/actores/generadores',    icon: Factory,      label: 'Admin Generadores' });
       items.push({ path: '/admin/actores/operadores',     icon: FlaskConical, label: 'Admin Operadores' });
       items.push({ path: '/admin/actores/transportistas', icon: Truck,        label: 'Admin Transporte' });
+      items.push({ path: '/admin/solicitudes',            icon: FileCheck,    label: 'Solicitudes' });
       items.push({ path: '/admin/residuos',               icon: FlaskConical, label: 'Catálogo Residuos' });
       items.push({ path: '/admin/tratamientos',           icon: BarChart3,    label: 'Tratamientos' });
       items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
@@ -147,12 +149,14 @@ export const MainLayout: React.FC = () => {
       items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
     } else if (isAdminGenerador) {
       items.push({ path: '/admin/actores/generadores',    icon: Factory,      label: 'Mis Generadores' });
+      items.push({ path: '/admin/solicitudes',            icon: FileCheck,    label: 'Solicitudes' });
       items.push({ path: '/admin/residuos',               icon: FlaskConical, label: 'Catálogo Residuos' });
     } else if (isAdminTransportista) {
       items.push({ path: '/admin/actores/transportistas', icon: Truck,        label: 'Mis Transportistas' });
       items.push({ path: '/admin/vehiculos',              icon: Truck,        label: 'Vehículos' });
     } else if (isAdminOperador) {
       items.push({ path: '/admin/actores/operadores',     icon: FlaskConical, label: 'Mis Operadores' });
+      items.push({ path: '/admin/solicitudes',            icon: FileCheck,    label: 'Solicitudes' });
       items.push({ path: '/admin/tratamientos',           icon: BarChart3,    label: 'Tratamientos' });
     } else if (isTransportista) {
       items.push({ path: '/admin/vehiculos',              icon: Truck,        label: 'Mis Vehículos' });

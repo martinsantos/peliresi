@@ -14,6 +14,9 @@ import {
   Save,
   Key,
   Shield,
+  MapPin,
+  Award,
+  ExternalLink,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -22,11 +25,13 @@ import { Badge } from '../../components/ui/BadgeV2';
 import { toast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { usuarioService } from '../../services/usuario.service';
+import api from '../../services/api';
 
 
 const PerfilPage: React.FC = () => {
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { currentUser, isGenerador, isOperador } = useAuth();
+  const [actorData, setActorData] = useState<Record<string, any> | null>(null);
   const [user, setUser] = useState({
     nombre: '',
     email: '',
@@ -53,6 +58,16 @@ const PerfilPage: React.FC = () => {
     }
   }, [currentUser]);
 
+  // Fetch actor data for GENERADOR/OPERADOR
+  useEffect(() => {
+    if (currentUser?.actorId && (isGenerador || isOperador)) {
+      const tipo = isGenerador ? 'generadores' : 'operadores';
+      api.get(`/actores/${tipo}/${currentUser.actorId}`)
+        .then(res => setActorData(res.data.data))
+        .catch(() => { /* silently ignore */ });
+    }
+  }, [currentUser?.actorId, isGenerador, isOperador]);
+
   const guardarCambios = async () => {
     setGuardando(true);
     try {
@@ -78,6 +93,76 @@ const PerfilPage: React.FC = () => {
         <h2 className="text-2xl font-bold text-neutral-900">Mi Perfil</h2>
         <p className="text-neutral-600 mt-1">Gestiona tu información personal</p>
       </div>
+
+      {/* Datos del Establecimiento - solo GENERADOR/OPERADOR */}
+      {(isGenerador || isOperador) && actorData && (
+        <Card>
+          <CardHeader
+            title="Datos de mi Establecimiento"
+            icon={<Building2 size={18} />}
+            action={
+              <Button
+                variant="outline"
+                size="sm"
+                rightIcon={<ExternalLink size={14} />}
+                onClick={() => navigate('/mi-perfil/solicitar-cambios')}
+              >
+                Solicitar Cambios
+              </Button>
+            }
+          />
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="p-3 bg-neutral-50 rounded-xl">
+                <div className="flex items-center gap-2 text-neutral-500 mb-1">
+                  <Building2 size={14} />
+                  <span className="text-xs font-medium uppercase">Razon Social</span>
+                </div>
+                <p className="font-medium text-neutral-900">{actorData.razonSocial || '-'}</p>
+              </div>
+              <div className="p-3 bg-neutral-50 rounded-xl">
+                <div className="flex items-center gap-2 text-neutral-500 mb-1">
+                  <Shield size={14} />
+                  <span className="text-xs font-medium uppercase">CUIT</span>
+                </div>
+                <p className="font-medium text-neutral-900 font-mono">{actorData.cuit || '-'}</p>
+              </div>
+              <div className="p-3 bg-neutral-50 rounded-xl">
+                <div className="flex items-center gap-2 text-neutral-500 mb-1">
+                  <MapPin size={14} />
+                  <span className="text-xs font-medium uppercase">Domicilio</span>
+                </div>
+                <p className="font-medium text-neutral-900">{actorData.domicilio || '-'}</p>
+              </div>
+              <div className="p-3 bg-neutral-50 rounded-xl">
+                <div className="flex items-center gap-2 text-neutral-500 mb-1">
+                  <Phone size={14} />
+                  <span className="text-xs font-medium uppercase">Telefono</span>
+                </div>
+                <p className="font-medium text-neutral-900">{actorData.telefono || '-'}</p>
+              </div>
+              <div className="p-3 bg-neutral-50 rounded-xl">
+                <div className="flex items-center gap-2 text-neutral-500 mb-1">
+                  <Award size={14} />
+                  <span className="text-xs font-medium uppercase">Categoria</span>
+                </div>
+                <p className="font-medium text-neutral-900">{actorData.categoria || '-'}</p>
+              </div>
+              <div className="p-3 bg-neutral-50 rounded-xl">
+                <div className="flex items-center gap-2 text-neutral-500 mb-1">
+                  <Award size={14} />
+                  <span className="text-xs font-medium uppercase">
+                    {isGenerador ? 'N. Inscripcion' : 'N. Habilitacion'}
+                  </span>
+                </div>
+                <p className="font-medium text-neutral-900">
+                  {(isGenerador ? actorData.numeroInscripcion : actorData.numeroHabilitacion) || '-'}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Sidebar - Info Principal */}

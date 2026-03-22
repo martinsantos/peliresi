@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth, type UserRole } from '../contexts/AuthContext';
 
 interface ProtectedRouteProps {
@@ -19,7 +19,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   roles,
   redirectTo = '/login',
 }) => {
-  const { currentUser, isLoading } = useAuth();
+  const { currentUser, isLoading, isRestricted } = useAuth();
+  const location = useLocation();
 
   // Show spinner while auth state is being determined
   if (isLoading) {
@@ -36,6 +37,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   // Not authenticated -> redirect to login
   if (!currentUser) {
     return <Navigate to={redirectTo} replace />;
+  }
+
+  // Restricted users can only access /mi-solicitud
+  if (isRestricted && !location.pathname.startsWith('/mi-solicitud')) {
+    return <Navigate to="/mi-solicitud" replace />;
   }
 
   // Authenticated but role not allowed -> access denied

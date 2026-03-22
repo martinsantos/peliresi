@@ -43,6 +43,7 @@ model Usuario {
   auditorias      Auditoria[]         @relation("UsuarioAuditorias")
   notificaciones  Notificacion[]
   reglasCreadas   ReglaAlerta[]       @relation("ReglasCreadas")
+  solicitudes     SolicitudInscripcion[]
 
   @@map("usuarios")
 }
@@ -66,9 +67,28 @@ model Generador {
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
 
+  // Campos regulatorios DPA Mendoza
+  expedienteInscripcion   String?
+  domicilioLegalCalle     String?
+  domicilioLegalLocalidad String?
+  domicilioLegalDepto     String?
+  domicilioRealCalle      String?
+  domicilioRealLocalidad  String?
+  domicilioRealDepto      String?
+  certificacionISO        DateTime?
+  resolucionInscripcion   String?
+  factorR                 Float?
+  montoMxR                Float?
+  categoriaIndividual     String?
+  libroOperatoria         Boolean?
+
   // Relaciones
   usuario     Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   manifiestos Manifiesto[]
+  pagos       PagoTEF[]
+  ddjj        DeclaracionJurada[]
+  documentos  Documento[]
+  renovaciones Renovacion[]
 
   @@map("generadores")
 }
@@ -126,10 +146,32 @@ model Operador {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
+  // Campos enriquecidos DPA Mendoza
+  expedienteInscripcion       String?
+  certificadoNumero           String?
+  domicilioLegalCalle         String?
+  domicilioLegalLocalidad     String?
+  domicilioLegalDepto         String?
+  domicilioRealCalle          String?
+  domicilioRealLocalidad      String?
+  domicilioRealDepto          String?
+  representanteLegalNombre    String?
+  representanteLegalDNI       String?
+  representanteLegalTelefono  String?
+  representanteTecnicoNombre  String?
+  representanteTecnicoMatricula String?
+  representanteTecnicoTelefono  String?
+  vencimientoHabilitacion     DateTime?
+  resolucionDPA               String?
+
   // Relaciones
   usuario       Usuario              @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   tratamientos  TratamientoAutorizado[]
   manifiestos   Manifiesto[]
+  documentos    Documento[]
+  pagos         PagoTEF[]
+  ddjj          DeclaracionJurada[]
+  renovaciones  Renovacion[]
 
   @@map("operadores")
 }
@@ -355,6 +397,9 @@ model Auditoria {
   userAgent       String?
   usuarioId       String?
   manifiestoId    String?
+  generadorId     String?
+  operadorId      String?
+  transportistaId String?
   createdAt       DateTime    @default(now())
 
   // Relaciones
@@ -363,6 +408,9 @@ model Auditoria {
 
   @@index([manifiestoId])
   @@index([createdAt])
+  @@index([generadorId])
+  @@index([operadorId])
+  @@index([transportistaId])
   @@map("auditorias")
 }
 
@@ -489,6 +537,14 @@ enum TipoNotificacion {
   VENCIMIENTO_PROXIMO
   ALERTA_SISTEMA
   INFO_GENERAL
+  SOLICITUD_ENVIADA
+  SOLICITUD_OBSERVADA
+  SOLICITUD_APROBADA
+  SOLICITUD_RECHAZADA
+  SOLICITUD_MENSAJE
+  MODIFICACION_SOLICITADA
+  MODIFICACION_APROBADA
+  MODIFICACION_RECHAZADA
 }
 
 enum PrioridadNotificacion {
@@ -576,6 +632,116 @@ model BlockchainSello {
   @@map("blockchain_sellos")
 }
 
+// ========== GENERADOR FISCAL & DOCUMENTOS ==========
+
+model PagoTEF {
+  id               String    @id @default(cuid())
+  generadorId      String?
+  operadorId       String?
+  anio             Int
+  montoTEF         Float?
+  resolucion       String?
+  notificado       Boolean   @default(false)
+  fechaNotificado  DateTime?
+  fechaPago        DateTime?
+  pagoFueraTermino Boolean   @default(false)
+  habilitado       Boolean?
+  gedoNotificacion String?
+  gedoResolucion   String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  generador Generador? @relation(fields: [generadorId], references: [id], onDelete: Cascade)
+  operador  Operador?  @relation(fields: [operadorId], references: [id], onDelete: Cascade)
+
+  @@unique([generadorId, anio])
+  @@unique([operadorId, anio])
+  @@index([generadorId])
+  @@index([operadorId])
+  @@map("pagos_tef")
+}
+
+model DeclaracionJurada {
+  id                String    @id @default(cuid())
+  generadorId       String?
+  operadorId        String?
+  anio              Int
+  numeroGDE         String?
+  presentada        Boolean   @default(false)
+  fechaPresentacion DateTime?
+  ticketPago        String?
+  observaciones     String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  generador Generador? @relation(fields: [generadorId], references: [id], onDelete: Cascade)
+  operador  Operador?  @relation(fields: [operadorId], references: [id], onDelete: Cascade)
+
+  @@unique([generadorId, anio])
+  @@unique([operadorId, anio])
+  @@index([generadorId])
+  @@index([operadorId])
+  @@map("declaraciones_juradas")
+}
+
+model Documento {
+  id            String    @id @default(cuid())
+  generadorId   String?
+  operadorId    String?
+  tipo          String
+  nombre        String
+  path          String
+  mimeType      String
+  size          Int
+  anio          Int?
+  estado        String    @default("PENDIENTE")
+  observaciones String?
+  subidoPor     String
+  revisadoPor   String?
+  revisadoAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  generador Generador? @relation(fields: [generadorId], references: [id], onDelete: Cascade)
+  operador  Operador?  @relation(fields: [operadorId], references: [id], onDelete: Cascade)
+
+  @@index([generadorId])
+  @@index([operadorId])
+  @@map("documentos")
+}
+
+// ========== RENOVACION ANUAL ==========
+
+model Renovacion {
+  id                String    @id @default(cuid())
+  anio              Int
+  tipoActor         String    // "GENERADOR" | "OPERADOR"
+  generadorId       String?
+  operadorId        String?
+  modalidad         String    // "SIN_CAMBIOS" | "CON_CAMBIOS"
+  estado            String    @default("PENDIENTE") // PENDIENTE | APROBADA | RECHAZADA
+  datosActuales     String?   // JSON snapshot
+  datosNuevos       String?   // JSON proposed (solo CON_CAMBIOS)
+  camposModificados String?   // JSON ["domicilio","corrientesY"]
+  tefAnterior       Float?
+  tefNuevo          Float?
+  revisadoPor       String?
+  fechaRevision     DateTime?
+  observaciones     String?
+  motivoRechazo     String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  generador Generador? @relation(fields: [generadorId], references: [id], onDelete: Cascade)
+  operador  Operador?  @relation(fields: [operadorId], references: [id], onDelete: Cascade)
+
+  @@unique([anio, generadorId])
+  @@unique([anio, operadorId])
+  @@index([anio])
+  @@index([estado])
+  @@map("renovaciones")
+}
+
 // ========== DEMO ACCESS CONTROL ==========
 
 model DemoAccess {
@@ -585,7 +751,83 @@ model DemoAccess {
   userAgent       String?
   accessGranted   DateTime    @default(now())
   lastActivity    DateTime    @default(now())
-  
+
   @@index([sessionId])
   @@map("demo_access")
+}
+
+// ========== SOLICITUD DE INSCRIPCION ==========
+
+enum EstadoSolicitud {
+  BORRADOR
+  ENVIADA
+  EN_REVISION
+  OBSERVADA
+  APROBADA
+  RECHAZADA
+}
+
+model SolicitudInscripcion {
+  id                String            @id @default(cuid())
+  usuarioId         String
+  tipoActor         String            // "GENERADOR" | "OPERADOR"
+  estado            EstadoSolicitud   @default(BORRADOR)
+  datosActor        String            // JSON completo del wizard
+  datosResiduos     String?           // JSON corrientes/residuos
+  datosTEF          String?           // JSON calculo TEF
+  datosRegulatorio  String?           // JSON expediente, resolucion, etc.
+  fechaEnvio        DateTime?
+  fechaRevision     DateTime?
+  revisadoPor       String?
+  motivoRechazo     String?
+  observaciones     String?
+  generadorId       String?   @unique // ID del actor creado al aprobar
+  operadorId        String?   @unique // ID del actor creado al aprobar
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  usuario           Usuario           @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  documentos        DocumentoSolicitud[]
+  mensajes          MensajeSolicitud[]
+
+  @@index([usuarioId])
+  @@index([estado])
+  @@index([tipoActor, estado])
+  @@map("solicitudes_inscripcion")
+}
+
+model DocumentoSolicitud {
+  id              String    @id @default(cuid())
+  solicitudId     String
+  tipo            String    // "MEMORIA_TECNICA", "CONSTANCIA_AFIP", etc.
+  nombre          String
+  path            String
+  mimeType        String
+  size            Int
+  estado          String    @default("PENDIENTE") // PENDIENTE | APROBADO | RECHAZADO
+  observaciones   String?
+  revisadoPor     String?
+  revisadoAt      DateTime?
+  createdAt       DateTime  @default(now())
+
+  solicitud       SolicitudInscripcion @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+
+  @@index([solicitudId])
+  @@map("documentos_solicitud")
+}
+
+model MensajeSolicitud {
+  id              String    @id @default(cuid())
+  solicitudId     String
+  autorId         String
+  autorRol        String    // "ADMIN" | "CANDIDATO"
+  contenido       String
+  leido           Boolean   @default(false)
+  leidoAt         DateTime?
+  createdAt       DateTime  @default(now())
+
+  solicitud       SolicitudInscripcion @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+
+  @@index([solicitudId, createdAt])
+  @@map("mensajes_solicitud")
 }

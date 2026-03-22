@@ -195,6 +195,164 @@ export interface CreateOperadorRequest {
   tipoOperador?: string;
   tecnologia?: string;
   corrientesY?: string;
+  expedienteInscripcion?: string;
+  certificadoNumero?: string;
+  domicilioLegalCalle?: string;
+  domicilioLegalLocalidad?: string;
+  domicilioLegalDepto?: string;
+  domicilioRealCalle?: string;
+  domicilioRealLocalidad?: string;
+  domicilioRealDepto?: string;
+  representanteLegalNombre?: string;
+  representanteLegalDNI?: string;
+  representanteLegalTelefono?: string;
+  representanteTecnicoNombre?: string;
+  representanteTecnicoMatricula?: string;
+  representanteTecnicoTelefono?: string;
+  vencimientoHabilitacion?: string;
+  resolucionDPA?: string;
+  latitud?: number;
+  longitud?: number;
+}
+
+// ========================================
+// RENOVACIONES
+// ========================================
+
+export interface Renovacion {
+  id: string;
+  anio: number;
+  tipoActor: 'GENERADOR' | 'OPERADOR';
+  generadorId?: string;
+  operadorId?: string;
+  modalidad: 'SIN_CAMBIOS' | 'CON_CAMBIOS';
+  estado: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA';
+  datosActuales?: string;
+  datosNuevos?: string;
+  camposModificados?: string;
+  tefAnterior?: number;
+  tefNuevo?: number;
+  revisadoPor?: string;
+  fechaRevision?: string;
+  observaciones?: string;
+  motivoRechazo?: string;
+  createdAt: string;
+  generador?: { razonSocial: string; cuit: string };
+  operador?: { razonSocial: string; cuit: string };
+}
+
+export interface RenovacionFilters {
+  anio?: number;
+  tipoActor?: string;
+  estado?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface CreateRenovacionRequest {
+  anio: number;
+  tipoActor: 'GENERADOR' | 'OPERADOR';
+  generadorId?: string;
+  operadorId?: string;
+  modalidad: 'SIN_CAMBIOS' | 'CON_CAMBIOS';
+  datosNuevos?: any;
+  camposModificados?: string[];
+  tefAnterior?: number;
+  tefNuevo?: number;
+  observaciones?: string;
+}
+
+// ========================================
+// SOLICITUDES DE INSCRIPCION
+// ========================================
+
+export type EstadoSolicitud = 'BORRADOR' | 'ENVIADA' | 'EN_REVISION' | 'OBSERVADA' | 'APROBADA' | 'RECHAZADA';
+
+export interface SolicitudInscripcion {
+  id: string;
+  usuarioId: string;
+  tipoActor: 'GENERADOR' | 'OPERADOR';
+  estado: EstadoSolicitud;
+  datosActor: string;
+  datosResiduos?: string;
+  datosTEF?: string;
+  datosRegulatorio?: string;
+  fechaEnvio?: string;
+  fechaRevision?: string;
+  revisadoPor?: string;
+  motivoRechazo?: string;
+  observaciones?: string;
+  generadorId?: string;
+  operadorId?: string;
+  createdAt: string;
+  updatedAt: string;
+  usuario?: { id: string; email: string; nombre: string; rol: string };
+  documentos?: DocumentoSolicitud[];
+  mensajes?: MensajeSolicitud[];
+  _count?: { documentos: number; mensajes: number };
+}
+
+export interface DocumentoSolicitud {
+  id: string;
+  solicitudId: string;
+  tipo: string;
+  nombre: string;
+  path: string;
+  mimeType: string;
+  size: number;
+  estado: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO';
+  observaciones?: string;
+  revisadoPor?: string;
+  revisadoAt?: string;
+  createdAt: string;
+}
+
+export interface MensajeSolicitud {
+  id: string;
+  solicitudId: string;
+  autorId: string;
+  autorRol: 'ADMIN' | 'CANDIDATO';
+  contenido: string;
+  leido: boolean;
+  leidoAt?: string;
+  createdAt: string;
+}
+
+export interface SolicitudFilters {
+  estado?: EstadoSolicitud;
+  tipoActor?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface IniciarSolicitudRequest {
+  email: string;
+  password: string;
+  nombre: string;
+  tipoActor: 'GENERADOR' | 'OPERADOR';
+  cuit: string;
+}
+
+export interface UpdateSolicitudRequest {
+  datosActor?: string;
+  datosResiduos?: string;
+  datosTEF?: string;
+  datosRegulatorio?: string;
+}
+
+// ========================================
+// HISTORIAL / AUDITORIA ACTORES
+// ========================================
+
+export interface AuditoriaEntry {
+  id: string;
+  accion: string;
+  modulo: string;
+  datosAntes?: string;
+  datosDespues?: string;
+  createdAt: string;
+  usuario?: { nombre: string; email: string; rol: string };
 }
 
 export interface ActorFilters {
