@@ -35,7 +35,7 @@ const storage = multer.diskStorage({
 export const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB
 
 // Helper: check if user is an admin role
-const ADMIN_ROLES = ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR'];
+const ADMIN_ROLES = ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA'];
 function isAdmin(rol: string): boolean {
   return ADMIN_ROLES.includes(rol);
 }
@@ -57,8 +57,8 @@ export const iniciarSolicitud = async (req: Request, res: Response, next: NextFu
       throw new AppError('email, password, nombre, tipoActor y cuit son obligatorios', 400);
     }
 
-    if (!['GENERADOR', 'OPERADOR'].includes(tipoActor)) {
-      throw new AppError('tipoActor debe ser GENERADOR u OPERADOR', 400);
+    if (!['GENERADOR', 'OPERADOR', 'TRANSPORTISTA'].includes(tipoActor)) {
+      throw new AppError('tipoActor debe ser GENERADOR, OPERADOR o TRANSPORTISTA', 400);
     }
 
     // Email format validation
@@ -273,7 +273,7 @@ export const enviarSolicitud = async (req: AuthRequest, res: Response, next: Nex
 
     // Notify admins via in-app notification
     const admins = await prisma.usuario.findMany({
-      where: { rol: { in: ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR'] }, activo: true },
+      where: { rol: { in: ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA'] }, activo: true },
       select: { id: true },
     });
 
@@ -452,7 +452,7 @@ export const crearMensaje = async (req: AuthRequest, res: Response, next: NextFu
     } else {
       // Notify admins
       const admins = await prisma.usuario.findMany({
-        where: { rol: { in: ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR'] }, activo: true },
+        where: { rol: { in: ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA'] }, activo: true },
         select: { id: true },
       });
       await Promise.all(admins.map((admin) =>
@@ -642,6 +642,7 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
     const result = await prisma.$transaction(async (tx) => {
       let generadorId: string | undefined;
       let operadorId: string | undefined;
+      let transportistaId: string | undefined;
 
       if (solicitud.tipoActor === 'GENERADOR') {
         const generador = await tx.generador.create({
@@ -679,6 +680,29 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
           },
         });
         operadorId = operador.id;
+      } else if (solicitud.tipoActor === 'TRANSPORTISTA') {
+        const transportista = await tx.transportista.create({
+          data: {
+            usuarioId: solicitud.usuarioId,
+            razonSocial: datosActor.razonSocial || datosActor.nombre || solicitud.usuario.nombre,
+            cuit: datosActor.cuit || solicitud.usuario.cuit || '',
+            domicilio: datosActor.domicilio || '',
+            telefono: datosActor.telefono || '',
+            email: datosActor.email || solicitud.usuario.email,
+            numeroHabilitacion: datosActor.numeroHabilitacion || 'PENDIENTE',
+            ...(datosActor.localidad && { localidad: datosActor.localidad }),
+            ...(datosActor.vencimientoHabilitacion && { vencimientoHabilitacion: new Date(datosActor.vencimientoHabilitacion) }),
+            ...(datosActor.corrientesAutorizadas && { corrientesAutorizadas: datosActor.corrientesAutorizadas }),
+            ...(datosActor.expedienteDPA && { expedienteDPA: datosActor.expedienteDPA }),
+            ...(datosActor.resolucionDPA && { resolucionDPA: datosActor.resolucionDPA }),
+            ...(datosActor.resolucionSSP && { resolucionSSP: datosActor.resolucionSSP }),
+            ...(datosActor.actaInspeccion && { actaInspeccion: datosActor.actaInspeccion }),
+            ...(datosActor.actaInspeccion2 && { actaInspeccion2: datosActor.actaInspeccion2 }),
+            ...(datosActor.latitud && { latitud: parseFloat(datosActor.latitud) }),
+            ...(datosActor.longitud && { longitud: parseFloat(datosActor.longitud) }),
+          },
+        });
+        transportistaId = transportista.id;
       }
 
       // Update solicitud
@@ -688,6 +712,7 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
           estado: 'APROBADA',
           generadorId,
           operadorId,
+          transportistaId,
           revisadoPor: req.user!.id,
           fechaRevision: new Date(),
           observaciones: observaciones || undefined,

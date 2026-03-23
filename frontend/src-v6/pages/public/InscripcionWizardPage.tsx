@@ -14,7 +14,7 @@ import {
   ArrowLeft, ArrowRight, Send, Upload, Check,
   Building2, FileText, MapPin, Users, Shield,
   Factory, FlaskConical, AlertCircle, Loader2,
-  Eye, EyeOff, X, Paperclip, ClipboardList, Calculator,
+  Eye, EyeOff, X, Paperclip, ClipboardList, Calculator, Truck, Car,
 } from 'lucide-react';
 import { Button } from '../../components/ui/ButtonV2';
 import api from '../../services/api';
@@ -47,6 +47,12 @@ const DOCS_OPERADOR = [
   { tipo: 'RESOLUCION_DPA', nombre: 'Resolucion DPA' },
 ];
 
+const DOCS_TRANSPORTISTA = [
+  { tipo: 'CONSTANCIA_AFIP', nombre: 'Constancia AFIP' },
+  { tipo: 'CERTIFICADO_HABILITACION', nombre: 'Habilitacion de Transporte' },
+  { tipo: 'SEGURO_AMBIENTAL', nombre: 'Seguro Ambiental' },
+];
+
 interface StepDef {
   id: number;
   label: string;
@@ -72,6 +78,14 @@ const STEPS_OPERADOR: StepDef[] = [
   { id: 6, label: 'Calculo TEF', icon: Calculator },
   { id: 7, label: 'Documentos', icon: FileText },
   { id: 8, label: 'Resumen', icon: Check },
+];
+
+const STEPS_TRANSPORTISTA: StepDef[] = [
+  { id: 1, label: 'Datos Basicos', icon: Truck },
+  { id: 2, label: 'Habilitacion', icon: Shield },
+  { id: 3, label: 'Vehiculos', icon: Car },
+  { id: 4, label: 'Documentos', icon: FileText },
+  { id: 5, label: 'Resumen', icon: Check },
 ];
 
 // ========================================
@@ -126,8 +140,9 @@ const InscripcionWizardPage: React.FC = () => {
   const navigate = useNavigate();
   const isGenerador = tipo === 'generador';
   const isOperador = tipo === 'operador';
-  const tipoActor = isGenerador ? 'GENERADOR' : 'OPERADOR';
-  const steps = isGenerador ? STEPS_GENERADOR : STEPS_OPERADOR;
+  const isTransportista = tipo === 'transportista';
+  const tipoActor = isGenerador ? 'GENERADOR' : isOperador ? 'OPERADOR' : 'TRANSPORTISTA';
+  const steps = isGenerador ? STEPS_GENERADOR : isOperador ? STEPS_OPERADOR : STEPS_TRANSPORTISTA;
   const totalSteps = steps.length;
 
   // Phase tracking
@@ -331,13 +346,13 @@ const InscripcionWizardPage: React.FC = () => {
   // RENDER: Invalid tipo
   // ========================================
 
-  if (!isGenerador && !isOperador) {
+  if (!isGenerador && !isOperador && !isTransportista) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl border border-neutral-200 shadow-lg p-8 max-w-md text-center">
           <AlertCircle size={48} className="text-error-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-neutral-900 mb-2">Tipo invalido</h2>
-          <p className="text-neutral-500 mb-4">El tipo de inscripcion debe ser "generador" o "operador".</p>
+          <p className="text-neutral-500 mb-4">El tipo de inscripcion debe ser "generador", "operador" o "transportista".</p>
           <Button variant="outline" onClick={() => navigate('/')}>Volver al inicio</Button>
         </div>
       </div>
@@ -357,7 +372,7 @@ const InscripcionWizardPage: React.FC = () => {
           </div>
           <h2 className="text-2xl font-bold text-neutral-900 mb-2">Solicitud enviada</h2>
           <p className="text-neutral-600 mb-6">
-            Tu solicitud de inscripcion como {isGenerador ? 'Generador' : 'Operador'} ha sido enviada exitosamente.
+            Tu solicitud de inscripcion como {isGenerador ? 'Generador' : isOperador ? 'Operador' : 'Transportista'} ha sido enviada exitosamente.
             Recibiras un email cuando el equipo de la DGFA la revise.
           </p>
           <Button variant="primary" onClick={() => navigate('/login')}>Ir al login</Button>
@@ -376,17 +391,18 @@ const InscripcionWizardPage: React.FC = () => {
         <div className="w-full max-w-lg">
           {/* Header */}
           <div className="text-center mb-6">
-            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3 ${isGenerador ? 'bg-purple-100' : 'bg-blue-100'}`}>
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3 ${isGenerador ? 'bg-purple-100' : isOperador ? 'bg-blue-100' : 'bg-orange-100'}`}>
               {isGenerador
                 ? <Factory size={28} className="text-purple-600" />
-                : <FlaskConical size={28} className="text-blue-600" />
+                : isOperador ? <FlaskConical size={28} className="text-blue-600" />
+                : <Truck size={28} className="text-orange-600" />
               }
             </div>
             <h1 className="text-2xl font-bold text-neutral-900">
-              Inscripcion como {isGenerador ? 'Generador' : 'Operador'}
+              Inscripcion como {isGenerador ? 'Generador' : isOperador ? 'Operador' : 'Transportista'}
             </h1>
             <p className="text-sm text-neutral-500 mt-1">
-              Registro Provincial de {isGenerador ? 'Generadores' : 'Operadores'} de RRPP - Ley 5917
+              Registro Provincial de {isGenerador ? 'Generadores' : isOperador ? 'Operadores' : 'Transportistas'} de RRPP - Ley 5917
             </p>
           </div>
 
@@ -958,6 +974,112 @@ const InscripcionWizardPage: React.FC = () => {
     }
   };
 
+  const renderTransportistaStep = () => {
+    switch (step) {
+      case 1: return (
+        <div className="space-y-4">
+          <SectionTitle icon={Truck} title="Datos del Transportista" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Razon Social *</label>
+              <input value={form.razonSocial || ''} onChange={e => up('razonSocial', e.target.value)}
+                placeholder="Transporte S.A." className={inputCls(attempted.has(1) && !form.razonSocial?.trim())} />
+              <FieldError show={attempted.has(1) && !form.razonSocial?.trim()} msg="Razon Social es obligatoria" />
+            </div>
+            <div>
+              <label className={labelCls}>Domicilio</label>
+              <input value={form.domicilio || ''} onChange={e => up('domicilio', e.target.value)}
+                placeholder="Calle 123, Ciudad" className={inputCls()} />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Telefono</label>
+              <input value={form.telefono || ''} onChange={e => up('telefono', e.target.value)}
+                placeholder="0261-4XXXXXX" className={inputCls()} />
+            </div>
+            <div>
+              <label className={labelCls}>Email de contacto</label>
+              <input type="email" value={form.emailContacto || ''} onChange={e => up('emailContacto', e.target.value)}
+                placeholder="contacto@transporte.com" className={inputCls()} />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Localidad</label>
+              <input value={form.localidad || ''} onChange={e => up('localidad', e.target.value)}
+                placeholder="Godoy Cruz, Mendoza" className={inputCls()} />
+            </div>
+            <div>
+              <label className={labelCls}>Coordenadas</label>
+              <input value={form.coordenadas || ''} onChange={e => up('coordenadas', e.target.value)}
+                placeholder="-32.89, -68.83" className={inputCls()} />
+            </div>
+          </div>
+        </div>
+      );
+      case 2: return (
+        <div className="space-y-4">
+          <SectionTitle icon={Shield} title="Habilitacion y Datos DPA" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>N de Habilitacion</label>
+              <input value={form.numeroHabilitacion || ''} onChange={e => up('numeroHabilitacion', e.target.value)}
+                placeholder="HAB-TR-XXXX" className={inputCls()} />
+            </div>
+            <div>
+              <label className={labelCls}>Vencimiento Habilitacion</label>
+              <input type="date" value={form.vencimientoHabilitacion || ''} onChange={e => up('vencimientoHabilitacion', e.target.value)} className={inputCls()} />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Expediente DPA</label>
+              <input value={form.expedienteDPA || ''} onChange={e => up('expedienteDPA', e.target.value)} placeholder="EXP-DPA-XXXX" className={inputCls()} />
+            </div>
+            <div>
+              <label className={labelCls}>Resolucion DPA</label>
+              <input value={form.resolucionDPA || ''} onChange={e => up('resolucionDPA', e.target.value)} placeholder="0359/24" className={inputCls()} />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Resolucion SSP</label>
+              <input value={form.resolucionSSP || ''} onChange={e => up('resolucionSSP', e.target.value)} placeholder="SSP-XXXX" className={inputCls()} />
+            </div>
+            <div>
+              <label className={labelCls}>Corrientes Autorizadas</label>
+              <input value={form.corrientesAutorizadas || ''} onChange={e => up('corrientesAutorizadas', e.target.value)} placeholder="Y4, Y8, Y9" className={inputCls()} />
+            </div>
+          </div>
+        </div>
+      );
+      case 3: return (
+        <div className="space-y-4">
+          <SectionTitle icon={Car} title="Vehiculos y Choferes" />
+          <p className="text-sm text-neutral-500">
+            Describa los vehiculos y choferes habilitados. Un dato por linea.
+          </p>
+          <div>
+            <label className={labelCls}>Vehiculos (patente, marca, modelo, capacidad — uno por linea)</label>
+            <textarea value={form.vehiculosDesc || ''} onChange={e => up('vehiculosDesc', e.target.value)}
+              placeholder={"AB123CD, Mercedes, Atego 1726, 10 tn\nXY456ZW, Iveco, Tector, 8 tn"} rows={5}
+              className="w-full px-4 py-3 rounded-xl border border-neutral-200 focus:border-[#0D8A4F] focus:ring-2 focus:ring-[#0D8A4F]/20 focus:outline-none text-sm bg-white transition-colors resize-none font-mono" />
+          </div>
+          <div>
+            <label className={labelCls}>Choferes (nombre, DNI, licencia — uno por linea)</label>
+            <textarea value={form.choferesDesc || ''} onChange={e => up('choferesDesc', e.target.value)}
+              placeholder={"Juan Perez, 12345678, LIC-001\nMaria Lopez, 87654321, LIC-002"} rows={4}
+              className="w-full px-4 py-3 rounded-xl border border-neutral-200 focus:border-[#0D8A4F] focus:ring-2 focus:ring-[#0D8A4F]/20 focus:outline-none text-sm bg-white transition-colors resize-none font-mono" />
+          </div>
+        </div>
+      );
+      case 4: return renderDocumentos(DOCS_TRANSPORTISTA);
+      case 5: return renderResumen();
+      default: return null;
+    }
+  };
+
   // Shared: Documents step
   function renderDocumentos(docs: { tipo: string; nombre: string }[]) {
     return (
@@ -1109,7 +1231,31 @@ const InscripcionWizardPage: React.FC = () => {
     ];
     if (isGenerador) tefFields.push({ label: 'Potencia (HP)', value: form.tefPotencia || '' });
     if (isOperador) tefFields.push({ label: 'Capacidad (tn/mes)', value: form.tefCapacidad || '' });
-    sections.push({ label: 'Calculo TEF', fields: tefFields });
+    if (!isTransportista) sections.push({ label: 'Calculo TEF', fields: tefFields });
+
+    // Transportista-specific
+    if (isTransportista) {
+      sections.push({
+        label: 'Habilitacion DPA',
+        fields: [
+          { label: 'Habilitacion', value: form.numeroHabilitacion || '' },
+          { label: 'Vencimiento', value: form.vencimientoHabilitacion || '' },
+          { label: 'Expediente DPA', value: form.expedienteDPA || '' },
+          { label: 'Resolucion DPA', value: form.resolucionDPA || '' },
+          { label: 'Resolucion SSP', value: form.resolucionSSP || '' },
+          { label: 'Corrientes', value: form.corrientesAutorizadas || '' },
+        ],
+      });
+      if (form.vehiculosDesc || form.choferesDesc) {
+        sections.push({
+          label: 'Vehiculos y Choferes',
+          fields: [
+            { label: 'Vehiculos', value: form.vehiculosDesc || '' },
+            { label: 'Choferes', value: form.choferesDesc || '' },
+          ],
+        });
+      }
+    }
 
     // Documents
     const docEntries = Object.entries(adjuntos);
@@ -1169,15 +1315,16 @@ const InscripcionWizardPage: React.FC = () => {
             <ArrowLeft size={18} className="text-neutral-600" />
           </button>
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-xl ${isGenerador ? 'bg-purple-100' : 'bg-blue-100'}`}>
+            <div className={`p-2 rounded-xl ${isGenerador ? 'bg-purple-100' : isOperador ? 'bg-blue-100' : 'bg-orange-100'}`}>
               {isGenerador
                 ? <Factory size={22} className="text-purple-600" />
-                : <FlaskConical size={22} className="text-blue-600" />
+                : isOperador ? <FlaskConical size={22} className="text-blue-600" />
+                : <Truck size={22} className="text-orange-600" />
               }
             </div>
             <div>
               <h2 className="text-xl font-bold text-neutral-900">
-                Inscripcion como {isGenerador ? 'Generador' : 'Operador'}
+                Inscripcion como {isGenerador ? 'Generador' : isOperador ? 'Operador' : 'Transportista'}
               </h2>
               <p className="text-xs text-neutral-500">Paso {step} de {totalSteps}</p>
             </div>
@@ -1218,7 +1365,7 @@ const InscripcionWizardPage: React.FC = () => {
 
         {/* Step Content */}
         <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 min-h-[320px]">
-          {isGenerador ? renderGeneradorStep() : renderOperadorStep()}
+          {isGenerador ? renderGeneradorStep() : isOperador ? renderOperadorStep() : renderTransportistaStep()}
         </div>
 
         {/* Navigation Buttons */}

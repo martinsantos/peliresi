@@ -81,6 +81,7 @@ model Generador {
   montoMxR                Float?
   categoriaIndividual     String?
   libroOperatoria         Boolean?
+  tefInputs               Json?
 
   // Relaciones
   usuario     Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
@@ -163,6 +164,7 @@ model Operador {
   representanteTecnicoTelefono  String?
   vencimientoHabilitacion     DateTime?
   resolucionDPA               String?
+  tefInputs                   Json?
 
   // Relaciones
   usuario       Usuario              @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
@@ -770,7 +772,7 @@ enum EstadoSolicitud {
 model SolicitudInscripcion {
   id                String            @id @default(cuid())
   usuarioId         String
-  tipoActor         String            // "GENERADOR" | "OPERADOR"
+  tipoActor         String            // "GENERADOR" | "OPERADOR" | "TRANSPORTISTA"
   estado            EstadoSolicitud   @default(BORRADOR)
   datosActor        String            // JSON completo del wizard
   datosResiduos     String?           // JSON corrientes/residuos
@@ -783,6 +785,7 @@ model SolicitudInscripcion {
   observaciones     String?
   generadorId       String?   @unique // ID del actor creado al aprobar
   operadorId        String?   @unique // ID del actor creado al aprobar
+  transportistaId   String?   @unique // ID del actor creado al aprobar
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
