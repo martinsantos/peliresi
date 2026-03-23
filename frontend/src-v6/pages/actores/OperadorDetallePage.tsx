@@ -23,6 +23,8 @@ import {
   Leaf,
   Zap,
   FileText,
+  User,
+  Briefcase,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -186,14 +188,17 @@ const OperadorDetallePage: React.FC = () => {
               <CardHeader title="Datos de la Planta" icon={<FlaskConical size={20} />} />
               <CardContent>
                 <div className="space-y-4">
-                  {/* Domicilio Real (CSV - structured) */}
+                  {/* Direccion Real (CSV - structured) */}
                   {enriched?.domicilioReal ? (
                     <div className="flex items-start gap-3 text-sm">
                       <MapPin size={16} className="text-neutral-400 shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-neutral-500">Domicilio Real (planta)</p>
+                        <p className="text-neutral-500">Direccion Real {(apiOperador as any)?.tipoOperador === 'IN_SITU' ? '(sede administrativa)' : '(planta)'}</p>
                         <p className="font-medium text-neutral-900">{enriched.domicilioReal.calle}</p>
                         <p className="text-neutral-600">{enriched.domicilioReal.localidad}, {enriched.domicilioReal.departamento}</p>
+                        {(apiOperador as any)?.tipoOperador === 'IN_SITU' && (
+                          <p className="text-xs text-amber-600 mt-1">Opera en la ubicacion del generador</p>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -205,12 +210,12 @@ const OperadorDetallePage: React.FC = () => {
                       </div>
                     </div>
                   )}
-                  {/* Domicilio Legal (CSV) */}
+                  {/* Direccion Fiscal (CSV) */}
                   {enriched?.domicilioLegal && (
                     <div className="flex items-start gap-3 text-sm">
                       <MapPin size={16} className="text-neutral-400 shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-neutral-500">Domicilio Legal</p>
+                        <p className="text-neutral-500">Direccion Fiscal</p>
                         <p className="font-medium text-neutral-900">{enriched.domicilioLegal.calle}</p>
                         <p className="text-neutral-600">{enriched.domicilioLegal.localidad}, {enriched.domicilioLegal.departamento}</p>
                       </div>
@@ -244,6 +249,121 @@ const OperadorDetallePage: React.FC = () => {
                       <p className="font-medium text-neutral-900">{operador.vencimientoHab}</p>
                     </div>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Datos Regulatorios y Representantes */}
+            <Card>
+              <CardHeader title="Datos Regulatorios y Representantes" icon={<Briefcase size={20} />} />
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Categoría y Regulatorio */}
+                  {((apiOperador as any)?.categoria || (apiOperador as any)?.expedienteInscripcion || (apiOperador as any)?.resolucionDPA) && (
+                    <div className="space-y-3">
+                      {(apiOperador as any)?.categoria && (
+                        <div className="flex items-center gap-3 text-sm">
+                          <Shield size={16} className="text-neutral-400 shrink-0" />
+                          <div>
+                            <p className="text-neutral-500">Categoría</p>
+                            <p className="font-medium text-neutral-900">{(apiOperador as any).categoria}</p>
+                          </div>
+                        </div>
+                      )}
+                      {(apiOperador as any)?.expedienteInscripcion && (
+                        <div className="flex items-center gap-3 text-sm">
+                          <FileText size={16} className="text-neutral-400 shrink-0" />
+                          <div>
+                            <p className="text-neutral-500">Expediente Inscripción</p>
+                            <p className="font-medium text-neutral-900">{(apiOperador as any).expedienteInscripcion}</p>
+                          </div>
+                        </div>
+                      )}
+                      {(apiOperador as any)?.resolucionDPA && (
+                        <div className="flex items-center gap-3 text-sm">
+                          <FileText size={16} className="text-neutral-400 shrink-0" />
+                          <div>
+                            <p className="text-neutral-500">Resolución DPA</p>
+                            <p className="font-medium text-neutral-900">{(apiOperador as any).resolucionDPA}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {/* Representante Legal */}
+                  {((apiOperador as any)?.representanteLegalNombre || (apiOperador as any)?.representanteLegalDNI) && (
+                    <div className="border-t border-neutral-100 pt-4">
+                      <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-3">Representante Legal</p>
+                      <div className="space-y-2">
+                        {(apiOperador as any)?.representanteLegalNombre && (
+                          <div className="flex items-center gap-3 text-sm">
+                            <User size={16} className="text-neutral-400 shrink-0" />
+                            <div>
+                              <p className="text-neutral-500">Nombre</p>
+                              <p className="font-medium text-neutral-900">{(apiOperador as any).representanteLegalNombre}</p>
+                            </div>
+                          </div>
+                        )}
+                        {(apiOperador as any)?.representanteLegalDNI && (
+                          <div className="flex items-center gap-3 text-sm">
+                            <FileText size={16} className="text-neutral-400 shrink-0" />
+                            <div>
+                              <p className="text-neutral-500">DNI</p>
+                              <p className="font-medium text-neutral-900">{(apiOperador as any).representanteLegalDNI}</p>
+                            </div>
+                          </div>
+                        )}
+                        {(apiOperador as any)?.representanteLegalTelefono && (
+                          <div className="flex items-center gap-3 text-sm">
+                            <Phone size={16} className="text-neutral-400 shrink-0" />
+                            <div>
+                              <p className="text-neutral-500">Teléfono</p>
+                              <p className="font-medium text-neutral-900">{(apiOperador as any).representanteLegalTelefono}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {/* Representante Técnico */}
+                  {((apiOperador as any)?.representanteTecnicoNombre || (apiOperador as any)?.representanteTecnicoMatricula) && (
+                    <div className="border-t border-neutral-100 pt-4">
+                      <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-3">Representante Técnico</p>
+                      <div className="space-y-2">
+                        {(apiOperador as any)?.representanteTecnicoNombre && (
+                          <div className="flex items-center gap-3 text-sm">
+                            <User size={16} className="text-neutral-400 shrink-0" />
+                            <div>
+                              <p className="text-neutral-500">Nombre</p>
+                              <p className="font-medium text-neutral-900">{(apiOperador as any).representanteTecnicoNombre}</p>
+                            </div>
+                          </div>
+                        )}
+                        {(apiOperador as any)?.representanteTecnicoMatricula && (
+                          <div className="flex items-center gap-3 text-sm">
+                            <FileText size={16} className="text-neutral-400 shrink-0" />
+                            <div>
+                              <p className="text-neutral-500">Matrícula</p>
+                              <p className="font-medium text-neutral-900">{(apiOperador as any).representanteTecnicoMatricula}</p>
+                            </div>
+                          </div>
+                        )}
+                        {(apiOperador as any)?.representanteTecnicoTelefono && (
+                          <div className="flex items-center gap-3 text-sm">
+                            <Phone size={16} className="text-neutral-400 shrink-0" />
+                            <div>
+                              <p className="text-neutral-500">Teléfono</p>
+                              <p className="font-medium text-neutral-900">{(apiOperador as any).representanteTecnicoTelefono}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {/* Fallback if no data */}
+                  {!(apiOperador as any)?.categoria && !(apiOperador as any)?.representanteLegalNombre && !(apiOperador as any)?.representanteTecnicoNombre && (
+                    <p className="text-sm text-neutral-400">Sin datos regulatorios registrados</p>
+                  )}
                 </div>
               </CardContent>
             </Card>

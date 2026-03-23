@@ -360,6 +360,8 @@ const GeneradorDetallePage: React.FC = () => {
                   <InfoRow icon={<Calendar size={16} />} label="Fecha de alta" value={generador.fechaAlta} />
                   <InfoRow icon={<Phone size={16} />} label="Telefono" value={generador.telefono} />
                   <InfoRow icon={<Mail size={16} />} label="Email" value={generador.email} />
+                  {g.actividad && <InfoRow icon={<FileText size={16} />} label="Actividad" value={g.actividad} />}
+                  {g.rubro && <InfoRow icon={<FileText size={16} />} label="Rubro" value={g.rubro} />}
                   {g.expedienteInscripcion && <InfoRow icon={<FileText size={16} />} label="Expediente" value={g.expedienteInscripcion} />}
                   {g.resolucionInscripcion && <InfoRow icon={<Award size={16} />} label="Resolucion" value={g.resolucionInscripcion} />}
                   {g.certificacionISO && (
