@@ -252,7 +252,7 @@ const TransportistasPage: React.FC = () => {
       nombre: '',
       numeroHabilitacion: row.numeroHabilitacion !== '-' ? row.numeroHabilitacion : '',
       vencimientoHabilitacion: row.vencimientoHabilitacion
-        ? new Date(row.vencimientoHabilitacion).toISOString().split('T')[0]
+        ? new Date(row.vencimientoHabilitacion as Date).toISOString().split('T')[0]
         : '',
       coordenadas: row._raw?.latitud ? `${row._raw.latitud}, ${row._raw.longitud}` : '',
       corrientesAutorizadas: row._raw?.corrientesAutorizadas || '',

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SITREP — Manual del Sistema | v2026.6</title>
+<title>SITREP — Manual del Sistema | v2026.7</title>
 <meta name="description" content="Manual completo del Sistema de Trazabilidad de Residuos Peligrosos - Provincia de Mendoza">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,7 +18,7 @@
     <span></span><span></span><span></span>
   </button>
   <div class="logo">SITREP <span>Mendoza</span></div>
-  <span class="version">v2026.6</span>
+  <span class="version">v2026.7</span>
   <span class="doc-title">Manual del Sistema de Trazabilidad de Residuos Peligrosos</span>
   <div class="header-actions">
     <button class="header-action-btn" id="btnShare" onclick="shareManual()" aria-label="Compartir" title="Compartir">
@@ -71,6 +71,7 @@
     <a href="#mod-herramientas" class="nav-link level-2">3.9 Herramientas</a>
     <a href="#mod-blockchain" class="nav-link level-2">3.10 Certificacion Blockchain</a>
     <a href="#mod-estadisticas" class="nav-link level-2">3.11 Estadisticas</a>
+    <a href="#mod-inscripcion" class="nav-link level-2">3.12 Inscripcion y Solicitudes</a>
   </div>
 
   <div class="nav-section-title" onclick="toggleNavGroup(this)">4. Aplicacion Movil</div>
@@ -225,7 +226,7 @@
   <div class="print-logo">SITREP</div>
   <h1>Manual del Sistema de Trazabilidad<br>de Residuos Peligrosos</h1>
   <p class="print-subtitle">Provincia de Mendoza &mdash; Direccion General de Fiscalizacion Ambiental</p>
-  <p class="print-date">Version 2026.6 &mdash; Marzo 2026</p>
+  <p class="print-date">Version 2026.7 &mdash; Marzo 2026</p>
 </div>
 
 <!-- Hero Section — Apple Keynote Style -->
@@ -1253,6 +1254,145 @@ SITREP implementa un sistema de certificacion blockchain basado en <strong>2 sel
 </table>
 
 <p>Estos datos permiten a los administradores identificar tendencias, cuellos de botella en el proceso y evaluar la eficiencia operativa del sistema de trazabilidad.</p>
+</section>
+
+<!-- ============================================================ -->
+<!-- SECTION 3.12: INSCRIPCION PUBLICA Y SOLICITUDES               -->
+<!-- ============================================================ -->
+
+<section id="mod-inscripcion" data-role="all">
+<h3>3.12 Inscripcion Publica y Solicitudes</h3>
+<div class="section-intro">
+SITREP ofrece dos vias para dar de alta actores en el sistema: <strong>auto-inscripcion publica</strong> (sin login, accesible desde cualquier navegador) y <strong>creacion directa</strong> por un administrador desde el panel de gestion. La auto-inscripcion genera una <em>solicitud</em> que debe ser aprobada por un administrador antes de activar la cuenta.
+</div>
+
+<h4>URLs de Inscripcion Publica</h4>
+<p>Estas paginas no requieren autenticacion. El solicitante accede directamente desde un enlace o QR:</p>
+<table>
+<thead><tr><th>Actor</th><th>URL</th><th>Wizard</th></tr></thead>
+<tbody>
+<tr><td>Generador</td><td><code>/inscripcion/generador</code></td><td>7 pasos</td></tr>
+<tr><td>Operador</td><td><code>/inscripcion/operador</code></td><td>8 pasos</td></tr>
+<tr><td>Transportista</td><td><code>/inscripcion/transportista</code></td><td>5 pasos</td></tr>
+</tbody>
+</table>
+
+<h4>Fase 1: Creacion de Cuenta</h4>
+<p>Todos los wizards comienzan con una fase de creacion de cuenta. El solicitante ingresa:</p>
+<ul>
+<li><strong>Email:</strong> sera el usuario de acceso al sistema.</li>
+<li><strong>Contrasena:</strong> minimo 6 caracteres, con confirmacion.</li>
+<li><strong>Nombre completo:</strong> nombre del responsable de la solicitud.</li>
+<li><strong>CUIT:</strong> identificador fiscal unico (formato XX-XXXXXXXX-X).</li>
+</ul>
+<p>El sistema valida unicidad de email y formato de CUIT antes de crear la cuenta y la solicitud en estado <span class="badge badge-neutral">BORRADOR</span>.</p>
+
+<h4>Wizard de Generador (7 pasos)</h4>
+<div class="cu-screenshot"><a href="screenshots/desktop/70_inscripcion_generador_paso1.png" target="_blank"><img src="screenshots/desktop/70_inscripcion_generador_paso1.png" alt="Inscripcion Generador — Paso 1" loading="lazy"></a><div class="cu-screenshot-caption">Inscripcion Generador — Fase 1 creacion de cuenta</div></div>
+
+<table>
+<thead><tr><th>Paso</th><th>Nombre</th><th>Campos</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Establecimiento</td><td>Razon social, CUIT, actividad, rubro, categoria (Grandes/Medianos/Pequenos Generadores)</td></tr>
+<tr><td>2</td><td>Regulatorio</td><td>Numero inscripcion, expediente DPA, resolucion inscripcion, libro operatoria (checkbox)</td></tr>
+<tr><td>3</td><td>Domicilios</td><td>Domicilio legal (calle, localidad, departamento), domicilio real (con opcion "igual al legal"), coordenadas GPS</td></tr>
+<tr><td>4</td><td>Adicional</td><td>Categoria individual, certificacion ISO, telefono</td></tr>
+<tr><td>5</td><td>Calculo TEF</td><td>Factor R, monto MxR, zona, coeficientes A1-A10 de peligrosidad ambiental (ver seccion TEF abajo)</td></tr>
+<tr><td>6</td><td>Documentos</td><td>Carga de archivos: Memoria Tecnica, Factura Luz, Habilitacion Municipal, Constancia AFIP</td></tr>
+<tr><td>7</td><td>Resumen</td><td>Revision de todos los datos con opcion de enviar la solicitud</td></tr>
+</tbody>
+</table>
+
+<h4>Wizard de Operador (8 pasos)</h4>
+<div class="cu-screenshot"><a href="screenshots/desktop/72_inscripcion_operador_paso1.png" target="_blank"><img src="screenshots/desktop/72_inscripcion_operador_paso1.png" alt="Inscripcion Operador — Paso 1" loading="lazy"></a><div class="cu-screenshot-caption">Inscripcion Operador — Fase 1 creacion de cuenta</div></div>
+
+<table>
+<thead><tr><th>Paso</th><th>Nombre</th><th>Campos</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Establecimiento</td><td>Razon social, CUIT, tipo operador (FIJO / IN SITU), tecnologia, categoria</td></tr>
+<tr><td>2</td><td>Regulatorio</td><td>Numero habilitacion, certificado numero, expediente inscripcion, resolucion DPA, vencimiento habilitacion</td></tr>
+<tr><td>3</td><td>Domicilios</td><td>Domicilio legal, domicilio real (con opcion "igual al legal"), coordenadas GPS</td></tr>
+<tr><td>4</td><td>Representantes</td><td>Representante legal (nombre, DNI, telefono), representante tecnico (nombre, matricula, telefono)</td></tr>
+<tr><td>5</td><td>Corrientes</td><td>Seleccion de corrientes Y autorizadas (Y1-Y48 segun Ley 24.051)</td></tr>
+<tr><td>6</td><td>Calculo TEF</td><td>Factor R, monto MxR, zona, coeficientes de peligrosidad ambiental</td></tr>
+<tr><td>7</td><td>Documentos</td><td>Carga de archivos: Memoria Tecnica, Plan Contingencia, Habilitacion Municipal, Constancia AFIP, Certificado Tratamiento</td></tr>
+<tr><td>8</td><td>Resumen</td><td>Revision y envio de solicitud</td></tr>
+</tbody>
+</table>
+
+<h4>Wizard de Transportista (5 pasos)</h4>
+<div class="cu-screenshot"><a href="screenshots/desktop/74_inscripcion_transportista_paso1.png" target="_blank"><img src="screenshots/desktop/74_inscripcion_transportista_paso1.png" alt="Inscripcion Transportista — Paso 1" loading="lazy"></a><div class="cu-screenshot-caption">Inscripcion Transportista — Fase 1 creacion de cuenta</div></div>
+
+<table>
+<thead><tr><th>Paso</th><th>Nombre</th><th>Campos</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Datos Basicos</td><td>Razon social, CUIT, domicilio, localidad, telefono, email</td></tr>
+<tr><td>2</td><td>Habilitacion</td><td>Numero habilitacion, vencimiento, corrientes autorizadas, expediente DPA, resolucion DPA, resolucion SSP</td></tr>
+<tr><td>3</td><td>Vehiculos</td><td>Lista dinamica: patente, marca, modelo, anio, capacidad, numero habilitacion, vencimiento. Boton "Agregar vehiculo"</td></tr>
+<tr><td>4</td><td>Documentos</td><td>Constancia AFIP, Habilitacion de Transporte, Seguro Ambiental</td></tr>
+<tr><td>5</td><td>Resumen</td><td>Revision y envio de solicitud</td></tr>
+</tbody>
+</table>
+
+<h4>Calculo TEF (Tasa de Evaluacion y Fiscalizacion)</h4>
+<div class="cu-screenshot"><a href="screenshots/desktop/71_inscripcion_generador_tef.png" target="_blank"><img src="screenshots/desktop/71_inscripcion_generador_tef.png" alt="Paso TEF — calculo automatico" loading="lazy"></a><div class="cu-screenshot-caption">Paso TEF — calculo automatico de la tasa</div></div>
+
+<p>El calculo TEF implementa el <strong>Decreto 2625/99 — Ley 5917 (Mendoza)</strong>. La formula es:</p>
+<pre>TEF = M x R x ISO_factor
+Donde: R = Z x A x D x C</pre>
+<table>
+<thead><tr><th>Variable</th><th>Significado</th><th>Valores</th></tr></thead>
+<tbody>
+<tr><td><strong>M</strong></td><td>Coeficiente anual de fiscalizacion</td><td>162 (fijado por la autoridad)</td></tr>
+<tr><td><strong>Z</strong></td><td>Coeficiente zonal</td><td>Parque Industrial (0.75), Zona Industrial (1), Rural (1.5), Urbana (2)</td></tr>
+<tr><td><strong>A</strong></td><td>Coeficientes de peligrosidad (A1..A10)</td><td>10 subfactores: stock, almacenamiento, peligrosidad, tratabilidad, transporte, contingencia, monitoreo, instalaciones, idoneidad</td></tr>
+<tr><td><strong>D</strong></td><td>Superficie de la planta</td><td>Segun metros cuadrados declarados</td></tr>
+<tr><td><strong>C</strong></td><td>Corrientes Y del residuo</td><td>Factor segun tipo de corriente (tabla predefinida)</td></tr>
+<tr><td><strong>ISO</strong></td><td>Factor ISO (descuento)</td><td>1 (sin certificacion), 0.9 (con ISO 14000)</td></tr>
+</tbody>
+</table>
+<p>El componente <code>CalculadoraTEF</code> realiza el calculo en tiempo real y muestra el desglose completo con cada subfactor. Aplica tanto en inscripcion publica como en wizards de creacion admin.</p>
+
+<h4>Workflow de Solicitudes</h4>
+<p>Toda solicitud de inscripcion publica sigue el siguiente flujo de estados:</p>
+<div style="text-align:center; margin: 1rem 0;">
+<span class="badge badge-neutral">BORRADOR</span> &rarr;
+<span class="badge badge-info">ENVIADA</span> &rarr;
+<span class="badge badge-warning">EN_REVISION</span> &rarr;
+<span class="badge badge-success">APROBADA</span> | <span class="badge badge-warning">OBSERVADA</span> | <span class="badge badge-error">RECHAZADA</span>
+</div>
+<table>
+<thead><tr><th>Estado</th><th>Significado</th><th>Quien actua</th></tr></thead>
+<tbody>
+<tr><td><span class="badge badge-neutral">BORRADOR</span></td><td>Solicitud creada pero no enviada. El solicitante puede seguir editando datos.</td><td>Solicitante</td></tr>
+<tr><td><span class="badge badge-info">ENVIADA</span></td><td>Solicitud enviada para revision. El solicitante ya no puede modificarla.</td><td>Solicitante</td></tr>
+<tr><td><span class="badge badge-warning">EN_REVISION</span></td><td>Un administrador ha tomado la solicitud y esta revisando los datos.</td><td>Admin</td></tr>
+<tr><td><span class="badge badge-success">APROBADA</span></td><td>Solicitud aprobada. Se crea el actor y se activa la cuenta de usuario.</td><td>Admin</td></tr>
+<tr><td><span class="badge badge-warning">OBSERVADA</span></td><td>Se requieren correcciones. El solicitante recibe un mensaje con las observaciones.</td><td>Admin</td></tr>
+<tr><td><span class="badge badge-error">RECHAZADA</span></td><td>Solicitud rechazada definitivamente con motivo.</td><td>Admin</td></tr>
+</tbody>
+</table>
+
+<h4>Panel Admin de Solicitudes</h4>
+<div class="cu-screenshot"><a href="screenshots/desktop/76_admin_solicitudes_lista.png" target="_blank"><img src="screenshots/desktop/76_admin_solicitudes_lista.png" alt="Admin — Lista de Solicitudes" loading="lazy"></a><div class="cu-screenshot-caption">Panel de administracion de solicitudes de inscripcion</div></div>
+
+<p>Accesible desde <code>/admin/solicitudes</code>, el panel muestra:</p>
+<ul>
+<li><strong>4 KPIs:</strong> Pendientes, En Revision, Observadas, Aprobadas.</li>
+<li><strong>Filtros:</strong> Por estado, tipo de actor (Generador/Operador/Transportista) y busqueda por texto.</li>
+<li><strong>Tabla paginada:</strong> Numero de solicitud, solicitante, tipo actor, estado (badge color), fecha de creacion.</li>
+<li><strong>Accion:</strong> Clic en una fila navega al detalle de la solicitud.</li>
+</ul>
+
+<h4>Resultado de la Aprobacion</h4>
+<p>Al aprobar una solicitud, el sistema automaticamente:</p>
+<ol>
+<li>Crea el registro del actor (generador, operador o transportista) con todos los datos ingresados en el wizard.</li>
+<li>Vincula el actor con la cuenta de usuario creada en la Fase 1.</li>
+<li>Activa la cuenta de usuario (campo <code>activo = true</code>).</li>
+<li>El nuevo usuario puede iniciar sesion con el email y contrasena definidos durante la inscripcion.</li>
+</ol>
+<p>Si la solicitud incluia vehiculos (transportista), estos se crean como entidades anidadas dentro del transportista.</p>
 </section>
 
 <!-- ============================================================ -->
@@ -2941,7 +3081,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <section id="cu-admin" data-role="admin">
 <h2>7. Anexo: Casos de Uso</h2>
-<h3 class="cu-section-title"><span class="cu-section-badge role-admin">Administrador</span>7.1 Administrador DGFA <span class="cu-section-count">(20 casos)</span></h3>
+<h3 class="cu-section-title"><span class="cu-section-badge role-admin">Administrador</span>7.1 Administrador DGFA <span class="cu-section-count">(22 casos)</span></h3>
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A01: Gestionar Usuarios del Sistema</div>
 <div class="collapsible-body">
@@ -2968,19 +3108,29 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A02: Gestionar Generadores</div>
 <div class="collapsible-body">
-<div class="cu-screenshot"><a href="screenshots/desktop/64_generador_detalle.png" target="_blank"><img src="screenshots/desktop/64_generador_detalle.png" alt="Detalle de Generador" loading="lazy"></a><div class="cu-screenshot-caption">Detalle de Generador</div></div>
+<div class="cu-screenshot"><a href="screenshots/desktop/64_generador_detalle.png" target="_blank"><img src="screenshots/desktop/64_generador_detalle.png" alt="Detalle de Generador" loading="lazy"></a><div class="cu-screenshot-caption">Detalle de Generador — campos completos con actividad, rubro y domicilios</div></div>
 
-<p><strong>Descripcion:</strong> Alta, baja y modificacion de generadores de residuos peligrosos registrados. Incluye datos de inscripcion, categoria y geolocalizacion.</p>
+<p><strong>Descripcion:</strong> Alta, baja y modificacion de generadores de residuos peligrosos registrados. Incluye datos de inscripcion, categoria, geolocalizacion, actividad, rubro, domicilios legal/real, regulatorio y calculo TEF.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol ADMIN.</p>
 <p><strong>Flujo principal:</strong></p>
 <ol>
 <li>Acceder a Admin &gt; Actores &gt; Generadores.</li>
 <li>Visualizar tabla paginada con busqueda por razon social o CUIT.</li>
-<li>Crear/Editar: completar razonSocial, CUIT, domicilio, telefono, email, numeroInscripcion, categoria, coordenadas lat/lng.</li>
-<li>Los datos se enriquecen con informacion extendida del archivo CSV estatico indexado por CUIT.</li>
-<li>Guardar. El sistema valida los campos obligatorios.</li>
+<li>Crear nuevo: el boton "Nuevo Generador" abre un wizard de 6 pasos (<code>/admin/actores/generadores/nuevo</code>):
+  <ul>
+  <li><strong>Paso 1 — Identificacion:</strong> Razon social, CUIT (auto-enrichment via CSV), actividad, rubro, categoria, email, contrasena.</li>
+  <li><strong>Paso 2 — Domicilios:</strong> Domicilio legal (calle, localidad, departamento Mendoza), domicilio real (con opcion "igual al legal"), coordenadas GPS.</li>
+  <li><strong>Paso 3 — Residuos:</strong> Corrientes Y autorizadas (checkboxes Y1-Y48 segun Ley 24.051).</li>
+  <li><strong>Paso 4 — Calculo TEF:</strong> Componente CalculadoraTEF integrado (zona, coeficientes A1-A10, superficie, ISO).</li>
+  <li><strong>Paso 5 — Regulatorio:</strong> Numero inscripcion, expediente, resolucion, categoria individual, libro operatoria, certificacion ISO.</li>
+  <li><strong>Paso 6 — Adjuntos:</strong> Carga de documentos (Memoria Tecnica, Factura Luz, Habilitacion Municipal, Constancia AFIP) + resumen y confirmacion.</li>
+  </ul>
+</li>
+<li>Editar: mismos pasos con datos precargados (<code>/admin/actores/generadores/:id/editar</code>).</li>
+<li>Los datos se enriquecen automaticamente con informacion extendida del archivo CSV estatico indexado por CUIT.</li>
+<li>Guardar. El sistema valida los campos obligatorios y crea el usuario asociado.</li>
 </ol>
-<p><strong>Ruta:</strong> <code>/admin/actores/generadores</code></p>
+<p><strong>Ruta:</strong> <code>/admin/actores/generadores</code>, <code>/admin/actores/generadores/nuevo</code>, <code>/admin/actores/generadores/:id/editar</code></p>
 <p><strong>Endpoints:</strong> <code>GET/POST/PUT/DELETE /api/actores/generadores</code></p>
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
@@ -2989,38 +3139,54 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <div class="collapsible-body">
 <div class="cu-screenshot"><a href="screenshots/desktop/63_transportista_detalle_flota.png" target="_blank"><img src="screenshots/desktop/63_transportista_detalle_flota.png" alt="Detalle Transportista — flota y conductores" loading="lazy"></a><div class="cu-screenshot-caption">Detalle Transportista — flota y conductores</div></div>
 
-<p><strong>Descripcion:</strong> CRUD completo de empresas transportistas con entidades anidadas: vehiculos (patente, capacidad, habilitacion) y choferes (DNI, licencia).</p>
+<p><strong>Descripcion:</strong> CRUD completo de empresas transportistas con entidades anidadas: vehiculos (patente, capacidad, habilitacion) y choferes (DNI, licencia). Incluye campos DPA completos y wizard de creacion de 5 pasos.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol ADMIN.</p>
 <p><strong>Flujo principal:</strong></p>
 <ol>
 <li>Acceder a Admin &gt; Actores &gt; Transportistas.</li>
-<li>Crear/Editar transportista con datos basicos (razonSocial, CUIT, habilitacion).</li>
-<li>Agregar vehiculos: patente, marca, modelo, anio, capacidad, numero de habilitacion, Vencimiento de Habilitacion (date picker).</li>
-<li>Agregar choferes: nombre, apellido, DNI, licencia, Vencimiento de Licencia (date picker), telefono.</li>
-<li>Guardar con todas las entidades anidadas.</li>
+<li>Crear nuevo: el boton "Nuevo Transportista" abre un wizard de 5 pasos (<code>/admin/actores/transportistas/nuevo</code>):
+  <ul>
+  <li><strong>Paso 1 — Datos Basicos:</strong> Razon social, CUIT, domicilio, localidad, telefono, email, contrasena, nombre del responsable.</li>
+  <li><strong>Paso 2 — Habilitacion DPA:</strong> Numero habilitacion, vencimiento habilitacion, coordenadas, corrientes autorizadas, expediente DPA, resolucion DPA, resolucion SSP, acta inspeccion (2 campos).</li>
+  <li><strong>Paso 3 — Vehiculos:</strong> Lista dinamica con boton "Agregar Vehiculo". Cada vehiculo: patente, marca, modelo, anio, capacidad, numero habilitacion, vencimiento.</li>
+  <li><strong>Paso 4 — Choferes:</strong> Lista dinamica con boton "Agregar Chofer". Cada chofer: nombre, apellido, DNI, licencia, vencimiento licencia, telefono.</li>
+  <li><strong>Paso 5 — Confirmar:</strong> Resumen completo de datos, vehiculos y choferes. Boton guardar crea todo en una sola transaccion.</li>
+  </ul>
+</li>
+<li>Editar: mismos pasos con datos precargados (<code>/admin/actores/transportistas/:id/editar</code>).</li>
+<li>Guardar con todas las entidades anidadas (vehiculos + choferes se crean en la misma operacion).</li>
 </ol>
-<p><strong>Nota:</strong> Los transportistas pueden gestionar su propia flota de forma autonoma desde su perfil sin intervencion del administrador (ver CU-T12).</p>
-<p><strong>Ruta:</strong> <code>/admin/actores/transportistas</code></p>
+<p><strong>Nota:</strong> Los transportistas pueden gestionar su propia flota de forma autonoma desde su perfil sin intervencion del administrador (ver CU-T12). Ver tambien CU-A22 para detalles del wizard.</p>
+<p><strong>Ruta:</strong> <code>/admin/actores/transportistas</code>, <code>/admin/actores/transportistas/nuevo</code>, <code>/admin/actores/transportistas/:id/editar</code></p>
 <p><strong>Endpoints:</strong> <code>GET/POST/PUT/DELETE /api/actores/transportistas</code></p>
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A04: Gestionar Operadores</div>
 <div class="collapsible-body">
-<div class="cu-screenshot"><a href="screenshots/desktop/65_operador_detalle.png" target="_blank"><img src="screenshots/desktop/65_operador_detalle.png" alt="Detalle Operador" loading="lazy"></a><div class="cu-screenshot-caption">Detalle Operador</div></div>
+<div class="cu-screenshot"><a href="screenshots/desktop/65_operador_detalle.png" target="_blank"><img src="screenshots/desktop/65_operador_detalle.png" alt="Detalle Operador" loading="lazy"></a><div class="cu-screenshot-caption">Detalle Operador — representantes legales y tecnicos, regulatorio completo</div></div>
 
-<p><strong>Descripcion:</strong> Alta, baja y modificacion de plantas operadoras con certificados, corrientes Y autorizadas y metodos de tratamiento.</p>
+<p><strong>Descripcion:</strong> Alta, baja y modificacion de plantas operadoras con certificados, corrientes Y autorizadas, metodos de tratamiento, representantes legales/tecnicos y calculo TEF.</p>
 <p><strong>Precondiciones:</strong> El usuario autenticado tiene rol ADMIN.</p>
 <p><strong>Flujo principal:</strong></p>
 <ol>
 <li>Acceder a Admin &gt; Actores &gt; Operadores.</li>
-<li>Crear/Editar operador con datos basicos y certificados (tipo FIJO o IN SITU).</li>
-<li>Configurar corrientes Y autorizadas (tipos de residuo que puede recibir la planta).</li>
-<li>Definir tratamientos autorizados: metodo, descripcion, capacidad por tipo de residuo.</li>
+<li>Crear nuevo: el boton "Nuevo Operador" abre un wizard de 7 pasos (<code>/admin/actores/operadores/nuevo</code>):
+  <ul>
+  <li><strong>Paso 1 — Identificacion:</strong> Razon social, CUIT, tipo operador (FIJO/IN SITU), tecnologia, categoria, email, contrasena.</li>
+  <li><strong>Paso 2 — Domicilios:</strong> Domicilio legal, domicilio real (con opcion "igual al legal"), coordenadas GPS.</li>
+  <li><strong>Paso 3 — Representantes:</strong> Representante legal (nombre, DNI, telefono) y representante tecnico (nombre, matricula, telefono).</li>
+  <li><strong>Paso 4 — Residuos:</strong> Corrientes Y autorizadas (checkboxes Y1-Y48).</li>
+  <li><strong>Paso 5 — Calculo TEF:</strong> Componente CalculadoraTEF integrado.</li>
+  <li><strong>Paso 6 — Regulatorio:</strong> Numero habilitacion, certificado, expediente inscripcion, resolucion DPA, vencimiento habilitacion.</li>
+  <li><strong>Paso 7 — Adjuntos:</strong> Documentos requeridos (Memoria Tecnica, Plan Contingencia, Habilitacion Municipal, Constancia AFIP, Certificado Tratamiento) + resumen y confirmacion.</li>
+  </ul>
+</li>
+<li>Editar: mismos pasos con datos precargados (<code>/admin/actores/operadores/:id/editar</code>).</li>
 <li>Guardar. El sistema valida coherencia entre corrientes Y y tratamientos.</li>
 </ol>
 <p><strong>Nota:</strong> Existen empresas con certificados duales (ej: IBS CORDOBA tiene O-000056 IN SITU + O-000088 FIJO). El sistema maneja estos como registros separados.</p>
-<p><strong>Ruta:</strong> <code>/admin/actores/operadores</code></p>
+<p><strong>Ruta:</strong> <code>/admin/actores/operadores</code>, <code>/admin/actores/operadores/nuevo</code>, <code>/admin/actores/operadores/:id/editar</code></p>
 <p><strong>Endpoints:</strong> <code>GET/POST/PUT/DELETE /api/actores/operadores</code></p>
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
@@ -3314,6 +3480,53 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <p><strong>Endpoints:</strong> <code>POST /api/blockchain/registrar/:id</code>, <code>GET /api/blockchain/manifiesto/:id</code>, <code>GET /api/blockchain/registro</code>, <code>GET /api/blockchain/verificar/:hash</code></p>
 <p><span class="badge badge-complete">Completo</span></p>
 </div>
+
+<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A21: Gestionar Solicitudes de Inscripcion</div>
+<div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/76_admin_solicitudes_lista.png" target="_blank"><img src="screenshots/desktop/76_admin_solicitudes_lista.png" alt="Admin Solicitudes — lista con KPIs" loading="lazy"></a><div class="cu-screenshot-caption">Panel de solicitudes de inscripcion con KPIs y filtros</div></div>
+
+<p><strong>Descripcion:</strong> Administracion del workflow de solicitudes de inscripcion publica. El administrador revisa, observa, aprueba o rechaza solicitudes enviadas por generadores, operadores y transportistas a traves de los formularios publicos de auto-inscripcion (<code>/inscripcion/:tipo</code>).</p>
+<p><strong>Precondiciones:</strong> El usuario autenticado tiene rol ADMIN. Existen solicitudes en estado ENVIADA o superior.</p>
+<p><strong>Flujo principal:</strong></p>
+<ol>
+<li>Acceder a Admin &gt; Solicitudes. El panel muestra 4 KPIs (Pendientes, En Revision, Observadas, Aprobadas).</li>
+<li>Filtrar por estado (BORRADOR, ENVIADA, EN_REVISION, OBSERVADA, APROBADA, RECHAZADA), tipo de actor (Generador, Operador, Transportista) o busqueda por texto.</li>
+<li>Hacer clic en una solicitud para ver el detalle completo con todos los datos del wizard.</li>
+<li>Acciones disponibles:
+  <ul>
+  <li><strong>Aprobar:</strong> Crea el actor + activa la cuenta de usuario. Estado &rarr; APROBADA.</li>
+  <li><strong>Observar:</strong> Solicita correcciones con un mensaje para el solicitante. Estado &rarr; OBSERVADA.</li>
+  <li><strong>Rechazar:</strong> Deniega con motivo. Estado &rarr; RECHAZADA.</li>
+  </ul>
+</li>
+<li>La tabla paginada muestra numero, solicitante, tipo actor, estado (badge color) y fecha.</li>
+</ol>
+<p><strong>Workflow de estados:</strong> BORRADOR &rarr; ENVIADA &rarr; EN_REVISION &rarr; APROBADA | OBSERVADA | RECHAZADA (ver <a href="#mod-inscripcion">seccion 3.12</a>).</p>
+<p><strong>Ruta:</strong> <code>/admin/solicitudes</code></p>
+<p><strong>Endpoints:</strong> <code>GET /api/solicitudes</code>, <code>PATCH /api/solicitudes/:id/aprobar</code>, <code>PATCH /api/solicitudes/:id/observar</code>, <code>PATCH /api/solicitudes/:id/rechazar</code></p>
+<p><span class="badge badge-complete">Completo</span></p>
+</div>
+
+<div class="collapsible-header" onclick="toggleCollapsible(this)">CU-A22: Alta de Transportista con Flota</div>
+<div class="collapsible-body">
+<div class="cu-screenshot"><a href="screenshots/desktop/78_nuevo_transportista_wizard.png" target="_blank"><img src="screenshots/desktop/78_nuevo_transportista_wizard.png" alt="Nuevo Transportista — Wizard paso 1" loading="lazy"></a><div class="cu-screenshot-caption">Wizard de creacion de transportista — paso 1 datos basicos</div></div>
+
+<p><strong>Descripcion:</strong> Wizard dedicado de 5 pasos para la creacion de un transportista completo con todos los campos DPA (Direccion de Proteccion Ambiental), vehiculos y choferes en una sola operacion.</p>
+<p><strong>Precondiciones:</strong> El usuario autenticado tiene rol ADMIN.</p>
+<p><strong>Flujo principal (5 pasos):</strong></p>
+<ol>
+<li><strong>Paso 1 — Datos Basicos:</strong> Razon social, CUIT, domicilio, localidad, telefono, email del responsable, contrasena inicial, nombre del usuario asociado.</li>
+<li><strong>Paso 2 — Habilitacion DPA:</strong> Numero de habilitacion, vencimiento, coordenadas GPS, corrientes autorizadas (texto), expediente DPA, resolucion DPA, resolucion SSP, actas de inspeccion (2 campos).</li>
+<li><strong>Paso 3 — Vehiculos:</strong> Lista dinamica con boton "Agregar Vehiculo". Cada entrada incluye: patente, marca, modelo, anio, capacidad (kg), numero de habilitacion del vehiculo, fecha de vencimiento. Se pueden agregar o eliminar vehiculos antes de guardar.</li>
+<li><strong>Paso 4 — Choferes:</strong> Lista dinamica con boton "Agregar Chofer". Cada entrada incluye: nombre, apellido, DNI, numero de licencia, vencimiento de licencia, telefono. Se pueden agregar o eliminar choferes antes de guardar.</li>
+<li><strong>Paso 5 — Confirmar:</strong> Resumen completo con preview de datos basicos, campos DPA, vehiculos y choferes. Un boton "Guardar Transportista" crea todo en una sola transaccion (transportista + usuario + vehiculos + choferes).</li>
+</ol>
+<p><strong>Modo edicion:</strong> Al acceder con un ID existente (<code>/admin/actores/transportistas/:id/editar</code>), el wizard precarga todos los datos actuales del transportista incluyendo vehiculos y choferes existentes.</p>
+<p><strong>Ruta:</strong> <code>/admin/actores/transportistas/nuevo</code>, <code>/admin/actores/transportistas/:id/editar</code></p>
+<p><strong>Endpoints:</strong> <code>POST /api/actores/transportistas</code> (crea transportista + usuario + vehiculos + choferes), <code>PUT /api/actores/transportistas/:id</code></p>
+<p><span class="badge badge-complete">Completo</span></p>
+</div>
+
 </section>
 
 <section id="cu-generador" data-role="generador">
@@ -4645,6 +4858,18 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <table>
 <thead><tr><th>Version</th><th>Fecha</th><th>Descripcion de Cambios</th></tr></thead>
 <tbody>
+<tr><td><strong>2026.7</strong></td><td>Marzo 2026</td><td>
+<ul>
+<li>Nueva seccion 3.12: Inscripcion Publica y Solicitudes — auto-inscripcion para generadores (7 pasos), operadores (8 pasos) y transportistas (5 pasos).</li>
+<li>Calculo TEF (Tasa de Evaluacion y Fiscalizacion, Decreto 2625/99) integrado en wizards de inscripcion y creacion admin.</li>
+<li>Workflow de solicitudes: BORRADOR &rarr; ENVIADA &rarr; EN_REVISION &rarr; APROBADA/OBSERVADA/RECHAZADA.</li>
+<li>Panel admin de solicitudes (<code>/admin/solicitudes</code>) con KPIs, filtros por estado/tipo/busqueda.</li>
+<li>2 nuevos casos de uso: CU-A21 (Gestionar Solicitudes de Inscripcion), CU-A22 (Alta de Transportista con Flota).</li>
+<li>Actualizacion de CU-A02, CU-A03, CU-A04 con wizards completos de creacion (NuevoGeneradorPage 6 pasos, NuevoTransportistaPage 5 pasos, NuevoOperadorPage 7 pasos).</li>
+<li>Campos completos en paginas de detalle: representantes legales/tecnicos, DPA, actividad/rubro, domicilios legal/real.</li>
+<li>70 casos de uso totales, 67 completos.</li>
+</ul>
+</td></tr>
 <tr><td><strong>2026.6</strong></td><td>Marzo 2026</td><td>
 <ul>
 <li>Modulo de Certificacion Blockchain: nueva seccion 3.10 con 7 subsecciones (red, proceso, hash, panel, registro admin, verificacion, PDFs).</li>
@@ -4715,7 +4940,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <footer class="site-footer">
 <p><strong>SITREP</strong> &mdash; Sistema de Trazabilidad de Residuos Peligrosos</p>
 <p>Direccion General de Fiscalizacion Ambiental (DGFA) &mdash; Gobierno de Mendoza</p>
-<p>Version 2026.6 &mdash; Actualizado el 20 de marzo de 2026</p>
+<p>Version 2026.7 &mdash; Actualizado el 23 de marzo de 2026</p>
 <p style="margin-top:0.5rem;font-size:0.8rem;color:#9CA3AF;">Conforme a Ley Nacional 24.051, Decreto 831/93 y Ley Provincial 5917</p>
 <p style="margin-top:0.25rem;font-size:0.8rem;color:#9CA3AF;">Este documento es propiedad del Gobierno de la Provincia de Mendoza.</p>
 <p style="margin-top:0.25rem;font-size:0.8rem;color:#9CA3AF;">Desarrollo y operacion a cargo de Ultima Milla Soluciones Tecnologicas.</p>
