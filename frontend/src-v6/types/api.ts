@@ -165,6 +165,22 @@ export interface CreateGeneradorRequest {
   actividad?: string;
   rubro?: string;
   corrientesControl?: string;
+  latitud?: number;
+  longitud?: number;
+  expedienteInscripcion?: string;
+  domicilioLegalCalle?: string;
+  domicilioLegalLocalidad?: string;
+  domicilioLegalDepto?: string;
+  domicilioRealCalle?: string;
+  domicilioRealLocalidad?: string;
+  domicilioRealDepto?: string;
+  certificacionISO?: string;
+  resolucionInscripcion?: string;
+  factorR?: number;
+  montoMxR?: number;
+  categoriaIndividual?: string;
+  libroOperatoria?: boolean;
+  tefInputs?: Record<string, unknown>;
 }
 
 export interface CreateTransportistaRequest {
@@ -179,6 +195,14 @@ export interface CreateTransportistaRequest {
   telefono: string;
   numeroHabilitacion: string;
   vencimientoHabilitacion?: string;
+  latitud?: number;
+  longitud?: number;
+  corrientesAutorizadas?: string;
+  expedienteDPA?: string;
+  resolucionDPA?: string;
+  resolucionSSP?: string;
+  actaInspeccion?: string;
+  actaInspeccion2?: string;
 }
 
 export interface CreateOperadorRequest {
@@ -213,6 +237,7 @@ export interface CreateOperadorRequest {
   resolucionDPA?: string;
   latitud?: number;
   longitud?: number;
+  tefInputs?: Record<string, unknown>;
 }
 
 // ========================================

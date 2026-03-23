@@ -20,6 +20,7 @@ import {
   Trash2,
   Download,
   Loader2,
+  RefreshCw,
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -34,11 +35,10 @@ import { downloadCsv } from '../../utils/exportCsv';
 import {
   useOperadores,
   useCreateOperador,
-  useUpdateOperador,
   useDeleteOperador,
 } from '../../hooks/useActores';
 import { OPERADORES_DATA, type OperadorEnriched } from '../../data/operadores-enrichment';
-import { CORRIENTES_Y, CORRIENTES_Y_CODES } from '../../data/corrientes-y';
+import { CORRIENTES_Y, CORRIENTES_Y_CODES, parseCorrientes } from '../../data/corrientes-y';
 
 const INITIAL_FORM = {
   razonSocial: '',
@@ -69,16 +69,13 @@ const AdminOperadoresPage: React.FC = () => {
   const [sortBy, setSortBy] = useState<string | undefined>(undefined);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [modalCrear, setModalCrear] = useState(false);
-  const [modalEditar, setModalEditar] = useState(false);
   const [modalEliminar, setModalEliminar] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; razonSocial: string } | null>(null);
   const [form, setForm] = useState(INITIAL_FORM);
 
   // API hooks
   const { data: apiData, isLoading, isError, error } = useOperadores({ page: currentPage, limit: 20, search: busqueda || undefined, sortBy, sortOrder });
   const createMutation = useCreateOperador();
-  const updateMutation = useUpdateOperador();
   const deleteMutation = useDeleteOperador();
 
   const operadoresData = Array.isArray(apiData?.items) ? apiData.items : [];
@@ -115,7 +112,7 @@ const AdminOperadoresPage: React.FC = () => {
         certificado: enriched?.certificado || null,
         tipoOperador: o.tipoOperador || enriched?.tipoOperador || null,
         tecnologia: o.tecnologia || enriched?.tecnologia || null,
-        corrientes: o.corrientesY ? o.corrientesY.split(',').map((s: string) => s.trim()) : (enriched?.corrientes || []),
+        corrientes: o.corrientesY ? parseCorrientes(o.corrientesY) : (enriched?.corrientes || []),
         corrientesYRaw: o.corrientesY || (enriched?.corrientes?.join(', ') || ''),
         mailCSV: enriched?.mail || null,
         telefonoCSV: enriched?.telefono || null,
@@ -188,52 +185,6 @@ const AdminOperadoresPage: React.FC = () => {
     }
   };
 
-  const handleEditar = async () => {
-    if (!editId) return;
-    try {
-      await updateMutation.mutateAsync({
-        id: editId,
-        data: {
-          razonSocial: form.razonSocial,
-          cuit: form.cuit,
-          domicilio: form.domicilio,
-          telefono: form.telefono,
-          email: form.email,
-          numeroHabilitacion: form.numeroHabilitacion,
-          categoria: form.categoria,
-          tipoOperador: form.tipoOperador,
-          tecnologia: form.tecnologia,
-          corrientesY: form.corrientesY,
-        },
-      });
-      toast.success('Actualizado', `Operador ${form.razonSocial} actualizado`);
-      setModalEditar(false);
-      setEditId(null);
-      setForm(INITIAL_FORM);
-    } catch (err: any) {
-      toast.error('Error', err?.response?.data?.message || 'No se pudo actualizar');
-    }
-  };
-
-  const openEditar = (row: typeof tableData[0]) => {
-    setEditId(row.id);
-    setForm({
-      razonSocial: row.razonSocial || '',
-      cuit: row.cuit || '',
-      domicilio: row.domicilio || '',
-      telefono: row.telefono || '',
-      email: row.email || '',
-      password: '',
-      nombre: '',
-      numeroHabilitacion: row.numeroHabilitacion !== '-' ? row.numeroHabilitacion : '',
-      categoria: row.categoria !== '-' ? row.categoria : '',
-      tipoOperador: row.tipoOperador || '',
-      tecnologia: row.tecnologia || '',
-      corrientesY: row.corrientesYRaw || '',
-    });
-    setModalEditar(true);
-  };
-
   const handleEliminar = async () => {
     if (!deleteTarget) return;
     try {
@@ -261,8 +212,8 @@ const AdminOperadoresPage: React.FC = () => {
         'Email (API)': o.email,
         'Teléfono (CSV)': o.telefonoCSV || '',
         'Teléfono (API)': o.telefono,
-        'Domicilio Real': o.domicilioReal ? `${o.domicilioReal.calle}, ${o.domicilioReal.localidad}, ${o.domicilioReal.departamento}` : '',
-        'Domicilio Legal': o.domicilioLegal ? `${o.domicilioLegal.calle}, ${o.domicilioLegal.localidad}, ${o.domicilioLegal.departamento}` : '',
+        'Direccion Real': o.domicilioReal ? `${o.domicilioReal.calle}, ${o.domicilioReal.localidad}, ${o.domicilioReal.departamento}` : '',
+        'Direccion Fiscal': o.domicilioLegal ? `${o.domicilioLegal.calle}, ${o.domicilioLegal.localidad}, ${o.domicilioLegal.departamento}` : '',
         Tratamientos: o.tratamientosCount,
         Manifiestos: o.manifiestosProcesados,
         Estado: o.activo ? 'Activo' : 'Inactivo',
@@ -335,26 +286,24 @@ const AdminOperadoresPage: React.FC = () => {
       </div>
       {form.corrientesY && (
         <div className="flex flex-wrap gap-1">
-          {form.corrientesY.split(',').map(c => c.trim()).filter(Boolean).map(code => (
+          {parseCorrientes(form.corrientesY).map(code => (
             <span key={code} className="text-[11px] px-1.5 py-0.5 bg-warning-50 text-warning-700 border border-warning-200 rounded" title={CORRIENTES_Y[code] || code}>
               {code}
             </span>
           ))}
         </div>
       )}
-      {!editId && (
-        <div className="grid grid-cols-2 gap-4">
-          <Input label="Nombre Responsable" value={form.nombre} onChange={(e) => updateField('nombre', e.target.value)} placeholder="Juan Perez" />
-          <Input label="Password inicial" type="password" value={form.password} onChange={(e) => updateField('password', e.target.value)} placeholder="Min. 8 caracteres" />
-        </div>
-      )}
+      <div className="grid grid-cols-2 gap-4">
+        <Input label="Nombre Responsable" value={form.nombre} onChange={(e) => updateField('nombre', e.target.value)} placeholder="Juan Perez" />
+        <Input label="Password inicial" type="password" value={form.password} onChange={(e) => updateField('password', e.target.value)} placeholder="Min. 8 caracteres" />
+      </div>
     </div>
   );
 
   const columns = [
     {
       key: 'operador',
-      width: '20%',
+      width: '22%',
       header: 'Operador',
       sortable: true,
       render: (row: typeof tableData[0]) => (
@@ -376,7 +325,7 @@ const AdminOperadoresPage: React.FC = () => {
     },
     {
       key: 'tipo',
-      width: '12%',
+      width: '10%',
       header: 'Tipo',
       sortable: true,
       hiddenBelow: 'md' as const,
@@ -393,7 +342,7 @@ const AdminOperadoresPage: React.FC = () => {
     },
     {
       key: 'corrientes',
-      width: '14%',
+      width: '12%',
       header: 'Corrientes',
       hiddenBelow: 'lg' as const,
       render: (row: typeof tableData[0]) => row.corrientes.length > 0 ? (
@@ -415,7 +364,7 @@ const AdminOperadoresPage: React.FC = () => {
     },
     {
       key: 'tecnologia',
-      width: '22%',
+      width: '18%',
       header: 'Tecnología',
       hiddenBelow: 'lg' as const,
       render: (row: typeof tableData[0]) => row.tecnologia ? (
@@ -428,7 +377,7 @@ const AdminOperadoresPage: React.FC = () => {
     },
     {
       key: 'contacto',
-      width: '14%',
+      width: '16%',
       header: 'Contacto',
       hiddenBelow: 'lg' as const,
       render: (row: typeof tableData[0]) => {
@@ -466,7 +415,7 @@ const AdminOperadoresPage: React.FC = () => {
     },
     {
       key: 'acciones',
-      width: '10%',
+      width: '14%',
       header: '',
       align: 'right' as const,
       render: (row: typeof tableData[0]) => (
@@ -493,10 +442,17 @@ const AdminOperadoresPage: React.FC = () => {
           </button>
           <button
             className="p-1.5 text-neutral-400 hover:text-info-600 hover:bg-info-50 rounded-lg transition-colors"
-            onClick={(e) => { e.stopPropagation(); openEditar(row); }}
+            onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/admin/actores/operadores/${row.id}/editar` : `/admin/actores/operadores/${row.id}/editar`); }}
             title="Editar"
           >
             <Edit size={16} />
+          </button>
+          <button
+            className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+            onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/admin/actores/operadores/${row.id}/renovar` : `/admin/actores/operadores/${row.id}/renovar`); }}
+            title="Renovar"
+          >
+            <RefreshCw size={16} />
           </button>
           <button
             className="p-1.5 text-neutral-400 hover:text-error-600 hover:bg-error-50 rounded-lg transition-colors"
@@ -527,7 +483,7 @@ const AdminOperadoresPage: React.FC = () => {
           <Button variant="outline" leftIcon={<Download size={18} />} onClick={handleExport}>
             Exportar
           </Button>
-          <Button leftIcon={<Plus size={18} />} onClick={() => { setForm(INITIAL_FORM); setModalCrear(true); }}>
+          <Button leftIcon={<Plus size={18} />} onClick={() => navigate(isMobile ? '/mobile/admin/actores/operadores/nuevo' : '/admin/actores/operadores/nuevo')}>
             Nuevo Operador
           </Button>
         </div>
@@ -657,6 +613,7 @@ const AdminOperadoresPage: React.FC = () => {
               onRowClick={(row) => navigate(isMobile ? `/mobile/admin/actores/operadores/${row.id}` : `/admin/actores/operadores/${row.id}`)}
               emptyMessage="No se encontraron operadores"
               stickyHeader
+              fixedLayout
             />
             <Pagination
               currentPage={currentPage}
@@ -680,24 +637,6 @@ const AdminOperadoresPage: React.FC = () => {
             <Button variant="outline" onClick={() => { setModalCrear(false); setForm(INITIAL_FORM); }}>Cancelar</Button>
             <Button onClick={handleCrear} disabled={createMutation.isPending}>
               {createMutation.isPending ? 'Guardando...' : 'Crear Operador'}
-            </Button>
-          </>
-        }
-      >
-        {renderForm()}
-      </Modal>
-
-      {/* Modal editar */}
-      <Modal
-        isOpen={modalEditar}
-        onClose={() => { setModalEditar(false); setEditId(null); setForm(INITIAL_FORM); }}
-        title="Editar Operador"
-        size="lg"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => { setModalEditar(false); setEditId(null); setForm(INITIAL_FORM); }}>Cancelar</Button>
-            <Button onClick={handleEditar} disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? 'Guardando...' : 'Guardar Cambios'}
             </Button>
           </>
         }

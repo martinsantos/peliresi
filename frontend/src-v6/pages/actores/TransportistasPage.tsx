@@ -51,6 +51,13 @@ const INITIAL_FORM = {
   nombre: '',
   numeroHabilitacion: '',
   vencimientoHabilitacion: '',
+  coordenadas: '',
+  corrientesAutorizadas: '',
+  expedienteDPA: '',
+  resolucionDPA: '',
+  resolucionSSP: '',
+  actaInspeccion: '',
+  actaInspeccion2: '',
 };
 
 const TransportistasPage: React.FC = () => {
@@ -157,6 +164,13 @@ const TransportistasPage: React.FC = () => {
 
   const updateField = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }));
 
+  const parseCoords = (coords: string) => {
+    const parts = coords?.split(',').map(s => s.trim()).filter(Boolean);
+    const lat = parts?.[0] ? Number(parts[0]) : undefined;
+    const lng = parts?.[1] ? Number(parts[1]) : undefined;
+    return lat && lng && !isNaN(lat) && !isNaN(lng) ? { latitud: lat, longitud: lng } : {};
+  };
+
   const handleCrear = async () => {
     if (!form.razonSocial || !form.cuit || !form.email) {
       toast.error('Campos requeridos', 'Razón social, CUIT y email son obligatorios');
@@ -172,7 +186,8 @@ const TransportistasPage: React.FC = () => {
         domicilio: form.domicilio,
         telefono: form.telefono,
         numeroHabilitacion: form.numeroHabilitacion,
-      });
+        ...parseCoords(form.coordenadas),
+      } as any);
       toast.success('Creado', `Transportista ${form.razonSocial} creado`);
       setModalCrear(false);
       setForm(INITIAL_FORM);
@@ -195,6 +210,13 @@ const TransportistasPage: React.FC = () => {
           email: form.email,
           numeroHabilitacion: form.numeroHabilitacion,
           vencimientoHabilitacion: form.vencimientoHabilitacion || undefined,
+          ...parseCoords(form.coordenadas),
+          corrientesAutorizadas: form.corrientesAutorizadas || undefined,
+          expedienteDPA: form.expedienteDPA || undefined,
+          resolucionDPA: form.resolucionDPA || undefined,
+          resolucionSSP: form.resolucionSSP || undefined,
+          actaInspeccion: form.actaInspeccion || undefined,
+          actaInspeccion2: form.actaInspeccion2 || undefined,
         },
       });
       toast.success('Actualizado', `Transportista ${form.razonSocial} actualizado`);
@@ -221,6 +243,13 @@ const TransportistasPage: React.FC = () => {
       vencimientoHabilitacion: row.vencimientoHabilitacion
         ? new Date(row.vencimientoHabilitacion).toISOString().split('T')[0]
         : '',
+      coordenadas: row._raw?.latitud ? `${row._raw.latitud}, ${row._raw.longitud}` : '',
+      corrientesAutorizadas: row._raw?.corrientesAutorizadas || '',
+      expedienteDPA: row._raw?.expedienteDPA || '',
+      resolucionDPA: row._raw?.resolucionDPA || '',
+      resolucionSSP: row._raw?.resolucionSSP || '',
+      actaInspeccion: row._raw?.actaInspeccion || '',
+      actaInspeccion2: row._raw?.actaInspeccion2 || '',
     });
     setModalEditar(true);
   };
@@ -274,6 +303,23 @@ const TransportistasPage: React.FC = () => {
         <Input label="N° Habilitación" value={form.numeroHabilitacion} onChange={(e) => updateField('numeroHabilitacion', e.target.value)} placeholder="HAB-TR-2024-XXXX" />
         <Input label="Vencimiento Habilitación" type="date" value={form.vencimientoHabilitacion} onChange={(e) => updateField('vencimientoHabilitacion', e.target.value)} />
       </div>
+      <Input label="Coordenadas Geograficas" value={form.coordenadas} onChange={(e) => updateField('coordenadas', e.target.value)} placeholder="-32.89, -68.83" />
+      {/* Datos DPA */}
+      <div className="border-t border-neutral-100 pt-4 mt-2">
+        <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-3">Datos DPA</p>
+        <div className="grid grid-cols-2 gap-4">
+          <Input label="Expediente DPA" value={form.expedienteDPA} onChange={(e) => updateField('expedienteDPA', e.target.value)} placeholder="EXP-DPA-XXXX" />
+          <Input label="Resolución DPA" value={form.resolucionDPA} onChange={(e) => updateField('resolucionDPA', e.target.value)} placeholder="0359/24" />
+        </div>
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <Input label="Resolución SSP" value={form.resolucionSSP} onChange={(e) => updateField('resolucionSSP', e.target.value)} placeholder="SSP-XXXX" />
+          <Input label="Corrientes Autorizadas" value={form.corrientesAutorizadas} onChange={(e) => updateField('corrientesAutorizadas', e.target.value)} placeholder="Y4, Y8, Y9" />
+        </div>
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <Input label="Acta Inspección" value={form.actaInspeccion} onChange={(e) => updateField('actaInspeccion', e.target.value)} placeholder="rp-g000040" />
+          <Input label="Acta Inspección 2" value={form.actaInspeccion2} onChange={(e) => updateField('actaInspeccion2', e.target.value)} placeholder="" />
+        </div>
+      </div>
       {!editId && (
         <div className="grid grid-cols-2 gap-4">
           <Input label="Nombre Responsable" value={form.nombre} onChange={(e) => updateField('nombre', e.target.value)} placeholder="Juan Perez" />
@@ -286,7 +332,7 @@ const TransportistasPage: React.FC = () => {
   const columns = [
     {
       key: 'transportista',
-      width: '20%',
+      width: '24%',
       header: 'Transportista',
       sortable: true,
       render: (row: typeof tableData[0]) => (
@@ -303,7 +349,7 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'habilitacion',
-      width: '16%',
+      width: '14%',
       header: 'Habilitación',
       hiddenBelow: 'md' as const,
       render: (row: typeof tableData[0]) => {
@@ -345,7 +391,7 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'flota',
-      width: '8%',
+      width: '7%',
       header: 'Vehículos',
       sortable: true,
       hiddenBelow: 'md' as const,
@@ -358,7 +404,7 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'choferes',
-      width: '8%',
+      width: '7%',
       header: 'Choferes',
       sortable: true,
       hiddenBelow: 'md' as const,
@@ -371,7 +417,7 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'contacto',
-      width: '20%',
+      width: '18%',
       header: 'Contacto',
       hiddenBelow: 'lg' as const,
       render: (row: typeof tableData[0]) => (
@@ -390,17 +436,6 @@ const TransportistasPage: React.FC = () => {
           )}
           {!row.email && !row.telefono && <span className="text-neutral-400">-</span>}
         </div>
-      ),
-    },
-    {
-      key: 'domicilio',
-      width: '14%',
-      header: 'Domicilio',
-      hiddenBelow: 'lg' as const,
-      render: (row: typeof tableData[0]) => (
-        <p className="text-xs text-neutral-600 truncate" title={row.domicilio}>
-          {row.domicilio || '-'}
-        </p>
       ),
     },
     {
@@ -598,6 +633,7 @@ const TransportistasPage: React.FC = () => {
               onRowClick={(row) => navigate(isMobile ? `/mobile/actores/transportistas/${row.id}` : `/admin/actores/transportistas/${row.id}`)}
               emptyMessage="No se encontraron transportistas"
               stickyHeader
+              fixedLayout
             />
             <Pagination
               currentPage={currentPage}
