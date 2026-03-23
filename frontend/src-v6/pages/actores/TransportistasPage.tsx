@@ -184,9 +184,17 @@ const TransportistasPage: React.FC = () => {
         razonSocial: form.razonSocial,
         cuit: form.cuit,
         domicilio: form.domicilio,
+        localidad: form.localidad || undefined,
         telefono: form.telefono,
         numeroHabilitacion: form.numeroHabilitacion,
+        vencimientoHabilitacion: form.vencimientoHabilitacion || undefined,
         ...parseCoords(form.coordenadas),
+        corrientesAutorizadas: form.corrientesAutorizadas || undefined,
+        expedienteDPA: form.expedienteDPA || undefined,
+        resolucionDPA: form.resolucionDPA || undefined,
+        resolucionSSP: form.resolucionSSP || undefined,
+        actaInspeccion: form.actaInspeccion || undefined,
+        actaInspeccion2: form.actaInspeccion2 || undefined,
       } as any);
       toast.success('Creado', `Transportista ${form.razonSocial} creado`);
       setModalCrear(false);

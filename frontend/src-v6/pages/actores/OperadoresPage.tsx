@@ -30,10 +30,10 @@ import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Input } from '../../components/ui/Input';
 import { Modal, ConfirmModal } from '../../components/ui/Modal';
+import { toast } from '../../components/ui/Toast';
 import {
   useOperadores,
   useCreateOperador,
-  useUpdateOperador,
   useDeleteOperador,
 } from '../../hooks/useActores';
 
@@ -63,16 +63,13 @@ const OperadoresPage: React.FC = () => {
   const [sortBy, setSortBy] = useState<string | undefined>(undefined);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [modalCrear, setModalCrear] = useState(false);
-  const [modalEditar, setModalEditar] = useState(false);
   const [modalEliminar, setModalEliminar] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; razonSocial: string } | null>(null);
   const [form, setForm] = useState(INITIAL_FORM);
 
   // API hooks
   const { data: apiData, isLoading } = useOperadores({ search: searchTerm || undefined, sortBy, sortOrder });
   const createMutation = useCreateOperador();
-  const updateMutation = useUpdateOperador();
   const deleteMutation = useDeleteOperador();
 
   const operadoresData = Array.isArray(apiData?.items) ? apiData.items : [];
@@ -129,48 +126,13 @@ const OperadoresPage: React.FC = () => {
       });
       setModalCrear(false);
       setForm(INITIAL_FORM);
-    } catch {
-      // Error handled by React Query
-    }
-  };
-
-  const handleEditar = async () => {
-    if (!editId) return;
-    try {
-      await updateMutation.mutateAsync({
-        id: editId,
-        data: {
-          razonSocial: form.razonSocial,
-          cuit: form.cuit,
-          domicilio: form.domicilio,
-          telefono: form.telefono,
-          email: form.email,
-          numeroHabilitacion: form.numeroHabilitacion,
-          categoria: form.categoria,
-        },
-      });
-      setModalEditar(false);
-      setEditId(null);
-      setForm(INITIAL_FORM);
-    } catch {
-      // Error handled by React Query
+    } catch (err: any) {
+      toast.error('Error', err?.response?.data?.message || 'No se pudo crear el operador');
     }
   };
 
   const openEditar = (op: any) => {
-    setEditId(op.id);
-    setForm({
-      razonSocial: op.razonSocial || '',
-      cuit: op.cuit || '',
-      domicilio: op.domicilio || '',
-      telefono: op.telefono || '',
-      email: op.email || '',
-      password: '',
-      nombre: '',
-      numeroHabilitacion: op.numeroHabilitacion || '',
-      categoria: op.categoria || '',
-    });
-    setModalEditar(true);
+    navigate(isMobile ? `/mobile/admin/actores/operadores/${op.id}/editar` : `/admin/actores/operadores/${op.id}/editar`);
   };
 
   const handleEliminar = async () => {
@@ -179,8 +141,8 @@ const OperadoresPage: React.FC = () => {
       await deleteMutation.mutateAsync(deleteTarget.id);
       setModalEliminar(false);
       setDeleteTarget(null);
-    } catch {
-      // Error handled by React Query
+    } catch (err: any) {
+      toast.error('Error', err?.response?.data?.message || 'No se pudo eliminar el operador');
     }
   };
 
@@ -199,12 +161,10 @@ const OperadoresPage: React.FC = () => {
         <Input label="N. Habilitacion" value={form.numeroHabilitacion} onChange={(e) => updateField('numeroHabilitacion', e.target.value)} placeholder="HAB-OP-2024-XXXX" />
         <Input label="Categoria" value={form.categoria} onChange={(e) => updateField('categoria', e.target.value)} placeholder="Incineracion" />
       </div>
-      {!editId && (
-        <div className="grid grid-cols-2 gap-4">
-          <Input label="Nombre Responsable" value={form.nombre} onChange={(e) => updateField('nombre', e.target.value)} placeholder="Juan Perez" />
-          <Input label="Password inicial" type="password" value={form.password} onChange={(e) => updateField('password', e.target.value)} placeholder="Min. 8 caracteres" />
-        </div>
-      )}
+      <div className="grid grid-cols-2 gap-4">
+        <Input label="Nombre Responsable" value={form.nombre} onChange={(e) => updateField('nombre', e.target.value)} placeholder="Juan Perez" />
+        <Input label="Password inicial" type="password" value={form.password} onChange={(e) => updateField('password', e.target.value)} placeholder="Min. 8 caracteres" />
+      </div>
     </div>
   );
 
@@ -393,7 +353,7 @@ const OperadoresPage: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-3 py-2.5">
-                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center justify-end gap-1">
                           <Button variant="ghost" size="sm" className="p-2" onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/admin/actores/operadores/${op.id}` : `/admin/actores/operadores/${op.id}`); }}>
                             <Eye size={16} />
                           </Button>
@@ -503,24 +463,6 @@ const OperadoresPage: React.FC = () => {
             <Button variant="outline" onClick={() => { setModalCrear(false); setForm(INITIAL_FORM); }}>Cancelar</Button>
             <Button onClick={handleCrear} disabled={createMutation.isPending}>
               {createMutation.isPending ? 'Guardando...' : 'Crear Operador'}
-            </Button>
-          </>
-        }
-      >
-        {renderForm()}
-      </Modal>
-
-      {/* Modal editar */}
-      <Modal
-        isOpen={modalEditar}
-        onClose={() => { setModalEditar(false); setEditId(null); setForm(INITIAL_FORM); }}
-        title="Editar Operador"
-        size="lg"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => { setModalEditar(false); setEditId(null); setForm(INITIAL_FORM); }}>Cancelar</Button>
-            <Button onClick={handleEditar} disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? 'Guardando...' : 'Guardar Cambios'}
             </Button>
           </>
         }
