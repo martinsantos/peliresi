@@ -237,6 +237,9 @@ const TransportistasPage: React.FC = () => {
   };
 
   const openEditar = (row: typeof tableData[0]) => {
+    navigate(isMobile ? `/mobile/admin/actores/transportistas/${row.id}/editar` : `/admin/actores/transportistas/${row.id}/editar`);
+    return;
+    // Legacy modal code below - kept for reference
     setEditId(row.id);
     setForm({
       razonSocial: row.razonSocial || '',
@@ -520,7 +523,7 @@ const TransportistasPage: React.FC = () => {
           <Button variant="outline" leftIcon={<Download size={18} />} onClick={handleExport}>
             Exportar
           </Button>
-          <Button leftIcon={<Plus size={18} />} onClick={() => { setForm(INITIAL_FORM); setModalCrear(true); }}>
+          <Button leftIcon={<Plus size={18} />} onClick={() => navigate(isMobile ? '/mobile/admin/actores/transportistas/nuevo' : '/admin/actores/transportistas/nuevo')}>
             Nuevo Transportista
           </Button>
         </div>

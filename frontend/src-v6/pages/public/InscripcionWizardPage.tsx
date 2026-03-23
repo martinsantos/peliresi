@@ -14,7 +14,7 @@ import {
   ArrowLeft, ArrowRight, Send, Upload, Check,
   Building2, FileText, MapPin, Users, Shield,
   Factory, FlaskConical, AlertCircle, Loader2,
-  Eye, EyeOff, X, Paperclip, ClipboardList,
+  Eye, EyeOff, X, Paperclip, ClipboardList, Calculator,
 } from 'lucide-react';
 import { Button } from '../../components/ui/ButtonV2';
 import api from '../../services/api';
@@ -58,8 +58,9 @@ const STEPS_GENERADOR: StepDef[] = [
   { id: 2, label: 'Regulatorio', icon: ClipboardList },
   { id: 3, label: 'Domicilios', icon: MapPin },
   { id: 4, label: 'Adicional', icon: Shield },
-  { id: 5, label: 'Documentos', icon: FileText },
-  { id: 6, label: 'Resumen', icon: Check },
+  { id: 5, label: 'Calculo TEF', icon: Calculator },
+  { id: 6, label: 'Documentos', icon: FileText },
+  { id: 7, label: 'Resumen', icon: Check },
 ];
 
 const STEPS_OPERADOR: StepDef[] = [
@@ -68,8 +69,9 @@ const STEPS_OPERADOR: StepDef[] = [
   { id: 3, label: 'Domicilios', icon: MapPin },
   { id: 4, label: 'Representantes', icon: Users },
   { id: 5, label: 'Corrientes', icon: Shield },
-  { id: 6, label: 'Documentos', icon: FileText },
-  { id: 7, label: 'Resumen', icon: Check },
+  { id: 6, label: 'Calculo TEF', icon: Calculator },
+  { id: 7, label: 'Documentos', icon: FileText },
+  { id: 8, label: 'Resumen', icon: Check },
 ];
 
 // ========================================
@@ -650,8 +652,59 @@ const InscripcionWizardPage: React.FC = () => {
         </div>
       );
 
-      case 5: return renderDocumentos(DOCS_GENERADOR);
-      case 6: return renderResumen();
+      case 5: return (
+        <div className="space-y-4">
+          <SectionTitle icon={Calculator} title="Calculo TEF (Tasa por Evaluacion Fiscal)" />
+          <p className="text-sm text-neutral-500">
+            Complete los datos necesarios para el calculo de la Tasa de Evaluacion y Fiscalizacion.
+            El monto final sera determinado por la DGFA segun la normativa vigente.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Factor R (Nivel de Riesgo)</label>
+              <input type="number" step="0.01" value={form.factorR || ''} onChange={e => up('factorR', e.target.value)}
+                placeholder="0.00" className={inputCls()} />
+              <p className="text-xs text-neutral-400 mt-1">Indice de riesgo ambiental calculado</p>
+            </div>
+            <div>
+              <label className={labelCls}>Monto MxR ($)</label>
+              <input type="number" step="0.01" value={form.montoMxR || ''} onChange={e => up('montoMxR', e.target.value)}
+                placeholder="0.00" className={inputCls()} />
+              <p className="text-xs text-neutral-400 mt-1">Monto resultante = M x R</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Personal afectado (cantidad)</label>
+              <input type="number" value={form.tefPersonal || ''} onChange={e => up('tefPersonal', e.target.value)}
+                placeholder="0" className={inputCls()} />
+            </div>
+            <div>
+              <label className={labelCls}>Superficie del establecimiento (m2)</label>
+              <input type="number" value={form.tefSuperficie || ''} onChange={e => up('tefSuperficie', e.target.value)}
+                placeholder="0" className={inputCls()} />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Potencia instalada (HP)</label>
+              <input type="number" value={form.tefPotencia || ''} onChange={e => up('tefPotencia', e.target.value)}
+                placeholder="0" className={inputCls()} />
+            </div>
+            <div>
+              <label className={labelCls}>Zona</label>
+              <select value={form.tefZona || ''} onChange={e => up('tefZona', e.target.value)} className={selectCls()}>
+                <option value="">Seleccionar...</option>
+                <option value="URBANA">Urbana</option>
+                <option value="SUBURBANA">Suburbana</option>
+                <option value="RURAL">Rural</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      );
+      case 6: return renderDocumentos(DOCS_GENERADOR);
+      case 7: return renderResumen();
       default: return null;
     }
   };
@@ -849,8 +902,58 @@ const InscripcionWizardPage: React.FC = () => {
         </div>
       );
 
-      case 6: return renderDocumentos(DOCS_OPERADOR);
-      case 7: return renderResumen();
+      case 6: return (
+        <div className="space-y-4">
+          <SectionTitle icon={Calculator} title="Calculo TEF (Tasa por Evaluacion Fiscal)" />
+          <p className="text-sm text-neutral-500">
+            Complete los datos para el calculo de la Tasa de Evaluacion y Fiscalizacion del operador.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Factor R (Nivel de Riesgo)</label>
+              <input type="number" step="0.01" value={form.factorR || ''} onChange={e => up('factorR', e.target.value)}
+                placeholder="0.00" className={inputCls()} />
+              <p className="text-xs text-neutral-400 mt-1">Indice de riesgo ambiental calculado</p>
+            </div>
+            <div>
+              <label className={labelCls}>Monto MxR ($)</label>
+              <input type="number" step="0.01" value={form.montoMxR || ''} onChange={e => up('montoMxR', e.target.value)}
+                placeholder="0.00" className={inputCls()} />
+              <p className="text-xs text-neutral-400 mt-1">Monto resultante = M x R</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Capacidad de tratamiento (tn/mes)</label>
+              <input type="number" value={form.tefCapacidad || ''} onChange={e => up('tefCapacidad', e.target.value)}
+                placeholder="0" className={inputCls()} />
+            </div>
+            <div>
+              <label className={labelCls}>Superficie de la planta (m2)</label>
+              <input type="number" value={form.tefSuperficie || ''} onChange={e => up('tefSuperficie', e.target.value)}
+                placeholder="0" className={inputCls()} />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Personal afectado (cantidad)</label>
+              <input type="number" value={form.tefPersonal || ''} onChange={e => up('tefPersonal', e.target.value)}
+                placeholder="0" className={inputCls()} />
+            </div>
+            <div>
+              <label className={labelCls}>Zona</label>
+              <select value={form.tefZona || ''} onChange={e => up('tefZona', e.target.value)} className={selectCls()}>
+                <option value="">Seleccionar...</option>
+                <option value="URBANA">Urbana</option>
+                <option value="SUBURBANA">Suburbana</option>
+                <option value="RURAL">Rural</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      );
+      case 7: return renderDocumentos(DOCS_OPERADOR);
+      case 8: return renderResumen();
       default: return null;
     }
   };
@@ -995,6 +1098,18 @@ const InscripcionWizardPage: React.FC = () => {
         ],
       });
     }
+
+    // TEF
+    const tefFields: { label: string; value: string }[] = [
+      { label: 'Factor R', value: form.factorR || '' },
+      { label: 'Monto MxR', value: form.montoMxR ? `$ ${form.montoMxR}` : '' },
+      { label: 'Personal', value: form.tefPersonal || '' },
+      { label: 'Superficie (m2)', value: form.tefSuperficie || '' },
+      { label: 'Zona', value: form.tefZona || '' },
+    ];
+    if (isGenerador) tefFields.push({ label: 'Potencia (HP)', value: form.tefPotencia || '' });
+    if (isOperador) tefFields.push({ label: 'Capacidad (tn/mes)', value: form.tefCapacidad || '' });
+    sections.push({ label: 'Calculo TEF', fields: tefFields });
 
     // Documents
     const docEntries = Object.entries(adjuntos);

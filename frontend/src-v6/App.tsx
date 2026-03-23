@@ -76,6 +76,7 @@ const GeneradorDetallePage = lazy(() => import('./pages/admin/GeneradorDetallePa
 const NuevoGeneradorPage = lazy(() => import('./pages/admin/NuevoGeneradorPage'));
 const AdminOperadoresPage = lazy(() => import('./pages/admin/AdminOperadoresPage'));
 const NuevoOperadorPage = lazy(() => import('./pages/admin/NuevoOperadorPage'));
+const NuevoTransportistaPage = lazy(() => import('./pages/admin/NuevoTransportistaPage'));
 const AdminRenovacionesPage = lazy(() => import('./pages/admin/AdminRenovacionesPage'));
 const AdminVehiculosPage = lazy(() => import('./pages/admin/AdminVehiculosPage'));
 const AdminResiduosPage = lazy(() => import('./pages/admin/AdminResiduosPage'));
@@ -223,6 +224,8 @@ function App() {
         <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_TRANSPORTISTA']} />}>
           <Route element={<MobileLayout />}>
             <Route path="/mobile/admin/actores/transportistas" element={<TransportistasPage />} />
+            <Route path="/mobile/admin/actores/transportistas/nuevo" element={<NuevoTransportistaPage />} />
+            <Route path="/mobile/admin/actores/transportistas/:id/editar" element={<NuevoTransportistaPage />} />
           </Route>
         </Route>
         {/* Transportista detail: ADMIN + ADMIN_TRANSPORTISTA + TRANSPORTISTA (own profile) */}
@@ -325,6 +328,8 @@ function App() {
         <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_TRANSPORTISTA']} />}>
           <Route element={<MainLayout />}>
             <Route path="/admin/actores/transportistas" element={<TransportistasPage />} />
+            <Route path="/admin/actores/transportistas/nuevo" element={<NuevoTransportistaPage />} />
+            <Route path="/admin/actores/transportistas/:id/editar" element={<NuevoTransportistaPage />} />
           </Route>
         </Route>
         {/* Transportista detail: ADMIN + ADMIN_TRANSPORTISTA + TRANSPORTISTA (own profile) */}
