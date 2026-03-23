@@ -162,7 +162,7 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
                         className="hover:bg-primary-50/30 transition-colors cursor-pointer"
                         onClick={() => t.transportistaId && navigate(`/admin/actores/transportistas/${t.transportistaId}`)}
                       >
-                        <td className="px-4 py-3 text-sm font-medium text-neutral-900 max-w-[200px] truncate">{t.transportista}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-neutral-900 max-w-[200px] truncate" title={t.transportista}>{t.transportista}</td>
                         <td className="px-4 py-3 text-sm font-semibold text-neutral-900">{t.totalViajes}</td>
                         <td className="px-4 py-3 text-sm text-emerald-600 font-semibold">{t.completados}</td>
                         <td className="px-4 py-3 text-sm text-amber-600 hidden md:table-cell">{t.enTransito}</td>

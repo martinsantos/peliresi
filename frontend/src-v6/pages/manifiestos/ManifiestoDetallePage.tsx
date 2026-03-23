@@ -580,7 +580,7 @@ const ManifiestoDetailPage: React.FC = () => {
                     {(m.residuos || []).map((residuo) => (
                       <tr key={residuo.id} className="hover:bg-neutral-50 transition-colors">
                         <td className="px-3 py-2.5 font-mono text-sm">{residuo.tipoResiduo?.codigo || '-'}</td>
-                        <td className="px-3 py-2.5 text-neutral-700 truncate">{residuo.tipoResiduo?.nombre || residuo.descripcion || '-'}</td>
+                        <td className="px-3 py-2.5 text-neutral-700 truncate" title={residuo.tipoResiduo?.nombre || residuo.descripcion || '-'}>{residuo.tipoResiduo?.nombre || residuo.descripcion || '-'}</td>
                         <td className="px-3 py-2.5 font-medium">{formatNumber(residuo.cantidad)}</td>
                         <td className="px-3 py-2.5 text-neutral-600">{residuo.unidad}</td>
                       </tr>

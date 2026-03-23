@@ -314,7 +314,7 @@ export const AdminResiduosPage: React.FC = () => {
           </div>
           <div className="min-w-0">
             <p className="font-medium text-neutral-900">{row.codigo}</p>
-            <p className="text-xs text-neutral-500 line-clamp-1 max-w-[220px]">{row.descripcion}</p>
+            <p className="text-xs text-neutral-500 line-clamp-1 max-w-[220px]" title={row.descripcion}>{row.descripcion}</p>
           </div>
         </div>
       ),

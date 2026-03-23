@@ -272,7 +272,7 @@ const AuditoriaPage: React.FC = () => {
                     <td className="px-3 py-2.5 text-sm text-neutral-600 hidden md:table-cell">
                       {log.modulo}
                     </td>
-                    <td className="px-3 py-2.5 text-sm text-neutral-900 truncate hidden md:table-cell">
+                    <td className="px-3 py-2.5 text-sm text-neutral-900 truncate hidden md:table-cell" title={log.detalle}>
                       {log.detalle}
                     </td>
                     <td className="px-3 py-2.5 text-sm text-neutral-500 font-mono hidden md:table-cell">

@@ -329,7 +329,7 @@ const CargaMasivaPage: React.FC = () => {
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-2">
                         <FileSpreadsheet size={18} className="text-success-600" />
-                        <span className="font-medium text-neutral-900 truncate">{carga.archivo}</span>
+                        <span className="font-medium text-neutral-900 truncate" title={carga.archivo}>{carga.archivo}</span>
                       </div>
                     </td>
                     <td className="px-3 py-2.5 text-sm text-neutral-600 hidden md:table-cell">{carga.fecha}</td>

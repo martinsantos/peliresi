@@ -152,7 +152,7 @@ export default function TratadosTab({ data, periodo, onExportPDF }: { data: any;
                   {sortedDetalle.slice(0, 50).map((d: any, i: number) => (
                     <tr key={i} className="hover:bg-primary-50/30 transition-colors cursor-pointer" onClick={() => d.id && navigate(`/manifiestos/${d.id}`)}>
                       <td className="px-4 py-3 text-sm font-semibold text-primary-600">{d.numero}</td>
-                      <td className="px-4 py-3 text-sm text-neutral-900 max-w-[200px] truncate">{d.generador}</td>
+                      <td className="px-4 py-3 text-sm text-neutral-900 max-w-[200px] truncate" title={d.generador}>{d.generador}</td>
                       <td className="px-4 py-3 text-sm text-neutral-700 hidden md:table-cell">{d.metodoTratamiento || '-'}</td>
                       <td className="px-4 py-3 text-sm text-neutral-500">{d.fechaTratamiento ? new Date(d.fechaTratamiento).toLocaleDateString('es-AR') : '-'}</td>
                       <td className="px-4 py-3">

@@ -323,7 +323,7 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
         <div>
           <p className="font-medium text-neutral-900 mb-1 truncate">{t.metodo}</p>
           {t.descripcion && (
-            <p className="text-xs text-neutral-500 line-clamp-1 mb-1">{t.descripcion}</p>
+            <p className="text-xs text-neutral-500 line-clamp-1 mb-1" title={t.descripcion}>{t.descripcion}</p>
           )}
           {t.capacidad && (
             <div className="flex items-center gap-1.5">

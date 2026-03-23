@@ -296,8 +296,8 @@ export const AdminVehiculosPage: React.FC = () => {
             <Truck size={20} className="text-primary-600" />
           </div>
           <div className="min-w-0">
-            <p className="font-medium text-neutral-900 truncate">{row.patente}</p>
-            <p className="text-xs text-neutral-500 truncate">{row.habilitacion || 'Sin habilitación'}</p>
+            <p className="font-medium text-neutral-900 truncate" title={row.patente}>{row.patente}</p>
+            <p className="text-xs text-neutral-500 truncate" title={row.habilitacion || 'Sin habilitación'}>{row.habilitacion || 'Sin habilitación'}</p>
           </div>
         </div>
       ),
@@ -309,8 +309,8 @@ export const AdminVehiculosPage: React.FC = () => {
       header: 'Detalles',
       render: (row: VehiculoDisplay) => (
         <div className="text-sm min-w-0">
-          <p className="text-neutral-900 truncate">{row.marca} {row.modelo}</p>
-          <p className="text-neutral-500 truncate">Año {row.anio} {row.capacidad ? `• ${row.capacidad}` : ''}</p>
+          <p className="text-neutral-900 truncate" title={`${row.marca} ${row.modelo}`}>{row.marca} {row.modelo}</p>
+          <p className="text-neutral-500 truncate" title={`Año ${row.anio} ${row.capacidad ? `• ${row.capacidad}` : ''}`}>Año {row.anio} {row.capacidad ? `• ${row.capacidad}` : ''}</p>
         </div>
       ),
     },

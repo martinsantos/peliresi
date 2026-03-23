@@ -221,7 +221,7 @@ export default function AdminBlockchainPage() {
                         <td className="py-3 px-3">
                           <span className="font-mono font-semibold text-neutral-900">{m.numero}</span>
                         </td>
-                        <td className="py-3 px-3 text-neutral-600 max-w-[180px] truncate">
+                        <td className="py-3 px-3 text-neutral-600 max-w-[180px] truncate" title={m.generador?.razonSocial || '-'}>
                           {m.generador?.razonSocial || '-'}
                         </td>
                         <td className="py-3 px-3">

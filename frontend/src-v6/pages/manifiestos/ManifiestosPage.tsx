@@ -47,10 +47,10 @@ const ManifiestosPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; numero: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [sortBy, setSortBy] = useState<'createdAt' | 'numero'>('createdAt');
+  const [sortBy, setSortBy] = useState<'createdAt' | 'numero' | 'estado'>('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  const handleSort = (col: 'createdAt' | 'numero') => {
+  const handleSort = (col: 'createdAt' | 'numero' | 'estado') => {
     if (sortBy === col) {
       setSortOrder(o => o === 'desc' ? 'asc' : 'desc');
     } else {
@@ -230,7 +230,12 @@ const ManifiestosPage: React.FC = () => {
                     </button>
                   </th>
                   <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: "25%" }}>Generador</th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: "15%" }}>Estado</th>
+                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: "15%" }}>
+                    <button onClick={() => handleSort('estado')} className="flex items-center gap-1 hover:text-primary-600 transition-colors">
+                      Estado
+                      {sortBy === 'estado' ? (sortOrder === 'desc' ? <ArrowDown size={13} /> : <ArrowUp size={13} />) : <ArrowUpDown size={13} className="opacity-40" />}
+                    </button>
+                  </th>
                   <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider hidden md:table-cell" style={{ width: "15%" }}>
                     <button onClick={() => handleSort('createdAt')} className="flex items-center gap-1 hover:text-primary-600 transition-colors">
                       Fecha
@@ -258,17 +263,23 @@ const ManifiestosPage: React.FC = () => {
                           {m.numero}
                         </span>
                         {m.blockchainStatus === 'CONFIRMADO' && (
-                          <span title="Verificado en blockchain"><ShieldCheck size={14} className="text-emerald-500 shrink-0" /></span>
+                          <span title="Verificado en blockchain" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-semibold border border-emerald-200 shrink-0">
+                            <ShieldCheck size={12} /> BC
+                          </span>
                         )}
                         {m.blockchainStatus === 'PENDIENTE' && (
-                          <span title="Registro blockchain pendiente"><ShieldCheck size={14} className="text-amber-400 animate-pulse shrink-0" /></span>
+                          <span title="Registro blockchain pendiente" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600 text-[10px] font-semibold border border-amber-200 animate-pulse shrink-0">
+                            <ShieldCheck size={12} /> BC
+                          </span>
                         )}
                         {m.blockchainStatus === 'ERROR' && (
-                          <span title="Error en registro blockchain"><ShieldCheck size={14} className="text-red-400 shrink-0" /></span>
+                          <span title="Error en registro blockchain" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-red-50 text-red-600 text-[10px] font-semibold border border-red-200 shrink-0">
+                            <ShieldCheck size={12} /> BC
+                          </span>
                         )}
                       </div>
                     </td>
-                    <td className="px-3 py-2.5 text-neutral-700 truncate">{m.generadorNombre}</td>
+                    <td className="px-3 py-2.5 text-neutral-700 truncate" title={m.generadorNombre}>{m.generadorNombre}</td>
                     <td className="px-3 py-2.5">
                       <Badge variant="soft" color={estadoBadgeColor[m.estado] || 'neutral'}>
                         {ESTADO_LABELS[m.estado as EstadoManifiesto] || m.estado}
@@ -279,7 +290,7 @@ const ManifiestosPage: React.FC = () => {
                       {typeof m.peso === 'number' ? m.peso.toLocaleString('es-AR') : '0'} {m.unidad}
                     </td>
                     <td className="px-3 py-2.5">
-                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center justify-end gap-1">
                         <Button variant="ghost" size="sm" className="p-2" onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/manifiestos/${m.id}` : `/manifiestos/${m.id}`); }}>
                           <Eye size={16} />
                         </Button>

@@ -227,7 +227,9 @@ export const getManifiestos = async (req: AuthRequest, res: Response, next: Next
       ? { numero: dir }
       : sortBy === 'createdAt'
         ? { createdAt: dir }
-        : estado === 'ENTREGADO' ? { fechaEntrega: 'desc' }
+        : sortBy === 'estado'
+          ? { estado: dir }
+          : estado === 'ENTREGADO' ? { fechaEntrega: 'desc' }
         : estado === 'RECIBIDO' ? { fechaRecepcion: 'desc' }
         : estado === 'TRATADO' ? { fechaCierre: 'desc' }
         : { createdAt: 'desc' };

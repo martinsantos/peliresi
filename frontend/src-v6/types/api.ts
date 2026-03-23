@@ -137,7 +137,7 @@ export interface ManifiestoFilters {
   search?: string;
   page?: number;
   limit?: number;
-  sortBy?: 'createdAt' | 'numero';
+  sortBy?: 'createdAt' | 'numero' | 'estado';
   sortOrder?: 'asc' | 'desc';
 }
 

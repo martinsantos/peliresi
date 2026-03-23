@@ -172,9 +172,9 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
                           {m.estado?.replace(/_/g, ' ')}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-neutral-900 max-w-[200px] truncate">{m.generador}</td>
-                      <td className="px-4 py-3 text-sm text-neutral-700 max-w-[200px] truncate hidden md:table-cell">{m.transportista || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-neutral-700 max-w-[200px] truncate hidden lg:table-cell">{m.operador || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-neutral-900 max-w-[200px] truncate" title={m.generador}>{m.generador}</td>
+                      <td className="px-4 py-3 text-sm text-neutral-700 max-w-[200px] truncate hidden md:table-cell" title={m.transportista || '-'}>{m.transportista || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-neutral-700 max-w-[200px] truncate hidden lg:table-cell" title={m.operador || '-'}>{m.operador || '-'}</td>
                       <td className="px-4 py-3 text-sm text-neutral-500 hidden md:table-cell">{m.createdAt ? new Date(m.createdAt).toLocaleDateString('es-AR') : '-'}</td>
                     </tr>
                   ))}
