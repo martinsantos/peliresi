@@ -196,16 +196,16 @@ const ManifiestoDetailPage: React.FC = () => {
     || rechazar.isPending || registrarIncidente.isPending || revertir.isPending;
 
   // Use API data only
-  const manifiesto = (apiData as any)?.data || apiData;
+  const manifiesto = apiData;
   const m = (manifiesto || {}) as Partial<Manifiesto>;
   const timeline = buildTimeline(m);
   const totalPeso = Array.isArray(m.residuos) ? m.residuos.reduce((sum, r) => sum + (typeof r.cantidad === 'number' ? r.cantidad : 0), 0) : 0;
 
   // --- Tracking route for GPS map ---
   const trackingRoute = useMemo(() => {
-    const points = (m as any)?.tracking || [];
+    const points = m?.tracking || [];
     if (!points.length) return null;
-    const sorted = [...points].sort((a: any, b: any) =>
+    const sorted = [...points].sort((a, b) =>
       new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
     return {
@@ -220,11 +220,11 @@ const ManifiestoDetailPage: React.FC = () => {
 
   // Generador and Operador locations for planned route
   const generadorPos = useMemo(() => {
-    const g = m.generador as any;
+    const g = m.generador;
     return g?.latitud && g?.longitud ? [g.latitud, g.longitud] as [number, number] : null;
   }, [m]);
   const operadorPos = useMemo(() => {
-    const o = m.operador as any;
+    const o = m.operador;
     return o?.latitud && o?.longitud ? [o.latitud, o.longitud] as [number, number] : null;
   }, [m]);
 
@@ -663,7 +663,7 @@ const ManifiestoDetailPage: React.FC = () => {
                       <Popup>
                         <strong>Generador</strong><br />
                         {m.generador?.razonSocial || '-'}<br />
-                        <span style={{ fontSize: 11, color: '#666' }}>{(m.generador as any)?.domicilio || ''}</span>
+                        <span style={{ fontSize: 11, color: '#666' }}>{m.generador?.domicilio || ''}</span>
                       </Popup>
                     </Marker>
                   )}
@@ -674,7 +674,7 @@ const ManifiestoDetailPage: React.FC = () => {
                       <Popup>
                         <strong>Operador</strong><br />
                         {m.operador?.razonSocial || '-'}<br />
-                        <span style={{ fontSize: 11, color: '#666' }}>{(m.operador as any)?.domicilio || ''}</span>
+                        <span style={{ fontSize: 11, color: '#666' }}>{m.operador?.domicilio || ''}</span>
                       </Popup>
                     </Marker>
                   )}

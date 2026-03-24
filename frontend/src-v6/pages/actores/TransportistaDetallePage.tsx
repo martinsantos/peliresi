@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
+import type { Transportista, Vehiculo, Chofer, Manifiesto } from '../../types/models';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -60,10 +61,10 @@ const TransportistaDetallePage: React.FC = () => {
   const [showChoferModal, setShowChoferModal] = useState(false);
   const [vehiculoForm, setVehiculoForm] = useState(EMPTY_VEHICULO);
   const [choferForm, setChoferForm] = useState(EMPTY_CHOFER);
-  const [editingVehiculo, setEditingVehiculo] = useState<any>(null);
-  const [editingChofer, setEditingChofer] = useState<any>(null);
-  const [deleteVehiculoItem, setDeleteVehiculoItem] = useState<any>(null);
-  const [deleteChoferItem, setDeleteChoferItem] = useState<any>(null);
+  const [editingVehiculo, setEditingVehiculo] = useState<Vehiculo | null>(null);
+  const [editingChofer, setEditingChofer] = useState<Chofer | null>(null);
+  const [deleteVehiculoItem, setDeleteVehiculoItem] = useState<Vehiculo | null>(null);
+  const [deleteChoferItem, setDeleteChoferItem] = useState<Chofer | null>(null);
   const [corrientesExpanded, setCorrientesExpanded] = useState(false);
   const [historialPage, setHistorialPage] = useState(1);
   const [flotaSort, setFlotaSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
@@ -80,31 +81,31 @@ const TransportistaDetallePage: React.FC = () => {
 
   const transportista = apiTransportista ? {
     ...apiTransportista,
-    nombre: (apiTransportista as any).razonSocial || '-',
-    direccion: (apiTransportista as any).domicilio || '-',
-    estado: (apiTransportista as any).activo !== false ? 'ACTIVO' : 'SUSPENDIDO',
-    habilitacion: (apiTransportista as any).numeroHabilitacion || '-',
-    vencimientoHab: (apiTransportista as any).vencimientoHab || '-',
-    vencimientoHabilitacion: (apiTransportista as any).vencimientoHabilitacion
-      ? new Date((apiTransportista as any).vencimientoHabilitacion)
+    nombre: apiTransportista.razonSocial || '-',
+    direccion: apiTransportista.domicilio || '-',
+    estado: apiTransportista.activo !== false ? 'ACTIVO' : 'SUSPENDIDO',
+    habilitacion: apiTransportista.numeroHabilitacion || '-',
+    vencimientoHab: apiTransportista.vencimientoHabilitacion || '-',
+    vencimientoHabilitacion: apiTransportista.vencimientoHabilitacion
+      ? new Date(apiTransportista.vencimientoHabilitacion)
       : null,
-    localidad: (apiTransportista as any).localidad || null,
-    corrientesAutorizadas: (apiTransportista as any).corrientesAutorizadas || null,
-    expedienteDPA: (apiTransportista as any).expedienteDPA || null,
-    resolucionDPA: (apiTransportista as any).resolucionDPA || null,
-    resolucionSSP: (apiTransportista as any).resolucionSSP || null,
-    actaInspeccion: (apiTransportista as any).actaInspeccion || null,
-    actaInspeccion2: (apiTransportista as any).actaInspeccion2 || null,
-    flota: (apiTransportista as any).vehiculos || [],
-    conductores: (apiTransportista as any).choferes || [],
+    localidad: apiTransportista.localidad || null,
+    corrientesAutorizadas: apiTransportista.corrientesAutorizadas || null,
+    expedienteDPA: apiTransportista.expedienteDPA || null,
+    resolucionDPA: apiTransportista.resolucionDPA || null,
+    resolucionSSP: apiTransportista.resolucionSSP || null,
+    actaInspeccion: apiTransportista.actaInspeccion || null,
+    actaInspeccion2: apiTransportista.actaInspeccion2 || null,
+    flota: apiTransportista.vehiculos || [] as Vehiculo[],
+    conductores: apiTransportista.choferes || [] as Chofer[],
   } : null;
 
-  const rawFlota: any[] = transportista ? transportista.flota : [];
-  const rawChoferes: any[] = transportista ? transportista.conductores : [];
+  const rawFlota: Vehiculo[] = transportista ? transportista.flota : [];
+  const rawChoferes: Chofer[] = transportista ? transportista.conductores : [];
 
   const sortedFlota = useMemo(() => {
     if (!flotaSort) return rawFlota;
-    return [...rawFlota].sort((a: any, b: any) => {
+    return [...rawFlota].sort((a: Vehiculo, b: Vehiculo) => {
       const dir = flotaSort.direction === 'asc' ? 1 : -1;
       switch (flotaSort.key) {
         case 'patente': return dir * (a.patente || '').localeCompare(b.patente || '', 'es');
@@ -117,7 +118,7 @@ const TransportistaDetallePage: React.FC = () => {
 
   const sortedChoferes = useMemo(() => {
     if (!choferSort) return rawChoferes;
-    return [...rawChoferes].sort((a: any, b: any) => {
+    return [...rawChoferes].sort((a: Chofer, b: Chofer) => {
       const dir = choferSort.direction === 'asc' ? 1 : -1;
       switch (choferSort.key) {
         case 'nombre': return dir * (`${a.nombre} ${a.apellido}`).localeCompare(`${b.nombre} ${b.apellido}`, 'es');
@@ -154,7 +155,7 @@ const TransportistaDetallePage: React.FC = () => {
     setShowVehiculoModal(true);
   };
 
-  const openEditVehiculo = (v: any) => {
+  const openEditVehiculo = (v: Vehiculo) => {
     setEditingVehiculo(v);
     setVehiculoForm({
       patente: v.patente || '',
@@ -174,7 +175,7 @@ const TransportistaDetallePage: React.FC = () => {
     setShowChoferModal(true);
   };
 
-  const openEditChofer = (c: any) => {
+  const openEditChofer = (c: Chofer) => {
     setEditingChofer(c);
     setChoferForm({
       nombre: c.nombre || '',
@@ -434,13 +435,13 @@ const TransportistaDetallePage: React.FC = () => {
               <CardHeader title="Certificaciones" icon={<Award size={20} />} />
               <CardContent>
                 <div className="flex flex-wrap gap-2">
-                  {((apiTransportista as any)?.certificaciones || []).map((cert: string) => (
+                  {((apiTransportista as Transportista & { certificaciones?: string[] })?.certificaciones || []).map((cert: string) => (
                     <Badge key={cert} variant="soft" color="success">
                       <CheckCircle2 size={12} className="mr-1" />
                       {cert}
                     </Badge>
                   ))}
-                  {!((apiTransportista as any)?.certificaciones?.length) && (
+                  {!((apiTransportista as Transportista & { certificaciones?: string[] })?.certificaciones?.length) && (
                     <span className="text-sm text-neutral-400">Sin certificaciones registradas</span>
                   )}
                 </div>
@@ -586,7 +587,7 @@ const TransportistaDetallePage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-100">
-                      {sortedFlota.map((v: any) => (
+                      {sortedFlota.map((v: Vehiculo) => (
                         <tr key={v.patente || v.id} className="hover:bg-neutral-50 transition-colors">
                           <td className="px-3 py-2.5 font-mono font-semibold text-neutral-900">{v.patente}</td>
                           <td className="px-3 py-2.5 text-neutral-700">{v.marca} {v.modelo}</td>
@@ -655,7 +656,7 @@ const TransportistaDetallePage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-100">
-                      {sortedChoferes.map((c: any) => (
+                      {sortedChoferes.map((c: Chofer) => (
                         <tr key={c.dni || c.id} className="hover:bg-neutral-50 transition-colors">
                           <td className="px-3 py-2.5 font-medium text-neutral-900">{c.nombre} {c.apellido || ''}</td>
                           <td className="px-3 py-2.5 font-mono text-neutral-700">{c.dni || '-'}</td>
@@ -718,7 +719,7 @@ const TransportistaDetallePage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-100">
-                    {manifiestoData!.items.map((m: any) => (
+                    {manifiestoData!.items.map((m: Manifiesto) => (
                       <tr key={m.id} className="hover:bg-neutral-50 transition-colors">
                         <td className="px-3 py-2.5 font-mono text-sm font-semibold text-neutral-900">{m.numero}</td>
                         <td className="px-3 py-2.5">

@@ -33,11 +33,12 @@ self.addEventListener('activate', (event) => {
     console.log('[SW] Activando Service Worker v13...');
     event.waitUntil(
         caches.keys().then((cacheNames) => {
+            const currentCaches = [CACHE_NAME, RUNTIME_CACHE];
             return Promise.all(
                 cacheNames
-                    .filter((name) => name !== CACHE_NAME && name !== RUNTIME_CACHE)
+                    .filter((name) => !currentCaches.includes(name))
                     .map((name) => {
-                        console.log('[SW] Eliminando caché antigua:', name);
+                        console.log('[SW] Eliminando cache antigua:', name);
                         return caches.delete(name);
                     })
             );

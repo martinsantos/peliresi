@@ -208,6 +208,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ basePath = '
             <button
               onClick={() => setIsOpen(false)}
               className="p-1 rounded-lg hover:bg-neutral-100 text-neutral-400 transition-colors"
+              aria-label="Cerrar notificaciones"
             >
               <X size={16} />
             </button>

@@ -11,7 +11,14 @@ import { Badge } from '../../../components/ui/BadgeV2';
 import { ACTOR_ICONS, ACTOR_COLORS, createClusterIcon } from '../../../utils/map-icons';
 import { getDepartamento, DEPARTAMENTOS_MENDOZA } from '../../../utils/mendoza-departamentos';
 import { clusterMarkers } from './shared';
-import type { CentroControlData } from '../../../hooks/useCentroControl';
+import type { CentroControlData, ActorTransportista } from '../../../hooks/useCentroControl';
+
+// ActorTransportista may carry additional fields from the backend not declared in the hook type
+type ActorTransportistaExtra = ActorTransportista & {
+  localidad?: string;
+  vencimientoHabilitacion?: string;
+  corrientesAutorizadas?: string;
+};
 
 // ── Geocoding helpers para transportistas sin coords ──
 
@@ -123,7 +130,7 @@ export default function MapaActoresTab({
 
   const generadoresClustered = useMemo(() => {
     if (!ccData?.generadores) return [];
-    return clusterMarkers(ccData.generadores as any[]);
+    return clusterMarkers(ccData.generadores);
   }, [ccData?.generadores]);
 
   const totalGen = ccData?.generadores?.length || 0;
@@ -237,7 +244,8 @@ export default function MapaActoresTab({
               ))}
 
               {/* Transportistas — coords reales > Nominatim geocoded > centroide de dpto */}
-              {layers.transportistas && ccData.transportistas?.map((t, idx) => {
+              {layers.transportistas && ccData.transportistas?.map((tRaw, idx) => {
+                const t = tRaw as ActorTransportistaExtra;
                 const pos: [number, number] =
                   geocodedPos[t.id] ??
                   (t.latitud != null && t.longitud != null
@@ -254,17 +262,17 @@ export default function MapaActoresTab({
                       <div className="text-sm">
                         <strong className="text-orange-700">{t.razonSocial}</strong><br />
                         <span className="text-xs text-neutral-500">CUIT: {t.cuit}</span><br />
-                        {(t as any).localidad && (
-                          <span className="text-xs text-neutral-500">📍 {(t as any).localidad}</span>
+                        {t.localidad && (
+                          <span className="text-xs text-neutral-500">📍 {t.localidad}</span>
                         )}
-                        {(t as any).vencimientoHabilitacion && (() => {
-                          const vto = new Date((t as any).vencimientoHabilitacion);
+                        {t.vencimientoHabilitacion && (() => {
+                          const vto = new Date(t.vencimientoHabilitacion);
                           const dias = Math.ceil((vto.getTime() - Date.now()) / 86400000);
                           const emoji = dias <= 0 ? '🔴' : dias <= 30 ? '🟡' : '🟢';
                           return <><br /><span className="text-xs">{emoji} Vto: {vto.toLocaleDateString('es-AR')}</span></>;
                         })()}
-                        {(t as any).corrientesAutorizadas && (() => {
-                          const corrientes = (t as any).corrientesAutorizadas.split('/').filter(Boolean);
+                        {t.corrientesAutorizadas && (() => {
+                          const corrientes = t.corrientesAutorizadas.split('/').filter(Boolean);
                           const visible = corrientes.slice(0, 3);
                           const resto = corrientes.length - visible.length;
                           return (

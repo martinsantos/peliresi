@@ -921,9 +921,49 @@ Last comprehensive test: **18/18 passed** ✅ (2026-02-15 11:30)
 - **Retention**: 30 days (auto-cleanup via `find -mtime +30 -delete`)
 - **RPO**: 24 hours
 
-### ⚠️ Disk Space Alert
+### Restore Procedure
 
-Disco al 87% (11GB libres). Los backups crecen ~120MB/día. Monitorear con `df -h` y considerar cross-server rsync:
+```bash
+# 1. Identify backup to restore
+ssh root@23.105.176.45 "ls -lt /opt/sitrep-backups/sitrep-db-*.sql.gz | head -5"
+
+# 2. Stop backend to prevent writes during restore
+ssh root@23.105.176.45 "pm2 stop sitrep-backend"
+
+# 3. Restore database (replace FILENAME with chosen backup)
+ssh root@23.105.176.45 "gunzip -c /opt/sitrep-backups/FILENAME.sql.gz | docker exec -i directus-admin-database-1 psql -U directus -d trazabilidad_rrpp"
+
+# 4. Restart backend
+ssh root@23.105.176.45 "pm2 restart sitrep-backend"
+
+# 5. Verify
+curl -s https://sitrep.ultimamilla.com.ar/api/health
+bash backend/tests/smoke-test.sh
+```
+
+**If restoring to a clean database** (e.g., new server):
+```bash
+# Create database first
+docker exec -i directus-admin-database-1 psql -U directus -c "CREATE DATABASE trazabilidad_rrpp;"
+# Then restore as above
+```
+
+### SSH Deploy Key Rotation
+
+- **Current key**: GitHub Secrets `VPS_SSH_KEY_BASE64` (base64-encoded)
+- **Rotation policy**: Every 90 days (quarterly)
+- **Next rotation**: Check `gh secret list` for last update date
+- **Procedure**:
+  1. Generate new key: `ssh-keygen -t ed25519 -f deploy_key_new -N ""`
+  2. Add public key to server: `ssh root@23.105.176.45 "cat >> ~/.ssh/authorized_keys" < deploy_key_new.pub`
+  3. Update GitHub Secret: `cat deploy_key_new | base64 | gh secret set VPS_SSH_KEY_BASE64`
+  4. Verify CI/CD deploys successfully
+  5. Remove old key from server `authorized_keys`
+  6. Delete local key files
+
+### Disk Space Alert
+
+Disco al 87% (11GB libres). Los backups crecen ~120MB/dia. Monitorear con `df -h` y considerar cross-server rsync:
 ```bash
 # Rsync to Hostinger preview server (76.13.234.213)
 0 4 * * * rsync -avz /opt/sitrep-backups/ root@76.13.234.213:/backups/sitrep-prod/

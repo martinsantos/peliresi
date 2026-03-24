@@ -7,6 +7,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import type { Operador, Manifiesto } from '../../types/models';
 import {
   ArrowLeft,
   FlaskConical,
@@ -34,6 +35,17 @@ import { useOperador } from '../../hooks/useActores';
 import { useManifiestos } from '../../hooks/useManifiestos';
 import { OPERADORES_DATA, type OperadorEnriched } from '../../data/operadores-enrichment';
 import { CORRIENTES_Y } from '../../data/corrientes-y';
+
+/** Local view-model that extends Operador with UI-specific derived fields */
+interface OperadorViewModel extends Operador {
+  nombre: string;
+  direccion: string;
+  estado: string;
+  habilitacion: string;
+  vencimientoHab: string;
+  residuosAceptados: string[];
+  certificaciones: string[];
+}
 
 const estadoConfig: Record<string, { label: string; color: string }> = {
   ACTIVO: { label: 'En línea', color: 'success' },
@@ -75,15 +87,15 @@ const OperadorDetallePage: React.FC = () => {
   const { data: apiOperador, isLoading } = useOperador(id || '');
   const { data: manifiestoData } = useManifiestos({ operadorId: id, limit: 20, page: historialPage }, { enabled: !!id });
 
-  const operador = apiOperador ? {
+  const operador: OperadorViewModel | null = apiOperador ? {
     ...apiOperador,
-    nombre: (apiOperador as any).razonSocial || '-',
-    direccion: (apiOperador as any).domicilio || '-',
-    estado: (apiOperador as any).activo !== false ? 'ACTIVO' : 'INACTIVO',
-    habilitacion: (apiOperador as any).numeroHabilitacion || '-',
-    vencimientoHab: (apiOperador as any).vencimientoHab || '-',
-    residuosAceptados: (apiOperador as any).residuosAceptados || [],
-    certificaciones: (apiOperador as any).certificaciones || [],
+    nombre: apiOperador.razonSocial || '-',
+    direccion: apiOperador.domicilio || '-',
+    estado: apiOperador.activo !== false ? 'ACTIVO' : 'INACTIVO',
+    habilitacion: apiOperador.numeroHabilitacion || '-',
+    vencimientoHab: apiOperador.vencimientoHabilitacion || '-',
+    residuosAceptados: [],
+    certificaciones: [],
   } : null;
 
   // CSV enrichment lookup by CUIT
@@ -136,7 +148,7 @@ const OperadorDetallePage: React.FC = () => {
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-2xl font-bold text-neutral-900">{operador.nombre}</h2>
-                <Badge variant="soft" color={est.color as any}>
+                <Badge variant="soft" color={est.color}>
                   {operador.estado === 'ACTIVO' ? <CheckCircle2 size={12} className="mr-1" /> : <AlertCircle size={12} className="mr-1" />}
                   {est.label}
                 </Badge>
@@ -193,10 +205,10 @@ const OperadorDetallePage: React.FC = () => {
                     <div className="flex items-start gap-3 text-sm">
                       <MapPin size={16} className="text-neutral-400 shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-neutral-500">Direccion Real {(apiOperador as any)?.tipoOperador === 'IN_SITU' ? '(sede administrativa)' : '(planta)'}</p>
+                        <p className="text-neutral-500">Direccion Real {apiOperador?.tipoOperador === 'IN_SITU' ? '(sede administrativa)' : '(planta)'}</p>
                         <p className="font-medium text-neutral-900">{enriched.domicilioReal.calle}</p>
                         <p className="text-neutral-600">{enriched.domicilioReal.localidad}, {enriched.domicilioReal.departamento}</p>
-                        {(apiOperador as any)?.tipoOperador === 'IN_SITU' && (
+                        {apiOperador?.tipoOperador === 'IN_SITU' && (
                           <p className="text-xs text-amber-600 mt-1">Opera en la ubicacion del generador</p>
                         )}
                       </div>
@@ -259,66 +271,66 @@ const OperadorDetallePage: React.FC = () => {
               <CardContent>
                 <div className="space-y-4">
                   {/* Categoría y Regulatorio */}
-                  {((apiOperador as any)?.categoria || (apiOperador as any)?.expedienteInscripcion || (apiOperador as any)?.resolucionDPA) && (
+                  {(apiOperador?.categoria || apiOperador?.expedienteInscripcion || apiOperador?.resolucionDPA) && (
                     <div className="space-y-3">
-                      {(apiOperador as any)?.categoria && (
+                      {apiOperador?.categoria && (
                         <div className="flex items-center gap-3 text-sm">
                           <Shield size={16} className="text-neutral-400 shrink-0" />
                           <div>
                             <p className="text-neutral-500">Categoría</p>
-                            <p className="font-medium text-neutral-900">{(apiOperador as any).categoria}</p>
+                            <p className="font-medium text-neutral-900">{apiOperador.categoria}</p>
                           </div>
                         </div>
                       )}
-                      {(apiOperador as any)?.expedienteInscripcion && (
+                      {apiOperador?.expedienteInscripcion && (
                         <div className="flex items-center gap-3 text-sm">
                           <FileText size={16} className="text-neutral-400 shrink-0" />
                           <div>
                             <p className="text-neutral-500">Expediente Inscripción</p>
-                            <p className="font-medium text-neutral-900">{(apiOperador as any).expedienteInscripcion}</p>
+                            <p className="font-medium text-neutral-900">{apiOperador.expedienteInscripcion}</p>
                           </div>
                         </div>
                       )}
-                      {(apiOperador as any)?.resolucionDPA && (
+                      {apiOperador?.resolucionDPA && (
                         <div className="flex items-center gap-3 text-sm">
                           <FileText size={16} className="text-neutral-400 shrink-0" />
                           <div>
                             <p className="text-neutral-500">Resolución DPA</p>
-                            <p className="font-medium text-neutral-900">{(apiOperador as any).resolucionDPA}</p>
+                            <p className="font-medium text-neutral-900">{apiOperador.resolucionDPA}</p>
                           </div>
                         </div>
                       )}
                     </div>
                   )}
                   {/* Representante Legal */}
-                  {((apiOperador as any)?.representanteLegalNombre || (apiOperador as any)?.representanteLegalDNI) && (
+                  {(apiOperador?.representanteLegalNombre || apiOperador?.representanteLegalDNI) && (
                     <div className="border-t border-neutral-100 pt-4">
                       <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-3">Representante Legal</p>
                       <div className="space-y-2">
-                        {(apiOperador as any)?.representanteLegalNombre && (
+                        {apiOperador?.representanteLegalNombre && (
                           <div className="flex items-center gap-3 text-sm">
                             <User size={16} className="text-neutral-400 shrink-0" />
                             <div>
                               <p className="text-neutral-500">Nombre</p>
-                              <p className="font-medium text-neutral-900">{(apiOperador as any).representanteLegalNombre}</p>
+                              <p className="font-medium text-neutral-900">{apiOperador.representanteLegalNombre}</p>
                             </div>
                           </div>
                         )}
-                        {(apiOperador as any)?.representanteLegalDNI && (
+                        {apiOperador?.representanteLegalDNI && (
                           <div className="flex items-center gap-3 text-sm">
                             <FileText size={16} className="text-neutral-400 shrink-0" />
                             <div>
                               <p className="text-neutral-500">DNI</p>
-                              <p className="font-medium text-neutral-900">{(apiOperador as any).representanteLegalDNI}</p>
+                              <p className="font-medium text-neutral-900">{apiOperador.representanteLegalDNI}</p>
                             </div>
                           </div>
                         )}
-                        {(apiOperador as any)?.representanteLegalTelefono && (
+                        {apiOperador?.representanteLegalTelefono && (
                           <div className="flex items-center gap-3 text-sm">
                             <Phone size={16} className="text-neutral-400 shrink-0" />
                             <div>
                               <p className="text-neutral-500">Teléfono</p>
-                              <p className="font-medium text-neutral-900">{(apiOperador as any).representanteLegalTelefono}</p>
+                              <p className="font-medium text-neutral-900">{apiOperador.representanteLegalTelefono}</p>
                             </div>
                           </div>
                         )}
@@ -326,34 +338,34 @@ const OperadorDetallePage: React.FC = () => {
                     </div>
                   )}
                   {/* Representante Técnico */}
-                  {((apiOperador as any)?.representanteTecnicoNombre || (apiOperador as any)?.representanteTecnicoMatricula) && (
+                  {(apiOperador?.representanteTecnicoNombre || apiOperador?.representanteTecnicoMatricula) && (
                     <div className="border-t border-neutral-100 pt-4">
                       <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-3">Representante Técnico</p>
                       <div className="space-y-2">
-                        {(apiOperador as any)?.representanteTecnicoNombre && (
+                        {apiOperador?.representanteTecnicoNombre && (
                           <div className="flex items-center gap-3 text-sm">
                             <User size={16} className="text-neutral-400 shrink-0" />
                             <div>
                               <p className="text-neutral-500">Nombre</p>
-                              <p className="font-medium text-neutral-900">{(apiOperador as any).representanteTecnicoNombre}</p>
+                              <p className="font-medium text-neutral-900">{apiOperador.representanteTecnicoNombre}</p>
                             </div>
                           </div>
                         )}
-                        {(apiOperador as any)?.representanteTecnicoMatricula && (
+                        {apiOperador?.representanteTecnicoMatricula && (
                           <div className="flex items-center gap-3 text-sm">
                             <FileText size={16} className="text-neutral-400 shrink-0" />
                             <div>
                               <p className="text-neutral-500">Matrícula</p>
-                              <p className="font-medium text-neutral-900">{(apiOperador as any).representanteTecnicoMatricula}</p>
+                              <p className="font-medium text-neutral-900">{apiOperador.representanteTecnicoMatricula}</p>
                             </div>
                           </div>
                         )}
-                        {(apiOperador as any)?.representanteTecnicoTelefono && (
+                        {apiOperador?.representanteTecnicoTelefono && (
                           <div className="flex items-center gap-3 text-sm">
                             <Phone size={16} className="text-neutral-400 shrink-0" />
                             <div>
                               <p className="text-neutral-500">Teléfono</p>
-                              <p className="font-medium text-neutral-900">{(apiOperador as any).representanteTecnicoTelefono}</p>
+                              <p className="font-medium text-neutral-900">{apiOperador.representanteTecnicoTelefono}</p>
                             </div>
                           </div>
                         )}
@@ -361,7 +373,7 @@ const OperadorDetallePage: React.FC = () => {
                     </div>
                   )}
                   {/* Fallback if no data */}
-                  {!(apiOperador as any)?.categoria && !(apiOperador as any)?.representanteLegalNombre && !(apiOperador as any)?.representanteTecnicoNombre && (
+                  {!apiOperador?.categoria && !apiOperador?.representanteLegalNombre && !apiOperador?.representanteTecnicoNombre && (
                     <p className="text-sm text-neutral-400">Sin datos regulatorios registrados</p>
                   )}
                 </div>
@@ -476,7 +488,7 @@ const OperadorDetallePage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-100">
-                    {manifiestoData!.items.map((m: any) => (
+                    {manifiestoData!.items.map((m: Manifiesto) => (
                       <tr key={m.id} className="hover:bg-neutral-50 transition-colors">
                         <td className="px-3 py-2.5 font-mono text-sm font-semibold text-neutral-900">{m.numero}</td>
                         <td className="px-3 py-2.5">

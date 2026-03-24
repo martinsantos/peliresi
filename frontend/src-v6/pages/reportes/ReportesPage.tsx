@@ -146,55 +146,56 @@ const ReportesPage: React.FC = () => {
     let headers: string[] = [];
     let rows: (string | number)[][] = [];
 
+    // ReporteData shape varies per tab; treat top-level as a string-keyed record for PDF export
+    const d = data as unknown as Record<string, unknown>;
+    const r = (d.resumen as Record<string, unknown>) || {};
+
     if (activeTab === 'manifiestos') {
-      const r: any = data.resumen || {};
-      const list = (data as any).manifiestos || [];
+      const list = (d.manifiestos as Record<string, unknown>[]) || [];
       kpis = [
-        { label: 'Total Manifiestos', value: r.totalManifiestos || 0 },
+        { label: 'Total Manifiestos', value: (r.totalManifiestos as number) || 0 },
         { label: 'Total Residuos (kg)', value: Number(r.totalResiduos || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 }) },
-        { label: 'Estados', value: Object.keys((data as any).porEstado || {}).length },
+        { label: 'Estados', value: Object.keys((d.porEstado as Record<string, unknown>) || {}).length },
       ];
       headers = ['Número', 'Estado', 'Generador', 'Transportista', 'Operador', 'Fecha'];
-      rows = list.map((m: any) => [
-        m.numero || '',
-        m.estado || '',
-        m.generador || '',
-        m.transportista || '',
-        m.operador || '',
-        m.createdAt ? new Date(m.createdAt).toLocaleDateString('es-AR') : '',
+      rows = list.map((m) => [
+        (m.numero as string) || '',
+        (m.estado as string) || '',
+        (m.generador as string) || '',
+        (m.transportista as string) || '',
+        (m.operador as string) || '',
+        m.createdAt ? new Date(m.createdAt as string).toLocaleDateString('es-AR') : '',
       ]);
     } else if (activeTab === 'tratados') {
-      const r: any = data.resumen || {};
-      const list = (data as any).detalle || [];
+      const list = (d.detalle as Record<string, unknown>[]) || [];
       kpis = [
-        { label: 'Manifiestos Tratados', value: r.totalManifiestosTratados || 0 },
+        { label: 'Manifiestos Tratados', value: (r.totalManifiestosTratados as number) || 0 },
         { label: 'Residuos Tratados (kg)', value: Number(r.totalResiduosTratados || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 }) },
-        { label: 'Generadores', value: Object.keys((data as any).porGenerador || {}).length },
+        { label: 'Generadores', value: Object.keys((d.porGenerador as Record<string, unknown>) || {}).length },
       ];
       headers = ['Número', 'Generador', 'Método', 'Fecha', 'Residuos'];
-      rows = list.map((d: any) => [
-        d.numero || '',
-        d.generador || '',
-        d.metodoTratamiento || '',
-        d.fechaTratamiento ? new Date(d.fechaTratamiento).toLocaleDateString('es-AR') : '',
-        d.residuos?.length || 0,
+      rows = list.map((item) => [
+        (item.numero as string) || '',
+        (item.generador as string) || '',
+        (item.metodoTratamiento as string) || '',
+        item.fechaTratamiento ? new Date(item.fechaTratamiento as string).toLocaleDateString('es-AR') : '',
+        (Array.isArray(item.residuos) ? item.residuos.length : 0),
       ]);
     } else if (activeTab === 'transporte') {
-      const r: any = data.resumen || {};
-      const list = (data as any).transportistas || [];
+      const list = (d.transportistas as Record<string, unknown>[]) || [];
       kpis = [
-        { label: 'Transportistas', value: r.totalTransportistas || 0 },
-        { label: 'Total Viajes', value: r.totalViajes || 0 },
-        { label: 'En Tránsito', value: r.viajesActivos || 0 },
+        { label: 'Transportistas', value: (r.totalTransportistas as number) || 0 },
+        { label: 'Total Viajes', value: (r.totalViajes as number) || 0 },
+        { label: 'En Tránsito', value: (r.viajesActivos as number) || 0 },
       ];
       headers = ['Transportista', 'Viajes', 'Completados', 'En Tránsito', 'Vehículos', 'Tasa'];
-      rows = list.map((t: any) => [
-        t.transportista || '',
-        t.totalViajes || 0,
-        t.completados || 0,
-        t.enTransito || 0,
-        t.vehiculosRegistrados || 0,
-        t.tasaCompletitud || '0%',
+      rows = list.map((t) => [
+        (t.transportista as string) || '',
+        (t.totalViajes as number) || 0,
+        (t.completados as number) || 0,
+        (t.enTransito as number) || 0,
+        (t.vehiculosRegistrados as number) || 0,
+        (t.tasaCompletitud as string) || '0%',
       ]);
     }
 
@@ -211,7 +212,12 @@ const ReportesPage: React.FC = () => {
   const depModalData = useMemo(() => {
     if (!selectedDep || !ccData) return null;
     const genByDep = agruparPorDepartamento(ccData.generadores || []);
-    const transByDep = agruparPorDepartamento((ccData.transportistas || []).filter(t => t.latitud != null && t.longitud != null) as any);
+    const transByDep = agruparPorDepartamento(
+      (ccData.transportistas || []).filter(
+        (t): t is ActorTransportista & { latitud: number; longitud: number } =>
+          t.latitud != null && t.longitud != null,
+      ),
+    );
     const operByDep = agruparPorDepartamento(ccData.operadores || []);
     return {
       generadores: (genByDep[selectedDep] || []) as ActorGenerador[],

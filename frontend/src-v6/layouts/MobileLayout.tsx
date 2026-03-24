@@ -285,6 +285,7 @@ export const MobileLayout: React.FC = () => {
             <button
               onClick={() => setIsMenuOpen(true)}
               className="p-2 -ml-2 text-white/80 hover:bg-white/10 rounded-xl transition-colors touch-target"
+              aria-label="Abrir menu"
             >
               <Menu size={24} />
             </button>
@@ -312,6 +313,7 @@ export const MobileLayout: React.FC = () => {
         <button
           onClick={() => navigate(mp('/manifiestos/nuevo'))}
           className={`fixed right-4 bottom-24 w-14 h-14 ${config.bgColor} text-white rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-all z-30 hover-glow animate-scale-in-bounce`}
+          aria-label="Nuevo manifiesto"
         >
           <Plus size={28} />
         </button>
@@ -371,9 +373,10 @@ export const MobileLayout: React.FC = () => {
                     <p className={`text-xs ${config.color} font-medium`}>{config.label}</p>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => setIsMenuOpen(false)}
                   className="p-2 text-neutral-400 hover:bg-neutral-100 rounded-lg"
+                  aria-label="Cerrar menu"
                 >
                   <X size={20} />
                 </button>

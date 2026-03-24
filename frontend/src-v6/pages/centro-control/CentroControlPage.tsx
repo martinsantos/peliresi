@@ -226,8 +226,8 @@ export const CentroControlPage: React.FC = () => {
 
   // ── Compute dashboard stats ──
   const stats = useMemo(() => {
-    const raw = (statsData as any)?.data || statsData || {};
-    const estadisticas = raw.estadisticas || {};
+    const raw = statsData || {};
+    const estadisticas = (raw as { estadisticas?: Record<string, number> }).estadisticas || {};
     return {
       total: estadisticas.total || 0,
       borradores: estadisticas.borradores || 0,
@@ -245,7 +245,8 @@ export const CentroControlPage: React.FC = () => {
   const cc: CentroControlData | null = ccData || null;
 
   // ── KPIs (all from centro-control, filtered by date) ──
-  const kpis = useMemo(() => [
+  type KpiItem = { label: string; value: number; icon: React.ElementType; gradient: string; href: string; suffix?: string };
+  const kpis = useMemo((): KpiItem[] => [
     {
       label: 'Total Manifiestos',
       value: cc?.estadisticas?.totalManifiestos || 0,
@@ -286,7 +287,7 @@ export const CentroControlPage: React.FC = () => {
 
   // ── Pipeline data (from centro-control, filtered by date) ──
   const pipelineData = useMemo(() => {
-    const porEstado = (cc?.estadisticas as any)?.porEstado || {};
+    const porEstado = cc?.estadisticas?.porEstado || {};
     return ESTADO_PIPELINE.map(estado => ({
       name: estado.replace(/_/g, ' '),
       key: estado,
@@ -314,7 +315,7 @@ export const CentroControlPage: React.FC = () => {
 
   // ── Alertas ──
   const alertas = useMemo(() => {
-    const items = (alertasData as any)?.data?.items || (alertasData as any)?.data || alertasData?.items;
+    const items = alertasData?.items;
     if (!items || !Array.isArray(items) || items.length === 0) return [];
     return items.slice(0, 6).map((a: any) => ({
       id: a.id,
@@ -327,7 +328,7 @@ export const CentroControlPage: React.FC = () => {
   // ── Clustered generadores ──
   const generadoresClustered = useMemo(() => {
     if (!cc?.generadores) return [];
-    return clusterMarkers(cc.generadores as any[], mapZoom);
+    return clusterMarkers(cc.generadores, mapZoom);
   }, [cc?.generadores, mapZoom]);
 
   // ── Filtered trips + fly-to position ──
@@ -367,9 +368,9 @@ export const CentroControlPage: React.FC = () => {
   }, [selectedTripId, enTransitoForMap]);
 
   const viajesRealizados = useMemo(() => {
-    const items = (completedData as any)?.items || (completedData as any)?.data?.items || [];
+    const items = completedData?.items || [];
     if (!Array.isArray(items)) return [];
-    return items.map((m: any) => ({
+    return items.map((m) => ({
       id: m.id,
       numero: m.numero || m.id,
       transportista: m.transportista?.razonSocial || 'Transportista',
@@ -537,14 +538,14 @@ export const CentroControlPage: React.FC = () => {
         {kpis.map((kpi, i) => {
           const Icon = kpi.icon;
           return (
-            <div key={i} className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${kpi.gradient} p-4 group hover:shadow-lg transition-all duration-300 hover-lift cursor-pointer`} onClick={() => (kpi as any).href && navigate(`${isMobile ? '/mobile' : ''}${(kpi as any).href}`)}>
+            <div key={i} className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${kpi.gradient} p-4 group hover:shadow-lg transition-all duration-300 hover-lift cursor-pointer`} onClick={() => kpi.href && navigate(`${isMobile ? '/mobile' : ''}${kpi.href}`)}>
               <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-white/10 -translate-y-1/3 translate-x-1/3 group-hover:scale-125 transition-transform duration-500" />
               <div className="relative">
                 <div className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center mb-2">
                   <Icon size={18} className="text-white" />
                 </div>
                 <p className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                  {kpi.value}{(kpi as any).suffix || ''}
+                  {kpi.value}{kpi.suffix || ''}
                 </p>
                 <p className="text-xs text-white/75 font-medium mt-0.5">{kpi.label}</p>
               </div>

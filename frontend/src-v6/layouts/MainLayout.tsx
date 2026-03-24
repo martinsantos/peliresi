@@ -447,6 +447,7 @@ export const MainLayout: React.FC = () => {
               }}
               className="p-2 rounded-xl text-neutral-500 hover:text-primary-600 hover:bg-primary-50 transition-colors"
               title="Ver tour de ayuda"
+              aria-label="Ver tour de ayuda"
             >
               <HelpCircle size={20} />
             </button>
