@@ -44,3 +44,19 @@ export const CORRIENTES_Y: Record<string, string> = {
 };
 
 export const CORRIENTES_Y_CODES = Object.keys(CORRIENTES_Y);
+
+/**
+ * Parse corrientes string from DB which may be:
+ * - "Y8, Y9, Y48"   (comma-separated)
+ * - "Y8-Y9-Y48"     (hyphen-separated)
+ * - "Y8-Y9-Y48, Y12" (mixed)
+ * Returns array of individual codes: ["Y8", "Y9", "Y48"]
+ */
+export function parseCorrientes(str: string | null | undefined): string[] {
+  if (!str) return [];
+  return str
+    .split(',')
+    .flatMap(part => part.split('-'))
+    .map(s => s.trim())
+    .filter(Boolean);
+}

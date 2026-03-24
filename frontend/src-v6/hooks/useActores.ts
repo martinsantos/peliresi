@@ -228,3 +228,12 @@ export function useDeleteChofer() {
     },
   });
 }
+
+// Historial de cambios
+export function useHistorialActor(tipo: string, id: string, filters?: { anio?: number; modulo?: string; page?: number; limit?: number }) {
+  return useQuery({
+    queryKey: ['historial-actor', tipo, id, filters] as const,
+    queryFn: () => actoresService.getHistorialActor(tipo, id, filters),
+    enabled: !!tipo && !!id,
+  });
+}

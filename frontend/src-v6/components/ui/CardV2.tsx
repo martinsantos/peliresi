@@ -94,8 +94,9 @@ interface CardHeaderProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'ti
   icon?: React.ReactNode;
 }
 
-export const CardHeader = forwardRef<HTMLDivElement, CardHeaderProps>(
-  ({ title, subtitle, action, icon, className, ...props }, ref) => {
+export const CardHeader = forwardRef<HTMLDivElement, React.PropsWithChildren<CardHeaderProps>>(
+  ({ title, subtitle, action, icon, className, children, ...props }, ref) => {
+    const useChildren = !title && !icon && children;
     return (
       <div
         ref={ref}
@@ -107,26 +108,32 @@ export const CardHeader = forwardRef<HTMLDivElement, CardHeaderProps>(
         )}
         {...props}
       >
-        <div className="flex items-start gap-3 flex-1 min-w-0">
-          {icon && (
-            <div className="p-2.5 rounded-lg bg-primary-50 text-primary-600 shrink-0">
-              {icon}
+        {useChildren ? (
+          <>{children}</>
+        ) : (
+          <>
+            <div className="flex items-start gap-3 flex-1 min-w-0">
+              {icon && (
+                <div className="p-2.5 rounded-lg bg-primary-50 text-primary-600 shrink-0">
+                  {icon}
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                {title && (
+                  <h3 className="font-semibold text-lg text-neutral-900 tracking-tight">
+                    {title}
+                  </h3>
+                )}
+                {subtitle && (
+                  <p className="text-sm text-neutral-600 mt-0.5">
+                    {subtitle}
+                  </p>
+                )}
+              </div>
             </div>
-          )}
-          <div className="flex-1 min-w-0">
-            {title && (
-              <h3 className="font-semibold text-lg text-neutral-900 tracking-tight">
-                {title}
-              </h3>
-            )}
-            {subtitle && (
-              <p className="text-sm text-neutral-600 mt-0.5">
-                {subtitle}
-              </p>
-            )}
-          </div>
-        </div>
-        {action && <div className="shrink-0">{action}</div>}
+            {action && <div className="shrink-0">{action}</div>}
+          </>
+        )}
       </div>
     );
   }

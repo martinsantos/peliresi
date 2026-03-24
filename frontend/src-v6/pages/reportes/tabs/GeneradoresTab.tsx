@@ -12,13 +12,14 @@ import { Badge } from '../../../components/ui/BadgeV2';
 import { CHART_COLORS } from '../../../utils/chart-colors';
 import { ChartTooltip } from '../../../components/charts/ChartTooltip';
 import { KpiCard } from '../../../components/charts/KpiCard';
-import { getDepartamento } from '../../../utils/mendoza-departamentos';
 import { useGeneradores } from '../../../hooks/useActores';
+
+const TOP_N = 6; // top N categories in pie, rest → "Otros"
 
 export default function GeneradoresTab({
   periodoLabel,
 }: {
-  ccData?: any; // kept for API compatibility
+  ccData?: any;
   periodoLabel: string;
 }) {
   const navigate = useNavigate();
@@ -34,11 +35,13 @@ export default function GeneradoresTab({
     return sortConfig.direction === 'asc' ? <ChevronUp size={12} className="ml-1 text-primary-600 inline" /> : <ChevronDown size={12} className="ml-1 text-primary-600 inline" />;
   };
 
-  // Fetch ALL generadores from DB directly (not via Centro Control which filters by latitud != null)
-  const { data: paginatedData, isLoading } = useGeneradores({ limit: 500 });
+  // Fetch ALL generadores (limit raised to 5000 on backend)
+  const { data: paginatedData, isLoading } = useGeneradores({ limit: 5000 });
   const generadores = (paginatedData?.items || []).map((g: any) => ({
     ...g,
     cantManifiestos: g._count?.manifiestos || 0,
+    // Derive departamento from DB fields, fallback to domicilio text
+    depto: g.domicilioRealDepto || g.domicilioLegalDepto || '',
   }));
 
   const filtered = useMemo(() => {
@@ -57,11 +60,7 @@ export default function GeneradoresTab({
         switch (sortConfig.key) {
           case 'razonSocial': return dir * (a.razonSocial || '').localeCompare(b.razonSocial || '', 'es');
           case 'categoria': return dir * (a.categoria || '').localeCompare(b.categoria || '', 'es');
-          case 'departamento': {
-            const da = (a.latitud && a.longitud) ? getDepartamento(a.latitud, a.longitud) : 'Sin coordenadas';
-            const db = (b.latitud && b.longitud) ? getDepartamento(b.latitud, b.longitud) : 'Sin coordenadas';
-            return dir * da.localeCompare(db, 'es');
-          }
+          case 'departamento': return dir * (a.depto || '').localeCompare(b.depto || '', 'es');
           case 'manifiestos': return dir * (a.cantManifiestos - b.cantManifiestos);
           default: return 0;
         }
@@ -70,32 +69,64 @@ export default function GeneradoresTab({
     return list;
   }, [generadores, searchQuery, categoriaFilter, sortConfig]);
 
+  // Aggregate by categoria — top N + "Otros"
   const byCategoria = useMemo(() => {
     const map: Record<string, number> = {};
     for (const g of generadores) {
-      const cat = g.categoria || 'Sin categoría';
+      const cat = (g.categoria || '').trim() || 'Sin categoria';
       map[cat] = (map[cat] || 0) + 1;
     }
-    return Object.entries(map)
-      .map(([name, value], i) => ({
-        name: name.length > 20 ? name.substring(0, 17) + '...' : name,
-        fullName: name,
-        value,
-        fill: CHART_COLORS[i % CHART_COLORS.length],
-      }))
+    const sorted = Object.entries(map)
+      .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
+
+    if (sorted.length <= TOP_N) {
+      return sorted.map((s, i) => ({
+        name: s.name.length > 22 ? s.name.substring(0, 19) + '...' : s.name,
+        fullName: s.name,
+        value: s.value,
+        fill: CHART_COLORS[i % CHART_COLORS.length],
+      }));
+    }
+
+    const top = sorted.slice(0, TOP_N);
+    const otrosValue = sorted.slice(TOP_N).reduce((sum, s) => sum + s.value, 0);
+    const otrosCount = sorted.length - TOP_N;
+    return [
+      ...top.map((s, i) => ({
+        name: s.name.length > 22 ? s.name.substring(0, 19) + '...' : s.name,
+        fullName: s.name,
+        value: s.value,
+        fill: CHART_COLORS[i % CHART_COLORS.length],
+      })),
+      {
+        name: `Otros (${otrosCount})`,
+        fullName: `Otros (${otrosCount} categorias)`,
+        value: otrosValue,
+        fill: '#CBD5E1',
+      },
+    ];
   }, [generadores]);
 
+  // Aggregate by departamento from DB fields
   const byDep = useMemo(() => {
     const map: Record<string, number> = {};
     for (const g of generadores) {
-      const dep = (g.latitud && g.longitud) ? getDepartamento(g.latitud, g.longitud) : 'Sin coordenadas';
+      const dep = g.depto || 'Sin departamento';
       map[dep] = (map[dep] || 0) + 1;
     }
     return Object.entries(map)
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 10);
+  }, [generadores]);
+
+  const uniqueCategories = useMemo(() => {
+    const cats = new Set<string>();
+    for (const g of generadores) {
+      if (g.categoria) cats.add(g.categoria);
+    }
+    return cats.size;
   }, [generadores]);
 
   if (isLoading) {
@@ -117,15 +148,15 @@ export default function GeneradoresTab({
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        <KpiCard icon={Factory} label="Total Generadores" value={generadores.length} color="from-purple-600 to-purple-700" />
-        <KpiCard icon={Package} label="Categorías" value={byCategoria.length} color="from-indigo-600 to-indigo-700" sub="tipos" />
-        <KpiCard icon={MapPin} label="Departamentos" value={byDep.length} color="from-violet-600 to-violet-700" sub="con presencia" />
+        <KpiCard icon={Factory} label="Total Generadores" value={paginatedData?.total || generadores.length} color="from-purple-600 to-purple-700" />
+        <KpiCard icon={Package} label="Categorias" value={uniqueCategories} color="from-indigo-600 to-indigo-700" sub="tipos" />
+        <KpiCard icon={MapPin} label="Departamentos" value={byDep.filter(d => d.name !== 'Sin departamento').length} color="from-violet-600 to-violet-700" sub="con presencia" />
         <KpiCard icon={FileText} label="Manifiestos" value={generadores.reduce((s, g) => s + g.cantManifiestos, 0)} color="from-emerald-600 to-emerald-700" sub="generados" />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
         <Card className="border-0 shadow-sm">
-          <CardHeader title="Por Categoría" subtitle="Distribución de generadores" />
+          <CardHeader title="Por Categoria" subtitle={`Distribucion de generadores (top ${TOP_N})`} />
           <CardContent>
             {byCategoria.length > 0 ? (
               <ResponsiveContainer width="100%" height={320}>
@@ -139,7 +170,11 @@ export default function GeneradoresTab({
                     paddingAngle={3}
                     dataKey="value"
                     stroke="none"
-                    label={({ name, percent }: any) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                    label={({ name, percent, cx, x }: any) => {
+                      if ((percent ?? 0) < 0.03) return null;
+                      const short = name.length > 18 ? name.substring(0, 15) + '...' : name;
+                      return `${short} ${((percent ?? 0) * 100).toFixed(0)}%`;
+                    }}
                     labelLine={{ stroke: '#94a3b8', strokeWidth: 1 }}
                   >
                     {byCategoria.map((entry, i) => (
@@ -193,7 +228,7 @@ export default function GeneradoresTab({
               </div>
               <input
                 type="text"
-                placeholder="Categoría..."
+                placeholder="Categoria..."
                 value={categoriaFilter}
                 onChange={e => setCategoriaFilter(e.target.value)}
                 className="px-3 py-1.5 rounded-lg border border-neutral-200 text-xs text-neutral-700 w-32"
@@ -206,9 +241,9 @@ export default function GeneradoresTab({
             <table className="w-full text-left">
               <thead className="bg-neutral-50/80 border-b border-neutral-200 sticky top-0 z-10">
                 <tr>
-                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('razonSocial')}>Razón Social<SortIcon col="razonSocial" /></th>
+                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('razonSocial')}>Razon Social<SortIcon col="razonSocial" /></th>
                   <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">CUIT</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('categoria')}>Categoría<SortIcon col="categoria" /></th>
+                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('categoria')}>Categoria<SortIcon col="categoria" /></th>
                   <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('departamento')}>Departamento<SortIcon col="departamento" /></th>
                   <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('manifiestos')}>Manifiestos<SortIcon col="manifiestos" /></th>
                 </tr>
@@ -218,8 +253,8 @@ export default function GeneradoresTab({
                   <tr key={`${g.id}-${i}`} className="hover:bg-primary-50/30 transition-colors cursor-pointer" onClick={() => g.id && navigate(`/admin/actores/generadores/${g.id}`)}>
                     <td className="px-4 py-3 text-sm font-medium text-neutral-900 max-w-[200px] truncate">{g.razonSocial}</td>
                     <td className="px-4 py-3 text-sm text-neutral-600 font-mono text-xs">{g.cuit}</td>
-                    <td className="px-4 py-3 text-sm text-neutral-600 hidden md:table-cell">{g.categoria || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-neutral-600 hidden md:table-cell">{(g.latitud && g.longitud) ? getDepartamento(g.latitud, g.longitud) : '—'}</td>
+                    <td className="px-4 py-3 text-sm text-neutral-600 hidden md:table-cell max-w-[150px] truncate" title={g.categoria}>{g.categoria || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-neutral-600 hidden md:table-cell">{g.depto || '—'}</td>
                     <td className="px-4 py-3 text-center">
                       <Badge variant="soft" color="primary">{g.cantManifiestos}</Badge>
                     </td>

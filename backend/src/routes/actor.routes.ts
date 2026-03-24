@@ -5,8 +5,12 @@ import {
     getTransportistas, getTransportistaById, createTransportista, updateTransportista, deleteTransportista,
     addVehiculo, updateVehiculo, deleteVehiculo,
     addChofer, updateChofer, deleteChofer,
-    getOperadores, getOperadorById, createOperador, updateOperador, deleteOperador
+    getOperadores, getOperadorById, createOperador, updateOperador, deleteOperador,
+    getHistorialActor
 } from '../controllers/actor.controller';
+import { getPagosTEF, createPagoTEF, updatePagoTEF, deletePagoTEF, getDDJJ, createDDJJ, updateDDJJ, deleteDDJJ } from '../controllers/generador-fiscal.controller';
+import { getPagosTEFOperador, createPagoTEFOperador, updatePagoTEFOperador, deletePagoTEFOperador, getDDJJOperador, createDDJJOperador, updateDDJJOperador, deleteDDJJOperador } from '../controllers/operador-fiscal.controller';
+import { upload, uploadDocumento, getDocumentos, downloadDocumento, revisarDocumento, deleteDocumento } from '../controllers/documento.controller';
 
 const router = Router();
 router.use(isAuthenticated);
@@ -137,6 +141,25 @@ router.put('/generadores/:id',   requireAdminOrGenerador, updateGenerador);
  *         description: No se puede eliminar (tiene manifiestos asociados)
  */
 router.delete('/generadores/:id', requireAdminOrGenerador, deleteGenerador);
+
+// ===== GENERADORES — PAGOS TEF =====
+router.get('/generadores/:id/pagos',                          getPagosTEF);
+router.post('/generadores/:id/pagos',    requireAdminOrGenerador, createPagoTEF);
+router.put('/generadores/:genId/pagos/:pagoId',  requireAdminOrGenerador, updatePagoTEF);
+router.delete('/generadores/:genId/pagos/:pagoId', requireAdminOrGenerador, deletePagoTEF);
+
+// ===== GENERADORES — DDJJ =====
+router.get('/generadores/:id/ddjj',                           getDDJJ);
+router.post('/generadores/:id/ddjj',     requireAdminOrGenerador, createDDJJ);
+router.put('/generadores/:genId/ddjj/:ddjjId',   requireAdminOrGenerador, updateDDJJ);
+router.delete('/generadores/:genId/ddjj/:ddjjId',  requireAdminOrGenerador, deleteDDJJ);
+
+// ===== GENERADORES — DOCUMENTOS =====
+router.get('/generadores/:id/documentos',                     getDocumentos);
+router.post('/generadores/:id/documentos', requireAdminOrGenerador, upload.single('archivo'), uploadDocumento);
+router.get('/documentos/:docId/download',                     downloadDocumento);
+router.patch('/documentos/:docId/revisar', requireAdminOrGenerador, revisarDocumento);
+router.delete('/documentos/:docId',        requireAdminOrGenerador, deleteDocumento);
 
 // ===== TRANSPORTISTAS =====
 
@@ -534,5 +557,26 @@ router.put('/operadores/:id',    requireAdminOrOperador, updateOperador);
  *         description: No se puede eliminar (tiene manifiestos asociados)
  */
 router.delete('/operadores/:id', requireAdminOrOperador, deleteOperador);
+
+// ===== OPERADORES — PAGOS TEF =====
+router.get('/operadores/:id/pagos',                              getPagosTEFOperador);
+router.post('/operadores/:id/pagos',        requireAdminOrOperador, createPagoTEFOperador);
+router.put('/operadores/:opId/pagos/:pagoId',  requireAdminOrOperador, updatePagoTEFOperador);
+router.delete('/operadores/:opId/pagos/:pagoId', requireAdminOrOperador, deletePagoTEFOperador);
+
+// ===== OPERADORES — DDJJ =====
+router.get('/operadores/:id/ddjj',                               getDDJJOperador);
+router.post('/operadores/:id/ddjj',         requireAdminOrOperador, createDDJJOperador);
+router.put('/operadores/:opId/ddjj/:ddjjId',   requireAdminOrOperador, updateDDJJOperador);
+router.delete('/operadores/:opId/ddjj/:ddjjId',  requireAdminOrOperador, deleteDDJJOperador);
+
+// ===== OPERADORES — DOCUMENTOS =====
+router.get('/operadores/:id/documentos',                         getDocumentos);
+router.post('/operadores/:id/documentos', requireAdminOrOperador, upload.single('archivo'), uploadDocumento);
+
+// ===== HISTORIAL DE CAMBIOS =====
+router.get('/generadores/:id/historial', getHistorialActor);
+router.get('/operadores/:id/historial', getHistorialActor);
+router.get('/transportistas/:id/historial', getHistorialActor);
 
 export default router;

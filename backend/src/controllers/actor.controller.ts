@@ -3,13 +3,14 @@ import prisma from '../lib/prisma';
 import bcrypt from 'bcryptjs';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { auditarActor } from '../utils/auditoria';
 
 // ============== GENERADORES (CU-A06) ==============
 
 export const getGeneradores = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const { search, activo, page = 1, limit = 10, sortBy, sortOrder } = req.query;
-        const limitNum = Math.min(500, Math.max(1, Number(limit)));
+        const limitNum = Math.min(5000, Math.max(1, Number(limit)));
         const skip = (Number(page) - 1) * limitNum;
         const order: 'asc' | 'desc' = sortOrder === 'desc' ? 'desc' : 'asc';
         const GEN_SORT: Record<string, any> = {
@@ -37,7 +38,9 @@ export const getGeneradores = async (req: AuthRequest, res: Response, next: Next
                 take: limitNum,
                 include: {
                     usuario: { select: { email: true, nombre: true, apellido: true } },
-                    _count: { select: { manifiestos: true } }
+                    _count: { select: { manifiestos: true } },
+                    pagos: { where: { anio: { gte: new Date().getFullYear() - 1 } }, select: { anio: true, fechaPago: true, habilitado: true }, orderBy: { anio: 'desc' } },
+                    ddjj: { where: { anio: { gte: new Date().getFullYear() - 1 } }, select: { anio: true, presentada: true }, orderBy: { anio: 'desc' } },
                 },
                 orderBy
             }),
@@ -65,10 +68,13 @@ export const getGeneradorById = async (req: AuthRequest, res: Response, next: Ne
             include: {
                 usuario: { select: { email: true, nombre: true, apellido: true } },
                 manifiestos: {
-                    take: 10,
+                    take: 20,
                     orderBy: { createdAt: 'desc' },
                     select: { id: true, numero: true, estado: true, createdAt: true }
-                }
+                },
+                pagos: { orderBy: { anio: 'desc' } },
+                ddjj: { orderBy: { anio: 'desc' } },
+                documentos: { orderBy: { createdAt: 'desc' } }
             }
         });
 
@@ -84,7 +90,13 @@ export const getGeneradorById = async (req: AuthRequest, res: Response, next: Ne
 
 export const createGenerador = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const { razonSocial, cuit, domicilio, telefono, email, password, nombre, numeroInscripcion, categoria, actividad, rubro, corrientesControl } = req.body;
+        const {
+            razonSocial, cuit, domicilio, telefono, email, password, nombre, numeroInscripcion, categoria, actividad, rubro, corrientesControl,
+            expedienteInscripcion, domicilioLegalCalle, domicilioLegalLocalidad, domicilioLegalDepto,
+            domicilioRealCalle, domicilioRealLocalidad, domicilioRealDepto,
+            certificacionISO, resolucionInscripcion, factorR, montoMxR, categoriaIndividual, libroOperatoria,
+            latitud, longitud, tefInputs,
+        } = req.body;
 
         if (!razonSocial || !cuit || !email) {
             throw new AppError('Razón social, CUIT y email son obligatorios', 400);
@@ -123,21 +135,24 @@ export const createGenerador = async (req: AuthRequest, res: Response, next: Nex
         const generador = await prisma.generador.create({
             data: {
                 usuarioId: usuario.id,
-                razonSocial,
-                cuit,
-                domicilio,
-                telefono,
-                email,
-                numeroInscripcion,
-                categoria,
-                actividad,
-                rubro,
-                corrientesControl
+                razonSocial, cuit, domicilio, telefono, email, numeroInscripcion, categoria, actividad, rubro, corrientesControl,
+                expedienteInscripcion, domicilioLegalCalle, domicilioLegalLocalidad, domicilioLegalDepto,
+                domicilioRealCalle, domicilioRealLocalidad, domicilioRealDepto,
+                certificacionISO: certificacionISO ? new Date(certificacionISO) : undefined,
+                resolucionInscripcion,
+                factorR: factorR !== undefined ? Number(factorR) : undefined,
+                montoMxR: montoMxR !== undefined ? Number(montoMxR) : undefined,
+                categoriaIndividual, libroOperatoria,
+                ...(latitud !== undefined && { latitud: Number(latitud) }),
+                ...(longitud !== undefined && { longitud: Number(longitud) }),
+                ...(tefInputs !== undefined && { tefInputs }),
             },
             include: {
                 usuario: { select: { email: true, nombre: true } }
             }
         });
+
+        await auditarActor({ accion: 'CREATE', modulo: 'GENERADOR', datosDespues: generador, usuarioId: req.user!.id, generadorId: generador.id, ip: req.ip, userAgent: req.headers['user-agent'] });
 
         res.status(201).json({
             success: true,
@@ -152,23 +167,34 @@ export const createGenerador = async (req: AuthRequest, res: Response, next: Nex
 export const updateGenerador = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const { id } = req.params;
-        const { razonSocial, domicilio, telefono, email, numeroInscripcion, categoria, activo, actividad, rubro, corrientesControl } = req.body;
+        const {
+            razonSocial, domicilio, telefono, email, numeroInscripcion, categoria, activo, actividad, rubro, corrientesControl,
+            expedienteInscripcion, domicilioLegalCalle, domicilioLegalLocalidad, domicilioLegalDepto,
+            domicilioRealCalle, domicilioRealLocalidad, domicilioRealDepto,
+            certificacionISO, resolucionInscripcion, factorR, montoMxR, categoriaIndividual, libroOperatoria,
+            latitud, longitud, tefInputs,
+        } = req.body;
+
+        const antes = await prisma.generador.findUnique({ where: { id } });
 
         const generador = await prisma.generador.update({
             where: { id },
             data: {
-                razonSocial,
-                domicilio,
-                telefono,
-                email,
-                numeroInscripcion,
-                categoria,
-                activo,
-                actividad,
-                rubro,
-                corrientesControl
+                razonSocial, domicilio, telefono, email, numeroInscripcion, categoria, activo, actividad, rubro, corrientesControl,
+                expedienteInscripcion, domicilioLegalCalle, domicilioLegalLocalidad, domicilioLegalDepto,
+                domicilioRealCalle, domicilioRealLocalidad, domicilioRealDepto,
+                certificacionISO: certificacionISO ? new Date(certificacionISO) : certificacionISO,
+                resolucionInscripcion,
+                factorR: factorR !== undefined ? Number(factorR) : undefined,
+                montoMxR: montoMxR !== undefined ? Number(montoMxR) : undefined,
+                categoriaIndividual, libroOperatoria,
+                ...(latitud !== undefined && { latitud: Number(latitud) }),
+                ...(longitud !== undefined && { longitud: Number(longitud) }),
+                ...(tefInputs !== undefined && { tefInputs }),
             }
         });
+
+        await auditarActor({ accion: 'UPDATE', modulo: 'GENERADOR', datosAntes: antes, datosDespues: generador, usuarioId: req.user!.id, generadorId: id, ip: req.ip, userAgent: req.headers['user-agent'] });
 
         res.json({ success: true, data: { generador } });
     } catch (error) {
@@ -194,6 +220,8 @@ export const deleteGenerador = async (req: AuthRequest, res: Response, next: Nex
         // Eliminar generador y su usuario
         await prisma.generador.delete({ where: { id } });
         await prisma.usuario.delete({ where: { id: generador.usuarioId } });
+
+        await auditarActor({ accion: 'DELETE', modulo: 'GENERADOR', datosAntes: generador, usuarioId: req.user!.id, generadorId: id, ip: req.ip, userAgent: req.headers['user-agent'] });
 
         res.json({ success: true, message: 'Generador eliminado' });
     } catch (error) {
@@ -287,6 +315,7 @@ export const createTransportista = async (req: AuthRequest, res: Response, next:
             // Campos regulatorios DPA
             localidad, vencimientoHabilitacion, corrientesAutorizadas,
             expedienteDPA, resolucionDPA, resolucionSSP, actaInspeccion, actaInspeccion2,
+            latitud, longitud,
         } = req.body;
 
         const existente = await prisma.transportista.findFirst({ where: { cuit } });
@@ -322,6 +351,8 @@ export const createTransportista = async (req: AuthRequest, res: Response, next:
                 ...(resolucionSSP !== undefined && { resolucionSSP }),
                 ...(actaInspeccion !== undefined && { actaInspeccion }),
                 ...(actaInspeccion2 !== undefined && { actaInspeccion2 }),
+                ...(latitud !== undefined && { latitud: Number(latitud) }),
+                ...(longitud !== undefined && { longitud: Number(longitud) }),
                 vehiculos: vehiculos ? {
                     create: vehiculos.map((v: any) => ({
                         patente: v.patente,
@@ -347,6 +378,8 @@ export const createTransportista = async (req: AuthRequest, res: Response, next:
             include: { vehiculos: true, choferes: true }
         });
 
+        await auditarActor({ accion: 'CREATE', modulo: 'TRANSPORTISTA', datosDespues: transportista, usuarioId: req.user!.id, transportistaId: transportista.id, ip: req.ip, userAgent: req.headers['user-agent'] });
+
         res.status(201).json({
             success: true,
             data: { transportista },
@@ -365,7 +398,10 @@ export const updateTransportista = async (req: AuthRequest, res: Response, next:
             // Campos regulatorios DPA
             localidad, vencimientoHabilitacion, corrientesAutorizadas,
             expedienteDPA, resolucionDPA, resolucionSSP, actaInspeccion, actaInspeccion2,
+            latitud, longitud,
         } = req.body;
+
+        const antes = await prisma.transportista.findUnique({ where: { id } });
 
         const transportista = await prisma.transportista.update({
             where: { id },
@@ -381,8 +417,12 @@ export const updateTransportista = async (req: AuthRequest, res: Response, next:
                 ...(resolucionSSP !== undefined && { resolucionSSP }),
                 ...(actaInspeccion !== undefined && { actaInspeccion }),
                 ...(actaInspeccion2 !== undefined && { actaInspeccion2 }),
+                ...(latitud !== undefined && { latitud: Number(latitud) }),
+                ...(longitud !== undefined && { longitud: Number(longitud) }),
             }
         });
+
+        await auditarActor({ accion: 'UPDATE', modulo: 'TRANSPORTISTA', datosAntes: antes, datosDespues: transportista, usuarioId: req.user!.id, transportistaId: id, ip: req.ip, userAgent: req.headers['user-agent'] });
 
         res.json({ success: true, data: { transportista } });
     } catch (error) {
@@ -410,6 +450,8 @@ export const deleteTransportista = async (req: AuthRequest, res: Response, next:
         await prisma.transportista.delete({ where: { id } });
         await prisma.usuario.delete({ where: { id: transportista.usuarioId } });
 
+        await auditarActor({ accion: 'DELETE', modulo: 'TRANSPORTISTA', datosAntes: transportista, usuarioId: req.user!.id, transportistaId: id, ip: req.ip, userAgent: req.headers['user-agent'] });
+
         res.json({ success: true, message: 'Transportista eliminado' });
     } catch (error) {
         next(error);
@@ -434,6 +476,8 @@ export const addVehiculo = async (req: AuthRequest, res: Response, next: NextFun
                 vencimiento: new Date(vencimiento)
             }
         });
+
+        await auditarActor({ accion: 'CREATE', modulo: 'VEHICULO', datosDespues: vehiculo, usuarioId: req.user!.id, transportistaId: id, ip: req.ip, userAgent: req.headers['user-agent'] });
 
         res.status(201).json({ success: true, data: { vehiculo } });
     } catch (error) {
@@ -469,6 +513,8 @@ export const updateVehiculo = async (req: AuthRequest, res: Response, next: Next
             }
         });
 
+        await auditarActor({ accion: 'UPDATE', modulo: 'VEHICULO', datosAntes: vehiculo, datosDespues: updated, usuarioId: req.user!.id, transportistaId: id, ip: req.ip, userAgent: req.headers['user-agent'] });
+
         res.json({ success: true, data: { vehiculo: updated } });
     } catch (error) {
         next(error);
@@ -489,6 +535,8 @@ export const deleteVehiculo = async (req: AuthRequest, res: Response, next: Next
         }
 
         await prisma.vehiculo.delete({ where: { id: vehiculoId } });
+
+        await auditarActor({ accion: 'DELETE', modulo: 'VEHICULO', datosAntes: vehiculo, usuarioId: req.user!.id, transportistaId: id, ip: req.ip, userAgent: req.headers['user-agent'] });
 
         res.json({ success: true, message: 'Vehículo eliminado' });
     } catch (error) {
@@ -513,6 +561,8 @@ export const addChofer = async (req: AuthRequest, res: Response, next: NextFunct
                 telefono: telefono || ''
             }
         });
+
+        await auditarActor({ accion: 'CREATE', modulo: 'CHOFER', datosDespues: chofer, usuarioId: req.user!.id, transportistaId: id, ip: req.ip, userAgent: req.headers['user-agent'] });
 
         res.status(201).json({ success: true, data: { chofer } });
     } catch (error) {
@@ -547,6 +597,8 @@ export const updateChofer = async (req: AuthRequest, res: Response, next: NextFu
             }
         });
 
+        await auditarActor({ accion: 'UPDATE', modulo: 'CHOFER', datosAntes: chofer, datosDespues: updated, usuarioId: req.user!.id, transportistaId: id, ip: req.ip, userAgent: req.headers['user-agent'] });
+
         res.json({ success: true, data: { chofer: updated } });
     } catch (error) {
         next(error);
@@ -568,6 +620,8 @@ export const deleteChofer = async (req: AuthRequest, res: Response, next: NextFu
 
         await prisma.chofer.delete({ where: { id: choferId } });
 
+        await auditarActor({ accion: 'DELETE', modulo: 'CHOFER', datosAntes: chofer, usuarioId: req.user!.id, transportistaId: id, ip: req.ip, userAgent: req.headers['user-agent'] });
+
         res.json({ success: true, message: 'Chofer eliminado' });
     } catch (error) {
         next(error);
@@ -579,7 +633,7 @@ export const deleteChofer = async (req: AuthRequest, res: Response, next: NextFu
 export const getOperadores = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const { search, activo, page = 1, limit = 10, sortBy, sortOrder } = req.query;
-        const limitNum = Math.min(500, Math.max(1, Number(limit)));
+        const limitNum = Math.min(5000, Math.max(1, Number(limit)));
         const skip = (Number(page) - 1) * limitNum;
         const order: 'asc' | 'desc' = sortOrder === 'desc' ? 'desc' : 'asc';
         const OPER_SORT: Record<string, any> = {
@@ -637,7 +691,10 @@ export const getOperadorById = async (req: AuthRequest, res: Response, next: Nex
                 usuario: { select: { email: true, nombre: true, apellido: true } },
                 tratamientos: {
                     include: { tipoResiduo: true }
-                }
+                },
+                documentos: { orderBy: { createdAt: 'desc' } },
+                pagos: { orderBy: { anio: 'desc' } },
+                ddjj: { orderBy: { anio: 'desc' } },
             }
         });
 
@@ -742,44 +799,68 @@ export const getOperadorById = async (req: AuthRequest, res: Response, next: Nex
 
 export const createOperador = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const { razonSocial, cuit, numeroHabilitacion, domicilio, telefono, email, categoria, tipoOperador, tecnologia, corrientesY } = req.body;
+        const {
+            razonSocial, cuit, numeroHabilitacion, domicilio, telefono, email, password, nombre, categoria, tipoOperador, tecnologia, corrientesY,
+            expedienteInscripcion, certificadoNumero,
+            domicilioLegalCalle, domicilioLegalLocalidad, domicilioLegalDepto,
+            domicilioRealCalle, domicilioRealLocalidad, domicilioRealDepto,
+            representanteLegalNombre, representanteLegalDNI, representanteLegalTelefono,
+            representanteTecnicoNombre, representanteTecnicoMatricula, representanteTecnicoTelefono,
+            vencimientoHabilitacion, resolucionDPA, latitud, longitud, tefInputs,
+        } = req.body;
+
+        if (!razonSocial || !cuit || !email) {
+            throw new AppError('Razon social, CUIT y email son obligatorios', 400);
+        }
 
         const existente = await prisma.operador.findFirst({ where: { cuit } });
         if (existente) {
             throw new AppError('Ya existe un operador con ese CUIT', 400);
         }
 
-        const passwordHash = await bcrypt.hash(cuit, 10);
+        const existeEmail = await prisma.usuario.findUnique({ where: { email } });
+        if (existeEmail) {
+            throw new AppError('Ya existe un usuario con ese email', 400);
+        }
+
+        const rawPassword = password || cuit;
+        const passwordHash = await bcrypt.hash(rawPassword, 10);
         const usuario = await prisma.usuario.create({
             data: {
                 email,
                 password: passwordHash,
-                nombre: razonSocial,
-                apellido: '',
-                rol: 'OPERADOR'
+                nombre: nombre || razonSocial,
+                cuit,
+                rol: 'OPERADOR',
+                activo: true,
+                emailVerified: true,
             }
         });
 
         const operador = await prisma.operador.create({
             data: {
                 usuarioId: usuario.id,
-                razonSocial,
-                cuit,
-                numeroHabilitacion,
-                domicilio,
-                telefono,
-                email,
-                categoria,
-                tipoOperador,
-                tecnologia,
-                corrientesY
-            }
+                razonSocial, cuit, numeroHabilitacion, domicilio, telefono, email, categoria, tipoOperador, tecnologia, corrientesY,
+                expedienteInscripcion, certificadoNumero,
+                domicilioLegalCalle, domicilioLegalLocalidad, domicilioLegalDepto,
+                domicilioRealCalle, domicilioRealLocalidad, domicilioRealDepto,
+                representanteLegalNombre, representanteLegalDNI, representanteLegalTelefono,
+                representanteTecnicoNombre, representanteTecnicoMatricula, representanteTecnicoTelefono,
+                vencimientoHabilitacion: vencimientoHabilitacion ? new Date(vencimientoHabilitacion) : undefined,
+                resolucionDPA,
+                latitud: latitud !== undefined ? Number(latitud) : undefined,
+                longitud: longitud !== undefined ? Number(longitud) : undefined,
+                ...(tefInputs !== undefined && { tefInputs }),
+            },
+            include: { usuario: { select: { email: true, nombre: true } } }
         });
+
+        await auditarActor({ accion: 'CREATE', modulo: 'OPERADOR', datosDespues: operador, usuarioId: req.user!.id, operadorId: operador.id, ip: req.ip, userAgent: req.headers['user-agent'] });
 
         res.status(201).json({
             success: true,
             data: { operador },
-            message: 'Operador creado. Contraseña inicial: ' + cuit
+            message: `Operador creado. ${password ? 'Password: el definido en el formulario' : 'Password inicial: ' + cuit}`
         });
     } catch (error) {
         next(error);
@@ -789,23 +870,36 @@ export const createOperador = async (req: AuthRequest, res: Response, next: Next
 export const updateOperador = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const { id } = req.params;
-        const { razonSocial, numeroHabilitacion, domicilio, telefono, email, categoria, activo, tipoOperador, tecnologia, corrientesY } = req.body;
+        const {
+            razonSocial, numeroHabilitacion, domicilio, telefono, email, categoria, activo, tipoOperador, tecnologia, corrientesY,
+            expedienteInscripcion, certificadoNumero,
+            domicilioLegalCalle, domicilioLegalLocalidad, domicilioLegalDepto,
+            domicilioRealCalle, domicilioRealLocalidad, domicilioRealDepto,
+            representanteLegalNombre, representanteLegalDNI, representanteLegalTelefono,
+            representanteTecnicoNombre, representanteTecnicoMatricula, representanteTecnicoTelefono,
+            vencimientoHabilitacion, resolucionDPA, latitud, longitud, tefInputs,
+        } = req.body;
+
+        const antes = await prisma.operador.findUnique({ where: { id } });
 
         const operador = await prisma.operador.update({
             where: { id },
             data: {
-                razonSocial,
-                numeroHabilitacion,
-                domicilio,
-                telefono,
-                email,
-                categoria,
-                activo,
-                tipoOperador,
-                tecnologia,
-                corrientesY
+                razonSocial, numeroHabilitacion, domicilio, telefono, email, categoria, activo, tipoOperador, tecnologia, corrientesY,
+                expedienteInscripcion, certificadoNumero,
+                domicilioLegalCalle, domicilioLegalLocalidad, domicilioLegalDepto,
+                domicilioRealCalle, domicilioRealLocalidad, domicilioRealDepto,
+                representanteLegalNombre, representanteLegalDNI, representanteLegalTelefono,
+                representanteTecnicoNombre, representanteTecnicoMatricula, representanteTecnicoTelefono,
+                ...(vencimientoHabilitacion !== undefined && { vencimientoHabilitacion: vencimientoHabilitacion ? new Date(vencimientoHabilitacion) : null }),
+                ...(resolucionDPA !== undefined && { resolucionDPA }),
+                ...(latitud !== undefined && { latitud: Number(latitud) }),
+                ...(longitud !== undefined && { longitud: Number(longitud) }),
+                ...(tefInputs !== undefined && { tefInputs }),
             }
         });
+
+        await auditarActor({ accion: 'UPDATE', modulo: 'OPERADOR', datosAntes: antes, datosDespues: operador, usuarioId: req.user!.id, operadorId: id, ip: req.ip, userAgent: req.headers['user-agent'] });
 
         res.json({ success: true, data: { operador } });
     } catch (error) {
@@ -830,7 +924,62 @@ export const deleteOperador = async (req: AuthRequest, res: Response, next: Next
         await prisma.operador.delete({ where: { id } });
         await prisma.usuario.delete({ where: { id: operador.usuarioId } });
 
+        await auditarActor({ accion: 'DELETE', modulo: 'OPERADOR', datosAntes: operador, usuarioId: req.user!.id, operadorId: id, ip: req.ip, userAgent: req.headers['user-agent'] });
+
         res.json({ success: true, message: 'Operador eliminado' });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// ============== HISTORIAL DE CAMBIOS POR ACTOR ==============
+
+export const getHistorialActor = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { id } = req.params;
+        const { tipo } = req.query; // GENERADOR | OPERADOR | TRANSPORTISTA
+        const { anio, modulo: filtroModulo, page = 1, limit = 20 } = req.query;
+        const limitNum = Math.min(100, Math.max(1, Number(limit)));
+        const skip = (Number(page) - 1) * limitNum;
+
+        const where: any = {};
+        if (tipo === 'GENERADOR') where.generadorId = id;
+        else if (tipo === 'OPERADOR') where.operadorId = id;
+        else if (tipo === 'TRANSPORTISTA') where.transportistaId = id;
+        else throw new AppError('Tipo de actor invalido', 400);
+
+        if (anio) {
+            const year = Number(anio);
+            where.createdAt = {
+                gte: new Date(`${year}-01-01T00:00:00.000Z`),
+                lt: new Date(`${year + 1}-01-01T00:00:00.000Z`),
+            };
+        }
+
+        if (filtroModulo) {
+            where.modulo = filtroModulo;
+        }
+
+        const [historial, total] = await Promise.all([
+            prisma.auditoria.findMany({
+                where,
+                skip,
+                take: limitNum,
+                orderBy: { createdAt: 'desc' },
+                include: {
+                    usuario: { select: { nombre: true, email: true, rol: true } },
+                },
+            }),
+            prisma.auditoria.count({ where }),
+        ]);
+
+        res.json({
+            success: true,
+            data: {
+                historial,
+                pagination: { page: Number(page), limit: limitNum, total, pages: Math.ceil(total / limitNum) },
+            },
+        });
     } catch (error) {
         next(error);
     }

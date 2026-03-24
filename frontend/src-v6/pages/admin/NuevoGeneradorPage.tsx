@@ -1,49 +1,83 @@
 /**
- * SITREP v6 - Nuevo / Editar Generador Page
- * ==========================================
- * Formulario dedicado para crear o editar un generador de residuos peligrosos.
- * Ruta crear: /admin/actores/generadores/nuevo
- * Ruta editar: /admin/actores/generadores/:id/editar
+ * SITREP v6 - Nuevo / Editar Generador — Wizard 6 pasos
+ * ======================================================
+ * Paso 1: Identificacion y Contacto
+ * Paso 2: Domicilios
+ * Paso 3: Residuos Peligrosos (corrientes Y checkboxes)
+ * Paso 4: Calculo TEF (Z, A1-A10, D, ISO date aqui)
+ * Paso 5: Regulatorio y Acceso
+ * Paso 6: Archivos Adjuntos + Resumen + Confirmar
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
-  ArrowLeft,
-  Save,
-  Factory,
-  MapPin,
-  Lock,
-  Biohazard,
-  Loader2,
+  ArrowLeft, ArrowRight, Save, Factory, MapPin, Lock,
+  Biohazard, Loader2, ClipboardList, Calculator, FileText,
+  Check, Upload, Building2, AlertCircle, X, Paperclip,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
+import { Badge } from '../../components/ui/BadgeV2';
 import { toast } from '../../components/ui/Toast';
 import { useGenerador, useCreateGenerador, useUpdateGenerador } from '../../hooks/useActores';
-import { CORRIENTES_Y } from '../../data/corrientes-y';
+import { useUploadDocumento } from '../../hooks/useGeneradorFiscal';
+import { CORRIENTES_Y, CORRIENTES_Y_CODES, parseCorrientes } from '../../data/corrientes-y';
+import { GENERADORES_DATA } from '../../data/generadores-enrichment';
+import { C_CORRIENTES } from '../../utils/calculoTEF';
+import CalculadoraTEF, { type TEFInputs } from '../../components/CalculadoraTEF';
+
+const STEPS = [
+  { id: 1, label: 'Identificacion', icon: Factory },
+  { id: 2, label: 'Domicilios', icon: MapPin },
+  { id: 3, label: 'Residuos', icon: Biohazard },
+  { id: 4, label: 'Calculo TEF', icon: Calculator },
+  { id: 5, label: 'Regulatorio', icon: ClipboardList },
+  { id: 6, label: 'Adjuntos', icon: Upload },
+];
+const TOTAL_STEPS = 6;
+
+const DOCUMENTOS_REQUERIDOS = [
+  { tipo: 'MEMORIA_TECNICA', nombre: 'Memoria Tecnica', obligatorio: true, categoria: 'Doc. Tecnica' },
+  { tipo: 'FACTURA_LUZ', nombre: 'Factura de Luz', obligatorio: true, categoria: 'Doc. Administrativa' },
+  { tipo: 'HABILITACION_MUNICIPAL', nombre: 'Habilitacion Municipal o Constancia de Tramite', obligatorio: true, categoria: 'Doc. Administrativa' },
+  { tipo: 'CONSTANCIA_AFIP', nombre: 'Constancia AFIP', obligatorio: true, categoria: 'Doc. Fiscal' },
+  { tipo: 'CONTRATO_ALQUILER', nombre: 'Contrato de Alquiler (si corresponde)', obligatorio: false, categoria: 'Doc. Legal' },
+  { tipo: 'CERTIFICADO_ISO', nombre: 'Certificacion ISO 14000 o similar', obligatorio: false, categoria: 'Doc. Tecnica' },
+];
+
+const CATEGORIAS = ['Grandes Generadores', 'Medianos Generadores', 'Pequenos Generadores'];
+const CATEGORIAS_INDIVIDUALES = ['MINIMA', 'INDIVIDUAL', '2000-3000'];
+const DEPARTAMENTOS_MENDOZA = [
+  'Capital', 'Godoy Cruz', 'Guaymallen', 'Las Heras', 'Lujan de Cuyo',
+  'Maipu', 'San Rafael', 'General Alvear', 'Junin', 'La Paz',
+  'Lavalle', 'Malargue', 'Rivadavia', 'San Carlos', 'San Martin',
+  'Santa Rosa', 'Tunuyan', 'Tupungato',
+];
 
 const INITIAL_FORM = {
-  razonSocial: '',
-  cuit: '',
-  domicilio: '',
-  telefono: '',
-  email: '',
-  password: '',
-  nombre: '',
-  numeroInscripcion: '',
-  categoria: '',
-  actividad: '',
-  rubro: '',
-  corrientesControl: '',
+  razonSocial: '', cuit: '', domicilio: '', telefono: '', email: '',
+  password: '', nombre: '', numeroInscripcion: '', categoria: '',
+  actividad: '', rubro: '', corrientesControl: '',
+  domicilioLegalCalle: '', domicilioLegalLocalidad: '', domicilioLegalDepto: '',
+  domicilioRealCalle: '', domicilioRealLocalidad: '', domicilioRealDepto: '',
+  domicilioRealIgual: true,
+  expedienteInscripcion: '', resolucionInscripcion: '',
+  certificacionISO: '', factorR: '', categoriaIndividual: '',
+  montoMxR: '', libroOperatoria: false as boolean,
+  coordenadas: '',
 };
 
-const CATEGORIAS = [
-  'Grandes Generadores',
-  'Medianos Generadores',
-  'Pequeños Generadores',
-];
+// Styled input wrapper that shows red border on error
+function FieldError({ show, msg }: { show: boolean; msg: string }) {
+  if (!show) return null;
+  return (
+    <p className="flex items-center gap-1 text-xs text-error-600 mt-1">
+      <AlertCircle size={12} /> {msg}
+    </p>
+  );
+}
 
 const NuevoGeneradorPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -52,118 +86,231 @@ const NuevoGeneradorPage: React.FC = () => {
   const isMobile = location.pathname.startsWith('/mobile');
   const isEdit = Boolean(id);
 
+  const [step, setStep] = useState(1);
   const [form, setForm] = useState(INITIAL_FORM);
+  const [selectedY, setSelectedY] = useState<Set<string>>(new Set());
+  const [attempted, setAttempted] = useState<Set<number>>(new Set()); // steps where user tried to advance
+  const [adjuntos, setAdjuntos] = useState<Record<string, File>>({}); // tipo -> File
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [tefInputs, setTefInputs] = useState<TEFInputs | null>(null);
 
   const { data: existing, isLoading: loadingExisting } = useGenerador(id || '');
   const createMutation = useCreateGenerador();
   const updateMutation = useUpdateGenerador();
+  const uploadDocMutation = useUploadDocumento();
 
-  const backPath = isMobile
-    ? '/mobile/admin/actores/generadores'
-    : '/admin/actores/generadores';
+  const backPath = isMobile ? '/mobile/admin/actores/generadores' : '/admin/actores/generadores';
 
-  // Populate form when editing
   useEffect(() => {
     if (!isEdit || !existing) return;
     const g = existing as any;
+    // CSV enrichment fallback for fields not yet persisted in DB
+    const csv = g.cuit ? (GENERADORES_DATA[g.cuit] || GENERADORES_DATA[g.cuit?.replace(/^(\d{2})(\d{8})(\d)$/, '$1-$2-$3')]) : null;
+    // Parse CSV domicilio "CALLE, LOCALIDAD, DEPARTAMENTO" into split fields
+    const parsedDom = csv?.domicilio?.split(',').map((s: string) => s.trim()) || [];
+
     setForm({
-      razonSocial: g.razonSocial || '',
-      cuit: g.cuit || '',
-      domicilio: g.domicilio || '',
-      telefono: g.telefono || '',
-      email: g.email || g.usuario?.email || '',
-      password: '',
-      nombre: g.usuario?.nombre || '',
-      numeroInscripcion: g.numeroInscripcion || '',
-      categoria: g.categoria || '',
-      actividad: g.actividad || '',
-      rubro: g.rubro || '',
-      corrientesControl: g.corrientesControl || '',
+      razonSocial: g.razonSocial || '', cuit: g.cuit || '',
+      domicilio: g.domicilio || csv?.domicilio || '', telefono: g.telefono || csv?.telefono || '',
+      email: g.email || g.usuario?.email || csv?.email || '', password: '',
+      nombre: g.usuario?.nombre || '', numeroInscripcion: g.numeroInscripcion || csv?.certificado || '',
+      categoria: g.categoria || '', actividad: g.actividad || csv?.actividad || '',
+      rubro: g.rubro || csv?.rubro || '',
+      corrientesControl: g.corrientesControl || (csv?.categoriasControl ? csv.categoriasControl.join(', ') : ''),
+      domicilioLegalCalle: g.domicilioLegalCalle || parsedDom[0] || '',
+      domicilioLegalLocalidad: g.domicilioLegalLocalidad || parsedDom[1] || '',
+      domicilioLegalDepto: g.domicilioLegalDepto || parsedDom[2] || '',
+      domicilioRealCalle: g.domicilioRealCalle || '',
+      domicilioRealLocalidad: g.domicilioRealLocalidad || '',
+      domicilioRealDepto: g.domicilioRealDepto || '',
+      domicilioRealIgual: !g.domicilioRealCalle,
+      expedienteInscripcion: g.expedienteInscripcion || '',
+      resolucionInscripcion: g.resolucionInscripcion || '',
+      certificacionISO: g.certificacionISO ? new Date(g.certificacionISO).toISOString().split('T')[0] : '',
+      factorR: g.factorR != null ? String(g.factorR) : '',
+      categoriaIndividual: g.categoriaIndividual || '',
+      montoMxR: g.montoMxR != null ? String(g.montoMxR) : '',
+      libroOperatoria: g.libroOperatoria ?? false,
+      coordenadas: g.latitud ? `${g.latitud}, ${g.longitud}` : '',
     });
+
+    const corrientesStr = g.corrientesControl || (csv?.categoriasControl ? csv.categoriasControl.join(', ') : '');
+    if (corrientesStr) {
+      setSelectedY(new Set(parseCorrientes(corrientesStr)));
+    }
+
+    if (g.tefInputs) {
+      setTefInputs(g.tefInputs as TEFInputs);
+    }
   }, [existing, isEdit]);
 
-  const update = (field: string, value: string) =>
-    setForm((prev) => ({ ...prev, [field]: value }));
+  const up = (field: string, value: string | boolean) => setForm(prev => ({ ...prev, [field]: value }));
 
-  const validate = (): boolean => {
-    if (!form.razonSocial.trim()) {
-      toast.error('Campo requerido', 'Razón Social es obligatoria');
-      return false;
+  const toggleY = (code: string) => {
+    setSelectedY(prev => { const n = new Set(prev); n.has(code) ? n.delete(code) : n.add(code); return n; });
+  };
+
+  const corrientesCodes = useMemo(() => Array.from(selectedY).sort(), [selectedY]);
+
+  useEffect(() => { up('corrientesControl', corrientesCodes.join(', ')); }, [corrientesCodes]);
+
+  // Per-step validation — returns list of error messages
+  const getStepErrors = (s: number): string[] => {
+    const errs: string[] = [];
+    if (s === 1) {
+      if (!form.razonSocial.trim()) errs.push('Razon Social es obligatoria');
+      if (!form.cuit.trim()) errs.push('CUIT es obligatorio');
+      if (!form.email.trim()) errs.push('Email es obligatorio');
     }
-    if (!form.cuit.trim()) {
-      toast.error('Campo requerido', 'CUIT es obligatorio');
-      return false;
+    if (s === 5 && !isEdit) {
+      if (!form.password.trim()) errs.push('Password inicial es obligatorio');
     }
-    if (!form.email.trim()) {
-      toast.error('Campo requerido', 'Email es obligatorio');
-      return false;
+    return errs;
+  };
+
+  const stepHasErrors = (s: number) => getStepErrors(s).length > 0;
+  const showError = (field: string) => {
+    // Show error only if user attempted this step
+    if (field === 'razonSocial') return attempted.has(1) && !form.razonSocial.trim();
+    if (field === 'cuit') return attempted.has(1) && !form.cuit.trim();
+    if (field === 'email') return attempted.has(1) && !form.email.trim();
+    if (field === 'password') return attempted.has(5) && !isEdit && !form.password.trim();
+    return false;
+  };
+
+  const goNext = () => {
+    setAttempted(prev => new Set(prev).add(step));
+    const errs = getStepErrors(step);
+    if (errs.length > 0) {
+      toast.error('Campos obligatorios', errs.join('. '));
+      return;
     }
-    if (!isEdit && !form.password.trim()) {
-      toast.error('Campo requerido', 'Password inicial es obligatorio al crear');
-      return false;
-    }
-    return true;
+    if (step < TOTAL_STEPS) setStep(step + 1);
+  };
+
+  const goPrev = () => { if (step > 1) setStep(step - 1); };
+  const goStep = (s: number) => {
+    if (s < step) { setStep(s); return; }
+    setAttempted(prev => new Set(prev).add(step));
+    const errs = getStepErrors(step);
+    if (errs.length > 0) { toast.error('Campos obligatorios', errs.join('. ')); return; }
+    setStep(s);
+  };
+
+  // File attach handler
+  const attachFile = (tipo: string, file: File) => {
+    setAdjuntos(prev => ({ ...prev, [tipo]: file }));
+    toast.success('Archivo adjuntado', `${file.name}`);
+  };
+
+  const removeFile = (tipo: string) => {
+    setAdjuntos(prev => { const n = { ...prev }; delete n[tipo]; return n; });
   };
 
   const handleSubmit = async () => {
-    if (!validate()) return;
+    // Validate all steps
+    for (const s of [1, 5]) {
+      const errs = getStepErrors(s);
+      if (errs.length > 0) {
+        setAttempted(prev => new Set(prev).add(s));
+        toast.error('Campos obligatorios', errs.join('. '));
+        setStep(s);
+        return;
+      }
+    }
 
+    // Parse coordenadas "lat, long" back to separate fields for backend
+    const coordParts = form.coordenadas?.split(',').map(s => s.trim()).filter(Boolean);
+    const latitud = coordParts?.[0] ? Number(coordParts[0]) : undefined;
+    const longitud = coordParts?.[1] ? Number(coordParts[1]) : undefined;
+
+    const regulatory: Record<string, any> = {
+      expedienteInscripcion: form.expedienteInscripcion || undefined,
+      resolucionInscripcion: form.resolucionInscripcion || undefined,
+      certificacionISO: form.certificacionISO || undefined,
+      factorR: form.factorR ? Number(form.factorR) : undefined,
+      montoMxR: form.montoMxR ? Number(form.montoMxR) : undefined,
+      categoriaIndividual: form.categoriaIndividual || undefined,
+      libroOperatoria: form.libroOperatoria,
+      domicilioLegalCalle: form.domicilioLegalCalle || undefined,
+      domicilioLegalLocalidad: form.domicilioLegalLocalidad || undefined,
+      domicilioLegalDepto: form.domicilioLegalDepto || undefined,
+      domicilioRealCalle: form.domicilioRealIgual ? form.domicilioLegalCalle || undefined : form.domicilioRealCalle || undefined,
+      domicilioRealLocalidad: form.domicilioRealIgual ? form.domicilioLegalLocalidad || undefined : form.domicilioRealLocalidad || undefined,
+      domicilioRealDepto: form.domicilioRealIgual ? form.domicilioLegalDepto || undefined : form.domicilioRealDepto || undefined,
+    };
+
+    setSubmitError(null);
     try {
+      let generadorId: string | undefined;
+
       if (isEdit && id) {
         await updateMutation.mutateAsync({
           id,
           data: {
-            razonSocial: form.razonSocial,
-            cuit: form.cuit,
-            domicilio: form.domicilio,
-            telefono: form.telefono,
-            email: form.email,
-            numeroInscripcion: form.numeroInscripcion,
-            categoria: form.categoria,
-            actividad: form.actividad,
-            rubro: form.rubro,
-            corrientesControl: form.corrientesControl,
-          },
+            razonSocial: form.razonSocial, cuit: form.cuit,
+            domicilio: form.domicilio || form.domicilioLegalCalle,
+            telefono: form.telefono, email: form.email,
+            numeroInscripcion: form.numeroInscripcion, categoria: form.categoria,
+            actividad: form.actividad, rubro: form.rubro,
+            corrientesControl: corrientesCodes.join(', '),
+            ...regulatory,
+            ...(latitud && longitud && !isNaN(latitud) && !isNaN(longitud) ? { latitud, longitud } : {}),
+            ...(tefInputs && { tefInputs }),
+          } as any,
         });
+        generadorId = id;
         toast.success('Guardado', `Generador ${form.razonSocial} actualizado`);
       } else {
-        await createMutation.mutateAsync({
-          email: form.email,
-          password: form.password || 'TempPass123!',
+        const result: any = await createMutation.mutateAsync({
+          email: form.email, password: form.password,
           nombre: form.nombre || form.razonSocial,
-          razonSocial: form.razonSocial,
-          cuit: form.cuit,
-          domicilio: form.domicilio,
-          telefono: form.telefono,
-          numeroInscripcion: form.numeroInscripcion,
-          categoria: form.categoria,
-          actividad: form.actividad,
-          rubro: form.rubro,
-          corrientesControl: form.corrientesControl,
-        });
-        toast.success('Creado', `Generador ${form.razonSocial} creado exitosamente`);
+          razonSocial: form.razonSocial, cuit: form.cuit,
+          domicilio: form.domicilio || form.domicilioLegalCalle,
+          telefono: form.telefono, numeroInscripcion: form.numeroInscripcion,
+          categoria: form.categoria, actividad: form.actividad,
+          rubro: form.rubro, corrientesControl: corrientesCodes.join(', '),
+          ...regulatory,
+          ...(latitud && longitud && !isNaN(latitud) && !isNaN(longitud) ? { latitud, longitud } : {}),
+          ...(tefInputs && { tefInputs }),
+        } as any);
+        // result is data.data from service = { generador: { id, ... } }
+        generadorId = result?.generador?.id || result?.id;
+        toast.success('Generador creado', `${form.razonSocial} registrado exitosamente`);
       }
+
+      // Upload attached files after generador is created
+      const filesToUpload = Object.entries(adjuntos);
+      if (generadorId && filesToUpload.length > 0) {
+        let uploaded = 0;
+        for (const [tipo, file] of filesToUpload) {
+          try {
+            await uploadDocMutation.mutateAsync({ generadorId, file, tipo });
+            uploaded++;
+          } catch (uploadErr: any) {
+            console.error('Upload error:', uploadErr);
+            toast.error('Error subiendo', `No se pudo subir ${file.name}: ${uploadErr?.response?.data?.message || 'Error'}`);
+          }
+        }
+        if (uploaded > 0) {
+          toast.success('Documentos adjuntados', `${uploaded} archivo(s) subido(s)`);
+        }
+      }
+
       navigate(backPath);
     } catch (err: any) {
-      toast.error('Error', err?.response?.data?.message || 'No se pudo guardar el generador');
+      const msg = err?.response?.data?.message || err?.message || 'Error desconocido al guardar';
+      console.error('Submit error:', err);
+      setSubmitError(msg);
+      toast.add({ type: 'error', title: 'Error al guardar', message: msg, duration: 15000 });
     }
   };
 
-  const isPending = createMutation.isPending || updateMutation.isPending;
-
-  const corrientesCodes = form.corrientesControl
-    .split(',')
-    .map((c) => c.trim())
-    .filter(Boolean);
+  const isPending = createMutation.isPending || updateMutation.isPending || uploadDocMutation.isPending;
 
   if (isEdit && loadingExisting) {
     return (
       <div className="space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>
-            Volver
-          </Button>
-        </div>
         <Card className="py-12">
           <div className="text-center">
             <Loader2 size={32} className="animate-spin text-primary-500 mx-auto mb-4" />
@@ -175,199 +322,380 @@ const NuevoGeneradorPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto">
+    <div className="space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto pb-8">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>
-          Volver
-        </Button>
+        <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>Volver</Button>
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-purple-100 rounded-xl">
-            <Factory size={22} className="text-purple-600" />
-          </div>
+          <div className="p-2 bg-purple-100 rounded-xl"><Factory size={22} className="text-purple-600" /></div>
           <div>
-            <h2 className="text-2xl font-bold text-neutral-900">
-              {isEdit ? 'Editar Generador' : 'Nuevo Generador'}
-            </h2>
-            <p className="text-sm text-neutral-500">
-              {isEdit ? 'Modificar datos del generador' : 'Registrar un nuevo generador de residuos peligrosos'}
-            </p>
+            <h2 className="text-2xl font-bold text-neutral-900">{isEdit ? 'Editar Generador' : 'Registro Provincial de Generadores de RRPP'}</h2>
+            <p className="text-sm text-neutral-500">Ley 24.051, Ley Provincial 5917, Decreto 2625/99</p>
           </div>
         </div>
       </div>
 
-      {/* Sección 1: Identificación */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Factory size={18} className="text-purple-600" />
-            <h3 className="font-semibold text-neutral-900">Identificación</h3>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Razón Social *"
-              value={form.razonSocial}
-              onChange={(e) => update('razonSocial', e.target.value)}
-              placeholder="Empresa S.A."
-            />
-            <Input
-              label="CUIT *"
-              value={form.cuit}
-              onChange={(e) => update('cuit', e.target.value)}
-              placeholder="30-12345678-9"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">Categoría</label>
-            <select
-              value={form.categoria}
-              onChange={(e) => update('categoria', e.target.value)}
-              className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm bg-white"
-            >
-              <option value="">Seleccionar categoría...</option>
-              {CATEGORIAS.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-          <Input
-            label="N° Inscripción DGFA"
-            value={form.numeroInscripcion}
-            onChange={(e) => update('numeroInscripcion', e.target.value)}
-            placeholder="G-000XXX"
-          />
-        </CardContent>
-      </Card>
+      {/* Stepper */}
+      <div className="bg-white rounded-2xl border border-neutral-200 p-4 shadow-sm">
+        <div className="flex items-center justify-between">
+          {STEPS.map((s, i) => {
+            const Icon = s.icon;
+            const isActive = step === s.id;
+            const isDone = step > s.id;
+            const hasErr = attempted.has(s.id) && stepHasErrors(s.id);
+            return (
+              <React.Fragment key={s.id}>
+                <button onClick={() => goStep(s.id)} className={`flex flex-col items-center gap-1.5 group transition-all ${isActive ? 'scale-105' : ''}`}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
+                    hasErr ? 'bg-error-100 text-error-600 ring-2 ring-error-300' :
+                    isActive ? 'bg-primary-600 text-white shadow-lg shadow-primary-200' :
+                    isDone ? 'bg-primary-100 text-primary-700' :
+                    'bg-neutral-100 text-neutral-400 group-hover:bg-neutral-200'
+                  }`}>
+                    {hasErr ? <AlertCircle size={18} /> : isDone ? <Check size={18} /> : <Icon size={18} />}
+                  </div>
+                  <span className={`text-[10px] font-medium text-center leading-tight max-w-[80px] ${
+                    hasErr ? 'text-error-600' : isActive ? 'text-primary-700' : isDone ? 'text-primary-600' : 'text-neutral-400'
+                  }`}>{s.label}</span>
+                </button>
+                {i < STEPS.length - 1 && (
+                  <div className={`flex-1 h-0.5 mx-1 rounded ${step > s.id ? 'bg-primary-400' : 'bg-neutral-200'}`} />
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
+      </div>
 
-      {/* Sección 2: Contacto */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <MapPin size={18} className="text-info-600" />
-            <h3 className="font-semibold text-neutral-900">Contacto</h3>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Input
-            label="Domicilio"
-            value={form.domicilio}
-            onChange={(e) => update('domicilio', e.target.value)}
-            placeholder="Av. San Martín 1234, Mendoza"
-          />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="relative">
-              <Input
-                label="Teléfono"
-                value={form.telefono}
-                onChange={(e) => update('telefono', e.target.value)}
-                placeholder="+54 261 4XX-XXXX"
-              />
-            </div>
-            <Input
-              label="Email *"
-              type="email"
-              value={form.email}
-              onChange={(e) => update('email', e.target.value)}
-              placeholder="contacto@empresa.com"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Sección 3: Actividad Regulatoria */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Biohazard size={18} className="text-warning-600" />
-            <h3 className="font-semibold text-neutral-900">Actividad Regulatoria</h3>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Input
-            label="Rubro"
-            value={form.rubro}
-            onChange={(e) => update('rubro', e.target.value)}
-            placeholder="Ej: INDUSTRIA QUIMICA"
-          />
-          <Input
-            label="Actividad"
-            value={form.actividad}
-            onChange={(e) => update('actividad', e.target.value)}
-            placeholder="Ej: Generación de energía eléctrica"
-          />
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">
-              Corrientes Y (Ley 24.051) — separadas por coma
-            </label>
-            <input
-              value={form.corrientesControl}
-              onChange={(e) => update('corrientesControl', e.target.value)}
-              placeholder="Ej: Y8, Y9, Y12, Y48"
-              className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm"
-            />
-            {corrientesCodes.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {corrientesCodes.map((code) => (
-                  <span
-                    key={code}
-                    className="text-[11px] px-1.5 py-0.5 bg-warning-50 text-warning-700 border border-warning-200 rounded"
-                    title={CORRIENTES_Y[code] || code}
-                  >
-                    {code}
-                  </span>
-                ))}
+      {/* Step Content */}
+      <div className="min-h-[400px]">
+        {/* ===== PASO 1 ===== */}
+        {step === 1 && (
+          <Card>
+            <CardHeader><div className="flex items-center gap-2"><Factory size={20} className="text-purple-600" /><h3 className="text-lg font-bold text-neutral-900">Identificacion y Contacto</h3></div></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Input label="Razon Social *" value={form.razonSocial} onChange={e => up('razonSocial', e.target.value)} placeholder="Empresa S.A."
+                    className={showError('razonSocial') ? 'border-error-400 bg-error-50' : ''} />
+                  <FieldError show={showError('razonSocial')} msg="La razon social es obligatoria" />
+                </div>
+                <div>
+                  <Input label="CUIT *" value={form.cuit} onChange={e => up('cuit', e.target.value)} placeholder="30-12345678-9"
+                    className={showError('cuit') ? 'border-error-400 bg-error-50' : ''} />
+                  <FieldError show={showError('cuit')} msg="El CUIT es obligatorio" />
+                </div>
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Categoria</label>
+                  <select value={form.categoria} onChange={e => up('categoria', e.target.value)} className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm bg-white">
+                    <option value="">Seleccionar...</option>
+                    {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <Input label="N Inscripcion DGFA" value={form.numeroInscripcion} onChange={e => up('numeroInscripcion', e.target.value)} placeholder="G-000XXX" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Input label="Email *" type="email" value={form.email} onChange={e => up('email', e.target.value)} placeholder="contacto@empresa.com"
+                    className={showError('email') ? 'border-error-400 bg-error-50' : ''} />
+                  <FieldError show={showError('email')} msg="El email es obligatorio" />
+                </div>
+                <Input label="Telefono" value={form.telefono} onChange={e => up('telefono', e.target.value)} placeholder="+54 261 4XX-XXXX" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input label="Rubro de la Empresa" value={form.rubro} onChange={e => up('rubro', e.target.value)} placeholder="INDUSTRIA QUIMICA" />
+                <Input label="Actividad Principal" value={form.actividad} onChange={e => up('actividad', e.target.value)} placeholder="Generacion de energia electrica" />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ===== PASO 2 ===== */}
+        {step === 2 && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader><div className="flex items-center gap-2"><Building2 size={20} className="text-info-600" /><h3 className="text-lg font-bold text-neutral-900">Direccion Fiscal</h3></div></CardHeader>
+              <CardContent className="space-y-4">
+                <Input label="Calle / Ruta" value={form.domicilioLegalCalle} onChange={e => up('domicilioLegalCalle', e.target.value)} placeholder="Av. San Martin 1234" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input label="Localidad" value={form.domicilioLegalLocalidad} onChange={e => up('domicilioLegalLocalidad', e.target.value)} placeholder="Ciudad de Mendoza" />
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Departamento</label>
+                    <select value={form.domicilioLegalDepto} onChange={e => up('domicilioLegalDepto', e.target.value)} className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm bg-white">
+                      <option value="">Seleccionar...</option>
+                      {DEPARTAMENTOS_MENDOZA.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-2"><MapPin size={20} className="text-warning-600" /><h3 className="text-lg font-bold text-neutral-900">Direccion Real</h3></div>
+                  <label className="flex items-center gap-2 text-sm text-neutral-500 cursor-pointer">
+                    <input type="checkbox" checked={form.domicilioRealIgual} onChange={e => up('domicilioRealIgual', e.target.checked)} className="rounded border-neutral-300 text-primary-600" />
+                    Igual a la fiscal
+                  </label>
+                </div>
+              </CardHeader>
+              {!form.domicilioRealIgual && (
+                <CardContent className="space-y-4">
+                  <Input label="Calle / Ruta" value={form.domicilioRealCalle} onChange={e => up('domicilioRealCalle', e.target.value)} placeholder="Ruta 40 km 3200" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input label="Localidad" value={form.domicilioRealLocalidad} onChange={e => up('domicilioRealLocalidad', e.target.value)} placeholder="Lujan de Cuyo" />
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-1">Departamento</label>
+                      <select value={form.domicilioRealDepto} onChange={e => up('domicilioRealDepto', e.target.value)} className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm bg-white">
+                        <option value="">Seleccionar...</option>
+                        {DEPARTAMENTOS_MENDOZA.map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <Input label="Coordenadas Geograficas" value={form.coordenadas} onChange={e => up('coordenadas', e.target.value)} placeholder="lat -32.89, long -68.83" />
+                </CardContent>
+              )}
+            </Card>
+          </div>
+        )}
+
+        {/* ===== PASO 3 ===== */}
+        {step === 3 && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-2"><Biohazard size={20} className="text-warning-600" /><h3 className="text-lg font-bold text-neutral-900">Categorias de Control (Corrientes Y)</h3></div>
+                <Badge variant="soft" color="warning">{selectedY.size} seleccionadas</Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-neutral-500 mb-4">Seleccione las corrientes de residuos peligrosos que genera la empresa (Convenio de Basilea, Ley 24.051)</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {CORRIENTES_Y_CODES.map(code => {
+                  const checked = selectedY.has(code);
+                  const cVal = C_CORRIENTES[code] || 0;
+                  return (
+                    <label key={code} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${checked ? 'border-primary-400 bg-primary-50/50 shadow-sm' : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'}`}>
+                      <input type="checkbox" checked={checked} onChange={() => toggleY(code)} className="mt-0.5 rounded border-neutral-300 text-primary-600 focus:ring-primary-500" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${checked ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-neutral-100 text-neutral-600'}`}>{code}</span>
+                          <span className="text-[10px] text-neutral-400 font-mono">C={cVal}</span>
+                        </div>
+                        <p className="text-xs text-neutral-600 mt-1 leading-relaxed">{CORRIENTES_Y[code]}</p>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ===== PASO 4: Calculo TEF + ISO date ===== */}
+        {step === 4 && (
+          <div className="space-y-6">
+            {/* ISO date input — here because it affects TEF */}
+            <Card>
+              <CardHeader><div className="flex items-center gap-2"><ClipboardList size={20} className="text-green-600" /><h3 className="text-lg font-bold text-neutral-900">Norma ISO 14000</h3></div></CardHeader>
+              <CardContent>
+                <p className="text-xs text-neutral-500 mb-3">Si la empresa posee certificacion ISO 14000, ingrese la fecha. Esto duplica el factor ISO en el calculo TEF (x2 en vez de x1).</p>
+                <div className="max-w-xs">
+                  <Input label="Fecha Certificacion ISO 14000" type="date" value={form.certificacionISO} onChange={e => up('certificacionISO', e.target.value)} />
+                </div>
+                <div className={`mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${form.certificacionISO ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-neutral-50 text-neutral-500 border border-neutral-200'}`}>
+                  Factor ISO: <span className="font-bold font-mono">{form.certificacionISO ? '2' : '1'}</span>
+                  <span className="text-xs">({form.certificacionISO ? 'Posee ISO — factor x2' : 'Sin ISO — factor x1'})</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Calculator size={20} className="text-primary-600" />
+                  <div>
+                    <h3 className="text-lg font-bold text-neutral-900">Datos para el Calculo de la T.E.F.</h3>
+                    <p className="text-xs text-neutral-500">Decreto Reglamentario 2625/99 — Ley Provincial 5917</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <CalculadoraTEF corrientesY={corrientesCodes} tieneISO={!!form.certificacionISO} inline initialInputs={tefInputs} onInputsChange={setTefInputs} />
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* ===== PASO 5 ===== */}
+        {step === 5 && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader><div className="flex items-center gap-2"><ClipboardList size={20} className="text-primary-600" /><h3 className="text-lg font-bold text-neutral-900">Datos Regulatorios</h3></div></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input label="Expediente Inscripcion" value={form.expedienteInscripcion} onChange={e => up('expedienteInscripcion', e.target.value)} placeholder="EX-2024-XXXXX" />
+                  <Input label="Resolucion Inscripcion" value={form.resolucionInscripcion} onChange={e => up('resolucionInscripcion', e.target.value)} placeholder="0412/2024" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input label="Factor R" type="number" value={form.factorR} onChange={e => up('factorR', e.target.value)} placeholder="0.00" />
+                  <Input label="Monto MxR ($)" type="number" value={form.montoMxR} onChange={e => up('montoMxR', e.target.value)} placeholder="0.00" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Categoria Individual</label>
+                    <select value={form.categoriaIndividual} onChange={e => up('categoriaIndividual', e.target.value)} className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm bg-white">
+                      <option value="">Sin categoria</option>
+                      {CATEGORIAS_INDIVIDUALES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex items-center pt-6">
+                    <label className="flex items-center gap-2 text-sm text-neutral-700 cursor-pointer">
+                      <input type="checkbox" checked={form.libroOperatoria} onChange={e => up('libroOperatoria', e.target.checked)} className="rounded border-neutral-300" />
+                      Libro de Operatoria
+                    </label>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {!isEdit && (
+              <Card>
+                <CardHeader><div className="flex items-center gap-2"><Lock size={20} className="text-neutral-500" /><h3 className="text-lg font-bold text-neutral-900">Acceso al Sistema</h3></div></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input label="Nombre del Responsable" value={form.nombre} onChange={e => up('nombre', e.target.value)} placeholder="Juan Perez" />
+                    <div>
+                      <Input label="Password Inicial *" type="password" value={form.password} onChange={e => up('password', e.target.value)} placeholder="Minimo 8 caracteres"
+                        className={showError('password') ? 'border-error-400 bg-error-50' : ''} />
+                      <FieldError show={showError('password')} msg="El password es obligatorio para crear el generador" />
+                    </div>
+                  </div>
+                  <p className="text-xs text-neutral-500">El responsable podra cambiar su contrasena desde su perfil al ingresar.</p>
+                </CardContent>
+              </Card>
             )}
           </div>
-        </CardContent>
-      </Card>
+        )}
 
-      {/* Sección 4: Acceso (solo creación) */}
-      {!isEdit && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Lock size={18} className="text-neutral-500" />
-              <h3 className="font-semibold text-neutral-900">Acceso al Sistema</h3>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input
-                label="Nombre del Responsable"
-                value={form.nombre}
-                onChange={(e) => update('nombre', e.target.value)}
-                placeholder="Juan Pérez"
-              />
-              <Input
-                label="Password Inicial *"
-                type="password"
-                value={form.password}
-                onChange={(e) => update('password', e.target.value)}
-                placeholder="Mínimo 8 caracteres"
-              />
-            </div>
-            <p className="text-xs text-neutral-500">
-              El responsable podrá cambiar su contraseña desde su perfil al ingresar por primera vez.
-            </p>
-          </CardContent>
-        </Card>
+        {/* ===== PASO 6: Archivos Adjuntos ===== */}
+        {step === 6 && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Upload size={20} className="text-primary-600" />
+                  <div>
+                    <h3 className="text-lg font-bold text-neutral-900">Archivos Adjuntos al Formulario</h3>
+                    <p className="text-xs text-neutral-500">Tamano max. 10MB por archivo (PDF, JPG, PNG)</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="border border-neutral-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-neutral-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-600">Nombre</th>
+                        <th className="px-4 py-3 text-center text-xs font-semibold text-neutral-600 w-20">Oblig.</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-600 hidden md:table-cell w-32">Categoria</th>
+                        <th className="px-4 py-3 text-center text-xs font-semibold text-neutral-600 w-48">Archivo</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-100">
+                      {DOCUMENTOS_REQUERIDOS.map(doc => {
+                        const file = adjuntos[doc.tipo];
+                        return (
+                          <tr key={doc.tipo} className="hover:bg-neutral-50">
+                            <td className="px-4 py-3">
+                              <p className="font-medium text-neutral-900 text-xs uppercase">{doc.nombre}</p>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              {doc.obligatorio ? (
+                                <span className="inline-flex items-center justify-center w-5 h-5 rounded border-2 border-primary-500 bg-primary-50"><Check size={12} className="text-primary-600" /></span>
+                              ) : (
+                                <span className="inline-flex items-center justify-center w-5 h-5 rounded border-2 border-neutral-300" />
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-[10px] text-neutral-500 hidden md:table-cell uppercase">{doc.categoria}</td>
+                            <td className="px-4 py-3 text-center">
+                              {file ? (
+                                <div className="inline-flex items-center gap-2 px-2 py-1 bg-success-50 border border-success-200 rounded-lg">
+                                  <Paperclip size={12} className="text-success-600" />
+                                  <span className="text-xs text-success-700 truncate max-w-[100px]">{file.name}</span>
+                                  <button onClick={() => removeFile(doc.tipo)} className="text-neutral-400 hover:text-error-600"><X size={14} /></button>
+                                </div>
+                              ) : (
+                                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-100 hover:bg-primary-50 border border-neutral-200 hover:border-primary-300 rounded-lg cursor-pointer transition-colors text-xs font-medium text-neutral-700 hover:text-primary-700">
+                                  <Upload size={14} />
+                                  Subir
+                                  <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png"
+                                    onChange={e => { const f = e.target.files?.[0]; if (f) attachFile(doc.tipo, f); e.target.value = ''; }}
+                                  />
+                                </label>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {Object.keys(adjuntos).length > 0 && (
+                  <p className="text-xs text-success-600 mt-3">{Object.keys(adjuntos).length} archivo(s) listos para adjuntar al confirmar</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Resumen */}
+            <Card className="border-primary-200 bg-primary-50/30">
+              <CardHeader><h3 className="text-lg font-bold text-neutral-900">Resumen del Registro</h3></CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                  <div><p className="text-neutral-500 text-xs">Razon Social</p><p className="font-medium text-neutral-900">{form.razonSocial || '-'}</p></div>
+                  <div><p className="text-neutral-500 text-xs">CUIT</p><p className="font-medium font-mono text-neutral-900">{form.cuit || '-'}</p></div>
+                  <div><p className="text-neutral-500 text-xs">Categoria</p><p className="font-medium text-neutral-900">{form.categoria || '-'}</p></div>
+                  <div><p className="text-neutral-500 text-xs">Corrientes Y</p><p className="font-medium text-neutral-900">{selectedY.size} seleccionadas</p></div>
+                  <div><p className="text-neutral-500 text-xs">Domicilio</p><p className="font-medium text-neutral-900">{form.domicilioLegalCalle || form.domicilio || '-'}</p></div>
+                  <div><p className="text-neutral-500 text-xs">Departamento</p><p className="font-medium text-neutral-900">{form.domicilioLegalDepto || '-'}</p></div>
+                  <div><p className="text-neutral-500 text-xs">ISO 14000</p><Badge variant="soft" color={form.certificacionISO ? 'success' : 'neutral'}>{form.certificacionISO ? 'SI' : 'NO'}</Badge></div>
+                  <div><p className="text-neutral-500 text-xs">Adjuntos</p><p className="font-medium text-neutral-900">{Object.keys(adjuntos).length} archivos</p></div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
+
+      {/* Error banner */}
+      {submitError && (
+        <div className="bg-error-50 border-2 border-error-300 rounded-xl p-4 flex items-start gap-3">
+          <AlertCircle size={20} className="text-error-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-bold text-error-800">No se pudo guardar el generador</p>
+            <p className="text-sm text-error-700 mt-1">{submitError}</p>
+          </div>
+          <button onClick={() => setSubmitError(null)} className="text-error-400 hover:text-error-600"><X size={18} /></button>
+        </div>
       )}
 
-      {/* Acciones */}
-      <div className="flex justify-end gap-3 pb-8">
-        <Button variant="outline" onClick={() => navigate(backPath)} disabled={isPending}>
-          Cancelar
+      {/* Navigation */}
+      <div className="flex items-center justify-between pt-2">
+        <Button variant="outline" leftIcon={<ArrowLeft size={16} />} onClick={step === 1 ? () => navigate(backPath) : goPrev}>
+          {step === 1 ? 'Cancelar' : 'Volver'}
         </Button>
-        <Button
-          leftIcon={isPending ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-          onClick={handleSubmit}
-          disabled={isPending}
-        >
-          {isPending ? 'Guardando...' : isEdit ? 'Guardar Cambios' : 'Crear Generador'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-neutral-400">Paso {step} de {TOTAL_STEPS}</span>
+          {step < TOTAL_STEPS ? (
+            <Button rightIcon={<ArrowRight size={16} />} onClick={goNext}>Continuar</Button>
+          ) : (
+            <Button leftIcon={isPending ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} onClick={handleSubmit} disabled={isPending}>
+              {isPending ? 'Guardando...' : isEdit ? 'Guardar Cambios' : 'Confirmar Registro'}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

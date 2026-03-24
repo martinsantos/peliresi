@@ -32,8 +32,8 @@ export default function OperadoresTab({
     return sortConfig.direction === 'asc' ? <ChevronUp size={12} className="ml-1 text-primary-600 inline" /> : <ChevronDown size={12} className="ml-1 text-primary-600 inline" />;
   };
 
-  // Fetch ALL operadores from database (not filtered by activity)
-  const { data: paginatedData, isLoading } = useOperadores({ limit: 500 });
+  // Fetch ALL operadores from database (limit raised to 5000 on backend)
+  const { data: paginatedData, isLoading } = useOperadores({ limit: 5000 });
   const operadores = paginatedData?.items || [];
 
   const filtered = useMemo(() => {
@@ -70,32 +70,43 @@ export default function OperadoresTab({
   const byCategoria = useMemo(() => {
     const map: Record<string, number> = {};
     for (const o of operadores) {
-      const cat = (o as any).categoria || 'Sin categoría';
+      const cat = ((o as any).categoria || '').trim() || 'Sin categoria';
       map[cat] = (map[cat] || 0) + 1;
     }
-    return Object.entries(map)
-      .map(([name, value], i) => ({
-        name: name.length > 20 ? name.substring(0, 17) + '...' : name,
-        fullName: name,
-        value,
-        fill: CHART_COLORS[i % CHART_COLORS.length],
-      }))
+    const sorted = Object.entries(map)
+      .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
+    const TOP = 8;
+    if (sorted.length <= TOP) {
+      return sorted.map((s, i) => ({
+        name: s.name.length > 20 ? s.name.substring(0, 17) + '...' : s.name,
+        fullName: s.name, value: s.value, fill: CHART_COLORS[i % CHART_COLORS.length],
+      }));
+    }
+    const top = sorted.slice(0, TOP);
+    const otrosVal = sorted.slice(TOP).reduce((sum, s) => sum + s.value, 0);
+    return [
+      ...top.map((s, i) => ({
+        name: s.name.length > 20 ? s.name.substring(0, 17) + '...' : s.name,
+        fullName: s.name, value: s.value, fill: CHART_COLORS[i % CHART_COLORS.length],
+      })),
+      { name: `Otros (${sorted.length - TOP})`, fullName: `Otros (${sorted.length - TOP} categorias)`, value: otrosVal, fill: '#CBD5E1' },
+    ];
   }, [operadores]);
 
-  // Count by tipo (FIJO vs IN SITU)
+  // Count by tipo using tipoOperador field (FIJO, IN_SITU)
   const byTipo = useMemo(() => {
-    const fijo = operadores.filter((o: any) => (o.categoria || '').toUpperCase().includes('FIJO')).length;
-    const inSitu = operadores.filter((o: any) => (o.categoria || '').toUpperCase().includes('IN SITU')).length;
-    const mixto = operadores.filter((o: any) => {
-      const cat = (o.categoria || '').toUpperCase();
-      return cat.includes('FIJO') && cat.includes('IN SITU');
-    }).length;
-    return [
-      { name: 'FIJO', value: fijo - mixto, fill: '#3B82F6' },
-      { name: 'IN SITU', value: inSitu - mixto, fill: '#10B981' },
-      { name: 'FIJO / IN SITU', value: mixto, fill: '#8B5CF6' },
-    ].filter(x => x.value > 0);
+    const map: Record<string, number> = {};
+    for (const o of operadores) {
+      const tipo = (o as any).tipoOperador || 'Sin definir';
+      map[tipo] = (map[tipo] || 0) + 1;
+    }
+    const labels: Record<string, string> = { FIJO: 'Planta Fija', IN_SITU: 'In Situ', 'Sin definir': 'Sin definir' };
+    const colors: Record<string, string> = { FIJO: '#3B82F6', IN_SITU: '#10B981', 'Sin definir': '#94A3B8' };
+    return Object.entries(map)
+      .map(([key, value]) => ({ name: labels[key] || key, value, fill: colors[key] || '#8B5CF6' }))
+      .filter(x => x.value > 0)
+      .sort((a, b) => b.value - a.value);
   }, [operadores]);
 
   // Count tratamientos
@@ -122,10 +133,10 @@ export default function OperadoresTab({
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        <KpiCard icon={FlaskConical} label="Total Operadores" value={operadores.length} color="from-blue-600 to-blue-700" />
-        <KpiCard icon={Layers} label="Categorías" value={byCategoria.length} color="from-purple-600 to-purple-700" sub="tipos" />
+        <KpiCard icon={FlaskConical} label="Total Operadores" value={paginatedData?.total || operadores.length} color="from-blue-600 to-blue-700" />
+        <KpiCard icon={Layers} label="Categorias" value={byCategoria.length} color="from-purple-600 to-purple-700" sub="tipos" />
         <KpiCard icon={FileCheck} label="Tratamientos" value={totalTratamientos} color="from-emerald-600 to-emerald-700" sub="autorizados" />
-        <KpiCard icon={MapPin} label="FIJO" value={byTipo.find(x => x.name === 'FIJO')?.value || 0} color="from-cyan-600 to-cyan-700" sub="plantas fijas" />
+        <KpiCard icon={MapPin} label="Planta Fija" value={byTipo.find(x => x.name === 'Planta Fija')?.value || 0} color="from-cyan-600 to-cyan-700" sub="plantas fijas" />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">

@@ -3,7 +3,7 @@
  */
 
 import api from './api';
-import type { ActorFilters, CreateGeneradorRequest, CreateTransportistaRequest, CreateOperadorRequest, PaginatedData } from '../types/api';
+import type { ActorFilters, CreateGeneradorRequest, CreateTransportistaRequest, CreateOperadorRequest, PaginatedData, AuditoriaEntry } from '../types/api';
 import type { Generador, Transportista, Operador, Vehiculo, Chofer } from '../types/models';
 
 export const actoresService = {
@@ -143,5 +143,19 @@ export const actoresService = {
 
   async deleteChofer(transportistaId: string, choferId: string): Promise<void> {
     await api.delete(`/actores/transportistas/${transportistaId}/choferes/${choferId}`);
+  },
+
+  // Historial de cambios por actor
+  async getHistorialActor(tipo: string, id: string, filters?: { anio?: number; modulo?: string; page?: number; limit?: number }): Promise<PaginatedData<AuditoriaEntry>> {
+    const tipoPath = tipo === 'GENERADOR' ? 'generadores' : tipo === 'OPERADOR' ? 'operadores' : 'transportistas';
+    const { data } = await api.get(`/actores/${tipoPath}/${id}/historial`, { params: { tipo, ...filters } });
+    const raw = data.data;
+    return {
+      items: raw.historial || [],
+      total: raw.pagination?.total || 0,
+      page: raw.pagination?.page || 1,
+      limit: raw.pagination?.limit || 20,
+      totalPages: raw.pagination?.pages || 1,
+    };
   },
 };

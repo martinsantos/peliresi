@@ -20,6 +20,10 @@ import {
   Trash2,
   Download,
   Loader2,
+  ShieldCheck,
+  ShieldAlert,
+  ShieldX,
+  RefreshCw,
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -35,7 +39,7 @@ import {
   useDeleteGenerador,
 } from '../../hooks/useActores';
 import { GENERADORES_DATA, TOP_RUBROS, type GeneradorEnriched } from '../../data/generadores-enrichment';
-import { CORRIENTES_Y } from '../../data/corrientes-y';
+import { CORRIENTES_Y, parseCorrientes } from '../../data/corrientes-y';
 
 const AdminGeneradoresPage: React.FC = () => {
   const navigate = useNavigate();
@@ -46,6 +50,7 @@ const AdminGeneradoresPage: React.FC = () => {
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [filtroRubro, setFiltroRubro] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('todos');
+  const [filtroCompliance, setFiltroCompliance] = useState('todos');
   const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState<string | undefined>(undefined);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -60,10 +65,21 @@ const AdminGeneradoresPage: React.FC = () => {
   const total = apiData?.total || generadoresData.length;
   const totalPages = apiData?.totalPages || 1;
 
-  // Map to display format + merge JSON enrichment
+  // Map to display format + merge JSON enrichment + compute compliance
   const tableData = useMemo(() =>
     generadoresData.map((g: any) => {
       const enriched: GeneradorEnriched | null = GENERADORES_DATA[g.cuit] || null;
+
+      // Compliance: green = TEF paid + DDJJ presented + habilitado; yellow = partial; red = 2+ years unpaid
+      const pagosRecent = g.pagos || [];
+      const ddjjRecent = g.ddjj || [];
+      const tefPaid = pagosRecent.some((p: any) => p.fechaPago != null);
+      const habilitado = pagosRecent.some((p: any) => p.habilitado === true);
+      const ddjjOk = ddjjRecent.some((d: any) => d.presentada);
+      const compliance: 'verde' | 'amarillo' | 'rojo' | 'sin_datos' =
+        pagosRecent.length === 0 && ddjjRecent.length === 0 ? 'sin_datos' :
+        tefPaid && ddjjOk && habilitado ? 'verde' :
+        !tefPaid && !ddjjOk ? 'rojo' : 'amarillo';
 
       return {
         id: g.id,
@@ -77,11 +93,12 @@ const AdminGeneradoresPage: React.FC = () => {
         activo: g.activo !== false,
         createdAt: g.createdAt,
         _raw: g,
+        compliance,
         // DB fields with JSON enrichment fallback
         certificado: enriched?.certificado || null,
         rubro: g.rubro || enriched?.rubro || null,
         actividad: g.actividad || enriched?.actividad || null,
-        categoriasControl: g.corrientesControl ? g.corrientesControl.split(',').map((s: string) => s.trim()) : (enriched?.categoriasControl || []),
+        categoriasControl: g.corrientesControl ? parseCorrientes(g.corrientesControl) : (enriched?.categoriasControl || []),
         corrientesControlRaw: g.corrientesControl || (enriched?.categoriasControl?.join(', ') || ''),
         emailOriginal: enriched?.emailOriginal || null,
         emailGenerado: enriched?.emailGenerado || false,
@@ -90,7 +107,7 @@ const AdminGeneradoresPage: React.FC = () => {
     [generadoresData]
   );
 
-  // Client-side filters (rubro, categoria, estado); sort is server-side
+  // Client-side filters (rubro, categoria, estado, compliance); sort is server-side
   const filteredData = useMemo(() => {
     return tableData.filter((g) => {
       if (filtroRubro && g.rubro !== filtroRubro) return false;
@@ -98,9 +115,10 @@ const AdminGeneradoresPage: React.FC = () => {
       const matchesEstado = filtroEstado === 'todos' ||
                             (filtroEstado === 'activo' && g.activo) ||
                             (filtroEstado === 'inactivo' && !g.activo);
-      return matchesCategoria && matchesEstado;
+      const matchesCompliance = filtroCompliance === 'todos' || g.compliance === filtroCompliance;
+      return matchesCategoria && matchesEstado && matchesCompliance;
     });
-  }, [tableData, filtroRubro, filtroCategoria, filtroEstado]);
+  }, [tableData, filtroRubro, filtroCategoria, filtroEstado, filtroCompliance]);
 
   const GEN_COL_MAP: Record<string, string> = {
     generador: 'razonSocial',
@@ -117,8 +135,8 @@ const AdminGeneradoresPage: React.FC = () => {
   const stats = {
     total,
     activos: generadoresData.filter((g: any) => g.activo !== false).length,
-    inactivos: generadoresData.filter((g: any) => g.activo === false).length,
-    filtrados: filteredData.length,
+    alDia: tableData.filter(g => g.compliance === 'verde').length,
+    conDeuda: tableData.filter(g => g.compliance === 'rojo').length,
   };
 
   const openEditar = (row: typeof tableData[0]) => {
@@ -163,7 +181,7 @@ const AdminGeneradoresPage: React.FC = () => {
   const columns = [
     {
       key: 'generador',
-      width: '20%',
+      width: '22%',
       header: 'Generador',
       sortable: true,
       render: (row: typeof tableData[0]) => (
@@ -185,7 +203,7 @@ const AdminGeneradoresPage: React.FC = () => {
     },
     {
       key: 'categoria',
-      width: '12%',
+      width: '10%',
       header: 'Categoría',
       sortable: true,
       hiddenBelow: 'md' as const,
@@ -202,7 +220,7 @@ const AdminGeneradoresPage: React.FC = () => {
     },
     {
       key: 'categoriasY',
-      width: '16%',
+      width: '12%',
       header: 'Corrientes Y',
       hiddenBelow: 'lg' as const,
       render: (row: typeof tableData[0]) => row.categoriasControl.length > 0 ? (
@@ -224,7 +242,7 @@ const AdminGeneradoresPage: React.FC = () => {
     },
     {
       key: 'rubro',
-      width: '18%',
+      width: '16%',
       header: 'Rubro / Actividad',
       hiddenBelow: 'lg' as const,
       render: (row: typeof tableData[0]) => {
@@ -265,8 +283,29 @@ const AdminGeneradoresPage: React.FC = () => {
       },
     },
     {
+      key: 'compliance',
+      width: '7%',
+      header: 'Compliance',
+      hiddenBelow: 'md' as const,
+      render: (row: typeof tableData[0]) => {
+        const cfg = {
+          verde: { icon: ShieldCheck, color: 'text-success-600', bg: 'bg-success-50', label: 'Al dia' },
+          amarillo: { icon: ShieldAlert, color: 'text-warning-600', bg: 'bg-warning-50', label: 'Parcial' },
+          rojo: { icon: ShieldX, color: 'text-error-600', bg: 'bg-error-50', label: 'Deuda' },
+          sin_datos: { icon: ShieldAlert, color: 'text-neutral-400', bg: 'bg-neutral-50', label: 'S/D' },
+        }[row.compliance];
+        const Icon = cfg.icon;
+        return (
+          <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg ${cfg.bg}`} title={cfg.label}>
+            <Icon size={14} className={cfg.color} />
+            <span className={`text-xs font-medium ${cfg.color}`}>{cfg.label}</span>
+          </div>
+        );
+      },
+    },
+    {
       key: 'estado',
-      width: '8%',
+      width: '7%',
       header: 'Estado',
       sortable: true,
       render: (row: typeof tableData[0]) => (
@@ -308,6 +347,13 @@ const AdminGeneradoresPage: React.FC = () => {
             title="Editar"
           >
             <Edit size={16} />
+          </button>
+          <button
+            className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+            onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/admin/actores/generadores/${row.id}/renovar` : `/admin/actores/generadores/${row.id}/renovar`); }}
+            title="Renovar"
+          >
+            <RefreshCw size={16} />
           </button>
           <button
             className="p-1.5 text-neutral-400 hover:text-error-600 hover:bg-error-50 rounded-lg transition-colors"
@@ -375,12 +421,12 @@ const AdminGeneradoresPage: React.FC = () => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-warning-100 rounded-lg">
-                <AlertTriangle size={20} className="text-warning-600" />
+              <div className="p-2 bg-emerald-100 rounded-lg">
+                <ShieldCheck size={20} className="text-emerald-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-neutral-900">{stats.inactivos}</p>
-                <p className="text-sm text-neutral-600">Inactivos</p>
+                <p className="text-2xl font-bold text-neutral-900">{stats.alDia}</p>
+                <p className="text-sm text-neutral-600">Al dia</p>
               </div>
             </div>
           </CardContent>
@@ -388,12 +434,12 @@ const AdminGeneradoresPage: React.FC = () => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-info-100 rounded-lg">
-                <Search size={20} className="text-info-600" />
+              <div className="p-2 bg-error-100 rounded-lg">
+                <ShieldX size={20} className="text-error-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-neutral-900">{stats.filtrados}</p>
-                <p className="text-sm text-neutral-600">Filtrados</p>
+                <p className="text-2xl font-bold text-neutral-900">{stats.conDeuda}</p>
+                <p className="text-sm text-neutral-600">Con deuda</p>
               </div>
             </div>
           </CardContent>
@@ -442,6 +488,17 @@ const AdminGeneradoresPage: React.FC = () => {
                 <option value="activo">Activo</option>
                 <option value="inactivo">Inactivo</option>
               </select>
+              <select
+                value={filtroCompliance}
+                onChange={(e) => { setFiltroCompliance(e.target.value); setCurrentPage(1); }}
+                className="px-4 h-10 rounded-xl border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
+              >
+                <option value="todos">Compliance: Todos</option>
+                <option value="verde">Al dia</option>
+                <option value="amarillo">Parcial</option>
+                <option value="rojo">Con deuda</option>
+                <option value="sin_datos">Sin datos</option>
+              </select>
             </div>
           </div>
         </CardContent>
@@ -469,6 +526,7 @@ const AdminGeneradoresPage: React.FC = () => {
               onRowClick={(row) => navigate(isMobile ? `/mobile/admin/actores/generadores/${row.id}` : `/admin/actores/generadores/${row.id}`)}
               emptyMessage="No se encontraron generadores"
               stickyHeader
+              fixedLayout
             />
             <Pagination
               currentPage={currentPage}

@@ -618,7 +618,7 @@ export const AlertasPage: React.FC = () => {
                             </span>
                             <button
                               onClick={() => eliminarAlerta(alerta.id)}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-neutral-100 text-neutral-300 hover:text-neutral-500"
+                              className="p-1 rounded hover:bg-neutral-100 text-neutral-300 hover:text-neutral-500"
                               title="Eliminar"
                             >
                               <X size={13} />

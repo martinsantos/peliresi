@@ -134,7 +134,10 @@ export function Table<T extends Record<string, any>>({
                   />
                 </th>
               )}
-              {columns.map((column) => (
+              {columns.map((column, colIdx) => {
+                const isLastCol = colIdx === columns.length - 1;
+                const isStickyRight = isLastCol && column.key === 'acciones';
+                return (
                 <th
                   key={column.key}
                   className={cn(
@@ -143,7 +146,8 @@ export function Table<T extends Record<string, any>>({
                     column.sortable && sortable && 'cursor-pointer select-none hover:text-neutral-900',
                     column.align === 'center' && 'text-center',
                     column.align === 'right' && 'text-right',
-                    hiddenClass(column)
+                    hiddenClass(column),
+                    isStickyRight && 'sticky right-0 bg-neutral-50 z-[5] shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)]'
                   )}
                   style={{ width: column.width }}
                   onClick={() => column.sortable && handleSort(column.key)}
@@ -161,7 +165,8 @@ export function Table<T extends Record<string, any>>({
                     )}
                   </div>
                 </th>
-              ))}
+                );
+              })}
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
@@ -215,7 +220,10 @@ export function Table<T extends Record<string, any>>({
                         />
                       </td>
                     )}
-                    {columns.map((column) => (
+                    {columns.map((column, colIdx) => {
+                      const isLastCol = colIdx === columns.length - 1;
+                      const isStickyRight = isLastCol && column.key === 'acciones';
+                      return (
                       <td
                         key={column.key}
                         className={cn(
@@ -224,12 +232,14 @@ export function Table<T extends Record<string, any>>({
                           column.align === 'center' && 'text-center',
                           column.align === 'right' && 'text-right',
                           column.truncate && 'truncate max-w-0',
-                          hiddenClass(column)
+                          hiddenClass(column),
+                          isStickyRight && 'sticky right-0 bg-white z-[5] shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)]'
                         )}
                       >
                         {column.render ? column.render(row) : row[column.key]}
                       </td>
-                    ))}
+                      );
+                    })}
                   </tr>
                   {expandedContent && (
                     <tr>
