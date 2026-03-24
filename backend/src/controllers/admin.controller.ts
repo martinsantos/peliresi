@@ -394,3 +394,45 @@ export const ejecutarJobVencimientos = async (req: AuthRequest, res: Response, n
     next(error);
   }
 };
+
+// ===== EMAIL QUEUE =====
+
+export const getEmailQueue = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { estado, to, fechaDesde, fechaHasta, page = '1', limit = '20' } = req.query;
+    const take = Math.min(parseInt(limit as string) || 20, 100);
+    const skip = (Math.max(parseInt(page as string) || 1, 1) - 1) * take;
+
+    const where: any = {};
+    if (estado) where.estado = estado;
+    if (to) where.to = { contains: to as string, mode: 'insensitive' };
+    if (fechaDesde || fechaHasta) {
+      where.createdAt = {};
+      if (fechaDesde) where.createdAt.gte = new Date(fechaDesde as string);
+      if (fechaHasta) {
+        const end = new Date(fechaHasta as string);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+      }
+    }
+
+    const [data, total] = await Promise.all([
+      prisma.emailQueue.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take,
+        skip,
+        select: {
+          id: true, to: true, subject: true, tipo: true, prioridad: true,
+          estado: true, intentos: true, maxIntentos: true, error: true,
+          digestKey: true, createdAt: true, sentAt: true, nextRetryAt: true,
+        },
+      }),
+      prisma.emailQueue.count({ where }),
+    ]);
+
+    res.json({ data, total, page: Math.floor(skip / take) + 1, limit: take });
+  } catch (error) {
+    next(error);
+  }
+};

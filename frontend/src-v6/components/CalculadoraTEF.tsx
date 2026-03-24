@@ -22,6 +22,12 @@ export interface TEFInputs {
   superficieM2: number;
 }
 
+/** Imperative handle to read current TEF state without re-render coupling */
+export interface CalculadoraTEFHandle {
+  getResult: () => TEFResult;
+  getInputs: () => TEFInputs;
+}
+
 interface CalculadoraTEFProps {
   corrientesY: string[];
   tieneISO: boolean;
@@ -62,36 +68,46 @@ const A_HELP: Record<string, string> = {
   a10_idoneidad: 'Nivel de capacitacion y conciencia ambiental del personal.',
 };
 
-const CalculadoraTEF: React.FC<CalculadoraTEFProps> = ({ corrientesY, tieneISO, onResultChange, onInputsChange, initialInputs, inline = false }) => {
+const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProps>(({ corrientesY, tieneISO, onResultChange, onInputsChange, initialInputs, inline = false }, ref) => {
   const [zona, setZona] = useState(initialInputs?.zona || 'zona_rural');
   const [coefA, setCoefA] = useState<CoeficientesA>(initialInputs?.coefA ? { ...initialInputs.coefA } : { ...DEFAULT_A });
   const [personal, setPersonal] = useState(initialInputs?.personal || 0);
   const [potenciaHP, setPotenciaHP] = useState(initialInputs?.potenciaHP || 0);
   const [superficieM2, setSuperficieM2] = useState(initialInputs?.superficieM2 || 0);
   const [showHelp, setShowHelp] = useState<string | null>(null);
-  const prevInitialRef = React.useRef<TEFInputs | null>(null);
-
-  // Re-initialize when initialInputs arrive (e.g. edit mode loads data async)
-  React.useEffect(() => {
-    if (initialInputs && initialInputs !== prevInitialRef.current) {
-      prevInitialRef.current = initialInputs;
-      setZona(initialInputs.zona);
-      setCoefA({ ...initialInputs.coefA });
-      setPersonal(initialInputs.personal);
-      setPotenciaHP(initialInputs.potenciaHP);
-      setSuperficieM2(initialInputs.superficieM2);
-    }
-  }, [initialInputs]);
 
   const result = useMemo(() => {
-    const r = calcularTEF({
+    return calcularTEF({
       zona, coeficientesA: coefA, personal, potenciaHP, superficieM2,
       corrientesY, tieneISO,
     });
-    onResultChange?.(r);
-    onInputsChange?.({ zona, coefA, personal, potenciaHP, superficieM2 });
-    return r;
   }, [zona, coefA, personal, potenciaHP, superficieM2, corrientesY, tieneISO]);
+
+  // Imperative handle: parent reads values on demand (no render coupling)
+  React.useImperativeHandle(ref, () => ({
+    getResult: () => result,
+    getInputs: () => ({ zona, coefA, personal, potenciaHP, superficieM2 }),
+  }));
+
+  // Legacy callback support for admin pages that pass onInputsChange/onResultChange
+  // Guarded by stable string keys to prevent infinite loops
+  const onResultChangeRef = React.useRef(onResultChange);
+  const onInputsChangeRef = React.useRef(onInputsChange);
+  onResultChangeRef.current = onResultChange;
+  onInputsChangeRef.current = onInputsChange;
+  const resultKey = `${result.TEF}|${result.R}`;
+  const inputsKey = `${zona}|${personal}|${potenciaHP}|${superficieM2}`;
+  const didMountRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!didMountRef.current) { didMountRef.current = true; return; }
+    onResultChangeRef.current?.(result);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resultKey]);
+  React.useEffect(() => {
+    if (!didMountRef.current) return;
+    onInputsChangeRef.current?.({ zona, coefA, personal, potenciaHP, superficieM2 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputsKey]);
 
   const updateA = (key: keyof CoeficientesA, val: number) =>
     setCoefA(prev => ({ ...prev, [key]: val }));
@@ -362,6 +378,8 @@ const CalculadoraTEF: React.FC<CalculadoraTEFProps> = ({ corrientesY, tieneISO, 
       <CardContent>{content}</CardContent>
     </Card>
   );
-};
+});
+
+CalculadoraTEF.displayName = 'CalculadoraTEF';
 
 export default CalculadoraTEF;

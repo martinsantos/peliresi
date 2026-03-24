@@ -10,6 +10,7 @@ import {
   ejecutarJobVencimientos,
   updatePreferenciasNotificacion,
   impersonateUsuario,
+  getEmailQueue,
 } from '../controllers/admin.controller';
 
 const router = Router();
@@ -241,5 +242,8 @@ router.post('/impersonate/:userId', impersonateUsuario);
  *         description: Job ejecutado exitosamente
  */
 router.post('/jobs/vencimientos', ejecutarJobVencimientos);
+
+// ===== EMAIL QUEUE =====
+router.get('/email-queue', getEmailQueue);
 
 export default router;

@@ -834,3 +834,46 @@ model MensajeSolicitud {
   @@index([solicitudId, createdAt])
   @@map("mensajes_solicitud")
 }
+
+// ── Email Queue ─────────────────────────────────────────────────────
+
+enum EmailTipo {
+  TRANSACCIONAL
+  ALERTA
+}
+
+enum EmailPrioridad {
+  CRITICA
+  NORMAL
+  BAJA
+}
+
+enum EmailEstado {
+  PENDIENTE
+  ENVIADO
+  FALLIDO
+  DIGEST_PENDIENTE
+  SUPRIMIDO
+}
+
+model EmailQueue {
+  id          String         @id @default(cuid())
+  to          String
+  subject     String
+  html        String         @db.Text
+  tipo        EmailTipo
+  prioridad   EmailPrioridad @default(NORMAL)
+  estado      EmailEstado    @default(PENDIENTE)
+  intentos    Int            @default(0)
+  maxIntentos Int            @default(3)
+  error       String?
+  digestKey   String?
+  createdAt   DateTime       @default(now())
+  sentAt      DateTime?
+  nextRetryAt DateTime?
+
+  @@index([estado, nextRetryAt])
+  @@index([to, createdAt])
+  @@index([digestKey])
+  @@map("email_queue")
+}

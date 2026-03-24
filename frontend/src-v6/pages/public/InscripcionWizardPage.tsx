@@ -8,7 +8,7 @@
  * Phase 2: Multi-step wizard to complete the solicitud
  */
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, ArrowRight, Send, Upload, Check,
@@ -17,6 +17,7 @@ import {
   Eye, EyeOff, X, Paperclip, ClipboardList, Calculator, Truck, Car,
 } from 'lucide-react';
 import { Button } from '../../components/ui/ButtonV2';
+import CalculadoraTEF, { type TEFInputs, type CalculadoraTEFHandle } from '../../components/CalculadoraTEF';
 import api from '../../services/api';
 import axios from 'axios';
 
@@ -173,6 +174,62 @@ const InscripcionWizardPage: React.FC = () => {
     setForm(prev => ({ ...prev, [field]: value }));
   }, []);
 
+  // Imperative ref to read TEF values on demand (no render coupling = no loops)
+  const tefRef = useRef<CalculadoraTEFHandle>(null);
+
+  // Snapshot TEF values into form when leaving the TEF step
+  const snapshotTEF = useCallback(() => {
+    if (!tefRef.current) return;
+    const r = tefRef.current.getResult();
+    const inputs = tefRef.current.getInputs();
+    setForm(prev => ({
+      ...prev,
+      factorR: r.R.toFixed(4),
+      montoMxR: r.TEF.toFixed(2),
+      tefInputs: JSON.stringify(inputs),
+      tefPersonal: String(inputs.personal),
+      tefSuperficie: String(inputs.superficieM2),
+      tefPotencia: String(inputs.potenciaHP),
+      tefZona: inputs.zona,
+    }));
+  }, []);
+
+  // Shared TEF step renderer (used by generador step 5, operador step 6)
+  const tefCorrientesRaw = isGenerador ? form.corrientesControl : form.corrientesY;
+  const tefCorrientesYList = useMemo(() =>
+    (tefCorrientesRaw || '').split(/[,;/]/).map(s => s.trim()).filter(s => /^Y\d+$/i.test(s)),
+    [tefCorrientesRaw],
+  );
+  const tefTieneISO = !!form.certificacionISO;
+  const tefInitialInputs = useMemo<TEFInputs | null>(() => {
+    if (!form.tefInputs) return null;
+    try { return JSON.parse(form.tefInputs); } catch { return null; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only on mount — after that CalculadoraTEF owns its state
+
+  function renderTEFStep() {
+    return (
+      <div className="space-y-4">
+        <SectionTitle icon={Calculator} title="Calculo TEF (Tasa por Evaluacion Fiscal)" />
+        <p className="text-sm text-neutral-500">
+          Calculadora completa segun Decreto 2625/99. Complete los coeficientes para obtener la tasa.
+          {tefCorrientesYList.length === 0 && (
+            <span className="block mt-1 text-amber-600 font-medium">
+              Ingrese corrientes Y en el paso anterior para calcular el coeficiente C.
+            </span>
+          )}
+        </p>
+        <CalculadoraTEF
+          ref={tefRef}
+          corrientesY={tefCorrientesYList}
+          tieneISO={tefTieneISO}
+          inline={true}
+          initialInputs={tefInitialInputs}
+        />
+      </div>
+    );
+  }
+
   const upReg = useCallback((field: string, value: string) => {
     setReg(prev => ({ ...prev, [field]: value }));
   }, []);
@@ -254,32 +311,34 @@ const InscripcionWizardPage: React.FC = () => {
 
   const stepHasErrors = (s: number) => getStepErrors(s).length > 0;
 
-  const goNext = async () => {
-    setAttempted(prev => new Set(prev).add(step));
-    const errs = getStepErrors(step);
-    if (errs.length > 0) return;
+  const tefStepNumber = isGenerador ? 5 : isOperador ? 6 : -1;
 
-    // Save progress
-    if (solicitudId) {
-      setSaving(true);
-      try {
-        await api.put(`/solicitudes/${solicitudId}`, { datosFormulario: form });
-      } catch {
-        // Silent save failure - user can continue
-      } finally {
-        setSaving(false);
-      }
-    }
-
-    if (step < totalSteps) setStep(step + 1);
+  const leaveStep = () => {
+    // Snapshot TEF values into form when leaving the calculator step
+    if (step === tefStepNumber) snapshotTEF();
   };
 
-  const goPrev = () => { if (step > 1) setStep(step - 1); };
+  const goNext = () => {
+    setAttempted(prev => new Set(prev).add(step));
+    leaveStep();
+    if (step < totalSteps) setStep(step + 1);
+
+    // Save progress in background (fire-and-forget)
+    if (solicitudId) {
+      setSaving(true);
+      api.put(`/solicitudes/${solicitudId}`, { datosFormulario: form })
+        .catch(() => {})
+        .finally(() => setSaving(false));
+    }
+  };
+
+  const goPrev = () => { leaveStep(); if (step > 1) setStep(step - 1); };
 
   const goStep = (s: number) => {
-    if (s < step) { setStep(s); return; }
-    setAttempted(prev => new Set(prev).add(step));
-    if (getStepErrors(step).length > 0) return;
+    if (s !== step) {
+      setAttempted(prev => new Set(prev).add(step));
+      leaveStep();
+    }
     setStep(s);
   };
 
@@ -304,6 +363,8 @@ const InscripcionWizardPage: React.FC = () => {
 
   // Submit
   const handleSubmit = async () => {
+    // Snapshot TEF if currently on TEF step
+    snapshotTEF();
     // Validate required steps
     for (let s = 1; s <= totalSteps; s++) {
       const errs = getStepErrors(s);
@@ -668,57 +729,7 @@ const InscripcionWizardPage: React.FC = () => {
         </div>
       );
 
-      case 5: return (
-        <div className="space-y-4">
-          <SectionTitle icon={Calculator} title="Calculo TEF (Tasa por Evaluacion Fiscal)" />
-          <p className="text-sm text-neutral-500">
-            Complete los datos necesarios para el calculo de la Tasa de Evaluacion y Fiscalizacion.
-            El monto final sera determinado por la DGFA segun la normativa vigente.
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Factor R (Nivel de Riesgo)</label>
-              <input type="number" step="0.01" value={form.factorR || ''} onChange={e => up('factorR', e.target.value)}
-                placeholder="0.00" className={inputCls()} />
-              <p className="text-xs text-neutral-400 mt-1">Indice de riesgo ambiental calculado</p>
-            </div>
-            <div>
-              <label className={labelCls}>Monto MxR ($)</label>
-              <input type="number" step="0.01" value={form.montoMxR || ''} onChange={e => up('montoMxR', e.target.value)}
-                placeholder="0.00" className={inputCls()} />
-              <p className="text-xs text-neutral-400 mt-1">Monto resultante = M x R</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Personal afectado (cantidad)</label>
-              <input type="number" value={form.tefPersonal || ''} onChange={e => up('tefPersonal', e.target.value)}
-                placeholder="0" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Superficie del establecimiento (m2)</label>
-              <input type="number" value={form.tefSuperficie || ''} onChange={e => up('tefSuperficie', e.target.value)}
-                placeholder="0" className={inputCls()} />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Potencia instalada (HP)</label>
-              <input type="number" value={form.tefPotencia || ''} onChange={e => up('tefPotencia', e.target.value)}
-                placeholder="0" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Zona</label>
-              <select value={form.tefZona || ''} onChange={e => up('tefZona', e.target.value)} className={selectCls()}>
-                <option value="">Seleccionar...</option>
-                <option value="URBANA">Urbana</option>
-                <option value="SUBURBANA">Suburbana</option>
-                <option value="RURAL">Rural</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      );
+      case 5: return renderTEFStep();
       case 6: return renderDocumentos(DOCS_GENERADOR);
       case 7: return renderResumen();
       default: return null;
@@ -918,56 +929,7 @@ const InscripcionWizardPage: React.FC = () => {
         </div>
       );
 
-      case 6: return (
-        <div className="space-y-4">
-          <SectionTitle icon={Calculator} title="Calculo TEF (Tasa por Evaluacion Fiscal)" />
-          <p className="text-sm text-neutral-500">
-            Complete los datos para el calculo de la Tasa de Evaluacion y Fiscalizacion del operador.
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Factor R (Nivel de Riesgo)</label>
-              <input type="number" step="0.01" value={form.factorR || ''} onChange={e => up('factorR', e.target.value)}
-                placeholder="0.00" className={inputCls()} />
-              <p className="text-xs text-neutral-400 mt-1">Indice de riesgo ambiental calculado</p>
-            </div>
-            <div>
-              <label className={labelCls}>Monto MxR ($)</label>
-              <input type="number" step="0.01" value={form.montoMxR || ''} onChange={e => up('montoMxR', e.target.value)}
-                placeholder="0.00" className={inputCls()} />
-              <p className="text-xs text-neutral-400 mt-1">Monto resultante = M x R</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Capacidad de tratamiento (tn/mes)</label>
-              <input type="number" value={form.tefCapacidad || ''} onChange={e => up('tefCapacidad', e.target.value)}
-                placeholder="0" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Superficie de la planta (m2)</label>
-              <input type="number" value={form.tefSuperficie || ''} onChange={e => up('tefSuperficie', e.target.value)}
-                placeholder="0" className={inputCls()} />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Personal afectado (cantidad)</label>
-              <input type="number" value={form.tefPersonal || ''} onChange={e => up('tefPersonal', e.target.value)}
-                placeholder="0" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Zona</label>
-              <select value={form.tefZona || ''} onChange={e => up('tefZona', e.target.value)} className={selectCls()}>
-                <option value="">Seleccionar...</option>
-                <option value="URBANA">Urbana</option>
-                <option value="SUBURBANA">Suburbana</option>
-                <option value="RURAL">Rural</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      );
+      case 6: return renderTEFStep();
       case 7: return renderDocumentos(DOCS_OPERADOR);
       case 8: return renderResumen();
       default: return null;

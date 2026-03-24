@@ -29,6 +29,7 @@ import { iniciarBlockchainJob } from './jobs/blockchain.job';
 import blockchainRoutes from './routes/blockchain.routes';
 import renovacionRoutes from './routes/renovacion.routes';
 import solicitudRoutes from './routes/solicitud.routes';
+import { startEmailFlushTimer } from './services/email.service';
 
 // Inicializar la aplicación Express
 const app = express();
@@ -241,6 +242,7 @@ const PORT = config.PORT;
 app.listen(PORT, () => {
   logger.info({ port: PORT }, `Server running on port ${PORT}`);
   logger.info({ url: `http://localhost:${PORT}` }, 'Server URL');
+  startEmailFlushTimer();
 });
 
 // Graceful shutdown handlers
