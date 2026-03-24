@@ -9,7 +9,9 @@ import OnboardingWizard from '../components/OnboardingWizard';
 import { authService } from '../services/auth.service';
 import { clearUserOfflineData } from '../services/offline-sync';
 import { clearSyncQueue } from '../services/indexeddb';
+import { useSessionTimeout } from '../hooks/useSessionTimeout';
 import { getAccessToken, getRefreshToken, setTokens, clearTokens, api } from '../services/api';
+import { queryClient } from '../main';
 import type { Usuario } from '../types/models';
 
 // ========================================
@@ -69,12 +71,15 @@ export interface AuthContextType {
 // DEMO CREDENTIALS - for quick-switch buttons
 // Must match actual seeded users in backend/prisma/seed.ts
 // ========================================
-export const DEMO_CREDENTIALS: Record<number, { email: string; password: string; nombre: string; rol: UserRole; sector: string }> = {
-  1:  { email: 'admin@dgfa.mendoza.gov.ar',          password: 'admin123', nombre: 'Administrador DGFA',          rol: 'ADMIN',         sector: 'DGFA' },
-  5:  { email: 'quimica.mendoza@industria.com',       password: 'gen123',   nombre: 'Roberto Gómez',               rol: 'GENERADOR',     sector: 'Química Mendoza S.A.' },
-  13: { email: 'transportes.andes@logistica.com',     password: 'trans123', nombre: 'Pedro Martínez',              rol: 'TRANSPORTISTA', sector: 'Transportes Andes S.R.L.' },
-  19: { email: 'tratamiento.residuos@planta.com',     password: 'op123',    nombre: 'Miguel Fernández',            rol: 'OPERADOR',      sector: 'Tratamiento de Residuos Mendoza S.A.' },
-};
+export const DEMO_CREDENTIALS: Record<number, { email: string; password: string; nombre: string; rol: UserRole; sector: string }> =
+  import.meta.env.VITE_DEMO_MODE === 'true'
+    ? {
+        1:  { email: 'admin@dgfa.mendoza.gov.ar',          password: 'admin123', nombre: 'Administrador DGFA',          rol: 'ADMIN',         sector: 'DGFA' },
+        5:  { email: 'quimica.mendoza@industria.com',       password: 'gen123',   nombre: 'Roberto Gómez',               rol: 'GENERADOR',     sector: 'Química Mendoza S.A.' },
+        13: { email: 'transportes.andes@logistica.com',     password: 'trans123', nombre: 'Pedro Martínez',              rol: 'TRANSPORTISTA', sector: 'Transportes Andes S.R.L.' },
+        19: { email: 'tratamiento.residuos@planta.com',     password: 'op123',    nombre: 'Miguel Fernández',            rol: 'OPERADOR',      sector: 'Tratamiento de Residuos Mendoza S.A.' },
+      }
+    : {};
 
 // ========================================
 // HELPERS
@@ -119,6 +124,33 @@ const IMPERSONATION_KEY = 'sitrep_impersonation';
 // CONTEXT
 // ========================================
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// ========================================
+// SESSION TIMEOUT GUARD
+// ========================================
+function SessionTimeoutGuard({ logout, isAuthenticated }: { logout: () => void; isAuthenticated: boolean }) {
+  const { showWarning, secondsLeft, dismissWarning } = useSessionTimeout(logout, isAuthenticated);
+
+  if (!showWarning) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50">
+      <div className="bg-white rounded-xl p-6 shadow-2xl max-w-sm mx-4 text-center">
+        <div className="text-4xl mb-3">&#9200;</div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Sesion a punto de expirar</h3>
+        <p className="text-gray-600 mb-4">
+          Por inactividad, su sesion se cerrara en <span className="font-bold text-red-600">{secondsLeft}s</span>.
+        </p>
+        <button
+          onClick={dismissWarning}
+          className="w-full px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition-colors"
+        >
+          Continuar trabajando
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ========================================
 // PROVIDER
@@ -228,6 +260,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         clearUserOfflineData(currentUser.id).catch(() => {});
       }
       clearSyncQueue().catch(() => {});
+      queryClient.clear();
       setCurrentUser(null);
     }
   }, [currentUser]);
@@ -359,6 +392,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           onDismiss={dismissOnboarding}
         />
       )}
+      <SessionTimeoutGuard logout={logout} isAuthenticated={!!currentUser} />
     </AuthContext.Provider>
   );
 };

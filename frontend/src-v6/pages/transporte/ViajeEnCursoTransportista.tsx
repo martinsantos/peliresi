@@ -37,12 +37,21 @@ import { EstadoManifiesto } from '../../types/models';
 import { formatDateTime, formatWeight } from '../../utils/formatters';
 import { offlineSafeMutation } from '../../utils/offline-mutation';
 
-// Recenter map when position changes
-function RecenterMap({ position }: { position: [number, number] | null }) {
+// Recenter map when position changes (respects user pan/zoom)
+function RecenterMap({ position, onUserInteract, followUser }: {
+  position: [number, number] | null;
+  onUserInteract: () => void;
+  followUser: boolean;
+}) {
   const map = useMap();
   useEffect(() => {
-    if (position) map.setView(position, map.getZoom());
-  }, [position, map]);
+    map.on('dragstart', onUserInteract);
+    map.on('zoomstart', onUserInteract);
+    return () => { map.off('dragstart', onUserInteract); map.off('zoomstart', onUserInteract); };
+  }, [map, onUserInteract]);
+  useEffect(() => {
+    if (position && followUser) map.setView(position, map.getZoom());
+  }, [position, map, followUser]);
   return null;
 }
 
@@ -59,6 +68,10 @@ const ViajeEnCursoTransportista: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = location.pathname.startsWith('/mobile');
+
+  // Map recenter control
+  const [followUser, setFollowUser] = useState(true);
+  const handleMapInteract = useCallback(() => setFollowUser(false), []);
 
   // Real data from API
   const { data: apiData, isLoading, isError } = useManifiesto(id || '');
@@ -754,8 +767,17 @@ const ViajeEnCursoTransportista: React.FC = () => {
                       <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                       {trackPoints.length > 1 && <Polyline positions={trackPoints} color="#0D8A4F" weight={4} opacity={0.8} />}
                       {currentPosition && <Marker position={currentPosition} icon={ACTOR_ICONS.enTransito}><Popup>Tu posición actual</Popup></Marker>}
-                      <RecenterMap position={currentPosition} />
+                      <RecenterMap position={currentPosition} onUserInteract={handleMapInteract} followUser={followUser} />
                     </MapContainer>
+                    {!followUser && currentPosition && (
+                      <button
+                        onClick={() => setFollowUser(true)}
+                        className="absolute bottom-3 right-3 z-[400] bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg text-xs font-medium text-primary-700 flex items-center gap-1.5 active:scale-95 transition-transform"
+                      >
+                        <Crosshair size={14} />
+                        Recentrar
+                      </button>
+                    )}
                   </div>
                 </Card>
               </div>

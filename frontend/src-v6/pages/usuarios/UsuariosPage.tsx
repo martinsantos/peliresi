@@ -820,7 +820,7 @@ const UsuariosPage: React.FC = () => {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="text-center p-4 bg-primary-50 rounded-xl">
                 <p className="text-2xl font-bold text-primary-600">{usuarioSeleccionado.manifiestos}</p>
                 <p className="text-sm text-primary-700">Manifiestos</p>

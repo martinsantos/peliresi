@@ -302,7 +302,7 @@ export const MobileLayout: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto">
-        <div className="p-4 pb-24">
+        <div className="p-4 pb-28">
           <Outlet />
         </div>
       </main>

@@ -21,6 +21,7 @@ import searchRoutes from './routes/search.routes';
 import { analyticsMiddleware, flushAnalytics } from './middlewares/analytics.middleware';
 import prisma from './lib/prisma';
 import { domainEvents } from './services/domainEvent.service';
+import logger from './utils/logger';
 import { alertaSubscriber } from './subscribers/alerta.subscriber';
 import { eventoManifiestoSubscriber } from './subscribers/eventoManifiesto.subscriber';
 import { iniciarVencimientoJob } from './jobs/vencimiento.job';
@@ -238,13 +239,13 @@ iniciarBlockchainJob();
 // Iniciar el servidor
 const PORT = config.PORT;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`URL: http://localhost:${PORT}`);
+  logger.info({ port: PORT }, `Server running on port ${PORT}`);
+  logger.info({ url: `http://localhost:${PORT}` }, 'Server URL');
 });
 
 // Graceful shutdown handlers
 const gracefulShutdown = async (signal: string) => {
-  console.log(`${signal} received. Shutting down gracefully...`);
+  logger.info({ signal }, 'Shutting down gracefully...');
   await flushAnalytics();
   await prisma.$disconnect();
   process.exit(0);
@@ -255,10 +256,10 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 // Catch unhandled rejections and exceptions
 process.on('unhandledRejection', (reason: any) => {
-  console.error('Unhandled Rejection:', reason?.message || reason);
+  logger.error({ err: reason }, 'Unhandled Rejection');
 });
 
 process.on('uncaughtException', (error: Error) => {
-  console.error('Uncaught Exception:', error.message);
+  logger.fatal({ err: error }, 'Uncaught Exception');
   gracefulShutdown('uncaughtException');
 });

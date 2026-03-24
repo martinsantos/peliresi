@@ -120,6 +120,13 @@ api.interceptors.response.use(
       }
     }
 
+    // Rate limit — show user-friendly message
+    if (error.response?.status === 429) {
+      const { toast } = await import('../components/ui/Toast');
+      toast.warning('Demasiadas solicitudes', 'Espere unos segundos antes de intentar nuevamente.');
+      return Promise.reject(error);
+    }
+
     return Promise.reject(error);
   }
 );

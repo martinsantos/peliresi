@@ -31,6 +31,7 @@ import { SkeletonStats, SkeletonCard } from '../../components/ui/Skeleton';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDashboardStats } from '../../hooks/useDashboard';
 import { useManifiestos } from '../../hooks/useManifiestos';
+import { formatRelativeTime } from '../../utils/formatters';
 
 // ========================================
 // ADMIN DASHBOARD
@@ -66,7 +67,7 @@ const AdminDashboard: React.FC = () => {
     titulo: `Manifiesto #${m.numero || m.id}`,
     accion: m.generador?.razonSocial || m.generador || 'Generador',
     tiempo: m.updatedAt || m.createdAt
-      ? new Date(m.updatedAt || m.createdAt).toLocaleString('es-AR', { hour: '2-digit', minute: '2-digit' })
+      ? formatRelativeTime(m.updatedAt || m.createdAt)
       : '-',
     estado: m.estado === 'EN_TRANSITO' ? 'alerta' : m.estado === 'TRATADO' ? 'exito' : 'nuevo',
   }));

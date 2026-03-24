@@ -354,8 +354,8 @@ export const ActoresPage: React.FC = () => {
 
   return (
     <>
-      {/* Filter bar */}
-      <div className="pt-2 pb-2">
+      {/* Filter bar — sticky */}
+      <div className="sticky top-0 z-20 bg-[#FAFAF8] -mx-4 lg:-mx-8 px-4 lg:px-8 pt-2 pb-2">
         <div className="p-3 bg-white rounded-2xl border border-neutral-100 shadow-sm">
           <Tabs activeTab={activeTab} onChange={(t) => { setActiveTab(t); setCurrentPage(1); }}>
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-3">

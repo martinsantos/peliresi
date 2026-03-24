@@ -296,7 +296,9 @@ const AdminGeneradoresPage: React.FC = () => {
         }[row.compliance];
         const Icon = cfg.icon;
         return (
-          <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg ${cfg.bg}`} title={cfg.label}>
+          <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg ${cfg.bg}`} title={
+            { verde: 'Al dia - TEF pagado, DDJJ presentada, habilitado', amarillo: 'Parcial - Cumplimiento incompleto', rojo: 'Deuda - TEF impago y DDJJ no presentada', sin_datos: 'Sin datos de compliance' }[row.compliance]
+          }>
             <Icon size={14} className={cfg.color} />
             <span className={`text-xs font-medium ${cfg.color}`}>{cfg.label}</span>
           </div>

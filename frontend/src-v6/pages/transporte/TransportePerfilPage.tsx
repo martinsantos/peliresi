@@ -118,8 +118,10 @@ const TransportePerfilPage: React.FC = () => {
         {activeTab === 'viaje' && (
           <>
             {(loadingViaje || loadingAprobados) ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 className="animate-spin text-neutral-400" size={32} />
+              <div className="space-y-4 py-4 animate-pulse">
+                <div className="h-24 bg-neutral-200 rounded-2xl" />
+                <div className="h-16 bg-neutral-200 rounded-2xl" />
+                <div className="h-16 bg-neutral-200 rounded-2xl" />
               </div>
             ) : !viajeEnCurso && viajesAsignados.length > 0 ? (
               /* === VIAJES ASIGNADOS (APROBADO) - Pendientes de retiro === */

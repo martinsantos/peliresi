@@ -454,7 +454,7 @@ const GeneradorDetallePage: React.FC = () => {
         <TabPanel id="fiscal">
           <div className="space-y-6">
             {/* KPI mini-cards */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Card className="p-4 text-center">
                 <p className="text-xs text-neutral-500">Ultimo TEF</p>
                 <p className="text-lg font-bold text-neutral-900 mt-1">

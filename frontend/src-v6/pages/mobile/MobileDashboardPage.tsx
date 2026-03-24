@@ -242,7 +242,7 @@ export const MobileDashboardPage: React.FC = () => {
       {/* Quick Access */}
       <div>
         <h3 className="text-sm font-semibold text-neutral-900 mb-3">Accesos Rápidos</h3>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {accesosRapidos.map((item) => {
             const Icon = item.icon;
             return (

@@ -110,25 +110,28 @@ const ManifiestosPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
+    <>
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-neutral-900">Manifiestos</h2>
-          <p className="text-neutral-600 mt-1">
-            Gestiona los manifiestos de residuos peligrosos
-          </p>
+      <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto mb-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-neutral-900">Manifiestos</h2>
+            <p className="text-neutral-600 mt-1">
+              Gestiona los manifiestos de residuos peligrosos
+            </p>
+          </div>
+          <Button
+            leftIcon={<Plus size={18} />}
+            onClick={() => navigate(isMobile ? '/mobile/manifiestos/nuevo' : '/manifiestos/nuevo')}
+            className="hover-glow"
+          >
+            Nuevo Manifiesto
+          </Button>
         </div>
-        <Button
-          leftIcon={<Plus size={18} />}
-          onClick={() => navigate(isMobile ? '/mobile/manifiestos/nuevo' : '/manifiestos/nuevo')}
-          className="hover-glow"
-        >
-          Nuevo Manifiesto
-        </Button>
       </div>
 
-      {/* Filters */}
+      {/* Filters — sticky */}
+      <div className="sticky top-0 z-20 bg-[#FAFAF8] -mx-4 lg:-mx-8 px-4 lg:px-8 pt-2 pb-2">
       <Card padding="base">
         <div className="flex flex-col md:flex-row gap-3">
           <div className="flex-1">
@@ -209,7 +212,9 @@ const ManifiestosPage: React.FC = () => {
           </div>
         )}
       </Card>
+      </div>
 
+      <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
       {/* Loading */}
       {isLoading && (
         <div className="flex items-center justify-center py-12">
@@ -361,7 +366,8 @@ const ManifiestosPage: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 };
 

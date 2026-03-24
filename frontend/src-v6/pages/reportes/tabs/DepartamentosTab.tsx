@@ -188,7 +188,7 @@ export function DepartamentoDetalleModal({
         </div>
 
         {/* Stats row */}
-        <div className="grid grid-cols-3 gap-3 px-6 py-4 bg-neutral-50/50">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 px-4 sm:px-6 py-4 bg-neutral-50/50">
           <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-neutral-100">
             <span className="w-3 h-3 rounded-full bg-green-500" />
             <span className="text-sm font-semibold text-neutral-900">{generadores.length}</span>

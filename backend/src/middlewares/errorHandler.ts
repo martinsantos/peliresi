@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import logger from '../utils/logger';
 
 export class AppError extends Error {
   public statusCode?: number;
@@ -23,12 +24,13 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ) => {
-  // Log full error internally
-  if (process.env.NODE_ENV === 'production') {
-    console.error(`[ERROR] ${req.method} ${req.path} - ${err.message}`);
-  } else {
-    console.error(err.stack);
-  }
+  // Log error with structured context
+  logger.error({
+    err,
+    method: req.method,
+    path: req.path,
+    statusCode: err.statusCode || 500,
+  }, err.message);
 
   let statusCode = err.statusCode || 500;
   let message = err.message || 'Error interno del servidor';

@@ -74,4 +74,5 @@ temp/
 .worktrees/
 
 # Env files with real credentials (never commit)
+backend/.env.production
 backend/.env.production.deploy

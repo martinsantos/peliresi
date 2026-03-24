@@ -94,9 +94,13 @@ export const Select: React.FC<SelectProps> = ({
     // Open upward if not enough space below and more space above
     const openUpward = spaceBelow < dropdownMaxH && spaceAbove > spaceBelow;
 
+    const viewportW = window.innerWidth;
+    const maxLeft = viewportW - rect.width - 8;
+    const clampedLeft = Math.min(rect.left, Math.max(0, maxLeft));
+
     return {
       position: 'fixed' as const,
-      left: rect.left,
+      left: clampedLeft,
       width: rect.width,
       zIndex: 9999,
       ...(openUpward

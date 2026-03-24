@@ -42,7 +42,7 @@ const colorStyles: Record<BadgeVariant, Record<string, string>> = {
     error: 'bg-error-50 text-error-700',
     info: 'bg-info-50 text-info-700',
     neutral: 'bg-neutral-50 text-neutral-700',
-    secondary: 'bg-neutral-50 text-neutral-600',
+    secondary: 'bg-neutral-50 text-neutral-700',
   },
   outline: {
     primary: 'bg-white text-primary-700 border-2 border-primary-200',
