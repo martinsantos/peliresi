@@ -71,7 +71,7 @@
     <a href="#mod-herramientas" class="nav-link level-2">3.9 Herramientas</a>
     <a href="#mod-blockchain" class="nav-link level-2">3.10 Certificacion Blockchain</a>
     <a href="#mod-estadisticas" class="nav-link level-2">3.11 Estadisticas</a>
-    <a href="#mod-inscripcion" class="nav-link level-2">3.12 Inscripcion y Solicitudes</a>
+    <a href="#mod-inscripcion" class="nav-link level-2">3.12 Inscripcion, Wizards y TEF</a>
   </div>
 
   <div class="nav-section-title" onclick="toggleNavGroup(this)">4. Aplicacion Movil</div>
@@ -154,7 +154,8 @@
     <a href="#gal-reportes" class="nav-link level-2">13.4 Reportes y Alertas</a>
     <a href="#gal-admin" class="nav-link level-2">13.5 Admin y Actores</a>
     <a href="#gal-masiva" class="nav-link level-2">13.6 Masiva y Config</a>
-    <a href="#gal-mobile" class="nav-link level-2">13.7 Vista Mobile PWA</a>
+    <a href="#gal-wizards" class="nav-link level-2">13.7 Wizards y TEF</a>
+    <a href="#gal-mobile" class="nav-link level-2">13.8 Vista Mobile PWA</a>
   </div>
 
   <div class="nav-section-title" onclick="toggleNavGroup(this)">14. Flujos por Perfil</div>
@@ -1261,13 +1262,17 @@ SITREP implementa un sistema de certificacion blockchain basado en <strong>2 sel
 <!-- ============================================================ -->
 
 <section id="mod-inscripcion" data-role="all">
-<h3>3.12 Inscripcion Publica y Solicitudes</h3>
+<h3>3.12 Inscripcion Publica, Wizards de Alta y Calculo TEF</h3>
 <div class="section-intro">
-SITREP ofrece dos vias para dar de alta actores en el sistema: <strong>auto-inscripcion publica</strong> (sin login, accesible desde cualquier navegador) y <strong>creacion directa</strong> por un administrador desde el panel de gestion. La auto-inscripcion genera una <em>solicitud</em> que debe ser aprobada por un administrador antes de activar la cuenta.
+SITREP ofrece dos vias para dar de alta actores en el sistema: <strong>auto-inscripcion publica</strong> (sin login, accesible desde cualquier navegador) y <strong>creacion directa</strong> por un administrador desde el panel de gestion. La auto-inscripcion genera una <em>solicitud</em> que debe ser aprobada por un administrador antes de activar la cuenta. Esta seccion documenta en detalle los <strong>6 wizards</strong> de alta (3 publicos + 3 admin), el componente de <strong>calculo TEF</strong>, y el workflow de solicitudes.
 </div>
 
-<h4>URLs de Inscripcion Publica</h4>
-<p>Estas paginas no requieren autenticacion. El solicitante accede directamente desde un enlace o QR:</p>
+<!-- ============================================================ -->
+<!-- 3.12.1 INSCRIPCION PUBLICA — FASE 1                          -->
+<!-- ============================================================ -->
+<h4 id="inscr-fase1">3.12.1 Inscripcion Publica — Fase 1 (Creacion de Cuenta)</h4>
+
+<p>Las paginas de inscripcion publica no requieren autenticacion. El solicitante accede directamente desde un enlace o codigo QR:</p>
 <table>
 <thead><tr><th>Actor</th><th>URL</th><th>Wizard</th></tr></thead>
 <tbody>
@@ -1277,83 +1282,521 @@ SITREP ofrece dos vias para dar de alta actores en el sistema: <strong>auto-insc
 </tbody>
 </table>
 
-<h4>Fase 1: Creacion de Cuenta</h4>
-<p>Todos los wizards comienzan con una fase de creacion de cuenta. El solicitante ingresa:</p>
-<ul>
-<li><strong>Email:</strong> sera el usuario de acceso al sistema.</li>
-<li><strong>Contrasena:</strong> minimo 6 caracteres, con confirmacion.</li>
-<li><strong>Nombre completo:</strong> nombre del responsable de la solicitud.</li>
-<li><strong>CUIT:</strong> identificador fiscal unico (formato XX-XXXXXXXX-X).</li>
-</ul>
-<p>El sistema valida unicidad de email y formato de CUIT antes de crear la cuenta y la solicitud en estado <span class="badge badge-neutral">BORRADOR</span>.</p>
+<div class="cu-screenshot"><a href="screenshots/desktop/W01_pub_gen_fase1.png" target="_blank"><img src="screenshots/desktop/W01_pub_gen_fase1.png" alt="Inscripcion Generador — Fase 1" loading="lazy"></a><div class="cu-screenshot-caption">Fase 1: Formulario de creacion de cuenta para auto-inscripcion publica (ejemplo: Generador)</div></div>
 
-<h4>Wizard de Generador (7 pasos)</h4>
-<div class="cu-screenshot"><a href="screenshots/desktop/70_inscripcion_generador_paso1.png" target="_blank"><img src="screenshots/desktop/70_inscripcion_generador_paso1.png" alt="Inscripcion Generador — Paso 1" loading="lazy"></a><div class="cu-screenshot-caption">Inscripcion Generador — Fase 1 creacion de cuenta</div></div>
+<p>Todos los wizards comienzan con la <strong>Fase 1: Crear Cuenta</strong>. El solicitante completa:</p>
+<table>
+<thead><tr><th>Campo</th><th>Tipo</th><th>Validaciones</th></tr></thead>
+<tbody>
+<tr><td><strong>Nombre completo</strong></td><td>Texto</td><td>Requerido</td></tr>
+<tr><td><strong>Email</strong></td><td>Email</td><td>Requerido, formato email valido, unicidad (no puede existir otro usuario con el mismo email)</td></tr>
+<tr><td><strong>CUIT</strong></td><td>Texto</td><td>Requerido, formato XX-XXXXXXXX-X (11 digitos)</td></tr>
+<tr><td><strong>Contrasena</strong></td><td>Password</td><td>Minimo 8 caracteres, al menos 1 mayuscula, al menos 1 numero</td></tr>
+<tr><td><strong>Confirmar contrasena</strong></td><td>Password</td><td>Debe coincidir con contrasena</td></tr>
+</tbody>
+</table>
+<p>Al hacer clic en <strong>"Crear cuenta y continuar"</strong>, el sistema ejecuta <code>POST /api/solicitudes/iniciar</code> que crea la cuenta de usuario (inactiva) y la solicitud en estado <span class="badge badge-neutral">BORRADOR</span>. El wizard avanza a la Fase 2, que es el formulario multi-paso especifico de cada tipo de actor.</p>
+
+<!-- ============================================================ -->
+<!-- 3.12.2 WIZARD GENERADOR — INSCRIPCION PUBLICA                -->
+<!-- ============================================================ -->
+<h4 id="inscr-gen">3.12.2 Wizard de Generador — Inscripcion Publica (7 pasos)</h4>
+
+<p>Tras completar la Fase 1, el wizard de generador presenta 7 pasos con stepper visual de progreso. Cada paso valida sus campos antes de permitir avanzar al siguiente.</p>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/W02_pub_gen_paso1.png" target="_blank"><img src="screenshots/desktop/W02_pub_gen_paso1.png" alt="Generador — Paso 1 Establecimiento" loading="lazy"></a><div class="cu-screenshot-caption">Paso 1: Establecimiento — datos basicos del generador</div></div>
 
 <table>
-<thead><tr><th>Paso</th><th>Nombre</th><th>Campos</th></tr></thead>
+<thead><tr><th>Paso</th><th>Nombre</th><th>Icono</th><th>Campos</th><th>Notas</th></tr></thead>
 <tbody>
-<tr><td>1</td><td>Establecimiento</td><td>Razon social, CUIT, actividad, rubro, categoria (Grandes/Medianos/Pequenos Generadores)</td></tr>
-<tr><td>2</td><td>Regulatorio</td><td>Numero inscripcion, expediente DPA, resolucion inscripcion, libro operatoria (checkbox)</td></tr>
-<tr><td>3</td><td>Domicilios</td><td>Domicilio legal (calle, localidad, departamento), domicilio real (con opcion "igual al legal"), coordenadas GPS</td></tr>
-<tr><td>4</td><td>Adicional</td><td>Categoria individual, certificacion ISO, telefono</td></tr>
-<tr><td>5</td><td>Calculo TEF</td><td>Factor R, monto MxR, zona, coeficientes A1-A10 de peligrosidad ambiental (ver seccion TEF abajo)</td></tr>
-<tr><td>6</td><td>Documentos</td><td>Carga de archivos: Memoria Tecnica, Factura Luz, Habilitacion Municipal, Constancia AFIP</td></tr>
-<tr><td>7</td><td>Resumen</td><td>Revision de todos los datos con opcion de enviar la solicitud</td></tr>
+<tr>
+  <td><strong>1</strong></td><td>Establecimiento</td><td>Factory</td>
+  <td>Razon Social, CUIT, Actividad principal, Rubro de la empresa, Categoria (Grandes / Medianos / Pequenos Generadores)</td>
+  <td>La categoria determina el regimen regulatorio aplicable</td>
+</tr>
+<tr>
+  <td><strong>2</strong></td><td>Regulatorio</td><td>ClipboardList</td>
+  <td>Numero de inscripcion DGFA, Expediente DPA, Resolucion de inscripcion, Libro de operatoria (checkbox)</td>
+  <td>Datos de la habilitacion provincial</td>
+</tr>
+<tr>
+  <td><strong>3</strong></td><td>Domicilios</td><td>MapPin</td>
+  <td>Domicilio legal (calle, localidad, departamento), Domicilio real (calle, localidad, departamento), Coordenadas GPS</td>
+  <td>Checkbox <em>"Domicilio real igual al legal"</em> autocompleta campos. 18 departamentos de Mendoza en dropdown</td>
+</tr>
+<tr>
+  <td><strong>4</strong></td><td>Adicional</td><td>Shield</td>
+  <td>Categoria individual (MINIMA / INDIVIDUAL / 2000-3000), Certificacion ISO 14000, Telefono de contacto</td>
+  <td>Datos complementarios del establecimiento</td>
+</tr>
+<tr>
+  <td><strong>5</strong></td><td>Calculo TEF</td><td>Calculator</td>
+  <td>Factor R, Monto MxR, Zona, Personal, Potencia HP, Superficie m2</td>
+  <td>Version simplificada del calculo TEF (ver <a href="#inscr-tef">seccion 3.12.5</a>)</td>
+</tr>
+<tr>
+  <td><strong>6</strong></td><td>Documentos</td><td>FileText</td>
+  <td>Constancia AFIP, Memoria Tecnica, Certificado de Habilitacion</td>
+  <td>3 documentos obligatorios. Carga de archivos PDF/imagen</td>
+</tr>
+<tr>
+  <td><strong>7</strong></td><td>Resumen</td><td>Check</td>
+  <td>(solo lectura)</td>
+  <td>Revision completa de todos los datos con secciones colapsables. Boton "Enviar Solicitud"</td>
+</tr>
 </tbody>
 </table>
 
-<h4>Wizard de Operador (8 pasos)</h4>
-<div class="cu-screenshot"><a href="screenshots/desktop/72_inscripcion_operador_paso1.png" target="_blank"><img src="screenshots/desktop/72_inscripcion_operador_paso1.png" alt="Inscripcion Operador — Paso 1" loading="lazy"></a><div class="cu-screenshot-caption">Inscripcion Operador — Fase 1 creacion de cuenta</div></div>
+<div class="cu-screenshot"><a href="screenshots/desktop/W05_pub_gen_paso5.png" target="_blank"><img src="screenshots/desktop/W05_pub_gen_paso5.png" alt="Generador — Paso 5 TEF" loading="lazy"></a><div class="cu-screenshot-caption">Paso 5: Calculo TEF simplificado (inscripcion publica)</div></div>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/W07_pub_gen_paso7.png" target="_blank"><img src="screenshots/desktop/W07_pub_gen_paso7.png" alt="Generador — Paso 7 Resumen" loading="lazy"></a><div class="cu-screenshot-caption">Paso 7: Resumen con secciones colapsables y boton de envio</div></div>
+
+<!-- ============================================================ -->
+<!-- 3.12.3 WIZARD OPERADOR — INSCRIPCION PUBLICA                 -->
+<!-- ============================================================ -->
+<h4 id="inscr-oper">3.12.3 Wizard de Operador — Inscripcion Publica (8 pasos)</h4>
+
+<p>El wizard de operador es el mas extenso, con 8 pasos que incluyen datos de representantes legales y tecnicos, corrientes Y autorizadas, y calculo TEF.</p>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/W08_pub_oper_paso1.png" target="_blank"><img src="screenshots/desktop/W08_pub_oper_paso1.png" alt="Operador — Paso 1" loading="lazy"></a><div class="cu-screenshot-caption">Paso 1: Establecimiento — seleccion de tipo FIJO / IN SITU</div></div>
 
 <table>
-<thead><tr><th>Paso</th><th>Nombre</th><th>Campos</th></tr></thead>
+<thead><tr><th>Paso</th><th>Nombre</th><th>Icono</th><th>Campos</th><th>Notas</th></tr></thead>
 <tbody>
-<tr><td>1</td><td>Establecimiento</td><td>Razon social, CUIT, tipo operador (FIJO / IN SITU), tecnologia, categoria</td></tr>
-<tr><td>2</td><td>Regulatorio</td><td>Numero habilitacion, certificado numero, expediente inscripcion, resolucion DPA, vencimiento habilitacion</td></tr>
-<tr><td>3</td><td>Domicilios</td><td>Domicilio legal, domicilio real (con opcion "igual al legal"), coordenadas GPS</td></tr>
-<tr><td>4</td><td>Representantes</td><td>Representante legal (nombre, DNI, telefono), representante tecnico (nombre, matricula, telefono)</td></tr>
-<tr><td>5</td><td>Corrientes</td><td>Seleccion de corrientes Y autorizadas (Y1-Y48 segun Ley 24.051)</td></tr>
-<tr><td>6</td><td>Calculo TEF</td><td>Factor R, monto MxR, zona, coeficientes de peligrosidad ambiental</td></tr>
-<tr><td>7</td><td>Documentos</td><td>Carga de archivos: Memoria Tecnica, Plan Contingencia, Habilitacion Municipal, Constancia AFIP, Certificado Tratamiento</td></tr>
-<tr><td>8</td><td>Resumen</td><td>Revision y envio de solicitud</td></tr>
+<tr>
+  <td><strong>1</strong></td><td>Establecimiento</td><td>FlaskConical</td>
+  <td>Razon Social, CUIT, Tipo de operador (FIJO / IN SITU), Tecnologia de tratamiento, Categoria</td>
+  <td>El tipo de operador afecta los campos de domicilio (IN SITU muestra alerta)</td>
+</tr>
+<tr>
+  <td><strong>2</strong></td><td>Regulatorio</td><td>ClipboardList</td>
+  <td>Numero habilitacion, Certificado numero, Expediente inscripcion, Resolucion DPA, Vencimiento habilitacion</td>
+  <td>Datos de la habilitacion DPA provincial</td>
+</tr>
+<tr>
+  <td><strong>3</strong></td><td>Domicilios</td><td>MapPin</td>
+  <td>Domicilio legal (calle, localidad, departamento), Domicilio real, Coordenadas GPS</td>
+  <td>Para IN SITU se muestra banner de alerta indicando que el domicilio puede variar</td>
+</tr>
+<tr>
+  <td><strong>4</strong></td><td>Representantes</td><td>Users</td>
+  <td>Representante legal (nombre, DNI, telefono), Representante tecnico (nombre, matricula profesional, telefono)</td>
+  <td>Ambos representantes son obligatorios segun normativa provincial</td>
+</tr>
+<tr>
+  <td><strong>5</strong></td><td>Corrientes</td><td>Shield</td>
+  <td>Corrientes Y autorizadas (Y4-Y48 segun Ley 24.051), Tecnologia de tratamiento (textarea)</td>
+  <td>Seleccion via textarea (una corriente por linea)</td>
+</tr>
+<tr>
+  <td><strong>6</strong></td><td>Calculo TEF</td><td>Calculator</td>
+  <td>Factor R, Monto MxR, Zona, Personal, Potencia HP, Superficie m2, Capacidad TEF</td>
+  <td>Incluye campo <code>tefCapacidad</code> especifico para operadores</td>
+</tr>
+<tr>
+  <td><strong>7</strong></td><td>Documentos</td><td>FileText</td>
+  <td>Constancia AFIP, Certificado de Habilitacion, Resolucion DPA</td>
+  <td>3 documentos obligatorios</td>
+</tr>
+<tr>
+  <td><strong>8</strong></td><td>Resumen</td><td>Check</td>
+  <td>(solo lectura)</td>
+  <td>Revision completa. Boton "Enviar Solicitud"</td>
+</tr>
 </tbody>
 </table>
 
-<h4>Wizard de Transportista (5 pasos)</h4>
-<div class="cu-screenshot"><a href="screenshots/desktop/74_inscripcion_transportista_paso1.png" target="_blank"><img src="screenshots/desktop/74_inscripcion_transportista_paso1.png" alt="Inscripcion Transportista — Paso 1" loading="lazy"></a><div class="cu-screenshot-caption">Inscripcion Transportista — Fase 1 creacion de cuenta</div></div>
+<div class="cu-screenshot"><a href="screenshots/desktop/W09_pub_oper_paso4.png" target="_blank"><img src="screenshots/desktop/W09_pub_oper_paso4.png" alt="Operador — Paso 4 Representantes" loading="lazy"></a><div class="cu-screenshot-caption">Paso 4: Representantes — legal y tecnico con sus datos de contacto</div></div>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/W10_pub_oper_paso5.png" target="_blank"><img src="screenshots/desktop/W10_pub_oper_paso5.png" alt="Operador — Paso 5 Corrientes" loading="lazy"></a><div class="cu-screenshot-caption">Paso 5: Corrientes Y autorizadas y tecnologia de tratamiento</div></div>
+
+<!-- ============================================================ -->
+<!-- 3.12.4 WIZARD TRANSPORTISTA — INSCRIPCION PUBLICA            -->
+<!-- ============================================================ -->
+<h4 id="inscr-trans">3.12.4 Wizard de Transportista — Inscripcion Publica (5 pasos)</h4>
+
+<p>El wizard de transportista es el mas breve, con 5 pasos enfocados en datos de la empresa, habilitacion, y flota vehicular.</p>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/W13_pub_trans_paso1.png" target="_blank"><img src="screenshots/desktop/W13_pub_trans_paso1.png" alt="Transportista — Paso 1" loading="lazy"></a><div class="cu-screenshot-caption">Paso 1: Datos basicos de la empresa transportista</div></div>
 
 <table>
-<thead><tr><th>Paso</th><th>Nombre</th><th>Campos</th></tr></thead>
+<thead><tr><th>Paso</th><th>Nombre</th><th>Icono</th><th>Campos</th><th>Notas</th></tr></thead>
 <tbody>
-<tr><td>1</td><td>Datos Basicos</td><td>Razon social, CUIT, domicilio, localidad, telefono, email</td></tr>
-<tr><td>2</td><td>Habilitacion</td><td>Numero habilitacion, vencimiento, corrientes autorizadas, expediente DPA, resolucion DPA, resolucion SSP</td></tr>
-<tr><td>3</td><td>Vehiculos</td><td>Lista dinamica: patente, marca, modelo, anio, capacidad, numero habilitacion, vencimiento. Boton "Agregar vehiculo"</td></tr>
-<tr><td>4</td><td>Documentos</td><td>Constancia AFIP, Habilitacion de Transporte, Seguro Ambiental</td></tr>
-<tr><td>5</td><td>Resumen</td><td>Revision y envio de solicitud</td></tr>
+<tr>
+  <td><strong>1</strong></td><td>Datos Basicos</td><td>Truck</td>
+  <td>Razon Social, CUIT, Domicilio, Localidad, Telefono, Email</td>
+  <td>Datos de contacto de la empresa</td>
+</tr>
+<tr>
+  <td><strong>2</strong></td><td>Habilitacion</td><td>Shield</td>
+  <td>Numero habilitacion, Vencimiento habilitacion, Corrientes autorizadas, Expediente DPA, Resolucion DPA, Resolucion SSP</td>
+  <td>Datos de habilitacion provincial para transporte de RRPP</td>
+</tr>
+<tr>
+  <td><strong>3</strong></td><td>Vehiculos</td><td>Car</td>
+  <td>Lista de vehiculos en formato texto (1 por linea): patente, marca, modelo, capacidad</td>
+  <td>Formato simplificado por textarea (la version admin usa tabla dinamica)</td>
+</tr>
+<tr>
+  <td><strong>4</strong></td><td>Documentos</td><td>FileText</td>
+  <td>Constancia AFIP, Habilitacion de Transporte, Seguro Ambiental</td>
+  <td>3 documentos obligatorios</td>
+</tr>
+<tr>
+  <td><strong>5</strong></td><td>Resumen</td><td>Check</td>
+  <td>(solo lectura)</td>
+  <td>Boton "Enviar Solicitud"</td>
+</tr>
 </tbody>
 </table>
 
-<h4>Calculo TEF (Tasa de Evaluacion y Fiscalizacion)</h4>
-<div class="cu-screenshot"><a href="screenshots/desktop/71_inscripcion_generador_tef.png" target="_blank"><img src="screenshots/desktop/71_inscripcion_generador_tef.png" alt="Paso TEF — calculo automatico" loading="lazy"></a><div class="cu-screenshot-caption">Paso TEF — calculo automatico de la tasa</div></div>
+<div class="cu-screenshot"><a href="screenshots/desktop/W15_pub_trans_paso3.png" target="_blank"><img src="screenshots/desktop/W15_pub_trans_paso3.png" alt="Transportista — Paso 3 Vehiculos" loading="lazy"></a><div class="cu-screenshot-caption">Paso 3: Vehiculos — ingreso en formato texto (inscripcion publica)</div></div>
 
-<p>El calculo TEF implementa el <strong>Decreto 2625/99 — Ley 5917 (Mendoza)</strong>. La formula es:</p>
-<pre>TEF = M x R x ISO_factor
+<!-- ============================================================ -->
+<!-- 3.12.5 CALCULO TEF — SECCION EXPANDIDA                       -->
+<!-- ============================================================ -->
+<h4 id="inscr-tef">3.12.5 Calculo TEF — Tasa de Evaluacion y Fiscalizacion</h4>
+
+<p>El calculo TEF implementa el <strong>Decreto 2625/99 — Ley 5917 (Mendoza)</strong>. Es utilizado tanto en la inscripcion publica (campos manuales simplificados) como en los wizards admin (componente interactivo <code>CalculadoraTEF</code> con calculo en tiempo real).</p>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/W20_adm_gen_paso4_tef.png" target="_blank"><img src="screenshots/desktop/W20_adm_gen_paso4_tef.png" alt="CalculadoraTEF — vista completa" loading="lazy"></a><div class="cu-screenshot-caption">Componente CalculadoraTEF en el wizard admin — header con resultado y desglose de coeficientes</div></div>
+
+<h5>Formula Principal</h5>
+<pre>TEF = M x R x ISO
 Donde: R = Z x A x D x C</pre>
+
 <table>
-<thead><tr><th>Variable</th><th>Significado</th><th>Valores</th></tr></thead>
+<thead><tr><th>Variable</th><th>Significado</th><th>Descripcion</th></tr></thead>
 <tbody>
-<tr><td><strong>M</strong></td><td>Coeficiente anual de fiscalizacion</td><td>162 (fijado por la autoridad)</td></tr>
-<tr><td><strong>Z</strong></td><td>Coeficiente zonal</td><td>Parque Industrial (0.75), Zona Industrial (1), Rural (1.5), Urbana (2)</td></tr>
-<tr><td><strong>A</strong></td><td>Coeficientes de peligrosidad (A1..A10)</td><td>10 subfactores: stock, almacenamiento, peligrosidad, tratabilidad, transporte, contingencia, monitoreo, instalaciones, idoneidad</td></tr>
-<tr><td><strong>D</strong></td><td>Superficie de la planta</td><td>Segun metros cuadrados declarados</td></tr>
-<tr><td><strong>C</strong></td><td>Corrientes Y del residuo</td><td>Factor segun tipo de corriente (tabla predefinida)</td></tr>
-<tr><td><strong>ISO</strong></td><td>Factor ISO (descuento)</td><td>1 (sin certificacion), 0.9 (con ISO 14000)</td></tr>
+<tr><td><strong>M</strong></td><td>Coeficiente anual de fiscalizacion</td><td>Fijado por la autoridad. Valor actual: <code>162</code></td></tr>
+<tr><td><strong>Z</strong></td><td>Coeficiente zonal</td><td>Depende de la ubicacion del establecimiento (ver tabla)</td></tr>
+<tr><td><strong>A</strong></td><td>Peligrosidad ambiental</td><td>Sumatoria de 10 subfactores A1 a A10 (ver tabla)</td></tr>
+<tr><td><strong>D</strong></td><td>Magnitud del establecimiento</td><td>Formula: <code>D = 0.15 x (personal + potenciaHP) + 0.005 x superficieM2</code></td></tr>
+<tr><td><strong>C</strong></td><td>Coeficiente de corriente</td><td>Maximo C entre las corrientes Y seleccionadas (ver tabla)</td></tr>
+<tr><td><strong>R</strong></td><td>Indice de riesgo</td><td>Resultado: <code>R = Z x A x D x C</code></td></tr>
+<tr><td><strong>ISO</strong></td><td>Factor certificacion ISO</td><td><code>1</code> sin certificacion, <code>2</code> con ISO 14000</td></tr>
 </tbody>
 </table>
-<p>El componente <code>CalculadoraTEF</code> realiza el calculo en tiempo real y muestra el desglose completo con cada subfactor. Aplica tanto en inscripcion publica como en wizards de creacion admin.</p>
 
-<h4>Workflow de Solicitudes</h4>
+<h5>Coeficiente Zonal (Z)</h5>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/W36_tef_resultado.png" target="_blank"><img src="screenshots/desktop/W36_tef_resultado.png" alt="TEF — header resultado" loading="lazy"></a><div class="cu-screenshot-caption">Header de resultado TEF con valor numerico y desglose R = Z x A x D x C</div></div>
+
+<p>El coeficiente Z refleja el riesgo ambiental segun la zona geografica del establecimiento. En la interfaz se presenta como 4 botones de seleccion:</p>
+<table>
+<thead><tr><th>Zona</th><th>Valor Z</th><th>Descripcion</th></tr></thead>
+<tbody>
+<tr><td>Parque Industrial</td><td><code>0.75</code></td><td>Zona con infraestructura ambiental compartida — menor riesgo</td></tr>
+<tr><td>Zona Industrial Exclusiva</td><td><code>1.00</code></td><td>Zona industrial designada — riesgo base</td></tr>
+<tr><td>Zona Rural</td><td><code>1.50</code></td><td>Zona rural sin infraestructura — riesgo moderado</td></tr>
+<tr><td>Zona Urbana</td><td><code>2.00</code></td><td>Zona urbana con poblacion cercana — mayor riesgo</td></tr>
+</tbody>
+</table>
+
+<h5>Magnitud D</h5>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/W38_tef_magnitud_d.png" target="_blank"><img src="screenshots/desktop/W38_tef_magnitud_d.png" alt="TEF — Magnitud D" loading="lazy"></a><div class="cu-screenshot-caption">Seccion Magnitud D: 3 inputs numericos con formula automatica</div></div>
+
+<p>La magnitud D se calcula a partir de 3 datos del establecimiento:</p>
+<table>
+<thead><tr><th>Input</th><th>Descripcion</th><th>Coeficiente en formula</th></tr></thead>
+<tbody>
+<tr><td><strong>Personal</strong></td><td>Cantidad de empleados en el establecimiento</td><td>x 0.15</td></tr>
+<tr><td><strong>Potencia HP</strong></td><td>Potencia instalada en HP (caballos de fuerza)</td><td>x 0.15</td></tr>
+<tr><td><strong>Superficie m2</strong></td><td>Superficie cubierta en metros cuadrados</td><td>x 0.005</td></tr>
+</tbody>
+</table>
+<pre>D = 0.15 x (personal + potenciaHP) + 0.005 x superficieM2</pre>
+
+<h5>Peligrosidad Ambiental (A) — 10 Coeficientes</h5>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/W39_tef_coef_a.png" target="_blank"><img src="screenshots/desktop/W39_tef_coef_a.png" alt="TEF — Coeficientes A" loading="lazy"></a><div class="cu-screenshot-caption">10 coeficientes de peligrosidad ambiental (A1-A10) con dropdowns y ayudas contextuales</div></div>
+
+<p>El coeficiente A es la sumatoria de 10 subfactores que evaluan distintos aspectos del riesgo ambiental del establecimiento. Cada subfactor se selecciona desde un dropdown con opciones predefinidas:</p>
+
+<table>
+<thead><tr><th>Coef.</th><th>Nombre</th><th>Opciones (valor)</th><th>Evaluacion</th></tr></thead>
+<tbody>
+<tr>
+  <td><strong>A1</strong></td><td>Stock de Residuos</td>
+  <td>Nulo (0), Menores de 50 kg (0.125), Entre 50 y 100 kg (0.25), Mayores de 100 kg (0.5)</td>
+  <td>Cantidad de RRPP almacenados al momento de la inspeccion</td>
+</tr>
+<tr>
+  <td><strong>A2</strong></td><td>Sitios de Almacenamiento</td>
+  <td>Muy Bueno (0), Bueno (0.25), Regular (0.5)</td>
+  <td>Estado de los sitios de almacenamiento de residuos</td>
+</tr>
+<tr>
+  <td><strong>A3</strong></td><td>Peligrosidad por Contingencias</td>
+  <td>Con Bajo Riesgo (0), Riesgo Moderado (0.25), Riesgo Severo (0.5)</td>
+  <td>Nivel de riesgo ante derrames, incendios, explosiones</td>
+</tr>
+<tr>
+  <td><strong>A4</strong></td><td>Grado de Tratabilidad</td>
+  <td>Sin necesidad de tratamiento (0), Convencionales (0.25), Dificultoso (0.5)</td>
+  <td>Dificultad para tratar los residuos generados</td>
+</tr>
+<tr>
+  <td><strong>A5</strong></td><td>Formas de Transporte</td>
+  <td>No requiere (0), Bajo riesgo (0.125), Requieren cuidados (0.25), Cuidados especiales (0.5)</td>
+  <td>Cuidados necesarios para trasladar los residuos</td>
+</tr>
+<tr>
+  <td><strong>A6</strong></td><td>Planes de Contingencia</td>
+  <td>Excelente (0), Buen nivel (0.125), Mejorables (0.25), Elementales (0.5)</td>
+  <td>Calidad de los planes de contingencia ambientales</td>
+</tr>
+<tr>
+  <td><strong>A7</strong></td><td>Plan de Monitoreo</td>
+  <td>Excelente (0), Buen nivel (0.125), Mejorables (0.25), Elementales (0.5)</td>
+  <td>Calidad del plan de monitoreo ambiental</td>
+</tr>
+<tr>
+  <td><strong>A8</strong></td><td>Instalaciones de Monitoreo</td>
+  <td>Adecuadas (0), Regulares (0.25), Basicas mejorables (0.5)</td>
+  <td>Estado de las instalaciones de monitoreo</td>
+</tr>
+<tr>
+  <td><strong>A9</strong></td><td>Instalaciones Generales</td>
+  <td>Excelente (0), Buen nivel (0.25), Regular (0.5)</td>
+  <td>Estado general de las instalaciones de la empresa</td>
+</tr>
+<tr>
+  <td><strong>A10</strong></td><td>Idoneidad del Personal</td>
+  <td>Excelente conciencia (0), Buen nivel (0.25), Debe ser mejorada (0.5)</td>
+  <td>Capacitacion y conciencia ambiental del personal</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rango posible de A:</strong> de 0 (optimo en todos los aspectos) a 5.0 (peor escenario).</p>
+
+<h5>Coeficiente de Corriente (C)</h5>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/W40_tef_coef_c.png" target="_blank"><img src="screenshots/desktop/W40_tef_coef_c.png" alt="TEF — Coeficiente C" loading="lazy"></a><div class="cu-screenshot-caption">Coeficiente C: se muestra el maximo entre las corrientes Y seleccionadas</div></div>
+
+<p>El coeficiente C refleja la peligrosidad del tipo de residuo segun la corriente Y (Ley 24.051). El sistema toma el <strong>maximo</strong> entre todas las corrientes seleccionadas:</p>
+<table>
+<thead><tr><th>Corriente</th><th>C</th><th>Corriente</th><th>C</th><th>Corriente</th><th>C</th></tr></thead>
+<tbody>
+<tr><td>Y4</td><td>1.8</td><td>Y5</td><td>1.5</td><td>Y6</td><td>2.0</td></tr>
+<tr><td>Y7</td><td>1.5</td><td>Y8</td><td>1.3</td><td>Y9</td><td>1.5</td></tr>
+<tr><td>Y10</td><td>2.0</td><td>Y11</td><td>1.8</td><td>Y12</td><td>2.0</td></tr>
+<tr><td>Y13</td><td>2.0</td><td>Y14</td><td>1.5</td><td>Y15</td><td>2.0</td></tr>
+<tr><td>Y16</td><td>1.3</td><td>Y17</td><td>1.5</td><td>Y18</td><td>1.5</td></tr>
+<tr><td>Y19</td><td>1.0</td><td>Y20</td><td>1.5</td><td>Y21</td><td>1.5</td></tr>
+<tr><td>Y22</td><td>1.5</td><td>Y23</td><td>1.5</td><td>Y24</td><td>1.5</td></tr>
+<tr><td>Y25</td><td>1.5</td><td>Y26</td><td>1.5</td><td>Y27</td><td>1.5</td></tr>
+<tr><td>Y28</td><td>1.5</td><td>Y29</td><td>1.5</td><td>Y30</td><td>1.0</td></tr>
+<tr><td>Y31</td><td>1.0</td><td>Y32</td><td>1.5</td><td>Y33</td><td>1.5</td></tr>
+<tr><td>Y34</td><td>1.3</td><td>Y35</td><td>1.3</td><td>Y36</td><td>1.0</td></tr>
+<tr><td>Y37</td><td>1.8</td><td>Y38</td><td>2.0</td><td>Y39</td><td>2.0</td></tr>
+<tr><td>Y40</td><td>2.0</td><td>Y41</td><td>1.8</td><td>Y42</td><td>2.0</td></tr>
+<tr><td>Y43</td><td>2.0</td><td>Y44</td><td>2.0</td><td>Y45</td><td>1.8</td></tr>
+<tr><td>Y48</td><td>1.5</td><td colspan="4"></td></tr>
+</tbody>
+</table>
+
+<h5>Desglose Final</h5>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/W41_tef_desglose.png" target="_blank"><img src="screenshots/desktop/W41_tef_desglose.png" alt="TEF — desglose completo" loading="lazy"></a><div class="cu-screenshot-caption">Vista completa del CalculadoraTEF con resultado numerico y todos los coeficientes</div></div>
+
+<p>El componente <code>CalculadoraTEF</code> muestra en el header oscuro el monto TEF resultante en pesos argentinos, junto con un desglose visual en 5 columnas de color (Z, A, D, C, R). El calculo se actualiza en tiempo real a medida que el usuario modifica cualquier parametro.</p>
+
+<p><strong>Diferencias entre inscripcion publica y admin:</strong></p>
+<ul>
+<li><strong>Inscripcion publica:</strong> El paso TEF usa campos de texto simples (factorR, montoMxR, zona, personal, potencia, superficie). El solicitante ingresa valores directamente.</li>
+<li><strong>Wizard admin:</strong> El paso TEF integra el componente interactivo <code>CalculadoraTEF</code> con dropdowns por cada coeficiente A1-A10, botones de seleccion de zona, y calculo automatico. Muestra el desglose completo en tiempo real.</li>
+</ul>
+
+<!-- ============================================================ -->
+<!-- 3.12.6 WIZARD ADMIN — NUEVO GENERADOR                        -->
+<!-- ============================================================ -->
+<h4 id="inscr-adm-gen">3.12.6 Wizard Admin — Nuevo Generador (6 pasos)</h4>
+
+<p>El wizard admin para generadores (<code>/admin/actores/generadores/nuevo</code>) presenta 6 pasos con el componente <code>CalculadoraTEF</code> interactivo integrado. Tambien se usa para editar generadores existentes (<code>/admin/actores/generadores/:id/editar</code>) precargando los datos.</p>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/W17_adm_gen_paso1.png" target="_blank"><img src="screenshots/desktop/W17_adm_gen_paso1.png" alt="Admin Generador — Paso 1" loading="lazy"></a><div class="cu-screenshot-caption">Paso 1: Identificacion y Contacto — razon social, CUIT, categoria, actividad, rubro</div></div>
+
+<table>
+<thead><tr><th>Paso</th><th>Nombre</th><th>Icono</th><th>Campos</th><th>Diferencias vs Inscripcion Publica</th></tr></thead>
+<tbody>
+<tr>
+  <td><strong>1</strong></td><td>Identificacion</td><td>Factory</td>
+  <td>Razon Social*, CUIT*, Domicilio, Telefono, Email*, Categoria* (dropdown), N Inscripcion DGFA, Actividad principal, Rubro de la empresa</td>
+  <td>Incluye campo Email para crear usuario. Enriquecimiento CSV: al ingresar CUIT coincidente con datos del Registro Provincial, autocompleta campos</td>
+</tr>
+<tr>
+  <td><strong>2</strong></td><td>Domicilios</td><td>MapPin</td>
+  <td>Domicilio legal (calle, localidad, departamento), Domicilio real, Coordenadas GPS</td>
+  <td>Checkbox "Domicilio real igual al legal". 18 departamentos de Mendoza</td>
+</tr>
+<tr>
+  <td><strong>3</strong></td><td>Residuos</td><td>Biohazard</td>
+  <td>Corrientes Y (checkboxes con codigos Y4-Y48)</td>
+  <td><strong>Interfaz de checkboxes</strong> en vez de textarea. Cada corriente muestra badge con coeficiente C. Seleccion visual con iconos por categoria</td>
+</tr>
+<tr>
+  <td><strong>4</strong></td><td>Calculo TEF</td><td>Calculator</td>
+  <td>Componente <code>CalculadoraTEF</code> inline: Zona (4 botones), Magnitud D (3 inputs), Peligrosidad A (10 dropdowns), Coeficiente C (automatico), ISO 14000 (checkbox)</td>
+  <td><strong>Componente interactivo completo</strong> vs campos manuales. Calculo automatico en tiempo real. Ver <a href="#inscr-tef">seccion 3.12.5</a></td>
+</tr>
+<tr>
+  <td><strong>5</strong></td><td>Regulatorio</td><td>ClipboardList</td>
+  <td>Expediente inscripcion, Resolucion inscripcion, Factor R, Categoria individual, Certificacion ISO, Libro operatoria (checkbox), Contrasena* (solo creacion)</td>
+  <td>Incluye campo contrasena para crear el usuario asociado al generador</td>
+</tr>
+<tr>
+  <td><strong>6</strong></td><td>Adjuntos</td><td>Upload</td>
+  <td>Tabla de 6 documentos: Memoria Tecnica*, Factura Luz*, Habilitacion Municipal*, Constancia AFIP*, Contrato Alquiler, Certificado ISO</td>
+  <td>6 documentos (4 obligatorios, 2 opcionales) con tabla de estado de carga. El paso tambien muestra un resumen compacto de los datos</td>
+</tr>
+</tbody>
+</table>
+<p><em>Campos marcados con * son obligatorios.</em></p>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/W18_adm_gen_paso2.png" target="_blank"><img src="screenshots/desktop/W18_adm_gen_paso2.png" alt="Admin Generador — Paso 2" loading="lazy"></a><div class="cu-screenshot-caption">Paso 2: Domicilios — legal y real con checkbox "igual al legal"</div></div>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/W21_adm_gen_paso4_tef_a.png" target="_blank"><img src="screenshots/desktop/W21_adm_gen_paso4_tef_a.png" alt="Admin Generador — TEF coef A" loading="lazy"></a><div class="cu-screenshot-caption">Paso 4: CalculadoraTEF — coeficientes A1-A10 con dropdowns y ayudas</div></div>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/W22_adm_gen_paso5.png" target="_blank"><img src="screenshots/desktop/W22_adm_gen_paso5.png" alt="Admin Generador — Paso 5" loading="lazy"></a><div class="cu-screenshot-caption">Paso 5: Regulatorio — expediente, resolucion, factor R, contrasena</div></div>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/W23_adm_gen_paso6.png" target="_blank"><img src="screenshots/desktop/W23_adm_gen_paso6.png" alt="Admin Generador — Paso 6" loading="lazy"></a><div class="cu-screenshot-caption">Paso 6: Adjuntos — tabla de documentos + resumen de datos</div></div>
+
+<!-- ============================================================ -->
+<!-- 3.12.7 WIZARD ADMIN — NUEVO OPERADOR                         -->
+<!-- ============================================================ -->
+<h4 id="inscr-adm-oper">3.12.7 Wizard Admin — Nuevo Operador (7 pasos)</h4>
+
+<p>El wizard admin para operadores (<code>/admin/actores/operadores/nuevo</code>) presenta 7 pasos. Incluye representantes legales y tecnicos, corrientes Y con checkboxes, y el componente TEF interactivo.</p>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/W24_adm_oper_paso1.png" target="_blank"><img src="screenshots/desktop/W24_adm_oper_paso1.png" alt="Admin Operador — Paso 1" loading="lazy"></a><div class="cu-screenshot-caption">Paso 1: Identificacion — tipo FIJO / IN SITU, tecnologia de tratamiento</div></div>
+
+<table>
+<thead><tr><th>Paso</th><th>Nombre</th><th>Icono</th><th>Campos</th><th>Notas</th></tr></thead>
+<tbody>
+<tr>
+  <td><strong>1</strong></td><td>Identificacion</td><td>FlaskConical</td>
+  <td>Razon Social*, CUIT*, Email*, Domicilio, Telefono, Tipo de operador* (FIJO / IN SITU), N Habilitacion, Categoria* (Planta Fija / Operador In Situ), Certificado numero, Tecnologia</td>
+  <td>Enriquecimiento CSV al ingresar CUIT coincidente</td>
+</tr>
+<tr>
+  <td><strong>2</strong></td><td>Domicilios</td><td>MapPin</td>
+  <td>Domicilio legal (calle, localidad, departamento), Domicilio real, Coordenadas</td>
+  <td>Para tipo IN SITU: alerta indicando que el domicilio de operacion puede variar</td>
+</tr>
+<tr>
+  <td><strong>3</strong></td><td>Representantes</td><td>Users</td>
+  <td>Representante Legal: nombre*, DNI*, telefono*. Representante Tecnico: nombre*, matricula profesional*, telefono*</td>
+  <td>Ambos obligatorios. Presentados en cards separadas con icono de usuario</td>
+</tr>
+<tr>
+  <td><strong>4</strong></td><td>Residuos</td><td>Biohazard</td>
+  <td>Corrientes Y (checkboxes Y4-Y48 con badge C), Tecnologia de tratamiento (textarea)</td>
+  <td>Checkboxes visuales + campo de texto libre para descripcion de tecnologia</td>
+</tr>
+<tr>
+  <td><strong>5</strong></td><td>Calculo TEF</td><td>Calculator</td>
+  <td>Componente <code>CalculadoraTEF</code> inline completo</td>
+  <td>Identico al del wizard generador, usa las corrientes Y seleccionadas en paso 4</td>
+</tr>
+<tr>
+  <td><strong>6</strong></td><td>Regulatorio</td><td>ClipboardList</td>
+  <td>Expediente inscripcion, Resolucion DPA, Vencimiento habilitacion (date), Contrasena* (solo creacion)</td>
+  <td>Campo de vencimiento con date picker</td>
+</tr>
+<tr>
+  <td><strong>7</strong></td><td>Adjuntos</td><td>Upload</td>
+  <td>Tabla de 7 documentos: Memoria Tecnica*, Plan Contingencia*, Habilitacion Municipal*, Constancia AFIP*, Certificado Tratamiento*, Poliza Seguro, Planos Planta</td>
+  <td>7 documentos (5 obligatorios, 2 opcionales)</td>
+</tr>
+</tbody>
+</table>
+<p><em>Campos marcados con * son obligatorios.</em></p>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/W26_adm_oper_paso3.png" target="_blank"><img src="screenshots/desktop/W26_adm_oper_paso3.png" alt="Admin Operador — Paso 3" loading="lazy"></a><div class="cu-screenshot-caption">Paso 3: Representantes — legal y tecnico con datos de contacto</div></div>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/W28_adm_oper_paso5_tef.png" target="_blank"><img src="screenshots/desktop/W28_adm_oper_paso5_tef.png" alt="Admin Operador — Paso 5 TEF" loading="lazy"></a><div class="cu-screenshot-caption">Paso 5: CalculadoraTEF interactivo integrado en el wizard de operador</div></div>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/W30_adm_oper_paso7.png" target="_blank"><img src="screenshots/desktop/W30_adm_oper_paso7.png" alt="Admin Operador — Paso 7" loading="lazy"></a><div class="cu-screenshot-caption">Paso 7: Adjuntos (7 documentos) + resumen de datos</div></div>
+
+<!-- ============================================================ -->
+<!-- 3.12.8 WIZARD ADMIN — NUEVO TRANSPORTISTA                    -->
+<!-- ============================================================ -->
+<h4 id="inscr-adm-trans">3.12.8 Wizard Admin — Nuevo Transportista (5 pasos)</h4>
+
+<p>El wizard admin para transportistas (<code>/admin/actores/transportistas/nuevo</code>) presenta 5 pasos. A diferencia de los otros wizards, incluye listas dinamicas para vehiculos y choferes con botones de "Agregar" y "Eliminar". El submit crea el transportista + usuario + vehiculos + choferes en una sola transaccion.</p>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/W31_adm_trans_paso1.png" target="_blank"><img src="screenshots/desktop/W31_adm_trans_paso1.png" alt="Admin Transportista — Paso 1" loading="lazy"></a><div class="cu-screenshot-caption">Paso 1: Datos basicos — razon social, CUIT, email, domicilio, localidad</div></div>
+
+<table>
+<thead><tr><th>Paso</th><th>Nombre</th><th>Icono</th><th>Campos</th><th>Notas</th></tr></thead>
+<tbody>
+<tr>
+  <td><strong>1</strong></td><td>Datos Basicos</td><td>Truck</td>
+  <td>Razon Social*, CUIT*, Domicilio, Localidad, Telefono, Email*, Nombre responsable, Contrasena* (solo creacion)</td>
+  <td>Email y contrasena crean el usuario asociado</td>
+</tr>
+<tr>
+  <td><strong>2</strong></td><td>Habilitacion DPA</td><td>Shield</td>
+  <td>Numero habilitacion, Vencimiento habilitacion (date), Corrientes autorizadas, Expediente DPA, Resolucion DPA, Resolucion SSP, Acta Inspeccion 1, Acta Inspeccion 2, Coordenadas GPS</td>
+  <td>8 campos regulatorios completos de la habilitacion DPA provincial</td>
+</tr>
+<tr>
+  <td><strong>3</strong></td><td>Vehiculos</td><td>Car</td>
+  <td>Lista dinamica de vehiculos. Cada vehiculo: Patente*, Marca, Modelo, Ano, Capacidad, N Habilitacion, Vencimiento</td>
+  <td>Boton <strong>"Agregar Vehiculo"</strong> inserta nueva fila. Icono papelera elimina fila. 7 campos por vehiculo</td>
+</tr>
+<tr>
+  <td><strong>4</strong></td><td>Choferes</td><td>User</td>
+  <td>Lista dinamica de choferes. Cada chofer: Nombre*, Apellido*, DNI*, Licencia, Vencimiento, Telefono</td>
+  <td>Boton <strong>"Agregar Chofer"</strong> inserta nueva fila. 6 campos por chofer</td>
+</tr>
+<tr>
+  <td><strong>5</strong></td><td>Confirmar</td><td>Check</td>
+  <td>(solo lectura)</td>
+  <td>Resumen completo: datos, habilitacion, lista de vehiculos, lista de choferes. Boton "Guardar Transportista"</td>
+</tr>
+</tbody>
+</table>
+<p><em>Campos marcados con * son obligatorios.</em></p>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/W32_adm_trans_paso2.png" target="_blank"><img src="screenshots/desktop/W32_adm_trans_paso2.png" alt="Admin Transportista — Paso 2" loading="lazy"></a><div class="cu-screenshot-caption">Paso 2: Habilitacion DPA — 8 campos regulatorios con datos de expediente y resoluciones</div></div>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/W33_adm_trans_paso3.png" target="_blank"><img src="screenshots/desktop/W33_adm_trans_paso3.png" alt="Admin Transportista — Paso 3" loading="lazy"></a><div class="cu-screenshot-caption">Paso 3: Vehiculos — lista dinamica con boton "Agregar" para cada vehiculo</div></div>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/W34_adm_trans_paso4.png" target="_blank"><img src="screenshots/desktop/W34_adm_trans_paso4.png" alt="Admin Transportista — Paso 4" loading="lazy"></a><div class="cu-screenshot-caption">Paso 4: Choferes — lista dinamica con datos de cada conductor</div></div>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/W35_adm_trans_paso5.png" target="_blank"><img src="screenshots/desktop/W35_adm_trans_paso5.png" alt="Admin Transportista — Paso 5" loading="lazy"></a><div class="cu-screenshot-caption">Paso 5: Confirmar — resumen completo antes de guardar</div></div>
+
+<!-- ============================================================ -->
+<!-- 3.12.9 VISTA MOBILE                                          -->
+<!-- ============================================================ -->
+<h4 id="inscr-mobile">3.12.9 Vista Mobile</h4>
+
+<p>Todos los wizards son responsivos y se adaptan al viewport mobile (390x844). Las principales diferencias con la version desktop:</p>
+<ul>
+<li><strong>Layout 1 columna:</strong> Los campos se apilan verticalmente en vez de usar grid 2-columnas.</li>
+<li><strong>Stepper compacto:</strong> Los pasos se muestran como iconos numerados sin texto, optimizando espacio horizontal.</li>
+<li><strong>Touch targets:</strong> Botones y dropdowns mas grandes para interaccion tactil.</li>
+<li><strong>CalculadoraTEF stacked:</strong> Las secciones del TEF se apilan verticalmente, cada una ocupando el ancho completo.</li>
+</ul>
+
+<div class="cu-screenshot"><a href="screenshots/mobile/W42_mob_gen_paso1.png" target="_blank"><img src="screenshots/mobile/W42_mob_gen_paso1.png" alt="Mobile — Generador paso 1" loading="lazy" style="max-width:300px;"></a><div class="cu-screenshot-caption">Mobile: Admin Generador — Paso 1 (layout 1 columna)</div></div>
+
+<div class="cu-screenshot"><a href="screenshots/mobile/W43_mob_gen_tef.png" target="_blank"><img src="screenshots/mobile/W43_mob_gen_tef.png" alt="Mobile — TEF" loading="lazy" style="max-width:300px;"></a><div class="cu-screenshot-caption">Mobile: CalculadoraTEF (secciones stacked verticalmente)</div></div>
+
+<div class="cu-screenshot"><a href="screenshots/mobile/W44_mob_oper_representantes.png" target="_blank"><img src="screenshots/mobile/W44_mob_oper_representantes.png" alt="Mobile — Operador representantes" loading="lazy" style="max-width:300px;"></a><div class="cu-screenshot-caption">Mobile: Operador — Representantes legal y tecnico</div></div>
+
+<div class="cu-screenshot"><a href="screenshots/mobile/W45_mob_trans_vehiculos.png" target="_blank"><img src="screenshots/mobile/W45_mob_trans_vehiculos.png" alt="Mobile — Transportista vehiculos" loading="lazy" style="max-width:300px;"></a><div class="cu-screenshot-caption">Mobile: Transportista — Lista de vehiculos</div></div>
+
+<div class="cu-screenshot"><a href="screenshots/mobile/W46_mob_inscripcion_fase1.png" target="_blank"><img src="screenshots/mobile/W46_mob_inscripcion_fase1.png" alt="Mobile — Inscripcion fase 1" loading="lazy" style="max-width:300px;"></a><div class="cu-screenshot-caption">Mobile: Inscripcion publica — Fase 1 creacion de cuenta</div></div>
+
+<!-- ============================================================ -->
+<!-- 3.12.10 WORKFLOW DE SOLICITUDES                               -->
+<!-- ============================================================ -->
+<h4 id="inscr-workflow">3.12.10 Workflow de Solicitudes</h4>
+
 <p>Toda solicitud de inscripcion publica sigue el siguiente flujo de estados:</p>
 <div style="text-align:center; margin: 1rem 0;">
 <span class="badge badge-neutral">BORRADOR</span> &rarr;
@@ -1373,7 +1816,7 @@ Donde: R = Z x A x D x C</pre>
 </tbody>
 </table>
 
-<h4>Panel Admin de Solicitudes</h4>
+<h5>Panel Admin de Solicitudes</h5>
 <div class="cu-screenshot"><a href="screenshots/desktop/76_admin_solicitudes_lista.png" target="_blank"><img src="screenshots/desktop/76_admin_solicitudes_lista.png" alt="Admin — Lista de Solicitudes" loading="lazy"></a><div class="cu-screenshot-caption">Panel de administracion de solicitudes de inscripcion</div></div>
 
 <p>Accesible desde <code>/admin/solicitudes</code>, el panel muestra:</p>
@@ -1384,7 +1827,7 @@ Donde: R = Z x A x D x C</pre>
 <li><strong>Accion:</strong> Clic en una fila navega al detalle de la solicitud.</li>
 </ul>
 
-<h4>Resultado de la Aprobacion</h4>
+<h5>Resultado de la Aprobacion</h5>
 <p>Al aprobar una solicitud, el sistema automaticamente:</p>
 <ol>
 <li>Crea el registro del actor (generador, operador o transportista) con todos los datos ingresados en el wizard.</li>
@@ -1393,6 +1836,23 @@ Donde: R = Z x A x D x C</pre>
 <li>El nuevo usuario puede iniciar sesion con el email y contrasena definidos durante la inscripcion.</li>
 </ol>
 <p>Si la solicitud incluia vehiculos (transportista), estos se crean como entidades anidadas dentro del transportista.</p>
+
+<!-- ============================================================ -->
+<!-- TABLA RESUMEN COMPARATIVA DE LOS 6 WIZARDS                   -->
+<!-- ============================================================ -->
+<h4 id="inscr-resumen">Resumen Comparativo de Wizards</h4>
+<table>
+<thead><tr><th>Wizard</th><th>Via</th><th>Pasos</th><th>TEF</th><th>Corrientes Y</th><th>Representantes</th><th>Vehiculos/Choferes</th><th>Documentos</th></tr></thead>
+<tbody>
+<tr><td>Generador</td><td>Publica</td><td>7</td><td>Campos manuales</td><td>No</td><td>No</td><td>No</td><td>3 obligatorios</td></tr>
+<tr><td>Operador</td><td>Publica</td><td>8</td><td>Campos manuales</td><td>Textarea</td><td>Si (legal + tecnico)</td><td>No</td><td>3 obligatorios</td></tr>
+<tr><td>Transportista</td><td>Publica</td><td>5</td><td>No</td><td>No</td><td>No</td><td>Texto libre</td><td>3 obligatorios</td></tr>
+<tr><td>Generador</td><td>Admin</td><td>6</td><td>CalculadoraTEF interactivo</td><td>Checkboxes + badge C</td><td>No</td><td>No</td><td>6 (4 oblig + 2 opc)</td></tr>
+<tr><td>Operador</td><td>Admin</td><td>7</td><td>CalculadoraTEF interactivo</td><td>Checkboxes + badge C</td><td>Si (legal + tecnico)</td><td>No</td><td>7 (5 oblig + 2 opc)</td></tr>
+<tr><td>Transportista</td><td>Admin</td><td>5</td><td>No</td><td>No</td><td>No</td><td>Listas dinamicas</td><td>No</td></tr>
+</tbody>
+</table>
+
 </section>
 
 <!-- ============================================================ -->
@@ -5166,7 +5626,59 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
   </div>
 </div>
 
-<h3 id="gal-mobile">13.7 Vista Mobile PWA (390×844)</h3>
+<h3 id="gal-wizards">13.7 Wizards de Alta y Calculo TEF</h3>
+<div class="screenshot-grid">
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/W01_pub_gen_fase1.png" target="_blank"><img src="screenshots/desktop/W01_pub_gen_fase1.png" alt="Inscripcion Fase 1" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Inscripcion Publica — Fase 1</strong><span class="sc-badge sc-todos">Todos</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/W17_adm_gen_paso1.png" target="_blank"><img src="screenshots/desktop/W17_adm_gen_paso1.png" alt="Admin Generador P1" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Admin Generador — Identificacion</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/W19_adm_gen_paso3.png" target="_blank"><img src="screenshots/desktop/W19_adm_gen_paso3.png" alt="Admin Generador Residuos" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Admin Generador — Residuos Y</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/W20_adm_gen_paso4_tef.png" target="_blank"><img src="screenshots/desktop/W20_adm_gen_paso4_tef.png" alt="CalculadoraTEF" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>CalculadoraTEF Interactivo</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/W24_adm_oper_paso1.png" target="_blank"><img src="screenshots/desktop/W24_adm_oper_paso1.png" alt="Admin Operador P1" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Admin Operador — Identificacion</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/W26_adm_oper_paso3.png" target="_blank"><img src="screenshots/desktop/W26_adm_oper_paso3.png" alt="Admin Operador Representantes" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Admin Operador — Representantes</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/W31_adm_trans_paso1.png" target="_blank"><img src="screenshots/desktop/W31_adm_trans_paso1.png" alt="Admin Transportista P1" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Admin Transportista — Datos</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/W33_adm_trans_paso3.png" target="_blank"><img src="screenshots/desktop/W33_adm_trans_paso3.png" alt="Admin Transportista Vehiculos" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Admin Transportista — Vehiculos</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/W34_adm_trans_paso4.png" target="_blank"><img src="screenshots/desktop/W34_adm_trans_paso4.png" alt="Admin Transportista Choferes" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>Admin Transportista — Choferes</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/W36_tef_resultado.png" target="_blank"><img src="screenshots/desktop/W36_tef_resultado.png" alt="TEF Resultado" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>TEF — Resultado Header</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/W39_tef_coef_a.png" target="_blank"><img src="screenshots/desktop/W39_tef_coef_a.png" alt="TEF Coeficientes A" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>TEF — Coeficientes A1-A10</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+  <div class="screenshot-card">
+    <a href="screenshots/desktop/W41_tef_desglose.png" target="_blank"><img src="screenshots/desktop/W41_tef_desglose.png" alt="TEF Desglose" loading="lazy"></a>
+    <div class="screenshot-caption"><strong>TEF — Desglose Completo</strong><span class="sc-badge sc-admin">Admin</span><span class="sc-badge sc-desktop">Desktop</span></div>
+  </div>
+</div>
+
+<h3 id="gal-mobile">13.8 Vista Mobile PWA (390×844)</h3>
 <div class="screenshot-grid screenshot-grid-mobile">
   <div class="screenshot-card">
     <a href="screenshots/mobile/M01_login_mobile.png" target="_blank"><img src="screenshots/mobile/M01_login_mobile.png" alt="Login Mobile" loading="lazy"></a>
