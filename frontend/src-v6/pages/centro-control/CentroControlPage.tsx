@@ -452,7 +452,7 @@ export const CentroControlPage: React.FC = () => {
             </span>
             <span className="text-xs font-semibold text-red-600">LIVE</span>
           </span>
-          <span className="text-xs text-neutral-400">{countdown}s</span>
+          <span className="text-xs text-neutral-400 tabular-nums w-6 text-right">{countdown}s</span>
           <button onClick={handleManualRefresh} className="p-1 hover:bg-neutral-100 rounded transition-colors text-neutral-400" title="Actualizar ahora">
             <RefreshCw size={13} />
           </button>
@@ -812,7 +812,7 @@ export const CentroControlPage: React.FC = () => {
                 </MapContainer>
 
                 {/* Mobile legend */}
-                <div className="sm:hidden absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg z-[400] text-xs">
+                <div className="sm:hidden absolute bottom-20 left-3 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg z-[400] text-xs">
                   <div className="flex items-center gap-3 flex-wrap">
                     <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded" style={{ background: ACTOR_COLORS.generador }} /> Gen</span>
                     <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: ACTOR_COLORS.transportista, transform: 'rotate(45deg)' }} /> Trans</span>
