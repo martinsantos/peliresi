@@ -366,6 +366,12 @@ export const NuevoManifiestoPage: React.FC = () => {
                 </div>
               ))}
 
+              {validationErrors.residuos && (
+                <div className="bg-error-50 border border-error-200 rounded-xl p-3 text-sm text-error-700">
+                  {validationErrors.residuos}
+                </div>
+              )}
+
               <Button
                 variant="outline"
                 fullWidth
@@ -379,7 +385,17 @@ export const NuevoManifiestoPage: React.FC = () => {
                 <Button variant="outline" onClick={() => setStep(1)}>
                   Anterior
                 </Button>
-                <Button onClick={() => setStep(3)}>
+                <Button
+                  onClick={() => {
+                    const hasValid = formData.residuos.some(r => r.tipo && r.cantidad && Number(r.cantidad) > 0);
+                    if (!hasValid) {
+                      setValidationErrors(prev => ({ ...prev, residuos: 'Agregue al menos un residuo con tipo y cantidad' }));
+                      return;
+                    }
+                    setValidationErrors(prev => { const n = {...prev}; delete n.residuos; return n; });
+                    setStep(3);
+                  }}
+                >
                   Siguiente
                 </Button>
               </div>
