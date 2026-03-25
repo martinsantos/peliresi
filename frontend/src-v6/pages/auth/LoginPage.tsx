@@ -6,7 +6,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, Leaf, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, Leaf, AlertCircle, Factory, Truck, FlaskConical } from 'lucide-react';
 import { useAuth, DEMO_CREDENTIALS } from '../../contexts/AuthContext';
 
 const DEMO_USERS = [
@@ -170,12 +170,47 @@ const LoginPage: React.FC = () => {
         </button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-neutral-600">
-        ¿No tenes cuenta?{' '}
-        <Link to="/registro" className="text-[#1B5E3C] font-semibold hover:underline">
-          Registrate
-        </Link>
-        {' · '}
+      {/* Inscripcion de Actores — destacado */}
+      <div className="mt-8 p-4 bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-200 rounded-2xl">
+        <h3 className="text-center text-sm font-bold text-emerald-800 mb-1">
+          Inscripcion Provincial de Actores
+        </h3>
+        <p className="text-center text-xs text-emerald-600 mb-4">
+          Registra tu empresa en el sistema de trazabilidad
+        </p>
+        <div className="grid grid-cols-3 gap-2">
+          <Link
+            to="/inscripcion/generador"
+            className="flex flex-col items-center gap-2 p-3 bg-white rounded-xl border border-emerald-200 hover:border-purple-400 hover:shadow-md transition-all group"
+          >
+            <div className="w-10 h-10 bg-purple-100 group-hover:bg-purple-500 rounded-xl flex items-center justify-center transition-colors">
+              <Factory size={20} className="text-purple-600 group-hover:text-white transition-colors" />
+            </div>
+            <span className="text-xs font-semibold text-neutral-700 text-center leading-tight">Generador</span>
+          </Link>
+          <Link
+            to="/inscripcion/transportista"
+            className="flex flex-col items-center gap-2 p-3 bg-white rounded-xl border border-emerald-200 hover:border-orange-400 hover:shadow-md transition-all group"
+          >
+            <div className="w-10 h-10 bg-orange-100 group-hover:bg-orange-500 rounded-xl flex items-center justify-center transition-colors">
+              <Truck size={20} className="text-orange-600 group-hover:text-white transition-colors" />
+            </div>
+            <span className="text-xs font-semibold text-neutral-700 text-center leading-tight">Transportista</span>
+          </Link>
+          <Link
+            to="/inscripcion/operador"
+            className="flex flex-col items-center gap-2 p-3 bg-white rounded-xl border border-emerald-200 hover:border-blue-400 hover:shadow-md transition-all group"
+          >
+            <div className="w-10 h-10 bg-blue-100 group-hover:bg-blue-500 rounded-xl flex items-center justify-center transition-colors">
+              <FlaskConical size={20} className="text-blue-600 group-hover:text-white transition-colors" />
+            </div>
+            <span className="text-xs font-semibold text-neutral-700 text-center leading-tight">Operador</span>
+          </Link>
+        </div>
+      </div>
+
+      <p className="mt-4 text-center text-sm text-neutral-600">
+        ¿Ya tenes cuenta?{' '}
         <Link to="/reclamar" className="text-[#1B5E3C] font-semibold hover:underline">
           Reclama tu cuenta
         </Link>

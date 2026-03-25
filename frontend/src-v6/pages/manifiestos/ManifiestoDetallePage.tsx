@@ -786,7 +786,7 @@ const ManifiestoDetailPage: React.FC = () => {
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-6 animate-fade-in min-w-0">
           {/* Blockchain Certification */}
           {m.estado !== 'BORRADOR' && (
             <BlockchainPanel
@@ -821,7 +821,7 @@ const ManifiestoDetailPage: React.FC = () => {
                         Escanear para verificar estado
                       </p>
                     </div>
-                    <div className="flex gap-2 w-full">
+                    <div className="flex gap-2 w-full min-w-0">
                       <Button
                         variant="outline"
                         size="sm"
