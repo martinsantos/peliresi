@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SITREP — Manual del Sistema</title>
+<style>
+:root{--primary:#0D8A4F;--primary-dark:#1B5E3C;--bg:#f8faf9;--card:#fff;--text:#1a1a1a;--muted:#6b7280;--border:#e5e7eb;--font:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;--mono:'JetBrains Mono','Fira Code','Consolas',monospace}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1a14;--card:#1a2e23;--text:#e2e8f0;--muted:#9ca3af;--border:#374151}}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
+a{color:var(--primary);text-decoration:none}a:hover{text-decoration:underline}
+.header{background:var(--primary-dark);color:#fff;padding:20px 24px;text-align:center}
+.header h1{font-size:22px;font-weight:700}
+.header p{font-size:13px;opacity:.8;margin-top:4px}
+.container{max-width:800px;margin:0 auto;padding:32px 16px;flex:1;width:100%}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:20px}
+.card h2{font-size:18px;color:var(--primary-dark);margin-bottom:12px}
+.card h3{font-size:15px;font-weight:600;margin:16px 0 8px}
+.card p,.card li{font-size:14px;line-height:1.7;color:var(--muted)}
+.card ul{padding-left:20px;margin:8px 0}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:12px 24px;border-radius:8px;font-size:15px;font-weight:600;text-decoration:none;transition:all .15s;border:none;cursor:pointer}
+.btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{background:var(--primary-dark);text-decoration:none}
+.btn-outline{background:transparent;border:2px solid var(--border);color:var(--text)}.btn-outline:hover{border-color:var(--primary);color:var(--primary);text-decoration:none}
+.btn-row{display:flex;gap:12px;margin:20px 0;flex-wrap:wrap;justify-content:center}
+pre{background:#1e293b;color:#e2e8f0;padding:14px;border-radius:8px;font-family:var(--mono);font-size:12.5px;line-height:1.7;overflow-x:auto;margin:12px 0}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--border)}
+th{font-weight:600;background:var(--bg)}
+.info-box{background:#ecfdf5;border-left:4px solid var(--primary);padding:12px 16px;border-radius:0 8px 8px 0;margin:12px 0;font-size:13px;color:#065f46}
+.warn-box{background:#fef9c3;border-left:4px solid #f59e0b;padding:12px 16px;border-radius:0 8px 8px 0;margin:12px 0;font-size:13px;color:#854d0e}
+@media(prefers-color-scheme:dark){.info-box{background:#052e16;color:#86efac}.warn-box{background:#422006;color:#fde68a}pre{background:#0f172a}}
+.phase-flow{display:flex;align-items:center;justify-content:center;gap:8px;margin:20px 0;flex-wrap:wrap}
+.phase-card{padding:12px 20px;border-radius:10px;font-weight:700;font-size:14px;text-align:center;min-width:140px}
+.phase-card.pre{background:#eff6ff;color:#1e40af;border:2px solid #bfdbfe}
+.phase-card.wizard{background:#ecfdf5;color:#065f46;border:2px solid #a7f3d0}
+.phase-card.post{background:#fef3c7;color:#92400e;border:2px solid #fde68a}
+.phase-arrow{font-size:24px;color:#9ca3af}
+.footer{text-align:center;padding:16px;font-size:12px;color:var(--muted);border-top:1px solid var(--border);margin-top:auto}
+.hero-section{text-align:center;padding:40px 20px;background:linear-gradient(135deg,#ecfdf5,#f0fdf4)}
+@media(prefers-color-scheme:dark){.hero-section{background:linear-gradient(135deg,#052e16,#0f1a14)}.phase-card.pre{background:#1e3a5f;color:#93c5fd;border-color:#1e40af}.phase-card.wizard{background:#052e16;color:#86efac;border-color:#065f46}.phase-card.post{background:#422006;color:#fde68a;border-color:#92400e}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>SITREP — Manual del Sistema</h1>
+  <p>Sistema de Trazabilidad de Residuos Peligrosos | Gobierno de Mendoza — DGFA</p>
+</div>
+
+<div class="hero-section">
+  <h2 style="font-size:24px;color:var(--primary-dark);margin-bottom:8px">Bienvenido al Manual de SITREP</h2>
+  <p style="color:var(--muted);max-width:600px;margin:0 auto 20px;font-size:15px">Guia completa para la instalacion, configuracion y uso del sistema de trazabilidad de residuos peligrosos.</p>
+  <div class="btn-row">
+    <a href="https://sitrep.ultimamilla.com.ar/manual/" class="btn btn-primary" target="_blank">Abrir Manual Online</a>
+    <a href="docs/manual/index.html" class="btn btn-outline">Abrir Manual Local</a>
+    <a href="SETUP.html" class="btn btn-outline">Wizard de Instalacion</a>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Quick access -->
+  <div class="card">
+    <h2>Acceso Rapido</h2>
+    <table>
+      <tr><td><strong>Manual completo (online)</strong></td><td><a href="https://sitrep.ultimamilla.com.ar/manual/" target="_blank">sitrep.ultimamilla.com.ar/manual</a></td></tr>
+      <tr><td><strong>Manual completo (local)</strong></td><td><a href="docs/manual/index.html">docs/manual/index.html</a></td></tr>
+      <tr><td><strong>Wizard de instalacion</strong></td><td><a href="SETUP.html">SETUP.html</a></td></tr>
+      <tr><td><strong>Guia tecnica de deploy</strong></td><td><a href="DEPLOY-NUEVO-SERVIDOR.md">DEPLOY-NUEVO-SERVIDOR.md</a></td></tr>
+      <tr><td><strong>Referencia tecnica</strong></td><td><a href="CLAUDE.md">CLAUDE.md</a></td></tr>
+    </table>
+  </div>
+
+  <!-- Installation overview -->
+  <div class="card">
+    <h2>Guia de Instalacion</h2>
+    <p>La instalacion de SITREP sigue 3 fases. Cada fase tiene verificaciones que aseguran que el sistema quede correctamente configurado.</p>
+
+    <div class="phase-flow">
+      <div class="phase-card pre">A. Pre-Instalacion</div>
+      <div class="phase-arrow">&rarr;</div>
+      <div class="phase-card wizard">B. Wizard Interactivo</div>
+      <div class="phase-arrow">&rarr;</div>
+      <div class="phase-card post">C. Post-Instalacion</div>
+    </div>
+
+    <h3>Fase A: Pre-Instalacion</h3>
+    <p>Antes de ejecutar el wizard, necesitas:</p>
+    <table>
+      <tr><td><strong>Servidor</strong></td><td>Ubuntu 22.04 LTS, 2+ cores, 4GB+ RAM, 80GB+ SSD</td></tr>
+      <tr><td><strong>DNS</strong></td><td>A record apuntando al IP del servidor (Cloudflare)</td></tr>
+      <tr><td><strong>SSH</strong></td><td>Acceso root al servidor</td></tr>
+      <tr><td><strong>Repositorio</strong></td><td><code>git clone https://github.com/martinsantos/peliresi.git</code></td></tr>
+      <tr><td><strong>Brevo</strong></td><td>Cuenta gratuita en brevo.com para envio de emails</td></tr>
+    </table>
+    <pre>ssh root@IP_DEL_SERVIDOR
+apt update &amp;&amp; apt upgrade -y
+apt install -y curl wget git ufw fail2ban htop
+ufw allow OpenSSH &amp;&amp; ufw allow 80/tcp &amp;&amp; ufw allow 443/tcp &amp;&amp; ufw enable</pre>
+
+    <h3>Fase B: Wizard Interactivo (8 pasos)</h3>
+    <p>Abrir <a href="SETUP.html"><strong>SETUP.html</strong></a> en el navegador. El wizard guia paso a paso:</p>
+    <ol style="padding-left:20px;margin:8px 0">
+      <li><strong>Servidor Web</strong> — Verificar Nginx + SSL</li>
+      <li><strong>Base de Datos</strong> — Docker + PostgreSQL 15</li>
+      <li><strong>Backend API</strong> — Node.js 20 + PM2 + .env</li>
+      <li><strong>Frontend</strong> — React SPA (Vite build)</li>
+      <li><strong>Admin Inicial</strong> — Seed de datos base</li>
+      <li><strong>Actores Reales</strong> — Importar 1,846 generadores + 52 operadores del registro DPA</li>
+      <li><strong>Email</strong> — Brevo SMTP + SPF/DKIM/DMARC</li>
+      <li><strong>Verificacion Final</strong> — Resumen + checklist</li>
+    </ol>
+    <div class="btn-row" style="justify-content:flex-start">
+      <a href="SETUP.html" class="btn btn-primary">Abrir Wizard &rarr;</a>
+    </div>
+
+    <h3>Fase C: Post-Instalacion</h3>
+    <table>
+      <tr><td>1</td><td><strong>Cambiar password admin</strong></td><td>Login &rarr; Perfil &rarr; Cambiar contrasena</td></tr>
+      <tr><td>2</td><td><strong>Backup automatico</strong></td><td><code>crontab -e</code> &rarr; <code>0 3 * * * /opt/scripts-cicd/backup_sitrep.sh</code></td></tr>
+      <tr><td>3</td><td><strong>Health check</strong></td><td><code>*/5 * * * * /opt/scripts-cicd/healthcheck.sh</code></td></tr>
+      <tr><td>4</td><td><strong>Activar emails</strong></td><td><code>DISABLE_EMAILS=false</code> en .env + <code>pm2 restart</code></td></tr>
+      <tr><td>5</td><td><strong>Smoke test</strong></td><td><code>bash backend/tests/smoke-test.sh</code></td></tr>
+      <tr><td>6</td><td><strong>Acceder</strong></td><td><code>https://tudominio.com/login</code></td></tr>
+    </table>
+  </div>
+
+  <!-- Manual sections index -->
+  <div class="card">
+    <h2>Indice del Manual</h2>
+    <p>El manual completo tiene 15 secciones. Abrir <a href="docs/manual/index.html">docs/manual/index.html</a> para la version interactiva con busqueda, capturas y navegacion.</p>
+    <table>
+      <tr><td><strong>0</strong></td><td>Guia de Instalacion</td><td>Setup wizard, pre/post instalacion</td></tr>
+      <tr><td><strong>1</strong></td><td>Vision General</td><td>Que es SITREP, marco legal, actores</td></tr>
+      <tr><td><strong>2</strong></td><td>Guia Rapida por Rol</td><td>Admin, Generador, Transportista, Operador</td></tr>
+      <tr><td><strong>3</strong></td><td>Modulos del Sistema</td><td>Dashboard, Manifiestos, Centro de Control, Reportes, GPS, Actores, Catalogos, Usuarios, Blockchain, Emails, Renovaciones</td></tr>
+      <tr><td><strong>4</strong></td><td>Aplicacion Movil (PWA)</td><td>Instalacion, GPS tracking, offline</td></tr>
+      <tr><td><strong>5</strong></td><td>Arquitectura</td><td>Stack tecnico, base de datos, API</td></tr>
+      <tr><td><strong>6</strong></td><td>Workflow</td><td>Estados de manifiestos, transiciones</td></tr>
+      <tr><td><strong>7</strong></td><td>Casos de Uso</td><td>70 casos de uso documentados</td></tr>
+      <tr><td><strong>8</strong></td><td>FAQ</td><td>Preguntas frecuentes</td></tr>
+      <tr><td><strong>9</strong></td><td>Glosario</td><td>Terminos y definiciones</td></tr>
+      <tr><td><strong>10</strong></td><td>Procedimientos</td><td>Ciclo completo, GPS, carga masiva, exportar PDF</td></tr>
+      <tr><td><strong>11</strong></td><td>Contacto</td><td>Soporte y contacto</td></tr>
+      <tr><td><strong>12</strong></td><td>Versiones</td><td>Historial de cambios (v2026.1 a v2026.8)</td></tr>
+      <tr><td><strong>13</strong></td><td>Galeria</td><td>135 capturas desktop + 48 mobile</td></tr>
+      <tr><td><strong>14</strong></td><td>Flujos por Perfil</td><td>Diagramas de flujo detallados</td></tr>
+      <tr><td><strong>15</strong></td><td>Referencia DevOps</td><td>Stack, deploy, schema, CI/CD, backups, instalacion</td></tr>
+    </table>
+  </div>
+
+  <div class="info-box">
+    <strong>Nota:</strong> El manual local (<code>docs/manual/index.html</code>) funciona mejor con las capturas de pantalla. Si las imagenes no se ven, asegurate de que el directorio <code>docs/screenshots/</code> este presente en el repositorio.
+  </div>
+
+</div>
+
+<div class="footer">
+  SITREP — Sistema de Trazabilidad de Residuos Peligrosos | Gobierno de Mendoza — DGFA | 2026<br>
+  <small>Desarrollo: Ultima Milla Soluciones Tecnologicas</small>
+</div>
+
+</body>
+</html>

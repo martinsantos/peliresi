@@ -1,10 +1,23 @@
-# 📚 README - Sistema de Trazabilidad de Residuos Peligrosos
+# SITREP — Sistema de Trazabilidad de Residuos Peligrosos
 
-## Demo DGFA Mendoza - Diciembre 2025
+## Instalacion Rapida
+
+| Archivo | Descripcion |
+|---------|-------------|
+| **[SETUP.html](SETUP.html)** | Wizard interactivo de instalacion (8 pasos, funciona sin servidor) |
+| **[MANUAL.html](MANUAL.html)** | Manual del sistema con indice, guia de instalacion y links |
+| **[DEPLOY-NUEVO-SERVIDOR.md](DEPLOY-NUEVO-SERVIDOR.md)** | Guia tecnica completa de deploy en servidor nuevo |
+| **[docs/manual/index.html](docs/manual/index.html)** | Manual interactivo completo con capturas de pantalla |
+
+Para instalar SITREP desde cero, abrir **SETUP.html** en el navegador y seguir los 8 pasos.
 
 ---
 
-## 🌐 Acceso a la Demo
+## Demo DGFA Mendoza
+
+---
+
+## Acceso a la Demo
 
 **URL de Producción:** [https://www.ultimamilla.com.ar/demoambiente/](https://www.ultimamilla.com.ar/demoambiente/)
 
