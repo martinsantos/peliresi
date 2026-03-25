@@ -286,7 +286,7 @@ footer.site-footer strong{color:var(--primary-dark);}
 /* ── v2026.4: Sidebar accordion ── */
 .nav-group-items {
   overflow: hidden;
-  max-height: 600px;
+  max-height: 1200px;
   transition: max-height 0.3s ease;
 }
 .nav-group-items.collapsed {
