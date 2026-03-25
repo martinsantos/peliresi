@@ -14,9 +14,9 @@ import prisma from '../lib/prisma';
 import { notificationService } from '../controllers/notification.controller';
 
 export function iniciarRecordatorioJob(): void {
-  const pmId = parseInt(process.env.pm_id || process.env.NODE_APP_INSTANCE || '0');
-  if (pmId !== 0) {
-    console.log(`[RecordatorioJob] Instancia PM2 no-0, skipping cron`);
+  const instanceId = process.env.NODE_APP_INSTANCE || process.env.pm_id || '0';
+  if (instanceId !== '0') {
+    console.log(`[RecordatorioJob] PM2 instancia ${instanceId}, skipping cron`);
     return;
   }
 

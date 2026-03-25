@@ -9,8 +9,8 @@ export function iniciarBlockchainJob(): void {
   }
 
   // Solo ejecutar en instancia 0 de PM2 cluster para evitar duplicacion
-  const instanceId = process.env.INSTANCE_ID || process.env.pm_id;
-  if (instanceId && instanceId !== '0') {
+  const instanceId = process.env.NODE_APP_INSTANCE || process.env.INSTANCE_ID || process.env.pm_id || '0';
+  if (instanceId !== '0') {
     console.log(`[BlockchainJob] PM2 instancia ${instanceId}, skipping cron`);
     return;
   }

@@ -6,8 +6,9 @@ const DIAS_ANTICIPACION = 30;
 
 export function iniciarVencimientoJob(): void {
   // Solo ejecutar en instancia 0 de PM2 cluster para evitar duplicación
-  if (process.env.pm_id && process.env.pm_id !== '0') {
-    console.log('[VencimientoJob] Instancia PM2 no-0, skipping cron');
+  const instanceId = process.env.NODE_APP_INSTANCE || process.env.pm_id || '0';
+  if (instanceId !== '0') {
+    console.log(`[VencimientoJob] PM2 instancia ${instanceId}, skipping cron`);
     return;
   }
 
