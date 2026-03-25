@@ -74,6 +74,7 @@ export interface CreateManifiestoRequest {
   generadorId: string;
   transportistaId: string;
   operadorId: string;
+  fechaEstimadaRetiro?: string;
   observaciones?: string;
   residuos: CreateManifiestoResiduoRequest[];
 }

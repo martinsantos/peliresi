@@ -26,6 +26,7 @@ import { alertaSubscriber } from './subscribers/alerta.subscriber';
 import { eventoManifiestoSubscriber } from './subscribers/eventoManifiesto.subscriber';
 import { iniciarVencimientoJob } from './jobs/vencimiento.job';
 import { iniciarBlockchainJob } from './jobs/blockchain.job';
+import { iniciarRecordatorioJob } from './jobs/recordatorio.job';
 import blockchainRoutes from './routes/blockchain.routes';
 import renovacionRoutes from './routes/renovacion.routes';
 import solicitudRoutes from './routes/solicitud.routes';
@@ -236,6 +237,7 @@ domainEvents.subscribe(alertaSubscriber);
 // Iniciar jobs cron
 iniciarVencimientoJob();
 iniciarBlockchainJob();
+iniciarRecordatorioJob();
 
 // Iniciar el servidor
 const PORT = config.PORT;

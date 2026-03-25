@@ -245,6 +245,7 @@ model Manifiesto {
   estado          EstadoManifiesto @default(BORRADOR)
   observaciones   String?
   fechaFirma      DateTime?
+  fechaEstimadaRetiro DateTime?
   fechaRetiro     DateTime?
   fechaEntrega    DateTime?
   fechaRecepcion  DateTime?

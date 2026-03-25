@@ -79,40 +79,124 @@ class NotificationService {
 
         if (!manifiesto) return;
 
+        const gen = manifiesto.generador;
+        const trans = manifiesto.transportista;
+        const oper = manifiesto.operador;
+        const num = manifiesto.numero;
+
+        // Build maps URL from generador coordinates (pickup location)
+        const mapsUrl = gen.latitud && gen.longitud
+            ? `https://maps.google.com/?q=${gen.latitud},${gen.longitud}`
+            : null;
+        const fechaRetiro = manifiesto.fechaEstimadaRetiro
+            ? manifiesto.fechaEstimadaRetiro.toLocaleDateString('es-AR')
+            : null;
+
+        // APROBADO: personalized notifications per role with location data
+        if (nuevoEstado === 'APROBADO') {
+            const promises: Promise<any>[] = [];
+
+            // Transportista: full pickup details with map link
+            if (trans.usuario.id !== actorId) {
+                const retiroInfo = fechaRetiro ? ` Retiro: ${fechaRetiro}.` : '';
+                promises.push(this.crearNotificacion({
+                    usuarioId: trans.usuario.id,
+                    tipo: 'MANIFIESTO_FIRMADO' as TipoNotificacion,
+                    titulo: 'Nuevo retiro asignado',
+                    mensaje: `${num} —${retiroInfo} ${gen.razonSocial}, ${gen.domicilio || ''}`.trim(),
+                    manifiestoId,
+                    prioridad: 'ALTA' as any,
+                    datos: {
+                        tipo: 'retiro_asignado',
+                        fechaRetiro: fechaRetiro || null,
+                        direccion: gen.domicilio || null,
+                        lat: gen.latitud, lng: gen.longitud,
+                        mapsUrl,
+                        generador: gen.razonSocial,
+                        operadorDestino: oper.razonSocial,
+                    },
+                }));
+            }
+
+            // Operador: upcoming reception
+            if (oper.usuario.id !== actorId) {
+                promises.push(this.crearNotificacion({
+                    usuarioId: oper.usuario.id,
+                    tipo: 'MANIFIESTO_FIRMADO' as TipoNotificacion,
+                    titulo: 'Manifiesto firmado — recibiras residuos',
+                    mensaje: `${num} de ${gen.razonSocial}.${fechaRetiro ? ` Retiro estimado: ${fechaRetiro}` : ''}`,
+                    manifiestoId,
+                    prioridad: 'NORMAL' as any,
+                    datos: {
+                        tipo: 'recepcion_programada',
+                        fechaRetiro: fechaRetiro || null,
+                        generador: gen.razonSocial,
+                        transportista: trans.razonSocial,
+                    },
+                }));
+            }
+
+            // Generador (if not the signer)
+            if (gen.usuario.id !== actorId) {
+                promises.push(this.crearNotificacion({
+                    usuarioId: gen.usuario.id,
+                    tipo: 'MANIFIESTO_FIRMADO' as TipoNotificacion,
+                    titulo: 'Tu manifiesto fue firmado',
+                    mensaje: `${num} firmado y listo para retiro`,
+                    manifiestoId,
+                    prioridad: 'NORMAL' as any,
+                }));
+            }
+
+            // Admins
+            const adminIds = await this.getAdminIds();
+            for (const adminId of adminIds) {
+                if (adminId !== actorId && adminId !== gen.usuario.id && adminId !== trans.usuario.id && adminId !== oper.usuario.id) {
+                    promises.push(this.crearNotificacion({
+                        usuarioId: adminId,
+                        tipo: 'MANIFIESTO_FIRMADO' as TipoNotificacion,
+                        titulo: 'Manifiesto firmado',
+                        mensaje: `${num} firmado por ${gen.razonSocial}`,
+                        manifiestoId,
+                        prioridad: 'NORMAL' as any,
+                    }));
+                }
+            }
+
+            await Promise.all(promises);
+            return;
+        }
+
+        // Other states: generic notification to all parties
         const mensajes: Record<string, { titulo: string; mensaje: string; tipo: TipoNotificacion }> = {
-            'APROBADO': {
-                titulo: 'Manifiesto Firmado',
-                mensaje: `El manifiesto ${manifiesto.numero} ha sido firmado y está listo para retiro`,
-                tipo: 'MANIFIESTO_FIRMADO'
-            },
             'EN_TRANSITO': {
                 titulo: 'Transporte Iniciado',
-                mensaje: `El manifiesto ${manifiesto.numero} está en camino`,
+                mensaje: `El manifiesto ${num} esta en camino`,
                 tipo: 'MANIFIESTO_EN_TRANSITO'
             },
             'ENTREGADO': {
                 titulo: 'Entrega Confirmada',
-                mensaje: `El manifiesto ${manifiesto.numero} ha sido entregado en destino`,
+                mensaje: `El manifiesto ${num} ha sido entregado en destino`,
                 tipo: 'MANIFIESTO_ENTREGADO'
             },
             'RECIBIDO': {
-                titulo: 'Recepción Confirmada',
-                mensaje: `El operador ha confirmado la recepción del manifiesto ${manifiesto.numero}`,
+                titulo: 'Recepcion Confirmada',
+                mensaje: `El operador ha confirmado la recepcion del manifiesto ${num}`,
                 tipo: 'MANIFIESTO_RECIBIDO'
             },
             'TRATADO': {
                 titulo: 'Tratamiento Completado',
-                mensaje: `El manifiesto ${manifiesto.numero} ha sido tratado y cerrado`,
+                mensaje: `El manifiesto ${num} ha sido tratado y cerrado`,
                 tipo: 'MANIFIESTO_TRATADO'
             },
             'RECHAZADO': {
-                titulo: '⚠️ Carga Rechazada',
-                mensaje: `La carga del manifiesto ${manifiesto.numero} ha sido rechazada`,
+                titulo: 'Carga Rechazada',
+                mensaje: `La carga del manifiesto ${num} ha sido rechazada`,
                 tipo: 'MANIFIESTO_RECHAZADO'
             },
             'EN_TRATAMIENTO': {
                 titulo: 'Tratamiento Iniciado',
-                mensaje: `El manifiesto ${manifiesto.numero} ha iniciado el proceso de tratamiento`,
+                mensaje: `El manifiesto ${num} ha iniciado el proceso de tratamiento`,
                 tipo: 'INFO_GENERAL'
             }
         };
@@ -120,24 +204,13 @@ class NotificationService {
         const info = mensajes[nuevoEstado];
         if (!info) return;
 
-        // Notificar a todos los involucrados excepto al que hizo la acción
-        const destinatarios = [
-            manifiesto.generador.usuario.id,
-            manifiesto.transportista.usuario.id,
-            manifiesto.operador.usuario.id
-        ].filter(id => id !== actorId);
-
-        // También notificar a admins
+        const destinatarios = [gen.usuario.id, trans.usuario.id, oper.usuario.id].filter(id => id !== actorId);
         const adminIds = await this.getAdminIds();
-        adminIds.forEach(id => {
-            if (!destinatarios.includes(id)) destinatarios.push(id);
-        });
+        adminIds.forEach(id => { if (!destinatarios.includes(id)) destinatarios.push(id); });
 
         await Promise.all(destinatarios.map(usuarioId =>
             this.crearNotificacion({
-                usuarioId,
-                ...info,
-                manifiestoId,
+                usuarioId, ...info, manifiestoId,
                 prioridad: nuevoEstado === 'RECHAZADO' ? 'ALTA' : 'NORMAL'
             })
         ));

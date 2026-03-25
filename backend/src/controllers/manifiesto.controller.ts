@@ -81,6 +81,7 @@ const createManifiestoSchema = z.object({
   generadorId: z.string().min(1, 'El generador es requerido').optional(),
   transportistaId: z.string().min(1, 'El transportista es requerido'),
   operadorId: z.string().min(1, 'El operador es requerido'),
+  fechaEstimadaRetiro: z.string().optional(),
   observaciones: z.string().max(1000).optional(),
   residuos: z.array(z.object({
     tipoResiduoId: z.string().min(1, 'El tipo de residuo es requerido'),
@@ -336,7 +337,7 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
       throw new AppError(parsed.error.issues[0].message, 400);
     }
 
-    const { generadorId: bodyGeneradorId, transportistaId, operadorId, residuos, observaciones } = parsed.data;
+    const { generadorId: bodyGeneradorId, transportistaId, operadorId, residuos, observaciones, fechaEstimadaRetiro } = parsed.data;
     const userId = req.user.id;
 
     // Verificar que el usuario es un generador o admin
@@ -364,6 +365,7 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
         transportistaId,
         operadorId,
         observaciones,
+        fechaEstimadaRetiro: fechaEstimadaRetiro ? new Date(fechaEstimadaRetiro) : null,
         estado: 'BORRADOR',
         creadoPorId: userId,
         residuos: {

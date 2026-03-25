@@ -123,6 +123,7 @@ export const NuevoManifiestoPage: React.FC = () => {
         generadorId: formData.generadorId || formData.generador,
         transportistaId: formData.transportista,
         operadorId: formData.operador,
+        fechaEstimadaRetiro: formData.fechaRetiro || undefined,
         observaciones: formData.observaciones || undefined,
         residuos: formData.residuos.map((r) => ({
           tipoResiduoId: r.tipo,
