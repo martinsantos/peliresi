@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SITREP — Setup Wizard</title>
+<style>
+:root{--primary:#0D8A4F;--primary-dark:#1B5E3C;--bg:#f8faf9;--card:#fff;--text:#1a1a1a;--muted:#6b7280;--border:#e5e7eb;--success:#16a34a;--warn:#f59e0b;--error:#dc2626;--code-bg:#1e293b;--code-text:#e2e8f0;--radius:12px;--font:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;--mono:'JetBrains Mono','Fira Code','Consolas',monospace}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1a14;--card:#1a2e23;--text:#e2e8f0;--muted:#9ca3af;--border:#374151;--code-bg:#0f172a}}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
+a{color:var(--primary);text-decoration:none}a:hover{text-decoration:underline}
+.header{background:var(--primary-dark);color:#fff;padding:16px 24px;display:flex;align-items:center;gap:12px}
+.header h1{font-size:18px;font-weight:700;letter-spacing:-0.3px}
+.header .badge{background:rgba(255,255,255,.15);padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600}
+.container{max-width:960px;margin:0 auto;padding:24px 16px;flex:1;width:100%}
+.stepper{display:flex;align-items:center;justify-content:center;gap:4px;margin-bottom:32px;flex-wrap:wrap}
+.step-dot{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:2px solid var(--border);color:var(--muted);cursor:pointer;transition:all .2s;flex-shrink:0}
+.step-dot.active{background:var(--primary);color:#fff;border-color:var(--primary);transform:scale(1.1)}
+.step-dot.done{background:var(--success);color:#fff;border-color:var(--success)}
+.step-dot.error{background:var(--error);color:#fff;border-color:var(--error)}
+.step-dot.warn{background:var(--warn);color:#fff;border-color:var(--warn)}
+.step-line{width:24px;height:2px;background:var(--border);flex-shrink:0}
+.step-line.done{background:var(--success)}
+@media(max-width:600px){.step-line{width:8px}.step-dot{width:30px;height:30px;font-size:11px}}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:16px}
+.card h2{font-size:20px;margin-bottom:4px;color:var(--primary-dark)}
+.card h3{font-size:15px;font-weight:600;margin:16px 0 8px;color:var(--text)}
+.card p,.card li{font-size:14px;line-height:1.6;color:var(--muted)}
+.card ul{padding-left:20px;margin:8px 0}
+.code-block{position:relative;background:var(--code-bg);color:var(--code-text);padding:16px;border-radius:8px;font-family:var(--mono);font-size:12.5px;line-height:1.7;overflow-x:auto;margin:12px 0;white-space:pre-wrap;word-break:break-word}
+.copy-btn{position:absolute;top:8px;right:8px;background:rgba(255,255,255,.1);border:none;color:#94a3b8;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-family:var(--font)}
+.copy-btn:hover{background:rgba(255,255,255,.2);color:#fff}
+.copy-btn.copied{color:var(--success)}
+.status{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600}
+.status-pass{background:#dcfce7;color:#166534}
+.status-fail{background:#fef2f2;color:#991b1b}
+.status-warn{background:#fef9c3;color:#854d0e}
+.status-pending{background:#f3f4f6;color:#6b7280}
+.status-checking{background:#eff6ff;color:#1e40af}
+@media(prefers-color-scheme:dark){.status-pass{background:#14532d;color:#86efac}.status-fail{background:#7f1d1d;color:#fca5a5}.status-warn{background:#713f12;color:#fde68a}.status-pending{background:#374151;color:#9ca3af}.status-checking{background:#1e3a5f;color:#93c5fd}}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;border:none;cursor:pointer;transition:all .15s}
+.btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{background:var(--primary-dark)}
+.btn-outline{background:transparent;border:2px solid var(--border);color:var(--text)}.btn-outline:hover{border-color:var(--primary);color:var(--primary)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-sm{padding:6px 14px;font-size:12px}
+.btn-row{display:flex;gap:12px;margin-top:20px;flex-wrap:wrap}
+.info-box{background:#ecfdf5;border-left:4px solid var(--primary);padding:12px 16px;border-radius:0 8px 8px 0;margin:12px 0;font-size:13px;color:#065f46}
+.warn-box{background:#fef9c3;border-left:4px solid var(--warn);padding:12px 16px;border-radius:0 8px 8px 0;margin:12px 0;font-size:13px;color:#854d0e}
+.error-box{background:#fef2f2;border-left:4px solid var(--error);padding:12px 16px;border-radius:0 8px 8px 0;margin:12px 0;font-size:13px;color:#991b1b}
+@media(prefers-color-scheme:dark){.info-box{background:#052e16;color:#86efac}.warn-box{background:#422006;color:#fde68a}.error-box{background:#450a0a;color:#fca5a5}}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--border)}
+th{font-weight:600;color:var(--text);background:var(--bg)}
+.check-item{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:14px}
+.check-item input[type=checkbox]{width:18px;height:18px;accent-color:var(--primary)}
+.result-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin:16px 0}
+.result-card{padding:16px;border-radius:8px;text-align:center}
+.result-card.rpass{background:#dcfce7;color:#166534}
+.result-card.rfail{background:#fef2f2;color:#991b1b}
+.result-card.rpending{background:#f3f4f6;color:#6b7280}
+.result-card .icon{font-size:28px;margin-bottom:4px}
+.result-card .label{font-size:12px;font-weight:600}
+.footer{text-align:center;padding:16px;font-size:12px;color:var(--muted);border-top:1px solid var(--border);margin-top:auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .6s linear infinite;display:inline-block;vertical-align:middle}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+  <h1>SITREP — Setup Wizard</h1>
+  <span class="badge">Instalacion</span>
+</div>
+
+<div class="container">
+  <div class="stepper" id="stepper"></div>
+  <div id="stepContent"></div>
+  <div class="btn-row" style="justify-content:space-between">
+    <button class="btn btn-outline" id="btnPrev" onclick="prevStep()">&#8592; Anterior</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-outline btn-sm" id="btnSkip" onclick="skipStep()">Saltar</button>
+      <button class="btn btn-primary" id="btnNext" onclick="nextStep()">Siguiente &#8594;</button>
+    </div>
+  </div>
+</div>
+
+<div class="footer">SITREP — Sistema de Trazabilidad de Residuos Peligrosos | Gobierno de Mendoza — DGFA | 2026</div>
+
+<script>
+/* === Safe DOM helpers === */
+function el(tag, attrs, children) {
+  var e = document.createElement(tag);
+  if (attrs) Object.keys(attrs).forEach(function(k) {
+    if (k === 'className') e.className = attrs[k];
+    else if (k === 'onclick') e.addEventListener('click', attrs[k]);
+    else if (k === 'textContent') e.textContent = attrs[k];
+    else e.setAttribute(k, attrs[k]);
+  });
+  if (typeof children === 'string') e.textContent = children;
+  else if (Array.isArray(children)) children.forEach(function(c) { if (c) e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+  return e;
+}
+function clearEl(id) { var e = document.getElementById(id); while (e && e.firstChild) e.removeChild(e.firstChild); return e; }
+
+/* === State === */
+var TOTAL = 8, cur = 1, status = {}, token = null;
+try { var s = JSON.parse(localStorage.getItem('sitrep_setup') || '{}'); if (s.status) status = s.status; if (s.cur) cur = s.cur; if (s.token) token = s.token; } catch(e) {}
+function save() { try { localStorage.setItem('sitrep_setup', JSON.stringify({status:status,cur:cur,token:token})); } catch(e) {} }
+
+var STEPS = [
+  {id:1,title:'Servidor Web'},{id:2,title:'Base de Datos'},{id:3,title:'Backend API'},
+  {id:4,title:'Frontend'},{id:5,title:'Admin Inicial'},{id:6,title:'Actores'},
+  {id:7,title:'Email'},{id:8,title:'Verificacion'}
+];
+
+/* === Stepper === */
+function renderStepper() {
+  var box = clearEl('stepper');
+  STEPS.forEach(function(step, i) {
+    var st = status[step.id] || 'pending';
+    var dot = el('div', {className:'step-dot' + (step.id===cur?' active':st==='pass'?' done':st==='fail'?' error':st==='warn'?' warn':''), title:step.title, onclick:function(){cur=step.id;render();}}, String(step.id));
+    box.appendChild(dot);
+    if (i < STEPS.length-1) box.appendChild(el('div',{className:'step-line'+(st==='pass'?' done':'')}));
+  });
+}
+
+/* === Code block with safe copy === */
+function codeBlock(code) {
+  var wrap = el('div',{className:'code-block'});
+  wrap.appendChild(document.createTextNode(code.trim()));
+  var btn = el('button',{className:'copy-btn',textContent:'Copiar',onclick:function(){
+    navigator.clipboard.writeText(code.trim());
+    btn.textContent='Copiado!'; btn.classList.add('copied');
+    setTimeout(function(){btn.textContent='Copiar';btn.classList.remove('copied');},2000);
+  }});
+  wrap.appendChild(btn);
+  return wrap;
+}
+
+function statusBadge(st) {
+  var labels = {pass:'Completado',fail:'Error',warn:'Advertencia',checking:'Verificando...',pending:'Pendiente'};
+  var badge = el('span',{className:'status status-'+(st||'pending')}, labels[st||'pending']);
+  if (st==='checking') { badge.textContent=''; badge.appendChild(el('span',{className:'spinner'})); badge.appendChild(document.createTextNode(' Verificando...')); }
+  return badge;
+}
+
+function infoBox(msg,type) { var d=el('div',{className:(type||'info')+'-box'}); d.textContent=msg; return d; }
+
+function resultBox(id) { return el('div',{id:id}); }
+
+function verifyBtn(label,fn) { return el('button',{className:'btn btn-primary btn-sm',textContent:label,onclick:fn}); }
+
+/* === Step renderers === */
+function renderStep1(box) {
+  var isHttps = location.protocol === 'https:';
+  if (!status[1]) { status[1]='pass'; save(); }
+  box.appendChild(el('h2',{},['Paso 1: Servidor Web ',statusBadge(status[1])]));
+  box.appendChild(el('p',{},'Si estas viendo esta pagina, Nginx esta funcionando correctamente.'));
+  var tbl = el('table');
+  [['\u{1F310} Dominio',location.hostname],['\u{1F512} Protocolo',location.protocol+(isHttps?' (SSL activo)':' (sin SSL)')],['URL',location.href]].forEach(function(r){
+    var tr=el('tr'); tr.appendChild(el('td',{},el('strong',{},r[0]))); tr.appendChild(el('td',{},r[1])); tbl.appendChild(tr);
+  });
+  box.appendChild(tbl);
+  if (isHttps) box.appendChild(infoBox('SSL configurado correctamente con Let\'s Encrypt.'));
+  else { box.appendChild(infoBox('SSL no detectado. Ejecutar certbot para obtener el certificado.','warn')); box.appendChild(codeBlock('certbot --nginx -d '+location.hostname)); }
+  box.appendChild(el('h3',{},'Si aun no instalaste Nginx:'));
+  box.appendChild(codeBlock('apt update && apt install -y nginx certbot python3-certbot-nginx\nufw allow 80/tcp && ufw allow 443/tcp'));
+}
+
+function renderStep2(box) {
+  box.appendChild(el('h2',{},['Paso 2: Base de Datos (PostgreSQL) ',statusBadge(status[2])]));
+  box.appendChild(el('p',{},'SITREP usa PostgreSQL 15 en un container Docker.'));
+  box.appendChild(el('h3',{},'Instalar Docker'));
+  box.appendChild(codeBlock('apt install -y docker.io docker-compose-plugin\nsystemctl enable docker'));
+  box.appendChild(el('h3',{},'Crear docker-compose.yml en /opt/sitrep-db/'));
+  box.appendChild(codeBlock("version: '3.8'\nservices:\n  postgres:\n    image: postgres:15-alpine\n    container_name: sitrep-postgres\n    restart: unless-stopped\n    environment:\n      POSTGRES_USER: sitrep\n      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}\n      POSTGRES_DB: trazabilidad_rrpp\n    ports:\n      - \"127.0.0.1:5432:5432\"\n    volumes:\n      - pgdata:/var/lib/postgresql/data\n    command: >\n      postgres\n        -c max_connections=100\n        -c shared_buffers=256MB\nvolumes:\n  pgdata:"));
+  box.appendChild(el('h3',{},'Iniciar'));
+  box.appendChild(codeBlock('cd /opt/sitrep-db\nPOSTGRES_PASSWORD=$(openssl rand -base64 32)\necho "POSTGRES_PASSWORD=$POSTGRES_PASSWORD" > .env\necho "Guardar este password: $POSTGRES_PASSWORD"\ndocker compose up -d'));
+  var row=el('div',{className:'btn-row'}); row.appendChild(verifyBtn('Verificar PostgreSQL',checkStep2)); box.appendChild(row);
+  box.appendChild(resultBox('r2'));
+}
+
+function renderStep3(box) {
+  box.appendChild(el('h2',{},['Paso 3: Backend API (Node.js) ',statusBadge(status[3])]));
+  box.appendChild(el('p',{},'El backend corre en Node.js 20 con PM2 en modo cluster.'));
+  box.appendChild(el('h3',{},'Instalar Node.js 20'));
+  box.appendChild(codeBlock('curl -fsSL https://deb.nodesource.com/setup_20.x | bash -\napt install -y nodejs\nnpm install -g pm2\npm2 startup'));
+  box.appendChild(el('h3',{},'Deploy del backend (desde maquina local)'));
+  box.appendChild(codeBlock('cd peliresi/backend\nnpm ci && npm run build\ntar czf /tmp/sitrep-backend.tar.gz dist package.json package-lock.json prisma ecosystem.config.js\nscp /tmp/sitrep-backend.tar.gz root@SERVIDOR:/tmp/'));
+  box.appendChild(el('h3',{},'En el servidor'));
+  box.appendChild(codeBlock('mkdir -p /var/www/sitrep-backend\ncd /var/www/sitrep-backend\ntar xzf /tmp/sitrep-backend.tar.gz\nnpm ci --production\nnpx prisma generate\nnpx prisma db push'));
+  box.appendChild(el('h3',{},'Crear .env'));
+  box.appendChild(codeBlock('NODE_ENV=production\nPORT=3002\nDATABASE_URL="postgresql://sitrep:TU_PASSWORD@localhost:5432/trazabilidad_rrpp?schema=public&connection_limit=20&pool_timeout=10"\nJWT_SECRET=GENERAR_CON_openssl_rand_base64_64\nJWT_EXPIRES_IN=24h\nJWT_REFRESH_SECRET=GENERAR_OTRO_DISTINTO\nJWT_REFRESH_EXPIRES_IN=7d\nFRONTEND_URL=https://'+location.hostname+'\nCORS_ORIGIN=https://'+location.hostname+'\nSUPER_ADMIN_EMAIL=admin@dgfa.mendoza.gov.ar\nENABLE_ANALYTICS=true\nSMTP_HOST=smtp-relay.brevo.com\nSMTP_PORT=587\nSMTP_USER=apikey\nSMTP_PASS=TU_API_KEY_BREVO\nSMTP_FROM="SITREP <no-reply@sitrep.ultimamilla.com.ar>"\nDISABLE_EMAILS=true\nEMAIL_DAILY_LIMIT_TRANSACCIONAL=10\nEMAIL_DAILY_LIMIT_ALERTA=6\nLOG_LEVEL=info'));
+  box.appendChild(el('h3',{},'Iniciar con PM2'));
+  box.appendChild(codeBlock('cd /var/www/sitrep-backend\npm2 start ecosystem.config.js\npm2 save'));
+  var row=el('div',{className:'btn-row'}); row.appendChild(verifyBtn('Verificar Backend',checkStep3)); box.appendChild(row);
+  box.appendChild(resultBox('r3'));
+}
+
+function renderStep4(box) {
+  box.appendChild(el('h2',{},['Paso 4: Frontend (React) ',statusBadge(status[4])]));
+  box.appendChild(el('p',{},'El frontend es una SPA compilada con Vite. Se sirve como archivos estaticos.'));
+  box.appendChild(el('h3',{},'Build y deploy (desde maquina local)'));
+  box.appendChild(codeBlock('cd peliresi/frontend\necho \'VITE_API_URL=https://'+location.hostname+'/api\' > .env.production\nnpm ci && npm run build\nnpx vite build --config vite.config.app.ts\ncd dist && tar czf /tmp/sitrep-frontend.tar.gz . && cd ..\ncd dist-app && tar czf /tmp/sitrep-app.tar.gz . && cd ..\nscp /tmp/sitrep-frontend.tar.gz /tmp/sitrep-app.tar.gz root@SERVIDOR:/tmp/'));
+  box.appendChild(el('h3',{},'En el servidor'));
+  box.appendChild(codeBlock('cd /var/www/sitrep && tar xzf /tmp/sitrep-frontend.tar.gz && chmod -R 755 .\nmkdir -p /var/www/sitrep/app && cd /var/www/sitrep/app\ntar xzf /tmp/sitrep-app.tar.gz && chmod -R 755 .'));
+  var row=el('div',{className:'btn-row'}); row.appendChild(verifyBtn('Verificar Frontend',checkStep4)); box.appendChild(row);
+  box.appendChild(resultBox('r4'));
+}
+
+function renderStep5(box) {
+  box.appendChild(el('h2',{},['Paso 5: Crear Admin Inicial ',statusBadge(status[5])]));
+  box.appendChild(el('p',{},'El seed crea el usuario administrador y el catalogo de tipos de residuo.'));
+  box.appendChild(codeBlock('cd /var/www/sitrep-backend\nnpx prisma db seed'));
+  box.appendChild(infoBox('Credenciales del admin: admin@dgfa.mendoza.gov.ar / admin123'));
+  box.appendChild(infoBox('Cambiar el password del admin inmediatamente despues del primer login.','warn'));
+  var row=el('div',{className:'btn-row'}); row.appendChild(verifyBtn('Verificar Login Admin',checkStep5)); box.appendChild(row);
+  box.appendChild(resultBox('r5'));
+}
+
+function renderStep6(box) {
+  box.appendChild(el('h2',{},['Paso 6: Cargar Actores Reales ',statusBadge(status[6])]));
+  box.appendChild(el('p',{},'Importar los actores reales del Registro Provincial de Mendoza.'));
+  var tbl=el('table'); var thead=el('thead'); var thr=el('tr'); ['Archivo','Registros','Fuente'].forEach(function(h){thr.appendChild(el('th',{},h));}); thead.appendChild(thr); tbl.appendChild(thead);
+  var tbody=el('tbody');
+  [['generadores-reales.csv','1,846','DPA Mendoza'],['operadores-reales.csv','52','DPA Mendoza'],['Registro Pcial de Transportistas de RRPP.xlsx','Variable','Registro Provincial']].forEach(function(r){
+    var tr=el('tr'); r.forEach(function(c){tr.appendChild(el('td',{},c));}); tbody.appendChild(tr);
+  }); tbl.appendChild(tbody); box.appendChild(tbl);
+  box.appendChild(codeBlock('cd /var/www/sitrep-backend\nnpx ts-node prisma/seed-generadores-reales.ts\nnpx ts-node prisma/seed-operadores-reales.ts\nnpx ts-node prisma/seed-transportistas-reales.ts\nnpx ts-node prisma/seed-admin-data.ts'));
+  var row=el('div',{className:'btn-row'}); row.appendChild(verifyBtn('Verificar Actores',checkStep6)); box.appendChild(row);
+  box.appendChild(resultBox('r6'));
+}
+
+function renderStep7(box) {
+  box.appendChild(el('h2',{},['Paso 7: Configurar Email ',statusBadge(status[7])]));
+  box.appendChild(el('p',{},'SITREP usa Brevo (gratis, 300 emails/dia) para notificaciones.'));
+  box.appendChild(el('h3',{},'1. Crear cuenta Brevo'));
+  box.appendChild(el('p',{},['Registrarse en ',el('a',{href:'https://www.brevo.com',target:'_blank'},'brevo.com'),' (gratis). Ir a Settings > SMTP & API > copiar API key.']));
+  box.appendChild(el('h3',{},'2. Configurar DNS en Cloudflare'));
+  var tbl=el('table'); var thead=el('thead'); var thr=el('tr'); ['Tipo','Nombre','Valor'].forEach(function(h){thr.appendChild(el('th',{},h));}); thead.appendChild(thr); tbl.appendChild(thead);
+  var tbody=el('tbody');
+  [['TXT','@','v=spf1 include:_spf.brevo.com ~all'],['TXT','brevokey._domainkey','(clave DKIM de Brevo)'],['TXT','_dmarc','v=DMARC1; p=none;']].forEach(function(r){
+    var tr=el('tr'); r.forEach(function(c){tr.appendChild(el('td',{},c));}); tbody.appendChild(tr);
+  }); tbl.appendChild(tbody); box.appendChild(tbl);
+  box.appendChild(el('h3',{},'3. Activar envio'));
+  box.appendChild(codeBlock('# Editar /var/www/sitrep-backend/.env:\nSMTP_PASS=xkeysib-TU-API-KEY\nDISABLE_EMAILS=false\n\n# Reiniciar:\npm2 restart sitrep-backend'));
+  var row=el('div',{className:'btn-row'}); row.appendChild(verifyBtn('Verificar Email Queue',checkStep7)); box.appendChild(row);
+  box.appendChild(resultBox('r7'));
+}
+
+function renderStep8(box) {
+  box.appendChild(el('h2',{},'Paso 8: Verificacion Final'));
+  box.appendChild(el('p',{},'Resumen del estado de la instalacion:'));
+  var grid=el('div',{className:'result-grid'});
+  var allPass=true;
+  STEPS.forEach(function(step){
+    if(step.id===8) return;
+    var st=status[step.id]||'pending';
+    if(st!=='pass') allPass=false;
+    var card=el('div',{className:'result-card '+(st==='pass'?'rpass':st==='fail'?'rfail':'rpending')});
+    card.appendChild(el('div',{className:'icon'},st==='pass'?'\u2713':st==='fail'?'\u2717':'\u25CF'));
+    card.appendChild(el('div',{className:'label'},step.title));
+    grid.appendChild(card);
+  });
+  box.appendChild(grid);
+
+  if(allPass){
+    status[8]='pass'; save();
+    var done=el('div',{className:'info-box',style:'font-size:16px;text-align:center;padding:24px'});
+    done.appendChild(el('strong',{},'\uD83C\uDF89 Sistema listo para produccion!'));
+    done.appendChild(el('br'));done.appendChild(el('br'));
+    var links=el('div',{style:'display:flex;gap:8px;justify-content:center;flex-wrap:wrap'});
+    links.appendChild(el('a',{href:'/login',className:'btn btn-primary',style:'color:#fff;text-decoration:none'},'Ir al Login'));
+    links.appendChild(el('a',{href:'/manual/',className:'btn btn-outline',style:'text-decoration:none'},'Ver Manual'));
+    links.appendChild(el('a',{href:'/inscripcion/generador',className:'btn btn-outline',style:'text-decoration:none'},'Probar Inscripcion'));
+    done.appendChild(links);
+    box.appendChild(done);
+  } else {
+    box.appendChild(infoBox('Hay pasos pendientes. Podes completarlos ahora o volver despues — el progreso se guarda.','warn'));
+    var links=el('div',{className:'btn-row',style:'justify-content:center'});
+    links.appendChild(el('a',{href:'/login',className:'btn btn-outline',style:'text-decoration:none'},'Ir al Login'));
+    links.appendChild(el('a',{href:'/manual/#devops-instalacion',className:'btn btn-outline',style:'text-decoration:none'},'Guia Completa'));
+    box.appendChild(links);
+  }
+
+  box.appendChild(el('h3',{style:'margin-top:24px'},'Checklist post-instalacion'));
+  ['Backup automatico configurado (cron 3 AM)','Health check cron activo (cada 5 min)','DNS apuntando al servidor correcto','Password del admin cambiado','DISABLE_EMAILS=false en .env','Smoke test ejecutado'].forEach(function(t){
+    var item=el('div',{className:'check-item'});
+    item.appendChild(el('input',{type:'checkbox'}));
+    item.appendChild(document.createTextNode(t));
+    box.appendChild(item);
+  });
+}
+
+/* === Main render === */
+function render() {
+  var box=clearEl('stepContent');
+  var card=el('div',{className:'card'});
+  switch(cur){
+    case 1:renderStep1(card);break;case 2:renderStep2(card);break;case 3:renderStep3(card);break;
+    case 4:renderStep4(card);break;case 5:renderStep5(card);break;case 6:renderStep6(card);break;
+    case 7:renderStep7(card);break;case 8:renderStep8(card);break;
+  }
+  box.appendChild(card);
+  document.getElementById('btnPrev').style.display=cur>1?'':'none';
+  document.getElementById('btnSkip').style.display=cur<TOTAL?'':'none';
+  document.getElementById('btnNext').textContent=cur===TOTAL?'Ir al Login \u2192':'Siguiente \u2192';
+  renderStepper(); save();
+  window.scrollTo(0,0);
+}
+
+/* === Checks === */
+function showResult(id,type,msg){var r=clearEl(id);if(r){r.appendChild(infoBox(msg,type));}}
+
+function checkStep2(){
+  status[2]='checking'; render();
+  fetch('/api/health',{signal:AbortSignal.timeout(5000)}).then(function(r){return r.json();}).then(function(d){
+    if(d.db==='connected'){status[2]='pass';showResult('r2','info','PostgreSQL conectado via backend API.');}
+    else{status[2]='warn';showResult('r2','warn','Backend responde pero DB no conecta.');}
+    renderStepper();save();
+  }).catch(function(){
+    showResult('r2','info','Backend aun no disponible (normal en este paso). Verificar Docker manualmente.');
+    status[2]='pending';renderStepper();save();
+  });
+}
+
+function checkStep3(){
+  status[3]='checking'; render();
+  fetch('/api/health',{signal:AbortSignal.timeout(5000)}).then(function(r){return r.json();}).then(function(d){
+    if(d.status==='ok'&&d.db==='connected'){status[3]='pass';showResult('r3','info','Backend OK. DB conectada, uptime: '+Math.round(d.uptime)+'s');}
+    else{status[3]='warn';showResult('r3','warn','Backend responde pero status: '+JSON.stringify(d));}
+    renderStepper();save();
+  }).catch(function(){
+    status[3]='fail';showResult('r3','error','Backend no responde. Verificar: pm2 logs sitrep-backend');
+    renderStepper();save();
+  });
+}
+
+function checkStep4(){
+  status[4]='checking'; render();
+  fetch('/',{signal:AbortSignal.timeout(5000)}).then(function(r){return r.text();}).then(function(html){
+    if(html.indexOf('id="root"')>-1&&html.indexOf('Setup Wizard')===-1){
+      status[4]='pass';showResult('r4','info','Frontend SPA cargado correctamente.');
+    } else {
+      status[4]='warn';showResult('r4','warn','La raiz (/) aun no tiene la SPA. Despliega el frontend.');
+    }
+    renderStepper();save();
+  }).catch(function(){
+    status[4]='fail';showResult('r4','error','No se pudo cargar /. Verificar Nginx.');
+    renderStepper();save();
+  });
+}
+
+function checkStep5(){
+  status[5]='checking'; render();
+  fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({email:'admin@dgfa.mendoza.gov.ar',password:'admin123'}),
+    signal:AbortSignal.timeout(5000)
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.success&&d.data&&d.data.tokens){
+      token=d.data.tokens.accessToken; save();
+      status[5]='pass';showResult('r5','info','Login admin exitoso. Token guardado para pasos siguientes.');
+    } else {
+      status[5]='fail';showResult('r5','error','Login fallo: '+(d.message||'respuesta inesperada')+'. Ejecutar seed.');
+    }
+    renderStepper();save();
+  }).catch(function(){
+    status[5]='fail';showResult('r5','error','Backend no responde. Completar pasos 2-3 primero.');
+    renderStepper();save();
+  });
+}
+
+function checkStep6(){
+  if(!token){showResult('r6','warn','Completar Paso 5 primero.');return;}
+  status[6]='checking'; render();
+  fetch('/api/catalogos/generadores',{headers:{'Authorization':'Bearer '+token},signal:AbortSignal.timeout(10000)
+  }).then(function(r){return r.json();}).then(function(d){
+    var items=d.data||d; var count=Array.isArray(items)?items.length:0;
+    if(count>10){status[6]='pass';showResult('r6','info',count+' generadores encontrados.');}
+    else if(count>0){status[6]='warn';showResult('r6','warn','Solo '+count+' generadores. Ejecutar seeds reales.');}
+    else{status[6]='fail';showResult('r6','error','0 generadores. Ejecutar los seeds.');}
+    renderStepper();save();
+  }).catch(function(){
+    status[6]='fail';showResult('r6','error','Error consultando generadores.');
+    renderStepper();save();
+  });
+}
+
+function checkStep7(){
+  if(!token){showResult('r7','warn','Completar Paso 5 primero.');return;}
+  status[7]='checking'; render();
+  fetch('/api/admin/email-queue?limit=1',{headers:{'Authorization':'Bearer '+token},signal:AbortSignal.timeout(5000)
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.data!==undefined){status[7]='pass';showResult('r7','info','Email queue activa. Total: '+(d.total||0)+' emails.');}
+    else{status[7]='warn';showResult('r7','warn','Respuesta inesperada del endpoint.');}
+    renderStepper();save();
+  }).catch(function(){
+    status[7]='fail';showResult('r7','error','Email queue no responde.');
+    renderStepper();save();
+  });
+}
+
+/* === Navigation === */
+function nextStep(){if(cur===TOTAL){window.location.href='/login';return;}cur++;render();}
+function prevStep(){if(cur>1){cur--;render();}}
+function skipStep(){if(!status[cur]||status[cur]==='pending')status[cur]='warn';nextStep();}
+
+/* === Auto-detect on load === */
+fetch('/api/health',{signal:AbortSignal.timeout(3000)}).then(function(r){return r.json();}).then(function(d){
+  if(d.status==='ok'&&d.db==='connected'){
+    status[1]='pass';status[2]='pass';status[3]='pass';
+    return fetch('/',{signal:AbortSignal.timeout(2000)});
+  }
+}).then(function(r){if(r)return r.text();}).then(function(html){
+  if(html&&html.indexOf('id="root"')>-1&&html.indexOf('Setup Wizard')===-1) status[4]='pass';
+  return fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({email:'admin@dgfa.mendoza.gov.ar',password:'admin123'}),signal:AbortSignal.timeout(3000)});
+}).then(function(r){if(r)return r.json();}).then(function(d){
+  if(d&&d.success&&d.data&&d.data.tokens){status[5]='pass';token=d.data.tokens.accessToken;save();}
+  render();
+}).catch(function(){render();});
+</script>
+</body>
+</html>
