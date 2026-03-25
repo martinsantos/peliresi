@@ -5,7 +5,7 @@ Permite el seguimiento completo del ciclo de vida de manifiestos: desde la gener
 
 **📚 Documentación Unificada**: Ver [`../INFRAESTRUCTURA.md`](../INFRAESTRUCTURA.md) para arquitectura completa de ambos servidores (Producción + Preview), stack tecnológico compartido, y CI/CD workflows.
 
-**Última actualización CI/CD**: 2026-02-15 - Backend workflow con Prisma binary fix + atomic deployments + rollback automático. Database compartida con Directus en PostgreSQL container.
+**Última actualización**: 2026-03-25 - Email queue/digest, inscripcion publica, CalculadoraTEF fix, auditoria fase 2, structured logging. Database compartida con Directus en PostgreSQL container.
 
 ## General Rules
 
@@ -54,6 +54,10 @@ Permite el seguimiento completo del ciclo de vida de manifiestos: desde la gener
 - ✅ Production API: All systems operational at https://sitrep.ultimamilla.com.ar/api
 
 **Recent Enhancements**:
+- ✅ **Email Queue + Digest System (2026-03-24):** DB-backed email queue (`email_queue` table) con 3 enums. Transaccional = envio inmediato + retry. Alertas = digest horario por destinatario. Rate limits: 10 transaccional/dia, 6 digest/dia. `DISABLE_EMAILS` kill switch. `FOR UPDATE SKIP LOCKED` cluster-safe. `GET /api/admin/email-queue` endpoint. Timer flush cada 5 min. Migracion a Brevo documentada.
+- ✅ **CalculadoraTEF Fix (2026-03-24):** Eliminado loop infinito de re-renders (React error #185) en wizard de inscripcion. Causa: flujo bidireccional reactivo entre wizard y calculadora. Solucion: `forwardRef` + `useImperativeHandle`, padre lee valores on-demand via ref.
+- ✅ **Inscripcion Publica de Actores (2026-03-23):** Wizards de auto-registro en `/inscripcion/generador`, `/inscripcion/operador`, `/inscripcion/transportista`. Phase 1: cuenta (POST /api/solicitudes/iniciar). Phase 2: wizard multi-paso con TEF. Arbitracion admin con mensajeria bidireccional. Modelos: SolicitudInscripcion, DocumentoSolicitud, MensajeSolicitud.
+- ✅ **Auditoria Fase 2 (2026-03-24):** Reducido `as any` 138→62, ARIA labels, structured logging (pino), Service Worker cleanup (v22), session timeout improvements.
 - ✅ **Blockchain Integridad Completa (2026-03-20):** 2 sellos blockchain (Genesis + Cierre) + rolling hash chain en cada cambio de estado. Tabla `blockchain_sellos`, endpoints verificar-integridad/verificar-lote, BlockchainPanel rediseñado con 2 sellos, badge ShieldCheck en lista manifiestos, panel verificación masiva en AdminBlockchainPage. 7 manifiestos migrados.
 - ✅ Cross-platform workflow test script: `backend/tests/cross-platform-workflow-test.sh` (59 tests)
 - ✅ Demo credentials aligned: Frontend DEMO_CREDENTIALS + MOCK_USERS match actual seeded DB users
@@ -217,6 +221,8 @@ ssh root@23.105.176.45 "docker exec directus-admin-database-1 psql -U directus -
 - **alertas_generadas**: manifiestoId, estado
 - **anomalias_transporte**: manifiestoId
 - **blockchain_sellos**: manifiestoId, status, hash, [manifiestoId+tipo] (unique)
+- **email_queue**: [estado+nextRetryAt], [to+createdAt], digestKey
+- **solicitudes_inscripcion**: usuarioId, estado, [tipoActor+estado]
 
 ---
 
@@ -237,6 +243,9 @@ ssh root@23.105.176.45 "docker exec directus-admin-database-1 psql -U directus -
 | `/api/pdf/*` | pdf.controller | Generación de PDF de manifiestos y certificados de disposición |
 | `/api/centro-control/*` | tracking.controller | Centro de Control: actividad por capas, mapa, estadísticas |
 | `/api/blockchain/*` | blockchain.controller | Certificación blockchain: status, registrar, verificar hash, registro, verificar-integridad, verificar-lote |
+| `/api/solicitudes/*` | solicitud.controller | Inscripcion publica, wizard CRUD, arbitracion admin, documentos, mensajeria |
+| `/api/renovaciones/*` | renovacion.controller | Renovaciones anuales: listar, crear, aprobar, rechazar |
+| `/api/search/*` | search.controller | Busqueda global (Cmd+K) en manifiestos, actores, usuarios |
 
 ### Key API Endpoints
 
@@ -283,6 +292,22 @@ GET  /api/blockchain/verificar/:hash   → Verificar hash en smart contract (pú
 GET  /api/blockchain/registro          → Lista manifiestos con blockchain (ADMIN, paginado, incluye sellos)
 GET  /api/blockchain/verificar-integridad/:id → Verificación completa: genesis + rolling chain + cierre (ADMIN)
 GET  /api/blockchain/verificar-lote    → Verificación masiva de integridad (ADMIN, params: fechaDesde, fechaHasta, estado)
+POST /api/solicitudes/iniciar        → Crear cuenta (activo:false) + SolicitudInscripcion (publico, sin auth)
+GET  /api/solicitudes/               → Listar solicitudes (ADMIN + sub-admins)
+GET  /api/solicitudes/mis-solicitudes → Solicitudes propias del candidato (auth)
+GET  /api/solicitudes/:id            → Detalle solicitud (auth)
+PUT  /api/solicitudes/:id            → Actualizar datos wizard (auth)
+POST /api/solicitudes/:id/enviar     → Enviar para revision (auth)
+POST /api/solicitudes/:id/documentos → Upload documento (multipart, 10MB max)
+POST /api/solicitudes/:id/revisar    → Marcar EN_REVISION (ADMIN)
+POST /api/solicitudes/:id/observar   → Pedir correcciones (ADMIN)
+POST /api/solicitudes/:id/aprobar    → Aprobar + crear actor (ADMIN)
+POST /api/solicitudes/:id/rechazar   → Rechazar solicitud (ADMIN)
+GET  /api/solicitudes/:id/mensajes   → Mensajes bidireccionales (auth)
+POST /api/solicitudes/:id/mensajes   → Enviar mensaje (auth)
+GET  /api/admin/email-queue          → Cola de emails con filtros (ADMIN, paginado)
+POST /api/admin/impersonate/:userId  → Generar JWT de impersonacion (ADMIN)
+PUT  /api/admin/preferencias-notificacion → Actualizar preferencias email (auth)
 ```
 
 ### Frontend Filter Mapping
@@ -298,6 +323,9 @@ La función `mapFilters()` en `reporte.service.ts` traduce entre ambos.
 | `GENERADOR` | Sus manifiestos (filtrado por generadorId), crear borradores, perfil |
 | `TRANSPORTISTA` | Sus manifiestos (filtrado por transportistaId), tracking GPS, viaje en curso, "Tomar Viaje" desde perfil |
 | `OPERADOR` | Sus manifiestos (filtrado por operadorId), recibir, tratar |
+| `ADMIN_TRANSPORTISTA` | Solicitudes de transportistas, CRUD transportistas del sector |
+| `ADMIN_GENERADOR` | Solicitudes de generadores, CRUD generadores del sector |
+| `ADMIN_OPERADOR` | Solicitudes de operadores, CRUD operadores del sector |
 
 ---
 
@@ -449,6 +477,104 @@ Los campos `blockchainHash`, `blockchainTxHash`, `blockchainBlockNumber`, `block
 
 ---
 
+## Email Queue + Digest System (2026-03-24)
+
+### Arquitectura
+
+Todos los emails pasan por una cola en DB (`email_queue`). Transaccionales se envian inmediato con retry; alertas se agrupan en digests horarios por destinatario.
+
+**Flujo**: `emailService.send*()` → INSERT email_queue → flush timer (5min) → SMTP send
+
+### Tabla EmailQueue
+
+```
+email_queue:
+  id, to, subject, html (Text), tipo (TRANSACCIONAL|ALERTA),
+  prioridad (CRITICA|NORMAL|BAJA), estado (PENDIENTE|ENVIADO|FALLIDO|DIGEST_PENDIENTE|SUPRIMIDO),
+  intentos, maxIntentos (default 3), error, digestKey,
+  createdAt, sentAt, nextRetryAt
+  @@index([estado, nextRetryAt])
+  @@index([to, createdAt])
+  @@index([digestKey])
+```
+
+### Clasificacion de Emails
+
+| Metodo | Tipo | Prioridad | Comportamiento |
+|--------|------|-----------|---------------|
+| sendEmailVerification | TRANSACCIONAL | CRITICA | Inmediato |
+| sendPasswordResetEmail | TRANSACCIONAL | CRITICA | Inmediato |
+| sendRegistroPendienteEmail | TRANSACCIONAL | NORMAL | Inmediato |
+| sendCuentaAprobadaEmail | TRANSACCIONAL | NORMAL | Inmediato |
+| sendNuevoRegistroAdminEmail | TRANSACCIONAL | NORMAL | Inmediato |
+| sendAlertEmail | ALERTA | BAJA | Digest horario |
+
+### Rate Limits (por destinatario por dia)
+
+- TRANSACCIONAL: max 10/dia (env: `EMAIL_DAILY_LIMIT_TRANSACCIONAL`)
+- ALERTA digest: max 6/dia (env: `EMAIL_DAILY_LIMIT_ALERTA`)
+- Excedido → estado = SUPRIMIDO (queda en DB para auditoria)
+
+### Flush Timer
+
+- Intervalo: 5 min (env: `EMAIL_FLUSH_INTERVAL_MS`)
+- Cluster-safe: `FOR UPDATE SKIP LOCKED` en PostgreSQL
+- Paso 1: Retry FALLIDO (intentos < max)
+- Paso 2: Agrupar DIGEST_PENDIENTE por digestKey → 1 email digest por grupo
+- Paso 3: Expirar FALLIDO con intentos >= max → SUPRIMIDO
+
+### Environment Variables
+
+| Variable | Default | Descripcion |
+|----------|---------|-------------|
+| DISABLE_EMAILS | false | Kill switch — suprime envios, sigue encolando |
+| EMAIL_DAILY_LIMIT_TRANSACCIONAL | 10 | Max transaccionales/dia/destinatario |
+| EMAIL_DAILY_LIMIT_ALERTA | 6 | Max digests/dia/destinatario |
+| EMAIL_FLUSH_INTERVAL_MS | 300000 | Intervalo flush (5 min) |
+| EMAIL_MAX_RETRIES | 3 | Max intentos antes de SUPRIMIDO |
+| SMTP_HOST | localhost | Servidor SMTP |
+| SMTP_PORT | 25 | Puerto SMTP |
+| SMTP_USER | (opcional) | Auth SMTP |
+| SMTP_PASS | (opcional) | Password SMTP |
+| SMTP_FROM | SITREP <no-reply@...> | Remitente |
+
+### Migracion a Brevo (futuro)
+
+Solo cambiar SMTP_HOST/USER/PASS en .env. Sin cambios de codigo. Ver spec completo: `docs/superpowers/specs/2026-03-24-email-queue-digest-design.md`
+
+---
+
+## Sistema de Inscripcion Publica
+
+### Flujo
+
+**Phase 1 — Registro** (publico, sin auth):
+`POST /api/solicitudes/iniciar` → crea Usuario (activo:false) + SolicitudInscripcion (BORRADOR)
+
+**Phase 2 — Wizard** (auth con token de Phase 1):
+Multi-paso segun tipo de actor:
+- Generador: 7 pasos (Establecimiento, Regulatorio, Domicilios, Adicional, Calculo TEF, Documentos, Resumen)
+- Operador: 8 pasos (Establecimiento, Regulatorio, Domicilios, Representantes, Corrientes, Calculo TEF, Documentos, Resumen)
+- Transportista: 5 pasos (Datos Basicos, Habilitacion, Vehiculos, Documentos, Resumen)
+
+**Arbitracion Admin**:
+ENVIADA → EN_REVISION → APROBADA (crea actor) | OBSERVADA (pide correcciones) | RECHAZADA
+
+### Modelos
+
+- `SolicitudInscripcion`: id, usuarioId, tipoActor, estado (EstadoSolicitud), datosActor (JSON), datosResiduos, datosTEF, datosRegulatorio, fechaEnvio, fechaRevision, revisadoPor, motivoRechazo, observaciones
+- `DocumentoSolicitud`: id, solicitudId, tipo (CONSTANCIA_AFIP, MEMORIA_TECNICA, etc.), nombre, path, estado (PENDIENTE|APROBADO|RECHAZADO), observacion
+- `MensajeSolicitud`: id, solicitudId, emisorId, texto, esAdmin, createdAt
+
+### Frontend
+
+| Pagina | Archivo | Descripcion |
+|--------|---------|-------------|
+| Wizard Inscripcion | `pages/public/InscripcionWizardPage.tsx` | Auto-registro publico con CalculadoraTEF |
+| Mi Solicitud | `pages/solicitud/MiSolicitudPage.tsx` | Vista candidato de su solicitud |
+
+---
+
 ## Frontend Pages (src-v6)
 
 ### Dashboard & Control
@@ -584,7 +710,7 @@ CUALQUIERA (excepto CANCELADO/TRATADO) → CANCELADO
 ### Configuration
 - **manifest.json** (main): scope `/`, start_url `/`
 - **manifest-app.json** (mobile): scope `/app/`, start_url `/app/`, orientation portrait
-- **Service Worker**: `public/sw.js` — network-first strategy, cache `trazabilidad-rrpp-v4`, API excluded from cache
+- **Service Worker**: `public/sw.js` — network-first strategy, cache `trazabilidad-rrpp-v22`, API excluded from cache
 - **Offline**: Custom `/offline.html` fallback page
 - **Icons**: `icon-192.png`, `icon-512.png` (maskable)
 
@@ -639,7 +765,7 @@ bash backend/tests/smoke-test.sh http://localhost:3002
 
 ### Service Worker Versioning
 
-- **Current version**: v10 (`sw.js` cache name: `trazabilidad-rrpp-v10`)
+- **Current version**: v22 (`sw.js` cache name: `trazabilidad-rrpp-v22`)
 - **Bump on deploy**: After deploying new frontend code, increment cache version in `frontend/public/sw.js` (`CACHE_NAME` and `RUNTIME_CACHE`) and redeploy `sw.js` to force PWA clients to fetch fresh assets
 
 ---
@@ -812,7 +938,7 @@ POSIBLES PREOCUPACIONES:
 
 ---
 
-## CI/CD Status (Updated 2026-02-15)
+## CI/CD Status (Updated 2026-03-25)
 
 ### ✅ Active Workflows
 

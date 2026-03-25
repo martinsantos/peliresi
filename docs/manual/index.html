@@ -72,6 +72,8 @@
     <a href="#mod-blockchain" class="nav-link level-2">3.10 Certificacion Blockchain</a>
     <a href="#mod-estadisticas" class="nav-link level-2">3.11 Estadisticas</a>
     <a href="#mod-inscripcion" class="nav-link level-2">3.12 Inscripcion, Wizards y TEF</a>
+    <a href="#mod-emails" class="nav-link level-2">3.13 Emails y Alertas</a>
+    <a href="#mod-renovaciones" class="nav-link level-2">3.14 Renovaciones Anuales</a>
   </div>
 
   <div class="nav-section-title" onclick="toggleNavGroup(this)">4. Aplicacion Movil</div>
@@ -1853,6 +1855,104 @@ Donde: R = Z x A x D x C</pre>
 </tbody>
 </table>
 
+</section>
+
+<!-- ============================================================ -->
+<!-- SECTION 3.13: SISTEMA DE EMAILS Y ALERTAS                     -->
+<!-- ============================================================ -->
+
+<section id="mod-emails" data-role="admin">
+<h3>3.13 Sistema de Emails y Alertas</h3>
+<div class="section-intro">
+SITREP utiliza una <strong>cola de emails en base de datos</strong> que garantiza que ningun email se pierda, permite reintentos automaticos y agrupa las alertas en resúmenes periodicos (digests) para no saturar los buzones de los destinatarios.
+</div>
+
+<h4>3.13.1 Tipos de Email</h4>
+<table>
+<thead><tr><th>Tipo</th><th>Ejemplos</th><th>Comportamiento</th></tr></thead>
+<tbody>
+<tr><td><strong>Transaccional</strong></td><td>Verificacion de cuenta, reset de password, cuenta aprobada, solicitud observada</td><td>Se intenta enviar inmediatamente. Si falla, queda en cola para reintento automatico (hasta 3 intentos).</td></tr>
+<tr><td><strong>Alerta</strong></td><td>Cambios de estado de manifiestos, incidentes, anomalias GPS, tiempo excesivo</td><td>Se acumulan y se envian como un <strong>resumen (digest)</strong> cada hora agrupado por destinatario. Un solo email con todas las alertas del periodo.</td></tr>
+</tbody>
+</table>
+
+<h4>3.13.2 Digests de Alertas</h4>
+<p>En vez de enviar un email por cada evento, el sistema agrupa las alertas del mismo destinatario dentro de la misma hora y envia un solo email resumen:</p>
+<div class="info-box">
+<strong>Ejemplo de digest:</strong><br>
+Asunto: [SITREP] Resumen de alertas — 2026-03-24 14:00<br><br>
+3 alertas en este periodo:<br>
+&bull; MAN-2026-0042: Estado cambio a EN_TRANSITO<br>
+&bull; MAN-2026-0043: Incidente reportado (averia)<br>
+&bull; MAN-2026-0041: Tiempo excesivo (52 horas)
+</div>
+
+<h4>3.13.3 Rate Limits</h4>
+<p>Para proteger contra saturacion de buzones:</p>
+<table>
+<thead><tr><th>Tipo</th><th>Limite por destinatario por dia</th></tr></thead>
+<tbody>
+<tr><td>Transaccional</td><td>10 emails/dia</td></tr>
+<tr><td>Digest de alertas</td><td>6 emails/dia</td></tr>
+</tbody>
+</table>
+<p>Los emails que excedan el limite quedan con estado <code>SUPRIMIDO</code> en la base de datos para auditoria.</p>
+
+<h4>3.13.4 Panel Admin — Cola de Emails</h4>
+<p>Los administradores pueden ver el estado de la cola de emails en <code>GET /api/admin/email-queue</code> con filtros por estado, destinatario y fecha. Esto permite:</p>
+<ul>
+<li>Ver emails pendientes, enviados, fallidos o suprimidos</li>
+<li>Diagnosticar problemas de entrega</li>
+<li>Verificar que los digests se estan generando correctamente</li>
+<li>Identificar destinatarios con emails suprimidos por rate limit</li>
+</ul>
+
+<h4>3.13.5 Estados de un Email</h4>
+<table>
+<thead><tr><th>Estado</th><th>Descripcion</th></tr></thead>
+<tbody>
+<tr><td><code>PENDIENTE</code></td><td>Transaccional esperando envio inmediato</td></tr>
+<tr><td><code>DIGEST_PENDIENTE</code></td><td>Alerta esperando agrupacion en digest</td></tr>
+<tr><td><code>ENVIADO</code></td><td>Enviado exitosamente via SMTP</td></tr>
+<tr><td><code>FALLIDO</code></td><td>Error de envio, se reintentara automaticamente</td></tr>
+<tr><td><code>SUPRIMIDO</code></td><td>Rate limit excedido o max reintentos alcanzados</td></tr>
+</tbody>
+</table>
+
+<h4>3.13.6 Kill Switch</h4>
+<p>La variable de entorno <code>DISABLE_EMAILS=true</code> suprime todos los envios SMTP pero sigue encolando emails en la base de datos. Util para mantenimiento o migraciones. Al desactivar el switch, los emails pendientes se procesan en el proximo ciclo de flush (cada 5 minutos).</p>
+</section>
+
+<!-- ============================================================ -->
+<!-- SECTION 3.14: RENOVACIONES ANUALES                            -->
+<!-- ============================================================ -->
+
+<section id="mod-renovaciones" data-role="all">
+<h3>3.14 Renovaciones Anuales</h3>
+<div class="section-intro">
+Los actores registrados (generadores, operadores) deben renovar su inscripcion anualmente. SITREP gestiona este proceso de forma digital con aprobacion del administrador.
+</div>
+
+<h4>3.14.1 Flujo de Renovacion</h4>
+<table>
+<thead><tr><th>Paso</th><th>Quien</th><th>Accion</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Actor</td><td>Ingresa a su perfil y solicita renovacion para el anio vigente. Indica si hay cambios en sus datos (<code>SIN_CAMBIOS</code> o <code>CON_CAMBIOS</code>).</td></tr>
+<tr><td>2</td><td>Actor</td><td>Si hay cambios, completa los campos modificados y adjunta nueva documentacion.</td></tr>
+<tr><td>3</td><td>Admin</td><td>Revisa la solicitud de renovacion en <code>/admin/renovaciones</code>.</td></tr>
+<tr><td>4</td><td>Admin</td><td>Aprueba (actualiza datos del actor + nueva fecha de vencimiento) o rechaza (con motivo).</td></tr>
+</tbody>
+</table>
+
+<h4>3.14.2 Estados</h4>
+<ul>
+<li><strong>PENDIENTE:</strong> Solicitud enviada, esperando revision del admin.</li>
+<li><strong>APROBADA:</strong> Datos actualizados, inscripcion renovada.</li>
+<li><strong>RECHAZADA:</strong> El admin rechazo la renovacion con motivo documentado.</li>
+</ul>
+
+<h4>3.14.3 Datos de la Renovacion</h4>
+<p>Cada renovacion registra: anio, tipo de cambio, datos anteriores y nuevos (JSON), documentos adjuntos, fecha de aprobacion/rechazo, y quien la proceso.</p>
 </section>
 
 <!-- ============================================================ -->
@@ -5318,6 +5418,15 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <table>
 <thead><tr><th>Version</th><th>Fecha</th><th>Descripcion de Cambios</th></tr></thead>
 <tbody>
+<tr><td><strong>2026.8</strong></td><td>Marzo 2026</td><td>
+<ul>
+<li>Nueva seccion 3.13: Sistema de Emails y Alertas — cola de emails en DB, digests horarios por destinatario, rate limits, panel admin de cola, kill switch.</li>
+<li>Nueva seccion 3.14: Renovaciones Anuales — flujo de renovacion con aprobacion admin.</li>
+<li>Fix critico: CalculadoraTEF ya no causa congelamiento del navegador (loop infinito de re-renders eliminado).</li>
+<li>Navegacion del wizard de inscripcion desbloqueada: se puede avanzar entre pasos sin completar campos.</li>
+<li>Auditoria Fase 2: reduccion de casting inseguro, etiquetas ARIA de accesibilidad, logging estructurado.</li>
+</ul>
+</td></tr>
 <tr><td><strong>2026.7</strong></td><td>Marzo 2026</td><td>
 <ul>
 <li>Nueva seccion 3.12: Inscripcion Publica y Solicitudes — auto-inscripcion para generadores (7 pasos), operadores (8 pasos) y transportistas (5 pasos).</li>
@@ -5400,7 +5509,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <footer class="site-footer">
 <p><strong>SITREP</strong> &mdash; Sistema de Trazabilidad de Residuos Peligrosos</p>
 <p>Direccion General de Fiscalizacion Ambiental (DGFA) &mdash; Gobierno de Mendoza</p>
-<p>Version 2026.7 &mdash; Actualizado el 23 de marzo de 2026</p>
+<p>Version 2026.8 &mdash; Actualizado el 25 de marzo de 2026</p>
 <p style="margin-top:0.5rem;font-size:0.8rem;color:#9CA3AF;">Conforme a Ley Nacional 24.051, Decreto 831/93 y Ley Provincial 5917</p>
 <p style="margin-top:0.25rem;font-size:0.8rem;color:#9CA3AF;">Este documento es propiedad del Gobierno de la Provincia de Mendoza.</p>
 <p style="margin-top:0.25rem;font-size:0.8rem;color:#9CA3AF;">Desarrollo y operacion a cargo de Ultima Milla Soluciones Tecnologicas.</p>
