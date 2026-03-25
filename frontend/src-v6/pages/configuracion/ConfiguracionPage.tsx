@@ -48,6 +48,10 @@ const ConfiguracionPage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [notifNuevoRegistro, setNotifNuevoRegistro] = useState(true);
   const [notifEmail, setNotifEmail] = useState(true);
+  const [notifWhatsapp, setNotifWhatsapp] = useState(false);
+  const [notifTelegram, setNotifTelegram] = useState(false);
+  const [whatsappPhone, setWhatsappPhone] = useState('');
+  const [telegramChatId, setTelegramChatId] = useState('');
   const [savingNotif, setSavingNotif] = useState(false);
   const { currentUser, isAdmin } = useAuth();
 
@@ -76,6 +80,10 @@ const ConfiguracionPage: React.FC = () => {
         if ((u as any).notifEmail !== undefined) {
           setNotifEmail((u as any).notifEmail);
         }
+        if ((u as any).notifWhatsapp !== undefined) setNotifWhatsapp((u as any).notifWhatsapp);
+        if ((u as any).notifTelegram !== undefined) setNotifTelegram((u as any).notifTelegram);
+        if ((u as any).whatsappPhone) setWhatsappPhone((u as any).whatsappPhone);
+        if ((u as any).telegramChatId) setTelegramChatId((u as any).telegramChatId);
       }).catch(() => {});
     }
   }, [currentUser]);
@@ -284,6 +292,92 @@ const ConfiguracionPage: React.FC = () => {
               </div>
             </div>
 
+            {/* WhatsApp */}
+            <div>
+              <h4 className="font-medium text-neutral-900 mb-1">WhatsApp (proximamente)</h4>
+              <p className="text-sm text-neutral-500 mb-4">
+                Recibir notificaciones de manifiestos y alertas via WhatsApp.
+              </p>
+              <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-neutral-200">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-neutral-900 text-sm">Recibir alertas por WhatsApp</p>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    Las alertas tambien llegaran a tu WhatsApp
+                  </p>
+                </div>
+                <button
+                  disabled={savingNotif}
+                  onClick={() => handleToggleNotif('notifWhatsapp', !notifWhatsapp)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${notifWhatsapp ? 'bg-green-600' : 'bg-neutral-300'}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${notifWhatsapp ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+              </div>
+              {notifWhatsapp && (
+                <div className="mt-2">
+                  <label className="block text-xs font-medium text-neutral-600 mb-1">Telefono WhatsApp (con codigo de pais)</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="tel"
+                      value={whatsappPhone}
+                      onChange={(e) => setWhatsappPhone(e.target.value)}
+                      placeholder="+54 261 XXXXXXX"
+                      className="flex-1 px-3 py-2 rounded-lg border border-neutral-200 text-sm focus:border-[#1B5E3C] focus:outline-none"
+                    />
+                    <button
+                      onClick={() => handleToggleNotif('whatsappPhone', whatsappPhone as any)}
+                      className="px-3 py-2 bg-[#1B5E3C] text-white text-sm rounded-lg font-medium"
+                    >
+                      Guardar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Telegram */}
+            <div>
+              <h4 className="font-medium text-neutral-900 mb-1">Telegram (proximamente)</h4>
+              <p className="text-sm text-neutral-500 mb-4">
+                Recibir notificaciones via bot de Telegram.
+              </p>
+              <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-neutral-200">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-neutral-900 text-sm">Recibir alertas por Telegram</p>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    Configura tu Chat ID de Telegram para recibir alertas
+                  </p>
+                </div>
+                <button
+                  disabled={savingNotif}
+                  onClick={() => handleToggleNotif('notifTelegram', !notifTelegram)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${notifTelegram ? 'bg-blue-500' : 'bg-neutral-300'}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${notifTelegram ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+              </div>
+              {notifTelegram && (
+                <div className="mt-2">
+                  <label className="block text-xs font-medium text-neutral-600 mb-1">Chat ID de Telegram</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={telegramChatId}
+                      onChange={(e) => setTelegramChatId(e.target.value)}
+                      placeholder="Tu chat ID numerico"
+                      className="flex-1 px-3 py-2 rounded-lg border border-neutral-200 text-sm focus:border-[#1B5E3C] focus:outline-none"
+                    />
+                    <button
+                      onClick={() => handleToggleNotif('telegramChatId', telegramChatId as any)}
+                      className="px-3 py-2 bg-[#1B5E3C] text-white text-sm rounded-lg font-medium"
+                    >
+                      Guardar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Solo para ADMIN */}
             {isAdmin && (
               <div>
@@ -322,17 +416,19 @@ const ConfiguracionPage: React.FC = () => {
     { id: 'notificaciones', label: 'Notificaciones', icon: Bell },
   ];
 
-  const handleToggleNotif = async (field: 'notifNuevoRegistro' | 'notifEmail', val: boolean) => {
+  const handleToggleNotif = async (field: string, val: any) => {
     setSavingNotif(true);
     try {
       await api.put('/admin/preferencias-notificacion', { [field]: val });
-      if (field === 'notifNuevoRegistro') {
-        setNotifNuevoRegistro(val);
-        toast.success('Preferencia guardada', val ? 'Recibirás emails de nuevos registros.' : 'No recibirás emails de nuevos registros.');
-      } else {
-        setNotifEmail(val);
-        toast.success('Preferencia guardada', val ? 'Recibirás alertas por email.' : 'No recibirás alertas por email.');
+      switch (field) {
+        case 'notifNuevoRegistro': setNotifNuevoRegistro(val); break;
+        case 'notifEmail': setNotifEmail(val); break;
+        case 'notifWhatsapp': setNotifWhatsapp(val); break;
+        case 'notifTelegram': setNotifTelegram(val); break;
+        case 'whatsappPhone': setWhatsappPhone(val); break;
+        case 'telegramChatId': setTelegramChatId(val); break;
       }
+      toast.success('Preferencia guardada', 'Configuracion de notificaciones actualizada.');
     } catch {
       toast.error('Error', 'No se pudo guardar la preferencia.');
     } finally {

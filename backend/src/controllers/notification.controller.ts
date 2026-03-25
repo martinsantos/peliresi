@@ -16,7 +16,7 @@ class NotificationService {
         return admins.map(a => a.id);
     }
 
-    // Crear notificación para un usuario
+    // Crear notificacion para un usuario + enviar por canales configurados
     async crearNotificacion(data: {
         usuarioId: string;
         tipo: TipoNotificacion;
@@ -26,7 +26,7 @@ class NotificationService {
         manifiestoId?: string;
         prioridad?: PrioridadNotificacion;
     }) {
-        return prisma.notificacion.create({
+        const notif = await prisma.notificacion.create({
             data: {
                 usuarioId: data.usuarioId,
                 tipo: data.tipo,
@@ -37,6 +37,46 @@ class NotificationService {
                 prioridad: data.prioridad || 'NORMAL'
             }
         });
+
+        // Send via configured channels (fire-and-forget, never blocks)
+        setImmediate(async () => {
+            try {
+                const user = await prisma.usuario.findUnique({
+                    where: { id: data.usuarioId },
+                    select: { email: true, nombre: true, notifEmail: true, notifWhatsapp: true, notifTelegram: true, whatsappPhone: true, telegramChatId: true },
+                });
+                if (!user) return;
+
+                // Email channel
+                if (user.notifEmail) {
+                    const subject = `[SITREP] ${data.titulo}`;
+                    emailService.sendAlertEmail(
+                        [user.email],
+                        { nombre: data.titulo, descripcion: data.mensaje },
+                        data.manifiestoId || null,
+                        { mensaje: data.mensaje, ...(data.datos || {}) },
+                    ).catch(() => {});
+                }
+
+                // WhatsApp channel (placeholder — requires integration with WhatsApp Business API)
+                if (user.notifWhatsapp && user.whatsappPhone) {
+                    console.log(`[NOTIF][WhatsApp] To: ${user.whatsappPhone} | ${data.titulo}: ${data.mensaje}`);
+                    // TODO: Integrate with WhatsApp Business API or Twilio
+                    // await whatsappService.send(user.whatsappPhone, `*${data.titulo}*\n${data.mensaje}`);
+                }
+
+                // Telegram channel (placeholder — requires Telegram Bot API)
+                if (user.notifTelegram && user.telegramChatId) {
+                    console.log(`[NOTIF][Telegram] ChatId: ${user.telegramChatId} | ${data.titulo}: ${data.mensaje}`);
+                    // TODO: Integrate with Telegram Bot API
+                    // await telegramService.send(user.telegramChatId, `*${data.titulo}*\n${data.mensaje}`);
+                }
+            } catch (err) {
+                console.error('[NOTIF] Error sending via channels:', err);
+            }
+        });
+
+        return notif;
     }
 
     // Notificar a usuarios por rol
@@ -214,140 +254,6 @@ class NotificationService {
                 prioridad: nuevoEstado === 'RECHAZADO' ? 'ALTA' : 'NORMAL'
             })
         ));
-    }
-    // Disparar alerta para un evento — llamar desde manifiesto.controller.ts con setImmediate()
-    // Nunca lanza excepciones — los errores se loguean y se ignoran
-    async dispararAlertaEvento(params: {
-        evento: string;
-        manifiestoId: string;
-        realizadoPorId: string;
-        datos?: Record<string, any>;
-    }): Promise<void> {
-        try {
-            const { evento, manifiestoId, realizadoPorId, datos } = params;
-
-            if (evento === 'CAMBIO_ESTADO' && datos?.estadoNuevo) {
-                await this.notificarCambioEstado(manifiestoId, datos.estadoNuevo, realizadoPorId);
-            } else if (evento === 'INCIDENTE') {
-                const m = await prisma.manifiesto.findUnique({
-                    where: { id: manifiestoId },
-                    select: { numero: true, operador: { select: { usuario: { select: { id: true } } } } }
-                });
-                if (m) {
-                    const destinatarios: string[] = [];
-                    const opUserId = m.operador?.usuario?.id;
-                    if (opUserId && opUserId !== realizadoPorId) destinatarios.push(opUserId);
-                    const adminIds = await this.getAdminIds();
-                    adminIds.forEach(id => { if (!destinatarios.includes(id) && id !== realizadoPorId) destinatarios.push(id); });
-                    await Promise.all(destinatarios.map(usuarioId =>
-                        this.crearNotificacion({
-                            usuarioId,
-                            tipo: 'INCIDENTE_REPORTADO',
-                            titulo: '⚠️ Incidente en Tránsito',
-                            mensaje: `Incidente reportado en manifiesto ${m.numero}${datos?.descripcion ? ': ' + datos.descripcion : ''}`,
-                            manifiestoId,
-                            prioridad: 'ALTA'
-                        })
-                    ));
-                }
-            } else if (evento === 'RECHAZO_CARGA') {
-                const m = await prisma.manifiesto.findUnique({
-                    where: { id: manifiestoId },
-                    select: { numero: true, generador: { select: { usuario: { select: { id: true } } } } }
-                });
-                if (m) {
-                    const destinatarios: string[] = [];
-                    const genUserId = m.generador?.usuario?.id;
-                    if (genUserId && genUserId !== realizadoPorId) destinatarios.push(genUserId);
-                    const adminIds = await this.getAdminIds();
-                    adminIds.forEach(id => { if (!destinatarios.includes(id) && id !== realizadoPorId) destinatarios.push(id); });
-                    await Promise.all(destinatarios.map(usuarioId =>
-                        this.crearNotificacion({
-                            usuarioId,
-                            tipo: 'MANIFIESTO_RECHAZADO',
-                            titulo: '❌ Carga Rechazada',
-                            mensaje: `La carga del manifiesto ${m.numero} fue rechazada`,
-                            manifiestoId,
-                            prioridad: 'ALTA'
-                        })
-                    ));
-                }
-            } else if (evento === 'DIFERENCIA_PESO') {
-                const m = await prisma.manifiesto.findUnique({
-                    where: { id: manifiestoId },
-                    select: { numero: true, generador: { select: { usuario: { select: { id: true } } } } }
-                });
-                if (m) {
-                    const destinatarios: string[] = [];
-                    const genUserId = m.generador?.usuario?.id;
-                    if (genUserId && genUserId !== realizadoPorId) destinatarios.push(genUserId);
-                    const adminIds = await this.getAdminIds();
-                    adminIds.forEach(id => { if (!destinatarios.includes(id) && id !== realizadoPorId) destinatarios.push(id); });
-                    await Promise.all(destinatarios.map(usuarioId =>
-                        this.crearNotificacion({
-                            usuarioId,
-                            tipo: 'ALERTA_SISTEMA',
-                            titulo: '⚖️ Diferencia de Peso Detectada',
-                            mensaje: `El manifiesto ${m.numero} presenta diferencia de peso${datos?.delta ? ' del ' + datos.delta : ''}`,
-                            manifiestoId,
-                            prioridad: 'ALTA'
-                        })
-                    ));
-                }
-            }
-
-            // Crear AlertaGenerada para cada regla activa que coincida (log global para ADMIN)
-            const reglas = await prisma.reglaAlerta.findMany({
-                where: { evento: evento as EventoAlerta, activa: true }
-            });
-            for (const regla of reglas) {
-                await prisma.alertaGenerada.create({
-                    data: {
-                        reglaId: regla.id,
-                        manifiestoId,
-                        datos: JSON.stringify(datos ?? {}),
-                        estado: 'PENDIENTE'
-                    }
-                });
-
-                // Notificar a destinatarios configurados en la regla
-                let destList: string[] = [];
-                try {
-                    destList = JSON.parse(regla.destinatarios || '[]');
-                } catch { /* malformed JSON, skip */ }
-
-                const roles = destList.filter((d: string) => !d.startsWith('email:'));
-                const emails = destList
-                    .filter((d: string) => d.startsWith('email:'))
-                    .map((d: string) => d.replace('email:', ''));
-
-                // Recopilar todos los emails: explícitos de la regla + usuarios del rol con notifEmail activo
-                const allEmailsSet = new Set<string>(emails);
-                for (const rol of roles) {
-                    await this.notificarPorRol(rol, {
-                        tipo: 'ALERTA_SISTEMA' as TipoNotificacion,
-                        titulo: regla.nombre,
-                        mensaje: `Regla activada: ${regla.nombre}${datos?.descripcion ? ' — ' + datos.descripcion : ''}`,
-                        manifiestoId,
-                        prioridad: 'ALTA' as PrioridadNotificacion
-                    });
-                    // Añadir emails de usuarios del rol que tienen notifEmail activo
-                    const usuariosConEmail = await prisma.usuario.findMany({
-                        where: { rol: rol as any, activo: true, notifEmail: true },
-                        select: { email: true },
-                    });
-                    usuariosConEmail.forEach(u => allEmailsSet.add(u.email));
-                }
-
-                if (allEmailsSet.size > 0) {
-                    await emailService.sendAlertEmail(Array.from(allEmailsSet), regla, manifiestoId, datos ?? {});
-                }
-            }
-
-            console.log(`[ALERTA] evento=${evento} manifiestoId=${manifiestoId}`);
-        } catch (err) {
-            console.error(`[ALERTA] Error disparando evento ${params.evento}:`, err);
-        }
     }
 }
 
