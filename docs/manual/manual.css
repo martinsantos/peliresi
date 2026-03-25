@@ -893,3 +893,34 @@ footer.site-footer strong{color:var(--primary-dark);}
   .hero-accent { font-size: 0.95rem; }
   pre { max-width: calc(100vw - 1.5rem); font-size: 0.72rem; }
 }
+
+/* ── v2026.8: Setup Wizard Mockups ── */
+.wm{border:2px solid var(--border-light,#d1d5db);border-radius:12px;overflow:hidden;margin:16px 0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif}
+.wm-hdr{background:#1B5E3C;color:#fff;padding:8px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+.wm-stepper{display:flex;gap:4px;padding:10px 12px;justify-content:center;align-items:center;background:#f3f4f6;border-bottom:1px solid #e5e7eb}
+.wm-dot{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;border:2px solid #d1d5db;color:#9ca3af;flex-shrink:0}
+.wm-dot.ac{background:#0D8A4F;color:#fff;border-color:#0D8A4F}
+.wm-dot.ok{background:#16a34a;color:#fff;border-color:#16a34a}
+.wm-line{width:12px;height:2px;background:#d1d5db;flex-shrink:0}
+.wm-line.ok{background:#16a34a}
+.wm-body{padding:16px;font-size:13px;color:#374151;line-height:1.6}
+.wm-body h4{font-size:14px;color:#1B5E3C;margin:0 0 8px}
+.wm-badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600}
+.wm-badge.pass{background:#dcfce7;color:#166534}
+.wm-badge.pending{background:#f3f4f6;color:#6b7280}
+.wm-badge.warn{background:#fef9c3;color:#854d0e}
+.wm-code{background:#1e293b;color:#e2e8f0;padding:8px 12px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.5;overflow-x:auto;margin:8px 0;white-space:pre}
+.wm-tbl{width:100%;border-collapse:collapse;margin:8px 0;font-size:12px}
+.wm-tbl td,.wm-tbl th{padding:4px 8px;border-bottom:1px solid #e5e7eb;text-align:left}
+.wm-tbl th{font-weight:600;background:#f9fafb}
+.wm-row{display:flex;gap:8px;margin-top:8px}
+.wm-btn{padding:4px 12px;border-radius:6px;font-size:11px;font-weight:600;border:none;cursor:default}
+.wm-btn.primary{background:#0D8A4F;color:#fff}
+.wm-btn.outline{background:#fff;border:1px solid #d1d5db;color:#374151}
+.phase-flow{display:flex;align-items:center;justify-content:center;gap:8px;margin:20px 0;flex-wrap:wrap}
+.phase-card{padding:12px 20px;border-radius:10px;font-weight:700;font-size:14px;text-align:center;min-width:140px}
+.phase-card.pre{background:#eff6ff;color:#1e40af;border:2px solid #bfdbfe}
+.phase-card.wizard{background:#ecfdf5;color:#065f46;border:2px solid #a7f3d0}
+.phase-card.post{background:#fef3c7;color:#92400e;border:2px solid #fde68a}
+.phase-arrow{font-size:24px;color:#9ca3af}
+@media(prefers-color-scheme:dark){.wm{background:#1a2e23;border-color:#374151}.wm-stepper{background:#1f2937}.wm-body{color:#d1d5db}.wm-tbl th{background:#1f2937}.wm-badge.pass{background:#14532d;color:#86efac}.phase-card.pre{background:#1e3a5f;color:#93c5fd;border-color:#1e40af}.phase-card.wizard{background:#052e16;color:#86efac;border-color:#065f46}.phase-card.post{background:#422006;color:#fde68a;border-color:#92400e}}

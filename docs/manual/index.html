@@ -42,6 +42,14 @@
     <input type="text" id="searchInput" placeholder="Buscar en el manual...">
   </div>
 
+  <div class="nav-section-title active-parent" onclick="toggleNavGroup(this)">0. INSTALACION</div>
+  <div class="nav-group-items">
+    <a href="#instalacion-rapida" class="nav-link">Guia Rapida</a>
+    <a href="#inst-pre" class="nav-link level-2">Pre-Instalacion</a>
+    <a href="#inst-wizard" class="nav-link level-2">Wizard Interactivo</a>
+    <a href="#inst-post" class="nav-link level-2">Post-Instalacion</a>
+  </div>
+
   <div class="nav-section-title" onclick="toggleNavGroup(this)">1. Vision General</div>
   <div class="nav-group-items">
     <a href="#que-es-sitrep" class="nav-link">1.1 Que es SITREP</a>
@@ -312,6 +320,282 @@
   <button class="role-tab" data-role="transportista">Transportista</button>
   <button class="role-tab" data-role="operador">Operador</button>
 </div>
+
+<!-- ============================================================ -->
+<!-- SECTION 0: GUIA DE INSTALACION RAPIDA                         -->
+<!-- ============================================================ -->
+
+<section id="instalacion-rapida" data-role="admin">
+<h2>0. Guia de Instalacion del Sistema</h2>
+<div class="info-card role-card-admin">
+<p><strong>Esta seccion es para el equipo tecnico que instalara SITREP por primera vez.</strong> Si el sistema ya esta instalado y funcionando, podes saltar directamente a la <a href="#que-es-sitrep">Seccion 1: Vision General</a>.</p>
+</div>
+
+<p>La instalacion de SITREP sigue un proceso de 3 fases. Cada fase tiene pasos verificables que aseguran que el sistema quede correctamente configurado.</p>
+
+<!-- Flujo de fases -->
+<div class="phase-flow">
+  <div class="phase-card pre">A. Pre-Instalacion</div>
+  <div class="phase-arrow">&rarr;</div>
+  <div class="phase-card wizard">B. Wizard Interactivo</div>
+  <div class="phase-arrow">&rarr;</div>
+  <div class="phase-card post">C. Post-Instalacion</div>
+</div>
+
+<div style="text-align:center;margin:16px 0">
+  <a href="/setup.html" target="_blank" style="display:inline-block;background:#0D8A4F;color:#fff;padding:12px 28px;border-radius:8px;font-weight:700;font-size:15px;text-decoration:none">Abrir Wizard de Instalacion &rarr;</a>
+</div>
+
+<!-- ─── FASE A: PRE-INSTALACION ─── -->
+<h3 id="inst-pre">Fase A: Pre-Instalacion</h3>
+<p>Antes de ejecutar el wizard, asegurate de tener lo siguiente preparado:</p>
+
+<table>
+<thead><tr><th>Requisito</th><th>Detalle</th><th>Como verificar</th></tr></thead>
+<tbody>
+<tr><td><strong>Servidor</strong></td><td>Ubuntu 22.04 LTS, 2+ cores, 4GB+ RAM, 80GB+ SSD</td><td><code>ssh root@IP</code> funciona</td></tr>
+<tr><td><strong>Dominio DNS</strong></td><td>A record apuntando al IP del servidor en Cloudflare</td><td><code>dig sitrep.tudominio.com</code> retorna el IP</td></tr>
+<tr><td><strong>Firewall</strong></td><td>Puertos 22, 80, 443 abiertos</td><td><code>ufw status</code> muestra ALLOW</td></tr>
+<tr><td><strong>Repositorio</strong></td><td>Acceso a <code>github.com/martinsantos/peliresi</code></td><td><code>git clone</code> funciona</td></tr>
+<tr><td><strong>Cuenta Brevo</strong></td><td>Registrado en brevo.com (gratis), API key obtenida</td><td>API key empieza con <code>xkeysib-</code></td></tr>
+</tbody>
+</table>
+
+<h4>Comandos de preparacion del servidor</h4>
+<pre>
+# Conectarse al servidor
+ssh root@IP_DEL_SERVIDOR
+
+# Actualizar sistema
+apt update && apt upgrade -y
+apt install -y curl wget git ufw fail2ban htop unzip
+
+# Configurar firewall
+ufw allow OpenSSH && ufw allow 80/tcp && ufw allow 443/tcp
+ufw enable
+
+# Configurar zona horaria
+timedatectl set-timezone America/Argentina/Mendoza
+</pre>
+
+<div class="info-box">
+<strong>Verificacion:</strong> Al terminar, <code>ufw status</code> debe mostrar SSH, HTTP y HTTPS como ALLOW. El servidor esta listo para el wizard.
+</div>
+
+<!-- ─── FASE B: WIZARD INTERACTIVO ─── -->
+<h3 id="inst-wizard">Fase B: Wizard Interactivo (8 pasos)</h3>
+<p>El <a href="/setup.html" target="_blank"><strong>Wizard de Instalacion</strong></a> es una pagina HTML autocontenida que guia cada paso. Funciona incluso sin backend — ideal para un servidor recien preparado. A continuacion se muestra cada paso con su pantalla.</p>
+
+<!-- PASO 1 -->
+<h4>Paso 1: Servidor Web (Nginx)</h4>
+<p>El wizard detecta automaticamente si Nginx esta funcionando y si SSL esta activo.</p>
+<div class="wm">
+  <div class="wm-hdr">SITREP — Setup Wizard <span style="margin-left:auto;background:rgba(255,255,255,.15);padding:2px 8px;border-radius:10px;font-size:11px">Instalacion</span></div>
+  <div class="wm-stepper">
+    <div class="wm-dot ac">1</div><div class="wm-line"></div>
+    <div class="wm-dot">2</div><div class="wm-line"></div>
+    <div class="wm-dot">3</div><div class="wm-line"></div>
+    <div class="wm-dot">4</div><div class="wm-line"></div>
+    <div class="wm-dot">5</div><div class="wm-line"></div>
+    <div class="wm-dot">6</div><div class="wm-line"></div>
+    <div class="wm-dot">7</div><div class="wm-line"></div>
+    <div class="wm-dot">8</div>
+  </div>
+  <div class="wm-body">
+    <h4>Paso 1: Servidor Web <span class="wm-badge pass">Completado</span></h4>
+    <p>Si estas viendo esta pagina, Nginx esta funcionando correctamente.</p>
+    <table class="wm-tbl"><tr><td><strong>Dominio</strong></td><td>sitrep.ultimamilla.com.ar</td></tr><tr><td><strong>Protocolo</strong></td><td>https: <span class="wm-badge pass">SSL Activo</span></td></tr></table>
+  </div>
+</div>
+
+<!-- PASO 2 -->
+<h4>Paso 2: Base de Datos (PostgreSQL)</h4>
+<p>Se instala Docker y se levanta PostgreSQL 15 en un container aislado con tuning para produccion.</p>
+<div class="wm">
+  <div class="wm-hdr">SITREP — Setup Wizard</div>
+  <div class="wm-stepper">
+    <div class="wm-dot ok">1</div><div class="wm-line ok"></div>
+    <div class="wm-dot ac">2</div><div class="wm-line"></div>
+    <div class="wm-dot">3</div><div class="wm-line"></div>
+    <div class="wm-dot">4</div><div class="wm-line"></div>
+    <div class="wm-dot">5</div><div class="wm-line"></div>
+    <div class="wm-dot">6</div><div class="wm-line"></div>
+    <div class="wm-dot">7</div><div class="wm-line"></div>
+    <div class="wm-dot">8</div>
+  </div>
+  <div class="wm-body">
+    <h4>Paso 2: Base de Datos (PostgreSQL) <span class="wm-badge pending">Pendiente</span></h4>
+    <p>SITREP usa PostgreSQL 15 en un container Docker.</p>
+    <div class="wm-code">docker compose up -d</div>
+    <div class="wm-row"><span class="wm-btn primary">Verificar PostgreSQL</span></div>
+  </div>
+</div>
+
+<!-- PASO 3 -->
+<h4>Paso 3: Backend API (Node.js + PM2)</h4>
+<p>Se despliega el backend, se configura el archivo .env con todas las credenciales, y se inicia con PM2 en modo cluster.</p>
+<div class="wm">
+  <div class="wm-hdr">SITREP — Setup Wizard</div>
+  <div class="wm-stepper">
+    <div class="wm-dot ok">1</div><div class="wm-line ok"></div>
+    <div class="wm-dot ok">2</div><div class="wm-line ok"></div>
+    <div class="wm-dot ac">3</div><div class="wm-line"></div>
+    <div class="wm-dot">4</div><div class="wm-line"></div>
+    <div class="wm-dot">5</div><div class="wm-line"></div>
+    <div class="wm-dot">6</div><div class="wm-line"></div>
+    <div class="wm-dot">7</div><div class="wm-line"></div>
+    <div class="wm-dot">8</div>
+  </div>
+  <div class="wm-body">
+    <h4>Paso 3: Backend API <span class="wm-badge pass">Completado</span></h4>
+    <p>Backend OK — DB conectada, uptime: 142s</p>
+    <div class="wm-code">{"status":"ok","db":"connected","uptime":142}</div>
+  </div>
+</div>
+
+<!-- PASO 4 -->
+<h4>Paso 4: Frontend (React SPA)</h4>
+<p>Se compila el frontend con Vite y se despliega como archivos estaticos en Nginx.</p>
+<div class="wm">
+  <div class="wm-hdr">SITREP — Setup Wizard</div>
+  <div class="wm-stepper">
+    <div class="wm-dot ok">1</div><div class="wm-line ok"></div>
+    <div class="wm-dot ok">2</div><div class="wm-line ok"></div>
+    <div class="wm-dot ok">3</div><div class="wm-line ok"></div>
+    <div class="wm-dot ac">4</div><div class="wm-line"></div>
+    <div class="wm-dot">5</div><div class="wm-line"></div>
+    <div class="wm-dot">6</div><div class="wm-line"></div>
+    <div class="wm-dot">7</div><div class="wm-line"></div>
+    <div class="wm-dot">8</div>
+  </div>
+  <div class="wm-body">
+    <h4>Paso 4: Frontend (React) <span class="wm-badge pass">Completado</span></h4>
+    <p>Frontend SPA cargado correctamente.</p>
+    <div class="wm-code">cd dist && tar czf /tmp/sitrep-frontend.tar.gz .</div>
+  </div>
+</div>
+
+<!-- PASO 5 -->
+<h4>Paso 5: Crear Admin Inicial</h4>
+<p>El seed crea el usuario administrador, el catalogo de tipos de residuo, y datos base del sistema.</p>
+<div class="wm">
+  <div class="wm-hdr">SITREP — Setup Wizard</div>
+  <div class="wm-stepper">
+    <div class="wm-dot ok">1</div><div class="wm-line ok"></div>
+    <div class="wm-dot ok">2</div><div class="wm-line ok"></div>
+    <div class="wm-dot ok">3</div><div class="wm-line ok"></div>
+    <div class="wm-dot ok">4</div><div class="wm-line ok"></div>
+    <div class="wm-dot ac">5</div><div class="wm-line"></div>
+    <div class="wm-dot">6</div><div class="wm-line"></div>
+    <div class="wm-dot">7</div><div class="wm-line"></div>
+    <div class="wm-dot">8</div>
+  </div>
+  <div class="wm-body">
+    <h4>Paso 5: Admin Inicial <span class="wm-badge pass">Completado</span></h4>
+    <p>Login admin exitoso. Token guardado para pasos siguientes.</p>
+    <table class="wm-tbl"><tr><td><strong>Email</strong></td><td>admin@dgfa.mendoza.gov.ar</td></tr><tr><td><strong>Password</strong></td><td>admin123 (cambiar inmediatamente)</td></tr></table>
+  </div>
+</div>
+
+<!-- PASO 6 -->
+<h4>Paso 6: Cargar Actores Reales</h4>
+<p>Se importan los actores del Registro Provincial de Mendoza desde archivos CSV/Excel.</p>
+<div class="wm">
+  <div class="wm-hdr">SITREP — Setup Wizard</div>
+  <div class="wm-stepper">
+    <div class="wm-dot ok">1</div><div class="wm-line ok"></div>
+    <div class="wm-dot ok">2</div><div class="wm-line ok"></div>
+    <div class="wm-dot ok">3</div><div class="wm-line ok"></div>
+    <div class="wm-dot ok">4</div><div class="wm-line ok"></div>
+    <div class="wm-dot ok">5</div><div class="wm-line ok"></div>
+    <div class="wm-dot ac">6</div><div class="wm-line"></div>
+    <div class="wm-dot">7</div><div class="wm-line"></div>
+    <div class="wm-dot">8</div>
+  </div>
+  <div class="wm-body">
+    <h4>Paso 6: Actores Reales <span class="wm-badge pass">Completado</span></h4>
+    <p>1,846 generadores encontrados en el sistema.</p>
+    <table class="wm-tbl"><tr><th>Datos</th><th>Registros</th></tr><tr><td>Generadores</td><td>1,846</td></tr><tr><td>Operadores</td><td>52</td></tr><tr><td>Transportistas</td><td>Variable</td></tr></table>
+  </div>
+</div>
+
+<!-- PASO 7 -->
+<h4>Paso 7: Configurar Email (Brevo SMTP)</h4>
+<p>Se configura el envio de notificaciones via Brevo y los registros DNS para deliverability.</p>
+<div class="wm">
+  <div class="wm-hdr">SITREP — Setup Wizard</div>
+  <div class="wm-stepper">
+    <div class="wm-dot ok">1</div><div class="wm-line ok"></div>
+    <div class="wm-dot ok">2</div><div class="wm-line ok"></div>
+    <div class="wm-dot ok">3</div><div class="wm-line ok"></div>
+    <div class="wm-dot ok">4</div><div class="wm-line ok"></div>
+    <div class="wm-dot ok">5</div><div class="wm-line ok"></div>
+    <div class="wm-dot ok">6</div><div class="wm-line ok"></div>
+    <div class="wm-dot ac">7</div><div class="wm-line"></div>
+    <div class="wm-dot">8</div>
+  </div>
+  <div class="wm-body">
+    <h4>Paso 7: Email <span class="wm-badge pass">Completado</span></h4>
+    <p>Email queue activa. Total: 0 emails en cola.</p>
+    <table class="wm-tbl"><tr><th>DNS</th><th>Valor</th></tr><tr><td>SPF</td><td>v=spf1 include:_spf.brevo.com ~all</td></tr><tr><td>DKIM</td><td>brevokey._domainkey (configurado)</td></tr><tr><td>DMARC</td><td>v=DMARC1; p=none;</td></tr></table>
+  </div>
+</div>
+
+<!-- PASO 8 -->
+<h4>Paso 8: Verificacion Final</h4>
+<p>El wizard muestra un resumen visual de todos los pasos y un checklist post-instalacion.</p>
+<div class="wm">
+  <div class="wm-hdr">SITREP — Setup Wizard</div>
+  <div class="wm-stepper">
+    <div class="wm-dot ok">1</div><div class="wm-line ok"></div>
+    <div class="wm-dot ok">2</div><div class="wm-line ok"></div>
+    <div class="wm-dot ok">3</div><div class="wm-line ok"></div>
+    <div class="wm-dot ok">4</div><div class="wm-line ok"></div>
+    <div class="wm-dot ok">5</div><div class="wm-line ok"></div>
+    <div class="wm-dot ok">6</div><div class="wm-line ok"></div>
+    <div class="wm-dot ok">7</div><div class="wm-line ok"></div>
+    <div class="wm-dot ac">8</div>
+  </div>
+  <div class="wm-body" style="text-align:center">
+    <h4 style="font-size:18px;margin-bottom:12px">Sistema listo para produccion!</h4>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:12px 0">
+      <span class="wm-badge pass" style="padding:6px 14px">Servidor</span>
+      <span class="wm-badge pass" style="padding:6px 14px">PostgreSQL</span>
+      <span class="wm-badge pass" style="padding:6px 14px">Backend</span>
+      <span class="wm-badge pass" style="padding:6px 14px">Frontend</span>
+      <span class="wm-badge pass" style="padding:6px 14px">Admin</span>
+      <span class="wm-badge pass" style="padding:6px 14px">Actores</span>
+      <span class="wm-badge pass" style="padding:6px 14px">Email</span>
+    </div>
+    <div class="wm-row" style="justify-content:center"><span class="wm-btn primary">Ir al Login</span> <span class="wm-btn outline">Ver Manual</span></div>
+  </div>
+</div>
+
+<!-- ─── FASE C: POST-INSTALACION ─── -->
+<h3 id="inst-post">Fase C: Post-Instalacion</h3>
+<p>Una vez que el wizard muestra todos los pasos en verde, realizar estas tareas finales:</p>
+
+<table>
+<thead><tr><th>#</th><th>Tarea</th><th>Comando / Accion</th><th>Por que</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><strong>Cambiar password admin</strong></td><td>Login &rarr; Perfil &rarr; Cambiar contrasena</td><td>El password <code>admin123</code> es solo para el setup inicial</td></tr>
+<tr><td>2</td><td><strong>Configurar backup automatico</strong></td><td><pre style="margin:0;background:transparent;padding:0;font-size:12px">crontab -e
+0 3 * * * /opt/scripts-cicd/backup_sitrep.sh</pre></td><td>Backup diario a las 3 AM con rotacion de 30 dias</td></tr>
+<tr><td>3</td><td><strong>Activar health check</strong></td><td><pre style="margin:0;background:transparent;padding:0;font-size:12px">crontab -e
+*/5 * * * * /opt/scripts-cicd/healthcheck.sh</pre></td><td>Reinicio automatico si el backend cae</td></tr>
+<tr><td>4</td><td><strong>Activar envio de emails</strong></td><td><pre style="margin:0;background:transparent;padding:0;font-size:12px"># En .env del backend:
+DISABLE_EMAILS=false
+pm2 restart sitrep-backend</pre></td><td>Habilita verificacion de email, alertas y notificaciones</td></tr>
+<tr><td>5</td><td><strong>Ejecutar smoke test</strong></td><td><code>bash backend/tests/smoke-test.sh</code></td><td>Verifica que todos los 46 endpoints responden correctamente</td></tr>
+<tr><td>6</td><td><strong>Acceder al sistema</strong></td><td>Abrir <code>https://tudominio.com/login</code></td><td>Verificar que el login, dashboard y modulos funcionan</td></tr>
+</tbody>
+</table>
+
+<div class="info-box">
+<strong>Instalacion completa.</strong> Para referencia tecnica detallada de cada paso, consultar la <a href="#devops-instalacion">Seccion 15.12 — Guia de Instalacion</a> o el archivo <code>DEPLOY-NUEVO-SERVIDOR.md</code> en el repositorio.
+</div>
+
+</section>
 
 <!-- ============================================================ -->
 <!-- SECTION 1: VISION GENERAL                                     -->
