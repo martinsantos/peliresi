@@ -298,7 +298,7 @@ export const AlertasPage: React.FC = () => {
     if (!isAdmin) {
       // Non-admin: map notificaciones to AlertaLocal format
       const notifs = Array.isArray(apiNotifs) ? apiNotifs
-        : (apiNotifs as any)?.data?.notificaciones || (apiNotifs as any)?.notificaciones || [];
+        : (apiNotifs as any)?.items || (apiNotifs as any)?.data?.notificaciones || (apiNotifs as any)?.notificaciones || [];
       return notifs
         .filter((n: any) => !deletedIds.has(n.id))
         .map((n: any) => ({

@@ -2221,6 +2221,90 @@ Asunto: [SITREP] Resumen de alertas — 2026-03-24 14:00<br><br>
 
 <h4>3.13.6 Kill Switch</h4>
 <p>La variable de entorno <code>DISABLE_EMAILS=true</code> suprime todos los envios SMTP pero sigue encolando emails en la base de datos. Util para mantenimiento o migraciones. Al desactivar el switch, los emails pendientes se procesan en el proximo ciclo de flush (cada 5 minutos).</p>
+
+<h4>3.13.7 Canales de Contacto por Usuario</h4>
+<p>Cada usuario puede configurar sus canales de notificacion preferidos desde <strong>Configuracion &rarr; Notificaciones</strong> en su perfil. Las notificaciones se envian automaticamente por los canales activos cada vez que ocurre un evento relevante (manifiesto firmado, retiro asignado, incidente, etc.).</p>
+
+<div class="cu-screenshot">
+  <a href="screenshots/desktop/38_configuracion_notificaciones_email.png" target="_blank">
+    <img src="screenshots/desktop/38_configuracion_notificaciones_email.png" alt="Configuracion de notificaciones - canales de contacto" loading="lazy">
+  </a>
+  <div class="cu-screenshot-caption">Pantalla de Configuracion &rarr; Notificaciones donde cada usuario activa/desactiva sus canales</div>
+</div>
+
+<table>
+<thead><tr><th>Canal</th><th>Estado</th><th>Como configurar</th><th>Disponibilidad</th></tr></thead>
+<tbody>
+<tr>
+  <td><strong>Email</strong></td>
+  <td>Activo</td>
+  <td>Toggle "Recibir alertas por email" en Configuracion &rarr; Notificaciones. Usa el email registrado del usuario.</td>
+  <td>Todos los roles. Emails via cola con digest (no satura buzones).</td>
+</tr>
+<tr>
+  <td><strong>In-App</strong></td>
+  <td>Activo (siempre)</td>
+  <td>Automatico. Las notificaciones aparecen en el icono de campana y en la pagina /alertas.</td>
+  <td>Todos los roles. Sin configuracion necesaria.</td>
+</tr>
+<tr>
+  <td><strong>WhatsApp</strong></td>
+  <td>Proximamente</td>
+  <td>Toggle "Recibir alertas por WhatsApp" + ingresar numero de telefono con codigo de pais (+54 261...).</td>
+  <td>Requiere integracion con WhatsApp Business API. La configuracion ya esta lista en el sistema.</td>
+</tr>
+<tr>
+  <td><strong>Telegram</strong></td>
+  <td>Proximamente</td>
+  <td>Toggle "Recibir alertas por Telegram" + ingresar Chat ID de Telegram (obtenido via @userinfobot).</td>
+  <td>Requiere crear un Bot de Telegram con @BotFather. La configuracion ya esta lista en el sistema.</td>
+</tr>
+</tbody>
+</table>
+
+<div class="cu-screenshot">
+  <a href="screenshots/desktop/37_configuracion_general.png" target="_blank">
+    <img src="screenshots/desktop/37_configuracion_general.png" alt="Pagina de Configuracion general del perfil" loading="lazy">
+  </a>
+  <div class="cu-screenshot-caption">Pagina de Configuracion general — accesible desde el menu lateral para todos los roles</div>
+</div>
+
+<p><strong>Como acceder:</strong></p>
+<ol>
+<li>Hacer clic en <strong>Configuracion</strong> en el menu lateral izquierdo.</li>
+<li>Seleccionar la pestana <strong>Notificaciones</strong>.</li>
+<li>Activar o desactivar cada canal con el toggle correspondiente.</li>
+<li>Para WhatsApp: ingresar el numero de telefono y presionar "Guardar".</li>
+<li>Para Telegram: ingresar el Chat ID y presionar "Guardar".</li>
+</ol>
+
+<div class="info-box">
+<strong>Nota:</strong> Todos los usuarios (ADMIN, Generador, Transportista, Operador) reciben notificaciones in-app automaticamente. El email es opcional y se activa por usuario. WhatsApp y Telegram estaran disponibles cuando se integren las APIs externas correspondientes.
+</div>
+
+<h4>3.13.8 Notificaciones con Ubicacion (Link a Mapa)</h4>
+<p>Cuando un manifiesto es firmado (APROBADO), el <strong>transportista</strong> recibe una notificacion que incluye:</p>
+<ul>
+<li>Fecha estimada de retiro</li>
+<li>Direccion del generador (punto de retiro)</li>
+<li>Link <strong>"Ver ubicacion"</strong> que abre Google Maps (en mobile, abre la app nativa)</li>
+</ul>
+<p>El link usa las coordenadas GPS del generador: <code>https://maps.google.com/?q=lat,lng</code></p>
+
+<div class="cu-screenshot">
+  <a href="screenshots/desktop/39_mi_perfil.png" target="_blank">
+    <img src="screenshots/desktop/39_mi_perfil.png" alt="Perfil del usuario con datos de contacto" loading="lazy">
+  </a>
+  <div class="cu-screenshot-caption">Perfil del usuario — los datos de contacto (telefono, email) se usan para las notificaciones</div>
+</div>
+
+<h4>3.13.9 Recordatorios Automaticos</h4>
+<p>El sistema ejecuta un job automatico cada 6 horas que detecta manifiestos con retiro programado en las proximas 24 horas y envia recordatorios:</p>
+<ul>
+<li><strong>Al transportista:</strong> "Recordatorio: retiro manana MAN-XXX" con link a mapa y direccion del generador.</li>
+<li><strong>Al generador:</strong> "Recordatorio: el transportista [nombre] retirara manana".</li>
+</ul>
+<p>Los recordatorios se envian una sola vez por manifiesto (deduplicacion automatica).</p>
 </section>
 
 <!-- ============================================================ -->
