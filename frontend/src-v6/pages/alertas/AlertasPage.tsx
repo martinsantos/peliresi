@@ -35,6 +35,7 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { toast } from '../../components/ui/Toast';
 import { useAlertas, useResolverAlerta, useReglasAlerta, useCreateReglaAlerta, useUpdateReglaAlerta, useDeleteReglaAlerta } from '../../hooks/useAlertas';
+import { useNotificaciones, useMarcarLeida, useMarcarTodasLeidas } from '../../hooks/useNotificaciones';
 import { useAuth } from '../../contexts/AuthContext';
 import { alertaService } from '../../services/alerta.service';
 import { formatRelativeTime } from '../../utils/formatters';
@@ -96,6 +97,13 @@ const tipoConfig = {
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function getTipoFromNotifTipo(tipo: string): AlertaLocal['tipo'] {
+  if (tipo?.includes('RECHAZADO') || tipo?.includes('INCIDENTE')) return 'critical';
+  if (tipo?.includes('ANOMALIA') || tipo?.includes('ALERTA')) return 'warning';
+  if (tipo?.includes('TRATADO') || tipo?.includes('RECIBIDO')) return 'success';
+  return 'info';
+}
 
 function getTipoFromEvento(evento: string | undefined, estado: string): AlertaLocal['tipo'] {
   if (estado === 'RESUELTA' || estado === 'DESCARTADA') return 'success';
@@ -254,8 +262,14 @@ export const AlertasPage: React.FC = () => {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
 
-  const { data: apiAlertas, isLoading, isError } = useAlertas();
+  // ADMIN: alertas generadas por reglas | Non-ADMIN: notificaciones del usuario
+  const { data: apiAlertas, isLoading: isLoadingAlertas, isError: isErrorAlertas } = useAlertas(undefined, isAdmin);
+  const { data: apiNotifs, isLoading: isLoadingNotifs, isError: isErrorNotifs } = useNotificaciones(undefined);
+  const isLoading = isAdmin ? isLoadingAlertas : isLoadingNotifs;
+  const isError = isAdmin ? isErrorAlertas : isErrorNotifs;
   const resolverMutation = useResolverAlerta();
+  const marcarLeidaMutation = useMarcarLeida();
+  const marcarTodasLeidasMutation = useMarcarTodasLeidas();
 
   const { data: reglas } = useReglasAlerta();
   const createRegla = useCreateReglaAlerta();
@@ -281,6 +295,26 @@ export const AlertasPage: React.FC = () => {
   const [page, setPage] = useState(1);
 
   const alertas: AlertaLocal[] = useMemo(() => {
+    if (!isAdmin) {
+      // Non-admin: map notificaciones to AlertaLocal format
+      const notifs = Array.isArray(apiNotifs) ? apiNotifs
+        : (apiNotifs as any)?.data?.notificaciones || (apiNotifs as any)?.notificaciones || [];
+      return notifs
+        .filter((n: any) => !deletedIds.has(n.id))
+        .map((n: any) => ({
+          id: n.id,
+          tipo: getTipoFromNotifTipo(n.tipo),
+          titulo: n.titulo || 'Notificacion',
+          mensaje: n.mensaje || '',
+          fecha: n.createdAt,
+          leida: n.leida || false,
+          manifiestoId: n.manifiestoId,
+          manifiestoNumero: null,
+          evento: n.tipo,
+          estado: n.leida ? 'RESUELTA' : 'PENDIENTE',
+        }));
+    }
+    // Admin: alertas generadas by rules
     const items = Array.isArray(apiAlertas?.items) ? apiAlertas.items : [];
     return items
       .filter((a: any) => !deletedIds.has(a.id))
@@ -300,7 +334,7 @@ export const AlertasPage: React.FC = () => {
           estado,
         };
       });
-  }, [apiAlertas, deletedIds, resolvedIds]);
+  }, [isAdmin, apiAlertas, apiNotifs, deletedIds, resolvedIds]);
 
   const alertasFiltradas = useMemo(() => {
     const since = periodStart(periodo);
@@ -329,12 +363,21 @@ export const AlertasPage: React.FC = () => {
   // ─── Actions ───────────────────────────────────────────────────────────────
 
   const marcarComoLeida = (id: string) => {
+    if (!isAdmin) {
+      marcarLeidaMutation.mutate(id, {
+        onSuccess: () => {
+          setResolvedIds(prev => new Set(prev).add(id));
+          toast.success('Leida', 'Notificacion marcada como leida');
+        },
+      });
+      return;
+    }
     resolverMutation.mutate(
       { id, notas: 'Marcada como leida' },
       {
         onSuccess: () => {
           setResolvedIds(prev => new Set(prev).add(id));
-          toast.success('Alerta resuelta', 'La alerta fue marcada como leída');
+          toast.success('Alerta resuelta', 'La alerta fue marcada como leida');
         },
         onError: () => {
           setResolvedIds(prev => new Set(prev).add(id));
