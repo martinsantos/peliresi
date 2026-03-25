@@ -53,8 +53,9 @@ export const alertaService = {
 
   // Anomalías
   async listAnomalias(manifiestoId?: string): Promise<AnomaliaTransporte[]> {
-    const { data } = await api.get('/alertas/anomalias', { params: { manifiestoId } });
-    const raw = data.data;
+    const path = manifiestoId ? `/anomalias/${manifiestoId}` : '/anomalias';
+    const { data } = await api.get(path);
+    const raw = data.data || data;
     return Array.isArray(raw) ? raw : raw.anomalias || [];
   },
 };
