@@ -128,10 +128,14 @@ const faqs = [
 
 // Videos data
 const videos = [
-  { title: 'Crear tu primer manifiesto', duration: '5:30', icon: FileText, color: 'bg-primary-100 text-primary-600' },
-  { title: 'Gestión de transportistas', duration: '4:15', icon: MessageCircle, color: 'bg-orange-100 text-orange-600' },
-  { title: 'Uso del escáner QR', duration: '3:45', icon: Phone, color: 'bg-info-100 text-info-600' },
-  { title: 'Reportes avanzados', duration: '7:20', icon: BookOpen, color: 'bg-success-100 text-success-600' },
+  { title: 'Login y Dashboard', animation: '/manual/screenshots/animations/login_dashboard.webp', duration: 'Demo' },
+  { title: 'Navegacion del Admin', animation: '/manual/screenshots/animations/admin_menu_navegacion.webp', duration: 'Demo' },
+  { title: 'Viaje del Transportista', animation: '/manual/screenshots/animations/transportista_viaje.webp', duration: 'Demo' },
+  { title: 'Tracking GPS en Mapa', animation: '/manual/screenshots/animations/tracking_gps_mapa.webp', duration: 'Demo' },
+  { title: 'Recepcion del Operador', animation: '/manual/screenshots/animations/operador_recepcion.webp', duration: 'Demo' },
+  { title: 'Reportes y Exportacion', animation: '/manual/screenshots/animations/reportes_exportacion.webp', duration: 'Demo' },
+  { title: 'Cambio de Perfil', animation: '/manual/screenshots/animations/cambio_perfil_menu.webp', duration: 'Demo' },
+  { title: 'Onboarding de la App', animation: '/manual/screenshots/animations/demoapp_selector_onboarding.webp', duration: 'Demo' },
 ];
 
 const AyudaPage: React.FC = () => {
@@ -315,20 +319,24 @@ const AyudaPage: React.FC = () => {
             </h3>
             <div className="space-y-4 animate-fade-in">
               {videos.map((video) => (
-                <div 
+                <div
                   key={video.title}
                   className="group cursor-pointer"
+                  onClick={() => window.open(video.animation, '_blank')}
                 >
-                  <div className="relative aspect-video bg-neutral-100 rounded-lg mb-2 flex items-center justify-center overflow-hidden">
-                    <div className={`w-14 h-14 ${video.color} rounded-xl flex items-center justify-center`}>
-                      <video.icon size={28} />
-                    </div>
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
-                        <Play className="text-primary-600 ml-1" size={20} />
+                  <div className="relative aspect-video bg-neutral-100 rounded-lg mb-2 overflow-hidden">
+                    <img
+                      src={video.animation}
+                      alt={video.title}
+                      loading="lazy"
+                      className="w-full h-full object-cover object-top"
+                    />
+                    <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="w-10 h-10 bg-white/90 rounded-full flex items-center justify-center shadow-lg">
+                        <ExternalLink className="text-primary-600" size={16} />
                       </div>
                     </div>
-                    <span className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 text-white text-xs rounded">
+                    <span className="absolute bottom-2 right-2 px-2 py-0.5 bg-black/60 text-white text-[10px] font-medium rounded">
                       {video.duration}
                     </span>
                   </div>
@@ -338,10 +346,10 @@ const AyudaPage: React.FC = () => {
                 </div>
               ))}
             </div>
-            <button className="w-full mt-4 flex items-center justify-center gap-2 text-primary-600 font-medium text-sm hover:underline">
-              Ver todos los videos
+            <a href="/manual/#gal-acceso" className="w-full mt-4 flex items-center justify-center gap-2 text-primary-600 font-medium text-sm hover:underline">
+              Ver galeria completa
               <ExternalLink size={14} />
-            </button>
+            </a>
           </Card>
         </div>
       </div>
