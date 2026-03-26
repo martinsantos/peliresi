@@ -118,7 +118,7 @@ router.delete('/notificaciones/:id', eliminarNotificacion);
  *       403:
  *         description: Solo ADMIN
  */
-router.get('/alertas/reglas', hasRole('ADMIN'), getReglasAlerta);
+router.get('/alertas/reglas', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'), getReglasAlerta);
 
 /**
  * @openapi
@@ -213,7 +213,7 @@ router.delete('/alertas/reglas/:id', hasRole('ADMIN'), eliminarReglaAlerta);
  *       403:
  *         description: Solo ADMIN
  */
-router.get('/alertas', hasRole('ADMIN'), getAlertasGeneradas);
+router.get('/alertas', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'), getAlertasGeneradas);
 
 /**
  * @openapi
@@ -233,7 +233,7 @@ router.get('/alertas', hasRole('ADMIN'), getAlertasGeneradas);
  *       403:
  *         description: Solo ADMIN
  */
-router.put('/alertas/:id/resolver', hasRole('ADMIN'), resolverAlerta);
+router.put('/alertas/:id/resolver', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'), resolverAlerta);
 
 // ============ ANOMALIAS DE TRANSPORTE ============
 

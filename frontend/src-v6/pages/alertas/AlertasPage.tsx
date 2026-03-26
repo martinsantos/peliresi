@@ -260,13 +260,13 @@ function periodStart(period: string): Date | null {
 
 export const AlertasPage: React.FC = () => {
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isAnyAdmin } = useAuth();
 
-  // ADMIN: alertas generadas por reglas | Non-ADMIN: notificaciones del usuario
-  const { data: apiAlertas, isLoading: isLoadingAlertas, isError: isErrorAlertas } = useAlertas(undefined, isAdmin);
+  // Any admin role: alertas generadas por reglas | Non-admin: notificaciones del usuario
+  const { data: apiAlertas, isLoading: isLoadingAlertas, isError: isErrorAlertas } = useAlertas(undefined, isAnyAdmin);
   const { data: apiNotifs, isLoading: isLoadingNotifs, isError: isErrorNotifs } = useNotificaciones(undefined);
-  const isLoading = isAdmin ? isLoadingAlertas : isLoadingNotifs;
-  const isError = isAdmin ? isErrorAlertas : isErrorNotifs;
+  const isLoading = isAnyAdmin ? isLoadingAlertas : isLoadingNotifs;
+  const isError = isAnyAdmin ? isErrorAlertas : isErrorNotifs;
   const resolverMutation = useResolverAlerta();
   const marcarLeidaMutation = useMarcarLeida();
   const marcarTodasLeidasMutation = useMarcarTodasLeidas();
@@ -295,7 +295,7 @@ export const AlertasPage: React.FC = () => {
   const [page, setPage] = useState(1);
 
   const alertas: AlertaLocal[] = useMemo(() => {
-    if (!isAdmin) {
+    if (!isAnyAdmin) {
       // Non-admin: map notificaciones to AlertaLocal format
       const notifs = Array.isArray(apiNotifs) ? apiNotifs
         : (apiNotifs as any)?.items || (apiNotifs as any)?.data?.notificaciones || (apiNotifs as any)?.notificaciones || [];
@@ -334,7 +334,7 @@ export const AlertasPage: React.FC = () => {
           estado,
         };
       });
-  }, [isAdmin, apiAlertas, apiNotifs, deletedIds, resolvedIds]);
+  }, [isAnyAdmin, apiAlertas, apiNotifs, deletedIds, resolvedIds]);
 
   const alertasFiltradas = useMemo(() => {
     const since = periodStart(periodo);
@@ -363,7 +363,7 @@ export const AlertasPage: React.FC = () => {
   // ─── Actions ───────────────────────────────────────────────────────────────
 
   const marcarComoLeida = (id: string) => {
-    if (!isAdmin) {
+    if (!isAnyAdmin) {
       marcarLeidaMutation.mutate(id, {
         onSuccess: () => {
           setResolvedIds(prev => new Set(prev).add(id));
@@ -828,7 +828,7 @@ export const AlertasPage: React.FC = () => {
       </div>
 
       {/* Tabs (admin) or direct list */}
-      {isAdmin ? (
+      {isAnyAdmin ? (
         <Tabs activeTab={activeTab} onChange={setActiveTab}>
           <TabList>
             <Tab id="alertas">Alertas</Tab>

@@ -930,7 +930,10 @@ const UsuariosPage: React.FC = () => {
                 className="w-full px-4 py-2.5 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
               >
                 <option value="">Seleccionar rol</option>
-                <option value="ADMIN">Administrador</option>
+                <option value="ADMIN">Super Administrador</option>
+                <option value="ADMIN_GENERADOR">Admin de Generadores</option>
+                <option value="ADMIN_TRANSPORTISTA">Admin de Transporte</option>
+                <option value="ADMIN_OPERADOR">Admin de Operadores</option>
                 <option value="GENERADOR">Generador</option>
                 <option value="TRANSPORTISTA">Transportista</option>
                 <option value="OPERADOR">Operador</option>
