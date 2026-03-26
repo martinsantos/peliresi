@@ -155,6 +155,7 @@ const UsuariosPage: React.FC = () => {
   const [modalPromover, setModalPromover] = useState(false);
   const [promoverPassword, setPromoverPassword] = useState('');
   const [promoverLoading, setPromoverLoading] = useState(false);
+  const [promoverTargetRol, setPromoverTargetRol] = useState('');
 
   // Form state for new user
   const [formNombre, setFormNombre] = useState('');
@@ -798,14 +799,14 @@ const UsuariosPage: React.FC = () => {
                 {usuarioSeleccionado.estado === 'activo' ? 'Desactivar' : 'Activar'}
               </Button>
             )}
-            {usuarioSeleccionado && ['ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'].includes(usuarioSeleccionado.rol) && (
+            {usuarioSeleccionado && ['ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR', 'ADMIN'].includes(usuarioSeleccionado.rol) && usuarioSeleccionado.id !== currentUser?.id && (
               <Button
                 variant="outline"
                 leftIcon={<ShieldCheck size={16} />}
-                className="text-amber-700 border-amber-300 hover:bg-amber-50"
-                onClick={() => { setModalVer(false); setModalPromover(true); setPromoverPassword(''); }}
+                className={usuarioSeleccionado.rol === 'ADMIN' ? 'text-red-700 border-red-300 hover:bg-red-50' : 'text-amber-700 border-amber-300 hover:bg-amber-50'}
+                onClick={() => { setModalVer(false); setModalPromover(true); setPromoverPassword(''); setPromoverTargetRol(usuarioSeleccionado.rol === 'ADMIN' ? '' : ''); }}
               >
-                Promover a Super Admin
+                {usuarioSeleccionado.rol === 'ADMIN' ? 'Degradar rol' : 'Promover a Super Admin'}
               </Button>
             )}
             {usuarioSeleccionado && <Button onClick={() => abrirEditar(usuarioSeleccionado)}>Editar</Button>}
@@ -984,63 +985,84 @@ const UsuariosPage: React.FC = () => {
         variant="danger"
       />
 
-      {/* Modal Promover a Super Admin */}
+      {/* Modal Cambiar Jerarquia (Promover / Degradar) */}
       <Modal
         isOpen={modalPromover}
-        onClose={() => { setModalPromover(false); setPromoverPassword(''); }}
-        title="Promover a Super Administrador"
+        onClose={() => { setModalPromover(false); setPromoverPassword(''); setPromoverTargetRol(''); }}
+        title={usuarioSeleccionado?.rol === 'ADMIN' ? 'Degradar Super Administrador' : 'Promover a Super Administrador'}
         size="sm"
         footer={
           <>
-            <Button variant="outline" onClick={() => { setModalPromover(false); setPromoverPassword(''); }}>Cancelar</Button>
+            <Button variant="outline" onClick={() => { setModalPromover(false); setPromoverPassword(''); setPromoverTargetRol(''); }}>Cancelar</Button>
             <Button
-              variant="primary"
+              variant={usuarioSeleccionado?.rol === 'ADMIN' ? 'outline' : 'primary'}
+              className={usuarioSeleccionado?.rol === 'ADMIN' ? 'text-red-700 border-red-300 hover:bg-red-50' : ''}
               leftIcon={<ShieldCheck size={16} />}
               isLoading={promoverLoading}
-              disabled={!promoverPassword}
+              disabled={!promoverPassword || (usuarioSeleccionado?.rol === 'ADMIN' && !promoverTargetRol)}
               onClick={async () => {
                 if (!usuarioSeleccionado || !promoverPassword) return;
+                const nuevoRol = usuarioSeleccionado.rol === 'ADMIN' ? promoverTargetRol : 'ADMIN';
+                if (!nuevoRol) return;
                 setPromoverLoading(true);
                 try {
-                  // Verify super admin password first
-                  await api.post('/auth/login', {
-                    email: currentUser?.email,
-                    password: promoverPassword,
-                  });
-                  // If login succeeds, password is correct — promote user
-                  await api.put(`/admin/usuarios/${usuarioSeleccionado.id}`, { rol: 'ADMIN' });
-                  toast.success('Promovido', `${usuarioSeleccionado.nombre} ahora es Super Administrador`);
-                  setModalPromover(false);
-                  setPromoverPassword('');
-                  // Refresh list
+                  await api.post('/auth/login', { email: currentUser?.email, password: promoverPassword });
+                  await api.put(`/admin/usuarios/${usuarioSeleccionado.id}`, { rol: nuevoRol });
+                  const label = nuevoRol === 'ADMIN' ? 'Super Administrador' : nuevoRol.replace(/_/g, ' ');
+                  toast.success('Rol actualizado', `${usuarioSeleccionado.nombre} ahora es ${label}`);
+                  setModalPromover(false); setPromoverPassword(''); setPromoverTargetRol('');
                   window.location.reload();
                 } catch (err: any) {
-                  const msg = err?.response?.data?.message || 'Clave incorrecta o error de red';
-                  toast.error('Error', msg);
-                } finally {
-                  setPromoverLoading(false);
-                }
+                  toast.error('Error', err?.response?.data?.message || 'Clave incorrecta o error de red');
+                } finally { setPromoverLoading(false); }
               }}
             >
-              Confirmar Promocion
+              {usuarioSeleccionado?.rol === 'ADMIN' ? 'Confirmar Degradacion' : 'Confirmar Promocion'}
             </Button>
           </>
         }
       >
         {usuarioSeleccionado && (
           <div className="space-y-4">
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
-              <ShieldCheck size={32} className="text-amber-600 mx-auto mb-2" />
-              <p className="font-semibold text-amber-900">
-                {usuarioSeleccionado.nombre}
-              </p>
-              <p className="text-sm text-amber-700 mt-1">
-                {usuarioSeleccionado.rol.replace('_', ' ')} &rarr; <strong>Super Administrador</strong>
-              </p>
-            </div>
-            <p className="text-sm text-neutral-600">
-              Esta accion otorgara acceso completo al sistema. Ingresa tu clave de Super Admin para confirmar.
-            </p>
+            {usuarioSeleccionado.rol === 'ADMIN' ? (
+              <>
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
+                  <UserX size={32} className="text-red-500 mx-auto mb-2" />
+                  <p className="font-semibold text-red-900">{usuarioSeleccionado.nombre}</p>
+                  <p className="text-sm text-red-700 mt-1">Super Administrador &rarr; rol inferior</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Nuevo rol</label>
+                  <select
+                    value={promoverTargetRol}
+                    onChange={(e) => setPromoverTargetRol(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-red-500 focus:outline-none"
+                  >
+                    <option value="">Seleccionar rol destino...</option>
+                    <option value="ADMIN_GENERADOR">Admin de Generadores</option>
+                    <option value="ADMIN_TRANSPORTISTA">Admin de Transporte</option>
+                    <option value="ADMIN_OPERADOR">Admin de Operadores</option>
+                    <option value="GENERADOR">Generador</option>
+                    <option value="TRANSPORTISTA">Transportista</option>
+                    <option value="OPERADOR">Operador</option>
+                  </select>
+                </div>
+                <p className="text-sm text-neutral-600">
+                  Esto removera el acceso de Super Admin. Ingresa tu clave para confirmar.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
+                  <ShieldCheck size={32} className="text-amber-600 mx-auto mb-2" />
+                  <p className="font-semibold text-amber-900">{usuarioSeleccionado.nombre}</p>
+                  <p className="text-sm text-amber-700 mt-1">{usuarioSeleccionado.rol.replace(/_/g, ' ')} &rarr; <strong>Super Administrador</strong></p>
+                </div>
+                <p className="text-sm text-neutral-600">
+                  Esto otorgara acceso completo al sistema. Ingresa tu clave para confirmar.
+                </p>
+              </>
+            )}
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">Tu clave de Super Admin</label>
               <input
@@ -1050,7 +1072,6 @@ const UsuariosPage: React.FC = () => {
                 placeholder="Ingresa tu clave actual"
                 className="w-full px-4 py-2.5 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-amber-500 focus:outline-none"
                 autoFocus
-                onKeyDown={(e) => { if (e.key === 'Enter' && promoverPassword) (e.target as HTMLInputElement).form?.querySelector<HTMLButtonElement>('[type=submit]')?.click(); }}
               />
             </div>
           </div>
