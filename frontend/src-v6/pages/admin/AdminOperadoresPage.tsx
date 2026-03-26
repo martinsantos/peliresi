@@ -37,8 +37,9 @@ import {
   useCreateOperador,
   useDeleteOperador,
 } from '../../hooks/useActores';
-import { OPERADORES_DATA, type OperadorEnriched } from '../../data/operadores-enrichment';
+import type { OperadorEnriched } from '../../data/operadores-enrichment';
 import { CORRIENTES_Y, CORRIENTES_Y_CODES, parseCorrientes } from '../../data/corrientes-y';
+import { useOperadoresEnrichment } from '../../hooks/useEnrichment';
 
 const INITIAL_FORM = {
   razonSocial: '',
@@ -61,6 +62,8 @@ const AdminOperadoresPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const isMobile = location.pathname.startsWith('/mobile');
   const { isAdmin, impersonateUser } = useAuth();
+  const { data: enrichmentData } = useOperadoresEnrichment();
+  const OPERADORES_DATA = enrichmentData?.operadores || {};
   const [busqueda, setBusqueda] = useState(searchParams.get('q') || '');
   const [filtroTipo, setFiltroTipo] = useState('');
   const [filtroCorriente, setFiltroCorriente] = useState('');

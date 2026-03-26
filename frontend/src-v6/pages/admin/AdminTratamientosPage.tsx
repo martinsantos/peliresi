@@ -53,6 +53,7 @@ import {
   type CategoriaId,
   type MetodoTratamiento,
 } from '../../data/tratamientos-catalogo';
+import { useOperadoresEnrichment } from '../../hooks/useEnrichment';
 
 // ---------------------------------------------------------------------------
 // Risk config
@@ -620,6 +621,9 @@ const CatalogoTab: React.FC<{
   navigate: ReturnType<typeof useNavigate>;
   cuitToId: Record<string, string>;
 }> = ({ navigate, cuitToId }) => {
+  const { data: enrichmentData } = useOperadoresEnrichment();
+  const OPERADORES_DATA = enrichmentData?.operadores || {};
+
   const [searchTerm, setSearchTerm] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState<CategoriaId | ''>('');
   const [filtroRiesgo, setFiltroRiesgo] = useState('');
@@ -639,7 +643,7 @@ const CatalogoTab: React.FC<{
         const catName = CATEGORIAS_TRATAMIENTO.find(c => c.metodos.includes(m))?.nombre || '';
         const haystack = `${m.nombre} ${m.nombreCorto} ${m.descripcion} ${catName}`.toLowerCase();
         const operadorMatch = m.operadores.some(o => {
-          const enr = getOperadorEnriched(o.cuit);
+          const enr = getOperadorEnriched(o.cuit, OPERADORES_DATA);
           return enr && enr.empresa.toLowerCase().includes(search);
         });
         if (!haystack.includes(search) && !operadorMatch) return false;
@@ -669,7 +673,7 @@ const CatalogoTab: React.FC<{
         'Corrientes Y': m.corrientesY.join(', '),
         'Cant. Operadores': m.operadores.length,
         Operadores: m.operadores.map(o => {
-          const enr = getOperadorEnriched(o.cuit);
+          const enr = getOperadorEnriched(o.cuit, OPERADORES_DATA);
           return enr ? `${enr.empresa} (${o.tipo})` : o.cuit;
         }).join('; '),
         Riesgo: getRiesgoMetodo(m),
@@ -897,9 +901,11 @@ const ExpandedMetodo: React.FC<{
   const location = useLocation();
   const isMobile = location.pathname.startsWith('/mobile');
   const prefix = isMobile ? '/mobile' : '';
+  const { data: enrichmentData } = useOperadoresEnrichment();
+  const OPERADORES_DATA = enrichmentData?.operadores || {};
   const operadoresEnriched = metodo.operadores.map(o => ({
     ...o,
-    enriched: getOperadorEnriched(o.cuit),
+    enriched: getOperadorEnriched(o.cuit, OPERADORES_DATA),
   }));
 
   return (

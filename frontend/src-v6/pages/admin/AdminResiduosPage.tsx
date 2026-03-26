@@ -28,7 +28,7 @@ import { useTiposResiduo, useCreateTipoResiduo, useUpdateTipoResiduo, useDeleteT
 import { toast } from '../../components/ui/Toast';
 import { downloadCsv } from '../../utils/exportCsv';
 import { CORRIENTES_Y, CORRIENTES_Y_CODES } from '../../data/corrientes-y';
-import { OPERADORES_POR_CORRIENTE, OPERADORES_DATA } from '../../data/operadores-enrichment';
+import { useOperadoresEnrichment } from '../../hooks/useEnrichment';
 
 interface ResiduoDisplay {
   id: string;
@@ -56,6 +56,10 @@ const INITIAL_FORM = {
 };
 
 export const AdminResiduosPage: React.FC = () => {
+  const { data: enrichmentData } = useOperadoresEnrichment();
+  const OPERADORES_DATA = enrichmentData?.operadores || {};
+  const OPERADORES_POR_CORRIENTE = enrichmentData?.porCorriente || {};
+
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [corrienteFilter, setCorrienteFilter] = useState('');

@@ -8,7 +8,7 @@
  * Cada método indica qué corrientes Y puede procesar.
  */
 
-import { OPERADORES_DATA, type OperadorEnriched } from './operadores-enrichment';
+import type { OperadorEnriched } from './operadores-enrichment';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -682,9 +682,9 @@ export function getRiesgoMetodo(m: MetodoTratamiento): 'critico' | 'alto' | 'med
   return 'bajo';
 }
 
-/** Get enriched operator data from CUIT */
-export function getOperadorEnriched(cuit: string): OperadorEnriched | null {
-  return OPERADORES_DATA[cuit] || null;
+/** Get enriched operator data from CUIT. Pass the OPERADORES_DATA map from useOperadoresEnrichment(). */
+export function getOperadorEnriched(cuit: string, operadoresData: Record<string, OperadorEnriched> = {}): OperadorEnriched | null {
+  return operadoresData[cuit] || null;
 }
 
 // ---------------------------------------------------------------------------

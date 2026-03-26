@@ -23,6 +23,7 @@ import {
   getRiesgoMetodo,
   getOperadorEnriched,
 } from '../../../data/tratamientos-catalogo';
+import { useOperadoresEnrichment } from '../../../hooks/useEnrichment';
 
 const CAT_CHART_COLORS: Record<string, string> = {
   biologico: '#22C55E',
@@ -56,6 +57,9 @@ export default function TratamientosTab({
 }: {
   periodoLabel: string;
 }) {
+  const { data: enrichmentData } = useOperadoresEnrichment();
+  const OPERADORES_DATA = enrichmentData?.operadores || {};
+
   const [searchQuery, setSearchQuery] = useState('');
   const [catFilter, setCatFilter] = useState('');
 
@@ -103,7 +107,7 @@ export default function TratamientosTab({
         m.nombreCorto.toLowerCase().includes(q) ||
         m.descripcion.toLowerCase().includes(q) ||
         m.operadores.some(o => {
-          const enr = getOperadorEnriched(o.cuit);
+          const enr = getOperadorEnriched(o.cuit, OPERADORES_DATA);
           return enr && enr.empresa.toLowerCase().includes(q);
         })
       );

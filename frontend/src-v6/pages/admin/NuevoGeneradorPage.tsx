@@ -26,7 +26,7 @@ import { useUploadDocumento } from '../../hooks/useGeneradorFiscal';
 import type { CreateGeneradorRequest } from '../../types/api';
 import type { Generador } from '../../types/models';
 import { CORRIENTES_Y, CORRIENTES_Y_CODES, parseCorrientes } from '../../data/corrientes-y';
-import { GENERADORES_DATA } from '../../data/generadores-enrichment';
+import { useGeneradoresEnrichment } from '../../hooks/useEnrichment';
 import { C_CORRIENTES } from '../../utils/calculoTEF';
 import CalculadoraTEF, { type TEFInputs } from '../../components/CalculadoraTEF';
 
@@ -87,6 +87,9 @@ const NuevoGeneradorPage: React.FC = () => {
   const location = useLocation();
   const isMobile = location.pathname.startsWith('/mobile');
   const isEdit = Boolean(id);
+
+  const { data: enrichmentData } = useGeneradoresEnrichment();
+  const GENERADORES_DATA = enrichmentData?.generadores || {};
 
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(INITIAL_FORM);

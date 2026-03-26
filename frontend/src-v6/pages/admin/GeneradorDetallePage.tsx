@@ -22,7 +22,7 @@ import { useGenerador } from '../../hooks/useActores';
 import { useManifiestos } from '../../hooks/useManifiestos';
 import { usePagosTEF, useCreatePago, useUpdatePago, useDeletePago, useDDJJ, useCreateDDJJ, useUpdateDDJJ, useDeleteDDJJ, useDocumentos, useUploadDocumento, useRevisarDocumento, useDeleteDocumento } from '../../hooks/useGeneradorFiscal';
 import { downloadCsv } from '../../utils/exportCsv';
-import { GENERADORES_DATA } from '../../data/generadores-enrichment';
+import { useGeneradoresEnrichment } from '../../hooks/useEnrichment';
 import { CORRIENTES_Y, parseCorrientes } from '../../data/corrientes-y';
 import DocumentUpload from '../../components/DocumentUpload';
 import CalculadoraTEF from '../../components/CalculadoraTEF';
@@ -140,6 +140,9 @@ const GeneradorDetallePage: React.FC = () => {
   const [historialPage, setHistorialPage] = useState(1);
   const [pagoModal, setPagoModal] = useState<{ open: boolean; editing?: PagoTEF }>({ open: false });
   const [ddjjModal, setDdjjModal] = useState<{ open: boolean; editing?: DeclaracionJurada }>({ open: false });
+
+  const { data: enrichmentData } = useGeneradoresEnrichment();
+  const GENERADORES_DATA = enrichmentData?.generadores || {};
 
   const { data: apiGenerador, isLoading } = useGenerador(id || '');
   const { data: manifiestoData } = useManifiestos({ generadorId: id, limit: 20, page: historialPage }, { enabled: !!id });

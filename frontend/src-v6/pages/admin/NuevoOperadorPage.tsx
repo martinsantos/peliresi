@@ -27,7 +27,7 @@ import { useUploadOperadorDocumento } from '../../hooks/useGeneradorFiscal';
 import type { CreateOperadorRequest } from '../../types/api';
 import type { Operador } from '../../types/models';
 import { CORRIENTES_Y, CORRIENTES_Y_CODES, parseCorrientes } from '../../data/corrientes-y';
-import { OPERADORES_DATA } from '../../data/operadores-enrichment';
+import { useOperadoresEnrichment } from '../../hooks/useEnrichment';
 import { C_CORRIENTES } from '../../utils/calculoTEF';
 import CalculadoraTEF, { type TEFInputs } from '../../components/CalculadoraTEF';
 
@@ -89,6 +89,9 @@ const NuevoOperadorPage: React.FC = () => {
   const location = useLocation();
   const isMobile = location.pathname.startsWith('/mobile');
   const isEdit = Boolean(id);
+
+  const { data: enrichmentData } = useOperadoresEnrichment();
+  const OPERADORES_DATA = enrichmentData?.operadores || {};
 
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(INITIAL_FORM);

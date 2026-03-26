@@ -38,14 +38,18 @@ import {
   useGeneradores,
   useDeleteGenerador,
 } from '../../hooks/useActores';
-import { GENERADORES_DATA, TOP_RUBROS, type GeneradorEnriched } from '../../data/generadores-enrichment';
+import type { GeneradorEnriched } from '../../data/generadores-enrichment';
 import { CORRIENTES_Y, parseCorrientes } from '../../data/corrientes-y';
+import { useGeneradoresEnrichment } from '../../hooks/useEnrichment';
 
 const AdminGeneradoresPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = location.pathname.startsWith('/mobile');
   const { isAdmin, impersonateUser } = useAuth();
+  const { data: enrichmentData } = useGeneradoresEnrichment();
+  const GENERADORES_DATA = enrichmentData?.generadores || {};
+  const TOP_RUBROS = enrichmentData?.topRubros || [];
   const [busqueda, setBusqueda] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [filtroRubro, setFiltroRubro] = useState('');

@@ -33,8 +33,9 @@ import { Badge } from '../../components/ui/BadgeV2';
 import { Tabs, TabList, Tab, TabPanel } from '../../components/ui/Tabs';
 import { useOperador } from '../../hooks/useActores';
 import { useManifiestos } from '../../hooks/useManifiestos';
-import { OPERADORES_DATA, type OperadorEnriched } from '../../data/operadores-enrichment';
+import type { OperadorEnriched } from '../../data/operadores-enrichment';
 import { CORRIENTES_Y } from '../../data/corrientes-y';
+import { useOperadoresEnrichment } from '../../hooks/useEnrichment';
 
 /** Local view-model that extends Operador with UI-specific derived fields */
 interface OperadorViewModel extends Operador {
@@ -82,6 +83,9 @@ const OperadorDetallePage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = location.pathname.startsWith('/mobile');
+
+  const { data: enrichmentData } = useOperadoresEnrichment();
+  const OPERADORES_DATA = enrichmentData?.operadores || {};
 
   const [historialPage, setHistorialPage] = useState(1);
   const { data: apiOperador, isLoading } = useOperador(id || '');

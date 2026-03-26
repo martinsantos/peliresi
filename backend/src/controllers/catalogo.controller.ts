@@ -1,7 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
+import path from 'path';
 import prisma from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
+
+// Pre-load enrichment JSON once at startup (they're static, ~580KB total)
+const DATA_DIR = path.join(__dirname, '..', '..', 'data');
+const generadoresEnrichment = require(path.join(DATA_DIR, 'generadores-enrichment.json'));
+const generadoresTopRubros = require(path.join(DATA_DIR, 'generadores-top-rubros.json'));
+const operadoresEnrichment = require(path.join(DATA_DIR, 'operadores-enrichment.json'));
+const operadoresPorCorriente = require(path.join(DATA_DIR, 'operadores-por-corriente.json'));
 
 // Obtener tipos de residuos
 export const getTiposResiduos = async (req: Request, res: Response, next: NextFunction) => {
@@ -418,6 +426,28 @@ export const getTratamientos = async (req: Request, res: Response, next: NextFun
             success: true,
             data: { tratamientos }
         });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// =============================================
+// Enrichment data (static JSON, pre-loaded)
+// =============================================
+
+// GET /api/catalogos/enrichment/generadores
+export const getGeneradoresEnrichment = (_req: Request, res: Response, next: NextFunction) => {
+    try {
+        res.json({ success: true, data: generadoresEnrichment, topRubros: generadoresTopRubros });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// GET /api/catalogos/enrichment/operadores
+export const getOperadoresEnrichment = (_req: Request, res: Response, next: NextFunction) => {
+    try {
+        res.json({ success: true, data: operadoresEnrichment, porCorriente: operadoresPorCorriente });
     } catch (error) {
         next(error);
     }

@@ -17,6 +17,8 @@ import {
     createTratamiento,
     updateTratamiento,
     deleteTratamiento,
+    getGeneradoresEnrichment,
+    getOperadoresEnrichment,
 } from '../controllers/catalogo.controller';
 
 const router = Router();
@@ -46,6 +48,10 @@ const router = Router();
  */
 // Rutas publicas (para selectores en formularios)
 router.get('/tipos-residuos', getTiposResiduos);
+
+// Enrichment data (static JSON, public — non-sensitive reference data)
+router.get('/enrichment/generadores', getGeneradoresEnrichment);
+router.get('/enrichment/operadores', getOperadoresEnrichment);
 
 // Rutas protegidas
 router.use(isAuthenticated);
