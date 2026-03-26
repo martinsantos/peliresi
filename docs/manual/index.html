@@ -1205,50 +1205,103 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <p>Administracion CRUD completa de usuarios del sistema con los siguientes campos: email, nombre, apellido, empresa, telefono, CUIT, asignacion de rol.</p>
 
 <h4>Roles y Permisos</h4>
+
+<p>SITREP tiene <strong>7 roles</strong> organizados en dos niveles: administradores y actores operativos.</p>
+
+<h4>Nivel 1: Administradores</h4>
 <table>
-<thead><tr><th>Rol</th><th>Alcance</th><th>Permisos Clave</th></tr></thead>
+<thead><tr><th>Rol</th><th>Alcance</th><th>Acceso</th></tr></thead>
 <tbody>
-<tr><td><strong>ADMIN</strong></td><td>Acceso total</td><td>Gestion de actores, usuarios, catalogos, reportes completos, auditoria, alertas, centro de control</td></tr>
-<tr><td><strong>GENERADOR</strong></td><td>Manifiestos propios</td><td>Crear, firmar y seguir manifiestos. Dashboard y reportes propios</td></tr>
-<tr><td><strong>TRANSPORTISTA</strong></td><td>Manifiestos asignados</td><td>Confirmar retiro/entrega, GPS, registrar incidentes, escaner QR</td></tr>
-<tr><td><strong>OPERADOR</strong></td><td>Manifiestos entrantes</td><td>Recibir, pesar, aceptar/rechazar, registrar tratamiento, cerrar manifiesto, certificados</td></tr>
+<tr><td><strong>Super Admin (ADMIN)</strong></td><td>Acceso total al sistema</td><td>Todo: usuarios, solicitudes, actores, catalogos, reportes, alertas, blockchain, auditoria, carga masiva, impersonar, centro de control</td></tr>
+<tr><td><strong>Admin de Generadores</strong></td><td>Gestiona generadores</td><td>CRUD generadores, catalogo residuos, blockchain, auditoria, carga masiva, reportes, alertas, centro de control, impersonar</td></tr>
+<tr><td><strong>Admin de Transporte</strong></td><td>Gestiona transportistas</td><td>CRUD transportistas, vehiculos, blockchain, auditoria, carga masiva, reportes, alertas, centro de control, impersonar</td></tr>
+<tr><td><strong>Admin de Operadores</strong></td><td>Gestiona operadores</td><td>CRUD operadores, tratamientos, blockchain, auditoria, carga masiva, reportes, alertas, centro de control, impersonar</td></tr>
 </tbody>
 </table>
+
+<h4>Nivel 2: Actores Operativos</h4>
+<table>
+<thead><tr><th>Rol</th><th>Alcance</th><th>Acceso</th></tr></thead>
+<tbody>
+<tr><td><strong>Generador</strong></td><td>Manifiestos propios</td><td>Crear, firmar y seguir manifiestos. Dashboard y reportes propios</td></tr>
+<tr><td><strong>Transportista</strong></td><td>Manifiestos asignados</td><td>Confirmar retiro/entrega, GPS, registrar incidentes, escaner QR</td></tr>
+<tr><td><strong>Operador</strong></td><td>Manifiestos entrantes</td><td>Recibir, pesar, aceptar/rechazar, registrar tratamiento, cerrar manifiesto, certificados</td></tr>
+</tbody>
+</table>
+
+<h4>Diferencias entre Super Admin y Admin Sectorial</h4>
+<table>
+<thead><tr><th>Funcionalidad</th><th>Super Admin</th><th>Admin Sectorial</th></tr></thead>
+<tbody>
+<tr><td>Gestion de Usuarios (CRUD)</td><td><strong>SI</strong></td><td>No</td></tr>
+<tr><td>Solicitudes de Inscripcion</td><td><strong>SI</strong></td><td>No</td></tr>
+<tr><td>Promover/Degradar admins</td><td><strong>SI</strong></td><td>No</td></tr>
+<tr><td>Dashboard</td><td>SI</td><td>SI</td></tr>
+<tr><td>Centro de Control</td><td>SI</td><td>SI</td></tr>
+<tr><td>Manifiestos</td><td>SI</td><td>SI</td></tr>
+<tr><td>Reportes</td><td>SI</td><td>SI</td></tr>
+<tr><td>Alertas (ver/resolver)</td><td>SI</td><td>SI</td></tr>
+<tr><td>Certificacion Blockchain</td><td>SI</td><td>SI</td></tr>
+<tr><td>Auditoria</td><td>SI</td><td>SI</td></tr>
+<tr><td>Carga Masiva</td><td>SI</td><td>SI</td></tr>
+<tr><td>Impersonar (Acceso Comodin)</td><td>SI</td><td>SI</td></tr>
+<tr><td>CRUD de su sector</td><td>SI (todos)</td><td>SI (solo su tipo)</td></tr>
+</tbody>
+</table>
+
+<h4>Alta de Administradores Sectoriales</h4>
+<p>Los administradores sectoriales pueden darse de alta de dos formas:</p>
+<ol>
+<li><strong>Auto-registro:</strong> Desde la pagina de login, seccion "Administradores Sectoriales", seleccionar el tipo (Admin Generadores, Admin Transporte, Admin Operadores). El usuario queda <strong>inactivo</strong> hasta que el Super Admin lo active desde Gestion de Usuarios.</li>
+<li><strong>Creacion por Super Admin:</strong> Desde <code>/admin/usuarios</code> &rarr; "Nuevo Usuario", seleccionar el rol correspondiente (Admin de Generadores, Admin de Transporte, Admin de Operadores).</li>
+</ol>
+
+<h4>Promocion y Degradacion de Roles</h4>
+<p>El Super Admin puede promover un admin sectorial a Super Admin (o degradarlo) desde el detalle del usuario:</p>
+<ol>
+<li>Ir a <code>/admin/usuarios</code></li>
+<li>Click en el usuario &rarr; se abre el modal de detalle</li>
+<li>Click en <strong>"Promover a Super Admin"</strong> (boton dorado) o <strong>"Degradar rol"</strong> (boton rojo)</li>
+<li>Ingresar la clave del Super Admin actual para confirmar</li>
+<li>El cambio se aplica inmediatamente</li>
+</ol>
+<div class="warn-box" style="background:#FEF3C7;border-left:4px solid #F59E0B;padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0;">
+<strong>Seguridad:</strong> La promocion/degradacion requiere la clave del Super Admin que realiza la operacion. No se puede degradar a uno mismo.
+</div>
 
 <h4>Auditoria (<code>/admin/auditoria</code>)</h4>
 <p>Log inmutable de todas las operaciones realizadas en el sistema. Incluye filtros por fecha, usuario, accion y modulo. Muestra datos anteriores y posteriores a cada cambio (before/after).</p>
 
-<h4>Matriz de Permisos Detallada</h4>
+<h4>Matriz de Permisos Detallada (7 roles)</h4>
 <table>
-<thead><tr><th>Recurso / Operacion</th><th>ADMIN</th><th>GENERADOR</th><th>TRANSPORTISTA</th><th>OPERADOR</th></tr></thead>
+<thead><tr><th>Recurso / Operacion</th><th>Super Admin</th><th>Adm Gen</th><th>Adm Trans</th><th>Adm Op</th><th>Generador</th><th>Transportista</th><th>Operador</th></tr></thead>
 <tbody>
-<tr><td>Ver Dashboard</td><td>Si (global)</td><td>Si (propios)</td><td>Si (asignados)</td><td>Si (entrantes)</td></tr>
-<tr><td>Crear Manifiesto</td><td>Si</td><td>Si</td><td>No</td><td>No</td></tr>
-<tr><td>Firmar / Aprobar Manifiesto</td><td>Si</td><td>Si (propios)</td><td>No</td><td>No</td></tr>
-<tr><td>Confirmar Retiro</td><td>Si</td><td>No</td><td>Si (asignados)</td><td>No</td></tr>
-<tr><td>Confirmar Entrega</td><td>Si</td><td>No</td><td>Si (asignados)</td><td>No</td></tr>
-<tr><td>Registrar Incidente</td><td>Si</td><td>No</td><td>Si (en transito)</td><td>No</td></tr>
-<tr><td>Confirmar Recepcion</td><td>Si</td><td>No</td><td>No</td><td>Si (destino)</td></tr>
-<tr><td>Rechazar Carga</td><td>Si</td><td>No</td><td>No</td><td>Si (destino)</td></tr>
-<tr><td>Registrar Tratamiento</td><td>Si</td><td>No</td><td>No</td><td>Si (destino)</td></tr>
-<tr><td>Cerrar Manifiesto</td><td>Si</td><td>No</td><td>No</td><td>Si (destino)</td></tr>
-<tr><td>Cancelar Manifiesto</td><td>Si</td><td>Si (propios)</td><td>No</td><td>No</td></tr>
-<tr><td>Descargar PDF</td><td>Si</td><td>Si (propios)</td><td>Si (asignados)</td><td>Si (destino)</td></tr>
-<tr><td>Descargar Certificado</td><td>Si</td><td>Si (propios)</td><td>Si (asignados)</td><td>Si (destino)</td></tr>
-<tr><td>Ver Centro de Control</td><td>Si (todo)</td><td>No</td><td>Si (propios)</td><td>No</td></tr>
-<tr><td>Ver Reportes</td><td>Si (globales)</td><td>Si (propios)</td><td>No</td><td>Si (propios)</td></tr>
-<tr><td>Exportar CSV/PDF</td><td>Si</td><td>Si</td><td>No</td><td>Si</td></tr>
-<tr><td>Gestionar Actores</td><td>Si</td><td>No</td><td>No</td><td>No</td></tr>
-<tr><td>Gestionar Usuarios</td><td>Si</td><td>No</td><td>No</td><td>No</td></tr>
-<tr><td>Gestionar Catalogos</td><td>Si</td><td>No</td><td>No</td><td>No</td></tr>
-<tr><td>Gestionar Alertas</td><td>Si</td><td>No</td><td>No</td><td>No</td></tr>
-<tr><td>Ver Auditoria</td><td>Si</td><td>No</td><td>No</td><td>No</td></tr>
-<tr><td>Carga Masiva</td><td>Si</td><td>No</td><td>No</td><td>No</td></tr>
-<tr><td>Configuracion Sistema</td><td>Si</td><td>No</td><td>No</td><td>No</td></tr>
-<tr><td>Tracking GPS (enviar)</td><td>No</td><td>No</td><td>Si</td><td>No</td></tr>
-<tr><td>Escanear QR</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td></tr>
-<tr><td>Notificaciones</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td></tr>
-<tr><td>Gestionar Perfil</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td></tr>
+<tr><td>Dashboard</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td></tr>
+<tr><td>Centro de Control</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>No</td><td>Si</td><td>No</td></tr>
+<tr><td>Manifiestos (ver)</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td></tr>
+<tr><td>Crear Manifiesto</td><td>Si</td><td>No</td><td>No</td><td>No</td><td>Si</td><td>No</td><td>No</td></tr>
+<tr><td>Firmar Manifiesto</td><td>Si</td><td>No</td><td>No</td><td>No</td><td>Si</td><td>No</td><td>No</td></tr>
+<tr><td>Confirmar Retiro/Entrega</td><td>Si</td><td>No</td><td>No</td><td>No</td><td>No</td><td>Si</td><td>No</td></tr>
+<tr><td>Recibir/Tratar/Cerrar</td><td>Si</td><td>No</td><td>No</td><td>No</td><td>No</td><td>No</td><td>Si</td></tr>
+<tr><td>Reportes</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td></tr>
+<tr><td>Alertas (ver/resolver)</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td></tr>
+<tr><td>Reglas de Alerta (CRUD)</td><td>Si</td><td>No</td><td>No</td><td>No</td><td>No</td><td>No</td><td>No</td></tr>
+<tr><td>Blockchain</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>No</td><td>No</td><td>No</td></tr>
+<tr><td>Auditoria</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>No</td><td>No</td><td>No</td></tr>
+<tr><td>Carga Masiva</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>No</td><td>No</td><td>No</td></tr>
+<tr><td>Impersonar (Comodin)</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>No</td><td>No</td><td>No</td></tr>
+<tr><td>Gestion de Usuarios</td><td><strong>Si</strong></td><td>No</td><td>No</td><td>No</td><td>No</td><td>No</td><td>No</td></tr>
+<tr><td>Solicitudes Inscripcion</td><td><strong>Si</strong></td><td>No</td><td>No</td><td>No</td><td>No</td><td>No</td><td>No</td></tr>
+<tr><td>Promover/Degradar roles</td><td><strong>Si</strong></td><td>No</td><td>No</td><td>No</td><td>No</td><td>No</td><td>No</td></tr>
+<tr><td>CRUD Generadores</td><td>Si</td><td>Si</td><td>No</td><td>No</td><td>No</td><td>No</td><td>No</td></tr>
+<tr><td>CRUD Transportistas</td><td>Si</td><td>No</td><td>Si</td><td>No</td><td>No</td><td>No</td><td>No</td></tr>
+<tr><td>CRUD Operadores</td><td>Si</td><td>No</td><td>No</td><td>Si</td><td>No</td><td>No</td><td>No</td></tr>
+<tr><td>Catalogo Residuos</td><td>Si</td><td>Si</td><td>No</td><td>No</td><td>No</td><td>No</td><td>No</td></tr>
+<tr><td>Vehiculos/Choferes</td><td>Si</td><td>No</td><td>Si</td><td>No</td><td>No</td><td>Si</td><td>No</td></tr>
+<tr><td>Tratamientos</td><td>Si</td><td>No</td><td>No</td><td>Si</td><td>No</td><td>No</td><td>No</td></tr>
+<tr><td>Tracking GPS</td><td>No</td><td>No</td><td>No</td><td>No</td><td>No</td><td>Si</td><td>No</td></tr>
+<tr><td>Notificaciones</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td></tr>
+<tr><td>Configuracion Perfil</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td></tr>
 </tbody>
 </table>
 
