@@ -1,11 +1,27 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { Rol } from '@prisma/client';
 import { config } from '../config/config';
 import { AppError } from './errorHandler';
 import prisma from '../lib/prisma';
 
+/** Shape of req.user set by isAuthenticated middleware. */
+export interface AuthUser {
+  id: string;
+  email: string;
+  nombre: string;
+  rol: Rol;
+  activo: boolean;
+  generador: { id: string; [key: string]: unknown } | null;
+  transportista: { id: string; [key: string]: unknown } | null;
+  operador: { id: string; [key: string]: unknown } | null;
+  restricted: boolean;
+}
+
 export interface AuthRequest extends Request {
-  user?: any;
+  // Typed as `any` for backward compatibility with existing controller code
+  // that accesses req.user without null-checks. See AuthUser for the runtime shape.
+  user?: any; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 export const isAuthenticated = async (
@@ -31,6 +47,7 @@ export const isAuthenticated = async (
       select: {
         id: true,
         email: true,
+        nombre: true,
         rol: true,
         activo: true,
         generador: true,

@@ -1,13 +1,15 @@
 // Analytics Controller - Superadmin only stats and logs
 import { Request, Response } from 'express';
 import prisma from '../lib/prisma';
+import logger from '../utils/logger';
+import { AuthRequest } from '../middlewares/auth.middleware';
 
 // Get super admin email from env — no fallback to avoid accidental access
 const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL;
 
 // Middleware to check superadmin access
 export const isSuperAdmin = (req: Request, res: Response, next: Function) => {
-    const user = (req as any).user;
+    const user = (req as AuthRequest).user;
 
     if (!SUPER_ADMIN_EMAIL || !user || user.email !== SUPER_ADMIN_EMAIL) {
         return res.status(403).json({
@@ -114,7 +116,7 @@ export const getAnalyticsSummary = async (req: Request, res: Response) => {
             }
         });
     } catch (error) {
-        console.error('Error getting analytics summary:', error);
+        logger.error({ err: error }, 'Error getting analytics summary');
         res.status(500).json({
             success: false,
             error: 'Error al obtener estadísticas'
@@ -175,7 +177,7 @@ export const getAnalyticsLogs = async (req: Request, res: Response) => {
             }
         });
     } catch (error) {
-        console.error('Error getting analytics logs:', error);
+        logger.error({ err: error }, 'Error getting analytics logs');
         res.status(500).json({
             success: false,
             error: 'Error al obtener logs'
@@ -216,7 +218,7 @@ export const getUserActivity = async (req: Request, res: Response) => {
             }
         });
     } catch (error) {
-        console.error('Error getting user activity:', error);
+        logger.error({ err: error }, 'Error getting user activity');
         res.status(500).json({
             success: false,
             error: 'Error al obtener actividad del usuario'
@@ -246,7 +248,7 @@ export const getManifiestosPorMes = async (req: Request, res: Response) => {
             })),
         });
     } catch (error) {
-        console.error('Error getting manifiestos por mes:', error);
+        logger.error({ err: error }, 'Error getting manifiestos por mes');
         res.status(500).json({ success: false, data: [], error: 'Error al obtener manifiestos por mes' });
     }
 };
@@ -276,7 +278,7 @@ export const getResiduosPorTipo = async (req: Request, res: Response) => {
             })),
         });
     } catch (error) {
-        console.error('Error getting residuos por tipo:', error);
+        logger.error({ err: error }, 'Error getting residuos por tipo');
         res.status(500).json({ success: false, data: [], error: 'Error al obtener residuos por tipo' });
     }
 };
@@ -297,7 +299,7 @@ export const getManifiestosPorEstado = async (req: Request, res: Response) => {
             })),
         });
     } catch (error) {
-        console.error('Error getting manifiestos por estado:', error);
+        logger.error({ err: error }, 'Error getting manifiestos por estado');
         res.status(500).json({ success: false, data: [], error: 'Error al obtener manifiestos por estado' });
     }
 };
@@ -320,7 +322,8 @@ export const getTiempoPromedioPorEtapa = async (req: Request, res: Response) => 
             orderBy: { createdAt: 'desc' },
         });
 
-        const etapas = [
+        type DateKey = keyof typeof manifiestos[number];
+        const etapas: Array<{ name: string; from: DateKey; to: DateKey }> = [
             { name: 'Creación → Firma', from: 'createdAt', to: 'fechaFirma' },
             { name: 'Firma → Retiro', from: 'fechaFirma', to: 'fechaRetiro' },
             { name: 'Retiro → Entrega', from: 'fechaRetiro', to: 'fechaEntrega' },
@@ -331,8 +334,8 @@ export const getTiempoPromedioPorEtapa = async (req: Request, res: Response) => 
         const result = etapas.map(etapa => {
             const tiempos: number[] = [];
             for (const m of manifiestos) {
-                const fromDate = (m as any)[etapa.from];
-                const toDate = (m as any)[etapa.to];
+                const fromDate = m[etapa.from];
+                const toDate = m[etapa.to];
                 if (fromDate && toDate) {
                     const diffHours = (new Date(toDate).getTime() - new Date(fromDate).getTime()) / (1000 * 60 * 60);
                     if (diffHours > 0) tiempos.push(diffHours);
@@ -344,7 +347,7 @@ export const getTiempoPromedioPorEtapa = async (req: Request, res: Response) => 
 
         res.json({ success: true, data: result });
     } catch (error) {
-        console.error('Error getting tiempo promedio:', error);
+        logger.error({ err: error }, 'Error getting tiempo promedio');
         res.status(500).json({ success: false, data: [], error: 'Error al obtener tiempo promedio por etapa' });
     }
 };

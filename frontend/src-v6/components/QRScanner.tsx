@@ -217,7 +217,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
     if (!track) return;
     const newVal = !torchOn;
     try {
-      await (track as any).applyConstraints({ advanced: [{ torch: newVal }] });
+      await track.applyConstraints({ advanced: [{ torch: newVal }] } as unknown as MediaTrackConstraints);
       setTorchOn(newVal);
     } catch {
       // torch not supported or failed

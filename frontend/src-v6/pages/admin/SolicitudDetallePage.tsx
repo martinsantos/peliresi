@@ -285,7 +285,7 @@ const SolicitudDetallePage: React.FC = () => {
                           <span className="text-[10px] text-neutral-400">{formatFileSize(doc.size)}</span>
                         </div>
                       </div>
-                      <Badge variant="soft" color={dCfg.color as any} size="sm">{dCfg.label}</Badge>
+                      <Badge variant="soft" color={dCfg.color} size="sm">{dCfg.label}</Badge>
                     </div>
 
                     {doc.observaciones && (

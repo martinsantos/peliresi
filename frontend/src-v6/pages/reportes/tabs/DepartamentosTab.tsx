@@ -211,7 +211,7 @@ export function DepartamentoDetalleModal({
           <Filter size={14} className="text-neutral-400" />
           <select
             value={tipoFilter}
-            onChange={e => setTipoFilter(e.target.value as any)}
+            onChange={e => setTipoFilter(e.target.value as 'todos' | 'generador' | 'transportista' | 'operador')}
             className="px-2.5 py-1.5 rounded-lg border border-neutral-200 text-xs font-medium text-neutral-700 bg-white"
           >
             <option value="todos">Todos los tipos</option>
@@ -322,7 +322,7 @@ export default function DepartamentosTab({
   const depStats = useMemo(() => {
     if (!ccData) return [];
     const genByDep = agruparPorDepartamento(ccData.generadores || []);
-    const transByDep = agruparPorDepartamento((ccData.transportistas || []).filter(t => t.latitud != null && t.longitud != null) as any);
+    const transByDep = agruparPorDepartamento((ccData.transportistas || []).filter((t): t is typeof t & { latitud: number; longitud: number } => t.latitud != null && t.longitud != null));
     const operByDep = agruparPorDepartamento(ccData.operadores || []);
 
     const allDeps = new Set([

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import prisma from '../lib/prisma';
+import logger from '../utils/logger';
 import { config } from '../config/config';
 import {
   verificarEnBlockchain,
@@ -98,7 +99,7 @@ export const registrarBlockchain = async (req: AuthRequest, res: Response, next:
     // Fire-and-forget: start registration, respond immediately
     setImmediate(() => {
       registrarEnBlockchain(id).catch((err) => {
-        console.error('[Blockchain] Error registrando manifiesto:', err.message);
+        logger.error({ err: err.message }, 'Error registrando manifiesto en blockchain');
       });
     });
 

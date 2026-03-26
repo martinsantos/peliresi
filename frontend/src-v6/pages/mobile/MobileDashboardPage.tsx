@@ -78,7 +78,7 @@ export const MobileDashboardPage: React.FC = () => {
     { id: 4, label: 'Reportes', icon: TrendingUp, path: mp('/reportes'), color: 'purple' },
   ], [mp]);
 
-  const dashStats = (dashData as any)?.data || dashData;
+  const dashStats = dashData;
 
   const stats = [
     { id: 1, label: 'Manifiestos Total', value: String(dashStats?.manifiestos?.total ?? 0), change: undefined, icon: FileText, color: 'primary', href: '/manifiestos' },
@@ -299,7 +299,7 @@ export const MobileDashboardPage: React.FC = () => {
               <CardContent className="p-4 text-center">
                 <p className="text-sm text-neutral-500">
                   {(dashStats?.manifiestos?.enTransito ?? 0) > 0
-                    ? `${dashStats.manifiestos.enTransito} manifiestos en tránsito`
+                    ? `${dashStats?.manifiestos?.enTransito} manifiestos en tránsito`
                     : 'Sin actividad reciente'}
                 </p>
               </CardContent>

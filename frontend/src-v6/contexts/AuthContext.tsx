@@ -215,9 +215,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ? { cuit: identifier.trim(), password }
         : { email: identifier.trim(), password };
       const response = await authService.login(credentials);
-      if ((response as any).restricted) {
+      if (response.restricted) {
         setIsRestricted(true);
-        setSolicitudId((response as any).solicitudId || null);
+        setSolicitudId(response.solicitudId || null);
       }
       const user = apiUserToUser(response.user);
       setCurrentUser(user);

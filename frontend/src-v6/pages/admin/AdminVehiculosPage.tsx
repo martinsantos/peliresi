@@ -373,7 +373,7 @@ export const AdminVehiculosPage: React.FC = () => {
           inactivo: { label: 'Inactivo', color: 'neutral' },
         };
         const config = estadoConfig[row.estado] || estadoConfig.inactivo;
-        return <Badge variant="soft" color={config.color as any}>{config.label}</Badge>;
+        return <Badge variant="soft" color={config.color}>{config.label}</Badge>;
       },
     },
     {

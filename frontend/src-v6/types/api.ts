@@ -50,6 +50,8 @@ export interface LoginResponse {
   accessToken: string;
   refreshToken: string;
   user: Usuario;
+  restricted?: boolean;
+  solicitudId?: string | null;
 }
 
 export interface RefreshTokenRequest {

@@ -90,9 +90,9 @@ export const EditarManifiestoPage: React.FC = () => {
   }, [manifiesto, initialized]);
 
   // Selected actor details
-  const selectedGenerador = generadoresList.find((g: any) => g.id === formData.generadorId) as any;
-  const selectedTransportista = transportistasList.find((t: any) => t.id === formData.transportista) as any;
-  const selectedOperador = operadoresList.find((o: any) => o.id === formData.operador) as any;
+  const selectedGenerador = generadoresList.find((g) => g.id === formData.generadorId);
+  const selectedTransportista = transportistasList.find((t) => t.id === formData.transportista);
+  const selectedOperador = operadoresList.find((o) => o.id === formData.operador);
 
   const handleAddResiduo = () => {
     setFormData({

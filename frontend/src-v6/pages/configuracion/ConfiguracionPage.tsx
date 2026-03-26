@@ -31,6 +31,16 @@ import { authService } from '../../services/auth.service';
 import api from '../../services/api';
 import { usuarioService } from '../../services/usuario.service';
 
+/** Extended user profile fields from /auth/profile (notification preferences) */
+interface UserWithPreferences {
+  notifNuevoRegistro?: boolean;
+  notifEmail?: boolean;
+  notifWhatsapp?: boolean;
+  notifTelegram?: boolean;
+  whatsappPhone?: string;
+  telegramChatId?: string;
+}
+
 // Secciones base de configuración
 const BASE_SECTIONS = [
   { id: 'perfil', label: 'Perfil', icon: User },
@@ -74,16 +84,13 @@ const ConfiguracionPage: React.FC = () => {
       });
       // Cargar preferencia de notificaciones desde API (el profile trae el campo)
       authService.getMe().then(u => {
-        if ((u as any).notifNuevoRegistro !== undefined) {
-          setNotifNuevoRegistro((u as any).notifNuevoRegistro);
-        }
-        if ((u as any).notifEmail !== undefined) {
-          setNotifEmail((u as any).notifEmail);
-        }
-        if ((u as any).notifWhatsapp !== undefined) setNotifWhatsapp((u as any).notifWhatsapp);
-        if ((u as any).notifTelegram !== undefined) setNotifTelegram((u as any).notifTelegram);
-        if ((u as any).whatsappPhone) setWhatsappPhone((u as any).whatsappPhone);
-        if ((u as any).telegramChatId) setTelegramChatId((u as any).telegramChatId);
+        const prefs = u as unknown as UserWithPreferences;
+        if (prefs.notifNuevoRegistro !== undefined) setNotifNuevoRegistro(prefs.notifNuevoRegistro);
+        if (prefs.notifEmail !== undefined) setNotifEmail(prefs.notifEmail);
+        if (prefs.notifWhatsapp !== undefined) setNotifWhatsapp(prefs.notifWhatsapp);
+        if (prefs.notifTelegram !== undefined) setNotifTelegram(prefs.notifTelegram);
+        if (prefs.whatsappPhone) setWhatsappPhone(prefs.whatsappPhone);
+        if (prefs.telegramChatId) setTelegramChatId(prefs.telegramChatId);
       }).catch(() => {});
     }
   }, [currentUser]);
@@ -325,7 +332,7 @@ const ConfiguracionPage: React.FC = () => {
                       className="flex-1 px-3 py-2 rounded-lg border border-neutral-200 text-sm focus:border-[#1B5E3C] focus:outline-none"
                     />
                     <button
-                      onClick={() => handleToggleNotif('whatsappPhone', whatsappPhone as any)}
+                      onClick={() => handleToggleNotif('whatsappPhone', whatsappPhone)}
                       className="px-3 py-2 bg-[#1B5E3C] text-white text-sm rounded-lg font-medium"
                     >
                       Guardar
@@ -368,7 +375,7 @@ const ConfiguracionPage: React.FC = () => {
                       className="flex-1 px-3 py-2 rounded-lg border border-neutral-200 text-sm focus:border-[#1B5E3C] focus:outline-none"
                     />
                     <button
-                      onClick={() => handleToggleNotif('telegramChatId', telegramChatId as any)}
+                      onClick={() => handleToggleNotif('telegramChatId', telegramChatId)}
                       className="px-3 py-2 bg-[#1B5E3C] text-white text-sm rounded-lg font-medium"
                     >
                       Guardar
@@ -416,17 +423,17 @@ const ConfiguracionPage: React.FC = () => {
     { id: 'notificaciones', label: 'Notificaciones', icon: Bell },
   ];
 
-  const handleToggleNotif = async (field: string, val: any) => {
+  const handleToggleNotif = async (field: string, val: boolean | string) => {
     setSavingNotif(true);
     try {
       await api.put('/admin/preferencias-notificacion', { [field]: val });
       switch (field) {
-        case 'notifNuevoRegistro': setNotifNuevoRegistro(val); break;
-        case 'notifEmail': setNotifEmail(val); break;
-        case 'notifWhatsapp': setNotifWhatsapp(val); break;
-        case 'notifTelegram': setNotifTelegram(val); break;
-        case 'whatsappPhone': setWhatsappPhone(val); break;
-        case 'telegramChatId': setTelegramChatId(val); break;
+        case 'notifNuevoRegistro': setNotifNuevoRegistro(val as boolean); break;
+        case 'notifEmail': setNotifEmail(val as boolean); break;
+        case 'notifWhatsapp': setNotifWhatsapp(val as boolean); break;
+        case 'notifTelegram': setNotifTelegram(val as boolean); break;
+        case 'whatsappPhone': setWhatsappPhone(val as string); break;
+        case 'telegramChatId': setTelegramChatId(val as string); break;
       }
       toast.success('Preferencia guardada', 'Configuracion de notificaciones actualizada.');
     } catch {

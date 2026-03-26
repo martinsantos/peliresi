@@ -33,7 +33,7 @@ function applyClientFilters(items: Manifiesto[], filters?: ManifiestoFilters): M
     const q = filters.search.toLowerCase();
     result = result.filter(m =>
       m.numero?.toLowerCase().includes(q) ||
-      (m as any).generador?.razonSocial?.toLowerCase().includes(q)
+      m.generador?.razonSocial?.toLowerCase().includes(q)
     );
   }
   if (filters.limit) {

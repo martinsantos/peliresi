@@ -14,8 +14,23 @@ export const SWUpdateBanner: React.FC = () => {
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
 
+    let registration: ServiceWorkerRegistration | null = null;
+    let installingWorker: ServiceWorker | null = null;
+
     const handleControllerChange = () => {
       setShowUpdate(true);
+    };
+
+    const handleStateChange = () => {
+      if (installingWorker?.state === 'installed' && navigator.serviceWorker.controller) {
+        setShowUpdate(true);
+      }
+    };
+
+    const handleUpdateFound = () => {
+      installingWorker = registration?.installing ?? null;
+      if (!installingWorker) return;
+      installingWorker.addEventListener('statechange', handleStateChange);
     };
 
     // Detect when a new SW takes control
@@ -23,23 +38,17 @@ export const SWUpdateBanner: React.FC = () => {
 
     // Also check if there's a waiting worker already
     navigator.serviceWorker.ready.then((reg) => {
+      registration = reg;
       if (reg.waiting) {
         setShowUpdate(true);
       }
-      reg.addEventListener('updatefound', () => {
-        const newWorker = reg.installing;
-        if (!newWorker) return;
-        newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            // New SW installed but waiting — show update banner
-            setShowUpdate(true);
-          }
-        });
-      });
+      reg.addEventListener('updatefound', handleUpdateFound);
     });
 
     return () => {
       navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+      registration?.removeEventListener('updatefound', handleUpdateFound);
+      installingWorker?.removeEventListener('statechange', handleStateChange);
     };
   }, []);
 

@@ -1,4 +1,5 @@
 import prisma from '../lib/prisma';
+import logger from './logger';
 
 interface AuditarActorParams {
   accion: 'CREATE' | 'UPDATE' | 'DELETE';
@@ -30,6 +31,6 @@ export async function auditarActor(params: AuditarActorParams): Promise<void> {
       },
     });
   } catch (err) {
-    console.error('Error registrando auditoria de actor:', err);
+    logger.error({ err }, 'Error registrando auditoria de actor');
   }
 }

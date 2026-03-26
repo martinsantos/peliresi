@@ -58,7 +58,7 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
       .map(([name, value], i) => {
         // Backend returns { cantidad, unidad } objects OR plain numbers
         const numVal = typeof value === 'object' && value !== null
-          ? Number((value as any).cantidad) || 0
+          ? Number((value as { cantidad: number }).cantidad) || 0
           : Number(value) || 0;
         return {
           name: name.length > 25 ? name.substring(0, 22) + '...' : name,

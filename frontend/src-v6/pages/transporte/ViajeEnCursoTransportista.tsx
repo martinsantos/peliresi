@@ -75,8 +75,8 @@ const ViajeEnCursoTransportista: React.FC = () => {
 
   // Real data from API
   const { data: apiData, isLoading, isError } = useManifiesto(id || '');
-  const manifiesto = (apiData as any)?.data || apiData;
-  const m = manifiesto || {};
+  const manifiesto = apiData;
+  const m: Record<string, any> = manifiesto || {};
 
   // Persist active trip snapshot to localStorage for recovery after app restart
   useEffect(() => {

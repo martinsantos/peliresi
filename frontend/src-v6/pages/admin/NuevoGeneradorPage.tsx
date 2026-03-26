@@ -23,6 +23,8 @@ import { Badge } from '../../components/ui/BadgeV2';
 import { toast } from '../../components/ui/Toast';
 import { useGenerador, useCreateGenerador, useUpdateGenerador } from '../../hooks/useActores';
 import { useUploadDocumento } from '../../hooks/useGeneradorFiscal';
+import type { CreateGeneradorRequest } from '../../types/api';
+import type { Generador } from '../../types/models';
 import { CORRIENTES_Y, CORRIENTES_Y_CODES, parseCorrientes } from '../../data/corrientes-y';
 import { GENERADORES_DATA } from '../../data/generadores-enrichment';
 import { C_CORRIENTES } from '../../utils/calculoTEF';
@@ -103,7 +105,7 @@ const NuevoGeneradorPage: React.FC = () => {
 
   useEffect(() => {
     if (!isEdit || !existing) return;
-    const g = existing as any;
+    const g = existing;
     // CSV enrichment fallback for fields not yet persisted in DB
     const csv = g.cuit ? (GENERADORES_DATA[g.cuit] || GENERADORES_DATA[g.cuit?.replace(/^(\d{2})(\d{8})(\d)$/, '$1-$2-$3')]) : null;
     // Parse CSV domicilio "CALLE, LOCALIDAD, DEPARTAMENTO" into split fields
@@ -140,7 +142,7 @@ const NuevoGeneradorPage: React.FC = () => {
     }
 
     if (g.tefInputs) {
-      setTefInputs(g.tefInputs as TEFInputs);
+      setTefInputs(g.tefInputs as unknown as TEFInputs);
     }
   }, [existing, isEdit]);
 
@@ -257,12 +259,12 @@ const NuevoGeneradorPage: React.FC = () => {
             ...regulatory,
             ...(latitud && longitud && !isNaN(latitud) && !isNaN(longitud) ? { latitud, longitud } : {}),
             ...(tefInputs && { tefInputs }),
-          } as any,
+          } as Partial<CreateGeneradorRequest>,
         });
         generadorId = id;
         toast.success('Guardado', `Generador ${form.razonSocial} actualizado`);
       } else {
-        const result: any = await createMutation.mutateAsync({
+        const result = await createMutation.mutateAsync({
           email: form.email, password: form.password,
           nombre: form.nombre || form.razonSocial,
           razonSocial: form.razonSocial, cuit: form.cuit,
@@ -273,9 +275,10 @@ const NuevoGeneradorPage: React.FC = () => {
           ...regulatory,
           ...(latitud && longitud && !isNaN(latitud) && !isNaN(longitud) ? { latitud, longitud } : {}),
           ...(tefInputs && { tefInputs }),
-        } as any);
-        // result is data.data from service = { generador: { id, ... } }
-        generadorId = result?.generador?.id || result?.id;
+        } as CreateGeneradorRequest);
+        // result is data.data from service — could be Generador or { generador: { id, ... } }
+        const resultObj = result as Generador & { generador?: { id: string } };
+        generadorId = resultObj?.generador?.id || resultObj?.id;
         toast.success('Generador creado', `${form.razonSocial} registrado exitosamente`);
       }
 

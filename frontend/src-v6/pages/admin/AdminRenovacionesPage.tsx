@@ -184,7 +184,7 @@ const AdminRenovacionesPage: React.FC = () => {
                         </Badge>
                       </td>
                       <td className="py-3 px-4">
-                        <Badge variant="soft" color={cfg.color as any}>{cfg.label}</Badge>
+                        <Badge variant="soft" color={cfg.color}>{cfg.label}</Badge>
                       </td>
                       <td className="py-3 px-4 text-xs text-neutral-500">
                         {campos.length > 0 ? campos.slice(0, 3).join(', ') + (campos.length > 3 ? '...' : '') : '-'}
@@ -242,7 +242,7 @@ const AdminRenovacionesPage: React.FC = () => {
               </div>
               <div>
                 <p className="text-xs text-neutral-500">Estado</p>
-                <Badge variant="soft" color={(ESTADO_CONFIG[selectedRenov.estado]?.color || 'warning') as any}>
+                <Badge variant="soft" color={ESTADO_CONFIG[selectedRenov.estado]?.color || 'warning'}>
                   {ESTADO_CONFIG[selectedRenov.estado]?.label || selectedRenov.estado}
                 </Badge>
               </div>

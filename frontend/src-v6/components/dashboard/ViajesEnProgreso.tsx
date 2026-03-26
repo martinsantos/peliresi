@@ -35,9 +35,9 @@ interface ViajeData {
 }
 
 function mapManifiestoToViaje(m: Manifiesto): ViajeData {
-  const transportista = (m as any).transportista;
-  const generador = (m as any).generador;
-  const operador = (m as any).operador;
+  const transportista = m.transportista;
+  const generador = m.generador;
+  const operador = m.operador;
 
   const updatedAt = m.updatedAt ? new Date(m.updatedAt) : new Date(m.createdAt);
   const diffMs = Date.now() - updatedAt.getTime();

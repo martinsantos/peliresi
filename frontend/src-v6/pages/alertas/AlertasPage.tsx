@@ -298,7 +298,10 @@ export const AlertasPage: React.FC = () => {
     if (!isAnyAdmin) {
       // Non-admin: map notificaciones to AlertaLocal format
       const notifs = Array.isArray(apiNotifs) ? apiNotifs
-        : (apiNotifs as any)?.items || (apiNotifs as any)?.data?.notificaciones || (apiNotifs as any)?.notificaciones || [];
+        : (apiNotifs as { items?: unknown[]; data?: { notificaciones?: unknown[] }; notificaciones?: unknown[] })?.items
+          || (apiNotifs as { data?: { notificaciones?: unknown[] } })?.data?.notificaciones
+          || (apiNotifs as { notificaciones?: unknown[] })?.notificaciones
+          || [];
       return notifs
         .filter((n: any) => !deletedIds.has(n.id))
         .map((n: any) => ({
@@ -309,7 +312,7 @@ export const AlertasPage: React.FC = () => {
           fecha: n.createdAt,
           leida: n.leida || false,
           manifiestoId: n.manifiestoId,
-          manifiestoNumero: null,
+          manifiestoNumero: undefined,
           evento: n.tipo,
           estado: n.leida ? 'RESUELTA' : 'PENDIENTE',
         }));

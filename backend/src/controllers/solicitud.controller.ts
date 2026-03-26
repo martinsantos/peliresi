@@ -4,7 +4,9 @@ import crypto from 'crypto';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { Rol } from '@prisma/client';
 import prisma from '../lib/prisma';
+import logger from '../utils/logger';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { emailService } from '../services/email.service';
@@ -96,7 +98,7 @@ export const iniciarSolicitud = async (req: Request, res: Response, next: NextFu
         data: {
           email,
           password: hashedPassword,
-          rol: tipoActor as any,
+          rol: tipoActor as Rol,
           nombre,
           cuit: normalizedCuit,
           activo: false,
@@ -119,7 +121,7 @@ export const iniciarSolicitud = async (req: Request, res: Response, next: NextFu
 
     // Send email verification (fire-and-forget, don't block)
     emailService.sendEmailVerification(email, nombre, rawToken).catch((err) => {
-      console.error('[SOLICITUD] Error enviando email de verificacion:', err);
+      logger.error({ err }, 'Error enviando email de verificacion de solicitud');
     });
 
     res.status(201).json({
@@ -724,7 +726,7 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
         where: { id: solicitud.usuarioId },
         data: {
           activo: true,
-          rol: solicitud.tipoActor as any,
+          rol: solicitud.tipoActor as Rol,
         },
       });
 

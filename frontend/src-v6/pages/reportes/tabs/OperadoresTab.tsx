@@ -70,7 +70,7 @@ export default function OperadoresTab({
   const byCategoria = useMemo(() => {
     const map: Record<string, number> = {};
     for (const o of operadores) {
-      const cat = ((o as any).categoria || '').trim() || 'Sin categoria';
+      const cat = (o.categoria || '').trim() || 'Sin categoria';
       map[cat] = (map[cat] || 0) + 1;
     }
     const sorted = Object.entries(map)
@@ -98,7 +98,7 @@ export default function OperadoresTab({
   const byTipo = useMemo(() => {
     const map: Record<string, number> = {};
     for (const o of operadores) {
-      const tipo = (o as any).tipoOperador || 'Sin definir';
+      const tipo = o.tipoOperador || 'Sin definir';
       map[tipo] = (map[tipo] || 0) + 1;
     }
     const labels: Record<string, string> = { FIJO: 'Planta Fija', IN_SITU: 'In Situ', 'Sin definir': 'Sin definir' };

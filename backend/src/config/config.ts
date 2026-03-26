@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import path from 'path';
+import logger from '../utils/logger';
 
 // Cargar variables de entorno
 dotenv.config({
@@ -32,13 +33,13 @@ export const config = {
 
 // Validar configuraciones requeridas
 if (!config.DATABASE_URL) {
-  console.error('ERROR: DATABASE_URL no está definida en las variables de entorno');
+  logger.error('DATABASE_URL no esta definida en las variables de entorno');
   process.exit(1);
 }
 
 // En producción: fallar rápido si JWT_SECRET es el valor inseguro por defecto
 if (config.NODE_ENV === 'production' && config.JWT_SECRET === 'your-super-secret-jwt-key-change-in-production') {
-  console.error('FATAL: JWT_SECRET is using the insecure default value in production. Set a strong secret in .env');
+  logger.error('FATAL: JWT_SECRET is using the insecure default value in production. Set a strong secret in .env');
   process.exit(1);
 }
 

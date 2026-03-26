@@ -115,7 +115,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ basePath = '
 
   const items: Notificacion[] = data?.items ?? [];
   // noLeidas viene en data.noLeidas via service; fallback a contar items no leídos
-  const unreadCount = Math.min((data as any)?.noLeidas ?? items.filter(i => !i.leida).length, 99);
+  const unreadCount = Math.min(data?.noLeidas ?? items.filter(i => !i.leida).length, 99);
 
   // Close on outside click
   useEffect(() => {

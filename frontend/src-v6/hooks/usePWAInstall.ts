@@ -29,14 +29,15 @@ export function usePWAInstall(): UsePWAInstallReturn {
   const [isInstalled, setIsInstalled] = useState(false);
 
   // --- Detect iOS Safari ---
+  // MSStream exists only on IE; standalone is iOS-specific
   const isIOS = typeof navigator !== 'undefined' &&
     /iPad|iPhone|iPod/.test(navigator.userAgent) &&
-    !(window as any).MSStream;
+    !('MSStream' in window);
 
   // --- Detect standalone (already installed) ---
   useEffect(() => {
     const mql = window.matchMedia('(display-mode: standalone)');
-    const check = () => setIsInstalled(mql.matches || (navigator as any).standalone === true);
+    const check = () => setIsInstalled(mql.matches || ('standalone' in navigator && (navigator as Navigator & { standalone?: boolean }).standalone === true));
     check();
     mql.addEventListener('change', check);
     return () => mql.removeEventListener('change', check);

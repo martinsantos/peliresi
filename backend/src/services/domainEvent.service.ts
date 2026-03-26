@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import logger from '../utils/logger';
 
 export type DomainEvent =
   | {
@@ -73,7 +74,7 @@ class DomainEventBus extends EventEmitter {
     this.on('event', (e: DomainEvent) =>
       setImmediate(() =>
         handler(e).catch((err: Error) =>
-          console.error('[DomainEvent] handler error for', e.type, ':', err.message)
+          logger.error({ eventType: e.type, err: err.message }, 'DomainEvent handler error')
         )
       )
     );

@@ -75,7 +75,7 @@ const NuevoTransportistaPage: React.FC = () => {
 
   useEffect(() => {
     if (!isEdit || !existing) return;
-    const t = existing as any;
+    const t = existing;
     setForm({
       razonSocial: t.razonSocial || '', cuit: t.cuit || '',
       domicilio: t.domicilio || '', localidad: t.localidad || '',
@@ -168,7 +168,7 @@ const NuevoTransportistaPage: React.FC = () => {
         await updateMutation.mutateAsync({ id, data: payload });
         toast.success('Actualizado', `Transportista ${form.razonSocial} actualizado`);
       } else {
-        await createMutation.mutateAsync(payload as any);
+        await createMutation.mutateAsync(payload);
         toast.success('Creado', `Transportista ${form.razonSocial} creado. Password inicial: ${payload.password}`);
       }
       const backPath = isMobile ? '/mobile/actores/transportistas' : '/admin/actores/transportistas';

@@ -55,7 +55,7 @@ export const NuevoManifiestoPage: React.FC = () => {
   // Form state
   const [formData, setFormData] = useState({
     generador: currentUser?.rol === 'GENERADOR' ? currentUser?.sector || '' : '',
-    generadorId: currentUser?.rol === 'GENERADOR' ? (currentUser as any).generadorId || '' : '',
+    generadorId: currentUser?.rol === 'GENERADOR' ? currentUser?.actorId || '' : '',
     transportista: '',
     operador: '',
     fechaRetiro: new Date().toISOString().split('T')[0],
@@ -64,9 +64,9 @@ export const NuevoManifiestoPage: React.FC = () => {
   });
 
   // Selected actor details (auto-populated from catalogs)
-  const selectedGenerador = generadoresList.find((g: any) => g.id === formData.generadorId) as any;
-  const selectedTransportista = transportistasList.find((t: any) => t.id === formData.transportista) as any;
-  const selectedOperador = operadoresList.find((o: any) => o.id === formData.operador) as any;
+  const selectedGenerador = generadoresList.find((g) => g.id === formData.generadorId);
+  const selectedTransportista = transportistasList.find((t) => t.id === formData.transportista);
+  const selectedOperador = operadoresList.find((o) => o.id === formData.operador);
 
   const handleAddResiduo = () => {
     setFormData({

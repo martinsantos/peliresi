@@ -289,7 +289,7 @@ export const ActoresPage: React.FC = () => {
       sortable: true,
       render: (row: any) => {
         const config = tipoConfig[row.tipo as keyof typeof tipoConfig];
-        return <Badge variant="soft" color={config?.color as any}>{config?.label}</Badge>;
+        return <Badge variant="soft" color={config?.color}>{config?.label}</Badge>;
       },
     },
     {
@@ -584,7 +584,7 @@ export const ActoresPage: React.FC = () => {
                       </Badge>
                     </div>
                     <div className="space-y-2 mb-4">
-                      <Badge variant="soft" color={config.color as any}>
+                      <Badge variant="soft" color={config.color}>
                         {config.label}
                       </Badge>
                       <div className="flex items-center gap-1 text-sm text-neutral-600">
@@ -658,7 +658,7 @@ export const ActoresPage: React.FC = () => {
                     {actorSeleccionado.activo !== false ? <CheckCircle size={12} className="mr-1" /> : <XCircle size={12} className="mr-1" />}
                     {actorSeleccionado.activo !== false ? 'Activo' : 'Inactivo'}
                   </Badge>
-                  <Badge variant="soft" color={tipoConfig[actorSeleccionado.tipo as keyof typeof tipoConfig].color as any}>
+                  <Badge variant="soft" color={tipoConfig[actorSeleccionado.tipo as keyof typeof tipoConfig].color}>
                     {tipoConfig[actorSeleccionado.tipo as keyof typeof tipoConfig].label}
                   </Badge>
                 </div>

@@ -64,12 +64,12 @@ export function DropdownTrigger({ children, asChild, className }: DropdownTrigge
   const { isOpen, setIsOpen, triggerRef } = useDropdown();
 
   if (asChild && React.isValidElement(children)) {
-    return React.cloneElement(children as React.ReactElement<any>, {
+    return React.cloneElement(children as React.ReactElement<Record<string, unknown>>, {
       ref: triggerRef,
       onClick: () => setIsOpen(!isOpen),
       'aria-expanded': isOpen,
       'aria-haspopup': true,
-    } as any);
+    });
   }
 
   return (

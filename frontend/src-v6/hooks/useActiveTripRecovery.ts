@@ -9,6 +9,7 @@
 import { useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { manifiestoService } from '../services/manifiesto.service';
+import { EstadoManifiesto } from '../types/models';
 
 export function useActiveTripRecovery() {
   const { currentUser, isTransportista } = useAuth();
@@ -24,7 +25,7 @@ export function useActiveTripRecovery() {
 
     const recover = async () => {
       try {
-        const res = await manifiestoService.list({ estado: 'EN_TRANSITO' as any, limit: 1 });
+        const res = await manifiestoService.list({ estado: EstadoManifiesto.EN_TRANSITO, limit: 1 });
         if (cancelled) return;
 
         const manifiestos = res?.items || [];

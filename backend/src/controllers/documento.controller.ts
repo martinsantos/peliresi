@@ -20,7 +20,7 @@ const storage = multer.diskStorage({
     destination: (req, _file, cb) => {
         const actorId = (req as AuthRequest).params.id;
         // Determine actor type from route path
-        const isOperador = (req as any).originalUrl?.includes('/operadores/');
+        const isOperador = (req as AuthRequest).originalUrl?.includes('/operadores/');
         const actorType = isOperador ? 'operadores' : 'generadores';
         const dir = path.join(UPLOADS_DIR, actorType, actorId);
         ensureDir(dir);
@@ -40,7 +40,8 @@ export const upload = multer({
         if (ALLOWED_MIMES.includes(file.mimetype)) {
             cb(null, true);
         } else {
-            cb(new AppError('Tipo de archivo no permitido. Solo PDF, JPG, PNG.', 400) as any);
+            const err: Error = new AppError('Tipo de archivo no permitido. Solo PDF, JPG, PNG.', 400);
+            cb(err);
         }
     }
 });

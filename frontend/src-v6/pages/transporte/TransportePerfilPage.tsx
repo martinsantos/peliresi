@@ -99,7 +99,7 @@ const TransportePerfilPage: React.FC = () => {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id as 'viaje' | 'info' | 'historial')}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-all rounded-lg ${
                 isActive
                   ? 'text-primary-700 bg-white shadow-sm'
@@ -311,9 +311,9 @@ const TransportePerfilPage: React.FC = () => {
                   Mensaje
                 </button>
               </div>
-              {(currentUser as any)?.transportista?.id && (
+              {currentUser?.actorId && (
                 <button
-                  onClick={() => navigate(mp(`/admin/actores/transportistas/${(currentUser as any).transportista.id}`))}
+                  onClick={() => navigate(mp(`/admin/actores/transportistas/${currentUser.actorId}`))}
                   className="w-full flex items-center justify-center gap-2 mt-3 py-3 bg-primary-50 border border-primary-200 rounded-xl text-primary-700 font-medium hover:bg-primary-100 transition-colors"
                 >
                   <Settings size={16} />

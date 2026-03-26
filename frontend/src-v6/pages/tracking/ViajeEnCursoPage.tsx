@@ -157,8 +157,8 @@ const ViajeEnCursoPage: React.FC = () => {
   const isMobile = location.pathname.startsWith('/mobile');
 
   const { data: apiData, isLoading, isError } = useManifiesto(id || '');
-  const manifiesto = (apiData as any)?.data || apiData;
-  const m = manifiesto || {};
+  const manifiesto = apiData;
+  const m: Record<string, any> = manifiesto || {};
 
   // State: which actor to fly to
   const [flyTarget, setFlyTarget] = useState<[number, number] | null>(null);

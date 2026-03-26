@@ -1,6 +1,8 @@
 // Analytics Middleware - Tracks all API requests for superadmin stats
 import { Request, Response, NextFunction } from 'express';
 import prisma from '../lib/prisma';
+import logger from '../utils/logger';
+import { AuthRequest } from './auth.middleware';
 
 interface AnalyticsData {
     timestamp: Date;
@@ -45,7 +47,7 @@ async function flushAnalyticsBuffer() {
             }))
         });
     } catch (error) {
-        console.error('Error flushing analytics:', error);
+        logger.error({ err: error }, 'Error flushing analytics');
         // Re-add failed entries (up to buffer size)
         analyticsBuffer.push(...dataToInsert.slice(0, BUFFER_SIZE));
     }
@@ -71,7 +73,7 @@ export const analyticsMiddleware = (req: Request, res: Response, next: NextFunct
         const duration = Date.now() - startTime;
 
         // Get user info from request (set by auth middleware)
-        const user = (req as any).user;
+        const user = (req as AuthRequest).user;
 
         const analyticsData: AnalyticsData = {
             timestamp: new Date(),

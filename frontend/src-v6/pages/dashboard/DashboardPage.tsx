@@ -31,6 +31,7 @@ import { SkeletonStats, SkeletonCard } from '../../components/ui/Skeleton';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDashboardStats } from '../../hooks/useDashboard';
 import { useManifiestos } from '../../hooks/useManifiestos';
+import { EstadoManifiesto } from '../../types/models';
 import { formatRelativeTime } from '../../utils/formatters';
 
 // ========================================
@@ -53,7 +54,7 @@ const AdminDashboard: React.FC = () => {
   const tratadosM = est?.tratados ?? 0;
   const complianceRate = totalM > 0 ? `${((tratadosM / totalM) * 100).toFixed(1)}%` : '-';
 
-  const stats = [
+  const stats: { id: number; label: string; value: string; icon: typeof FileText; color: string; href: string; change?: string }[] = [
     { id: 1, label: 'Manifiestos Total', value: String(totalM), icon: FileText, color: 'primary', href: '/manifiestos' },
     { id: 2, label: 'En Tránsito', value: String(enTransitoM), icon: Truck, color: 'info', href: '/manifiestos?estado=EN_TRANSITO' },
     { id: 3, label: 'Tratados', value: String(tratadosM), icon: AlertCircle, color: 'warning', href: '/reportes' },
@@ -149,8 +150,8 @@ const AdminDashboard: React.FC = () => {
                       'text-success-600'
                     } />
                   </div>
-                  {(stat as any).change && (
-                    <span className="text-xs font-semibold text-success-600 bg-success-50 px-2 py-0.5 rounded-full">{(stat as any).change}</span>
+                  {stat.change && (
+                    <span className="text-xs font-semibold text-success-600 bg-success-50 px-2 py-0.5 rounded-full">{stat.change}</span>
                   )}
                 </div>
                 <p className="text-2xl font-bold text-neutral-900 animate-count-up">{stat.value}</p>
@@ -350,8 +351,8 @@ const TransportistaDashboard: React.FC = () => {
   const route = (path: string) => isMobile ? `/mobile${path}` : path;
 
   const { data: dashStats } = useDashboardStats();
-  const { data: tripsEnTransito } = useManifiestos({ estado: 'EN_TRANSITO' as any, limit: 5 });
-  const { data: tripsAprobados } = useManifiestos({ estado: 'APROBADO' as any, limit: 5 });
+  const { data: tripsEnTransito } = useManifiestos({ estado: EstadoManifiesto.EN_TRANSITO, limit: 5 });
+  const { data: tripsAprobados } = useManifiestos({ estado: EstadoManifiesto.APROBADO, limit: 5 });
   const activeTrips = tripsEnTransito?.items || [];
   const pendingTrips = tripsAprobados?.items || [];
 

@@ -13,6 +13,7 @@
 
 import nodemailer from 'nodemailer';
 import prisma from '../lib/prisma';
+import logger from '../utils/logger';
 
 // ── Config ──────────────────────────────────────────────────────────
 
@@ -88,11 +89,11 @@ async function checkDailyLimit(to: string, tipo: 'TRANSACCIONAL' | 'ALERTA'): Pr
 
 async function smtpSend(to: string, subject: string, html: string): Promise<void> {
   if (DISABLE_EMAILS) {
-    console.log(`[EMAIL][DISABLED] Suppressed -> ${to}: ${subject}`);
+    logger.info({ to, subject }, 'Email suppressed (DISABLE_EMAILS=true)');
     return;
   }
   await transporter.sendMail({ from: FROM, to, subject, html });
-  console.log(`[EMAIL] Sent -> ${to}: ${subject}`);
+  logger.info({ to, subject }, 'Email sent');
 }
 
 // ── Queue helpers ───────────────────────────────────────────────────
@@ -121,7 +122,7 @@ async function enqueueTransaccional(
       where: { id: row.id },
       data: { estado: 'SUPRIMIDO', error: `daily limit: ${LIMIT_TRANSACCIONAL} for ${to}` },
     });
-    console.warn(`[EMAIL] Rate limited TRANSACCIONAL -> ${to}: ${subject}`);
+    logger.warn({ to, subject }, 'Email rate limited (TRANSACCIONAL)');
     return;
   }
 
@@ -137,7 +138,7 @@ async function enqueueTransaccional(
       where: { id: row.id },
       data: { estado: 'FALLIDO', intentos: 1, error: err?.message || 'unknown', nextRetryAt: retryAt },
     });
-    console.error(`[EMAIL] Failed (queued for retry) -> ${to}: ${subject}`, err?.message);
+    logger.error({ to, subject, err: err?.message }, 'Email failed (queued for retry)');
   }
 }
 
@@ -153,7 +154,7 @@ async function enqueueAlerta(to: string, subject: string, html: string): Promise
       digestKey: digestKeyFor(to),
     },
   });
-  console.log(`[EMAIL] Queued alert digest -> ${to}: ${subject}`);
+  logger.info({ to, subject }, 'Email alert digest queued');
 }
 
 // ── Flush (called by timer) ─────────────────────────────────────────
@@ -266,7 +267,7 @@ export async function flushEmailQueue(): Promise<void> {
     });
 
   } catch (err) {
-    console.error('[EMAIL] flushEmailQueue error:', err);
+    logger.error({ err }, 'flushEmailQueue error');
   }
 }
 
@@ -511,10 +512,10 @@ let flushTimer: ReturnType<typeof setInterval> | null = null;
 export function startEmailFlushTimer(): void {
   if (flushTimer) return;
   flushTimer = setInterval(() => {
-    flushEmailQueue().catch(err => console.error('[EMAIL] Flush timer error:', err));
+    flushEmailQueue().catch(err => logger.error({ err }, 'Email flush timer error'));
   }, FLUSH_INTERVAL);
-  console.log(`[EMAIL] Flush timer started (every ${FLUSH_INTERVAL / 1000}s, daily limits: transaccional=${LIMIT_TRANSACCIONAL}, alerta=${LIMIT_ALERTA})`);
-  if (DISABLE_EMAILS) console.warn('[EMAIL] DISABLE_EMAILS=true — sends suppressed, queue active');
+  logger.info({ flushIntervalSec: FLUSH_INTERVAL / 1000, limitTransaccional: LIMIT_TRANSACCIONAL, limitAlerta: LIMIT_ALERTA }, 'Email flush timer started');
+  if (DISABLE_EMAILS) logger.warn('DISABLE_EMAILS=true — sends suppressed, queue active');
 }
 
 export function stopEmailFlushTimer(): void {

@@ -1,8 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
-import { TipoNotificacion, PrioridadNotificacion, EventoAlerta, EstadoAlerta, TipoAnomalia, SeveridadAnomalia } from '@prisma/client';
+import { Rol, TipoNotificacion, PrioridadNotificacion, EventoAlerta, EstadoAlerta, TipoAnomalia, SeveridadAnomalia } from '@prisma/client';
 import prisma from '../lib/prisma';
+import logger from '../utils/logger';
 import { emailService } from '../services/email.service';
 import { domainEvents } from '../services/domainEvent.service';
+import { AuthRequest } from '../middlewares/auth.middleware';
 
 // ============ SERVICIO DE NOTIFICACIONES ============
 
@@ -60,19 +62,19 @@ class NotificationService {
 
                 // WhatsApp channel (placeholder — requires integration with WhatsApp Business API)
                 if (user.notifWhatsapp && user.whatsappPhone) {
-                    console.log(`[NOTIF][WhatsApp] To: ${user.whatsappPhone} | ${data.titulo}: ${data.mensaje}`);
+                    logger.info({ channel: 'WhatsApp', to: user.whatsappPhone }, `${data.titulo}: ${data.mensaje}`);
                     // TODO: Integrate with WhatsApp Business API or Twilio
                     // await whatsappService.send(user.whatsappPhone, `*${data.titulo}*\n${data.mensaje}`);
                 }
 
                 // Telegram channel (placeholder — requires Telegram Bot API)
                 if (user.notifTelegram && user.telegramChatId) {
-                    console.log(`[NOTIF][Telegram] ChatId: ${user.telegramChatId} | ${data.titulo}: ${data.mensaje}`);
+                    logger.info({ channel: 'Telegram', chatId: user.telegramChatId }, `${data.titulo}: ${data.mensaje}`);
                     // TODO: Integrate with Telegram Bot API
                     // await telegramService.send(user.telegramChatId, `*${data.titulo}*\n${data.mensaje}`);
                 }
             } catch (err) {
-                console.error('[NOTIF] Error sending via channels:', err);
+                logger.error({ err }, 'Error sending notification via channels');
             }
         });
 
@@ -89,7 +91,7 @@ class NotificationService {
         prioridad?: PrioridadNotificacion;
     }) {
         const usuarios = await prisma.usuario.findMany({
-            where: { rol: rol as any, activo: true },
+            where: { rol: rol as Rol, activo: true },
             select: { id: true }
         });
 
@@ -145,7 +147,7 @@ class NotificationService {
                     titulo: 'Nuevo retiro asignado',
                     mensaje: `${num} —${retiroInfo} ${gen.razonSocial}, ${gen.domicilio || ''}`.trim(),
                     manifiestoId,
-                    prioridad: 'ALTA' as any,
+                    prioridad: 'ALTA' as PrioridadNotificacion,
                     datos: {
                         tipo: 'retiro_asignado',
                         fechaRetiro: fechaRetiro || null,
@@ -166,7 +168,7 @@ class NotificationService {
                     titulo: 'Manifiesto firmado — recibiras residuos',
                     mensaje: `${num} de ${gen.razonSocial}.${fechaRetiro ? ` Retiro estimado: ${fechaRetiro}` : ''}`,
                     manifiestoId,
-                    prioridad: 'NORMAL' as any,
+                    prioridad: 'NORMAL' as PrioridadNotificacion,
                     datos: {
                         tipo: 'recepcion_programada',
                         fechaRetiro: fechaRetiro || null,
@@ -184,7 +186,7 @@ class NotificationService {
                     titulo: 'Tu manifiesto fue firmado',
                     mensaje: `${num} firmado y listo para retiro`,
                     manifiestoId,
-                    prioridad: 'NORMAL' as any,
+                    prioridad: 'NORMAL' as PrioridadNotificacion,
                 }));
             }
 
@@ -198,7 +200,7 @@ class NotificationService {
                         titulo: 'Manifiesto firmado',
                         mensaje: `${num} firmado por ${gen.razonSocial}`,
                         manifiestoId,
-                        prioridad: 'NORMAL' as any,
+                        prioridad: 'NORMAL' as PrioridadNotificacion,
                     }));
                 }
             }
@@ -264,7 +266,7 @@ export const notificationService = new NotificationService();
 // Obtener notificaciones del usuario actual
 export const getNotificaciones = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const usuarioId = (req as any).user.id;
+        const usuarioId = (req as AuthRequest).user!.id;
         const { leida, limit = 20, offset = 0 } = req.query;
         const limitNum = Math.min(500, Math.max(1, parseInt(limit as string)));
 
@@ -307,7 +309,7 @@ export const getNotificaciones = async (req: Request, res: Response, next: NextF
 export const marcarLeida = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { id } = req.params;
-        const usuarioId = (req as any).user.id;
+        const usuarioId = (req as AuthRequest).user!.id;
 
         const notificacion = await prisma.notificacion.update({
             where: { id, usuarioId },
@@ -323,7 +325,7 @@ export const marcarLeida = async (req: Request, res: Response, next: NextFunctio
 // Marcar todas como leídas
 export const marcarTodasLeidas = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const usuarioId = (req as any).user.id;
+        const usuarioId = (req as AuthRequest).user!.id;
 
         await prisma.notificacion.updateMany({
             where: { usuarioId, leida: false },
@@ -340,7 +342,7 @@ export const marcarTodasLeidas = async (req: Request, res: Response, next: NextF
 export const eliminarNotificacion = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { id } = req.params;
-        const usuarioId = (req as any).user.id;
+        const usuarioId = (req as AuthRequest).user!.id;
 
         await prisma.notificacion.delete({
             where: { id, usuarioId }
@@ -374,7 +376,7 @@ export const getReglasAlerta = async (req: Request, res: Response, next: NextFun
 // Crear regla de alerta
 export const crearReglaAlerta = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const usuarioId = (req as any).user.id;
+        const usuarioId = (req as AuthRequest).user!.id;
         const { nombre, descripcion, evento, condicion, destinatarios } = req.body;
 
         // Frontend already sends condicion and destinatarios as JSON strings — do NOT re-stringify
@@ -487,7 +489,7 @@ export const resolverAlerta = async (req: Request, res: Response, next: NextFunc
     try {
         const { id } = req.params;
         const { estado, notas } = req.body;
-        const usuarioId = (req as any).user.id;
+        const usuarioId = (req as AuthRequest).user!.id;
 
         const alerta = await prisma.alertaGenerada.update({
             where: { id },
@@ -712,7 +714,7 @@ export const resolverAnomalia = async (req: Request, res: Response, next: NextFu
     try {
         const { id } = req.params;
         const { notas } = req.body;
-        const usuarioId = (req as any).user.id;
+        const usuarioId = (req as AuthRequest).user!.id;
 
         const anomalia = await prisma.anomaliaTransporte.update({
             where: { id },

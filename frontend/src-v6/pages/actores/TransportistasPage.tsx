@@ -195,7 +195,7 @@ const TransportistasPage: React.FC = () => {
         resolucionSSP: form.resolucionSSP || undefined,
         actaInspeccion: form.actaInspeccion || undefined,
         actaInspeccion2: form.actaInspeccion2 || undefined,
-      } as any);
+      });
       toast.success('Creado', `Transportista ${form.razonSocial} creado`);
       setModalCrear(false);
       setForm(INITIAL_FORM);

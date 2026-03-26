@@ -103,7 +103,7 @@ const AuditoriaPage: React.FC = () => {
   // Stats from real data only
   const stats = useMemo(() => {
     if (apiData?.resumen) {
-      const resumen = apiData.resumen as any;
+      const resumen = apiData.resumen as { total?: number; porTipo?: Record<string, number> };
       return {
         total: resumen.total ?? logsFiltrados.length,
         logins: resumen.porTipo?.LOGIN ?? logsData.filter(l => l.accion === 'LOGIN').length,

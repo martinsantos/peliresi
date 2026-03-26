@@ -1,5 +1,6 @@
 import { EventoAlerta, TipoNotificacion, PrioridadNotificacion } from '@prisma/client';
 import prisma from '../lib/prisma';
+import logger from '../utils/logger';
 import { emailService } from '../services/email.service';
 import { notificationService } from '../controllers/notification.controller';
 import { DomainEvent } from '../services/domainEvent.service';
@@ -218,10 +219,9 @@ export async function alertaSubscriber(event: DomainEvent): Promise<void> {
   // 2. Disparar ReglaAlerta activas para este evento
   if (eventoAlerta) {
     const manifiestoId = 'manifiestoId' in event ? event.manifiestoId : undefined;
-    const datos: Record<string, any> = { ...event };
-    delete (datos as any).type;
+    const { type: _type, ...datos } = event;
     await dispararReglasAlerta(eventoAlerta, manifiestoId, datos);
   }
 
-  console.log(`[AlertaSubscriber] evento=${event.type}`);
+  logger.info({ eventType: event.type }, 'AlertaSubscriber processed event');
 }

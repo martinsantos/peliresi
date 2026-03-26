@@ -24,6 +24,8 @@ import { Badge } from '../../components/ui/BadgeV2';
 import { toast } from '../../components/ui/Toast';
 import { useOperador, useCreateOperador, useUpdateOperador } from '../../hooks/useActores';
 import { useUploadOperadorDocumento } from '../../hooks/useGeneradorFiscal';
+import type { CreateOperadorRequest } from '../../types/api';
+import type { Operador } from '../../types/models';
 import { CORRIENTES_Y, CORRIENTES_Y_CODES, parseCorrientes } from '../../data/corrientes-y';
 import { OPERADORES_DATA } from '../../data/operadores-enrichment';
 import { C_CORRIENTES } from '../../utils/calculoTEF';
@@ -105,7 +107,7 @@ const NuevoOperadorPage: React.FC = () => {
 
   useEffect(() => {
     if (!isEdit || !existing) return;
-    const o = existing as any;
+    const o = existing;
     // CSV enrichment fallback for fields not yet persisted in DB
     const csv = o.cuit ? (OPERADORES_DATA[o.cuit] || null) : null;
 
@@ -146,7 +148,7 @@ const NuevoOperadorPage: React.FC = () => {
     }
 
     if (o.tefInputs) {
-      setTefInputs(o.tefInputs as TEFInputs);
+      setTefInputs(o.tefInputs as unknown as TEFInputs);
     }
   }, [existing, isEdit]);
 
@@ -281,12 +283,12 @@ const NuevoOperadorPage: React.FC = () => {
             numeroHabilitacion: form.numeroHabilitacion,
             categoria: form.categoria,
             ...extra,
-          } as any,
+          } as Partial<CreateOperadorRequest>,
         });
         operadorId = id;
         toast.success('Guardado', `Operador ${form.razonSocial} actualizado`);
       } else {
-        const result: any = await createMutation.mutateAsync({
+        const result = await createMutation.mutateAsync({
           email: form.email, password: form.password,
           nombre: form.nombre || form.razonSocial,
           razonSocial: form.razonSocial, cuit: form.cuit,
@@ -295,8 +297,9 @@ const NuevoOperadorPage: React.FC = () => {
           numeroHabilitacion: form.numeroHabilitacion,
           categoria: form.categoria,
           ...extra,
-        } as any);
-        operadorId = result?.operador?.id || result?.id;
+        } as CreateOperadorRequest);
+        const resultObj = result as Operador & { operador?: { id: string } };
+        operadorId = resultObj?.operador?.id || resultObj?.id;
         toast.success('Operador creado', `${form.razonSocial} registrado exitosamente`);
       }
 

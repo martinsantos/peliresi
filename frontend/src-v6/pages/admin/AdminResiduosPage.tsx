@@ -187,7 +187,7 @@ export const AdminResiduosPage: React.FC = () => {
         categoria: form.categoria,
         caracteristicas: form.caracteristicas || null,
         peligrosidad: form.peligrosidad,
-      } as any);
+      });
       toast.success('Creado', `Tipo de residuo ${form.codigo} creado`);
       setModalCrear(false);
       setForm(INITIAL_FORM);
@@ -221,7 +221,7 @@ export const AdminResiduosPage: React.FC = () => {
           categoria: form.categoria,
           caracteristicas: form.caracteristicas || null,
           peligrosidad: form.peligrosidad,
-        } as any,
+        },
       });
       toast.success('Actualizado', `Tipo de residuo ${form.codigo} actualizado`);
       setModalEditar(false);
@@ -346,7 +346,7 @@ export const AdminResiduosPage: React.FC = () => {
           ninguna: 'success',
         };
         return (
-          <Badge variant="soft" color={colors[row.peligrosidad] as any}>
+          <Badge variant="soft" color={colors[row.peligrosidad]}>
             {row.peligrosidad.charAt(0).toUpperCase() + row.peligrosidad.slice(1)}
           </Badge>
         );

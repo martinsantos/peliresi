@@ -1,6 +1,7 @@
 import { ethers } from 'ethers';
 import crypto from 'crypto';
 import prisma from '../lib/prisma';
+import logger from '../utils/logger';
 import { config } from '../config/config';
 import SitrepRegistryABI from '../contracts/SitrepRegistry.json';
 
@@ -209,9 +210,9 @@ export async function registrarSello(
       });
     }
 
-    console.log(`[Blockchain] Sello ${tipo} registrado para ${manifiestoId} — tx: ${tx.hash}`);
+    logger.info({ manifiestoId, tipo, txHash: tx.hash }, `Sello ${tipo} registrado`);
   } catch (err: any) {
-    console.error(`[Blockchain] Error registrando sello ${tipo} para ${manifiestoId}:`, err.message);
+    logger.error({ manifiestoId, tipo, err: err.message }, `Error registrando sello ${tipo}`);
     try {
       await prisma.blockchainSello.updateMany({
         where: { manifiestoId, tipo },
@@ -244,7 +245,7 @@ export async function registrarEnBlockchain(manifiestoId: string): Promise<void>
   });
 
   if (!manifiesto) {
-    console.error(`[Blockchain] Manifiesto ${manifiestoId} no encontrado`);
+    logger.error({ manifiestoId }, 'Manifiesto no encontrado para blockchain');
     return;
   }
 
@@ -490,7 +491,7 @@ export async function procesarPendientes(): Promise<void> {
               blockchainStatus: 'CONFIRMADO',
             },
           });
-          console.log(`[Blockchain] Confirmado (legacy): ${m.numero} — tx: ${m.blockchainTxHash}`);
+          logger.info({ numero: m.numero, txHash: m.blockchainTxHash }, 'Blockchain confirmado (legacy)');
           continue;
         }
       } catch { /* fall through to retry */ }
@@ -528,7 +529,7 @@ export async function procesarPendientes(): Promise<void> {
               },
             });
           }
-          console.log(`[Blockchain] Sello ${sello.tipo} confirmado: ${sello.manifiesto.numero} — tx: ${sello.txHash}`);
+          logger.info({ tipo: sello.tipo, numero: sello.manifiesto.numero, txHash: sello.txHash }, `Sello ${sello.tipo} confirmado`);
           continue;
         }
       } catch { /* fall through to retry */ }
@@ -549,7 +550,7 @@ export async function procesarPendientes(): Promise<void> {
         });
       }
     } catch (err: any) {
-      console.error(`[Blockchain] Error reintentando sello ${sello.id}:`, err.message);
+      logger.error({ selloId: sello.id, err: err.message }, 'Error reintentando sello blockchain');
       await prisma.blockchainSello.update({
         where: { id: sello.id },
         data: { status: 'ERROR', retries: { increment: 1 } },

@@ -159,9 +159,9 @@ const GeneradorDetallePage: React.FC = () => {
 
   const generador = apiGenerador ? {
     ...apiGenerador,
-    estado: (apiGenerador as any).activo !== false ? 'activo' : 'inactivo',
-    inscripcionDGFA: (apiGenerador as any).numeroInscripcion || '-',
-    fechaAlta: (apiGenerador as any).createdAt ? new Date((apiGenerador as any).createdAt).toISOString().split('T')[0] : '-',
+    estado: apiGenerador.activo !== false ? 'activo' : 'inactivo',
+    inscripcionDGFA: apiGenerador.numeroInscripcion || '-',
+    fechaAlta: apiGenerador.createdAt ? new Date(apiGenerador.createdAt).toISOString().split('T')[0] : '-',
   } : null;
 
   const backPath = isMobile ? '/mobile/admin/actores/generadores' : '/admin/actores/generadores';
@@ -184,7 +184,7 @@ const GeneradorDetallePage: React.FC = () => {
 
   if (!generador) return null;
 
-  const g = generador as any;
+  const g = generador;
   const enriched = generador.cuit ? (GENERADORES_DATA[generador.cuit] || GENERADORES_DATA[generador.cuit.replace(/^(\d{2})(\d{8})(\d)$/, '$1-$2-$3')]) : null;
   const categorias = g.corrientesControl
     ? parseCorrientes(g.corrientesControl)
