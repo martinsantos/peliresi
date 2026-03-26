@@ -122,7 +122,7 @@ export const MobileLayout: React.FC = () => {
 
   // Guard: redirect to login if not authenticated (after hooks to comply with rules of hooks)
   if (!isLoading && !currentUser) {
-    return <Navigate to={`${mp}/login`} replace />;
+    return <Navigate to="/login" replace />;
   }
 
   const config = currentUser ? roleConfig[currentUser.rol] : roleConfig.ADMIN;
