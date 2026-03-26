@@ -32,7 +32,9 @@ import {
   ChevronRight,
   MapPin,
   Clock,
-  Loader2
+  Loader2,
+  UserCheck,
+  UserX,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -467,6 +469,18 @@ const UsuariosPage: React.FC = () => {
           <Button
             variant="ghost"
             size="sm"
+            className={`p-2 ${row.estado === 'activo' ? 'text-amber-500' : 'text-emerald-600'}`}
+            onClick={(e: any) => {
+              e.stopPropagation();
+              cambiarEstado(row.id, row.estado === 'activo' ? 'inactivo' : 'activo');
+            }}
+            title={row.estado === 'activo' ? 'Desactivar usuario' : 'Activar usuario'}
+          >
+            {row.estado === 'activo' ? <UserX size={16} /> : <UserCheck size={16} />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             className="p-2"
             onClick={(e: any) => { e.stopPropagation(); verUsuario(row); }}
             title="Ver detalle"
@@ -731,6 +745,14 @@ const UsuariosPage: React.FC = () => {
                         <p className="text-xs text-neutral-500">Manifiestos</p>
                       </div>
                       <div className="flex gap-1">
+                        <Button
+                          variant="ghost" size="sm"
+                          className={`p-2 ${usuario.estado === 'activo' ? 'text-amber-500' : 'text-emerald-600'}`}
+                          onClick={() => cambiarEstado(usuario.id, usuario.estado === 'activo' ? 'inactivo' : 'activo')}
+                          title={usuario.estado === 'activo' ? 'Desactivar' : 'Activar'}
+                        >
+                          {usuario.estado === 'activo' ? <UserX size={16} /> : <UserCheck size={16} />}
+                        </Button>
                         <Button variant="ghost" size="sm" className="p-2" onClick={() => verUsuario(usuario)}>
                           <Eye size={16} />
                         </Button>
@@ -759,6 +781,18 @@ const UsuariosPage: React.FC = () => {
         footer={
           <>
             <Button variant="outline" onClick={() => setModalVer(false)}>Cerrar</Button>
+            {usuarioSeleccionado && (
+              <Button
+                variant={usuarioSeleccionado.estado === 'activo' ? 'outline' : 'primary'}
+                leftIcon={usuarioSeleccionado.estado === 'activo' ? <UserX size={16} /> : <UserCheck size={16} />}
+                onClick={() => {
+                  cambiarEstado(usuarioSeleccionado.id, usuarioSeleccionado.estado === 'activo' ? 'inactivo' : 'activo');
+                  setModalVer(false);
+                }}
+              >
+                {usuarioSeleccionado.estado === 'activo' ? 'Desactivar' : 'Activar'}
+              </Button>
+            )}
             {usuarioSeleccionado && <Button onClick={() => abrirEditar(usuarioSeleccionado)}>Editar</Button>}
           </>
         }
