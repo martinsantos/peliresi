@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SITREP — Manual del Sistema | v2026.8</title>
+<title>SITREP — Manual del Sistema | v2026.9</title>
 <meta name="description" content="Manual completo del Sistema de Trazabilidad de Residuos Peligrosos - Provincia de Mendoza">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,7 +18,7 @@
     <span></span><span></span><span></span>
   </button>
   <div class="logo">SITREP <span>Mendoza</span></div>
-  <span class="version">v2026.8</span>
+  <span class="version">v2026.9</span>
   <span class="doc-title">Manual del Sistema de Trazabilidad de Residuos Peligrosos</span>
   <div class="header-actions">
     <button class="header-action-btn" id="btnShare" onclick="shareManual()" aria-label="Compartir" title="Compartir">
@@ -5855,6 +5855,33 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <table>
 <thead><tr><th>Version</th><th>Fecha</th><th>Descripcion de Cambios</th></tr></thead>
 <tbody>
+<tr><td><strong>2026.9</strong></td><td>Marzo 2026</td><td>
+<ul>
+<li><strong>Administradores Sectoriales:</strong> 3 nuevos roles (Admin Generadores, Admin Transporte, Admin Operadores) con acceso a Blockchain, Carga Masiva, Auditoria, Centro de Control, Impersonar. Solo Super Admin ve Usuarios y Solicitudes.</li>
+<li><strong>Promover/Degradar roles:</strong> Modal con validacion de clave del Super Admin para cambiar jerarquia de usuarios.</li>
+<li><strong>Notificaciones con ubicacion:</strong> Al firmar un manifiesto, el transportista recibe link a Google Maps con la direccion del retiro. Recordatorio automatico 24h antes (job cron cada 6h).</li>
+<li><strong>Notificaciones multi-canal:</strong> Email para todos los roles (no solo ADMIN). Placeholders para WhatsApp y Telegram en Configuracion &rarr; Notificaciones.</li>
+<li><strong>Alertas para no-admin:</strong> La pagina /alertas ahora muestra notificaciones del usuario para roles no-admin. Admin sectoriales ven alertas globales.</li>
+<li><strong>Refactorizacion completa (5 fases):</strong>
+  <ul>
+    <li>Fase 1: 90 "as any" eliminados (100% type-safe), 47 console.log reemplazados por logger pino, constants.ts centralizado.</li>
+    <li>Fase 2: 18,251 LOC de datos estaticos movidos a backend API (-28% LOC frontend, -527KB de bundle).</li>
+    <li>Fase 3: manifiesto.controller.ts (1,802 LOC) dividido en 4 archivos. notification.controller.ts dividido en 2.</li>
+    <li>Fase 4: ManifiestoDetallePage dividida en 3 componentes. GPS logic extraido a useGPSTracking hook.</li>
+    <li>Fase 5: Hooks divididos: useManifiestoWorkflow, useGeneradores, useTransportistas, useOperadores.</li>
+  </ul>
+</li>
+<li><strong>Test integral multi-rol:</strong> 49 tests automatizados en 7 secciones (accesos, altas, perfiles, manifiestos completo, alertas, permisos sectoriales, endpoints publicos). 49/49 PASS en 40s.</li>
+<li><strong>Setup Wizard:</strong> Pagina /setup.html para instalacion guiada paso a paso sin backend. MANUAL.html y SETUP.html en raiz del repositorio.</li>
+<li><strong>Seccion 0 del manual:</strong> Guia de instalacion con mockups del wizard, pre/post instalacion.</li>
+<li><strong>Seccion 15.12:</strong> Guia de instalacion del sistema completa (15 subsecciones paso a paso).</li>
+<li><strong>DEPLOY-NUEVO-SERVIDOR.md:</strong> Guia tecnica de deploy en servidor nuevo (1,564 lineas) con DNS, correos, Brevo, backups.</li>
+<li>Seccion 3.8 reescrita con matriz de 7 roles x 26 permisos.</li>
+<li>Alta de admin sectoriales desde login + edicion de rol en gestion de usuarios.</li>
+<li>Boton Activar/Desactivar usuario en tabla, cards y modal.</li>
+<li>Service Worker bumped a v23.</li>
+</ul>
+</td></tr>
 <tr><td><strong>2026.8</strong></td><td>Marzo 2026</td><td>
 <ul>
 <li>Nueva seccion 3.13: Sistema de Emails y Alertas — cola de emails en DB, digests horarios por destinatario, rate limits, panel admin de cola, kill switch.</li>
@@ -5946,7 +5973,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <footer class="site-footer">
 <p><strong>SITREP</strong> &mdash; Sistema de Trazabilidad de Residuos Peligrosos</p>
 <p>Direccion General de Fiscalizacion Ambiental (DGFA) &mdash; Gobierno de Mendoza</p>
-<p>Version 2026.8 &mdash; Actualizado el 25 de marzo de 2026</p>
+<p>Version 2026.9 &mdash; Actualizado el 26 de marzo de 2026</p>
 <p style="margin-top:0.5rem;font-size:0.8rem;color:#9CA3AF;">Conforme a Ley Nacional 24.051, Decreto 831/93 y Ley Provincial 5917</p>
 <p style="margin-top:0.25rem;font-size:0.8rem;color:#9CA3AF;">Este documento es propiedad del Gobierno de la Provincia de Mendoza.</p>
 <p style="margin-top:0.25rem;font-size:0.8rem;color:#9CA3AF;">Desarrollo y operacion a cargo de Ultima Milla Soluciones Tecnologicas.</p>
