@@ -329,7 +329,7 @@ router.put('/anomalias/:id/resolver', hasRole('ADMIN'), resolverAnomalia);
  *       403:
  *         description: Solo ADMIN
  */
-router.post('/carga-masiva/generadores', hasRole('ADMIN'), upload.single('archivo'), cargaMasivaGeneradores);
+router.post('/carga-masiva/generadores', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'), upload.single('archivo'), cargaMasivaGeneradores);
 
 /**
  * @openapi
@@ -355,7 +355,7 @@ router.post('/carga-masiva/generadores', hasRole('ADMIN'), upload.single('archiv
  *       403:
  *         description: Solo ADMIN
  */
-router.post('/carga-masiva/transportistas', hasRole('ADMIN'), upload.single('archivo'), cargaMasivaTransportistas);
+router.post('/carga-masiva/transportistas', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'), upload.single('archivo'), cargaMasivaTransportistas);
 
 /**
  * @openapi
@@ -381,7 +381,7 @@ router.post('/carga-masiva/transportistas', hasRole('ADMIN'), upload.single('arc
  *       403:
  *         description: Solo ADMIN
  */
-router.post('/carga-masiva/operadores', hasRole('ADMIN'), upload.single('archivo'), cargaMasivaOperadores);
+router.post('/carga-masiva/operadores', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'), upload.single('archivo'), cargaMasivaOperadores);
 
 /**
  * @openapi
@@ -404,6 +404,6 @@ router.post('/carga-masiva/operadores', hasRole('ADMIN'), upload.single('archivo
  *       403:
  *         description: Solo ADMIN
  */
-router.get('/carga-masiva/plantilla/:tipo', hasRole('ADMIN'), descargarPlantilla);
+router.get('/carga-masiva/plantilla/:tipo', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'), descargarPlantilla);
 
 export default router;

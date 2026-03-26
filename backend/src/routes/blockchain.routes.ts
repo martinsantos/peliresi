@@ -21,13 +21,13 @@ router.get('/manifiesto/:id', isAuthenticated, getBlockchainStatus);
 // Authenticated: register a manifest on blockchain on-demand
 router.post('/registrar/:id', isAuthenticated, registrarBlockchain);
 
-// Admin: list all blockchain registrations
-router.get('/registro', isAuthenticated, hasRole('ADMIN'), getRegistroBlockchain);
+// Admin + sectorial: list all blockchain registrations
+router.get('/registro', isAuthenticated, hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'), getRegistroBlockchain);
 
-// Admin: verify integrity of a single manifest
-router.get('/verificar-integridad/:id', isAuthenticated, hasRole('ADMIN'), getVerificarIntegridad);
+// Admin + sectorial: verify integrity of a single manifest
+router.get('/verificar-integridad/:id', isAuthenticated, hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'), getVerificarIntegridad);
 
-// Admin: batch integrity verification
-router.get('/verificar-lote', isAuthenticated, hasRole('ADMIN'), getVerificarLote);
+// Admin + sectorial: batch integrity verification
+router.get('/verificar-lote', isAuthenticated, hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'), getVerificarLote);
 
 export default router;

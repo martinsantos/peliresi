@@ -313,13 +313,19 @@ function App() {
           </Route>
         </Route>
 
-        {/* Admin Routes - ADMIN only */}
+        {/* Admin Routes - Super ADMIN only */}
         <Route element={<ProtectedRoute roles={['ADMIN']} />}>
           <Route element={<MainLayout />}>
             <Route path="/admin/usuarios" element={<UsuariosPage />} />
             <Route path="/admin/actores" element={<ActoresPage />} />
-            <Route path="/admin/blockchain" element={<AdminBlockchainPage />} />
             <Route path="/admin/auditoria" element={<AuditoriaPage />} />
+          </Route>
+        </Route>
+
+        {/* Blockchain + Carga Masiva - All admin roles */}
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR']} />}>
+          <Route element={<MainLayout />}>
+            <Route path="/admin/blockchain" element={<AdminBlockchainPage />} />
             <Route path="/admin/carga-masiva" element={<CargaMasivaPage />} />
           </Route>
         </Route>
