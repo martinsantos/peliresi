@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import {
@@ -119,6 +119,11 @@ export const MobileLayout: React.FC = () => {
 
   // Auto-sync data to IndexedDB for offline use
   useOfflineSync();
+
+  // Guard: redirect to login if not authenticated (after hooks to comply with rules of hooks)
+  if (!isLoading && !currentUser) {
+    return <Navigate to={`${mp}/login`} replace />;
+  }
 
   const config = currentUser ? roleConfig[currentUser.rol] : roleConfig.ADMIN;
 
