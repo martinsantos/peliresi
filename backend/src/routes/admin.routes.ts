@@ -42,9 +42,9 @@ const router = Router();
 // Preferencias propias — solo autenticacion (cualquier admin puede actualizar las suyas)
 router.put('/preferencias-notificacion', isAuthenticated, updatePreferenciasNotificacion);
 
-// All admin routes require authentication + ADMIN role
+// All admin routes require authentication + any admin role
 router.use(isAuthenticated);
-router.use(hasRole('ADMIN'));
+router.use(hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'));
 
 // ===== USUARIOS CRUD =====
 
@@ -78,7 +78,7 @@ router.use(hasRole('ADMIN'));
  *       403:
  *         description: Solo ADMIN
  */
-router.get('/usuarios', getUsuarios);
+router.get('/usuarios', hasRole('ADMIN'), getUsuarios);
 
 /**
  * @openapi
@@ -98,7 +98,7 @@ router.get('/usuarios', getUsuarios);
  *       404:
  *         description: Usuario no encontrado
  */
-router.get('/usuarios/:id', getUsuarioById);
+router.get('/usuarios/:id', hasRole('ADMIN'), getUsuarioById);
 
 /**
  * @openapi
@@ -126,7 +126,7 @@ router.get('/usuarios/:id', getUsuarioById);
  *       400:
  *         description: Datos invalidos o email duplicado
  */
-router.post('/usuarios', createUsuario);
+router.post('/usuarios', hasRole('ADMIN'), createUsuario);
 
 /**
  * @openapi
@@ -157,7 +157,7 @@ router.post('/usuarios', createUsuario);
  *       404:
  *         description: Usuario no encontrado
  */
-router.put('/usuarios/:id', updateUsuario);
+router.put('/usuarios/:id', hasRole('ADMIN'), updateUsuario);
 
 /**
  * @openapi
@@ -177,7 +177,7 @@ router.put('/usuarios/:id', updateUsuario);
  *       400:
  *         description: No se puede eliminar (tiene manifiestos asociados)
  */
-router.delete('/usuarios/:id', deleteUsuario);
+router.delete('/usuarios/:id', hasRole('ADMIN'), deleteUsuario);
 
 /**
  * @openapi
@@ -197,7 +197,7 @@ router.delete('/usuarios/:id', deleteUsuario);
  *       404:
  *         description: Usuario no encontrado
  */
-router.patch('/usuarios/:id/toggle-activo', toggleActivo);
+router.patch('/usuarios/:id/toggle-activo', hasRole('ADMIN'), toggleActivo);
 
 // ===== IMPERSONATE =====
 

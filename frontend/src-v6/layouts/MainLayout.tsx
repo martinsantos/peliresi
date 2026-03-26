@@ -110,8 +110,8 @@ export const MainLayout: React.FC = () => {
     // Dashboard para todos
     items.push({ path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' });
     
-    // Centro de Control para Admin, Transportista, Admin Transportista y Admin Operador
-    if (isAdmin || isTransportista || isAdminTransportista || isAdminOperador) {
+    // Centro de Control para Admin, Transportista y todos los Admin Sectoriales
+    if (isAdmin || isTransportista || isAdminTransportista || isAdminOperador || isAdminGenerador) {
       items.push({ path: '/centro-control', icon: Command, label: 'Centro de Control' });
     }
 
@@ -151,16 +151,19 @@ export const MainLayout: React.FC = () => {
       items.push({ path: '/admin/actores/generadores',    icon: Factory,      label: 'Mis Generadores' });
       items.push({ path: '/admin/residuos',               icon: FlaskConical, label: 'Catálogo Residuos' });
       items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
+      items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
       items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
     } else if (isAdminTransportista) {
       items.push({ path: '/admin/actores/transportistas', icon: Truck,        label: 'Mis Transportistas' });
       items.push({ path: '/admin/vehiculos',              icon: Truck,        label: 'Vehículos' });
       items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
+      items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
       items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
     } else if (isAdminOperador) {
       items.push({ path: '/admin/actores/operadores',     icon: FlaskConical, label: 'Mis Operadores' });
       items.push({ path: '/admin/tratamientos',           icon: BarChart3,    label: 'Tratamientos' });
       items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
+      items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
       items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
     } else if (isTransportista) {
       items.push({ path: '/admin/vehiculos',              icon: Truck,        label: 'Mis Vehículos' });
