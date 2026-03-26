@@ -36,6 +36,8 @@ import { manifiestoService } from '../../services/manifiesto.service';
 import { EstadoManifiesto } from '../../types/models';
 import { formatDateTime, formatWeight } from '../../utils/formatters';
 import { offlineSafeMutation } from '../../utils/offline-mutation';
+import { useGPSTracking, headingToCompass } from '../../hooks/useGPSTracking';
+import type { GpsStatus } from '../../hooks/useGPSTracking';
 
 // Recenter map when position changes (respects user pan/zoom)
 function RecenterMap({ position, onUserInteract, followUser }: {
@@ -53,14 +55,6 @@ function RecenterMap({ position, onUserInteract, followUser }: {
     if (position && followUser) map.setView(position, map.getZoom());
   }, [position, map, followUser]);
   return null;
-}
-
-type GpsStatus = 'checking' | 'acquiring' | 'active' | 'denied' | 'unavailable' | 'error';
-
-function headingToCompass(heading: number | null): string {
-  if (heading == null) return '-';
-  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
-  return dirs[Math.round(heading / 45) % 8];
 }
 
 const ViajeEnCursoTransportista: React.FC = () => {
@@ -120,30 +114,28 @@ const ViajeEnCursoTransportista: React.FC = () => {
   const [incidenteDescripcion, setIncidenteDescripcion] = useState('');
   const [vistaMapa, setVistaMapa] = useState(true);
 
-  // GPS state — FIX 1: full state machine + metadata
-  const [gpsStatus, setGpsStatus] = useState<GpsStatus>('checking');
-  const [currentPosition, setCurrentPosition] = useState<[number, number] | null>(null);
-  const [trackPoints, setTrackPoints] = useState<[number, number][]>([]);
-  const [gpsDetails, setGpsDetails] = useState<{
-    accuracy: number | null;
-    speed: number | null;
-    heading: number | null;
-    altitude: number | null;
-    lastUpdate: Date | null;
-  }>({ accuracy: null, speed: null, heading: null, altitude: null, lastUpdate: null });
+  // GPS tracking via custom hook
+  const gps = useGPSTracking({
+    manifiestoId: id,
+    estado: m.estado,
+    viajeStatus,
+  });
+
+  const currentPosition = gps.position;
+  const trackPoints = gps.trackPoints;
+  const gpsStatus = gps.status;
+  const gpsDetails = gps.details;
+  const gpsSendStatus = gps.sendStatus;
+  const cleanupGps = gps.cleanupGps;
+
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [gpsSendStatus, setGpsSendStatus] = useState<'ok' | 'error' | 'idle'>('idle');
-  const watchIdRef = useRef<number | null>(null);
-  const sendIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pendingUpdatesRef = useRef<{ lat: number; lng: number; speed: number | null; heading: number | null }[]>([]);
 
   const isActionPending = confirmarRetiro.isPending || confirmarEntrega.isPending || registrarIncidente.isPending;
 
   // Default center (Mendoza, Argentina)
   const defaultCenter: [number, number] = [-32.9287, -68.8535];
 
-  // FIX 3B: Restore pause state from localStorage on mount
+  // Restore pause state from localStorage on mount
   useEffect(() => {
     if (id) {
       const saved = localStorage.getItem(`viaje_status_${id}`);
@@ -151,63 +143,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
     }
   }, [id]);
 
-  // C2: Restore pending GPS updates from localStorage on mount and flush in order
-  useEffect(() => {
-    if (!id) return;
-    const savedPending = localStorage.getItem(`gps_pending_${id}`);
-    if (savedPending) {
-      try {
-        const parsed = JSON.parse(savedPending);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          pendingUpdatesRef.current = parsed;
-          // Flush in order (sequential, not parallel — preserves route)
-          (async () => {
-            let flushed = 0;
-            for (const p of parsed) {
-              try {
-                await manifiestoService.actualizarUbicacion(id, p.lat, p.lng, p.speed, p.heading);
-                flushed++;
-              } catch {
-                break; // stop on first failure
-              }
-            }
-            if (flushed === parsed.length) {
-              pendingUpdatesRef.current = [];
-              localStorage.removeItem(`gps_pending_${id}`);
-            } else {
-              pendingUpdatesRef.current = parsed.slice(flushed);
-              localStorage.setItem(`gps_pending_${id}`, JSON.stringify(pendingUpdatesRef.current));
-            }
-          })();
-        }
-      } catch {
-        localStorage.removeItem(`gps_pending_${id}`);
-      }
-    }
-  }, [id]);
-
-  // FIX 1A: Check GPS permission on mount
-  useEffect(() => {
-    if (!('geolocation' in navigator)) {
-      setGpsStatus('unavailable');
-      return;
-    }
-    if (navigator.permissions?.query) {
-      navigator.permissions.query({ name: 'geolocation' as PermissionName }).then(result => {
-        if (result.state === 'denied') {
-          setGpsStatus('denied');
-        } else {
-          setGpsStatus('checking');
-        }
-      }).catch(() => {
-        setGpsStatus('checking'); // permissions API not supported, proceed anyway
-      });
-    } else {
-      setGpsStatus('checking');
-    }
-  }, []);
-
-  // FIX 6: Timer persistence from server timestamp (fechaRetiro)
+  // Timer persistence from server timestamp (fechaRetiro)
   useEffect(() => {
     if (m.estado === EstadoManifiesto.EN_TRANSITO && m.fechaRetiro) {
       const start = new Date(m.fechaRetiro).getTime();
@@ -216,120 +152,8 @@ const ViajeEnCursoTransportista: React.FC = () => {
     }
   }, [m.estado, m.fechaRetiro]);
 
-  // A2: Robust cleanup function — clears watcher + flushes pending to localStorage
-  const cleanupGps = useCallback(() => {
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-    }
-    if (sendIntervalRef.current) {
-      clearInterval(sendIntervalRef.current);
-      sendIntervalRef.current = null;
-    }
-    // C2: Flush pending to localStorage on cleanup so they survive PWA close
-    if (id && pendingUpdatesRef.current.length > 0) {
-      localStorage.setItem(`gps_pending_${id}`, JSON.stringify(pendingUpdatesRef.current));
-    }
-  }, [id]);
-
-  // Start GPS tracking when EN_TRANSITO and ACTIVO
-  useEffect(() => {
-    if (m.estado !== EstadoManifiesto.EN_TRANSITO || viajeStatus === 'PAUSADO') return;
-    if (gpsStatus === 'denied' || gpsStatus === 'unavailable') return;
-
-    setGpsStatus('acquiring');
-
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        const { latitude, longitude, accuracy, speed, heading, altitude } = pos.coords;
-        const point: [number, number] = [latitude, longitude];
-        setCurrentPosition(point);
-        setTrackPoints(prev => [...prev, point]);
-        setGpsDetails({ accuracy, speed, heading, altitude, lastUpdate: new Date() });
-        setGpsStatus('active');
-      },
-      (err) => {
-        // FIX 1E: Error callback with user feedback
-        if (err.code === 1) {
-          setGpsStatus('denied');
-          toast.error('Permiso de ubicación denegado. Activa GPS en Ajustes.');
-        } else if (err.code === 2) {
-          setGpsStatus('unavailable');
-          toast.error('No se pudo obtener ubicación. Verifica que el GPS esté activo.');
-        } else {
-          setGpsStatus('error');
-          toast.error('Tiempo de espera GPS agotado. Reintentando...');
-        }
-        if (!currentPosition) setCurrentPosition(defaultCenter);
-      },
-      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
-    );
-
-    // GPS send interval: every 30s, send current position + flush any pending
-    // Offline: accumulate ALL points (capped at 500 ≈ 4h) for later flush
-    sendIntervalRef.current = setInterval(async () => {
-      if (!currentPosition || !id) return;
-
-      const point = {
-        lat: currentPosition[0],
-        lng: currentPosition[1],
-        speed: gpsDetails.speed,
-        heading: gpsDetails.heading,
-      };
-
-      try {
-        // First flush any accumulated pending points in order
-        if (pendingUpdatesRef.current.length > 0) {
-          const remaining: typeof pendingUpdatesRef.current = [];
-          for (const p of pendingUpdatesRef.current) {
-            try {
-              await manifiestoService.actualizarUbicacion(id, p.lat, p.lng, p.speed, p.heading);
-            } catch {
-              remaining.push(p);
-              break; // stop on first failure to preserve order
-            }
-          }
-          // Keep unflushed items + any items after the failed one
-          const flushed = pendingUpdatesRef.current.length - remaining.length;
-          if (remaining.length > 0) {
-            pendingUpdatesRef.current = [...remaining, ...pendingUpdatesRef.current.slice(flushed + 1)];
-          } else {
-            pendingUpdatesRef.current = [];
-          }
-        }
-
-        // Now send current position
-        await manifiestoService.actualizarUbicacion(id, point.lat, point.lng, point.speed, point.heading);
-        // Full success: clear pending
-        pendingUpdatesRef.current = [];
-        localStorage.removeItem(`gps_pending_${id}`);
-        setGpsSendStatus('ok');
-      } catch {
-        // Failure: append current point to pending queue
-        pendingUpdatesRef.current.push(point);
-        // Cap at 500 points (~4 hours of tracking at 30s intervals)
-        if (pendingUpdatesRef.current.length > 500) {
-          pendingUpdatesRef.current = pendingUpdatesRef.current.slice(-500);
-        }
-        localStorage.setItem(`gps_pending_${id}`, JSON.stringify(pendingUpdatesRef.current));
-        setGpsSendStatus('error');
-        if (pendingUpdatesRef.current.length === 1) {
-          toast.warning('Sin conexión GPS. Los puntos se guardan localmente.');
-        }
-      }
-    }, 30000);
-
-    // A2: beforeunload listener to flush GPS data when PWA closes
-    const handleBeforeUnload = () => cleanupGps();
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    return () => {
-      cleanupGps();
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [m.estado, viajeStatus, id, gpsStatus, cleanupGps]);
-
   // Timer tick
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
     if (m.estado !== EstadoManifiesto.EN_TRANSITO || viajeStatus === 'PAUSADO') return;
     timerRef.current = setInterval(() => setElapsedTime(prev => prev + 1), 1000);
@@ -379,16 +203,13 @@ const ViajeEnCursoTransportista: React.FC = () => {
       );
       if (result === 'QUEUED') {
         toast.info('Sin conexión — La entrega se confirmará al reconectar');
-        // Optimistically update local state so the UI reflects the intent
         if (id) localStorage.setItem(`viaje_status_${id}`, 'COMPLETED');
         cleanupGps();
         setShowFinalizarModal(false);
         return;
       }
       toast.success('Entrega confirmada exitosamente');
-      // Stop GPS — use robust cleanup
       cleanupGps();
-      // Clean localStorage
       if (id) {
         localStorage.removeItem(`viaje_snapshot_${id}`);
         localStorage.removeItem(`viaje_status_${id}`);
@@ -401,7 +222,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
     }
   };
 
-  // FIX 4: Incident saving with description fallback + GPS coords
+  // Incident saving with description fallback + GPS coords
   const handleRegistrarIncidente = async () => {
     if (!incidenteTipo) {
       toast.warning('Selecciona un tipo de incidente');
@@ -433,7 +254,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
     }
   };
 
-  // FIX 3: Pause/resume persisted via backend incident events
+  // Pause/resume persisted via backend incident events
   const handlePausar = async () => {
     const newStatus = viajeStatus === 'ACTIVO' ? 'PAUSADO' : 'ACTIVO';
     try {
@@ -498,7 +319,6 @@ const ViajeEnCursoTransportista: React.FC = () => {
   }
 
   if ((!manifiesto || isError) && cachedSnapshot) {
-    // Show cached snapshot with reconnecting banner when API fails
     return (
       <div className="min-h-screen bg-neutral-50 pb-24">
         <header className="sticky top-0 z-40 bg-white border-b border-neutral-200">
@@ -550,7 +370,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
   const totalPeso = Array.isArray(m.residuos) ? m.residuos.reduce((sum: number, r: any) => sum + (r.cantidad || 0), 0) : 0;
   const eventos = Array.isArray(m.eventos) ? m.eventos : [];
 
-  // FIX 1D: GPS Status Panel component
+  // GPS Status Panel component
   const GpsStatusPanel = () => {
     if (m.estado !== EstadoManifiesto.EN_TRANSITO) return null;
 
@@ -692,7 +512,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
         {/* EN_TRANSITO state: Active trip */}
         {m.estado === EstadoManifiesto.EN_TRANSITO && (
           <>
-            {/* GPS Status Panel — FIX 1D: Always visible */}
+            {/* GPS Status Panel */}
             <GpsStatusPanel />
 
             {/* Timer */}
@@ -864,7 +684,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
         </div>
       )}
 
-      {/* Modal Incidente — FIX 4B: proper select + description handling */}
+      {/* Modal Incidente */}
       {showIncidenteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <Card className="w-full max-w-sm">

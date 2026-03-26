@@ -1,265 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
-import { Rol, TipoNotificacion, PrioridadNotificacion, EventoAlerta, EstadoAlerta, TipoAnomalia, SeveridadAnomalia } from '@prisma/client';
+import { EventoAlerta, EstadoAlerta, TipoAnomalia, SeveridadAnomalia } from '@prisma/client';
 import prisma from '../lib/prisma';
-import logger from '../utils/logger';
-import { emailService } from '../services/email.service';
-import { domainEvents } from '../services/domainEvent.service';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { domainEvents } from '../services/domainEvent.service';
 
-// ============ SERVICIO DE NOTIFICACIONES ============
-
-class NotificationService {
-    // Helper: get all active admin user IDs (reused across multiple event handlers)
-    private async getAdminIds(): Promise<string[]> {
-        const admins = await prisma.usuario.findMany({
-            where: { rol: 'ADMIN', activo: true },
-            select: { id: true }
-        });
-        return admins.map(a => a.id);
-    }
-
-    // Crear notificacion para un usuario + enviar por canales configurados
-    async crearNotificacion(data: {
-        usuarioId: string;
-        tipo: TipoNotificacion;
-        titulo: string;
-        mensaje: string;
-        datos?: any;
-        manifiestoId?: string;
-        prioridad?: PrioridadNotificacion;
-    }) {
-        const notif = await prisma.notificacion.create({
-            data: {
-                usuarioId: data.usuarioId,
-                tipo: data.tipo,
-                titulo: data.titulo,
-                mensaje: data.mensaje,
-                datos: data.datos ? JSON.stringify(data.datos) : null,
-                manifiestoId: data.manifiestoId,
-                prioridad: data.prioridad || 'NORMAL'
-            }
-        });
-
-        // Send via configured channels (fire-and-forget, never blocks)
-        setImmediate(async () => {
-            try {
-                const user = await prisma.usuario.findUnique({
-                    where: { id: data.usuarioId },
-                    select: { email: true, nombre: true, notifEmail: true, notifWhatsapp: true, notifTelegram: true, whatsappPhone: true, telegramChatId: true },
-                });
-                if (!user) return;
-
-                // Email channel
-                if (user.notifEmail) {
-                    const subject = `[SITREP] ${data.titulo}`;
-                    emailService.sendAlertEmail(
-                        [user.email],
-                        { nombre: data.titulo, descripcion: data.mensaje },
-                        data.manifiestoId || null,
-                        { mensaje: data.mensaje, ...(data.datos || {}) },
-                    ).catch(() => {});
-                }
-
-                // WhatsApp channel (placeholder — requires integration with WhatsApp Business API)
-                if (user.notifWhatsapp && user.whatsappPhone) {
-                    logger.info({ channel: 'WhatsApp', to: user.whatsappPhone }, `${data.titulo}: ${data.mensaje}`);
-                    // TODO: Integrate with WhatsApp Business API or Twilio
-                    // await whatsappService.send(user.whatsappPhone, `*${data.titulo}*\n${data.mensaje}`);
-                }
-
-                // Telegram channel (placeholder — requires Telegram Bot API)
-                if (user.notifTelegram && user.telegramChatId) {
-                    logger.info({ channel: 'Telegram', chatId: user.telegramChatId }, `${data.titulo}: ${data.mensaje}`);
-                    // TODO: Integrate with Telegram Bot API
-                    // await telegramService.send(user.telegramChatId, `*${data.titulo}*\n${data.mensaje}`);
-                }
-            } catch (err) {
-                logger.error({ err }, 'Error sending notification via channels');
-            }
-        });
-
-        return notif;
-    }
-
-    // Notificar a usuarios por rol
-    async notificarPorRol(rol: string, data: {
-        tipo: TipoNotificacion;
-        titulo: string;
-        mensaje: string;
-        datos?: any;
-        manifiestoId?: string;
-        prioridad?: PrioridadNotificacion;
-    }) {
-        const usuarios = await prisma.usuario.findMany({
-            where: { rol: rol as Rol, activo: true },
-            select: { id: true }
-        });
-
-        const notificaciones = usuarios.map(u => ({
-            usuarioId: u.id,
-            tipo: data.tipo,
-            titulo: data.titulo,
-            mensaje: data.mensaje,
-            datos: data.datos ? JSON.stringify(data.datos) : null,
-            manifiestoId: data.manifiestoId,
-            prioridad: data.prioridad || 'NORMAL'
-        }));
-
-        return prisma.notificacion.createMany({ data: notificaciones });
-    }
-
-    // Notificar cambio de estado de manifiesto
-    async notificarCambioEstado(manifiestoId: string, nuevoEstado: string, actorId?: string) {
-        const manifiesto = await prisma.manifiesto.findUnique({
-            where: { id: manifiestoId },
-            include: {
-                generador: { include: { usuario: true } },
-                transportista: { include: { usuario: true } },
-                operador: { include: { usuario: true } }
-            }
-        });
-
-        if (!manifiesto) return;
-
-        const gen = manifiesto.generador;
-        const trans = manifiesto.transportista;
-        const oper = manifiesto.operador;
-        const num = manifiesto.numero;
-
-        // Build maps URL from generador coordinates (pickup location)
-        const mapsUrl = gen.latitud && gen.longitud
-            ? `https://maps.google.com/?q=${gen.latitud},${gen.longitud}`
-            : null;
-        const fechaRetiro = manifiesto.fechaEstimadaRetiro
-            ? manifiesto.fechaEstimadaRetiro.toLocaleDateString('es-AR')
-            : null;
-
-        // APROBADO: personalized notifications per role with location data
-        if (nuevoEstado === 'APROBADO') {
-            const promises: Promise<any>[] = [];
-
-            // Transportista: full pickup details with map link
-            if (trans.usuario.id !== actorId) {
-                const retiroInfo = fechaRetiro ? ` Retiro: ${fechaRetiro}.` : '';
-                promises.push(this.crearNotificacion({
-                    usuarioId: trans.usuario.id,
-                    tipo: 'MANIFIESTO_FIRMADO' as TipoNotificacion,
-                    titulo: 'Nuevo retiro asignado',
-                    mensaje: `${num} —${retiroInfo} ${gen.razonSocial}, ${gen.domicilio || ''}`.trim(),
-                    manifiestoId,
-                    prioridad: 'ALTA' as PrioridadNotificacion,
-                    datos: {
-                        tipo: 'retiro_asignado',
-                        fechaRetiro: fechaRetiro || null,
-                        direccion: gen.domicilio || null,
-                        lat: gen.latitud, lng: gen.longitud,
-                        mapsUrl,
-                        generador: gen.razonSocial,
-                        operadorDestino: oper.razonSocial,
-                    },
-                }));
-            }
-
-            // Operador: upcoming reception
-            if (oper.usuario.id !== actorId) {
-                promises.push(this.crearNotificacion({
-                    usuarioId: oper.usuario.id,
-                    tipo: 'MANIFIESTO_FIRMADO' as TipoNotificacion,
-                    titulo: 'Manifiesto firmado — recibiras residuos',
-                    mensaje: `${num} de ${gen.razonSocial}.${fechaRetiro ? ` Retiro estimado: ${fechaRetiro}` : ''}`,
-                    manifiestoId,
-                    prioridad: 'NORMAL' as PrioridadNotificacion,
-                    datos: {
-                        tipo: 'recepcion_programada',
-                        fechaRetiro: fechaRetiro || null,
-                        generador: gen.razonSocial,
-                        transportista: trans.razonSocial,
-                    },
-                }));
-            }
-
-            // Generador (if not the signer)
-            if (gen.usuario.id !== actorId) {
-                promises.push(this.crearNotificacion({
-                    usuarioId: gen.usuario.id,
-                    tipo: 'MANIFIESTO_FIRMADO' as TipoNotificacion,
-                    titulo: 'Tu manifiesto fue firmado',
-                    mensaje: `${num} firmado y listo para retiro`,
-                    manifiestoId,
-                    prioridad: 'NORMAL' as PrioridadNotificacion,
-                }));
-            }
-
-            // Admins
-            const adminIds = await this.getAdminIds();
-            for (const adminId of adminIds) {
-                if (adminId !== actorId && adminId !== gen.usuario.id && adminId !== trans.usuario.id && adminId !== oper.usuario.id) {
-                    promises.push(this.crearNotificacion({
-                        usuarioId: adminId,
-                        tipo: 'MANIFIESTO_FIRMADO' as TipoNotificacion,
-                        titulo: 'Manifiesto firmado',
-                        mensaje: `${num} firmado por ${gen.razonSocial}`,
-                        manifiestoId,
-                        prioridad: 'NORMAL' as PrioridadNotificacion,
-                    }));
-                }
-            }
-
-            await Promise.all(promises);
-            return;
-        }
-
-        // Other states: generic notification to all parties
-        const mensajes: Record<string, { titulo: string; mensaje: string; tipo: TipoNotificacion }> = {
-            'EN_TRANSITO': {
-                titulo: 'Transporte Iniciado',
-                mensaje: `El manifiesto ${num} esta en camino`,
-                tipo: 'MANIFIESTO_EN_TRANSITO'
-            },
-            'ENTREGADO': {
-                titulo: 'Entrega Confirmada',
-                mensaje: `El manifiesto ${num} ha sido entregado en destino`,
-                tipo: 'MANIFIESTO_ENTREGADO'
-            },
-            'RECIBIDO': {
-                titulo: 'Recepcion Confirmada',
-                mensaje: `El operador ha confirmado la recepcion del manifiesto ${num}`,
-                tipo: 'MANIFIESTO_RECIBIDO'
-            },
-            'TRATADO': {
-                titulo: 'Tratamiento Completado',
-                mensaje: `El manifiesto ${num} ha sido tratado y cerrado`,
-                tipo: 'MANIFIESTO_TRATADO'
-            },
-            'RECHAZADO': {
-                titulo: 'Carga Rechazada',
-                mensaje: `La carga del manifiesto ${num} ha sido rechazada`,
-                tipo: 'MANIFIESTO_RECHAZADO'
-            },
-            'EN_TRATAMIENTO': {
-                titulo: 'Tratamiento Iniciado',
-                mensaje: `El manifiesto ${num} ha iniciado el proceso de tratamiento`,
-                tipo: 'INFO_GENERAL'
-            }
-        };
-
-        const info = mensajes[nuevoEstado];
-        if (!info) return;
-
-        const destinatarios = [gen.usuario.id, trans.usuario.id, oper.usuario.id].filter(id => id !== actorId);
-        const adminIds = await this.getAdminIds();
-        adminIds.forEach(id => { if (!destinatarios.includes(id)) destinatarios.push(id); });
-
-        await Promise.all(destinatarios.map(usuarioId =>
-            this.crearNotificacion({
-                usuarioId, ...info, manifiestoId,
-                prioridad: nuevoEstado === 'RECHAZADO' ? 'ALTA' : 'NORMAL'
-            })
-        ));
-    }
-}
-
-export const notificationService = new NotificationService();
+// Re-export notificationService so existing imports continue to work
+export { notificationService } from '../services/notification-dispatcher.service';
 
 // ============ CONTROLADOR DE NOTIFICACIONES ============
 
@@ -305,7 +51,7 @@ export const getNotificaciones = async (req: Request, res: Response, next: NextF
     }
 };
 
-// Marcar notificación como leída
+// Marcar notificacion como leida
 export const marcarLeida = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { id } = req.params;
@@ -322,7 +68,7 @@ export const marcarLeida = async (req: Request, res: Response, next: NextFunctio
     }
 };
 
-// Marcar todas como leídas
+// Marcar todas como leidas
 export const marcarTodasLeidas = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const usuarioId = (req as AuthRequest).user!.id;
@@ -332,13 +78,13 @@ export const marcarTodasLeidas = async (req: Request, res: Response, next: NextF
             data: { leida: true, fechaLeida: new Date() }
         });
 
-        res.json({ success: true, message: 'Todas las notificaciones marcadas como leídas' });
+        res.json({ success: true, message: 'Todas las notificaciones marcadas como leidas' });
     } catch (error) {
         next(error);
     }
 };
 
-// Eliminar notificación
+// Eliminar notificacion
 export const eliminarNotificacion = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { id } = req.params;
@@ -348,7 +94,7 @@ export const eliminarNotificacion = async (req: Request, res: Response, next: Ne
             where: { id, usuarioId }
         });
 
-        res.json({ success: true, message: 'Notificación eliminada' });
+        res.json({ success: true, message: 'Notificacion eliminada' });
     } catch (error) {
         next(error);
     }
@@ -507,7 +253,7 @@ export const resolverAlerta = async (req: Request, res: Response, next: NextFunc
     }
 };
 
-// ============ DETECCIÓN DE ANOMALÍAS GPS ============
+// ============ DETECCION DE ANOMALIAS GPS ============
 
 interface PuntoGPS {
     latitud: number;
@@ -533,7 +279,7 @@ class AnomaliaDetector {
         return deg * (Math.PI / 180);
     }
 
-    // Detectar anomalías en la ruta
+    // Detectar anomalias en la ruta
     async detectarAnomalias(manifiestoId: string, userId?: string): Promise<any[]> {
         const anomaliasDetectadas: any[] = [];
 
@@ -595,11 +341,11 @@ class AnomaliaDetector {
                 });
             }
 
-            // 3. Detectar pérdida de GPS (gap > 30 min sin datos)
+            // 3. Detectar perdida de GPS (gap > 30 min sin datos)
             if (tiempoHoras > 0.5 && distancia > 10) {
                 anomaliasDetectadas.push({
                     tipo: 'GPS_PERDIDO' as TipoAnomalia,
-                    descripcion: `Pérdida de señal GPS por ${(tiempoHoras * 60).toFixed(0)} minutos`,
+                    descripcion: `Perdida de senal GPS por ${(tiempoHoras * 60).toFixed(0)} minutos`,
                     latitud: puntoActual.latitud,
                     longitud: puntoActual.longitud,
                     valorDetectado: tiempoHoras * 60,
@@ -609,7 +355,7 @@ class AnomaliaDetector {
             }
         }
 
-        // Guardar anomalías detectadas
+        // Guardar anomalias detectadas
         for (const anomalia of anomaliasDetectadas) {
             await prisma.anomaliaTransporte.create({
                 data: {
@@ -632,7 +378,7 @@ class AnomaliaDetector {
         return anomaliasDetectadas;
     }
 
-    // Verificar tiempo excesivo de tránsito
+    // Verificar tiempo excesivo de transito
     async verificarTiempoTransito(manifiestoId: string): Promise<boolean> {
         const manifiesto = await prisma.manifiesto.findUnique({
             where: { id: manifiestoId }
@@ -643,15 +389,15 @@ class AnomaliaDetector {
         }
 
         const horasTransito = (Date.now() - manifiesto.fechaRetiro.getTime()) / (1000 * 60 * 60);
-        const LIMITE_HORAS = 24; // Máximo 24 horas de tránsito
+        const LIMITE_HORAS = 24; // Maximo 24 horas de transito
 
         if (horasTransito > LIMITE_HORAS) {
-            // Crear anomalía
+            // Crear anomalia
             await prisma.anomaliaTransporte.create({
                 data: {
                     manifiestoId,
                     tipo: 'TIEMPO_EXCESIVO',
-                    descripcion: `Tiempo de tránsito excede ${LIMITE_HORAS} horas: ${horasTransito.toFixed(1)} horas`,
+                    descripcion: `Tiempo de transito excede ${LIMITE_HORAS} horas: ${horasTransito.toFixed(1)} horas`,
                     latitud: 0,
                     longitud: 0,
                     valorDetectado: horasTransito,
@@ -678,7 +424,7 @@ class AnomaliaDetector {
 
 export const anomaliaDetector = new AnomaliaDetector();
 
-// Endpoint para detectar anomalías
+// Endpoint para detectar anomalias
 export const detectarAnomalias = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { manifiestoId } = req.params;
@@ -689,7 +435,7 @@ export const detectarAnomalias = async (req: Request, res: Response, next: NextF
     }
 };
 
-// Obtener anomalías de un manifiesto
+// Obtener anomalias de un manifiesto
 export const getAnomalias = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { manifiestoId } = req.params;
@@ -709,7 +455,7 @@ export const getAnomalias = async (req: Request, res: Response, next: NextFuncti
     }
 };
 
-// Resolver anomalía
+// Resolver anomalia
 export const resolverAnomalia = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { id } = req.params;
@@ -989,11 +735,11 @@ export const descargarPlantilla = async (req: Request, res: Response, next: Next
         const plantillas: Record<string, string> = {
             generadores: 'cuit,razon_social,domicilio,telefono,email,numero_inscripcion,categoria\n30-12345678-9,Empresa Demo SA,Av. Ejemplo 1234,261-4567890,contacto@empresa.com,MDZ-001-2024,Industrial',
             transportistas: 'cuit,razon_social,domicilio,telefono,email,numero_habilitacion\n30-98765432-1,Transporte Demo SRL,Ruta 40 Km 5,261-9876543,info@transporte.com,HAB-T-001',
-            operadores: 'cuit,razon_social,domicilio,telefono,email,numero_habilitacion,categoria\n30-55555555-5,Operador Demo SA,Parque Industrial 100,261-5555555,operador@demo.com,HAB-O-001,Disposición Final'
+            operadores: 'cuit,razon_social,domicilio,telefono,email,numero_habilitacion,categoria\n30-55555555-5,Operador Demo SA,Parque Industrial 100,261-5555555,operador@demo.com,HAB-O-001,Disposicion Final'
         };
 
         if (!plantillas[tipo]) {
-            return res.status(400).json({ success: false, error: 'Tipo de plantilla no válido' });
+            return res.status(400).json({ success: false, error: 'Tipo de plantilla no valido' });
         }
 
         res.setHeader('Content-Type', 'text/csv');
