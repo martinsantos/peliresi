@@ -552,6 +552,13 @@ const InscripcionWizardPage: React.FC = () => {
               Crear cuenta y continuar
             </Button>
 
+            <button
+              onClick={() => setPhase(2)}
+              className="w-full mt-2 py-2 text-sm text-neutral-400 hover:text-[#0D8A4F] transition-colors"
+            >
+              Saltar al formulario (modo prueba) &rarr;
+            </button>
+
             <p className="text-xs text-neutral-400 text-center mt-2">
               Ya tenes cuenta?{' '}
               <button onClick={() => navigate('/login')} className="text-[#0D8A4F] font-medium hover:underline">
@@ -1270,7 +1277,7 @@ const InscripcionWizardPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100 py-8 px-4">
-      <div className="max-w-3xl mx-auto space-y-6">
+      <div className="max-w-5xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
           <button onClick={() => navigate(-1)} className="p-2 rounded-xl bg-white border border-neutral-200 hover:bg-neutral-50 transition-colors">

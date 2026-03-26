@@ -11,8 +11,8 @@ import { Leaf, FlaskConical, Truck, Factory } from 'lucide-react';
 export const AuthLayout: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-primary-50 flex">
-      {/* Left side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 bg-primary-500 relative overflow-hidden">
+      {/* Left side - Branding (compact) */}
+      <div className="hidden lg:flex lg:w-2/5 xl:w-1/3 bg-primary-500 relative overflow-hidden">
         {/* Background pattern */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full -translate-x-1/2 -translate-y-1/2" />
@@ -63,9 +63,9 @@ export const AuthLayout: React.FC = () => {
         </div>
       </div>
       
-      {/* Right side - Form */}
-      <div className="flex-1 flex items-center justify-center p-6 lg:p-12">
-        <div className="w-full max-w-md">
+      {/* Right side - Form (wider) */}
+      <div className="flex-1 flex items-center justify-center p-6 lg:p-12 overflow-y-auto">
+        <div className="w-full max-w-lg">
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center justify-center gap-3 mb-8">
             <div className="w-10 h-10 bg-primary-500 rounded-xl flex items-center justify-center text-white">
