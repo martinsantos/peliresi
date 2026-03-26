@@ -6,7 +6,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, Leaf, AlertCircle, Factory, Truck, FlaskConical } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, Leaf, AlertCircle, Factory, Truck, FlaskConical, ShieldCheck } from 'lucide-react';
 import { useAuth, DEMO_CREDENTIALS } from '../../contexts/AuthContext';
 
 const DEMO_USERS = [
@@ -206,6 +206,42 @@ const LoginPage: React.FC = () => {
             </div>
             <span className="text-xs font-semibold text-neutral-700 text-center leading-tight">Operador</span>
           </Link>
+        </div>
+
+        {/* Administradores Sectoriales */}
+        <div className="mt-3 pt-3 border-t border-emerald-200">
+          <p className="text-center text-[10px] text-emerald-600 mb-2 uppercase tracking-wider font-semibold">
+            Administradores Sectoriales
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            <Link
+              to="/registro?tipo=ADMIN_GENERADOR"
+              className="flex flex-col items-center gap-1.5 p-2.5 bg-white rounded-xl border border-emerald-200 hover:border-purple-400 hover:shadow-md transition-all group"
+            >
+              <div className="w-8 h-8 bg-purple-50 group-hover:bg-purple-500 rounded-lg flex items-center justify-center transition-colors">
+                <ShieldCheck size={16} className="text-purple-600 group-hover:text-white transition-colors" />
+              </div>
+              <span className="text-[10px] font-semibold text-neutral-600 text-center leading-tight">Admin Generadores</span>
+            </Link>
+            <Link
+              to="/registro?tipo=ADMIN_TRANSPORTISTA"
+              className="flex flex-col items-center gap-1.5 p-2.5 bg-white rounded-xl border border-emerald-200 hover:border-orange-400 hover:shadow-md transition-all group"
+            >
+              <div className="w-8 h-8 bg-orange-50 group-hover:bg-orange-500 rounded-lg flex items-center justify-center transition-colors">
+                <ShieldCheck size={16} className="text-orange-600 group-hover:text-white transition-colors" />
+              </div>
+              <span className="text-[10px] font-semibold text-neutral-600 text-center leading-tight">Admin Transporte</span>
+            </Link>
+            <Link
+              to="/registro?tipo=ADMIN_OPERADOR"
+              className="flex flex-col items-center gap-1.5 p-2.5 bg-white rounded-xl border border-emerald-200 hover:border-blue-400 hover:shadow-md transition-all group"
+            >
+              <div className="w-8 h-8 bg-blue-50 group-hover:bg-blue-500 rounded-lg flex items-center justify-center transition-colors">
+                <ShieldCheck size={16} className="text-blue-600 group-hover:text-white transition-colors" />
+              </div>
+              <span className="text-[10px] font-semibold text-neutral-600 text-center leading-tight">Admin Operadores</span>
+            </Link>
+          </div>
         </div>
       </div>
 
