@@ -120,9 +120,18 @@ export const MobileLayout: React.FC = () => {
   // Auto-sync data to IndexedDB for offline use
   useOfflineSync();
 
-  // Guard: redirect to login if not authenticated (after hooks to comply with rules of hooks)
+  // Guard: redirect to login if not authenticated (AFTER all hooks to comply with rules of hooks)
   if (!isLoading && !currentUser) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Show loading while auth is being determined (prevents children from rendering without user)
+  if (isLoading || !currentUser) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-neutral-50">
+        <div className="w-10 h-10 border-4 border-primary-200 border-t-primary-500 rounded-full animate-spin" />
+      </div>
+    );
   }
 
   const config = currentUser ? roleConfig[currentUser.rol] : roleConfig.ADMIN;
