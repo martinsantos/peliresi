@@ -231,41 +231,39 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
           Tiene en cuenta las caracteristicas del emprendimiento (Art. 15 incisos c al j).
           Mejor gestion ambiental = menor valor. Se compone de 10 sub-coeficientes.
         </p>
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           {(Object.keys(A_OPTIONS) as (keyof typeof A_OPTIONS)[]).map(key => {
             const Icon = A_ICONS[key] || ShieldAlert;
             const help = A_HELP[key];
             return (
               <div key={key} className="bg-white rounded-xl border border-neutral-200 p-3 hover:border-amber-300 transition-colors">
-                <div className="flex items-center gap-3">
-                  <Icon size={16} className="text-amber-600 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-neutral-800 uppercase">{A_LABELS[key]}</span>
-                      <button
-                        onClick={() => setShowHelp(showHelp === key ? null : key)}
-                        className="text-neutral-300 hover:text-amber-600"
-                      >
-                        <HelpCircle size={13} />
-                      </button>
-                    </div>
+                <div className="flex items-start gap-2 mb-2">
+                  <Icon size={14} className="text-amber-600 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <span className="text-[11px] font-bold text-neutral-800 uppercase leading-tight">{A_LABELS[key]}</span>
+                    <button
+                      onClick={() => setShowHelp(showHelp === key ? null : key)}
+                      className="text-neutral-300 hover:text-amber-600 ml-1 align-middle"
+                    >
+                      <HelpCircle size={11} />
+                    </button>
                     {showHelp === key && (
                       <p className="text-[10px] text-neutral-500 mt-0.5">{help}</p>
                     )}
                   </div>
-                  <select
-                    value={coefA[key]}
-                    onChange={e => updateA(key, Number(e.target.value))}
-                    className="w-64 h-9 px-3 rounded-lg border border-neutral-200 text-xs bg-white focus:border-amber-500 focus:outline-none"
-                  >
-                    {A_OPTIONS[key].map(opt => (
-                      <option key={opt.valor} value={opt.valor}>
-                        {opt.label.toUpperCase()}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="text-xs font-mono font-bold text-amber-700 w-10 text-right">{coefA[key]}</span>
+                  <span className="text-xs font-mono font-bold text-amber-700 shrink-0">{coefA[key]}</span>
                 </div>
+                <select
+                  value={coefA[key]}
+                  onChange={e => updateA(key, Number(e.target.value))}
+                  className="w-full h-9 px-3 rounded-lg border border-neutral-200 text-xs bg-neutral-50 focus:border-amber-500 focus:outline-none"
+                >
+                  {A_OPTIONS[key].map(opt => (
+                    <option key={opt.valor} value={opt.valor}>
+                      {opt.label.toUpperCase()}
+                    </option>
+                  ))}
+                </select>
               </div>
             );
           })}
