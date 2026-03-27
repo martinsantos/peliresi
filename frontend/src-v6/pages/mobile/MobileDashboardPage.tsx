@@ -73,8 +73,8 @@ export const MobileDashboardPage: React.FC = () => {
 
   const accesosRapidos = useMemo(() => [
     { id: 1, label: 'Nuevo Manifiesto', icon: FileText, path: mp('/manifiestos/nuevo'), color: 'primary' },
-    { id: 2, label: 'Escanear QR', icon: MapPin, path: mp('/scan'), color: 'success' },
-    { id: 3, label: 'Ver Tracking', icon: Package, path: mp('/tracking'), color: 'info' },
+    { id: 2, label: 'Escanear QR', icon: MapPin, path: mp('/escaner-qr'), color: 'success' },
+    { id: 3, label: 'Ver Tracking', icon: Package, path: mp('/centro-control'), color: 'info' },
     { id: 4, label: 'Reportes', icon: TrendingUp, path: mp('/reportes'), color: 'purple' },
   ], [mp]);
 
@@ -329,7 +329,7 @@ export const MobileDashboardPage: React.FC = () => {
               Ver manifiestos
             </button>
             <button 
-              onClick={() => navigate(mp('/tracking'))}
+              onClick={() => navigate(mp('/centro-control'))}
               className="flex-1 py-2 bg-primary-400/50 text-white font-medium rounded-lg text-sm"
             >
               Ver tracking
