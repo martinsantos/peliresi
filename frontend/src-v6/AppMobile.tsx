@@ -9,7 +9,6 @@ import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { MobileLayout } from './layouts/MobileLayout';
-import ProtectedRoute from './components/ProtectedRoute';
 
 // Pages - Lazy loaded
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
@@ -92,18 +91,30 @@ const ActiveTripGuard: React.FC = () => {
   return <Navigate to="/dashboard" replace />;
 };
 
-/** Auth gate: shows login or children based on auth state */
+/** Auth gate: single source of truth for public/private routing */
 const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser, isLoading } = useAuth();
   const location = useLocation();
 
   // Public routes that don't need auth
-  const publicPaths = ['/login', '/reclamar', '/manifiestos/verificar'];
+  const publicPaths = ['/login', '/reclamar', '/manifiestos/verificar', '/inscripcion', '/registro'];
   const isPublic = publicPaths.some(p => location.pathname.startsWith(p));
+
+  // While auth state is loading, show loader (even for public routes,
+  // so we can redirect logged-in users away from /login once resolved)
+  if (isLoading) return <PageLoader />;
+
+  // Logged-in user on /login → redirect to dashboard
+  if (currentUser && location.pathname === '/login') {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // Public route → render
   if (isPublic) return <>{children}</>;
 
-  if (isLoading) return <PageLoader />;
+  // Private route without auth → redirect to login
   if (!currentUser) return <Navigate to="/login" replace />;
+
   return <>{children}</>;
 };
 

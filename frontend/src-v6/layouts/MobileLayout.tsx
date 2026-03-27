@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Outlet, NavLink, useLocation, useNavigate, Navigate } from 'react-router-dom';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import {
@@ -120,23 +120,7 @@ export const MobileLayout: React.FC = () => {
   // Auto-sync data to IndexedDB for offline use
   useOfflineSync();
 
-  // Guard: redirect to login if not authenticated (AFTER all hooks to comply with rules of hooks)
-  if (!isLoading && !currentUser) {
-    return <Navigate to="/login" replace />;
-  }
-
-  // Show loading while auth is being determined (prevents children from rendering without user)
-  if (isLoading || !currentUser) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-neutral-50">
-        <div className="w-10 h-10 border-4 border-primary-200 border-t-primary-500 rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  const config = currentUser ? roleConfig[currentUser.rol] : roleConfig.ADMIN;
-
-  // Track active trip for TRANSPORTISTA
+  // Track active trip for TRANSPORTISTA — must be before any conditional returns (Rules of Hooks)
   const [activeTripId, setActiveTripId] = useState<string | null>(null);
   useEffect(() => {
     const checkActiveTrip = () => {
@@ -234,8 +218,11 @@ export const MobileLayout: React.FC = () => {
   const adminItems = menuItems.filter(i => i.section === 'admin');
   const toolsItems = menuItems.filter(i => i.section === 'tools');
 
-  // Early return AFTER all hooks
+  // Auth is handled by AuthGate in AppMobile — this is a safety net.
+  // Returns null while loading or if no user (AuthGate will redirect to /login).
   if (isLoading || !currentUser) return null;
+
+  const config = roleConfig[currentUser.rol];
 
   // Título según la ruta actual
   const getPageTitle = () => {

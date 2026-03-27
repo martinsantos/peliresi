@@ -7,11 +7,11 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import OnboardingWizard from '../components/OnboardingWizard';
 import { authService } from '../services/auth.service';
+import { useQueryClient } from '@tanstack/react-query';
 import { clearUserOfflineData } from '../services/offline-sync';
 import { clearSyncQueue } from '../services/indexeddb';
 import { useSessionTimeout } from '../hooks/useSessionTimeout';
 import { getAccessToken, getRefreshToken, setTokens, clearTokens, api } from '../services/api';
-import { queryClient } from '../main';
 import type { Usuario } from '../types/models';
 
 // ========================================
@@ -156,6 +156,7 @@ function SessionTimeoutGuard({ logout, isAuthenticated }: { logout: () => void; 
 // PROVIDER
 // ========================================
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const qc = useQueryClient();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -260,10 +261,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         clearUserOfflineData(currentUser.id).catch(() => {});
       }
       clearSyncQueue().catch(() => {});
-      queryClient.clear();
+      qc.clear();
       setCurrentUser(null);
     }
-  }, [currentUser]);
+  }, [currentUser, qc]);
 
   const dismissOnboarding = useCallback(() => {
     setShowOnboarding(false);
