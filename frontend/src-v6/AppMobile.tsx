@@ -7,7 +7,7 @@
 
 import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { MobileLayout } from './layouts/MobileLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -92,17 +92,32 @@ const ActiveTripGuard: React.FC = () => {
   return <Navigate to="/dashboard" replace />;
 };
 
+/** Auth gate: shows login or children based on auth state */
+const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { currentUser, isLoading } = useAuth();
+  const location = useLocation();
+
+  // Public routes that don't need auth
+  const publicPaths = ['/login', '/reclamar', '/manifiestos/verificar'];
+  const isPublic = publicPaths.some(p => location.pathname.startsWith(p));
+  if (isPublic) return <>{children}</>;
+
+  if (isLoading) return <PageLoader />;
+  if (!currentUser) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+};
+
 function AppMobile() {
   return (
     <AuthProvider>
       <Suspense fallback={<PageLoader />}>
+        <AuthGate>
         <Routes>
           {/* Login & Account Claim */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/reclamar" element={<ReclamarCuentaPage />} />
 
-          {/* Mobile Routes - protected + MobileLayout */}
-          <Route element={<ProtectedRoute redirectTo="/login" />}>
+          {/* Mobile Routes - MobileLayout (auth handled by AuthGate above) */}
           <Route element={<MobileLayout />}>
             <Route path="/dashboard" element={<MobileDashboardPage />} />
             <Route path="/centro-control" element={<CentroControlPage />} />
@@ -142,15 +157,12 @@ function AppMobile() {
             <Route path="/escaner-qr" element={<EscanerQRPage />} />
             <Route path="/estadisticas" element={<EstadisticasPage />} />
           </Route>
-          </Route>
 
           {/* Verificación pública de manifiesto (QR) */}
           <Route path="/manifiestos/verificar/:numero" element={<VerificarManifiestoPage />} />
 
-          {/* Root: protected redirect */}
-          <Route element={<ProtectedRoute redirectTo="/login" />}>
-            <Route path="/" element={<ActiveTripGuard />} />
-          </Route>
+          {/* Root redirect */}
+          <Route path="/" element={<ActiveTripGuard />} />
 
           {/* Legacy tracking redirects */}
           <Route path="/tracking" element={<Navigate to="/centro-control" replace />} />
@@ -159,6 +171,7 @@ function AppMobile() {
           {/* 404 */}
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
+        </AuthGate>
       </Suspense>
     </AuthProvider>
   );
