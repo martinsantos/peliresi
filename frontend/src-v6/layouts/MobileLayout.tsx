@@ -543,7 +543,7 @@ export const MobileLayout: React.FC = () => {
             <div className="p-4 border-t border-neutral-100 bg-white safe-area-bottom space-y-2">
               <InstallPWAButton />
               <button
-                onClick={() => { logout(); setIsMenuOpen(false); navigate('/login'); }}
+                onClick={async () => { setIsMenuOpen(false); await logout(); }}
                 className="w-full flex items-center gap-3 px-3 py-2.5 text-error-600 hover:bg-error-50 rounded-xl transition-colors"
               >
                 <LogOut size={20} />
