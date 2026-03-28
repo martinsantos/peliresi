@@ -159,7 +159,7 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<TratamientoDB | null>(null);
   const [deleteItem, setDeleteItem] = useState<TratamientoDB | null>(null);
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+  const [expandedOperadorId, setExpandedOperadorId] = useState<string | null>(null);
   const itemsPerPage = 15;
 
   // Form state
@@ -170,12 +170,13 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
   const [formCapacidad, setFormCapacidad] = useState('');
   const [formActivo, setFormActivo] = useState(true);
 
-  const allTratamientos: TratamientoDB[] = tratamientos || [];
+  const allTratamientos: TratamientoDB[] = tratamientos?.tratamientos || [];
+  const manifiestosPorOperador: Record<string, number> = tratamientos?.manifiestosPorOperador || {};
   const tiposResiduoList = tiposResiduo || [];
 
   const filtered = useMemo(() => {
     const search = searchTerm.toLowerCase().trim();
-    let result = allTratamientos.filter(t => {
+    return allTratamientos.filter(t => {
       if (filtroOperador && t.operadorId !== filtroOperador) return false;
       if (search) {
         const haystack = `${t.operador?.razonSocial || ''} ${t.tipoResiduo?.codigo || ''} ${t.tipoResiduo?.nombre || ''} ${t.metodo} ${t.descripcion || ''}`.toLowerCase();
@@ -183,22 +184,23 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
       }
       return true;
     });
-    if (sortConfig) {
-      result = [...result].sort((a, b) => {
-        const dir = sortConfig.direction === 'asc' ? 1 : -1;
-        switch (sortConfig.key) {
-          case 'operador': return dir * (a.operador?.razonSocial || '').localeCompare(b.operador?.razonSocial || '', 'es');
-          case 'residuo': return dir * (a.tipoResiduo?.codigo || '').localeCompare(b.tipoResiduo?.codigo || '', 'es');
-          case 'metodo': return dir * a.metodo.localeCompare(b.metodo, 'es');
-          default: return 0;
-        }
-      });
-    }
-    return result;
-  }, [allTratamientos, searchTerm, filtroOperador, sortConfig]);
+  }, [allTratamientos, searchTerm, filtroOperador]);
 
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
-  const paginados = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  // Group filtered tratamientos by operador for accordion view
+  const grouped = useMemo(() => {
+    const groups: Record<string, { operador: TratamientoDB['operador']; operadorId: string; tratamientos: TratamientoDB[] }> = {};
+    for (const t of filtered) {
+      const key = t.operadorId;
+      if (!groups[key]) groups[key] = { operador: t.operador, operadorId: key, tratamientos: [] };
+      groups[key].tratamientos.push(t);
+    }
+    return Object.values(groups).sort((a, b) =>
+      (a.operador?.razonSocial || '').localeCompare(b.operador?.razonSocial || '', 'es')
+    );
+  }, [filtered]);
+
+  const totalPages = Math.ceil(grouped.length / itemsPerPage);
+  const paginados = grouped.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const openCreate = () => {
     setEditingItem(null);
@@ -270,97 +272,6 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
       toast.error('Error', err?.response?.data?.message || err?.message || 'Error inesperado');
     }
   };
-
-  const columns = [
-    {
-      key: 'operador',
-      header: 'Operador',
-      sortable: true,
-      width: '22%',
-      render: (t: TratamientoDB) => (
-        <div className="flex items-start gap-3">
-          <div className="shrink-0 w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
-            <FlaskConical size={18} className="text-blue-600" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="font-semibold text-neutral-900 truncate">{t.operador?.razonSocial || '-'}</p>
-            <p className="text-xs text-neutral-400 font-mono truncate">{t.operador?.cuit || ''}</p>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'residuo',
-      header: 'Tipo Residuo',
-      sortable: true,
-      width: '28%',
-      render: (t: TratamientoDB) => (
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="inline-block px-2 py-1 text-xs font-mono font-bold rounded bg-primary-100 text-primary-800">
-              {t.tipoResiduo?.codigo || '-'}
-            </span>
-            {t.activo && (
-              <Badge variant="soft" color="success" className="text-[10px]">
-                Activo
-              </Badge>
-            )}
-            {!t.activo && (
-              <Badge variant="soft" color="error" className="text-[10px]">
-                Inactivo
-              </Badge>
-            )}
-          </div>
-          <p className="text-sm text-neutral-600 truncate">{t.tipoResiduo?.nombre || ''}</p>
-        </div>
-      ),
-    },
-    {
-      key: 'metodo',
-      header: 'Método y Capacidad',
-      sortable: true,
-      width: '38%',
-      render: (t: TratamientoDB) => (
-        <div>
-          <p className="font-medium text-neutral-900 mb-1 truncate">{t.metodo}</p>
-          {t.descripcion && (
-            <p className="text-xs text-neutral-500 line-clamp-1 mb-1" title={t.descripcion}>{t.descripcion}</p>
-          )}
-          {t.capacidad && (
-            <div className="flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-primary-500"></div>
-              <span className="text-xs font-semibold text-primary-700">
-                {t.capacidad} tn/mes
-              </span>
-            </div>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'acciones',
-      header: 'Acciones',
-      width: '12%',
-      render: (t: TratamientoDB) => (
-        <div className="flex items-center justify-end gap-2">
-          <button
-            onClick={(e) => { e.stopPropagation(); openEdit(t); }}
-            className="p-2 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-neutral-700 transition-colors"
-            title="Editar"
-          >
-            <Pencil size={16} />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); setDeleteItem(t); }}
-            className="p-2 rounded-lg hover:bg-red-50 text-neutral-400 hover:text-red-600 transition-colors"
-            title="Eliminar"
-          >
-            <Trash2 size={16} />
-          </button>
-        </div>
-      ),
-    },
-  ];
 
   const handleExport = () => {
     const rows = filtered.map(t => ({
@@ -469,51 +380,166 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
         )}
       </Card>
 
-      {/* Table */}
-      <Card className="overflow-hidden shadow-sm">
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-16">
-            <Loader2 size={32} className="animate-spin text-primary-500 mb-3" />
-            <p className="text-sm text-neutral-500">Cargando autorizaciones...</p>
+      {/* Accordion grouped by operador */}
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center py-16">
+          <Loader2 size={32} className="animate-spin text-primary-500 mb-3" />
+          <p className="text-sm text-neutral-500">Cargando autorizaciones...</p>
+        </div>
+      ) : paginados.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 px-4">
+          <div className="w-16 h-16 rounded-full bg-neutral-100 flex items-center justify-center mb-4">
+            <ShieldCheck size={32} className="text-neutral-400" />
           </div>
-        ) : paginados.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 px-4">
-            <div className="w-16 h-16 rounded-full bg-neutral-100 flex items-center justify-center mb-4">
-              <ShieldCheck size={32} className="text-neutral-400" />
-            </div>
-            <p className="text-lg font-semibold text-neutral-900 mb-2">
-              {searchTerm || filtroOperador ? 'No se encontraron resultados' : 'No hay autorizaciones registradas'}
-            </p>
-            <p className="text-sm text-neutral-500 mb-6 text-center max-w-md">
-              {searchTerm || filtroOperador
-                ? 'Intenta ajustar los filtros para encontrar lo que buscas'
-                : 'Comienza creando la primera autorización de tratamiento'}
-            </p>
-            {!(searchTerm || filtroOperador) && (
-              <Button leftIcon={<Plus size={16} />} onClick={openCreate}>
-                Nueva Autorización
-              </Button>
-            )}
-          </div>
-        ) : (
-          <Table
-            data={paginados}
-            columns={columns}
-            keyExtractor={(t) => t.id}
-            sortable={true}
-            onSort={(key, dir) => setSortConfig({ key, direction: dir })}
-            stickyHeader
-            fixedLayout
-            emptyMessage="No hay tratamientos autorizados registrados"
-          />
-        )}
-      </Card>
+          <p className="text-lg font-semibold text-neutral-900 mb-2">
+            {searchTerm || filtroOperador ? 'No se encontraron resultados' : 'No hay autorizaciones registradas'}
+          </p>
+          <p className="text-sm text-neutral-500 mb-6 text-center max-w-md">
+            {searchTerm || filtroOperador
+              ? 'Intenta ajustar los filtros para encontrar lo que buscas'
+              : 'Comienza creando la primera autorización de tratamiento'}
+          </p>
+          {!(searchTerm || filtroOperador) && (
+            <Button leftIcon={<Plus size={16} />} onClick={openCreate}>
+              Nueva Autorización
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {paginados.map((group) => {
+            const isExpanded = expandedOperadorId === group.operadorId;
+            const manifCount = manifiestosPorOperador[group.operadorId] || 0;
+            return (
+              <Card key={group.operadorId} className="overflow-hidden shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setExpandedOperadorId(isExpanded ? null : group.operadorId)}
+                  className="w-full p-4 flex items-center justify-between hover:bg-neutral-50 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                      <FlaskConical size={20} className="text-blue-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-neutral-900 truncate">{group.operador?.razonSocial || '-'}</p>
+                      <p className="text-xs text-neutral-400 font-mono">{group.operador?.cuit || ''}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Badge variant="soft" color="primary" className="text-xs">
+                      {group.tratamientos.length} {group.tratamientos.length === 1 ? 'autorización' : 'autorizaciones'}
+                    </Badge>
+                    {manifCount > 0 && (
+                      <Badge variant="soft" color="success" className="text-xs">
+                        {manifCount} {manifCount === 1 ? 'manifiesto' : 'manifiestos'}
+                      </Badge>
+                    )}
+                    <ChevronDown
+                      size={18}
+                      className={`text-neutral-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                    />
+                  </div>
+                </button>
+                {isExpanded && (
+                  <div className="border-t border-neutral-100">
+                    {/* Desktop table inside accordion — with scroll */}
+                    <div className="hidden md:block max-h-[420px] overflow-y-auto">
+                      <table className="w-full text-sm table-fixed">
+                        <thead className="sticky top-0 z-[5]">
+                          <tr className="bg-neutral-50 text-left">
+                            <th className="px-3 py-2 text-xs font-semibold text-neutral-500 uppercase tracking-wider" style={{width:'60px'}}>Código</th>
+                            <th className="px-3 py-2 text-xs font-semibold text-neutral-500 uppercase tracking-wider" style={{width:'30%'}}>Residuo</th>
+                            <th className="px-3 py-2 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden lg:table-cell" style={{width:'35%'}}>Método</th>
+                            <th className="px-3 py-2 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden xl:table-cell" style={{width:'10%'}}>Capacidad</th>
+                            <th className="px-3 py-2 text-xs font-semibold text-neutral-500 uppercase tracking-wider" style={{width:'70px'}}>Estado</th>
+                            <th className="px-3 py-2 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-right" style={{width:'70px'}}>Acc.</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-neutral-100">
+                          {group.tratamientos.map((t) => (
+                            <tr key={t.id} className="hover:bg-neutral-50 transition-colors">
+                              <td className="px-3 py-2.5">
+                                <span className="inline-block px-2 py-0.5 text-xs font-mono font-bold rounded-full bg-warning-100 text-warning-800">
+                                  {t.tipoResiduo?.codigo || '-'}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2.5 truncate" title={t.tipoResiduo?.nombre || ''}>
+                                <span className="text-sm text-neutral-700">{t.tipoResiduo?.nombre || ''}</span>
+                              </td>
+                              <td className="px-3 py-2.5 hidden lg:table-cell">
+                                <p className="text-xs text-neutral-900 line-clamp-2" title={t.metodo}>{t.metodo}</p>
+                              </td>
+                              <td className="px-3 py-2.5 hidden xl:table-cell">
+                                {t.capacidad ? (
+                                  <span className="text-xs font-semibold text-primary-700">{t.capacidad} tn/mes</span>
+                                ) : (
+                                  <span className="text-xs text-neutral-300">-</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2.5">
+                                <Badge variant="soft" color={t.activo ? 'success' : 'error'} className="text-[10px]">
+                                  {t.activo ? 'Activo' : 'Inact.'}
+                                </Badge>
+                              </td>
+                              <td className="px-3 py-2.5">
+                                <div className="flex items-center justify-end gap-0.5">
+                                  <button onClick={(e) => { e.stopPropagation(); openEdit(t); }} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-neutral-700 transition-colors" title="Editar"><Pencil size={13} /></button>
+                                  <button onClick={(e) => { e.stopPropagation(); setDeleteItem(t); }} className="p-1.5 rounded-lg hover:bg-red-50 text-neutral-400 hover:text-red-600 transition-colors" title="Eliminar"><Trash2 size={13} /></button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {/* Mobile card view inside accordion — with scroll */}
+                    <div className="md:hidden p-3 space-y-2 max-h-[350px] overflow-y-auto">
+                      {group.tratamientos.map((t) => (
+                        <div key={t.id} className="p-2.5 bg-neutral-50 rounded-lg">
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="inline-block px-1.5 py-0.5 text-[10px] font-mono font-bold rounded-full bg-warning-100 text-warning-800 shrink-0">
+                                {t.tipoResiduo?.codigo || '-'}
+                              </span>
+                              <span className="text-xs text-neutral-600 truncate">{t.tipoResiduo?.nombre || ''}</span>
+                            </div>
+                            <Badge variant="soft" color={t.activo ? 'success' : 'error'} className="text-[10px] shrink-0">
+                              {t.activo ? 'Activo' : 'Inact.'}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center justify-end gap-0.5 mt-1">
+                            <button onClick={() => openEdit(t)} className="p-1 rounded-lg hover:bg-neutral-200 text-neutral-400 hover:text-neutral-700 transition-colors"><Pencil size={13} /></button>
+                            <button onClick={() => setDeleteItem(t)} className="p-1 rounded-lg hover:bg-red-100 text-neutral-400 hover:text-red-600 transition-colors"><Trash2 size={13} /></button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Footer */}
+                    <div className="px-4 py-2 bg-neutral-50 border-t border-neutral-100 text-xs text-neutral-500 flex items-center gap-3">
+                      <span>{group.tratamientos.length} autorizaciones</span>
+                      <span>·</span>
+                      <span className="text-success-600">{group.tratamientos.filter((t) => t.activo).length} activas</span>
+                      {group.tratamientos.some((t) => !t.activo) && (
+                        <>
+                          <span>·</span>
+                          <span className="text-error-500">{group.tratamientos.filter((t) => !t.activo).length} inactivas</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
       {totalPages > 1 && (
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
-          totalItems={filtered.length}
+          totalItems={grouped.length}
           itemsPerPage={itemsPerPage}
           onPageChange={setCurrentPage}
         />
@@ -899,8 +925,7 @@ const ExpandedMetodo: React.FC<{
   cuitToId: Record<string, string>;
 }> = ({ metodo, navigate, cuitToId }) => {
   const location = useLocation();
-  const isMobile = location.pathname.startsWith('/mobile');
-  const prefix = isMobile ? '/mobile' : '';
+  const prefix = '';
   const { data: enrichmentData } = useOperadoresEnrichment();
   const OPERADORES_DATA = enrichmentData?.operadores || {};
   const operadoresEnriched = metodo.operadores.map(o => ({

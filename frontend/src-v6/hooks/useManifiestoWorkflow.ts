@@ -100,6 +100,18 @@ export function useConfirmarRecepcion() {
   });
 }
 
+export function useConfirmarRecepcionInSitu() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id }: { id: string }) =>
+      manifiestoService.confirmarRecepcionInSitu(id),
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: KEYS.detail(id) });
+      qc.invalidateQueries({ queryKey: KEYS.lists() });
+    },
+  });
+}
+
 export function useRegistrarTratamiento() {
   const qc = useQueryClient();
   return useMutation({
@@ -141,6 +153,18 @@ export function useCerrarManifiesto() {
   return useMutation({
     mutationFn: (id: string) => manifiestoService.cerrar(id),
     onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: KEYS.detail(id) });
+      qc.invalidateQueries({ queryKey: KEYS.lists() });
+    },
+  });
+}
+
+export function useCancelarManifiesto() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, motivo }: { id: string; motivo?: string }) =>
+      manifiestoService.cancelar(id, motivo),
+    onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },

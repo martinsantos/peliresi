@@ -32,8 +32,8 @@ interface ManifiestoParaHash {
   numero: string;
   generadorId: string;
   generador: { cuit: string };
-  transportistaId: string;
-  transportista: { cuit: string };
+  transportistaId: string | null;
+  transportista: { cuit: string } | null;
   operadorId: string;
   operador: { cuit: string };
   residuos: Array<{ tipoResiduoId: string; cantidad: number; unidad: string }>;
@@ -57,8 +57,8 @@ export function hashManifiesto(manifiesto: ManifiestoParaHash): string {
     numero: manifiesto.numero,
     generadorId: manifiesto.generadorId,
     generadorCuit: manifiesto.generador.cuit,
-    transportistaId: manifiesto.transportistaId,
-    transportistaCuit: manifiesto.transportista.cuit,
+    transportistaId: manifiesto.transportistaId ?? null,
+    transportistaCuit: manifiesto.transportista?.cuit ?? '',
     operadorId: manifiesto.operadorId,
     operadorCuit: manifiesto.operador.cuit,
     residuos: residuosSorted,
@@ -341,7 +341,7 @@ export async function verificarIntegridad(manifiestoId: string) {
         rollingHash: manifiesto.rollingHash,
         numero: manifiesto.numero,
         generadorCuit: manifiesto.generador.cuit,
-        transportistaCuit: manifiesto.transportista.cuit,
+        transportistaCuit: manifiesto.transportista?.cuit ?? '',
         operadorCuit: manifiesto.operador.cuit,
         residuos: manifiesto.residuos,
         fechaFirma: manifiesto.fechaFirma?.toISOString() ?? '',

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SITREP — Manual del Sistema | v2026.9</title>
+<title>SITREP — Manual del Sistema | v2026.10</title>
 <meta name="description" content="Manual completo del Sistema de Trazabilidad de Residuos Peligrosos - Provincia de Mendoza">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,8 +17,9 @@
   <button class="hamburger" id="hamburgerBtn" aria-label="Menu">
     <span></span><span></span><span></span>
   </button>
+  <img src="screenshots/logo-mendoza.webp" alt="Gobierno de Mendoza" style="height:28px;width:auto;margin-right:8px;">
   <div class="logo">SITREP <span>Mendoza</span></div>
-  <span class="version">v2026.9</span>
+  <span class="version">v2026.10</span>
   <span class="doc-title">Manual del Sistema de Trazabilidad de Residuos Peligrosos</span>
   <div class="header-actions">
     <button class="header-action-btn" id="btnShare" onclick="shareManual()" aria-label="Compartir" title="Compartir">
@@ -253,7 +254,10 @@
   <div class="print-logo">SITREP</div>
   <h1>Manual del Sistema de Trazabilidad<br>de Residuos Peligrosos</h1>
   <p class="print-subtitle">Provincia de Mendoza &mdash; Direccion General de Fiscalizacion Ambiental</p>
-  <p class="print-date">Version 2026.7 &mdash; Marzo 2026</p>
+  <p class="print-date">Version 2026.9 &mdash; Marzo 2026</p>
+  <div style="margin-top:2rem;text-align:center;">
+    <img src="screenshots/logo-mendoza.webp" alt="Gobierno de Mendoza" style="height:72px;width:auto;">
+  </div>
 </div>
 
 <!-- Hero Section — Apple Keynote Style -->
@@ -701,6 +705,9 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <tr><td><strong>Sistema</strong></td><td><span class="badge" style="background:var(--sistema-light);color:var(--sistema);">Gris</span></td><td>Procesos automatizados (generacion QR, notificaciones, deteccion de anomalias).</td><td>N/A</td></tr>
 </tbody>
 </table>
+<div class="callout callout-info" style="margin-top:1rem;">
+  <strong>Operadores In Situ:</strong> Algunos operadores pueden trabajar directamente en el domicilio del generador (modalidad IN SITU), sin necesidad de transporte. Un mismo operador puede tener ambas modalidades: FIJO (planta propia) e IN SITU.
+</div>
 </section>
 
 <section id="acceso" data-role="all">
@@ -902,6 +909,9 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <li><strong>Paso 5:</strong> Revision del resumen y firma electronica.</li>
 </ol>
 <p>El manifiesto se guarda como <strong>BORRADOR</strong> hasta que se firma electronicamente.</p>
+<div class="callout callout-warning" style="margin-top:1rem;">
+  <strong>Filtrado inteligente:</strong> Al seleccionar residuos, el sistema muestra solo los operadores habilitados para tratar esos tipos de residuos. Si se elige modalidad IN SITU, el transportista no es requerido.
+</div>
 
 <h4>Detalle (<code>/manifiestos/:id</code>)</h4>
 <ul>
@@ -940,6 +950,21 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <span class="workflow-state ws-cancelado">CANCELADO</span>
 </div>
 <p><strong>Nota:</strong> INCIDENTE es un evento registrado durante EN_TRANSITO, no un estado terminal. El manifiesto permanece en estado EN_TRANSITO mientras se resuelve el incidente.</p>
+
+<h4 style="margin-top:1.5rem;">Modalidad In Situ (sin transporte)</h4>
+<p>Cuando el operador trabaja <strong>in situ</strong> en el domicilio del generador, no se requiere transporte. El flujo es:</p>
+<div class="workflow-diagram">
+  <span class="workflow-state ws-borrador">BORRADOR</span>
+  <span class="workflow-arrow">&rarr;</span>
+  <span class="workflow-state ws-aprobado">APROBADO</span>
+  <span class="workflow-arrow">&rarr;</span>
+  <span class="workflow-state ws-recibido">RECIBIDO</span>
+  <span class="workflow-arrow">&rarr;</span>
+  <span class="workflow-state ws-tratamiento">EN_TRATAMIENTO</span>
+  <span class="workflow-arrow">&rarr;</span>
+  <span class="workflow-state ws-tratado">TRATADO</span>
+</div>
+<p>El operador confirma la recepci&oacute;n directamente sin pasar por EN_TRANSITO ni ENTREGADO.</p>
 
 <h4>Estados del Manifiesto</h4>
 <table>
@@ -1304,6 +1329,7 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <tr><td>Configuracion Perfil</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td></tr>
 </tbody>
 </table>
+<p><strong>Inspector:</strong> No es un rol sino una propiedad de usuario. Los inspectores pueden ver reportes completos de todo el sistema, independientemente de su rol base.</p>
 
 <h4>Registro de Auditoria - Campos Detallados</h4>
 <table>
@@ -2726,6 +2752,9 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <li><strong>Paso 2 - Residuos:</strong> Agregar uno o mas residuos con tipo, cantidad y unidad.</li>
 <li><strong>Paso 3 - Confirmacion:</strong> Revisar todos los datos y crear el manifiesto en estado BORRADOR.</li>
 </ol>
+<div class="callout callout-warning" style="margin-top:1rem;">
+  <strong>Filtrado inteligente:</strong> Al seleccionar residuos, el sistema muestra solo los operadores habilitados para tratar esos tipos de residuos. Si se elige modalidad IN SITU, el transportista no es requerido.
+</div>
 
 <h4>Detalle y Firma</h4>
 <p>Desde la pantalla de detalle, el generador puede:</p>
@@ -5855,6 +5884,17 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <table>
 <thead><tr><th>Version</th><th>Fecha</th><th>Descripcion de Cambios</th></tr></thead>
 <tbody>
+<tr><td><strong>2026.10</strong></td><td>Marzo 2026</td><td>
+<ul>
+  <li><strong>Operador In Situ:</strong> Operadores pueden trabajar en el domicilio del generador sin transporte. Workflow alternativo: APROBADO &rarr; RECIBIDO directo.</li>
+  <li><strong>Cross-filtering de residuos:</strong> Al crear manifiestos, solo se muestran operadores habilitados para los residuos seleccionados.</li>
+  <li><strong>Inspector:</strong> Nueva propiedad de usuario para ver reportes completos sin restricci&oacute;n de rol.</li>
+  <li><strong>Reportes filtrados:</strong> Cada rol ve solo datos de sus propios manifiestos/actores.</li>
+  <li><strong>Trazabilidad:</strong> Timeline del manifiesto renombrada a &ldquo;Trazabilidad&rdquo;.</li>
+  <li><strong>Mobile responsive:</strong> Todas las tablas con vista de cards en m&oacute;vil. Login redise&ntilde;ado.</li>
+  <li><strong>Logo Gobierno de Mendoza:</strong> Visible en login, footer y cabecera del manual.</li>
+</ul>
+</td></tr>
 <tr><td><strong>2026.9</strong></td><td>Marzo 2026</td><td>
 <ul>
 <li><strong>Administradores Sectoriales:</strong> 3 nuevos roles (Admin Generadores, Admin Transporte, Admin Operadores) con acceso a Blockchain, Carga Masiva, Auditoria, Centro de Control, Impersonar. Solo Super Admin ve Usuarios y Solicitudes.</li>

@@ -87,7 +87,6 @@ const NuevoOperadorPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const isMobile = location.pathname.startsWith('/mobile');
   const isEdit = Boolean(id);
 
   const { data: enrichmentData } = useOperadoresEnrichment();
@@ -106,7 +105,7 @@ const NuevoOperadorPage: React.FC = () => {
   const updateMutation = useUpdateOperador();
   const uploadDocMutation = useUploadOperadorDocumento();
 
-  const backPath = isMobile ? '/mobile/admin/actores/operadores' : '/admin/actores/operadores';
+  const backPath = '/admin/actores/operadores';
 
   useEffect(() => {
     if (!isEdit || !existing) return;

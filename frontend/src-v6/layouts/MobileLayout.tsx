@@ -536,6 +536,9 @@ export const MobileLayout: React.FC = () => {
                 <LogOut size={20} />
                 <span className="font-medium">Cerrar Sesión</span>
               </button>
+              <div className="pt-2 flex justify-center">
+                <img src="/logo-mendoza.webp" alt="Gobierno de Mendoza" className="h-8 w-auto opacity-50" />
+              </div>
             </div>
           </div>
         </>

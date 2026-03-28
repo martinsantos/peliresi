@@ -181,8 +181,80 @@ export default function AdminBlockchainPage() {
         ))}
       </div>
 
-      {/* Table */}
-      <Card>
+      {/* Mobile Card View */}
+      {!isLoading && manifiestos.length > 0 && (
+        <div className="md:hidden space-y-2">
+          {manifiestos.map((m: any) => {
+            const sellos = m.sellosBlockchain || [];
+            const genesis = sellos.find((s: any) => s.tipo === 'GENESIS');
+            const cierre = sellos.find((s: any) => s.tipo === 'CIERRE');
+            const st = statusStyles[m.blockchainStatus] || statusStyles.PENDIENTE;
+            return (
+              <Card
+                key={m.id}
+                className="active:scale-[0.98] transition-transform cursor-pointer"
+                onClick={() => navigate(`/manifiestos/${m.id}`)}
+              >
+                <div className="p-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center shrink-0">
+                        <ShieldCheck size={16} className="text-emerald-600" />
+                      </div>
+                      <span className="font-mono font-semibold text-sm text-neutral-900">{m.numero}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {genesis && (
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                          statusStyles[genesis.status]?.bg || 'bg-neutral-50'
+                        } ${statusStyles[genesis.status]?.text || 'text-neutral-500'}`}>
+                          G
+                        </span>
+                      )}
+                      {cierre && (
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                          statusStyles[cierre.status]?.bg || 'bg-neutral-50'
+                        } ${statusStyles[cierre.status]?.text || 'text-neutral-500'}`}>
+                          C
+                        </span>
+                      )}
+                      {!genesis && !cierre && (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${st.bg} ${st.text}`}>
+                          {st.icon}
+                          {m.blockchainStatus}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-sm text-neutral-600 truncate pl-10">{m.generador?.razonSocial || '-'}</p>
+                  <div className="flex items-center justify-between mt-2 pl-10">
+                    <span className="text-xs text-neutral-400">
+                      {m.blockchainTimestamp
+                        ? new Date(m.blockchainTimestamp).toLocaleDateString('es-AR')
+                        : '-'}
+                    </span>
+                    {genesis?.txHash && (
+                      <a
+                        href={`${ETHERSCAN_BASE}/tx/${genesis.txHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 font-mono text-[10px] text-emerald-600 hover:underline"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        {truncateHash(genesis.txHash, 4)}
+                        <ExternalLink size={10} />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Desktop Table */}
+      <Card className="hidden md:block">
         <CardContent>
           {isLoading ? (
             <div className="flex items-center justify-center py-12">

@@ -151,7 +151,59 @@ const AdminRenovacionesPage: React.FC = () => {
           </CardContent>
         </Card>
       ) : (
-        <Card>
+        <>
+        {/* Mobile Card View */}
+        <div className="md:hidden space-y-2">
+          {renovaciones.map(r => {
+            const cfg = ESTADO_CONFIG[r.estado] || ESTADO_CONFIG.PENDIENTE;
+            return (
+              <Card
+                key={r.id}
+                className="active:scale-[0.98] transition-transform cursor-pointer"
+                onClick={() => setSelectedRenov(r)}
+              >
+                <div className="p-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-8 h-8 bg-primary-50 rounded-lg flex items-center justify-center shrink-0">
+                        <RefreshCw size={16} className="text-primary-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm text-neutral-900 truncate">{actorName(r)}</p>
+                        <span className="text-xs text-neutral-400">{r.anio}</span>
+                      </div>
+                    </div>
+                    <Badge variant="soft" color={cfg.color}>{cfg.label}</Badge>
+                  </div>
+                  <div className="flex items-center justify-between mt-2 pl-10">
+                    <Badge variant="soft" color={r.tipoActor === 'GENERADOR' ? 'purple' : 'blue'}>
+                      {r.tipoActor}
+                    </Badge>
+                    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                      <button onClick={() => setSelectedRenov(r)} className="p-1.5 rounded-lg hover:bg-neutral-100" title="Ver detalle">
+                        <Eye size={14} className="text-neutral-500" />
+                      </button>
+                      {r.estado === 'PENDIENTE' && (
+                        <>
+                          <button onClick={() => handleAprobar(r)} className="p-1.5 rounded-lg hover:bg-green-50" title="Aprobar"
+                            disabled={aprobarMutation.isPending}>
+                            <ThumbsUp size={14} className="text-green-600" />
+                          </button>
+                          <button onClick={() => setRejectModal(r)} className="p-1.5 rounded-lg hover:bg-red-50" title="Rechazar">
+                            <ThumbsDown size={14} className="text-red-600" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Desktop Table */}
+        <Card className="hidden md:block">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -223,6 +275,7 @@ const AdminRenovacionesPage: React.FC = () => {
             </div>
           )}
         </Card>
+        </>
       )}
 
       {/* Detail Modal */}

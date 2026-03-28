@@ -139,7 +139,62 @@ const AdminSolicitudesPage: React.FC = () => {
           </CardContent>
         </Card>
       ) : (
-        <Card padding="none">
+        <>
+        {/* Mobile Card View */}
+        <div className="md:hidden space-y-2">
+          {solicitudes.map((s: SolicitudInscripcion) => {
+            const eCfg = ESTADO_CONFIG[s.estado] || ESTADO_CONFIG.ENVIADA;
+            return (
+              <Card
+                key={s.id}
+                className="active:scale-[0.98] transition-transform cursor-pointer"
+                onClick={() => navigate(`/admin/solicitudes/${s.id}`)}
+              >
+                <div className="p-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-8 h-8 bg-primary-50 rounded-lg flex items-center justify-center shrink-0">
+                        <FileText size={16} className="text-primary-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm text-neutral-900 truncate">{s.usuario?.nombre || '-'}</p>
+                        <p className="text-xs text-neutral-400 truncate">{s.usuario?.email}</p>
+                      </div>
+                    </div>
+                    <Badge
+                      variant="soft"
+                      color={eCfg.color}
+                      dot={s.estado === 'OBSERVADA'}
+                      pulse={s.estado === 'OBSERVADA'}
+                    >
+                      {eCfg.label}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between mt-2 pl-10">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="soft" color={s.tipoActor === 'GENERADOR' ? 'primary' : 'info'}>
+                        {s.tipoActor}
+                      </Badge>
+                      <span className="text-xs text-neutral-400">
+                        {s.fechaEnvio ? new Date(s.fechaEnvio).toLocaleDateString('es-AR') : '-'}
+                      </span>
+                    </div>
+                    <button
+                      onClick={e => { e.stopPropagation(); navigate(`/admin/solicitudes/${s.id}`); }}
+                      className="p-1.5 rounded-lg hover:bg-neutral-100"
+                      title="Ver detalle"
+                    >
+                      <Eye size={14} className="text-neutral-500" />
+                    </button>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Desktop Table */}
+        <Card padding="none" className="hidden md:block">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -227,6 +282,7 @@ const AdminSolicitudesPage: React.FC = () => {
             </div>
           )}
         </Card>
+        </>
       )}
     </div>
   );

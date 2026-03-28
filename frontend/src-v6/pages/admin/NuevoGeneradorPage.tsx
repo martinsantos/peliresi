@@ -85,7 +85,6 @@ const NuevoGeneradorPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const isMobile = location.pathname.startsWith('/mobile');
   const isEdit = Boolean(id);
 
   const { data: enrichmentData } = useGeneradoresEnrichment();
@@ -104,7 +103,7 @@ const NuevoGeneradorPage: React.FC = () => {
   const updateMutation = useUpdateGenerador();
   const uploadDocMutation = useUploadDocumento();
 
-  const backPath = isMobile ? '/mobile/admin/actores/generadores' : '/admin/actores/generadores';
+  const backPath = '/admin/actores/generadores';
 
   useEffect(() => {
     if (!isEdit || !existing) return;

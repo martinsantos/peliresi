@@ -36,6 +36,16 @@ export function useTiposResiduo() {
     queryKey: ['catalogos', 'tipos-residuo'],
     queryFn: () => fetchWithOfflineFallback('tipos-residuo', () => catalogoService.tiposResiduo()),
     staleTime: STALE_TIME,
+    select: (data) => data.tiposResiduos,
+  });
+}
+
+/** Returns tiposResiduos + server-side counts (manifiestosPorResiduo, operadoresPorResiduo) */
+export function useTiposResiduoEnriched() {
+  return useQuery({
+    queryKey: ['catalogos', 'tipos-residuo'],
+    queryFn: () => fetchWithOfflineFallback('tipos-residuo', () => catalogoService.tiposResiduo()),
+    staleTime: STALE_TIME,
   });
 }
 

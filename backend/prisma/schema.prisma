@@ -22,6 +22,7 @@ model Usuario {
   empresa         String?
   telefono        String?
   activo          Boolean     @default(true)
+  esInspector     Boolean     @default(false)
   dosFaSecret     String?
   dosFaVerificado Boolean     @default(false)
   notifNuevoRegistro      Boolean   @default(true)
@@ -145,6 +146,7 @@ model Operador {
   tipoOperador        String?
   tecnologia          String?
   corrientesY         String?
+  modalidades         String[]  @default(["FIJO"])
   latitud             Float?
   longitud            Float?
   activo              Boolean   @default(true)
@@ -174,6 +176,7 @@ model Operador {
   usuario       Usuario              @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   tratamientos  TratamientoAutorizado[]
   manifiestos   Manifiesto[]
+  sedes         SedeOperador[]
   documentos    Documento[]
   pagos         PagoTEF[]
   ddjj          DeclaracionJurada[]
@@ -244,8 +247,11 @@ model Manifiesto {
   id              String      @id @default(cuid())
   numero          String      @unique
   generadorId     String
-  transportistaId String
+  transportistaId String?
   operadorId      String
+  modalidad       String?   @default("FIJO")
+  tratamientoMetodo         String?
+  tratamientoAutorizadoId   String?
   estado          EstadoManifiesto @default(BORRADOR)
   observaciones   String?
   fechaFirma      DateTime?
@@ -268,7 +274,7 @@ model Manifiesto {
 
   // Relaciones
   generador       Generador           @relation(fields: [generadorId], references: [id])
-  transportista   Transportista       @relation(fields: [transportistaId], references: [id])
+  transportista   Transportista?      @relation(fields: [transportistaId], references: [id])
   operador        Operador            @relation(fields: [operadorId], references: [id])
   creadoPor       Usuario             @relation("UsuarioManifiestos", fields: [creadoPorId], references: [id])
   creadoPorId     String
@@ -368,6 +374,10 @@ model TratamientoAutorizado {
   descripcion     String?
   capacidad       Float?
   activo          Boolean     @default(true)
+  fechaAutorizacion    DateTime?
+  fechaVencimiento     DateTime?
+  numeroResolucion     String?
+  expediente           String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -419,6 +429,23 @@ model Auditoria {
   @@index([operadorId])
   @@index([transportistaId])
   @@map("auditorias")
+}
+
+model SedeOperador {
+  id           String   @id @default(cuid())
+  operadorId   String
+  nombre       String
+  tipo         String   @default("FIJO")
+  domicilio    String
+  localidad    String?
+  departamento String?
+  latitud      Float?
+  longitud     Float?
+  activo       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  operador     Operador @relation(fields: [operadorId], references: [id])
+
+  @@map("sedes_operador")
 }
 
 // Enumeraciones

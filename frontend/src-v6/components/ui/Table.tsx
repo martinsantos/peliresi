@@ -22,7 +22,7 @@ export interface Column<T> {
   width?: string;
   align?: 'left' | 'center' | 'right';
   sortable?: boolean;
-  hiddenBelow?: 'sm' | 'md' | 'lg';
+  hiddenBelow?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   truncate?: boolean;
   render?: (row: T) => React.ReactNode;
 }
@@ -115,6 +115,8 @@ export function Table<T extends Record<string, any>>({
     if (col.hiddenBelow === 'sm') return 'hidden sm:table-cell';
     if (col.hiddenBelow === 'md') return 'hidden md:table-cell';
     if (col.hiddenBelow === 'lg') return 'hidden lg:table-cell';
+    if (col.hiddenBelow === 'xl') return 'hidden xl:table-cell';
+    if (col.hiddenBelow === '2xl') return 'hidden 2xl:table-cell';
     return '';
   };
 

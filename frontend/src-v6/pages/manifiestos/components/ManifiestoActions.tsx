@@ -4,7 +4,7 @@
  * Workflow action buttons + confirmation dialogs for the manifiesto detail page.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Loader2,
   AlertCircle,
@@ -24,7 +24,9 @@ import {
   Recycle,
   Package,
   Microscope,
+  MapPin,
 } from 'lucide-react';
+import { api } from '../../../services/api';
 import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
 import { Button } from '../../../components/ui/ButtonV2';
 import { Badge } from '../../../components/ui/BadgeV2';
@@ -80,11 +82,13 @@ interface ManifiestoActionsProps {
   isAdmin: boolean;
   userRol: string;
   isActionPending: boolean;
+  isInSitu?: boolean;
   mutations: {
     firmar: MutationState;
     confirmarRetiro: MutationState;
     confirmarEntrega: MutationState;
     confirmarRecepcion: MutationState;
+    confirmarRecepcionInSitu: MutationState;
     pesaje: MutationState;
     registrarTratamiento: MutationState;
     cerrar: MutationState;
@@ -96,6 +100,7 @@ interface ManifiestoActionsProps {
   onConfirmarRetiro: () => void;
   onConfirmarEntrega: () => void;
   onConfirmarRecepcion: () => void;
+  onConfirmarRecepcionInSitu: () => void;
   onPesaje: (residuos: { id: string; cantidadRecibida: number }[], observaciones?: string) => void;
   onTratamiento: (metodo: string, observaciones?: string) => void;
   onCerrar: () => void;
@@ -114,11 +119,13 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
   isAdmin,
   userRol,
   isActionPending,
+  isInSitu,
   mutations,
   onFirmar,
   onConfirmarRetiro,
   onConfirmarEntrega,
   onConfirmarRecepcion,
+  onConfirmarRecepcionInSitu,
   onPesaje,
   onTratamiento,
   onCerrar,
@@ -139,6 +146,39 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
   const [showTratamientoModal, setShowTratamientoModal] = useState(false);
   const [tratamientoMetodo, setTratamientoMetodo] = useState('');
   const [tratamientoObs, setTratamientoObs] = useState('');
+
+  // Dynamic operador methods for tratamiento modal
+  const [operadorMetodos, setOperadorMetodos] = useState<{ metodo: string; residuos: string[] }[]>([]);
+  const [loadingMetodos, setLoadingMetodos] = useState(false);
+
+  useEffect(() => {
+    if (showTratamientoModal && m?.operadorId) {
+      setLoadingMetodos(true);
+      api.get(`/catalogos/operadores/${m.operadorId}/tratamientos`)
+        .then(res => {
+          const tratamientos: any[] = res.data?.data?.tratamientos || res.data || [];
+          // Group by metodo, collecting residuo codes per method
+          const grouped: Record<string, Set<string>> = {};
+          for (const t of tratamientos) {
+            const metodo = t.metodo || '';
+            if (!metodo) continue;
+            if (!grouped[metodo]) grouped[metodo] = new Set();
+            const codigo = t.tipoResiduo?.codigo;
+            if (codigo) grouped[metodo].add(codigo);
+          }
+          const result = Object.entries(grouped).map(([metodo, codigos]) => ({
+            metodo,
+            residuos: Array.from(codigos).sort(),
+          }));
+          setOperadorMetodos(result);
+          if (result.length === 1) setTratamientoMetodo(result[0].metodo);
+        })
+        .catch(() => setOperadorMetodos([]))
+        .finally(() => setLoadingMetodos(false));
+    } else if (!showTratamientoModal) {
+      setOperadorMetodos([]);
+    }
+  }, [showTratamientoModal, m?.operadorId]);
 
   // Modal state for rechazar
   const [showRechazarModal, setShowRechazarModal] = useState(false);
@@ -246,7 +286,8 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
               </Button>
             )}
 
-            {m.estado === EstadoManifiesto.APROBADO && (isAdmin || userRol === 'TRANSPORTISTA') && (
+            {/* Confirmar Retiro — only for FIJO (transport required) */}
+            {!isInSitu && m.estado === EstadoManifiesto.APROBADO && (isAdmin || userRol === 'TRANSPORTISTA') && (
               <Button
                 fullWidth
                 leftIcon={mutations.confirmarRetiro.isPending ? <Loader2 size={16} className="animate-spin" /> : <ClipboardCheck size={16} />}
@@ -257,7 +298,21 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
               </Button>
             )}
 
-            {m.estado === EstadoManifiesto.EN_TRANSITO && (isAdmin || userRol === 'TRANSPORTISTA') && (
+            {/* Confirmar Recepcion In Situ — APROBADO + no transportista */}
+            {isInSitu && m.estado === EstadoManifiesto.APROBADO && (isAdmin || userRol === 'OPERADOR') && (
+              <Button
+                fullWidth
+                leftIcon={mutations.confirmarRecepcionInSitu.isPending ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
+                onClick={onConfirmarRecepcionInSitu}
+                disabled={isActionPending}
+                className="!bg-emerald-600 hover:!bg-emerald-700"
+              >
+                Confirmar Recepcion In Situ
+              </Button>
+            )}
+
+            {/* Confirmar Entrega — only for FIJO (transport required) */}
+            {!isInSitu && m.estado === EstadoManifiesto.EN_TRANSITO && (isAdmin || userRol === 'TRANSPORTISTA') && (
               <Button
                 fullWidth
                 leftIcon={mutations.confirmarEntrega.isPending ? <Loader2 size={16} className="animate-spin" /> : <Truck size={16} />}
@@ -268,7 +323,8 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
               </Button>
             )}
 
-            {m.estado === EstadoManifiesto.EN_TRANSITO && (isAdmin || userRol === 'TRANSPORTISTA') && (
+            {/* Registrar Incidente — only for FIJO (transport required) */}
+            {!isInSitu && m.estado === EstadoManifiesto.EN_TRANSITO && (isAdmin || userRol === 'TRANSPORTISTA') && (
               <Button
                 fullWidth
                 variant="outline"
@@ -426,25 +482,74 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-2">Método de Tratamiento *</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {METODOS_TRATAMIENTO.map((met) => (
-                    <button
-                      key={met.id}
-                      type="button"
-                      onClick={() => setTratamientoMetodo(met.id)}
-                      className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all ${
-                        tratamientoMetodo === met.id
-                          ? 'border-primary-500 bg-primary-50 shadow-sm'
-                          : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
-                      }`}
-                    >
-                      <span className="text-2xl">{met.icon}</span>
-                      <span className={`text-xs font-medium ${
-                        tratamientoMetodo === met.id ? 'text-primary-700' : 'text-neutral-600'
-                      }`}>{met.label}</span>
-                    </button>
-                  ))}
-                </div>
+                {loadingMetodos ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 size={20} className="animate-spin text-primary-500 mr-2" />
+                    <span className="text-sm text-neutral-500">Cargando métodos autorizados...</span>
+                  </div>
+                ) : operadorMetodos.length > 0 ? (
+                  /* Dynamic: operador's authorized methods as radio cards */
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {operadorMetodos.map((om) => (
+                      <button
+                        key={om.metodo}
+                        type="button"
+                        onClick={() => setTratamientoMetodo(om.metodo)}
+                        className={`w-full text-left p-3 rounded-xl border-2 transition-all ${
+                          tratamientoMetodo === om.metodo
+                            ? 'border-primary-500 bg-primary-50 shadow-sm'
+                            : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                            tratamientoMetodo === om.metodo
+                              ? 'border-primary-500'
+                              : 'border-neutral-300'
+                          }`}>
+                            {tratamientoMetodo === om.metodo && (
+                              <div className="w-2 h-2 rounded-full bg-primary-500" />
+                            )}
+                          </div>
+                          <span className={`text-sm font-medium ${
+                            tratamientoMetodo === om.metodo ? 'text-primary-700' : 'text-neutral-900'
+                          }`}>{om.metodo}</span>
+                        </div>
+                        {om.residuos.length > 0 && (
+                          <div className="mt-1.5 ml-6 flex flex-wrap gap-1">
+                            <span className="text-[10px] text-neutral-400">Residuos:</span>
+                            {om.residuos.map(r => (
+                              <span key={r} className="inline-block px-1.5 py-0.5 text-[10px] font-mono font-bold rounded bg-primary-100 text-primary-800">
+                                {r}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  /* Fallback: hardcoded 6 method buttons */
+                  <div className="grid grid-cols-2 gap-2">
+                    {METODOS_TRATAMIENTO.map((met) => (
+                      <button
+                        key={met.id}
+                        type="button"
+                        onClick={() => setTratamientoMetodo(met.id)}
+                        className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all ${
+                          tratamientoMetodo === met.id
+                            ? 'border-primary-500 bg-primary-50 shadow-sm'
+                            : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
+                        }`}
+                      >
+                        <span className="text-2xl">{met.icon}</span>
+                        <span className={`text-xs font-medium ${
+                          tratamientoMetodo === met.id ? 'text-primary-700' : 'text-neutral-600'
+                        }`}>{met.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Observaciones</label>
@@ -665,8 +770,8 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
                 <span className="text-neutral-900">{m.generador?.razonSocial || '-'}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-neutral-500">Transportista:</span>
-                <span className="text-neutral-900">{m.transportista?.razonSocial || '-'}</span>
+                <span className="text-neutral-500">{isInSitu ? 'Modalidad:' : 'Transportista:'}</span>
+                <span className="text-neutral-900">{isInSitu ? 'In Situ' : (m.transportista?.razonSocial || '-')}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-neutral-500">Operador:</span>

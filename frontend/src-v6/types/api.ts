@@ -74,8 +74,9 @@ export interface ChangePasswordRequest {
 
 export interface CreateManifiestoRequest {
   generadorId: string;
-  transportistaId: string;
+  transportistaId?: string;
   operadorId: string;
+  modalidad?: 'FIJO' | 'IN_SITU';
   fechaEstimadaRetiro?: string;
   observaciones?: string;
   residuos: CreateManifiestoResiduoRequest[];
@@ -472,6 +473,7 @@ export interface UpdateUsuarioRequest {
   empresa?: string;
   telefono?: string;
   activo?: boolean;
+  esInspector?: boolean;
 }
 
 export interface UsuarioFilters {

@@ -41,9 +41,11 @@ import {
   useConfirmarRetiro,
   useConfirmarEntrega,
   useConfirmarRecepcion,
+  useConfirmarRecepcionInSitu,
   usePesaje,
   useRegistrarTratamiento,
   useCerrarManifiesto,
+  useCancelarManifiesto,
   useRechazarManifiesto,
   useRegistrarIncidente,
   useRevertirEstado,
@@ -74,7 +76,6 @@ const ManifiestoDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const isMobile = location.pathname.startsWith('/mobile');
   const isApp = location.pathname.startsWith('/app');
   const { data: apiData, isLoading, isError } = useManifiesto(id || '');
   const [qrCopied, setQrCopied] = React.useState(false);
@@ -88,19 +89,21 @@ const ManifiestoDetailPage: React.FC = () => {
   const confirmarRetiro = useConfirmarRetiro();
   const confirmarEntrega = useConfirmarEntrega();
   const confirmarRecepcion = useConfirmarRecepcion();
+  const confirmarRecepcionInSitu = useConfirmarRecepcionInSitu();
   const pesaje = usePesaje();
   const registrarTratamiento = useRegistrarTratamiento();
   const cerrar = useCerrarManifiesto();
   const rechazar = useRechazarManifiesto();
   const registrarIncidente = useRegistrarIncidente();
   const revertir = useRevertirEstado();
+  const cancelar = useCancelarManifiesto();
 
   // Cancel state (managed here because it navigates)
   const [isCancelling, setIsCancelling] = useState(false);
 
   // Track which action is in progress
   const isActionPending = firmar.isPending || confirmarRetiro.isPending || confirmarEntrega.isPending
-    || confirmarRecepcion.isPending || pesaje.isPending || registrarTratamiento.isPending || cerrar.isPending
+    || confirmarRecepcion.isPending || confirmarRecepcionInSitu.isPending || pesaje.isPending || registrarTratamiento.isPending || cerrar.isPending
     || rechazar.isPending || registrarIncidente.isPending || revertir.isPending;
 
   // Use API data only
@@ -190,6 +193,11 @@ const ManifiestoDetailPage: React.FC = () => {
     'Recepcion confirmada exitosamente',
   );
 
+  const handleConfirmarRecepcionInSitu = () => handleAction(
+    () => confirmarRecepcionInSitu.mutateAsync({ id: id! }),
+    'Recepcion in situ confirmada exitosamente',
+  );
+
   const handlePesaje = (residuos: { id: string; cantidadRecibida: number }[], observaciones?: string) => {
     handleAction(
       () => pesaje.mutateAsync({ id: id!, residuos, observaciones }),
@@ -226,9 +234,9 @@ const ManifiestoDetailPage: React.FC = () => {
   const handleCancelar = async () => {
     setIsCancelling(true);
     try {
-      await manifiestoService.delete(id!);
+      await cancelar.mutateAsync({ id: id! });
       toast.success('Manifiesto cancelado');
-      navigate(isMobile ? '/mobile/manifiestos' : '/manifiestos');
+      navigate('/manifiestos');
     } catch (err: any) {
       toast.error('Error al cancelar', err?.response?.data?.message || 'No se pudo cancelar el manifiesto');
     } finally {
@@ -275,7 +283,7 @@ const ManifiestoDetailPage: React.FC = () => {
   const isTransportista = userRol === 'TRANSPORTISTA';
   const transportistaStates = [EstadoManifiesto.APROBADO, EstadoManifiesto.EN_TRANSITO, EstadoManifiesto.ENTREGADO];
   if (!isLoading && manifiesto && isTransportista && m.estado && transportistaStates.includes(m.estado as EstadoManifiesto)) {
-    const prefix = isApp ? '/app' : isMobile ? '/mobile' : '';
+    const prefix = isApp ? '/app' : '';
     navigate(`${prefix}/transporte/viaje/${id}`, { replace: true });
     return null;
   }
@@ -308,11 +316,9 @@ const ManifiestoDetailPage: React.FC = () => {
   if (!manifiesto && (isError || !isLoading)) {
     return (
       <div className="space-y-6 animate-fade-in">
-        <div className="flex items-center gap-4">
-          <Link to={isMobile ? "/mobile/manifiestos" : "/manifiestos"}>
-            <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />}>Volver</Button>
-          </Link>
-        </div>
+        <Link to="/manifiestos">
+          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />}>Volver</Button>
+        </Link>
         <Card>
           <CardContent className="py-16 text-center">
             <AlertCircle size={48} className="mx-auto text-warning-400 mb-4" />
@@ -327,31 +333,25 @@ const ManifiestoDetailPage: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <Link to={isMobile ? "/mobile/manifiestos" : "/manifiestos"} className="shrink-0">
-            <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />}>
-              Volver
-            </Button>
-          </Link>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 min-w-0">
-              <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 truncate">{m.numero || id}</h2>
-              <Badge variant="soft" color={getEstadoBadgeColor(m.estado || EstadoManifiesto.BORRADOR)} className="shrink-0">
-                {formatEstado(m.estado || EstadoManifiesto.BORRADOR)}
-              </Badge>
-              {isError && (
-                <Badge variant="soft" color="warning" className="shrink-0">
-                  <AlertCircle size={12} className="mr-1" />
-                  Error al cargar
-                </Badge>
-              )}
-            </div>
-            <p className="text-neutral-600 mt-1 text-sm sm:text-base">
-              Creado el {m.createdAt ? formatDateTime(m.createdAt) : '-'}
-            </p>
-          </div>
+      <div className="space-y-2">
+        <Link to="/manifiestos">
+          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />}>Volver</Button>
+        </Link>
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
+          <h2 className="text-lg sm:text-2xl font-bold text-neutral-900 truncate">{m.numero || id}</h2>
+          <Badge variant="soft" color={getEstadoBadgeColor(m.estado || EstadoManifiesto.BORRADOR)} className="shrink-0">
+            {formatEstado(m.estado || EstadoManifiesto.BORRADOR)}
+          </Badge>
+          {isError && (
+            <Badge variant="soft" color="warning" className="shrink-0">
+              <AlertCircle size={12} className="mr-1" />
+              Error al cargar
+            </Badge>
+          )}
         </div>
+        <p className="text-neutral-600 text-sm sm:text-base">
+          Creado el {m.createdAt ? formatDateTime(m.createdAt) : '-'}
+        </p>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" leftIcon={<Download size={16} />} onClick={handleDescargarPDF}>
             Descargar PDF
@@ -362,7 +362,7 @@ const ManifiestoDetailPage: React.FC = () => {
             </Button>
           )}
           {m.estado === EstadoManifiesto.BORRADOR && (isAdmin || userRol === 'GENERADOR') && (
-            <Button size="sm" onClick={() => navigate(isMobile ? `/mobile/manifiestos/${id}/editar` : `/manifiestos/${id}/editar`)}>
+            <Button size="sm" onClick={() => navigate(`/manifiestos/${id}/editar`)}>
               Editar
             </Button>
           )}
@@ -380,7 +380,7 @@ const ManifiestoDetailPage: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div
                   className={`flex items-start gap-3 p-2 -m-2 rounded-lg transition-colors ${isAdmin ? 'cursor-pointer hover:bg-purple-50/50 group' : ''}`}
-                  onClick={() => isAdmin && m.generadorId && navigate(`${isMobile ? '/mobile' : ''}/admin/actores/generadores/${m.generadorId}`)}
+                  onClick={() => isAdmin && m.generadorId && navigate(`/admin/actores/generadores/${m.generadorId}`)}
                 >
                   <div className="p-2 bg-purple-50 rounded-lg text-purple-600">
                     <User size={20} />
@@ -392,23 +392,36 @@ const ManifiestoDetailPage: React.FC = () => {
                   </div>
                   {isAdmin && m.generadorId && <ExternalLink size={12} className="text-neutral-300 group-hover:text-purple-400 mt-1 shrink-0" />}
                 </div>
-                <div
-                  className={`flex items-start gap-3 p-2 -m-2 rounded-lg transition-colors ${isAdmin ? 'cursor-pointer hover:bg-orange-50/50 group' : ''}`}
-                  onClick={() => isAdmin && m.transportistaId && navigate(`${isMobile ? '/mobile' : ''}/admin/actores/transportistas/${m.transportistaId}`)}
-                >
-                  <div className="p-2 bg-orange-50 rounded-lg text-orange-600">
-                    <Truck size={20} />
+                {m.transportistaId ? (
+                  <div
+                    className={`flex items-start gap-3 p-2 -m-2 rounded-lg transition-colors ${isAdmin ? 'cursor-pointer hover:bg-orange-50/50 group' : ''}`}
+                    onClick={() => isAdmin && m.transportistaId && navigate(`/admin/actores/transportistas/${m.transportistaId}`)}
+                  >
+                    <div className="p-2 bg-orange-50 rounded-lg text-orange-600">
+                      <Truck size={20} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-neutral-500">Transportista</p>
+                      <p className={`font-medium text-neutral-900 ${isAdmin ? 'group-hover:text-orange-700' : ''}`}>{m.transportista?.razonSocial || '-'}</p>
+                      <p className="text-sm text-neutral-600">Hab: {m.transportista?.numeroHabilitacion || '-'}</p>
+                    </div>
+                    {isAdmin && m.transportistaId && <ExternalLink size={12} className="text-neutral-300 group-hover:text-orange-400 mt-1 shrink-0" />}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-neutral-500">Transportista</p>
-                    <p className={`font-medium text-neutral-900 ${isAdmin ? 'group-hover:text-orange-700' : ''}`}>{m.transportista?.razonSocial || '-'}</p>
-                    <p className="text-sm text-neutral-600">Hab: {m.transportista?.numeroHabilitacion || '-'}</p>
+                ) : (
+                  <div className="flex items-start gap-3 p-2 -m-2 rounded-lg">
+                    <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
+                      <MapPin size={20} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-neutral-500">Modalidad</p>
+                      <Badge variant="soft" color="success">In Situ</Badge>
+                      <p className="text-xs text-neutral-500 mt-1">Operador trabaja en sitio del generador</p>
+                    </div>
                   </div>
-                  {isAdmin && m.transportistaId && <ExternalLink size={12} className="text-neutral-300 group-hover:text-orange-400 mt-1 shrink-0" />}
-                </div>
+                )}
                 <div
                   className={`flex items-start gap-3 p-2 -m-2 rounded-lg transition-colors ${isAdmin ? 'cursor-pointer hover:bg-blue-50/50 group' : ''}`}
-                  onClick={() => isAdmin && m.operadorId && navigate(`${isMobile ? '/mobile' : ''}/admin/actores/operadores/${m.operadorId}`)}
+                  onClick={() => isAdmin && m.operadorId && navigate(`/admin/actores/operadores/${m.operadorId}`)}
                 >
                   <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
                     <FlaskConical size={20} />
@@ -678,14 +691,17 @@ const ManifiestoDetailPage: React.FC = () => {
             isAdmin={isAdmin}
             userRol={userRol}
             isActionPending={isActionPending}
+            isInSitu={!m.transportistaId}
             mutations={{
               firmar, confirmarRetiro, confirmarEntrega, confirmarRecepcion,
+              confirmarRecepcionInSitu,
               pesaje, registrarTratamiento, cerrar, rechazar, registrarIncidente, revertir,
             }}
             onFirmar={handleFirmar}
             onConfirmarRetiro={handleConfirmarRetiro}
             onConfirmarEntrega={handleConfirmarEntrega}
             onConfirmarRecepcion={handleConfirmarRecepcion}
+            onConfirmarRecepcionInSitu={handleConfirmarRecepcionInSitu}
             onPesaje={handlePesaje}
             onTratamiento={handleTratamiento}
             onCerrar={handleCerrar}

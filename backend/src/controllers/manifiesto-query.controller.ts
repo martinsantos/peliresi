@@ -171,13 +171,16 @@ export const getDashboardStats = async (req: AuthRequest, res: Response, next: N
     }
 
     // Contar manifiestos por estado
-    const [borradores, aprobados, enTransito, entregados, recibidos, tratados, total] = await Promise.all([
+    const [borradores, aprobados, enTransito, entregados, recibidos, enTratamiento, tratados, rechazados, cancelados, total] = await Promise.all([
       prisma.manifiesto.count({ where: { ...where, estado: 'BORRADOR' } }),
       prisma.manifiesto.count({ where: { ...where, estado: 'APROBADO' } }),
       prisma.manifiesto.count({ where: { ...where, estado: 'EN_TRANSITO' } }),
       prisma.manifiesto.count({ where: { ...where, estado: 'ENTREGADO' } }),
       prisma.manifiesto.count({ where: { ...where, estado: 'RECIBIDO' } }),
+      prisma.manifiesto.count({ where: { ...where, estado: 'EN_TRATAMIENTO' } }),
       prisma.manifiesto.count({ where: { ...where, estado: 'TRATADO' } }),
+      prisma.manifiesto.count({ where: { ...where, estado: 'RECHAZADO' } }),
+      prisma.manifiesto.count({ where: { ...where, estado: 'CANCELADO' } }),
       prisma.manifiesto.count({ where })
     ]);
 
@@ -216,7 +219,10 @@ export const getDashboardStats = async (req: AuthRequest, res: Response, next: N
           enTransito,
           entregados,
           recibidos,
+          enTratamiento,
           tratados,
+          rechazados,
+          cancelados,
           total
         },
         recientes,

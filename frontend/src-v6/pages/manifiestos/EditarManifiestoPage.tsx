@@ -33,7 +33,7 @@ export const EditarManifiestoPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isAdmin, isGenerador } = useAuth();
-  const isMobile = window.location.pathname.includes('/mobile') || window.location.pathname.includes('/app');
+  // Removed isMobile — React Router handles basename
 
   // Load existing manifiesto
   const { data: manifiesto, isLoading: loadingManifiesto } = useManifiesto(id!);
@@ -157,7 +157,7 @@ export const EditarManifiestoPage: React.FC = () => {
       });
 
       toast.success('Manifiesto actualizado', 'Los cambios fueron guardados exitosamente');
-      navigate(isMobile ? `/mobile/manifiestos/${id}` : `/manifiestos/${id}`);
+      navigate(`/manifiestos/${id}`);
     } catch (err: any) {
       toast.error(
         'Error al actualizar manifiesto',
@@ -201,7 +201,7 @@ export const EditarManifiestoPage: React.FC = () => {
                 Este manifiesto tiene estado <span className="font-semibold">{manifiesto.estado}</span> y solo
                 se pueden editar manifiestos en estado <span className="font-semibold">BORRADOR</span>.
               </p>
-              <Button fullWidth onClick={() => navigate(isMobile ? `/mobile/manifiestos/${id}` : `/manifiestos/${id}`)}>
+              <Button fullWidth onClick={() => navigate(`/manifiestos/${id}`)}>
                 Volver al Manifiesto
               </Button>
             </CardContent>
@@ -234,7 +234,7 @@ export const EditarManifiestoPage: React.FC = () => {
               <p className="text-neutral-600 mb-6">
                 Solo los perfiles <span className="font-semibold">GENERADOR</span> y <span className="font-semibold">ADMIN</span> pueden editar manifiestos.
               </p>
-              <Button fullWidth onClick={() => navigate(isMobile ? '/mobile/manifiestos' : '/manifiestos')}>
+              <Button fullWidth onClick={() => navigate('/manifiestos')}>
                 Volver a Manifiestos
               </Button>
             </CardContent>
@@ -253,7 +253,7 @@ export const EditarManifiestoPage: React.FC = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate(isMobile ? `/mobile/manifiestos/${id}` : `/manifiestos/${id}`)}
+              onClick={() => navigate(`/manifiestos/${id}`)}
             >
               <ArrowLeft size={20} />
             </Button>

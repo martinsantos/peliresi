@@ -42,6 +42,7 @@ interface SelectProps {
   searchable?: boolean;
   clearable?: boolean;
   isFullWidth?: boolean;
+  renderOption?: (option: SelectOption, isSelected: boolean) => React.ReactNode;
 }
 
 // ========================================
@@ -69,6 +70,7 @@ export const Select: React.FC<SelectProps> = ({
   searchable = false,
   clearable = false,
   isFullWidth = true,
+  renderOption,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -230,8 +232,12 @@ export const Select: React.FC<SelectProps> = ({
                 value === option.value && 'bg-primary-50 text-primary-600 font-medium'
               )}
             >
-              <span className="truncate">{option.label}</span>
-              {value === option.value && (
+              {renderOption ? (
+                <span className="flex-1 min-w-0">{renderOption(option, value === option.value)}</span>
+              ) : (
+                <span className="truncate">{option.label}</span>
+              )}
+              {value === option.value && !renderOption && (
                 <Check size={16} className="text-primary-500 flex-shrink-0 ml-2" />
               )}
             </button>

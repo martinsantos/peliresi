@@ -69,6 +69,9 @@ tbody tr:nth-child(even){background:color-mix(in srgb,var(--bg) 50%,var(--surfac
 .role-card-transportista{border-left-color:var(--transportista);}
 .role-card-operador{border-left-color:var(--operador);}
 .role-card-sistema{border-left-color:var(--sistema);}
+.callout{border-radius:8px;padding:1rem 1.25rem;margin:1rem 0;font-size:0.9rem;line-height:1.5;}
+.callout-info{background:#EFF6FF;border-left:4px solid #3B82F6;color:#1E40AF;}
+.callout-warning{background:#FEF3C7;border-left:4px solid #F59E0B;color:#92400E;}
 .workflow-diagram{display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;margin:1.5rem 0;}
 .workflow-state{padding:0.5rem 1rem;border-radius:8px;font-weight:600;font-size:0.85rem;white-space:nowrap;}
 .ws-borrador{background:#F3F4F6;color:#374151;}
@@ -349,6 +352,8 @@ footer.site-footer strong{color:var(--primary-dark);}
   td { border-bottom-color: var(--border); }
   code { background: #334155; color: #e2e8f0; }
   .info-card { background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+  .callout-info { background: #1e3a5f; color: #93c5fd; border-left-color: #2563eb; }
+  .callout-warning { background: #422006; color: #fde68a; border-left-color: #d97706; }
   .summary-card { background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
   .collapsible-header { background: var(--surface); }
   .screenshot-card { background: var(--surface); }

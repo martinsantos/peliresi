@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Calendar, CheckCircle } from 'lucide-react';
+import { Route, CheckCircle } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
 import { formatDateTime, formatEstado } from '../../../utils/formatters';
 import type { Manifiesto, EventoManifiesto } from '../../../types/models';
@@ -54,7 +54,7 @@ const ManifiestoTimeline: React.FC<ManifiestoTimelineProps> = ({ manifiesto }) =
 
   return (
     <Card>
-      <CardHeader title="Historial de estados" icon={<Calendar size={20} />} />
+      <CardHeader title="Trazabilidad" icon={<Route size={20} />} />
       <CardContent>
         {timeline.length === 0 ? (
           <div className="py-8 text-center text-neutral-500">No hay eventos registrados para este manifiesto</div>

@@ -131,7 +131,7 @@ export const Modal: React.FC<ModalProps> = ({
       <div
         ref={modalRef}
         className={cn(
-          'relative w-full bg-white rounded-2xl shadow-4 z-10',
+          'relative w-full bg-white rounded-2xl shadow-4 z-10 max-h-[90vh] flex flex-col',
           'animate-scale-in',
           sizeStyles[size]
         )}
@@ -164,7 +164,7 @@ export const Modal: React.FC<ModalProps> = ({
         )}
 
         {/* Content */}
-        <div className={cn('p-6', !title && !showCloseButton && 'pt-6')}>
+        <div className={cn('p-6 overflow-y-auto flex-1', !title && !showCloseButton && 'pt-6')}>
           {children}
         </div>
 

@@ -29,6 +29,7 @@ const updateUsuarioSchema = z.object({
   telefono: z.string().optional(),
   cuit: z.string().optional(),
   activo: z.boolean().optional(),
+  esInspector: z.boolean().optional(),
   emailVerified: z.boolean().optional(),
   rol: z.enum(['ADMIN', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR']).optional(),
 });
@@ -71,6 +72,7 @@ export const getUsuarios = async (req: AuthRequest, res: Response, next: NextFun
           empresa: true,
           telefono: true,
           activo: true,
+          esInspector: true,
           emailVerified: true,
           notifNuevoRegistro: true,
           createdAt: true,
@@ -115,6 +117,7 @@ export const getUsuarioById = async (req: AuthRequest, res: Response, next: Next
         empresa: true,
         telefono: true,
         activo: true,
+        esInspector: true,
         createdAt: true,
         generador: true,
         transportista: true,

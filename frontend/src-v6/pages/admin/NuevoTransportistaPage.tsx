@@ -54,7 +54,6 @@ const NuevoTransportistaPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const isMobile = location.pathname.startsWith('/mobile');
   const isEdit = !!id;
 
   const { data: existing } = useTransportista(isEdit ? id! : '');
@@ -171,7 +170,7 @@ const NuevoTransportistaPage: React.FC = () => {
         await createMutation.mutateAsync(payload);
         toast.success('Creado', `Transportista ${form.razonSocial} creado. Password inicial: ${payload.password}`);
       }
-      const backPath = isMobile ? '/mobile/actores/transportistas' : '/admin/actores/transportistas';
+      const backPath = '/admin/actores/transportistas';
       navigate(backPath);
     } catch (err: any) {
       toast.error('Error', err?.response?.data?.message || 'No se pudo guardar');
@@ -179,7 +178,7 @@ const NuevoTransportistaPage: React.FC = () => {
   };
 
   const isPending = createMutation.isPending || updateMutation.isPending;
-  const backPath = isMobile ? '/mobile/actores/transportistas' : '/admin/actores/transportistas';
+  const backPath = '/admin/actores/transportistas';
 
   return (
     <div className="space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto">

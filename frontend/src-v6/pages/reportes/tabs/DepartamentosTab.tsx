@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   MapPin, Truck, Factory, Package, Calendar, Filter, ChevronRight,
@@ -157,8 +158,8 @@ export function DepartamentoDetalleModal({
     window.print();
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 pb-8 overflow-y-auto">
+  return createPortal(
+    <div className="fixed inset-0 z-[60] flex items-start justify-center pt-20 pb-8 overflow-y-auto">
       {/* Backdrop */}
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
@@ -303,7 +304,8 @@ export function DepartamentoDetalleModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

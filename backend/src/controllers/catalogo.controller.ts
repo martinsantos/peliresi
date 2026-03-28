@@ -11,7 +11,7 @@ const generadoresTopRubros = require(path.join(DATA_DIR, 'generadores-top-rubros
 const operadoresEnrichment = require(path.join(DATA_DIR, 'operadores-enrichment.json'));
 const operadoresPorCorriente = require(path.join(DATA_DIR, 'operadores-por-corriente.json'));
 
-// Obtener tipos de residuos
+// Obtener tipos de residuos (with manifest + operador counts)
 export const getTiposResiduos = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { categoria, activo } = req.query;
@@ -20,14 +20,35 @@ export const getTiposResiduos = async (req: Request, res: Response, next: NextFu
         if (categoria) where.categoria = categoria;
         if (activo !== undefined) where.activo = activo === 'true';
 
-        const tiposResiduos = await prisma.tipoResiduo.findMany({
-            where,
-            orderBy: { codigo: 'asc' }
-        });
+        const [tiposResiduos, manifiestosCounts, operadoresCounts] = await Promise.all([
+            prisma.tipoResiduo.findMany({
+                where,
+                orderBy: { codigo: 'asc' }
+            }),
+            prisma.manifiestoResiduo.groupBy({
+                by: ['tipoResiduoId'],
+                _count: { id: true },
+            }),
+            prisma.tratamientoAutorizado.groupBy({
+                by: ['tipoResiduoId'],
+                where: { activo: true },
+                _count: { operadorId: true },
+            }),
+        ]);
+
+        const manifestosMap: Record<string, number> = {};
+        for (const mc of manifiestosCounts) {
+            manifestosMap[mc.tipoResiduoId] = mc._count.id;
+        }
+
+        const operadoresMap: Record<string, number> = {};
+        for (const oc of operadoresCounts) {
+            operadoresMap[oc.tipoResiduoId] = oc._count.operadorId;
+        }
 
         res.json({
             success: true,
-            data: { tiposResiduos }
+            data: { tiposResiduos, manifiestosPorResiduo: manifestosMap, operadoresPorResiduo: operadoresMap }
         });
     } catch (error) {
         next(error);
@@ -101,12 +122,20 @@ export const getTransportistas = async (req: Request, res: Response, next: NextF
 // Obtener operadores
 export const getOperadores = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const { activo, tipoResiduoId } = req.query;
+        const { activo, tipoResiduoId, tipoResiduoIds } = req.query;
 
         const where: any = {};
         if (activo !== undefined) where.activo = activo === 'true';
         // Push tipoResiduoId filter to DB instead of filtering in JS (avoids loading all operadores)
-        if (tipoResiduoId) {
+        if (tipoResiduoIds) {
+            // Multiple residuo filter: operador must have active tratamiento for EVERY specified residuo
+            const ids = (tipoResiduoIds as string).split(',').filter(Boolean);
+            if (ids.length > 0) {
+                where.AND = ids.map(id => ({
+                    tratamientos: { some: { tipoResiduoId: id, activo: true } }
+                }));
+            }
+        } else if (tipoResiduoId) {
             where.tratamientos = { some: { tipoResiduoId: tipoResiduoId as string } };
         }
 
@@ -393,15 +422,34 @@ export const deleteTratamiento = async (req: AuthRequest, res: Response, next: N
 // Listar todos los tratamientos autorizados (ADMIN)
 export const getAllTratamientos = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const tratamientos = await prisma.tratamientoAutorizado.findMany({
-            include: {
-                tipoResiduo: true,
-                operador: { select: { id: true, razonSocial: true, cuit: true } }
-            },
-            orderBy: { createdAt: 'desc' }
-        });
+        const [tratamientos, manifiestosCounts] = await Promise.all([
+            prisma.tratamientoAutorizado.findMany({
+                include: {
+                    tipoResiduo: true,
+                    operador: { select: { id: true, razonSocial: true, cuit: true } }
+                },
+                orderBy: { createdAt: 'desc' }
+            }),
+            prisma.manifiesto.groupBy({
+                by: ['operadorId'],
+                where: { estado: { in: ['EN_TRATAMIENTO', 'TRATADO'] } },
+                _count: { id: true },
+            }),
+        ]);
 
-        res.json({ success: true, data: { tratamientos } });
+        // Build operadorId -> manifiestos count map
+        const countsByOperador: Record<string, number> = {};
+        for (const row of manifiestosCounts) {
+            countsByOperador[row.operadorId] = row._count.id;
+        }
+
+        res.json({
+            success: true,
+            data: {
+                tratamientos,
+                manifiestosPorOperador: countsByOperador,
+            },
+        });
     } catch (error) {
         next(error);
     }

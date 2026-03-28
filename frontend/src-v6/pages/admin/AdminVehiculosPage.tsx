@@ -83,7 +83,6 @@ export const AdminVehiculosPage: React.FC = () => {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const isMobile = location.pathname.startsWith('/mobile');
   const { currentUser, isTransportista } = useAuth();
 
   const { data: transportistasData, isLoading, isError, error } = useTransportistas({ limit: 100, search: searchQuery || undefined });
@@ -305,7 +304,7 @@ export const AdminVehiculosPage: React.FC = () => {
     {
       key: 'detalles',
       width: '20%',
-      hiddenBelow: 'md' as const,
+      hiddenBelow: 'lg' as const,
       header: 'Detalles',
       render: (row: VehiculoDisplay) => (
         <div className="text-sm min-w-0">
@@ -318,7 +317,7 @@ export const AdminVehiculosPage: React.FC = () => {
       key: 'transportista',
       width: '20%',
       sortable: true,
-      hiddenBelow: 'md' as const,
+      hiddenBelow: 'lg' as const,
       header: 'Transportista',
       render: (row: VehiculoDisplay) => (
         <span className="text-sm text-neutral-700 truncate block">{row.transportista}</span>
@@ -328,6 +327,7 @@ export const AdminVehiculosPage: React.FC = () => {
       key: 'vtv',
       width: '15%',
       sortable: true,
+      hiddenBelow: 'xl' as const,
       header: 'Vencimiento',
       render: (row: VehiculoDisplay) => {
         if (!row.vencimiento) {
@@ -385,7 +385,7 @@ export const AdminVehiculosPage: React.FC = () => {
         <div className="flex items-center justify-end gap-1">
           <button
             className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-            onClick={(e) => { e.stopPropagation(); navigate(isMobile ? '/mobile/admin/actores/transportistas/' + row.transportistaId : '/admin/actores/transportistas/' + row.transportistaId); }}
+            onClick={(e) => { e.stopPropagation(); navigate('/admin/actores/transportistas/' + row.transportistaId); }}
             title="Ver transportista"
           >
             <Eye size={16} />
@@ -514,7 +514,7 @@ export const AdminVehiculosPage: React.FC = () => {
         <div className="flex items-center justify-end gap-1">
           <button
             className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-            onClick={(e) => { e.stopPropagation(); navigate(isMobile ? '/mobile/admin/actores/transportistas/' + row.transportistaId : '/admin/actores/transportistas/' + row.transportistaId); }}
+            onClick={(e) => { e.stopPropagation(); navigate('/admin/actores/transportistas/' + row.transportistaId); }}
             title="Ver transportista"
           >
             <Eye size={16} />
@@ -630,7 +630,92 @@ export const AdminVehiculosPage: React.FC = () => {
         </TabList>
 
         <TabPanel id="vehiculos">
-          <Card>
+          {/* Mobile Search */}
+          <div className="md:hidden mb-3">
+            <SearchInput
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Buscar por patente, transportista o marca..."
+            />
+          </div>
+
+          {/* Mobile Card View */}
+          {!isLoading && !isError && paginatedData.length > 0 && (
+            <div className="md:hidden space-y-2">
+              {paginatedData.map((v) => {
+                const estadoConfig: Record<string, { label: string; color: string }> = {
+                  disponible: { label: 'Disponible', color: 'success' },
+                  en_viaje: { label: 'En Viaje', color: 'info' },
+                  mantenimiento: { label: 'Mantenimiento', color: 'warning' },
+                  inactivo: { label: 'Inactivo', color: 'neutral' },
+                };
+                const config = estadoConfig[v.estado] || estadoConfig.inactivo;
+                return (
+                  <Card
+                    key={v.id}
+                    className="active:scale-[0.98] transition-transform cursor-pointer"
+                    onClick={() => navigate(`/admin/actores/transportistas/${v.transportistaId}`)}
+                  >
+                    <div className="p-3">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-8 h-8 bg-primary-50 rounded-lg flex items-center justify-center shrink-0">
+                            <Truck size={16} className="text-primary-600" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-bold text-sm text-neutral-900">{v.patente}</p>
+                            <p className="text-xs text-neutral-500 truncate">{v.marca} {v.modelo}</p>
+                          </div>
+                        </div>
+                        <Badge variant="soft" color={config.color}>{config.label}</Badge>
+                      </div>
+                      <div className="flex items-center justify-between mt-2 pl-10">
+                        <span className="text-xs text-neutral-500 truncate">{v.transportista}</span>
+                        <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                          <button
+                            className="p-1.5 text-neutral-400 hover:text-info-600 hover:bg-info-50 rounded-lg transition-colors"
+                            onClick={() => {
+                              setEditingVehiculo(v);
+                              setVehiculoForm({
+                                patente: v.patente,
+                                marca: v.marca,
+                                modelo: v.modelo,
+                                anio: String(v.anio || ''),
+                                capacidad: v.capacidad.replace(/[^\d]/g, ''),
+                                numeroHabilitacion: v.habilitacion || '',
+                                vencimiento: v.vencimiento ? new Date(v.vencimiento).toISOString().split('T')[0] : '',
+                                activo: v.activo,
+                              });
+                            }}
+                            title="Editar"
+                          >
+                            <Edit size={14} />
+                          </button>
+                          <button
+                            className="p-1.5 text-neutral-400 hover:text-error-600 hover:bg-error-50 rounded-lg transition-colors"
+                            onClick={() => setDeletingVehiculo({ id: v.id, transportistaId: v.transportistaId, patente: v.patente })}
+                            title="Eliminar"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalFilteredPages}
+                totalItems={filteredData.length}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentPage}
+              />
+            </div>
+          )}
+
+          {/* Desktop Table */}
+          <Card className="hidden md:block">
             <CardContent className="p-4">
               <div className="mb-4">
                 <SearchInput
@@ -656,7 +741,7 @@ export const AdminVehiculosPage: React.FC = () => {
                     keyExtractor={(row) => row.id}
                     sortable={true}
                     onSort={(key, dir) => setSortConfig({ key, direction: dir })}
-                    onRowClick={(row) => navigate(isMobile ? `/mobile/admin/actores/transportistas/${row.transportistaId}` : `/admin/actores/transportistas/${row.transportistaId}`)}
+                    onRowClick={(row) => navigate(`/admin/actores/transportistas/${row.transportistaId}`)}
                     stickyHeader
                     fixedLayout
                   />
@@ -674,7 +759,84 @@ export const AdminVehiculosPage: React.FC = () => {
         </TabPanel>
 
         <TabPanel id="choferes">
-          <Card>
+          {/* Mobile Search */}
+          <div className="md:hidden mb-3">
+            <SearchInput
+              value={choferSearch}
+              onChange={(v) => { setChoferSearch(v); setChoferPage(1); }}
+              placeholder="Buscar por nombre, DNI, licencia o transportista..."
+            />
+          </div>
+
+          {/* Mobile Card View */}
+          {!isLoading && !isError && paginatedChoferes.length > 0 && (
+            <div className="md:hidden space-y-2">
+              {paginatedChoferes.map((c) => (
+                <Card
+                  key={c.id}
+                  className="active:scale-[0.98] transition-transform cursor-pointer"
+                  onClick={() => navigate(`/admin/actores/transportistas/${c.transportistaId}`)}
+                >
+                  <div className="p-3">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-8 h-8 bg-info-50 rounded-lg flex items-center justify-center shrink-0">
+                          <User size={16} className="text-info-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm text-neutral-900 truncate">{c.nombre} {c.apellido}</p>
+                          <p className="text-xs text-neutral-500">DNI {c.dni}</p>
+                        </div>
+                      </div>
+                      <Badge variant="soft" color={c.activo ? 'success' : 'neutral'}>
+                        {c.activo ? 'Activo' : 'Inactivo'}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between mt-2 pl-10">
+                      <span className="text-xs text-neutral-500 truncate">{c.transportista}</span>
+                      <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                        <button
+                          className="p-1.5 text-neutral-400 hover:text-info-600 hover:bg-info-50 rounded-lg transition-colors"
+                          onClick={() => {
+                            setEditingChofer(c);
+                            setChoferForm({
+                              nombre: c.nombre,
+                              apellido: c.apellido,
+                              dni: c.dni,
+                              licencia: c.licencia,
+                              vencimiento: c.vencimiento ? new Date(c.vencimiento).toISOString().split('T')[0] : '',
+                              telefono: c.telefono,
+                              activo: c.activo,
+                            });
+                          }}
+                          title="Editar"
+                        >
+                          <Edit size={14} />
+                        </button>
+                        <button
+                          className="p-1.5 text-neutral-400 hover:text-error-600 hover:bg-error-50 rounded-lg transition-colors"
+                          onClick={() => setDeletingChofer({ id: c.id, transportistaId: c.transportistaId, nombre: `${c.nombre} ${c.apellido}` })}
+                          title="Eliminar"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+              <Pagination
+                currentPage={choferPage}
+                totalPages={totalChoferPages}
+                totalItems={filteredChoferes.length}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setChoferPage}
+              />
+            </div>
+          )}
+
+          {/* Desktop Table */}
+          <Card className="hidden md:block">
             <CardContent className="p-4">
               <div className="mb-4">
                 <SearchInput
@@ -700,7 +862,7 @@ export const AdminVehiculosPage: React.FC = () => {
                     keyExtractor={(row) => row.id}
                     sortable={true}
                     onSort={(key, dir) => setChoferSortConfig({ key, direction: dir })}
-                    onRowClick={(row) => navigate(isMobile ? `/mobile/admin/actores/transportistas/${row.transportistaId}` : `/admin/actores/transportistas/${row.transportistaId}`)}
+                    onRowClick={(row) => navigate(`/admin/actores/transportistas/${row.transportistaId}`)}
                     stickyHeader
                     fixedLayout
                   />

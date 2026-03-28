@@ -54,7 +54,7 @@ const TransportistaDetallePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const isMobile = location.pathname.startsWith('/mobile');
+  // Removed isMobile — React Router handles basename
   const { isAdmin } = useAuth();
 
   const [showVehiculoModal, setShowVehiculoModal] = useState(false);
@@ -145,9 +145,7 @@ const TransportistaDetallePage: React.FC = () => {
     return choferSort.direction === 'asc' ? <ChevronUp size={12} className="ml-1 text-primary-600 inline" /> : <ChevronDown size={12} className="ml-1 text-primary-600 inline" />;
   };
 
-  const backPath = isMobile
-    ? '/mobile/actores/transportistas'
-    : '/admin/actores/transportistas';
+  const backPath = '/admin/actores/transportistas';
 
   const openCreateVehiculo = () => {
     setEditingVehiculo(null);
@@ -326,31 +324,30 @@ const TransportistaDetallePage: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>
-            Volver
-          </Button>
-          <div className="flex items-center gap-3">
-            <div className="w-14 h-14 bg-secondary-100 rounded-xl flex items-center justify-center">
-              <Truck size={28} className="text-secondary-600" />
+      <div className="space-y-2">
+        <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>
+          Volver
+        </Button>
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 bg-secondary-100 rounded-xl flex items-center justify-center shrink-0">
+            <Truck size={24} className="text-secondary-600 sm:hidden" />
+            <Truck size={28} className="text-secondary-600 hidden sm:block" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <h2 className="text-lg sm:text-2xl font-bold text-neutral-900 truncate">{transportista.nombre}</h2>
+              <Badge variant="soft" color={transportista.estado === 'ACTIVO' ? 'success' : 'error'} className="shrink-0">
+                {transportista.estado === 'ACTIVO' ? <CheckCircle2 size={12} className="mr-1" /> : <AlertCircle size={12} className="mr-1" />}
+                {transportista.estado === 'ACTIVO' ? 'Activo' : 'Suspendido'}
+              </Badge>
+              {vtoStatus === 'vencida' && (
+                <Badge variant="soft" color="error" className="shrink-0"><AlertTriangle size={12} className="mr-1" />Hab. VENCIDA</Badge>
+              )}
+              {vtoStatus === 'pronto' && (
+                <Badge variant="soft" color="warning" className="shrink-0"><AlertTriangle size={12} className="mr-1" />Vence en {diasVtoHab}d</Badge>
+              )}
             </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-2xl font-bold text-neutral-900">{transportista.nombre}</h2>
-                <Badge variant="soft" color={transportista.estado === 'ACTIVO' ? 'success' : 'error'}>
-                  {transportista.estado === 'ACTIVO' ? <CheckCircle2 size={12} className="mr-1" /> : <AlertCircle size={12} className="mr-1" />}
-                  {transportista.estado === 'ACTIVO' ? 'Activo' : 'Suspendido'}
-                </Badge>
-                {vtoStatus === 'vencida' && (
-                  <Badge variant="soft" color="error"><AlertTriangle size={12} className="mr-1" />Habilitación VENCIDA</Badge>
-                )}
-                {vtoStatus === 'pronto' && (
-                  <Badge variant="soft" color="warning"><AlertTriangle size={12} className="mr-1" />Vence en {diasVtoHab} días</Badge>
-                )}
-              </div>
-              <span className="text-neutral-600 font-mono text-sm">CUIT: {transportista.cuit}</span>
-            </div>
+            <span className="text-neutral-600 font-mono text-sm">CUIT: {transportista.cuit}</span>
           </div>
         </div>
       </div>
@@ -579,10 +576,10 @@ const TransportistaDetallePage: React.FC = () => {
                       <tr>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase cursor-pointer select-none hover:text-primary-600" style={{ width: '15%' }} onClick={() => toggleFlotaSort('patente')}>Patente{flotaSortIcon('patente')}</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Marca / Modelo</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '12%' }}>Capacidad</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden lg:table-cell" style={{ width: '12%' }}>Capacidad</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase cursor-pointer select-none hover:text-primary-600" style={{ width: '10%' }} onClick={() => toggleFlotaSort('estado')}>Estado{flotaSortIcon('estado')}</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '13%' }}>Habilitación</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell cursor-pointer select-none hover:text-primary-600" style={{ width: '12%' }} onClick={() => toggleFlotaSort('vencimiento')}>Vencimiento{flotaSortIcon('vencimiento')}</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden lg:table-cell" style={{ width: '13%' }}>Habilitación</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden lg:table-cell cursor-pointer select-none hover:text-primary-600" style={{ width: '12%' }} onClick={() => toggleFlotaSort('vencimiento')}>Vencimiento{flotaSortIcon('vencimiento')}</th>
                         {isAdmin && <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase" style={{ width: '18%' }}>Acciones</th>}
                       </tr>
                     </thead>
@@ -591,14 +588,14 @@ const TransportistaDetallePage: React.FC = () => {
                         <tr key={v.patente || v.id} className="hover:bg-neutral-50 transition-colors">
                           <td className="px-3 py-2.5 font-mono font-semibold text-neutral-900">{v.patente}</td>
                           <td className="px-3 py-2.5 text-neutral-700">{v.marca} {v.modelo}</td>
-                          <td className="px-3 py-2.5 text-neutral-700 hidden md:table-cell">{typeof v.capacidad === 'number' ? `${v.capacidad.toLocaleString()} kg` : v.capacidad || '-'}</td>
+                          <td className="px-3 py-2.5 text-neutral-700 hidden lg:table-cell">{typeof v.capacidad === 'number' ? `${v.capacidad.toLocaleString()} kg` : v.capacidad || '-'}</td>
                           <td className="px-3 py-2.5">
                             <Badge variant="soft" color={v.activo !== false ? 'success' : 'warning'}>
                               {v.activo !== false ? 'Activo' : 'Inactivo'}
                             </Badge>
                           </td>
-                          <td className="px-3 py-2.5 text-neutral-600 hidden md:table-cell">{v.numeroHabilitacion || '-'}</td>
-                          <td className="px-3 py-2.5 text-neutral-600 hidden md:table-cell">{v.vencimiento ? new Date(v.vencimiento).toLocaleDateString('es-AR') : '-'}</td>
+                          <td className="px-3 py-2.5 text-neutral-600 hidden lg:table-cell">{v.numeroHabilitacion || '-'}</td>
+                          <td className="px-3 py-2.5 text-neutral-600 hidden lg:table-cell">{v.vencimiento ? new Date(v.vencimiento).toLocaleDateString('es-AR') : '-'}</td>
                           {isAdmin && (
                             <td className="px-3 py-2.5">
                               <div className="flex items-center justify-end gap-2">
@@ -650,8 +647,8 @@ const TransportistaDetallePage: React.FC = () => {
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase cursor-pointer select-none hover:text-primary-600" style={{ width: '22%' }} onClick={() => toggleChoferSort('nombre')}>Nombre{choferSortIcon('nombre')}</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '15%' }}>DNI</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '15%' }}>Licencia</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '14%' }}>Teléfono</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell cursor-pointer select-none hover:text-primary-600" style={{ width: '16%' }} onClick={() => toggleChoferSort('vencimiento')}>Vto. Licencia{choferSortIcon('vencimiento')}</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden lg:table-cell" style={{ width: '14%' }}>Teléfono</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden lg:table-cell cursor-pointer select-none hover:text-primary-600" style={{ width: '16%' }} onClick={() => toggleChoferSort('vencimiento')}>Vto. Licencia{choferSortIcon('vencimiento')}</th>
                         {isAdmin && <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase" style={{ width: '18%' }}>Acciones</th>}
                       </tr>
                     </thead>
@@ -661,8 +658,8 @@ const TransportistaDetallePage: React.FC = () => {
                           <td className="px-3 py-2.5 font-medium text-neutral-900">{c.nombre} {c.apellido || ''}</td>
                           <td className="px-3 py-2.5 font-mono text-neutral-700">{c.dni || '-'}</td>
                           <td className="px-3 py-2.5 text-neutral-700">{c.licencia || '-'}</td>
-                          <td className="px-3 py-2.5 text-neutral-700 hidden md:table-cell">{c.telefono || '-'}</td>
-                          <td className="px-3 py-2.5 text-neutral-600 hidden md:table-cell">{c.vencimiento ? new Date(c.vencimiento).toLocaleDateString('es-AR') : '-'}</td>
+                          <td className="px-3 py-2.5 text-neutral-700 hidden lg:table-cell">{c.telefono || '-'}</td>
+                          <td className="px-3 py-2.5 text-neutral-600 hidden lg:table-cell">{c.vencimiento ? new Date(c.vencimiento).toLocaleDateString('es-AR') : '-'}</td>
                           {isAdmin && (
                             <td className="px-3 py-2.5">
                               <div className="flex items-center justify-end gap-2">
@@ -713,8 +710,8 @@ const TransportistaDetallePage: React.FC = () => {
                     <tr>
                       <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Número</th>
                       <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Estado</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '22%' }}>Generador</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '18%' }}>Fecha</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden lg:table-cell" style={{ width: '22%' }}>Generador</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden lg:table-cell" style={{ width: '18%' }}>Fecha</th>
                       <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Acción</th>
                     </tr>
                   </thead>
@@ -731,13 +728,13 @@ const TransportistaDetallePage: React.FC = () => {
                             {m.estado}
                           </Badge>
                         </td>
-                        <td className="px-3 py-2.5 text-sm text-neutral-700 hidden md:table-cell">{m.generador?.razonSocial || '-'}</td>
-                        <td className="px-3 py-2.5 text-sm text-neutral-600 hidden md:table-cell">{m.createdAt ? new Date(m.createdAt).toLocaleDateString('es-AR') : '-'}</td>
+                        <td className="px-3 py-2.5 text-sm text-neutral-700 hidden lg:table-cell">{m.generador?.razonSocial || '-'}</td>
+                        <td className="px-3 py-2.5 text-sm text-neutral-600 hidden lg:table-cell">{m.createdAt ? new Date(m.createdAt).toLocaleDateString('es-AR') : '-'}</td>
                         <td className="px-3 py-2.5 text-right">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => navigate(isMobile ? `/mobile/manifiestos/${m.id}` : `/manifiestos/${m.id}`)}
+                            onClick={() => navigate(`/manifiestos/${m.id}`)}
                           >
                             Ver
                           </Button>

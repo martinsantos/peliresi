@@ -13,6 +13,7 @@ import {
     actualizarUbicacion,
     confirmarEntrega,
     confirmarRecepcion,
+    confirmarRecepcionInSitu,
     cerrarManifiesto,
     getDashboardStats,
     rechazarCarga,
@@ -22,7 +23,8 @@ import {
     getSyncInicial,
     getManifiestosEsperados,
     validarQR,
-    revertirEstado
+    revertirEstado,
+    cancelarManifiesto
 } from '../controllers/manifiesto.controller';
 
 const router = Router();
@@ -514,6 +516,35 @@ router.post('/:id/confirmar-recepcion', hasRole('OPERADOR', 'ADMIN'), confirmarR
 
 /**
  * @openapi
+ * /manifiestos/{id}/recepcion-insitu:
+ *   post:
+ *     tags: [Manifiestos]
+ *     summary: Confirmar recepcion in situ
+ *     description: Para manifiestos con modalidad IN_SITU. Cambia estado de APROBADO a RECIBIDO directamente (sin transporte). Solo OPERADOR y ADMIN.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               observaciones: { type: string }
+ *     responses:
+ *       200:
+ *         description: Recepcion in situ confirmada
+ *       400:
+ *         description: Manifiesto no es IN_SITU o estado invalido
+ *       403:
+ *         description: Rol no autorizado
+ */
+router.post('/:id/recepcion-insitu', hasRole('OPERADOR', 'ADMIN'), confirmarRecepcionInSitu);
+
+/**
+ * @openapi
  * /manifiestos/{id}/pesaje:
  *   post:
  *     tags: [Manifiestos]
@@ -639,6 +670,9 @@ router.post('/:id/cerrar', hasRole('OPERADOR', 'ADMIN'), cerrarManifiesto);
  *       403:
  *         description: Solo ADMIN
  */
+// Cancelar manifiesto (Generador o Admin)
+router.post('/:id/cancelar', hasRole('GENERADOR', 'ADMIN'), cancelarManifiesto);
+
 // Reversion de estado (solo ADMIN)
 router.post('/:id/revertir-estado', hasRole('ADMIN'), revertirEstado);
 

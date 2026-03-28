@@ -64,7 +64,6 @@ const TransportistasPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const isMobile = location.pathname.startsWith('/mobile');
   const { isAdmin, impersonateUser } = useAuth();
   const [busqueda, setBusqueda] = useState(searchParams.get('q') || '');
   const [filtroEstado, setFiltroEstado] = useState('todos');
@@ -237,7 +236,7 @@ const TransportistasPage: React.FC = () => {
   };
 
   const openEditar = (row: typeof tableData[0]) => {
-    navigate(isMobile ? `/mobile/admin/actores/transportistas/${row.id}/editar` : `/admin/actores/transportistas/${row.id}/editar`);
+    navigate(`/admin/actores/transportistas/${row.id}/editar`);
     return;
     // Legacy modal code below - kept for reference
     setEditId(row.id);
@@ -362,7 +361,7 @@ const TransportistasPage: React.FC = () => {
       key: 'habilitacion',
       width: '14%',
       header: 'Habilitación',
-      hiddenBelow: 'md' as const,
+      hiddenBelow: 'lg' as const,
       render: (row: typeof tableData[0]) => {
         const status = getVencimientoStatus(row.vencimientoHabilitacion);
         return (
@@ -386,7 +385,7 @@ const TransportistasPage: React.FC = () => {
       width: '12%',
       header: 'Localidad',
       sortable: true,
-      hiddenBelow: 'lg' as const,
+      hiddenBelow: 'xl' as const,
       render: (row: typeof tableData[0]) => (
         <div className="flex items-center gap-1 text-xs text-neutral-600">
           {row.localidad ? (
@@ -405,7 +404,7 @@ const TransportistasPage: React.FC = () => {
       width: '7%',
       header: 'Vehículos',
       sortable: true,
-      hiddenBelow: 'md' as const,
+      hiddenBelow: 'lg' as const,
       render: (row: typeof tableData[0]) => (
         <div className="text-center">
           <p className="text-sm font-bold text-neutral-900">{row.vehiculosCount}</p>
@@ -418,7 +417,7 @@ const TransportistasPage: React.FC = () => {
       width: '7%',
       header: 'Choferes',
       sortable: true,
-      hiddenBelow: 'md' as const,
+      hiddenBelow: 'lg' as const,
       render: (row: typeof tableData[0]) => (
         <div className="text-center">
           <p className="text-sm font-bold text-neutral-900">{row.choferesCount}</p>
@@ -430,7 +429,7 @@ const TransportistasPage: React.FC = () => {
       key: 'contacto',
       width: '18%',
       header: 'Contacto',
-      hiddenBelow: 'lg' as const,
+      hiddenBelow: 'xl' as const,
       render: (row: typeof tableData[0]) => (
         <div className="text-xs min-w-0">
           {row.email && (
@@ -482,7 +481,7 @@ const TransportistasPage: React.FC = () => {
           )}
           <button
             className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-            onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/actores/transportistas/${row.id}` : `/admin/actores/transportistas/${row.id}`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(`/admin/actores/transportistas/${row.id}`); }}
             title="Ver"
           >
             <Eye size={16} />
@@ -523,7 +522,7 @@ const TransportistasPage: React.FC = () => {
           <Button variant="outline" leftIcon={<Download size={18} />} onClick={handleExport}>
             Exportar
           </Button>
-          <Button leftIcon={<Plus size={18} />} onClick={() => navigate(isMobile ? '/mobile/admin/actores/transportistas/nuevo' : '/admin/actores/transportistas/nuevo')}>
+          <Button leftIcon={<Plus size={18} />} onClick={() => navigate('/admin/actores/transportistas/nuevo')}>
             Nuevo Transportista
           </Button>
         </div>
@@ -641,7 +640,7 @@ const TransportistasPage: React.FC = () => {
               keyExtractor={(row) => row.id}
               sortable={true}
               onSort={handleSort}
-              onRowClick={(row) => navigate(isMobile ? `/mobile/actores/transportistas/${row.id}` : `/admin/actores/transportistas/${row.id}`)}
+              onRowClick={(row) => navigate(`/admin/actores/transportistas/${row.id}`)}
               emptyMessage="No se encontraron transportistas"
               stickyHeader
               fixedLayout

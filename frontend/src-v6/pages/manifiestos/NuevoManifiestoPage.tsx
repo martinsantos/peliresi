@@ -4,7 +4,7 @@
  * Formulario para crear nuevo manifiesto de residuos
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -21,6 +21,8 @@ import {
   CheckCircle2,
   QrCode,
   Loader2,
+  Info,
+  MapPin,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -32,6 +34,14 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useCreateManifiesto } from '../../hooks/useManifiestos';
 import { useTiposResiduo, useCatalogoGeneradores, useCatalogoTransportistas, useCatalogoOperadores } from '../../hooks/useCatalogos';
 
+
+/** Parse corrientes Basel codes from various formats: "Y8-Y48", "Y8,Y48", "Y4/Y8/Y9", "Y8, Y9 e Y48", ["Y8","Y48"] */
+function parseCorrientes(raw: string | string[] | null | undefined): string[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.map(s => s.trim()).filter(Boolean);
+  // Split by comma, slash, or dash-between-Y-codes (e.g. "Y8-Y9-Y48")
+  return raw.split(/[,/]|(?<=\d)-(?=Y)/i).map(s => s.replace(/\s*e\s*$/, '').trim()).filter(Boolean);
+}
 
 export const NuevoManifiestoPage: React.FC = () => {
   const navigate = useNavigate();
@@ -56,6 +66,7 @@ export const NuevoManifiestoPage: React.FC = () => {
   const [formData, setFormData] = useState({
     generador: currentUser?.rol === 'GENERADOR' ? currentUser?.sector || '' : '',
     generadorId: currentUser?.rol === 'GENERADOR' ? currentUser?.actorId || '' : '',
+    modalidad: 'FIJO' as 'FIJO' | 'IN_SITU',
     transportista: '',
     operador: '',
     fechaRetiro: new Date().toISOString().split('T')[0],
@@ -67,6 +78,68 @@ export const NuevoManifiestoPage: React.FC = () => {
   const selectedGenerador = generadoresList.find((g) => g.id === formData.generadorId);
   const selectedTransportista = transportistasList.find((t) => t.id === formData.transportista);
   const selectedOperador = operadoresList.find((o) => o.id === formData.operador);
+
+  // Cross-filter: only show operadores that can handle ALL selected residuos
+  const selectedResiduoIds = useMemo(
+    () => formData.residuos.map((r) => r.tipo).filter(Boolean),
+    [formData.residuos]
+  );
+  const operadoresFiltrados = useMemo(() => {
+    let filtered = operadoresList;
+
+    // Filter by modalidad: check modalidades array, tipoOperador, or categoria
+    filtered = filtered.filter((op: any) => {
+      const modalidades: string[] = op.modalidades || [];
+      const tipo = (op.tipoOperador || op.categoria || '').toUpperCase();
+      if (formData.modalidad === 'IN_SITU') {
+        return modalidades.includes('IN_SITU') || tipo.includes('IN SITU') || tipo.includes('IN_SITU');
+      }
+      // FIJO
+      return modalidades.includes('FIJO') || tipo.includes('FIJO') || modalidades.length === 0;
+    });
+
+    // Filter by residuos compatibility (strict: operador must have tratamiento for each residuo)
+    if (selectedResiduoIds.length > 0) {
+      filtered = filtered.filter((op: any) => {
+        const opResiduoIds = new Set(
+          (op.tratamientos || [])
+            .filter((t: any) => t.activo !== false)
+            .map((t: any) => t.tipoResiduoId)
+        );
+        return selectedResiduoIds.every((id) => opResiduoIds.has(id));
+      });
+    }
+
+    return filtered;
+  }, [operadoresList, selectedResiduoIds, formData.modalidad]);
+
+  // Cross-filter: residuos by generador's corrientesControl
+  const genCorrientes = useMemo(() => {
+    const gen = selectedGenerador as any;
+    return parseCorrientes(gen?.corrientesControl || gen?.categoriasControl);
+  }, [selectedGenerador]);
+
+  const residuosFiltrados = useMemo(() => {
+    if (genCorrientes.length === 0) return tiposResiduo; // no data = show all
+    const filtered = tiposResiduo.filter((r: any) => genCorrientes.includes(r.codigo));
+    return filtered.length > 0 ? filtered : tiposResiduo; // fallback if no match
+  }, [tiposResiduo, genCorrientes]);
+
+  // Cross-filter: transportistas by selected residuos' codigos
+  const selectedCodigos = useMemo(() => {
+    return selectedResiduoIds
+      .map(id => (tiposResiduo as any[]).find((r: any) => r.id === id)?.codigo)
+      .filter(Boolean) as string[];
+  }, [selectedResiduoIds, tiposResiduo]);
+
+  const transportistasFiltrados = useMemo(() => {
+    if (selectedCodigos.length === 0) return transportistasList;
+    return transportistasList.filter((t: any) => {
+      const transCorrientes = parseCorrientes(t.corrientesAutorizadas);
+      if (transCorrientes.length === 0) return true; // No data = don't filter out
+      return selectedCodigos.every(c => transCorrientes.includes(c));
+    });
+  }, [transportistasList, selectedCodigos]);
 
   const handleAddResiduo = () => {
     setFormData({
@@ -92,7 +165,7 @@ export const NuevoManifiestoPage: React.FC = () => {
     if (!formData.generadorId && !formData.generador) {
       errors.generador = 'El generador es requerido';
     }
-    if (!formData.transportista) {
+    if (formData.modalidad !== 'IN_SITU' && !formData.transportista) {
       errors.transportista = 'El transportista es requerido';
     }
     if (!formData.operador) {
@@ -116,13 +189,12 @@ export const NuevoManifiestoPage: React.FC = () => {
       return;
     }
 
-    const isMobile = window.location.pathname.includes('/mobile');
-
     try {
       const result = await createManifiesto.mutateAsync({
         generadorId: formData.generadorId || formData.generador,
-        transportistaId: formData.transportista,
+        ...(formData.modalidad !== 'IN_SITU' && { transportistaId: formData.transportista }),
         operadorId: formData.operador,
+        modalidad: formData.modalidad,
         fechaEstimadaRetiro: formData.fechaRetiro || undefined,
         observaciones: formData.observaciones || undefined,
         residuos: formData.residuos.map((r) => ({
@@ -133,7 +205,7 @@ export const NuevoManifiestoPage: React.FC = () => {
       });
 
       toast.success('Manifiesto creado', `El manifiesto ${result.numero || result.id} fue creado exitosamente`);
-      navigate(isMobile ? `/mobile/manifiestos/${result.id}` : `/manifiestos/${result.id}`);
+      navigate(`/manifiestos/${result.id}`);
     } catch (err: any) {
       toast.error(
         'Error al crear manifiesto',
@@ -142,7 +214,7 @@ export const NuevoManifiestoPage: React.FC = () => {
     }
   };
 
-  const isMobile = window.location.pathname.includes('/mobile') || window.location.pathname.includes('/app');
+  // Removed isMobile — React Router handles /app/ basename
 
   // Only GENERADOR and ADMIN can create manifiestos
   const canCreate = isAdmin || isGenerador;
@@ -171,7 +243,7 @@ export const NuevoManifiestoPage: React.FC = () => {
               <p className="text-sm text-neutral-500 mb-6">
                 Solo los perfiles <span className="font-semibold">GENERADOR</span> y <span className="font-semibold">ADMIN</span> pueden crear nuevos manifiestos de residuos.
               </p>
-              <Button fullWidth onClick={() => navigate(isMobile ? '/app/manifiestos' : '/manifiestos')}>
+              <Button fullWidth onClick={() => navigate('/manifiestos')}>
                 Volver a Manifiestos
               </Button>
             </CardContent>
@@ -185,21 +257,22 @@ export const NuevoManifiestoPage: React.FC = () => {
     <div className="min-h-screen bg-neutral-50 pb-20">
       {/* Header */}
       <header className="sticky top-0 z-30 bg-white border-b border-neutral-200 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate(isMobile ? '/mobile/manifiestos' : '/manifiestos')}
+              className="shrink-0"
+              onClick={() => navigate('/manifiestos')}
             >
               <ArrowLeft size={20} />
             </Button>
-            <div>
-              <h1 className="text-lg font-bold text-neutral-900">Nuevo Manifiesto</h1>
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-lg font-bold text-neutral-900 truncate">Nuevo Manifiesto</h1>
               <p className="text-xs text-neutral-500">Paso {step} de 3</p>
             </div>
           </div>
-          <Badge variant="soft" color="primary">
+          <Badge variant="soft" color="primary" className="shrink-0">
             <FileText size={14} className="mr-1" />
             Borrador
           </Badge>
@@ -232,14 +305,35 @@ export const NuevoManifiestoPage: React.FC = () => {
                   value={formData.generadorId}
                   onChange={(val) => {
                     const gen = generadoresList.find((g: any) => g.id === val);
-                    setFormData({ ...formData, generadorId: val, generador: gen?.razonSocial || gen?.nombre || '' });
+                    setFormData({ ...formData, generadorId: val, generador: gen?.razonSocial || gen?.nombre || '', residuos: [{ tipo: '', cantidad: '', unidad: 'kg' }], transportista: '', operador: '' });
                   }}
                   options={[...generadoresList]
                     .sort((a: any, b: any) => (a.razonSocial || '').localeCompare(b.razonSocial || ''))
                     .map((g: any) => ({
                       value: g.id,
-                      label: `${g.razonSocial || g.nombre || g.label}${g.cuit ? ` — ${g.cuit}` : ''}`,
+                      label: `${g.razonSocial || g.nombre || g.label} — ${g.cuit || ''}`,
                     }))}
+                  renderOption={(opt) => {
+                    const gen = generadoresList.find((g: any) => g.id === opt.value) as any;
+                    const corrientes = gen ? parseCorrientes(gen.corrientesControl || gen.categoriasControl) : [];
+                    return (
+                      <div>
+                        <div className="text-sm font-medium text-neutral-900 truncate">{gen?.razonSocial || opt.label}</div>
+                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          <span className="text-xs text-neutral-500 font-mono">{gen?.cuit || ''}</span>
+                          {corrientes.length > 0 && (
+                            <>
+                              <span className="text-neutral-300">·</span>
+                              {corrientes.slice(0, 6).map((c: string) => (
+                                <span key={c} className="inline-block px-1.5 py-0 rounded bg-warning-100 text-warning-700 text-[10px] font-semibold">{c}</span>
+                              ))}
+                              {corrientes.length > 6 && <span className="text-[10px] text-neutral-400">+{corrientes.length - 6}</span>}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }}
                   placeholder="Buscar generador por nombre o CUIT..."
                   searchable
                   errorMessage={validationErrors.generador}
@@ -304,6 +398,23 @@ export const NuevoManifiestoPage: React.FC = () => {
               subtitle="Detalle de los residuos que serán transportados"
             />
             <CardContent className="space-y-4 animate-fade-in">
+              {genCorrientes.length > 0 && residuosFiltrados.length > 0 && (
+                <div className="flex items-center gap-2 p-2.5 bg-primary-50 border border-primary-200 rounded-xl text-xs text-primary-700">
+                  <CheckCircle2 size={14} className="shrink-0" />
+                  <span>
+                    <strong>{residuosFiltrados.length}</strong> residuos inscriptos para {(selectedGenerador as any)?.razonSocial || 'el generador'}
+                    <span className="ml-1 text-primary-500">({genCorrientes.join(', ')})</span>
+                  </span>
+                </div>
+              )}
+              {genCorrientes.length > 0 && residuosFiltrados.length === 0 && (
+                <div className="flex items-center gap-2 p-2.5 bg-warning-50 border border-warning-200 rounded-xl text-xs text-warning-700">
+                  <AlertTriangle size={14} className="shrink-0" />
+                  <span>
+                    No se encontraron residuos para las corrientes <strong>{genCorrientes.join(', ')}</strong> del generador. Mostrando todos los tipos de residuo.
+                  </span>
+                </div>
+              )}
               {formData.residuos.map((residuo, index) => (
                 <div key={index} className="p-4 bg-neutral-50 rounded-xl space-y-3">
                   <div className="flex items-center justify-between">
@@ -325,7 +436,7 @@ export const NuevoManifiestoPage: React.FC = () => {
                       label="Tipo de Residuo *"
                       value={residuo.tipo}
                       onChange={(val) => handleResiduoChange(index, 'tipo', val)}
-                      options={tiposResiduo.map((r: any) => ({
+                      options={residuosFiltrados.map((r: any) => ({
                         value: r.id,
                         label: `${r.codigo} - ${r.nombre || r.descripcion}`,
                       }))}
@@ -394,6 +505,24 @@ export const NuevoManifiestoPage: React.FC = () => {
                       return;
                     }
                     setValidationErrors(prev => { const n = {...prev}; delete n.residuos; return n; });
+                    // Clear operador if no longer valid for the selected residuos
+                    if (formData.operador) {
+                      const curResiduoIds = formData.residuos.map(r => r.tipo).filter(Boolean);
+                      if (curResiduoIds.length > 0) {
+                        const op = operadoresList.find((o: any) => o.id === formData.operador);
+                        if (op) {
+                          const opResiduoIds = new Set(
+                            ((op as any).tratamientos || [])
+                              .filter((t: any) => t.activo !== false)
+                              .map((t: any) => t.tipoResiduoId)
+                          );
+                          const stillValid = curResiduoIds.every(id => opResiduoIds.has(id));
+                          if (!stillValid) {
+                            setFormData(prev => ({ ...prev, operador: '' }));
+                          }
+                        }
+                      }
+                    }
                     setStep(3);
                   }}
                 >
@@ -407,71 +536,145 @@ export const NuevoManifiestoPage: React.FC = () => {
         {/* Step 3: Transporte y Operador */}
         {step === 3 && (
           <Card>
-            <CardHeader 
-              title="Transporte y Destino" 
+            <CardHeader
+              title="Transporte y Destino"
               icon={<Truck size={20} />}
               subtitle="Información del transportista y destino final"
             />
             <CardContent className="space-y-4 animate-fade-in">
+              {/* Modalidad selector */}
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">
-                  Transportista *
+                <label className="block text-sm font-medium text-neutral-700 mb-2">
+                  Modalidad de operacion *
                 </label>
-                <Select
-                  value={formData.transportista}
-                  onChange={(val) => setFormData({ ...formData, transportista: val })}
-                  options={[...transportistasList]
-                    .sort((a: any, b: any) => (a.razonSocial || '').localeCompare(b.razonSocial || ''))
-                    .map((t: any) => ({
-                      value: t.id,
-                      label: `${t.razonSocial || t.nombre || t.label}${t.cuit ? ` — ${t.cuit}` : ''}`,
-                    }))}
-                  placeholder="Buscar transportista por nombre o CUIT..."
-                  searchable
-                  errorMessage={validationErrors.transportista}
-                  size="base"
-                />
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, modalidad: 'FIJO', operador: '' }));
+                      setValidationErrors(prev => { const n = {...prev}; delete n.transportista; return n; });
+                    }}
+                    className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left ${
+                      formData.modalidad === 'FIJO'
+                        ? 'border-primary-500 bg-primary-50 shadow-sm'
+                        : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
+                    }`}
+                  >
+                    <Truck size={20} className={formData.modalidad === 'FIJO' ? 'text-primary-600' : 'text-neutral-400'} />
+                    <div>
+                      <p className={`text-sm font-semibold ${formData.modalidad === 'FIJO' ? 'text-primary-700' : 'text-neutral-700'}`}>Fijo</p>
+                      <p className="text-xs text-neutral-500">Requiere transporte</p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, modalidad: 'IN_SITU', transportista: '', operador: '' }));
+                      setValidationErrors(prev => { const n = {...prev}; delete n.transportista; return n; });
+                    }}
+                    className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left ${
+                      formData.modalidad === 'IN_SITU'
+                        ? 'border-emerald-500 bg-emerald-50 shadow-sm'
+                        : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
+                    }`}
+                  >
+                    <MapPin size={20} className={formData.modalidad === 'IN_SITU' ? 'text-emerald-600' : 'text-neutral-400'} />
+                    <div>
+                      <p className={`text-sm font-semibold ${formData.modalidad === 'IN_SITU' ? 'text-emerald-700' : 'text-neutral-700'}`}>In Situ</p>
+                      <p className="text-xs text-neutral-500">Operador en sitio</p>
+                    </div>
+                  </button>
+                </div>
               </div>
 
-              {selectedTransportista && (
-                <div className="p-4 bg-orange-50 rounded-xl border border-orange-100 space-y-2 animate-fade-in">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-neutral-500 mb-0.5">CUIT</label>
-                      <p className="text-sm font-semibold text-neutral-900">{selectedTransportista.cuit || '-'}</p>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-neutral-500 mb-0.5">Teléfono</label>
-                      <p className="text-sm font-semibold text-neutral-900">{selectedTransportista.telefono || '-'}</p>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-neutral-500 mb-0.5">Domicilio</label>
-                    <p className="text-sm font-semibold text-neutral-900">{selectedTransportista.domicilio || '-'}</p>
-                  </div>
-                  {selectedTransportista.numeroHabilitacion && (
-                    <div>
-                      <label className="block text-xs font-medium text-neutral-500 mb-0.5">N° Habilitación</label>
-                      <p className="text-sm font-semibold text-neutral-900">{selectedTransportista.numeroHabilitacion}</p>
+              {/* In Situ note */}
+              {formData.modalidad === 'IN_SITU' && (
+                <div className="flex items-start gap-2.5 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-800 animate-fade-in">
+                  <MapPin size={16} className="shrink-0 mt-0.5" />
+                  <span>El operador trabajara directamente en el domicilio del generador. No se requiere transporte.</span>
+                </div>
+              )}
+
+              {/* Transportista - only shown for FIJO */}
+              {formData.modalidad === 'FIJO' && (
+                <>
+                  {selectedCodigos.length > 0 && transportistasFiltrados.length < transportistasList.length && (
+                    <div className="flex items-center gap-2 p-2.5 bg-orange-50 border border-orange-200 rounded-xl text-xs text-orange-700">
+                      <Info size={14} className="shrink-0" />
+                      <span>Mostrando <strong>{transportistasFiltrados.length}</strong> transportistas habilitados para los residuos seleccionados</span>
                     </div>
                   )}
-                </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">
+                      Transportista *
+                    </label>
+                    <Select
+                      value={formData.transportista}
+                      onChange={(val) => setFormData({ ...formData, transportista: val })}
+                      options={[...transportistasFiltrados]
+                        .sort((a: any, b: any) => (a.razonSocial || '').localeCompare(b.razonSocial || ''))
+                        .map((t: any) => ({
+                          value: t.id,
+                          label: `${t.razonSocial || t.nombre || t.label}${t.cuit ? ` — ${t.cuit}` : ''}`,
+                        }))}
+                      placeholder={transportistasFiltrados.length === 0 ? 'No hay transportistas habilitados para estos residuos' : 'Buscar transportista por nombre o CUIT...'}
+                      searchable
+                      errorMessage={validationErrors.transportista}
+                      size="base"
+                    />
+                  </div>
+
+                  {selectedTransportista && (
+                    <div className="p-4 bg-orange-50 rounded-xl border border-orange-100 space-y-2 animate-fade-in">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-neutral-500 mb-0.5">CUIT</label>
+                          <p className="text-sm font-semibold text-neutral-900">{selectedTransportista.cuit || '-'}</p>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-neutral-500 mb-0.5">Telefono</label>
+                          <p className="text-sm font-semibold text-neutral-900">{selectedTransportista.telefono || '-'}</p>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-neutral-500 mb-0.5">Domicilio</label>
+                        <p className="text-sm font-semibold text-neutral-900">{selectedTransportista.domicilio || '-'}</p>
+                      </div>
+                      {selectedTransportista.numeroHabilitacion && (
+                        <div>
+                          <label className="block text-xs font-medium text-neutral-500 mb-0.5">N. Habilitacion</label>
+                          <p className="text-sm font-semibold text-neutral-900">{selectedTransportista.numeroHabilitacion}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
 
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Operador / Destino *
                 </label>
+                {selectedResiduoIds.length > 0 && (
+                  <div className="flex items-center gap-1.5 mb-2 text-xs text-primary-700 bg-primary-50 border border-primary-100 rounded-lg px-3 py-1.5">
+                    <Info size={14} className="shrink-0" />
+                    <span>
+                      Mostrando {operadoresFiltrados.length} operador{operadoresFiltrados.length !== 1 ? 'es' : ''} habilitado{operadoresFiltrados.length !== 1 ? 's' : ''} para los residuos seleccionados
+                    </span>
+                  </div>
+                )}
                 <Select
                   value={formData.operador}
                   onChange={(val) => setFormData({ ...formData, operador: val })}
-                  options={[...operadoresList]
+                  options={[...operadoresFiltrados]
                     .sort((a: any, b: any) => (a.razonSocial || '').localeCompare(b.razonSocial || ''))
                     .map((o: any) => ({
                       value: o.id,
                       label: `${o.razonSocial || o.nombre || o.label}${o.cuit ? ` — ${o.cuit}` : ''}`,
                     }))}
-                  placeholder="Buscar operador por nombre o CUIT..."
+                  placeholder={operadoresFiltrados.length === 0 && selectedResiduoIds.length > 0
+                    ? 'No hay operadores habilitados para estos residuos'
+                    : 'Buscar operador por nombre o CUIT...'}
                   searchable
                   errorMessage={validationErrors.operador}
                   size="base"

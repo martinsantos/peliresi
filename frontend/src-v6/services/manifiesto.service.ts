@@ -77,6 +77,11 @@ export const manifiestoService = {
     return data.data;
   },
 
+  async confirmarRecepcionInSitu(id: string): Promise<Manifiesto> {
+    const { data } = await api.post(`/manifiestos/${id}/recepcion-insitu`);
+    return data.data;
+  },
+
   async registrarTratamiento(id: string, req: RegistrarTratamientoRequest): Promise<Manifiesto> {
     const { data } = await api.post(`/manifiestos/${id}/tratamiento`, req);
     return data.data;
@@ -95,6 +100,11 @@ export const manifiestoService = {
   async cerrar(id: string): Promise<Manifiesto> {
     const { data } = await api.post(`/manifiestos/${id}/cerrar`);
     return data.data;
+  },
+
+  async cancelar(id: string, motivo?: string): Promise<Manifiesto> {
+    const { data } = await api.post(`/manifiestos/${id}/cancelar`, { motivo });
+    return data.data?.manifiesto || data.data;
   },
 
   async revertirEstado(id: string, estadoNuevo: string, motivo?: string): Promise<Manifiesto> {

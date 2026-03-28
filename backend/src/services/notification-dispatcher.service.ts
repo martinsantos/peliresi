@@ -132,9 +132,10 @@ class NotificationService {
         // APROBADO: personalized notifications per role with location data
         if (nuevoEstado === 'APROBADO') {
             const promises: Promise<any>[] = [];
+            const isInSitu = manifiesto.modalidad === 'IN_SITU';
 
-            // Transportista: full pickup details with map link
-            if (trans.usuario.id !== actorId) {
+            // Transportista: full pickup details with map link (skip for IN_SITU — no transportista)
+            if (trans && trans.usuario.id !== actorId) {
                 const retiroInfo = fechaRetiro ? ` Retiro: ${fechaRetiro}.` : '';
                 promises.push(this.crearNotificacion({
                     usuarioId: trans.usuario.id,
@@ -155,20 +156,26 @@ class NotificationService {
                 }));
             }
 
-            // Operador: upcoming reception
+            // Operador: upcoming reception (IN_SITU gets a different message — proceed in-situ)
             if (oper.usuario.id !== actorId) {
+                const titulo = isInSitu
+                    ? 'Tratamiento in situ requerido'
+                    : 'Manifiesto firmado — recibiras residuos';
+                const mensaje = isInSitu
+                    ? `${num} de ${gen.razonSocial}. Debe proceder con tratamiento in situ en ${gen.domicilio || 'domicilio del generador'}.`
+                    : `${num} de ${gen.razonSocial}.${fechaRetiro ? ` Retiro estimado: ${fechaRetiro}` : ''}`;
                 promises.push(this.crearNotificacion({
                     usuarioId: oper.usuario.id,
                     tipo: 'MANIFIESTO_FIRMADO' as TipoNotificacion,
-                    titulo: 'Manifiesto firmado — recibiras residuos',
-                    mensaje: `${num} de ${gen.razonSocial}.${fechaRetiro ? ` Retiro estimado: ${fechaRetiro}` : ''}`,
+                    titulo,
+                    mensaje,
                     manifiestoId,
-                    prioridad: 'NORMAL' as PrioridadNotificacion,
+                    prioridad: isInSitu ? 'ALTA' as PrioridadNotificacion : 'NORMAL' as PrioridadNotificacion,
                     datos: {
-                        tipo: 'recepcion_programada',
+                        tipo: isInSitu ? 'tratamiento_insitu' : 'recepcion_programada',
                         fechaRetiro: fechaRetiro || null,
                         generador: gen.razonSocial,
-                        transportista: trans.razonSocial,
+                        transportista: trans?.razonSocial || null,
                     },
                 }));
             }
@@ -187,8 +194,9 @@ class NotificationService {
 
             // Admins
             const adminIds = await this.getAdminIds();
+            const transUserId = trans?.usuario?.id;
             for (const adminId of adminIds) {
-                if (adminId !== actorId && adminId !== gen.usuario.id && adminId !== trans.usuario.id && adminId !== oper.usuario.id) {
+                if (adminId !== actorId && adminId !== gen.usuario.id && adminId !== transUserId && adminId !== oper.usuario.id) {
                     promises.push(this.crearNotificacion({
                         usuarioId: adminId,
                         tipo: 'MANIFIESTO_FIRMADO' as TipoNotificacion,
@@ -241,7 +249,7 @@ class NotificationService {
         const info = mensajes[nuevoEstado];
         if (!info) return;
 
-        const destinatarios = [gen.usuario.id, trans.usuario.id, oper.usuario.id].filter(id => id !== actorId);
+        const destinatarios = [gen.usuario.id, trans?.usuario?.id, oper.usuario.id].filter((id): id is string => !!id && id !== actorId);
         const adminIds = await this.getAdminIds();
         adminIds.forEach(id => { if (!destinatarios.includes(id)) destinatarios.push(id); });
 

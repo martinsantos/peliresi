@@ -60,7 +60,6 @@ const AdminOperadoresPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const isMobile = location.pathname.startsWith('/mobile');
   const { isAdmin, impersonateUser } = useAuth();
   const { data: enrichmentData } = useOperadoresEnrichment();
   const OPERADORES_DATA = enrichmentData?.operadores || {};
@@ -331,15 +330,21 @@ const AdminOperadoresPage: React.FC = () => {
       width: '10%',
       header: 'Tipo',
       sortable: true,
-      hiddenBelow: 'md' as const,
+      hiddenBelow: 'lg' as const,
       render: (row: typeof tableData[0]) => {
         const tipo = (row.tipoOperador || row.categoria) as string;
-        return tipo && tipo !== '-' ? (
-          <Badge variant="soft" color={tipo.includes('FIJO') ? 'primary' : 'success'}>
-            {tipo}
-          </Badge>
-        ) : (
-          <span className="text-xs text-neutral-400">-</span>
+        if (!tipo || tipo === '-') return <span className="text-xs text-neutral-400">-</span>;
+
+        // Parse modalidades: "FIJO / IN SITU" → ["FIJO", "IN SITU"]
+        const modalidades = tipo.split('/').map((s: string) => s.trim()).filter(Boolean);
+        return (
+          <div className="flex flex-wrap gap-1">
+            {modalidades.map((mod: string) => (
+              <Badge key={mod} variant="soft" color={mod.includes('FIJO') ? 'primary' : 'success'}>
+                {mod}
+              </Badge>
+            ))}
+          </div>
         );
       },
     },
@@ -347,7 +352,7 @@ const AdminOperadoresPage: React.FC = () => {
       key: 'corrientes',
       width: '12%',
       header: 'Corrientes',
-      hiddenBelow: 'lg' as const,
+      hiddenBelow: 'xl' as const,
       render: (row: typeof tableData[0]) => row.corrientes.length > 0 ? (
         <div className="flex flex-wrap gap-1">
           {row.corrientes.slice(0, 3).map((code: string) => (
@@ -369,7 +374,7 @@ const AdminOperadoresPage: React.FC = () => {
       key: 'tecnologia',
       width: '18%',
       header: 'Tecnología',
-      hiddenBelow: 'lg' as const,
+      hiddenBelow: 'xl' as const,
       render: (row: typeof tableData[0]) => row.tecnologia ? (
         <p className="text-xs text-neutral-600 line-clamp-2" title={row.tecnologia}>
           {row.tecnologia}
@@ -382,7 +387,7 @@ const AdminOperadoresPage: React.FC = () => {
       key: 'contacto',
       width: '16%',
       header: 'Contacto',
-      hiddenBelow: 'lg' as const,
+      hiddenBelow: 'xl' as const,
       render: (row: typeof tableData[0]) => {
         const mail = row.mailCSV || row.email;
         const tel = row.telefonoCSV || row.telefono;
@@ -438,21 +443,21 @@ const AdminOperadoresPage: React.FC = () => {
           )}
           <button
             className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-            onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/admin/actores/operadores/${row.id}` : `/admin/actores/operadores/${row.id}`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(`/admin/actores/operadores/${row.id}`); }}
             title="Ver"
           >
             <Eye size={16} />
           </button>
           <button
             className="p-1.5 text-neutral-400 hover:text-info-600 hover:bg-info-50 rounded-lg transition-colors"
-            onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/admin/actores/operadores/${row.id}/editar` : `/admin/actores/operadores/${row.id}/editar`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(`/admin/actores/operadores/${row.id}/editar`); }}
             title="Editar"
           >
             <Edit size={16} />
           </button>
           <button
             className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-            onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/admin/actores/operadores/${row.id}/renovar` : `/admin/actores/operadores/${row.id}/renovar`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(`/admin/actores/operadores/${row.id}/renovar`); }}
             title="Renovar"
           >
             <RefreshCw size={16} />
@@ -486,7 +491,7 @@ const AdminOperadoresPage: React.FC = () => {
           <Button variant="outline" leftIcon={<Download size={18} />} onClick={handleExport}>
             Exportar
           </Button>
-          <Button leftIcon={<Plus size={18} />} onClick={() => navigate(isMobile ? '/mobile/admin/actores/operadores/nuevo' : '/admin/actores/operadores/nuevo')}>
+          <Button leftIcon={<Plus size={18} />} onClick={() => navigate('/admin/actores/operadores/nuevo')}>
             Nuevo Operador
           </Button>
         </div>
@@ -613,7 +618,7 @@ const AdminOperadoresPage: React.FC = () => {
               keyExtractor={(row) => row.id}
               sortable={true}
               onSort={handleSort}
-              onRowClick={(row) => navigate(isMobile ? `/mobile/admin/actores/operadores/${row.id}` : `/admin/actores/operadores/${row.id}`)}
+              onRowClick={(row) => navigate(`/admin/actores/operadores/${row.id}`)}
               emptyMessage="No se encontraron operadores"
               stickyHeader
               fixedLayout

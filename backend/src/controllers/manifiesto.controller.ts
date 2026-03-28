@@ -6,14 +6,15 @@ import prisma from '../lib/prisma';
 
 // Re-export split modules so existing imports (e.g. routes) continue to work
 export { getManifiestos, getManifiestoById, getDashboardStats, getSyncInicial, getManifiestosEsperados } from './manifiesto-query.controller';
-export { firmarManifiesto, confirmarRetiro, confirmarEntrega, confirmarRecepcion, registrarTratamiento, cerrarManifiesto, rechazarCarga, registrarIncidente, revertirEstado, registrarPesaje } from './manifiesto-workflow.controller';
+export { firmarManifiesto, confirmarRetiro, confirmarEntrega, confirmarRecepcion, confirmarRecepcionInSitu, registrarTratamiento, cerrarManifiesto, rechazarCarga, registrarIncidente, revertirEstado, registrarPesaje, cancelarManifiesto } from './manifiesto-workflow.controller';
 export { actualizarUbicacion, getViajeActual } from './manifiesto-gps.controller';
 
 // Zod schemas for input validation
 const createManifiestoSchema = z.object({
   generadorId: z.string().min(1, 'El generador es requerido').optional(),
-  transportistaId: z.string().min(1, 'El transportista es requerido'),
+  transportistaId: z.string().min(1, 'El transportista es requerido').optional(),
   operadorId: z.string().min(1, 'El operador es requerido'),
+  modalidad: z.enum(['FIJO', 'IN_SITU']).optional().default('FIJO'),
   fechaEstimadaRetiro: z.string().optional(),
   observaciones: z.string().max(1000).optional(),
   residuos: z.array(z.object({
@@ -123,7 +124,7 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
       throw new AppError(parsed.error.issues[0].message, 400);
     }
 
-    const { generadorId: bodyGeneradorId, transportistaId, operadorId, residuos, observaciones, fechaEstimadaRetiro } = parsed.data;
+    const { generadorId: bodyGeneradorId, transportistaId, operadorId, modalidad, residuos, observaciones, fechaEstimadaRetiro } = parsed.data;
     const userId = req.user.id;
 
     // Verificar que el usuario es un generador o admin
@@ -140,6 +141,36 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
       throw new AppError('Se requiere un generador para crear el manifiesto', 400);
     }
 
+    // Modalidad validation
+    if (modalidad === 'FIJO' && !transportistaId) {
+      throw new AppError('Se requiere transportista para modalidad FIJO', 400);
+    }
+    if (modalidad === 'IN_SITU') {
+      if (transportistaId) {
+        throw new AppError('No se debe asignar transportista para modalidad IN_SITU', 400);
+      }
+      const op = await prisma.operador.findUnique({ where: { id: operadorId }, select: { modalidades: true } });
+      if (!op?.modalidades?.includes('IN_SITU')) {
+        throw new AppError('El operador no está habilitado para trabajar in situ', 400);
+      }
+    }
+
+    // Validate operador can handle all selected residuos
+    const tipoResiduoIds = residuos.map((r: { tipoResiduoId: string }) => r.tipoResiduoId);
+    const operador = await prisma.operador.findUnique({
+      where: { id: operadorId },
+      include: { tratamientos: { where: { activo: true } } },
+    });
+    if (operador) {
+      const operadorResiduoIds = new Set(operador.tratamientos.map((t: any) => t.tipoResiduoId));
+      const unsupported = tipoResiduoIds.filter((id: string) => !operadorResiduoIds.has(id));
+      if (unsupported.length > 0) {
+        const tipos = await prisma.tipoResiduo.findMany({ where: { id: { in: unsupported } }, select: { codigo: true, nombre: true } });
+        const names = tipos.map((t: any) => `${t.codigo} - ${t.nombre}`).join(', ');
+        throw new AppError(`El operador no está habilitado para tratar: ${names}`, 400);
+      }
+    }
+
     // Generar numero de manifiesto
     const numero = await generarNumeroManifiesto();
 
@@ -148,8 +179,9 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
       data: {
         numero,
         generadorId,
-        transportistaId,
+        transportistaId: modalidad === 'IN_SITU' ? null : transportistaId,
         operadorId,
+        modalidad,
         observaciones,
         fechaEstimadaRetiro: fechaEstimadaRetiro ? new Date(fechaEstimadaRetiro) : null,
         estado: 'BORRADOR',
@@ -350,7 +382,7 @@ export const validarQR = async (req: AuthRequest, res: Response, next: NextFunct
           numero: manifiesto.numero,
           estado: manifiesto.estado,
           generador: manifiesto.generador.razonSocial,
-          transportista: manifiesto.transportista.razonSocial,
+          transportista: manifiesto.transportista?.razonSocial ?? null,
           operador: manifiesto.operador.razonSocial,
           residuos: manifiesto.residuos.map(r => ({
             tipo: r.tipoResiduo.nombre,

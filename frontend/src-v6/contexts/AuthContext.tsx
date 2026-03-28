@@ -30,6 +30,7 @@ export interface User {
   ubicacion: string;
   permisos: string[];
   actorId?: string;
+  esInspector?: boolean;
 }
 
 export interface ImpersonationData {
@@ -112,6 +113,7 @@ function apiUserToUser(u: Usuario): User {
     telefono: u.telefono || '',
     ubicacion: '',
     permisos: rolPermisos[u.rol] || [],
+    esInspector: u.esInspector ?? false,
   };
 }
 

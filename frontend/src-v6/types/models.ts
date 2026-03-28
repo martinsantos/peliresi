@@ -102,6 +102,7 @@ export interface Usuario {
   empresa: string | null;
   telefono: string | null;
   activo: boolean;
+  esInspector?: boolean;
   dosFaVerificado: boolean;
   createdAt: string;
   updatedAt: string;
@@ -257,8 +258,9 @@ export interface Manifiesto {
   id: string;
   numero: string;
   generadorId: string;
-  transportistaId: string;
+  transportistaId: string | null;
   operadorId: string;
+  modalidad?: 'FIJO' | 'IN_SITU';
   creadoPorId: string;
   estado: EstadoManifiesto;
   observaciones: string | null;

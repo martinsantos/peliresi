@@ -135,7 +135,7 @@ const GeneradorDetallePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const isMobile = location.pathname.startsWith('/mobile');
+  // Removed isMobile — React Router handles basename
 
   const [historialPage, setHistorialPage] = useState(1);
   const [pagoModal, setPagoModal] = useState<{ open: boolean; editing?: PagoTEF }>({ open: false });
@@ -167,7 +167,7 @@ const GeneradorDetallePage: React.FC = () => {
     fechaAlta: apiGenerador.createdAt ? new Date(apiGenerador.createdAt).toISOString().split('T')[0] : '-',
   } : null;
 
-  const backPath = isMobile ? '/mobile/admin/actores/generadores' : '/admin/actores/generadores';
+  const backPath = '/admin/actores/generadores';
 
   if (isLoading) {
     return (
@@ -283,28 +283,10 @@ const GeneradorDetallePage: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-        <div className="flex items-start gap-4">
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>Volver</Button>
-          <div className="flex items-center gap-3">
-            <div className="w-14 h-14 bg-purple-100 rounded-xl flex items-center justify-center">
-              <Factory size={28} className="text-purple-600" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-2xl font-bold text-neutral-900">{generador.razonSocial}</h2>
-                <Badge variant="soft" color={generador.estado === 'activo' ? 'success' : 'warning'}>
-                  {generador.estado === 'activo' ? <CheckCircle size={12} className="mr-1" /> : <AlertTriangle size={12} className="mr-1" />}
-                  {generador.estado === 'activo' ? 'Activo' : 'Inactivo'}
-                </Badge>
-                <Badge variant="outline" color="neutral">{generador.categoria}</Badge>
-              </div>
-              <p className="text-neutral-600 mt-1 font-mono text-sm">CUIT: {generador.cuit}</p>
-            </div>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" leftIcon={<Download size={16} />} onClick={() => {
+          <Button variant="outline" size="sm" leftIcon={<Download size={16} />} onClick={() => {
             if (generador) downloadCsv([{
               RazonSocial: generador.razonSocial, CUIT: generador.cuit,
               Domicilio: generador.domicilio, Telefono: generador.telefono,
@@ -312,6 +294,23 @@ const GeneradorDetallePage: React.FC = () => {
               Estado: generador.estado
             }], 'generador-' + (generador.cuit || id));
           }}>Exportar</Button>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 bg-purple-100 rounded-xl flex items-center justify-center shrink-0">
+            <Factory size={24} className="text-purple-600 sm:hidden" />
+            <Factory size={28} className="text-purple-600 hidden sm:block" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <h2 className="text-lg sm:text-2xl font-bold text-neutral-900 truncate">{generador.razonSocial}</h2>
+              <Badge variant="soft" color={generador.estado === 'activo' ? 'success' : 'warning'} className="shrink-0">
+                {generador.estado === 'activo' ? <CheckCircle size={12} className="mr-1" /> : <AlertTriangle size={12} className="mr-1" />}
+                {generador.estado === 'activo' ? 'Activo' : 'Inactivo'}
+              </Badge>
+              <Badge variant="outline" color="neutral" className="shrink-0">{generador.categoria}</Badge>
+            </div>
+            <p className="text-neutral-600 mt-1 font-mono text-sm">CUIT: {generador.cuit}</p>
+          </div>
         </div>
       </div>
 
@@ -659,7 +658,7 @@ const GeneradorDetallePage: React.FC = () => {
                         <td className="px-3 py-2.5 text-sm text-neutral-700 hidden md:table-cell">{m.transportista?.razonSocial || '-'}</td>
                         <td className="px-3 py-2.5 text-sm text-neutral-600 hidden md:table-cell">{m.createdAt ? new Date(m.createdAt).toLocaleDateString('es-AR') : '-'}</td>
                         <td className="px-3 py-2.5 text-right">
-                          <Button variant="ghost" size="sm" onClick={() => navigate(isMobile ? `/mobile/manifiestos/${m.id}` : `/manifiestos/${m.id}`)}>Ver</Button>
+                          <Button variant="ghost" size="sm" onClick={() => navigate(`/manifiestos/${m.id}`)}>Ver</Button>
                         </td>
                       </tr>
                     ))}

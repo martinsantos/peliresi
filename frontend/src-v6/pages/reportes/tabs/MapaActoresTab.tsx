@@ -69,7 +69,8 @@ export default function MapaActoresTab({
   const [layers, setLayers] = useState({
     generadores: true,
     transportistas: true,
-    operadores: true,
+    operadoresFijos: true,
+    operadoresInSitu: true,
   });
 
   const toggleLayer = useCallback((layer: keyof typeof layers) => {
@@ -135,6 +136,16 @@ export default function MapaActoresTab({
 
   const totalGen = ccData?.generadores?.length || 0;
   const totalTrans = ccData?.transportistas?.length || 0;
+  const operadoresFijos = useMemo(() =>
+    (ccData?.operadores || []).filter((o: any) => {
+      const mods: string[] = o.modalidades || [];
+      return mods.includes('FIJO') || mods.length === 0;
+    }), [ccData?.operadores]);
+  const operadoresInSitu = useMemo(() =>
+    (ccData?.operadores || []).filter((o: any) => {
+      const mods: string[] = o.modalidades || [];
+      return mods.includes('IN_SITU');
+    }), [ccData?.operadores]);
   const totalOper = ccData?.operadores?.length || 0;
 
   if (import.meta.env.DEV) {
@@ -159,7 +170,8 @@ export default function MapaActoresTab({
           {([
             { key: 'generadores' as const, label: 'Generadores', color: 'bg-purple-500', activeClass: 'bg-purple-50 border-purple-300 text-purple-700 shadow-sm', count: totalGen },
             { key: 'transportistas' as const, label: 'Transportistas', color: 'bg-orange-500', activeClass: 'bg-orange-50 border-orange-300 text-orange-700 shadow-sm', count: totalTrans },
-            { key: 'operadores' as const, label: 'Operadores', color: 'bg-blue-500', activeClass: 'bg-blue-50 border-blue-300 text-blue-700 shadow-sm', count: totalOper },
+            { key: 'operadoresFijos' as const, label: 'Op. Fijos', color: 'bg-blue-500', activeClass: 'bg-blue-50 border-blue-300 text-blue-700 shadow-sm', count: operadoresFijos.length },
+            { key: 'operadoresInSitu' as const, label: 'Op. In Situ', color: 'bg-emerald-500', activeClass: 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-sm', count: operadoresInSitu.length },
           ]).map(l => (
             <button
               key={l.key}
@@ -177,7 +189,7 @@ export default function MapaActoresTab({
             </button>
           ))}
           <div className="ml-auto flex items-center gap-3 text-xs text-neutral-500">
-            {totalGen + totalTrans + totalOper} actores totales
+            {totalGen + totalTrans + totalOper} actores ({totalOper} operadores)
             {onToggleIncluirTodos && (
               <label className="flex items-center gap-1.5 cursor-pointer select-none border-l border-neutral-200 pl-3">
                 <span className="text-xs font-medium text-neutral-600">Todos</span>
@@ -304,31 +316,50 @@ export default function MapaActoresTab({
                 );
               })}
 
-              {/* Operadores */}
-              {layers.operadores && ccData.operadores?.map((o, idx) => (
+              {/* Operadores FIJOS — icono azul */}
+              {layers.operadoresFijos && operadoresFijos.map((o: any, idx: number) => (
                 <Marker
-                  key={`oper-${o.id}-${idx}`}
+                  key={`oper-fijo-${o.id}-${idx}`}
                   position={[o.latitud, o.longitud]}
                   icon={ACTOR_ICONS.operador}
                 >
                   <Popup>
                     <div className="text-sm">
-                      <strong className="text-blue-700">{o.razonSocial}</strong><br />
+                      <strong className="text-blue-700">{o.razonSocial}</strong>
+                      <span className="ml-1 text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-semibold">FIJO</span><br />
                       <span className="text-xs text-neutral-500">CUIT: {o.cuit}</span><br />
-                      <span className="text-xs text-neutral-500">Cat: {o.categoria}</span><br />
+                      {o.corrientesY && (
+                        <><span className="text-xs text-neutral-600">Corrientes: {o.corrientesY}</span><br /></>
+                      )}
                       <span className="text-xs">Recibidos: {o.cantRecibidos} | Tratados: {o.cantTratados}</span><br />
                       <div className="flex items-center gap-3 mt-1">
-                        <button
-                          className="text-xs text-primary-600 hover:underline"
-                          onClick={() => onSelectDep(getDepartamento(o.latitud, o.longitud))}
-                        >
-                          Ver departamento
-                        </button>
-                        <button
-                          className="text-xs text-primary-600 hover:underline font-medium"
-                          onClick={() => navigate(`/admin/actores/operadores/${o.id}`)}
-                        >
-                          Ver detalle →
+                        <button className="text-xs text-primary-600 hover:underline" onClick={() => onSelectDep(getDepartamento(o.latitud, o.longitud))}>Ver departamento</button>
+                        <button className="text-xs text-primary-600 hover:underline font-medium" onClick={() => navigate(`/admin/actores/operadores/${o.id}`)}>Ver detalle →</button>
+                      </div>
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
+
+              {/* Operadores IN SITU — icono verde */}
+              {layers.operadoresInSitu && operadoresInSitu.map((o: any, idx: number) => (
+                <Marker
+                  key={`oper-insitu-${o.id}-${idx}`}
+                  position={[o.latitud, o.longitud]}
+                  icon={ACTOR_ICONS.operador}
+                >
+                  <Popup>
+                    <div className="text-sm">
+                      <strong className="text-emerald-700">{o.razonSocial}</strong>
+                      <span className="ml-1 text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-semibold">IN SITU</span><br />
+                      <span className="text-xs text-neutral-500">CUIT: {o.cuit}</span><br />
+                      {o.corrientesY && (
+                        <><span className="text-xs text-neutral-600">Corrientes: {o.corrientesY}</span><br /></>
+                      )}
+                      <span className="text-xs">Recibidos: {o.cantRecibidos} | Tratados: {o.cantTratados}</span><br />
+                      <div className="flex items-center gap-3 mt-1">
+                        <button className="text-xs text-primary-600 hover:underline" onClick={() => onSelectDep(getDepartamento(o.latitud, o.longitud))}>Ver departamento</button>
+                        <button className="text-xs text-primary-600 hover:underline font-medium" onClick={() => navigate(`/admin/actores/operadores/${o.id}`)}>Ver detalle →
                         </button>
                       </div>
                     </div>
@@ -342,7 +373,8 @@ export default function MapaActoresTab({
               <div className="flex items-center gap-3 flex-wrap">
                 <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-purple-500" /> Generadores</span>
                 <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-orange-500" /> Transportistas</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Operadores</span>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Op. Fijos</span>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Op. In Situ</span>
               </div>
             </div>
           </div>

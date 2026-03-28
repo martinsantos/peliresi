@@ -295,7 +295,7 @@ export const ActoresPage: React.FC = () => {
     {
       key: 'contacto',
       width: '22%',
-      hiddenBelow: 'md' as const,
+      hiddenBelow: 'lg' as const,
       header: 'Contacto',
       render: (row: any) => (
         <div className="space-y-1">
@@ -334,7 +334,11 @@ export const ActoresPage: React.FC = () => {
           <Button variant="ghost" size="sm" className="p-2" onClick={(e: any) => { e.stopPropagation(); verDetalle(row); }}>
             <Eye size={16} />
           </Button>
-          <Button variant="ghost" size="sm" className="p-2" onClick={(e: any) => { e.stopPropagation(); }}>
+          <Button variant="ghost" size="sm" className="p-2" onClick={(e: any) => {
+            e.stopPropagation();
+            const base = row.tipo === 'generador' ? '/admin/actores/generadores' : row.tipo === 'transportista' ? '/actores/transportistas' : '/admin/actores/operadores';
+            navigate(`${base}/${row.id}`);
+          }}>
             <Edit size={16} />
           </Button>
           <Button

@@ -208,21 +208,27 @@ export const generarPDFManifiesto = async (req: AuthRequest, res: Response, next
         doc.y += 30;
 
         // ── 2. Transportista ──
-        drawSectionTitle(doc, '02', 'TRANSPORTISTA HABILITADO');
-        const tY = doc.y;
-        drawField(doc, 'Razon Social', manifiesto.transportista.razonSocial, 58, tY, 220);
-        drawField(doc, 'CUIT', manifiesto.transportista.cuit, 290, tY, 100);
-        drawField(doc, 'N\u00BA Habilitacion', manifiesto.transportista.numeroHabilitacion || 'N/A', 400, tY, 140);
-        doc.y = tY + 28;
-        if (manifiesto.transportista.vehiculos?.[0]) {
-            const v = manifiesto.transportista.vehiculos[0];
-            drawField(doc, 'Vehiculo', `${v.marca} ${v.modelo} \u2014 ${v.patente}`, 58, doc.y, 220);
+        if (manifiesto.transportista) {
+            drawSectionTitle(doc, '02', 'TRANSPORTISTA HABILITADO');
+            const tY = doc.y;
+            drawField(doc, 'Razon Social', manifiesto.transportista.razonSocial, 58, tY, 220);
+            drawField(doc, 'CUIT', manifiesto.transportista.cuit, 290, tY, 100);
+            drawField(doc, 'N\u00BA Habilitacion', manifiesto.transportista.numeroHabilitacion || 'N/A', 400, tY, 140);
+            doc.y = tY + 28;
+            if (manifiesto.transportista.vehiculos?.[0]) {
+                const v = manifiesto.transportista.vehiculos[0];
+                drawField(doc, 'Vehiculo', `${v.marca} ${v.modelo} \u2014 ${v.patente}`, 58, doc.y, 220);
+            }
+            if (manifiesto.transportista.choferes?.[0]) {
+                const c = manifiesto.transportista.choferes[0];
+                drawField(doc, 'Chofer', `${c.nombre} \u2014 DNI ${c.dni}`, 290, doc.y, 250);
+            }
+            doc.y += 30;
+        } else {
+            drawSectionTitle(doc, '02', 'MODALIDAD IN SITU');
+            drawField(doc, 'Modalidad', 'Tratamiento in situ — sin transporte', 58, doc.y, 400);
+            doc.y += 30;
         }
-        if (manifiesto.transportista.choferes?.[0]) {
-            const c = manifiesto.transportista.choferes[0];
-            drawField(doc, 'Chofer', `${c.nombre} \u2014 DNI ${c.dni}`, 290, doc.y, 250);
-        }
-        doc.y += 30;
 
         // ── 3. Operador ──
         drawSectionTitle(doc, '03', 'OPERADOR DE TRATAMIENTO');

@@ -68,31 +68,33 @@ export async function ejecutarRecordatorios(): Promise<number> {
       ? `https://maps.google.com/?q=${gen.latitud},${gen.longitud}`
       : null;
 
-    // Notificar transportista con ubicacion
-    await notificationService.crearNotificacion({
-      usuarioId: trans.usuario.id,
-      tipo: 'ALERTA_SISTEMA',
-      titulo: 'Recordatorio: retiro manana',
-      mensaje: `${m.numero} — Retiro: ${fecha}. ${gen.razonSocial}, ${gen.domicilio || ''}`.trim(),
-      manifiestoId: m.id,
-      prioridad: 'ALTA',
-      datos: {
-        tipo: 'recordatorio_retiro',
-        fechaRetiro: fecha,
-        direccion: gen.domicilio || null,
-        lat: gen.latitud,
-        lng: gen.longitud,
-        mapsUrl,
-        generador: gen.razonSocial,
-      },
-    });
+    // Notificar transportista con ubicacion (solo si hay transportista — no aplica para IN_SITU)
+    if (trans) {
+      await notificationService.crearNotificacion({
+        usuarioId: trans.usuario.id,
+        tipo: 'ALERTA_SISTEMA',
+        titulo: 'Recordatorio: retiro manana',
+        mensaje: `${m.numero} — Retiro: ${fecha}. ${gen.razonSocial}, ${gen.domicilio || ''}`.trim(),
+        manifiestoId: m.id,
+        prioridad: 'ALTA',
+        datos: {
+          tipo: 'recordatorio_retiro',
+          fechaRetiro: fecha,
+          direccion: gen.domicilio || null,
+          lat: gen.latitud,
+          lng: gen.longitud,
+          mapsUrl,
+          generador: gen.razonSocial,
+        },
+      });
+    }
 
     // Notificar generador
     await notificationService.crearNotificacion({
       usuarioId: gen.usuario.id,
       tipo: 'ALERTA_SISTEMA',
       titulo: 'Recordatorio: retiro programado manana',
-      mensaje: `${m.numero} — El transportista ${trans.razonSocial} retirara manana ${fecha}`,
+      mensaje: `${m.numero} — ${trans ? `El transportista ${trans.razonSocial} retirara` : 'Operador in situ trabajara'} manana ${fecha}`,
       manifiestoId: m.id,
       prioridad: 'NORMAL',
       datos: { tipo: 'recordatorio_retiro', fechaRetiro: fecha },

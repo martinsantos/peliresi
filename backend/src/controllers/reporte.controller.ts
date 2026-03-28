@@ -38,13 +38,16 @@ export const reporteManifiestosPorPeriodo = async (req: AuthRequest, res: Respon
             where.residuos = { some: { tipoResiduoId: tipoResiduoId as string } };
         }
 
-        // Filtrar por rol
-        if (req.user.rol === 'GENERADOR' && req.user.generador) {
-            where.generadorId = req.user.generador.id;
-        } else if (req.user.rol === 'TRANSPORTISTA' && req.user.transportista) {
-            where.transportistaId = req.user.transportista.id;
-        } else if (req.user.rol === 'OPERADOR' && req.user.operador) {
-            where.operadorId = req.user.operador.id;
+        // Filtrar por rol (ADMIN, ADMIN_*, esInspector → sin filtro)
+        const isFullAccess = ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'].includes(req.user.rol) || req.user.esInspector;
+        if (!isFullAccess) {
+            if (req.user.rol === 'GENERADOR' && req.user.generador) {
+                where.generadorId = req.user.generador.id;
+            } else if (req.user.rol === 'TRANSPORTISTA' && req.user.transportista) {
+                where.transportistaId = req.user.transportista.id;
+            } else if (req.user.rol === 'OPERADOR' && req.user.operador) {
+                where.operadorId = req.user.operador.id;
+            }
         }
 
         // Run paginated query + count + aggregations in parallel
@@ -110,7 +113,7 @@ export const reporteManifiestosPorPeriodo = async (req: AuthRequest, res: Respon
                     estado: m.estado,
                     createdAt: m.createdAt,
                     generador: m.generador.razonSocial,
-                    transportista: m.transportista.razonSocial,
+                    transportista: m.transportista?.razonSocial ?? null,
                     operador: m.operador.razonSocial,
                     residuos: m.residuos.map(r => ({
                         tipo: r.tipoResiduo.nombre,
@@ -151,9 +154,16 @@ export const reporteResiduosTratados = async (req: AuthRequest, res: Response, n
             if (fechaFin) where.fechaCierre.lte = new Date(fechaFin as string);
         }
 
-        // Filtrar por operador si no es admin
-        if (req.user.rol === 'OPERADOR' && req.user.operador) {
-            where.operadorId = req.user.operador.id;
+        // Filtrar por rol (ADMIN, ADMIN_*, esInspector → sin filtro)
+        const isFullAccess = ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'].includes(req.user.rol) || req.user.esInspector;
+        if (!isFullAccess) {
+            if (req.user.rol === 'GENERADOR' && req.user.generador) {
+                where.generadorId = req.user.generador.id;
+            } else if (req.user.rol === 'TRANSPORTISTA' && req.user.transportista) {
+                where.transportistaId = req.user.transportista.id;
+            } else if (req.user.rol === 'OPERADOR' && req.user.operador) {
+                where.operadorId = req.user.operador.id;
+            }
         }
 
         const [manifiestos, totalCount] = await Promise.all([
@@ -249,10 +259,38 @@ export const reporteTransporte = async (req: AuthRequest, res: Response, next: N
             if (fechaFin) manifiestoWhere.createdAt.lte = new Date(fechaFin as string);
         }
 
+        // Role-based filtering (ADMIN, ADMIN_*, esInspector → sin filtro)
+        const isFullAccess = ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'].includes(req.user.rol) || req.user.esInspector;
+        const transportistaWhere: any = {};
+
+        if (!isFullAccess) {
+            if (req.user.rol === 'TRANSPORTISTA' && req.user.transportista) {
+                // Only show their own company
+                transportistaWhere.id = req.user.transportista.id;
+            } else if (req.user.rol === 'GENERADOR' && req.user.generador) {
+                // Only show transportistas involved in their manifiestos
+                const involvedIds = await prisma.manifiesto.findMany({
+                    where: { generadorId: req.user.generador.id },
+                    select: { transportistaId: true },
+                    distinct: ['transportistaId'],
+                });
+                transportistaWhere.id = { in: involvedIds.map(m => m.transportistaId).filter(Boolean) };
+            } else if (req.user.rol === 'OPERADOR' && req.user.operador) {
+                // Only show transportistas that delivered to them
+                const involvedIds = await prisma.manifiesto.findMany({
+                    where: { operadorId: req.user.operador.id },
+                    select: { transportistaId: true },
+                    distinct: ['transportistaId'],
+                });
+                transportistaWhere.id = { in: involvedIds.map(m => m.transportistaId).filter(Boolean) };
+            }
+        }
+
         // Get total count + paginated transportistas with _count instead of full manifiestos
         const [totalTransportistas, transportistas] = await Promise.all([
-            prisma.transportista.count(),
+            prisma.transportista.count({ where: transportistaWhere }),
             prisma.transportista.findMany({
+                where: transportistaWhere,
                 skip,
                 take: limitNum,
                 select: {
@@ -433,7 +471,7 @@ export const exportarCSV = async (req: AuthRequest, res: Response, next: NextFun
 
                 manifiestos.forEach(m => {
                     m.residuos.forEach(r => {
-                        csvContent += `"${sanitizeCsvCell(m.numero)}","${sanitizeCsvCell(m.estado)}","${sanitizeCsvCell(m.generador.razonSocial)}","${sanitizeCsvCell(m.transportista.razonSocial)}","${sanitizeCsvCell(m.operador.razonSocial)}","${m.createdAt.toISOString()}","${m.fechaFirma?.toISOString() || ''}","${m.fechaRetiro?.toISOString() || ''}","${m.fechaEntrega?.toISOString() || ''}","${m.fechaRecepcion?.toISOString() || ''}","${m.fechaCierre?.toISOString() || ''}","${sanitizeCsvCell(r.tipoResiduo.nombre)}","${r.cantidad}","${r.unidad}"\n`;
+                        csvContent += `"${sanitizeCsvCell(m.numero)}","${sanitizeCsvCell(m.estado)}","${sanitizeCsvCell(m.generador.razonSocial)}","${sanitizeCsvCell(m.transportista?.razonSocial ?? 'IN SITU')}","${sanitizeCsvCell(m.operador.razonSocial)}","${m.createdAt.toISOString()}","${m.fechaFirma?.toISOString() || ''}","${m.fechaRetiro?.toISOString() || ''}","${m.fechaEntrega?.toISOString() || ''}","${m.fechaRecepcion?.toISOString() || ''}","${m.fechaCierre?.toISOString() || ''}","${sanitizeCsvCell(r.tipoResiduo.nombre)}","${r.cantidad}","${r.unidad}"\n`;
                     });
                 });
 

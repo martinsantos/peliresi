@@ -46,6 +46,18 @@ const EscanerQRPage = lazy(() => import('./pages/escaner/EscanerQRPage'));
 const EstadisticasPage = lazy(() => import('./pages/estadisticas/EstadisticasPage'));
 const NotFoundPage = lazy(() => import('./pages/shared/NotFoundPage'));
 const VerificarManifiestoPage = lazy(() => import('./pages/manifiestos/VerificarManifiestoPage'));
+const InscripcionWizardPage = lazy(() => import('./pages/public/InscripcionWizardPage'));
+const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
+const RegistroPage = lazy(() => import('./pages/auth/RegistroPage'));
+const MiSolicitudPage = lazy(() => import('./pages/solicitud/MiSolicitudPage'));
+const AdminSolicitudesPage = lazy(() => import('./pages/admin/AdminSolicitudesPage'));
+const SolicitudDetallePage = lazy(() => import('./pages/admin/SolicitudDetallePage'));
+const AdminBlockchainPage = lazy(() => import('./pages/admin/AdminBlockchainPage'));
+const AdminTratamientosPage = lazy(() => import('./pages/admin/AdminTratamientosPage'));
+const AdminRenovacionesPage = lazy(() => import('./pages/admin/AdminRenovacionesPage'));
+const SolicitarCambiosPage = lazy(() => import('./pages/perfil/SolicitarCambiosPage'));
+const EditarManifiestoPage = lazy(() => import('./pages/manifiestos/EditarManifiestoPage'));
 
 const PageLoader: React.FC = () => (
   <div className="min-h-screen flex items-center justify-center bg-neutral-50">
@@ -97,7 +109,7 @@ const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
 
   // Public routes that don't need auth
-  const publicPaths = ['/login', '/reclamar', '/manifiestos/verificar', '/inscripcion', '/registro'];
+  const publicPaths = ['/login', '/reclamar', '/manifiestos/verificar', '/inscripcion', '/registro', '/recuperar', '/reset-password'];
   const isPublic = publicPaths.some(p => location.pathname.startsWith(p));
 
   // While auth state is loading, show loader (even for public routes,
@@ -124,9 +136,12 @@ function AppMobile() {
       <Suspense fallback={<PageLoader />}>
         <AuthGate>
         <Routes>
-          {/* Login & Account Claim */}
+          {/* Auth — public, sin layout */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/reclamar" element={<ReclamarCuentaPage />} />
+          <Route path="/registro" element={<RegistroPage />} />
+          <Route path="/recuperar" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
           {/* Mobile Routes - MobileLayout (auth handled by AuthGate above) */}
           <Route element={<MobileLayout />}>
@@ -135,6 +150,7 @@ function AppMobile() {
             <Route path="/centro-control/viaje/:id" element={<ViajeRedirectMobile />} />
             <Route path="/manifiestos" element={<ManifiestosPage />} />
             <Route path="/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
+            <Route path="/manifiestos/:id/editar" element={<EditarManifiestoPage />} />
             <Route path="/manifiestos/:id" element={<ManifiestoDetallePage />} />
             <Route path="/transporte/perfil" element={<TransportePerfilPage />} />
             <Route path="/transporte/viaje/:id" element={<ViajeEnCursoTransportista />} />
@@ -149,6 +165,8 @@ function AppMobile() {
             <Route path="/notificaciones" element={<NotificacionesPage />} />
             <Route path="/configuracion" element={<ConfiguracionPage />} />
             <Route path="/mi-perfil" element={<PerfilPage />} />
+            <Route path="/mi-perfil/solicitar-cambios" element={<SolicitarCambiosPage />} />
+            <Route path="/mi-solicitud" element={<MiSolicitudPage />} />
             <Route path="/ayuda" element={<AyudaPage />} />
             <Route path="/switch-user" element={<UserSwitcherPage />} />
 
@@ -161,6 +179,11 @@ function AppMobile() {
             <Route path="/admin/operadores" element={<AdminOperadoresPage />} />
             <Route path="/admin/vehiculos" element={<AdminVehiculosPage />} />
             <Route path="/admin/residuos" element={<AdminResiduosPage />} />
+            <Route path="/admin/tratamientos" element={<AdminTratamientosPage />} />
+            <Route path="/admin/blockchain" element={<AdminBlockchainPage />} />
+            <Route path="/admin/renovaciones" element={<AdminRenovacionesPage />} />
+            <Route path="/admin/solicitudes" element={<AdminSolicitudesPage />} />
+            <Route path="/admin/solicitudes/:id" element={<SolicitudDetallePage />} />
             <Route path="/admin/auditoria" element={<AuditoriaPage />} />
             <Route path="/admin/carga-masiva" element={<CargaMasivaPage />} />
 
@@ -168,6 +191,9 @@ function AppMobile() {
             <Route path="/escaner-qr" element={<EscanerQRPage />} />
             <Route path="/estadisticas" element={<EstadisticasPage />} />
           </Route>
+
+          {/* Inscripcion publica de actores */}
+          <Route path="/inscripcion/:tipo" element={<InscripcionWizardPage />} />
 
           {/* Verificación pública de manifiesto (QR) */}
           <Route path="/manifiestos/verificar/:numero" element={<VerificarManifiestoPage />} />

@@ -258,8 +258,8 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
         const userData = {
           id: user.id, email: user.email, rol: user.rol, nombre: user.nombre,
           apellido: user.apellido, empresa: user.empresa, telefono: user.telefono,
-          activo: user.activo, generador: user.generador, transportista: user.transportista,
-          operador: user.operador, createdAt: user.createdAt,
+          activo: user.activo, esInspector: user.esInspector, generador: user.generador,
+          transportista: user.transportista, operador: user.operador, createdAt: user.createdAt,
         };
 
         // Audit restricted login
@@ -311,8 +311,8 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     const userData = {
       id: user.id, email: user.email, rol: user.rol, nombre: user.nombre,
       apellido: user.apellido, empresa: user.empresa, telefono: user.telefono,
-      activo: user.activo, generador: user.generador, transportista: user.transportista,
-      operador: user.operador, createdAt: user.createdAt,
+      activo: user.activo, esInspector: user.esInspector, generador: user.generador,
+      transportista: user.transportista, operador: user.operador, createdAt: user.createdAt,
     };
 
     res.json({ success: true, data: { user: userData, tokens: { accessToken, refreshToken } } });
@@ -395,8 +395,8 @@ export const getProfile = async (req: Request & { user?: any }, res: Response, n
       where: { id: req.user.id },
       select: {
         id: true, email: true, rol: true, nombre: true, apellido: true,
-        empresa: true, telefono: true, activo: true, createdAt: true,
-        generador: true, transportista: true, operador: true,
+        empresa: true, telefono: true, activo: true, esInspector: true,
+        createdAt: true, generador: true, transportista: true, operador: true,
         notifNuevoRegistro: true, notifEmail: true,
       },
     });

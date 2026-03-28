@@ -36,6 +36,8 @@ export interface ActorOperador {
   categoria: string;
   latitud: number;
   longitud: number;
+  modalidades?: string[];
+  corrientesY?: string;
   cantRecibidos: number;
   cantTratados: number;
 }

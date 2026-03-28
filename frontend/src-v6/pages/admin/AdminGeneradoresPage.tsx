@@ -45,7 +45,6 @@ import { useGeneradoresEnrichment } from '../../hooks/useEnrichment';
 const AdminGeneradoresPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const isMobile = location.pathname.startsWith('/mobile');
   const { isAdmin, impersonateUser } = useAuth();
   const { data: enrichmentData } = useGeneradoresEnrichment();
   const GENERADORES_DATA = enrichmentData?.generadores || {};
@@ -144,7 +143,7 @@ const AdminGeneradoresPage: React.FC = () => {
   };
 
   const openEditar = (row: typeof tableData[0]) => {
-    navigate(isMobile ? `/mobile/admin/actores/generadores/${row.id}/editar` : `/admin/actores/generadores/${row.id}/editar`);
+    navigate(`/admin/actores/generadores/${row.id}/editar`);
   };
 
   const handleEliminar = async () => {
@@ -185,9 +184,10 @@ const AdminGeneradoresPage: React.FC = () => {
   const columns = [
     {
       key: 'generador',
-      width: '22%',
+      width: '25%',
       header: 'Generador',
       sortable: true,
+      truncate: true,
       render: (row: typeof tableData[0]) => (
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -207,10 +207,10 @@ const AdminGeneradoresPage: React.FC = () => {
     },
     {
       key: 'categoria',
-      width: '10%',
+      width: '9%',
       header: 'Categoría',
       sortable: true,
-      hiddenBelow: 'md' as const,
+      hiddenBelow: 'xl' as const,
       render: (row: typeof tableData[0]) => {
         const cat = row.categoria !== '-' ? row.categoria : null;
         return cat ? (
@@ -224,9 +224,9 @@ const AdminGeneradoresPage: React.FC = () => {
     },
     {
       key: 'categoriasY',
-      width: '12%',
+      width: '10%',
       header: 'Corrientes Y',
-      hiddenBelow: 'lg' as const,
+      hiddenBelow: '2xl' as const,
       render: (row: typeof tableData[0]) => row.categoriasControl.length > 0 ? (
         <div className="flex flex-wrap gap-1">
           {row.categoriasControl.slice(0, 3).map((code: string) => (
@@ -246,9 +246,9 @@ const AdminGeneradoresPage: React.FC = () => {
     },
     {
       key: 'rubro',
-      width: '16%',
+      width: '13%',
       header: 'Rubro / Actividad',
-      hiddenBelow: 'lg' as const,
+      hiddenBelow: '2xl' as const,
       render: (row: typeof tableData[0]) => {
         const text = row.rubro || row.actividad;
         return text ? (
@@ -262,9 +262,9 @@ const AdminGeneradoresPage: React.FC = () => {
     },
     {
       key: 'contacto',
-      width: '16%',
+      width: '13%',
       header: 'Contacto',
-      hiddenBelow: 'lg' as const,
+      hiddenBelow: '2xl' as const,
       render: (row: typeof tableData[0]) => {
         const mail = row.emailOriginal || row.email;
         return (
@@ -288,9 +288,9 @@ const AdminGeneradoresPage: React.FC = () => {
     },
     {
       key: 'compliance',
-      width: '7%',
+      width: '8%',
       header: 'Compliance',
-      hiddenBelow: 'md' as const,
+      hiddenBelow: 'xl' as const,
       render: (row: typeof tableData[0]) => {
         const cfg = {
           verde: { icon: ShieldCheck, color: 'text-success-600', bg: 'bg-success-50', label: 'Al dia' },
@@ -322,14 +322,14 @@ const AdminGeneradoresPage: React.FC = () => {
     },
     {
       key: 'acciones',
-      width: '10%',
+      width: '12%',
       header: '',
       align: 'right' as const,
       render: (row: typeof tableData[0]) => (
-        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
           {isAdmin && row._raw?.usuarioId && row.activo && (
             <button
-              className="p-1.5 text-amber-500 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
+              className="p-1 text-amber-500 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
               title="Acceso Comodín — ver como este generador"
               onClick={async (e) => {
                 e.stopPropagation();
@@ -337,36 +337,36 @@ const AdminGeneradoresPage: React.FC = () => {
                 catch (err: any) { toast.error(err?.response?.data?.message || 'No se pudo acceder como este usuario'); }
               }}
             >
-              <Eye size={16} />
+              <Eye size={14} />
             </button>
           )}
           <button
-            className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-            onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/admin/actores/generadores/${row.id}` : `/admin/actores/generadores/${row.id}`); }}
+            className="p-1 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+            onClick={(e) => { e.stopPropagation(); navigate(`/admin/actores/generadores/${row.id}`); }}
             title="Ver"
           >
-            <Eye size={16} />
+            <Eye size={14} />
           </button>
           <button
-            className="p-1.5 text-neutral-400 hover:text-info-600 hover:bg-info-50 rounded-lg transition-colors"
+            className="p-1 text-neutral-400 hover:text-info-600 hover:bg-info-50 rounded-lg transition-colors"
             onClick={(e) => { e.stopPropagation(); openEditar(row); }}
             title="Editar"
           >
-            <Edit size={16} />
+            <Edit size={14} />
           </button>
           <button
-            className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-            onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/admin/actores/generadores/${row.id}/renovar` : `/admin/actores/generadores/${row.id}/renovar`); }}
+            className="p-1 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+            onClick={(e) => { e.stopPropagation(); navigate(`/admin/actores/generadores/${row.id}/renovar`); }}
             title="Renovar"
           >
-            <RefreshCw size={16} />
+            <RefreshCw size={14} />
           </button>
           <button
-            className="p-1.5 text-neutral-400 hover:text-error-600 hover:bg-error-50 rounded-lg transition-colors"
+            className="p-1 text-neutral-400 hover:text-error-600 hover:bg-error-50 rounded-lg transition-colors"
             onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: row.id, razonSocial: row.razonSocial }); setModalEliminar(true); }}
             title="Eliminar"
           >
-            <Trash2 size={16} />
+            <Trash2 size={14} />
           </button>
         </div>
       ),
@@ -390,7 +390,7 @@ const AdminGeneradoresPage: React.FC = () => {
           <Button variant="outline" leftIcon={<Download size={18} />} onClick={handleExport}>
             Exportar
           </Button>
-          <Button leftIcon={<Plus size={18} />} onClick={() => navigate(isMobile ? '/mobile/admin/actores/generadores/nuevo' : '/admin/actores/generadores/nuevo')}>
+          <Button leftIcon={<Plus size={18} />} onClick={() => navigate('/admin/actores/generadores/nuevo')}>
             Nuevo Generador
           </Button>
         </div>
@@ -529,7 +529,7 @@ const AdminGeneradoresPage: React.FC = () => {
               keyExtractor={(row) => row.id}
               sortable={true}
               onSort={handleSort}
-              onRowClick={(row) => navigate(isMobile ? `/mobile/admin/actores/generadores/${row.id}` : `/admin/actores/generadores/${row.id}`)}
+              onRowClick={(row) => navigate(`/admin/actores/generadores/${row.id}`)}
               emptyMessage="No se encontraron generadores"
               stickyHeader
               fixedLayout

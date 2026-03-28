@@ -92,7 +92,6 @@ const ManifiestosPage: React.FC = () => {
 
   const total = apiData?.total || manifiestos.length;
   const totalPages = apiData?.totalPages || 1;
-  const isMobile = window.location.pathname.startsWith('/mobile');
 
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) return;
@@ -122,7 +121,7 @@ const ManifiestosPage: React.FC = () => {
           </div>
           <Button
             leftIcon={<Plus size={18} />}
-            onClick={() => navigate(isMobile ? '/mobile/manifiestos/nuevo' : '/manifiestos/nuevo')}
+            onClick={() => navigate('/manifiestos/nuevo')}
             className="hover-glow"
           >
             Nuevo Manifiesto
@@ -222,9 +221,53 @@ const ManifiestosPage: React.FC = () => {
         </div>
       )}
 
-      {/* Table */}
+      {/* Mobile Card View */}
+      {!isLoading && manifiestos.length > 0 && (
+        <div className="md:hidden space-y-2">
+          {manifiestos.map((m) => (
+            <Card
+              key={m.id}
+              className="active:scale-[0.98] transition-transform cursor-pointer"
+              onClick={() => navigate(`/manifiestos/${m.id}`)}
+            >
+              <div className="p-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-8 h-8 bg-primary-50 rounded-lg flex items-center justify-center shrink-0">
+                      <FileText size={16} className="text-primary-600" />
+                    </div>
+                    <span className="font-mono font-semibold text-sm text-neutral-900">{m.numero}</span>
+                    {m.blockchainStatus === 'CONFIRMADO' && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-semibold border border-emerald-200 shrink-0">
+                        <ShieldCheck size={10} /> BC
+                      </span>
+                    )}
+                  </div>
+                  <Badge variant="soft" color={estadoBadgeColor[m.estado] || 'neutral'}>
+                    {ESTADO_LABELS[m.estado as EstadoManifiesto] || m.estado}
+                  </Badge>
+                </div>
+                <p className="text-sm text-neutral-600 truncate pl-10">{m.generadorNombre}</p>
+                <div className="flex items-center justify-between mt-2 pl-10">
+                  <span className="text-xs text-neutral-400">{formatDate(m.fecha)}</span>
+                  <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
+                    <Button variant="ghost" size="sm" className="p-1.5" onClick={() => navigate(`/manifiestos/${m.id}`)}>
+                      <Eye size={14} />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="p-1.5 text-error-500" onClick={() => setDeleteTarget({ id: m.id, numero: m.numero })}>
+                      <Trash2 size={14} />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Desktop Table */}
       {!isLoading && (
-        <Card padding="none" className="max-h-[70vh] overflow-auto">
+        <Card padding="none" className="hidden md:block max-h-[70vh] overflow-auto">
           <table className="w-full table-fixed">
               <thead className="bg-[#F5F5F3] border-b border-neutral-200 sticky top-0 z-10">
                 <tr>
@@ -241,13 +284,13 @@ const ManifiestosPage: React.FC = () => {
                       {sortBy === 'estado' ? (sortOrder === 'desc' ? <ArrowDown size={13} /> : <ArrowUp size={13} />) : <ArrowUpDown size={13} className="opacity-40" />}
                     </button>
                   </th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider hidden md:table-cell" style={{ width: "15%" }}>
+                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider hidden lg:table-cell" style={{ width: "15%" }}>
                     <button onClick={() => handleSort('createdAt')} className="flex items-center gap-1 hover:text-primary-600 transition-colors">
                       Fecha
                       {sortBy === 'createdAt' ? (sortOrder === 'desc' ? <ArrowDown size={13} /> : <ArrowUp size={13} />) : <ArrowUpDown size={13} className="opacity-40" />}
                     </button>
                   </th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider hidden md:table-cell" style={{ width: "10%" }}>Peso</th>
+                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider hidden lg:table-cell" style={{ width: "10%" }}>Peso</th>
                   <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: "15%" }}>Acciones</th>
                 </tr>
               </thead>
@@ -257,7 +300,7 @@ const ManifiestosPage: React.FC = () => {
                     key={m.id}
                     className="table-row-hover cursor-pointer group"
                     style={{ animationDelay: `${idx * 30}ms` }}
-                    onClick={() => navigate(isMobile ? `/mobile/manifiestos/${m.id}` : `/manifiestos/${m.id}`)}
+                    onClick={() => navigate(`/manifiestos/${m.id}`)}
                   >
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-3">
@@ -290,16 +333,16 @@ const ManifiestosPage: React.FC = () => {
                         {ESTADO_LABELS[m.estado as EstadoManifiesto] || m.estado}
                       </Badge>
                     </td>
-                    <td className="px-3 py-2.5 text-neutral-600 hidden md:table-cell">{formatDate(m.fecha)}</td>
-                    <td className="px-3 py-2.5 text-neutral-700 font-medium hidden md:table-cell">
+                    <td className="px-3 py-2.5 text-neutral-600 hidden lg:table-cell">{formatDate(m.fecha)}</td>
+                    <td className="px-3 py-2.5 text-neutral-700 font-medium hidden lg:table-cell">
                       {typeof m.peso === 'number' ? m.peso.toLocaleString('es-AR') : '0'} {m.unidad}
                     </td>
                     <td className="px-3 py-2.5">
                       <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="sm" className="p-2" onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/manifiestos/${m.id}` : `/manifiestos/${m.id}`); }}>
+                        <Button variant="ghost" size="sm" className="p-2" onClick={(e) => { e.stopPropagation(); navigate(`/manifiestos/${m.id}`); }}>
                           <Eye size={16} />
                         </Button>
-                        <Button variant="ghost" size="sm" className="p-2" onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/manifiestos/${m.id}/editar` : `/manifiestos/${m.id}/editar`); }}>
+                        <Button variant="ghost" size="sm" className="p-2" onClick={(e) => { e.stopPropagation(); navigate(`/manifiestos/${m.id}/editar`); }}>
                           <Edit size={16} />
                         </Button>
                         <Button variant="ghost" size="sm" className="p-2 text-error-500 hover:text-error-600" onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: m.id, numero: m.numero }); }}>
@@ -311,32 +354,36 @@ const ManifiestosPage: React.FC = () => {
                 ))}
               </tbody>
             </table>
+        </Card>
+      )}
 
-          {/* Empty state */}
-          {manifiestos.length === 0 && !isLoading && (
-            <div className="text-center py-12">
-              <FileText size={48} className="mx-auto text-neutral-300 mb-4" />
-              <p className="text-neutral-500 font-medium">No se encontraron manifiestos</p>
-              <p className="text-sm text-neutral-400 mt-1">Prueba con otros filtros de búsqueda</p>
-            </div>
-          )}
-
-          {/* Pagination */}
-          <div className="px-3 py-2.5 border-t border-neutral-200 flex items-center justify-between">
-            <p className="text-sm text-neutral-600">
-              Mostrando <span className="font-medium">{manifiestos.length}</span> de <span className="font-medium">{total}</span> manifiestos
-              {isError && <span className="text-warning-600 ml-2">(datos locales)</span>}
-            </p>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-                Anterior
-              </Button>
-              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
-                Siguiente
-              </Button>
-            </div>
+      {/* Empty state */}
+      {!isLoading && manifiestos.length === 0 && (
+        <Card>
+          <div className="text-center py-12">
+            <FileText size={48} className="mx-auto text-neutral-300 mb-4" />
+            <p className="text-neutral-500 font-medium">No se encontraron manifiestos</p>
+            <p className="text-sm text-neutral-400 mt-1">Prueba con otros filtros de búsqueda</p>
           </div>
         </Card>
+      )}
+
+      {/* Pagination */}
+      {!isLoading && manifiestos.length > 0 && (
+        <div className="px-3 py-2.5 bg-white rounded-xl border border-neutral-200 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <p className="text-xs sm:text-sm text-neutral-600">
+            Mostrando <span className="font-medium">{manifiestos.length}</span> de <span className="font-medium">{total}</span>
+            {isError && <span className="text-warning-600 ml-2">(datos locales)</span>}
+          </p>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+              Anterior
+            </Button>
+            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+              Siguiente
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* Delete Confirmation Modal */}

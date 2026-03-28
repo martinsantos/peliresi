@@ -12,6 +12,7 @@ export interface AuthUser {
   nombre: string;
   rol: Rol;
   activo: boolean;
+  esInspector: boolean;
   generador: { id: string; [key: string]: unknown } | null;
   transportista: { id: string; [key: string]: unknown } | null;
   operador: { id: string; [key: string]: unknown } | null;
@@ -50,6 +51,7 @@ export const isAuthenticated = async (
         nombre: true,
         rol: true,
         activo: true,
+        esInspector: true,
         generador: true,
         transportista: true,
         operador: true,

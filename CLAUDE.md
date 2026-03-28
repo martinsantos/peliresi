@@ -5,7 +5,7 @@ Permite el seguimiento completo del ciclo de vida de manifiestos: desde la gener
 
 **📚 Documentación Unificada**: Ver [`../INFRAESTRUCTURA.md`](../INFRAESTRUCTURA.md) para arquitectura completa de ambos servidores (Producción + Preview), stack tecnológico compartido, y CI/CD workflows.
 
-**Última actualización**: 2026-03-25 - Email queue/digest, inscripcion publica, CalculadoraTEF fix, auditoria fase 2, structured logging. Database compartida con Directus en PostgreSQL container.
+**Última actualización**: 2026-03-27 - Operador IN_SITU, cross-filtering residuos, inspector flag, reportes filtrados por rol, mobile card views, logo Gobierno de Mendoza. Database compartida con Directus en PostgreSQL container.
 
 ## General Rules
 
@@ -54,6 +54,7 @@ Permite el seguimiento completo del ciclo de vida de manifiestos: desde la gener
 - ✅ Production API: All systems operational at https://sitrep.ultimamilla.com.ar/api
 
 **Recent Enhancements**:
+- ✅ **Operador In-Situ + Cross-Filtering + Inspector (2026-03-27):** Operadores pueden trabajar IN_SITU (en domicilio del generador, sin transporte) o FIJO (con transporte). Campo `modalidades` en Operador (array: FIJO, IN_SITU), `modalidad` en Manifiesto. Workflow IN_SITU: BORRADOR → APROBADO → RECIBIDO (salta EN_TRANSITO/ENTREGADO). `transportistaId` nullable. Endpoint `POST /manifiestos/:id/recepcion-insitu`. Cross-filtering: al crear manifiesto, operadores filtrados por residuos seleccionados (TratamientoAutorizado). Backend valida compatibilidad residuo-operador (400 si no habilitado). `esInspector` flag en Usuario para reportes completos. Reportes filtrados por rol (GENERADOR/TRANSPORTISTA/OPERADOR ven solo sus datos). Timeline renombrada a "Trazabilidad". Mobile card views para todas las tablas. Logo Gobierno de Mendoza en login, footer y manual.
 - ✅ **Notificaciones Multi-Canal (2026-03-25):** `crearNotificacion()` envia email automaticamente a TODOS los roles (no solo ADMIN) si `notifEmail=true`. Campos WhatsApp/Telegram en schema Usuario (`notifWhatsapp`, `notifTelegram`, `whatsappPhone`, `telegramChatId`). UI de preferencias en ConfiguracionPage. Placeholders para WhatsApp Business API y Telegram Bot.
 - ✅ **Notificaciones con Ubicacion + Recordatorios (2026-03-25):** Al firmar manifiesto (APROBADO), transportista recibe notificacion con fecha retiro + link Google Maps (abre app nativa mobile). Operador recibe aviso de recepcion programada. Job `recordatorio.job.ts` cron cada 6h notifica 24h antes del retiro con mapsUrl. `fechaEstimadaRetiro` campo nuevo en Manifiesto.
 - ✅ **Setup Wizard + Manual Instalacion (2026-03-25):** `SETUP.html` y `MANUAL.html` en raiz del repo para instaladores offline. Setup wizard interactivo 8 pasos (funciona sin backend). Manual seccion 0 con mockups del wizard. Seccion 15.12 con 15 subsecciones paso-a-paso. `DEPLOY-NUEVO-SERVIDOR.md` guia tecnica completa (1564 lineas).
@@ -268,6 +269,7 @@ POST /api/manifiestos/:id/cerrar      → EN_TRATAMIENTO/RECIBIDO → TRATADO
 POST /api/manifiestos/:id/rechazar    → ENTREGADO → RECHAZADO
 POST /api/manifiestos/:id/incidente   → Registra incidente en transito (acepta campo `tipo` o `tipoIncidente`)
 POST /api/manifiestos/:id/cancelar    → Cancela manifiesto (si no es CANCELADO ni TRATADO)
+POST /api/manifiestos/:id/recepcion-insitu → APROBADO → RECIBIDO (solo modalidad IN_SITU, OPERADOR/ADMIN)
 POST /api/manifiestos/:id/ubicacion   → GPS update (latitud, longitud, velocidad?, direccion?) — solo EN_TRANSITO
 GET  /api/centro-control/actividad    → Centro de Control con capas (params: fechaDesde, fechaHasta, capas=generadores,transportistas,operadores,transito)
 GET  /api/pdf/manifiesto/:id          → PDF del manifiesto
@@ -330,6 +332,8 @@ La función `mapFilters()` en `reporte.service.ts` traduce entre ambos.
 | `ADMIN_TRANSPORTISTA` | Solicitudes de transportistas, CRUD transportistas del sector |
 | `ADMIN_GENERADOR` | Solicitudes de generadores, CRUD generadores del sector |
 | `ADMIN_OPERADOR` | Solicitudes de operadores, CRUD operadores del sector |
+
+**Inspector**: No es un rol sino una propiedad (`esInspector: boolean`) de cualquier usuario. Los inspectores ven reportes completos sin filtro de rol, como un ADMIN.
 
 ---
 
@@ -443,8 +447,11 @@ blockchain_sellos (max 2 filas por manifiesto):
   @@unique([manifiestoId, tipo])
 ```
 
-Campos adicionales en Manifiesto: `rollingHash` (hash acumulativo actual)
+Campos adicionales en Manifiesto: `rollingHash` (hash acumulativo actual), `modalidad` (String? — FIJO o IN_SITU)
 Campos adicionales en EventoManifiesto: `integrityHash` (snapshot del rollingHash al momento del evento)
+Campos adicionales en Operador: `modalidades` (String[] — array de modalidades: FIJO, IN_SITU)
+Campos adicionales en Usuario: `esInspector` (Boolean — permite ver reportes completos sin filtro de rol)
+Modelo `SedeOperador` (`sedes_operador` table): sedes/plantas del operador con ubicación geográfica
 
 ### Rolling Hash en workflow (manifiesto.controller.ts)
 
@@ -689,6 +696,9 @@ BORRADOR → APROBADO → EN_TRANSITO → ENTREGADO → RECIBIDO → EN_TRATAMIE
                                    ↘ RECHAZADO
                     ↗ INCIDENTE (evento, no cambia estado)
 CUALQUIERA (excepto CANCELADO/TRATADO) → CANCELADO
+
+Modalidad IN_SITU (sin transporte):
+BORRADOR → APROBADO → RECIBIDO → EN_TRATAMIENTO → TRATADO
 ```
 
 ### Workflow Actions by Role (ManifiestoDetallePage)
@@ -704,6 +714,7 @@ CUALQUIERA (excepto CANCELADO/TRATADO) → CANCELADO
 | Registrar Pesaje | RECIBIDO | _(updates weights)_ | OPERADOR, ADMIN |
 | Registrar Tratamiento | RECIBIDO | EN_TRATAMIENTO | OPERADOR, ADMIN |
 | Cerrar Manifiesto | EN_TRATAMIENTO/RECIBIDO | TRATADO | OPERADOR, ADMIN |
+| Confirmar Recepción In Situ | APROBADO | RECIBIDO | OPERADOR, ADMIN | (solo modalidad IN_SITU) |
 | Cancelar Manifiesto | _(any except CANCELADO/TRATADO)_ | CANCELADO | GENERADOR, ADMIN |
 | Descargar Certificado | TRATADO | _(PDF download)_ | ALL |
 

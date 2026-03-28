@@ -65,6 +65,7 @@ type UsuarioLocal = {
   avatar: string;
   ubicacion: string;
   manifiestos: number;
+  esInspector: boolean;
 };
 
 // ========================================
@@ -110,6 +111,7 @@ function apiUserToLocal(u: any): UsuarioLocal {
     avatar: initials,
     ubicacion: '',
     manifiestos: 0,
+    esInspector: !!u.esInspector,
   };
 }
 
@@ -171,6 +173,7 @@ const UsuariosPage: React.FC = () => {
   const [editNombre, setEditNombre] = useState('');
   const [editTelefono, setEditTelefono] = useState('');
   const [editEmpresa, setEditEmpresa] = useState('');
+  const [editEsInspector, setEditEsInspector] = useState(false);
 
   const itemsPerPage = 10;
 
@@ -323,6 +326,7 @@ const UsuariosPage: React.FC = () => {
     setEditNombre(usuario.nombre);
     setEditTelefono(usuario.telefono);
     setEditEmpresa(usuario.sector);
+    setEditEsInspector(usuario.esInspector);
     setModalVer(false);
     setModalEditar(true);
   };
@@ -334,7 +338,7 @@ const UsuariosPage: React.FC = () => {
     }
     const [nombre, ...apellidoParts] = editNombre.split(' ');
     updateMutation.mutate(
-      { id: usuarioSeleccionado.id, data: { email: editEmail, nombre: nombre || editNombre, apellido: apellidoParts.join(' ') || undefined, telefono: editTelefono || undefined, empresa: editEmpresa || undefined } },
+      { id: usuarioSeleccionado.id, data: { email: editEmail, nombre: nombre || editNombre, apellido: apellidoParts.join(' ') || undefined, telefono: editTelefono || undefined, empresa: editEmpresa || undefined, esInspector: editEsInspector } },
       {
         onSuccess: () => {
           setModalEditar(false);
@@ -362,7 +366,15 @@ const UsuariosPage: React.FC = () => {
               {row.avatar}
             </div>
             <div className="min-w-0">
-              <p className="font-semibold text-neutral-900 truncate">{row.nombre}</p>
+              <p className="font-semibold text-neutral-900 truncate flex items-center gap-1.5">
+                {row.nombre}
+                {row.esInspector && (
+                  <span title="Inspector — puede ver reportes completos de todo el sistema" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700">
+                    <Eye size={10} />
+                    Inspector
+                  </span>
+                )}
+              </p>
               <p className="text-sm text-neutral-500 truncate">{row.email}</p>
             </div>
           </div>
@@ -390,7 +402,7 @@ const UsuariosPage: React.FC = () => {
     {
       key: 'sector',
       width: '15%',
-      hiddenBelow: 'md' as const,
+      hiddenBelow: 'lg' as const,
       header: 'Sector/Empresa',
       render: (row: UsuarioLocal) => (
         <div className="min-w-0">
@@ -424,7 +436,7 @@ const UsuariosPage: React.FC = () => {
     {
       key: 'actividad',
       width: '10%',
-      hiddenBelow: 'lg' as const,
+      hiddenBelow: 'xl' as const,
       header: 'Actividad',
       align: 'center' as const,
       render: (row: UsuarioLocal) => (
@@ -437,7 +449,7 @@ const UsuariosPage: React.FC = () => {
     {
       key: 'ultimoAcceso',
       width: '13%',
-      hiddenBelow: 'md' as const,
+      hiddenBelow: 'lg' as const,
       header: 'Ultimo Acceso',
       sortable: true,
       render: (row: UsuarioLocal) => (
@@ -716,7 +728,15 @@ const UsuariosPage: React.FC = () => {
                           {usuario.avatar}
                         </div>
                         <div>
-                          <h4 className="font-semibold text-neutral-900">{usuario.nombre}</h4>
+                          <h4 className="font-semibold text-neutral-900 flex items-center gap-1.5 flex-wrap">
+                            {usuario.nombre}
+                            {usuario.esInspector && (
+                              <span title="Inspector — puede ver reportes completos de todo el sistema" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700">
+                                <Eye size={10} />
+                                Inspector
+                              </span>
+                            )}
+                          </h4>
                           <p className="text-sm text-neutral-500">{usuario.email}</p>
                         </div>
                       </div>
@@ -908,6 +928,24 @@ const UsuariosPage: React.FC = () => {
           <Input label="Nombre completo" placeholder="Juan Perez" value={editNombre} onChange={(e) => setEditNombre(e.target.value)} />
           <Input label="Telefono" placeholder="+54 261 123-4567" value={editTelefono} onChange={(e) => setEditTelefono(e.target.value)} />
           <Input label="Empresa / Sector" placeholder="Razon social" value={editEmpresa} onChange={(e) => setEditEmpresa(e.target.value)} />
+          <div className="flex items-center justify-between p-4 bg-indigo-50 border border-indigo-200 rounded-xl">
+            <div>
+              <p className="text-sm font-medium text-indigo-900">Inspector</p>
+              <p className="text-xs text-indigo-600 mt-0.5">Puede ver reportes completos de todo el sistema</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={editEsInspector}
+              aria-label="Inspector"
+              onClick={() => setEditEsInspector(!editEsInspector)}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${editEsInspector ? 'bg-indigo-600' : 'bg-neutral-300'}`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${editEsInspector ? 'translate-x-5' : 'translate-x-0'}`}
+              />
+            </button>
+          </div>
         </div>
       </Modal>
 

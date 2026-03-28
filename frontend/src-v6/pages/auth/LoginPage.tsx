@@ -59,16 +59,21 @@ const LoginPage: React.FC = () => {
   };
 
   return (
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 flex items-start md:items-center justify-center px-4 py-8 md:py-12">
     <div className="w-full max-w-md animate-fade-in-up">
       {/* Header */}
-      <div className="text-center mb-8">
-        <div className="w-16 h-16 bg-[#1B5E3C] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg animate-scale-in-bounce hover-glow">
-          <Leaf size={32} className="text-white" />
+      <div className="text-center mb-4 md:mb-6">
+        <div className="flex items-center justify-center gap-3 mb-2 md:mb-3">
+          <img src="/logo-mendoza.webp" alt="Gobierno de Mendoza" className="h-10 md:h-12 w-auto" />
+          <div className="w-px h-8 bg-neutral-200" />
+          <div className="w-11 h-11 md:w-13 md:h-13 bg-[#1B5E3C] rounded-xl flex items-center justify-center shadow-lg">
+            <Leaf size={24} className="text-white" />
+          </div>
         </div>
-        <h2 className="text-3xl font-bold text-neutral-900 mb-2" style={{ fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: '-0.03em' }}>
+        <h2 className="text-xl md:text-2xl font-bold text-neutral-900 mb-0.5" style={{ fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: '-0.03em' }}>
           SITREP v6
         </h2>
-        <p className="text-neutral-600">
+        <p className="text-xs md:text-sm text-neutral-600">
           Sistema de Trazabilidad de Residuos Peligrosos
         </p>
       </div>
@@ -82,19 +87,19 @@ const LoginPage: React.FC = () => {
       )}
 
       {/* Demo users - PRINCIPAL */}
-      <div className="mb-8">
-        <p className="text-sm text-neutral-500 text-center mb-4 font-medium">
+      <div className="mb-6 md:mb-8">
+        <p className="text-xs md:text-sm text-neutral-500 text-center mb-3 md:mb-4 font-medium">
           Selecciona un perfil para ingresar
         </p>
-        <div className="grid grid-cols-2 gap-3 stagger-children">
+        <div className="grid grid-cols-2 gap-2 md:gap-3 stagger-children">
           {DEMO_USERS.map((user) => (
             <button
               key={user.userId}
               onClick={() => handleDemoUser(user.userId)}
               disabled={loading}
-              className="p-4 text-left rounded-xl border-2 border-neutral-200 hover:border-primary-500 hover:bg-primary-50 transition-all active:scale-[0.97] disabled:opacity-50 hover-lift"
+              className="p-3 md:p-4 text-left rounded-xl border-2 border-neutral-200 bg-white hover:border-primary-500 hover:bg-primary-50 transition-all active:scale-[0.97] disabled:opacity-50"
             >
-              <div className={`w-8 h-8 ${user.color} rounded-lg flex items-center justify-center text-white text-xs font-bold mb-2`}>
+              <div className={`w-7 h-7 md:w-8 md:h-8 ${user.color} rounded-lg flex items-center justify-center text-white text-xs font-bold mb-1.5 md:mb-2`}>
                 {user.label[0]}
               </div>
               <p className="font-semibold text-sm text-neutral-900">{user.label}</p>
@@ -105,51 +110,51 @@ const LoginPage: React.FC = () => {
       </div>
 
       {/* Divider */}
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex items-center gap-3 md:gap-4 mb-4 md:mb-6">
         <div className="flex-1 h-px bg-neutral-200" />
-        <span className="text-xs text-neutral-400 font-medium">o ingresa con credenciales</span>
+        <span className="text-[10px] md:text-xs text-neutral-400 font-medium whitespace-nowrap">o ingresa con credenciales</span>
         <div className="flex-1 h-px bg-neutral-200" />
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-3 md:space-y-4 bg-white rounded-2xl p-4 md:p-0 md:bg-transparent border border-neutral-100 md:border-0 shadow-sm md:shadow-none">
         <div>
-          <label className="block text-sm font-medium text-neutral-700 mb-1.5">Email o CUIT</label>
+          <label className="block text-xs md:text-sm font-medium text-neutral-700 mb-1 md:mb-1.5">Email o CUIT</label>
           <div className="relative">
-            <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+            <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
             <input
               type="text"
               placeholder="tu@email.com o 20-12345678-9"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full h-11 pl-10 pr-4 border border-neutral-200 rounded-xl text-sm focus:border-[#1B5E3C] focus:ring-4 focus:ring-[#1B5E3C]/15 outline-none transition-all"
+              className="w-full h-10 md:h-11 pl-10 pr-4 border border-neutral-200 rounded-xl text-sm bg-neutral-50 md:bg-white focus:bg-white focus:border-[#1B5E3C] focus:ring-4 focus:ring-[#1B5E3C]/15 outline-none transition-all"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-neutral-700 mb-1.5">Contrasena</label>
+          <label className="block text-xs md:text-sm font-medium text-neutral-700 mb-1 md:mb-1.5">Contrasena</label>
           <div className="relative">
-            <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+            <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
             <input
               type={showPassword ? 'text' : 'password'}
               placeholder="********"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full h-11 pl-10 pr-10 border border-neutral-200 rounded-xl text-sm focus:border-[#1B5E3C] focus:ring-4 focus:ring-[#1B5E3C]/15 outline-none transition-all"
+              className="w-full h-10 md:h-11 pl-10 pr-10 border border-neutral-200 rounded-xl text-sm bg-neutral-50 md:bg-white focus:bg-white focus:border-[#1B5E3C] focus:ring-4 focus:ring-[#1B5E3C]/15 outline-none transition-all"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
             >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
         </div>
 
         <div className="flex justify-end">
-          <Link to="/recuperar" className="text-sm text-[#1B5E3C] hover:underline">
+          <Link to="/recuperar" className="text-xs md:text-sm text-[#1B5E3C] hover:underline">
             ¿Olvidaste tu contraseña?
           </Link>
         </div>
@@ -157,89 +162,89 @@ const LoginPage: React.FC = () => {
         <button
           type="submit"
           disabled={loading}
-          className="w-full h-11 bg-[#1B5E3C] hover:bg-[#164D32] text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] btn-glow disabled:opacity-50"
+          className="w-full h-10 md:h-11 bg-[#1B5E3C] hover:bg-[#164D32] text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50"
         >
           {loading ? (
             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
           ) : (
             <>
               Ingresar
-              <ArrowRight size={18} />
+              <ArrowRight size={16} />
             </>
           )}
         </button>
       </form>
 
       {/* Inscripcion de Actores — destacado */}
-      <div className="mt-8 p-4 bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-200 rounded-2xl">
-        <h3 className="text-center text-sm font-bold text-emerald-800 mb-1">
+      <div className="mt-6 md:mt-8 p-3 md:p-4 bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-200 rounded-2xl">
+        <h3 className="text-center text-xs md:text-sm font-bold text-emerald-800 mb-0.5 md:mb-1">
           Inscripcion Provincial de Actores
         </h3>
-        <p className="text-center text-xs text-emerald-600 mb-4">
+        <p className="text-center text-[10px] md:text-xs text-emerald-600 mb-3 md:mb-4">
           Registra tu empresa en el sistema de trazabilidad
         </p>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-1.5 md:gap-2">
           <Link
             to="/inscripcion/generador"
-            className="flex flex-col items-center gap-2 p-3 bg-white rounded-xl border border-emerald-200 hover:border-purple-400 hover:shadow-md transition-all group"
+            className="flex flex-col items-center gap-1.5 md:gap-2 p-2 md:p-3 bg-white rounded-xl border border-emerald-200 hover:border-purple-400 hover:shadow-md transition-all group"
           >
-            <div className="w-10 h-10 bg-purple-100 group-hover:bg-purple-500 rounded-xl flex items-center justify-center transition-colors">
-              <Factory size={20} className="text-purple-600 group-hover:text-white transition-colors" />
+            <div className="w-9 h-9 md:w-10 md:h-10 bg-purple-100 group-hover:bg-purple-500 rounded-xl flex items-center justify-center transition-colors">
+              <Factory size={18} className="text-purple-600 group-hover:text-white transition-colors" />
             </div>
-            <span className="text-xs font-semibold text-neutral-700 text-center leading-tight">Generador</span>
+            <span className="text-[10px] md:text-xs font-semibold text-neutral-700 text-center leading-tight">Generador</span>
           </Link>
           <Link
             to="/inscripcion/transportista"
-            className="flex flex-col items-center gap-2 p-3 bg-white rounded-xl border border-emerald-200 hover:border-orange-400 hover:shadow-md transition-all group"
+            className="flex flex-col items-center gap-1.5 md:gap-2 p-2 md:p-3 bg-white rounded-xl border border-emerald-200 hover:border-orange-400 hover:shadow-md transition-all group"
           >
-            <div className="w-10 h-10 bg-orange-100 group-hover:bg-orange-500 rounded-xl flex items-center justify-center transition-colors">
-              <Truck size={20} className="text-orange-600 group-hover:text-white transition-colors" />
+            <div className="w-9 h-9 md:w-10 md:h-10 bg-orange-100 group-hover:bg-orange-500 rounded-xl flex items-center justify-center transition-colors">
+              <Truck size={18} className="text-orange-600 group-hover:text-white transition-colors" />
             </div>
-            <span className="text-xs font-semibold text-neutral-700 text-center leading-tight">Transportista</span>
+            <span className="text-[10px] md:text-xs font-semibold text-neutral-700 text-center leading-tight">Transportista</span>
           </Link>
           <Link
             to="/inscripcion/operador"
-            className="flex flex-col items-center gap-2 p-3 bg-white rounded-xl border border-emerald-200 hover:border-blue-400 hover:shadow-md transition-all group"
+            className="flex flex-col items-center gap-1.5 md:gap-2 p-2 md:p-3 bg-white rounded-xl border border-emerald-200 hover:border-blue-400 hover:shadow-md transition-all group"
           >
-            <div className="w-10 h-10 bg-blue-100 group-hover:bg-blue-500 rounded-xl flex items-center justify-center transition-colors">
-              <FlaskConical size={20} className="text-blue-600 group-hover:text-white transition-colors" />
+            <div className="w-9 h-9 md:w-10 md:h-10 bg-blue-100 group-hover:bg-blue-500 rounded-xl flex items-center justify-center transition-colors">
+              <FlaskConical size={18} className="text-blue-600 group-hover:text-white transition-colors" />
             </div>
-            <span className="text-xs font-semibold text-neutral-700 text-center leading-tight">Operador</span>
+            <span className="text-[10px] md:text-xs font-semibold text-neutral-700 text-center leading-tight">Operador</span>
           </Link>
         </div>
 
         {/* Administradores Sectoriales */}
-        <div className="mt-3 pt-3 border-t border-emerald-200">
-          <p className="text-center text-[10px] text-emerald-600 mb-2 uppercase tracking-wider font-semibold">
+        <div className="mt-2.5 md:mt-3 pt-2.5 md:pt-3 border-t border-emerald-200">
+          <p className="text-center text-[9px] md:text-[10px] text-emerald-600 mb-1.5 md:mb-2 uppercase tracking-wider font-semibold">
             Administradores Sectoriales
           </p>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-1.5 md:gap-2">
             <Link
               to="/registro?tipo=ADMIN_GENERADOR"
-              className="flex flex-col items-center gap-1.5 p-2.5 bg-white rounded-xl border border-emerald-200 hover:border-purple-400 hover:shadow-md transition-all group"
+              className="flex flex-col items-center gap-1 md:gap-1.5 p-2 md:p-2.5 bg-white rounded-xl border border-emerald-200 hover:border-purple-400 hover:shadow-md transition-all group"
             >
-              <div className="w-8 h-8 bg-purple-50 group-hover:bg-purple-500 rounded-lg flex items-center justify-center transition-colors">
-                <ShieldCheck size={16} className="text-purple-600 group-hover:text-white transition-colors" />
+              <div className="w-7 h-7 md:w-8 md:h-8 bg-purple-50 group-hover:bg-purple-500 rounded-lg flex items-center justify-center transition-colors">
+                <ShieldCheck size={14} className="text-purple-600 group-hover:text-white transition-colors" />
               </div>
-              <span className="text-[10px] font-semibold text-neutral-600 text-center leading-tight">Admin Generadores</span>
+              <span className="text-[9px] md:text-[10px] font-semibold text-neutral-600 text-center leading-tight">Admin Gen.</span>
             </Link>
             <Link
               to="/registro?tipo=ADMIN_TRANSPORTISTA"
-              className="flex flex-col items-center gap-1.5 p-2.5 bg-white rounded-xl border border-emerald-200 hover:border-orange-400 hover:shadow-md transition-all group"
+              className="flex flex-col items-center gap-1 md:gap-1.5 p-2 md:p-2.5 bg-white rounded-xl border border-emerald-200 hover:border-orange-400 hover:shadow-md transition-all group"
             >
-              <div className="w-8 h-8 bg-orange-50 group-hover:bg-orange-500 rounded-lg flex items-center justify-center transition-colors">
-                <ShieldCheck size={16} className="text-orange-600 group-hover:text-white transition-colors" />
+              <div className="w-7 h-7 md:w-8 md:h-8 bg-orange-50 group-hover:bg-orange-500 rounded-lg flex items-center justify-center transition-colors">
+                <ShieldCheck size={14} className="text-orange-600 group-hover:text-white transition-colors" />
               </div>
-              <span className="text-[10px] font-semibold text-neutral-600 text-center leading-tight">Admin Transporte</span>
+              <span className="text-[9px] md:text-[10px] font-semibold text-neutral-600 text-center leading-tight">Admin Trans.</span>
             </Link>
             <Link
               to="/registro?tipo=ADMIN_OPERADOR"
-              className="flex flex-col items-center gap-1.5 p-2.5 bg-white rounded-xl border border-emerald-200 hover:border-blue-400 hover:shadow-md transition-all group"
+              className="flex flex-col items-center gap-1 md:gap-1.5 p-2 md:p-2.5 bg-white rounded-xl border border-emerald-200 hover:border-blue-400 hover:shadow-md transition-all group"
             >
-              <div className="w-8 h-8 bg-blue-50 group-hover:bg-blue-500 rounded-lg flex items-center justify-center transition-colors">
-                <ShieldCheck size={16} className="text-blue-600 group-hover:text-white transition-colors" />
+              <div className="w-7 h-7 md:w-8 md:h-8 bg-blue-50 group-hover:bg-blue-500 rounded-lg flex items-center justify-center transition-colors">
+                <ShieldCheck size={14} className="text-blue-600 group-hover:text-white transition-colors" />
               </div>
-              <span className="text-[10px] font-semibold text-neutral-600 text-center leading-tight">Admin Operadores</span>
+              <span className="text-[9px] md:text-[10px] font-semibold text-neutral-600 text-center leading-tight">Admin Oper.</span>
             </Link>
           </div>
         </div>
@@ -251,6 +256,12 @@ const LoginPage: React.FC = () => {
           Reclama tu cuenta
         </Link>
       </p>
+
+      {/* Logo Gobierno de Mendoza — pie */}
+      <div className="mt-6 flex justify-center opacity-50">
+        <img src="/logo-mendoza.webp" alt="Gobierno de Mendoza" className="h-7 md:h-8 w-auto" />
+      </div>
+    </div>
     </div>
   );
 };

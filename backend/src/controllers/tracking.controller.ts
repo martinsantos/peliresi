@@ -152,6 +152,8 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
           categoria: true,
           latitud: true,
           longitud: true,
+          modalidades: true,
+          corrientesY: true,
           _count: {
             select: {
               manifiestos: {
@@ -179,6 +181,8 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
         categoria: o.categoria,
         latitud: o.latitud,
         longitud: o.longitud,
+        modalidades: o.modalidades,
+        corrientesY: o.corrientesY,
         cantRecibidos: o._count.manifiestos,
         cantTratados: o.manifiestos.length,
       }));

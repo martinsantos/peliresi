@@ -172,6 +172,12 @@ export const confirmarRetiro = async (req: AuthRequest, res: Response, next: Nex
       throw new AppError('Solo los transportistas pueden confirmar retiros', 403);
     }
 
+    // Guard: IN_SITU manifiestos skip transport entirely
+    const pre = await prisma.manifiesto.findUnique({ where: { id }, select: { modalidad: true } });
+    if (pre?.modalidad === 'IN_SITU') {
+      throw new AppError('Los manifiestos in situ no requieren retiro por transportista', 400);
+    }
+
     // Atomic conditional update: prevents double-tap race condition
     const manifiestoActualizado = await prisma.$transaction(async (tx) => {
       let updated;
@@ -253,6 +259,12 @@ export const confirmarEntrega = async (req: AuthRequest, res: Response, next: Ne
 
     if (req.user.rol !== 'TRANSPORTISTA' && req.user.rol !== 'ADMIN') {
       throw new AppError('Solo los transportistas pueden confirmar entregas', 403);
+    }
+
+    // Guard: IN_SITU manifiestos skip transport entirely
+    const pre = await prisma.manifiesto.findUnique({ where: { id }, select: { modalidad: true } });
+    if (pre?.modalidad === 'IN_SITU') {
+      throw new AppError('Los manifiestos in situ no requieren entrega por transportista', 400);
     }
 
     // Atomic conditional update: prevents double-tap race condition
@@ -381,6 +393,85 @@ export const confirmarRecepcion = async (req: AuthRequest, res: Response, next: 
   }
 };
 
+// Confirmar recepcion in situ (operador) — APROBADO → RECIBIDO directly for IN_SITU manifiestos
+export const confirmarRecepcionInSitu = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { observaciones } = req.body;
+    const userId = req.user.id;
+
+    if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') {
+      throw new AppError('Solo los operadores pueden confirmar recepciones in situ', 403);
+    }
+
+    const manifiestoActualizado = await prisma.$transaction(async (tx) => {
+      // Validate manifiesto exists, is APROBADO, and is IN_SITU
+      const current = await tx.manifiesto.findUnique({
+        where: { id },
+        select: { estado: true, modalidad: true },
+      });
+      if (!current) throw new AppError('Manifiesto no encontrado', 404);
+      if (current.modalidad !== 'IN_SITU') {
+        throw new AppError('Esta accion solo aplica a manifiestos con modalidad IN_SITU', 400);
+      }
+      if (current.estado !== 'APROBADO') {
+        throw new AppError('El manifiesto debe estar aprobado para confirmar recepcion in situ', 400);
+      }
+
+      let updated;
+      try {
+        updated = await tx.manifiesto.update({
+          where: { id, estado: 'APROBADO' },
+          data: {
+            estado: 'RECIBIDO',
+            fechaRecepcion: new Date(),
+          },
+          include: {
+            generador: true,
+            transportista: true,
+            operador: true,
+            residuos: { include: { tipoResiduo: true } },
+          },
+        });
+      } catch (err: any) {
+        if (err?.code === 'P2025') {
+          throw new AppError('El manifiesto debe estar aprobado para confirmar recepcion in situ', 400);
+        }
+        throw err;
+      }
+
+      const evento = await tx.eventoManifiesto.create({
+        data: {
+          manifiestoId: id,
+          tipo: 'RECEPCION_IN_SITU',
+          descripcion: `Recepcion in situ confirmada por el operador.${observaciones ? ' ' + observaciones : ''}`,
+          usuarioId: userId,
+        },
+      });
+
+      await updateRollingHash(tx, id, 'RECIBIDO', updated.fechaRecepcion!, updated.observaciones, evento.id);
+
+      return updated;
+    });
+
+    res.json({
+      success: true,
+      data: { manifiesto: manifiestoActualizado },
+    });
+
+    domainEvents.emit({
+      type: 'MANIFIESTO_ESTADO_CAMBIADO',
+      manifiestoId: manifiestoActualizado.id,
+      estadoAnterior: 'APROBADO',
+      estadoNuevo: 'RECIBIDO',
+      numero: manifiestoActualizado.numero,
+      userId,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Registrar tratamiento y cerrar manifiesto
 export const cerrarManifiesto = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -482,7 +573,7 @@ export const cerrarManifiesto = async (req: AuthRequest, res: Response, next: Ne
           rollingHash: fresh.rollingHash,
           numero: fresh.numero,
           generadorCuit: fresh.generador.cuit,
-          transportistaCuit: fresh.transportista.cuit,
+          transportistaCuit: fresh.transportista?.cuit ?? '',
           operadorCuit: fresh.operador.cuit,
           residuos: fresh.residuos,
           fechaFirma: fresh.fechaFirma?.toISOString() ?? '',
@@ -644,6 +735,34 @@ export const registrarTratamiento = async (req: AuthRequest, res: Response, next
       throw new AppError('Solo los operadores pueden registrar tratamientos', 403);
     }
 
+    // Pre-fetch manifiesto to get operadorId for tratamiento validation
+    const manifiestoCheck = await prisma.manifiesto.findUnique({
+      where: { id },
+      select: { operadorId: true, estado: true },
+    });
+    if (!manifiestoCheck) {
+      throw new AppError('Manifiesto no encontrado', 404);
+    }
+    if (manifiestoCheck.estado !== 'RECIBIDO') {
+      throw new AppError('El manifiesto debe estar recibido para registrar tratamiento', 400);
+    }
+
+    // Validate metodo against operador's authorized tratamientos
+    const operadorTratamientos = await prisma.tratamientoAutorizado.findMany({
+      where: { operadorId: manifiestoCheck.operadorId, activo: true },
+      select: { id: true, metodo: true },
+    });
+    const metodosUnicos = [...new Set(operadorTratamientos.map(t => t.metodo))];
+    if (metodosUnicos.length > 0 && metodoFinal && !metodosUnicos.includes(metodoFinal)) {
+      throw new AppError(
+        `Método "${metodoFinal}" no autorizado para este operador. Métodos válidos: ${metodosUnicos.join(', ')}`,
+        400,
+      );
+    }
+    const matchingTratamiento = metodoFinal
+      ? operadorTratamientos.find(t => t.metodo === metodoFinal)
+      : undefined;
+
     // Atomic conditional update: prevents double-tap race condition
     const manifiestoActualizado = await prisma.$transaction(async (tx) => {
       let updated;
@@ -651,7 +770,9 @@ export const registrarTratamiento = async (req: AuthRequest, res: Response, next
         updated = await tx.manifiesto.update({
           where: { id, estado: 'RECIBIDO' },
           data: {
-            estado: 'EN_TRATAMIENTO'
+            estado: 'EN_TRATAMIENTO',
+            tratamientoMetodo: metodoFinal || null,
+            tratamientoAutorizadoId: matchingTratamiento?.id || null,
           },
           include: {
             generador: true,
@@ -857,6 +978,70 @@ export const registrarPesaje = async (req: AuthRequest, res: Response, next: Nex
         diferencia,
         porcentajeDif: parseFloat(porcentajeDif as string)
       }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Cancelar manifiesto (generador o admin)
+export const cancelarManifiesto = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { motivo } = req.body || {};
+    const userId = req.user.id;
+
+    const manifiesto = await prisma.manifiesto.findUnique({
+      where: { id },
+      select: { id: true, estado: true, numero: true },
+    });
+
+    if (!manifiesto) {
+      throw new AppError('Manifiesto no encontrado', 404);
+    }
+    if (manifiesto.estado === 'CANCELADO') {
+      throw new AppError('El manifiesto ya está cancelado', 400);
+    }
+    if (manifiesto.estado === 'TRATADO') {
+      throw new AppError('No se puede cancelar un manifiesto ya tratado', 400);
+    }
+
+    const estadoAnterior = manifiesto.estado;
+
+    const result = await prisma.$transaction(async (tx) => {
+      const updated = await tx.manifiesto.update({
+        where: { id },
+        data: { estado: 'CANCELADO' },
+        include: {
+          generador: true,
+          transportista: true,
+          operador: true,
+        },
+      });
+
+      const evento = await tx.eventoManifiesto.create({
+        data: {
+          manifiestoId: id,
+          tipo: 'CANCELACION',
+          descripcion: `Manifiesto cancelado${motivo ? ': ' + motivo : ''}`,
+          usuarioId: userId,
+        },
+      });
+
+      await updateRollingHash(tx, id, 'CANCELADO', new Date(), motivo || null, evento.id);
+
+      return updated;
+    });
+
+    res.json({ success: true, data: { manifiesto: result } });
+
+    domainEvents.emit({
+      type: 'MANIFIESTO_ESTADO_CAMBIADO',
+      manifiestoId: result.id,
+      estadoAnterior,
+      estadoNuevo: 'CANCELADO',
+      numero: result.numero,
+      userId,
     });
   } catch (error) {
     next(error);

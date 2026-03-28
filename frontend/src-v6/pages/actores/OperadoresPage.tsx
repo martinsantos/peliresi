@@ -107,7 +107,7 @@ const OperadoresPage: React.FC = () => {
       : <ChevronDown size={12} className="ml-1 text-primary-600 inline" />;
   };
 
-  const isMobile = typeof window !== 'undefined' && window.location.pathname.includes('/mobile');
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
   const updateField = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }));
 
@@ -132,7 +132,7 @@ const OperadoresPage: React.FC = () => {
   };
 
   const openEditar = (op: any) => {
-    navigate(isMobile ? `/mobile/admin/actores/operadores/${op.id}/editar` : `/admin/actores/operadores/${op.id}/editar`);
+    navigate(`/admin/actores/operadores/${op.id}/editar`);
   };
 
   const handleEliminar = async () => {
@@ -302,16 +302,61 @@ const OperadoresPage: React.FC = () => {
         </Card>
       )}
 
-      {/* Lista */}
+      {/* Mobile Card View (lista mode) */}
+      {!isLoading && vista === 'lista' && operadoresFiltrados.length > 0 && (
+        <div className="md:hidden space-y-2">
+          {operadoresFiltrados.map((op: any) => {
+            const isActivo = op.activo !== false;
+            const estado = isActivo ? estadoConfig.ACTIVO : estadoConfig.INACTIVO;
+            return (
+              <Card
+                key={op.id}
+                className="active:scale-[0.98] transition-transform cursor-pointer"
+                onClick={() => navigate(`/admin/actores/operadores/${op.id}`)}
+              >
+                <div className="p-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-8 h-8 bg-primary-50 rounded-lg flex items-center justify-center shrink-0">
+                        <FlaskConical size={16} className="text-primary-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm text-neutral-900 truncate">{op.razonSocial}</p>
+                        <p className="text-xs text-neutral-500">{op.cuit}</p>
+                      </div>
+                    </div>
+                    <Badge variant="soft" color={estado.color}>
+                      {estado.label}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between mt-2 pl-10">
+                    <span className="text-xs text-neutral-400">{op.categoria || '-'}</span>
+                    <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
+                      <Button variant="ghost" size="sm" className="p-1.5" onClick={() => navigate(`/admin/actores/operadores/${op.id}`)}>
+                        <Eye size={14} />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="p-1.5 text-error-500" onClick={() => { setDeleteTarget({ id: op.id, razonSocial: op.razonSocial }); setModalEliminar(true); }}>
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Desktop Lista */}
       {!isLoading && vista === 'lista' ? (
-        <Card padding="none" className="max-h-[70vh] overflow-auto">
+        <Card padding="none" className="hidden md:block max-h-[70vh] overflow-auto">
           <table className="w-full table-fixed">
               <thead className="bg-neutral-50 border-b border-neutral-200 sticky top-0 z-10">
                 <tr>
                   <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" style={{ width: '30%' }} onClick={() => toggleSort('razonSocial')}>Operador<SortIcon col="razonSocial" /></th>
                   <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" style={{ width: '15%' }} onClick={() => toggleSort('estado')}>Estado<SortIcon col="estado" /></th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" style={{ width: '15%' }} onClick={() => toggleSort('categoria')}>Categoria<SortIcon col="categoria" /></th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider hidden md:table-cell" style={{ width: '22%' }}>Contacto</th>
+                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider hidden lg:table-cell cursor-pointer select-none hover:text-primary-600" style={{ width: '15%' }} onClick={() => toggleSort('categoria')}>Categoria<SortIcon col="categoria" /></th>
+                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider hidden lg:table-cell" style={{ width: '22%' }}>Contacto</th>
                   <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase tracking-wider" style={{ width: '18%' }}>Acciones</th>
                 </tr>
               </thead>
@@ -323,7 +368,7 @@ const OperadoresPage: React.FC = () => {
                     <tr
                       key={op.id}
                       className="hover:bg-neutral-50 transition-colors cursor-pointer group"
-                      onClick={() => navigate(isMobile ? `/mobile/admin/actores/operadores/${op.id}` : `/admin/actores/operadores/${op.id}`)}
+                      onClick={() => navigate(`/admin/actores/operadores/${op.id}`)}
                     >
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-3">
@@ -344,17 +389,17 @@ const OperadoresPage: React.FC = () => {
                           </span>
                         </Badge>
                       </td>
-                      <td className="px-3 py-2.5 hidden md:table-cell">
+                      <td className="px-3 py-2.5 hidden lg:table-cell">
                         <span className="text-sm text-neutral-700">{op.categoria || '-'}</span>
                       </td>
-                      <td className="px-3 py-2.5 hidden md:table-cell">
+                      <td className="px-3 py-2.5 hidden lg:table-cell">
                         <div className="text-sm text-neutral-600">
                           <p className="flex items-center gap-1"><Phone size={12} /> {op.telefono}</p>
                         </div>
                       </td>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="sm" className="p-2" onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/admin/actores/operadores/${op.id}` : `/admin/actores/operadores/${op.id}`); }}>
+                          <Button variant="ghost" size="sm" className="p-2" onClick={(e) => { e.stopPropagation(); navigate(`/admin/actores/operadores/${op.id}`); }}>
                             <Eye size={16} />
                           </Button>
                           <Button variant="ghost" size="sm" className="p-2" onClick={(e) => { e.stopPropagation(); openEditar(op); }}>
@@ -381,7 +426,7 @@ const OperadoresPage: React.FC = () => {
               <Card
                 key={op.id}
                 className="p-5 hover:shadow-md transition-all cursor-pointer group"
-                onClick={() => navigate(isMobile ? `/mobile/admin/actores/operadores/${op.id}` : `/admin/actores/operadores/${op.id}`)}
+                onClick={() => navigate(`/admin/actores/operadores/${op.id}`)}
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -423,7 +468,7 @@ const OperadoresPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2 pt-4 border-t border-neutral-100">
-                  <Button variant="outline" size="sm" className="flex-1" leftIcon={<Eye size={14} />} onClick={(e) => { e.stopPropagation(); navigate(isMobile ? `/mobile/admin/actores/operadores/${op.id}` : `/admin/actores/operadores/${op.id}`); }}>
+                  <Button variant="outline" size="sm" className="flex-1" leftIcon={<Eye size={14} />} onClick={(e) => { e.stopPropagation(); navigate(`/admin/actores/operadores/${op.id}`); }}>
                     Ver
                   </Button>
                   <Button variant="outline" size="sm" className="flex-1" leftIcon={<Edit size={14} />} onClick={(e) => { e.stopPropagation(); openEditar(op); }}>

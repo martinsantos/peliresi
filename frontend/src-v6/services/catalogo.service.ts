@@ -7,10 +7,19 @@ import type { TipoResiduo } from '../types/models';
 import type { CatalogoItem } from '../types/api';
 
 export const catalogoService = {
-  async tiposResiduo(): Promise<TipoResiduo[]> {
+  async tiposResiduo(): Promise<{
+    tiposResiduos: TipoResiduo[];
+    manifiestosPorResiduo: Record<string, number>;
+    operadoresPorResiduo: Record<string, number>;
+  }> {
     const { data } = await api.get('/catalogos/tipos-residuos');
     const raw = data.data;
-    return Array.isArray(raw) ? raw : raw.tiposResiduos || raw.tiposResiduo || [];
+    if (Array.isArray(raw)) return { tiposResiduos: raw, manifiestosPorResiduo: {}, operadoresPorResiduo: {} };
+    return {
+      tiposResiduos: raw.tiposResiduos || raw.tiposResiduo || [],
+      manifiestosPorResiduo: raw.manifiestosPorResiduo || {},
+      operadoresPorResiduo: raw.operadoresPorResiduo || {},
+    };
   },
 
   async generadores(): Promise<CatalogoItem[]> {
@@ -65,10 +74,14 @@ export const catalogoService = {
   },
 
   // List all tratamientos autorizados (admin)
-  async allTratamientos(): Promise<any[]> {
+  async allTratamientos(): Promise<{ tratamientos: any[]; manifiestosPorOperador: Record<string, number> }> {
     const { data } = await api.get('/catalogos/tratamientos');
     const raw = data.data;
-    return Array.isArray(raw) ? raw : raw.tratamientos || [];
+    if (Array.isArray(raw)) return { tratamientos: raw, manifiestosPorOperador: {} };
+    return {
+      tratamientos: raw.tratamientos || [],
+      manifiestosPorOperador: raw.manifiestosPorOperador || {},
+    };
   },
 
   // CRUD tratamientos autorizados

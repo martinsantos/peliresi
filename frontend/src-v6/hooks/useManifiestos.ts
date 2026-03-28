@@ -100,10 +100,12 @@ export {
   useConfirmarEntrega,
   usePesaje,
   useConfirmarRecepcion,
+  useConfirmarRecepcionInSitu,
   useRegistrarTratamiento,
   useRechazarManifiesto,
   useRegistrarIncidente,
   useCerrarManifiesto,
+  useCancelarManifiesto,
   useRevertirEstado,
   useValidarQR,
 } from './useManifiestoWorkflow';

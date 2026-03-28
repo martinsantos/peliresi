@@ -82,7 +82,7 @@ const OperadorDetallePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const isMobile = location.pathname.startsWith('/mobile');
+  // Removed isMobile — React Router handles basename
 
   const { data: enrichmentData } = useOperadoresEnrichment();
   const OPERADORES_DATA = enrichmentData?.operadores || {};
@@ -113,9 +113,7 @@ const OperadorDetallePage: React.FC = () => {
 
   // Determine back path based on where we came from (admin vs actores)
   const isFromAdmin = location.pathname.includes('/admin/');
-  const backPath = isMobile
-    ? (isFromAdmin ? '/mobile/admin/actores/operadores' : '/mobile/actores/operadores')
-    : (isFromAdmin ? '/admin/actores/operadores' : '/actores/operadores');
+  const backPath = isFromAdmin ? '/admin/actores/operadores' : '/actores/operadores';
 
   if (isLoading) {
     return (
@@ -140,38 +138,37 @@ const OperadorDetallePage: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>
-            Volver
-          </Button>
-          <div className="flex items-center gap-3">
-            <div className="w-14 h-14 bg-primary-100 rounded-xl flex items-center justify-center">
-              <FlaskConical size={28} className="text-primary-600" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-2xl font-bold text-neutral-900">{operador.nombre}</h2>
-                <Badge variant="soft" color={est.color}>
-                  {operador.estado === 'ACTIVO' ? <CheckCircle2 size={12} className="mr-1" /> : <AlertCircle size={12} className="mr-1" />}
-                  {est.label}
+      <div className="space-y-2">
+        <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>
+          Volver
+        </Button>
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 bg-primary-100 rounded-xl flex items-center justify-center shrink-0">
+            <FlaskConical size={24} className="text-primary-600 sm:hidden" />
+            <FlaskConical size={28} className="text-primary-600 hidden sm:block" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <h2 className="text-lg sm:text-2xl font-bold text-neutral-900 truncate">{operador.nombre}</h2>
+              <Badge variant="soft" color={est.color} className="shrink-0">
+                {operador.estado === 'ACTIVO' ? <CheckCircle2 size={12} className="mr-1" /> : <AlertCircle size={12} className="mr-1" />}
+                {est.label}
+              </Badge>
+              {enriched?.tipoOperador && (
+                <Badge variant="outline" color={enriched.tipoOperador.includes('FIJO') ? 'primary' : 'success'} className="shrink-0">
+                  {enriched.tipoOperador}
                 </Badge>
-                {enriched?.tipoOperador && (
-                  <Badge variant="outline" color={enriched.tipoOperador.includes('FIJO') ? 'primary' : 'success'}>
-                    {enriched.tipoOperador}
-                  </Badge>
-                )}
-              </div>
-              <div className="flex items-center gap-3 mt-1 flex-wrap">
-                <span className="text-neutral-500 font-mono text-sm">CUIT: {operador.cuit}</span>
-                {enriched?.certificado && (
-                  <span className="text-xs font-mono text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md">{enriched.certificado}</span>
-                )}
-              </div>
-              {enriched?.expediente && (
-                <p className="text-xs text-neutral-400 mt-0.5">Exp: {enriched.expediente}</p>
               )}
             </div>
+            <div className="flex items-center gap-3 mt-1 flex-wrap">
+              <span className="text-neutral-500 font-mono text-sm">CUIT: {operador.cuit}</span>
+              {enriched?.certificado && (
+                <span className="text-xs font-mono text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md">{enriched.certificado}</span>
+              )}
+            </div>
+            {enriched?.expediente && (
+              <p className="text-xs text-neutral-400 mt-0.5">Exp: {enriched.expediente}</p>
+            )}
           </div>
         </div>
       </div>
@@ -467,7 +464,7 @@ const OperadorDetallePage: React.FC = () => {
                 variant="outline"
                 size="sm"
                 leftIcon={<BarChart3 size={14} />}
-                onClick={() => navigate(`${isMobile ? '/mobile' : ''}/admin/tratamientos`)}
+                onClick={() => navigate('/admin/tratamientos')}
               >
                 Ver catálogo completo de tratamientos
               </Button>
@@ -486,8 +483,8 @@ const OperadorDetallePage: React.FC = () => {
                     <tr>
                       <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Número</th>
                       <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Estado</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '22%' }}>Generador</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '18%' }}>Fecha</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden lg:table-cell" style={{ width: '22%' }}>Generador</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden lg:table-cell" style={{ width: '18%' }}>Fecha</th>
                       <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Acción</th>
                     </tr>
                   </thead>
@@ -504,13 +501,13 @@ const OperadorDetallePage: React.FC = () => {
                             {m.estado}
                           </Badge>
                         </td>
-                        <td className="px-3 py-2.5 text-sm text-neutral-700 hidden md:table-cell">{m.generador?.razonSocial || '-'}</td>
-                        <td className="px-3 py-2.5 text-sm text-neutral-600 hidden md:table-cell">{m.createdAt ? new Date(m.createdAt).toLocaleDateString('es-AR') : '-'}</td>
+                        <td className="px-3 py-2.5 text-sm text-neutral-700 hidden lg:table-cell">{m.generador?.razonSocial || '-'}</td>
+                        <td className="px-3 py-2.5 text-sm text-neutral-600 hidden lg:table-cell">{m.createdAt ? new Date(m.createdAt).toLocaleDateString('es-AR') : '-'}</td>
                         <td className="px-3 py-2.5 text-right">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => navigate(isMobile ? `/mobile/manifiestos/${m.id}` : `/manifiestos/${m.id}`)}
+                            onClick={() => navigate(`/manifiestos/${m.id}`)}
                           >
                             Ver
                           </Button>

@@ -471,6 +471,12 @@ export const MainLayout: React.FC = () => {
         <main className="flex-1 px-4 lg:px-8 pb-4 lg:pb-8 overflow-auto bg-[#FAFAF8]">
           <Outlet />
         </main>
+
+        {/* Footer */}
+        <footer className="border-t border-neutral-100 bg-white px-4 py-2.5 flex items-center justify-center gap-3 shrink-0">
+          <img src="/logo-mendoza.webp" alt="Gobierno de Mendoza" className="h-6 w-auto opacity-60" />
+          <span className="text-xs text-neutral-400">Provincia de Mendoza — SITREP v6</span>
+        </footer>
       </div>
       </div>
 
