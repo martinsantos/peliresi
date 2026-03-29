@@ -8098,6 +8098,33 @@ curl https://sitrep.ultimamilla.com.ar/api/health
 <li><strong><code>tipoResiduoId</code></strong>: nuevo filtro en <code>GET /api/manifiestos</code> — filtra manifiestos que contengan un tipo de residuo especifico (via <code>residuos.some</code>).</li>
 </ul>
 
+<h3>16.5 Mobile Responsive — Correccion Integral</h3>
+<p>Revision completa de todas las vistas en viewport mobile (375px). Correcciones aplicadas:</p>
+<ul>
+<li><strong>Botones Imprimir/CSV/PDF:</strong> ocultos en mobile (<code>hidden sm:flex</code>) en 13 paginas. Ocupaban todo el ancho y empujaban el contenido fuera de pantalla. Los botones de accion principal (Nuevo, Nueva Autorizacion) permanecen visibles.</li>
+<li><strong>Componente Tabs:</strong> ahora scrollea horizontalmente en mobile (<code>overflow-x-auto scrollbar-hide</code>). Los tabs no se parten en multiples lineas — usan <code>whitespace-nowrap</code>. Texto reducido a <code>text-xs</code> e iconos ocultos en mobile para ahorrar espacio. Afecta todas las paginas con tabs: detalle de Generador (5 tabs), Operador (3 tabs), Transportista (3 tabs), Tratamientos (2 tabs).</li>
+<li><strong>Sticky group headers en ManifiestosPage mobile:</strong> el offset <code>top</code> del sticky se mide dinamicamente via <code>filterBarRefCb</code> en vez del valor hardcodeado <code>top-[52px]</code> que no coincidia con la altura real del filter bar. Se re-mide al expandir/colapsar filtros.</li>
+<li><strong>TrazabilidadTimeline:</strong> eliminado <code>overflow-hidden</code> del Card wrapper que anulaba <code>position: sticky</code> de los month headers en todas las vistas de detalle de actor.</li>
+<li><strong>Selector de ordenamiento mobile:</strong> agregado dentro del panel de filtros expandible — dropdown (Fecha/Numero/Estado/Generador/Operador) + boton Asc/Desc. En desktop el sort se controla via click en headers de columna.</li>
+</ul>
+
+<h3>16.6 Assets y Screenshots del Manual</h3>
+<ul>
+<li><strong>Animaciones WebP:</strong> 8 archivos de animacion para la pagina de Ayuda (<code>/ayuda</code>) desplegados en <code>/manual/screenshots/animations/</code>. Previamente faltaban en produccion y mostraban imagen rota.</li>
+<li><strong>Screenshots del manual:</strong> 135 capturas desktop + 48 capturas mobile desplegadas en <code>/manual/screenshots/desktop/</code> y <code>/manual/screenshots/mobile/</code>. El manual HTML referencia 124 imagenes — todas verificadas 200 OK.</li>
+<li><strong>Total de assets verificados:</strong> 201 imagenes/iconos/animaciones — 100% resolviendo correctamente en produccion.</li>
+</ul>
+
+<h3>16.7 Optimizacion de Performance</h3>
+<ul>
+<li><strong>Dashboard backend:</strong> 12 queries individuales reemplazadas por 1 <code>groupBy</code> + 2 <code>findMany</code> en <code>Promise.all</code>. Reduccion ~70% en latencia del endpoint <code>/manifiestos/dashboard</code>.</li>
+<li><strong>jsPDF lazy loading:</strong> la libreria PDF (407KB + autoTable) se carga via <code>dynamic import</code> solo cuando el usuario exporta. No se incluye en el bundle inicial.</li>
+<li><strong>staleTime en queries:</strong> agregado a <code>useAlertas</code> (30s), <code>useReglas</code> (60s), <code>useAnomalias</code> (60s), <code>useOperadores</code> (60s), <code>useGeneradores</code> (60s). Evita refetches innecesarios al cambiar de tab o enfocar la ventana.</li>
+<li><strong>QueryClient unificado:</strong> configuracion compartida entre Web y PWA en <code>lib/queryClient.ts</code>. Previamente tenian configs distintas (retry funcion vs retry:1).</li>
+<li><strong>Rutas unificadas:</strong> 99 lazy imports duplicados entre <code>App.tsx</code> y <code>AppMobile.tsx</code> extraidos a <code>routes/pages.ts</code> — single source of truth.</li>
+<li><strong>DEMO_MODE desactivado en produccion.</strong></li>
+</ul>
+
 </section>
 
 </main>
