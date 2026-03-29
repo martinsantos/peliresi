@@ -107,7 +107,7 @@ export function TabList({ children, className }: TabListProps) {
   };
 
   return (
-    <div className={cn('flex items-center', variantStyles[variant], className)} role="tablist">
+    <div className={cn('flex items-center overflow-x-auto scrollbar-hide -mx-1 px-1', variantStyles[variant], className)} role="tablist">
       {children}
     </div>
   );
@@ -128,25 +128,25 @@ export function Tab({ id, children, disabled, icon, badge }: TabProps) {
 
   const variantStyles = {
     default: cn(
-      'px-4 py-2.5 text-sm font-medium border-b-2 transition-all',
+      'px-2.5 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-medium border-b-2 transition-all whitespace-nowrap shrink-0',
       isActive
         ? 'border-primary-500 text-primary-600'
         : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
     ),
     pills: cn(
-      'px-4 py-2 text-sm font-medium rounded-lg transition-all',
+      'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-lg transition-all whitespace-nowrap shrink-0',
       isActive
         ? 'bg-white text-primary-600 shadow-sm'
         : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200/50'
     ),
     underline: cn(
-      'px-1 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px',
+      'px-1 py-2 sm:py-2.5 text-xs sm:text-sm font-medium border-b-2 transition-all -mb-px whitespace-nowrap shrink-0',
       isActive
         ? 'border-primary-500 text-primary-600'
         : 'border-transparent text-neutral-500 hover:text-neutral-700'
     ),
     bordered: cn(
-      'px-4 py-2 text-sm font-medium rounded-md transition-all flex-1 text-center',
+      'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-md transition-all flex-1 text-center whitespace-nowrap',
       isActive
         ? 'bg-white text-primary-600 shadow-sm border border-neutral-200'
         : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
@@ -166,7 +166,7 @@ export function Tab({ id, children, disabled, icon, badge }: TabProps) {
         disabled && 'opacity-50 cursor-not-allowed'
       )}
     >
-      {icon && <span className="shrink-0">{icon}</span>}
+      {icon && <span className="shrink-0 hidden sm:inline-flex">{icon}</span>}
       <span>{children}</span>
       {badge && <span className="shrink-0">{badge}</span>}
     </button>
