@@ -131,11 +131,22 @@ const ManifiestosPage: React.FC = () => {
   const desktopSentinelRef = useRef<HTMLDivElement>(null);
   const mobileSentinelRef = useRef<HTMLDivElement>(null);
   const theadRef = useRef<HTMLTableSectionElement>(null);
-  const [theadH, setTheadH] = useState(34); // fallback; measured accurately via callback ref
+  const [theadH, setTheadH] = useState(34);
+  const [filterBarH, setFilterBarH] = useState(0); // measured for mobile sticky offset
 
   // Delete modal
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; numero: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Filter bar ref + re-measure when filters expand/collapse
+  const filterBarRef = useRef<HTMLDivElement>(null);
+  const filterBarRefCb = useCallback((node: HTMLDivElement | null) => {
+    filterBarRef.current = node;
+    if (node) setFilterBarH(node.offsetHeight);
+  }, []);
+  useEffect(() => {
+    if (filterBarRef.current) setFilterBarH(filterBarRef.current.offsetHeight);
+  }, [showFilters]);
 
   // Callback ref: measures thead height the instant it mounts in the DOM
   const theadRefCb = useCallback((node: HTMLTableSectionElement | null) => {
@@ -285,7 +296,7 @@ const ManifiestosPage: React.FC = () => {
       </div>
 
       {/* Filters — sticky */}
-      <div className="sticky top-0 z-20 bg-[#FAFAF8] -mx-4 lg:-mx-8 px-4 lg:px-8 pt-2 pb-2">
+      <div ref={filterBarRefCb} className="sticky top-0 z-20 bg-[#FAFAF8] -mx-4 lg:-mx-8 px-4 lg:px-8 pt-2 pb-2">
         <Card padding="base">
           <div className="flex flex-col md:flex-row gap-3">
             <div className="flex-1">
@@ -347,7 +358,7 @@ const ManifiestosPage: React.FC = () => {
             {allRows.map((m, idx) => (
               <React.Fragment key={m.id}>
                 {isGroupStart(idx) && (
-                  <div className="sticky top-[52px] z-[2] -mx-1 px-3 py-1.5 bg-neutral-100/95 backdrop-blur-sm border-b border-neutral-200 rounded-t-lg mt-3 first:mt-0">
+                  <div className="sticky z-[2] -mx-1 px-3 py-1.5 bg-neutral-100/95 backdrop-blur-sm border-b border-neutral-200 rounded-t-lg mt-3 first:mt-0" style={{ top: `${filterBarH}px` }}>
                     <div className="flex items-center gap-1.5">
                       <Calendar size={11} className="text-primary-500" />
                       <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-600">{getGroupLabel(getGroupKey(m, sortBy), sortBy)}</span>

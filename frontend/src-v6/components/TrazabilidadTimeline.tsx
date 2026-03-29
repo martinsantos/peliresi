@@ -225,7 +225,7 @@ const TrazabilidadTimeline: React.FC<TrazabilidadTimelineProps> = ({
   const hasActiveFilters = mesFilter || estadoFilter;
 
   return (
-    <Card className="overflow-hidden">
+    <Card>
       {/* ── Header bar ─────────────────────────────────────── */}
       <div className="px-3 sm:px-5 py-3 sm:py-4 border-b border-neutral-100 space-y-2">
         <div className="flex items-center gap-2">
