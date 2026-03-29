@@ -41,16 +41,32 @@ export const getGeneradores = async (req: AuthRequest, res: Response, next: Next
                     _count: { select: { manifiestos: true } },
                     pagos: { where: { anio: { gte: new Date().getFullYear() - 1 } }, select: { anio: true, fechaPago: true, habilitado: true }, orderBy: { anio: 'desc' } },
                     ddjj: { where: { anio: { gte: new Date().getFullYear() - 1 } }, select: { anio: true, presentada: true }, orderBy: { anio: 'desc' } },
+                    manifiestos: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } },
                 },
                 orderBy
             }),
             prisma.generador.count({ where })
         ]);
 
+        // Map ultimaActividad from most recent manifiesto
+        let mapped = generadores.map((g: any) => ({
+            ...g,
+            ultimaActividad: g.manifiestos?.[0]?.createdAt || null,
+        }));
+
+        // Sort by ultimaActividad if requested (client-side since it's a derived field)
+        if (sortBy === 'ultimaActividad') {
+            mapped.sort((a: any, b: any) => {
+                const da = a.ultimaActividad ? new Date(a.ultimaActividad).getTime() : 0;
+                const db = b.ultimaActividad ? new Date(b.ultimaActividad).getTime() : 0;
+                return order === 'desc' ? db - da : da - db;
+            });
+        }
+
         res.json({
             success: true,
             data: {
-                generadores,
+                generadores: mapped,
                 pagination: { page: Number(page), limit: limitNum, total, pages: Math.ceil(total / limitNum) }
             }
         });
@@ -266,17 +282,33 @@ export const getTransportistas = async (req: AuthRequest, res: Response, next: N
                     usuario: { select: { email: true, nombre: true, apellido: true } },
                     vehiculos: true,
                     choferes: true,
-                    _count: { select: { manifiestos: true } }
+                    _count: { select: { manifiestos: true } },
+                    manifiestos: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } },
                 },
                 orderBy
             }),
             prisma.transportista.count({ where })
         ]);
 
+        // Map ultimaActividad from most recent manifiesto
+        let mappedT = transportistas.map((t: any) => ({
+            ...t,
+            ultimaActividad: t.manifiestos?.[0]?.createdAt || null,
+        }));
+
+        // Sort by ultimaActividad if requested
+        if (sortBy === 'ultimaActividad') {
+            mappedT.sort((a: any, b: any) => {
+                const da = a.ultimaActividad ? new Date(a.ultimaActividad).getTime() : 0;
+                const db = b.ultimaActividad ? new Date(b.ultimaActividad).getTime() : 0;
+                return order === 'desc' ? db - da : da - db;
+            });
+        }
+
         res.json({
             success: true,
             data: {
-                transportistas,
+                transportistas: mappedT,
                 pagination: { page: Number(page), limit: limitNum, total, pages: Math.ceil(total / limitNum) }
             }
         });
@@ -662,17 +694,33 @@ export const getOperadores = async (req: AuthRequest, res: Response, next: NextF
                 include: {
                     usuario: { select: { email: true, nombre: true, apellido: true } },
                     tratamientos: { include: { tipoResiduo: true } },
-                    _count: { select: { manifiestos: true } }
+                    _count: { select: { manifiestos: true } },
+                    manifiestos: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } },
                 },
                 orderBy
             }),
             prisma.operador.count({ where })
         ]);
 
+        // Map ultimaActividad from most recent manifiesto
+        let mappedO = operadores.map((o: any) => ({
+            ...o,
+            ultimaActividad: o.manifiestos?.[0]?.createdAt || null,
+        }));
+
+        // Sort by ultimaActividad if requested
+        if (sortBy === 'ultimaActividad') {
+            mappedO.sort((a: any, b: any) => {
+                const da = a.ultimaActividad ? new Date(a.ultimaActividad).getTime() : 0;
+                const db = b.ultimaActividad ? new Date(b.ultimaActividad).getTime() : 0;
+                return order === 'desc' ? db - da : da - db;
+            });
+        }
+
         res.json({
             success: true,
             data: {
-                operadores,
+                operadores: mappedO,
                 pagination: { page: Number(page), limit: limitNum, total, pages: Math.ceil(total / limitNum) }
             }
         });

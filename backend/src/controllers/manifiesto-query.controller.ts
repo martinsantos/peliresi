@@ -6,7 +6,7 @@ import prisma from '../lib/prisma';
 // Obtener todos los manifiestos
 export const getManifiestos = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { estado, generadorId, transportistaId, operadorId, search, fechaDesde, fechaHasta, page = 1, limit = 10, sortBy, sortOrder } = req.query;
+    const { estado, generadorId, transportistaId, operadorId, tipoResiduoId, search, fechaDesde, fechaHasta, page = 1, limit = 10, sortBy, sortOrder } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
     const where: any = {};
@@ -15,6 +15,7 @@ export const getManifiestos = async (req: AuthRequest, res: Response, next: Next
     if (generadorId) where.generadorId = generadorId;
     if (transportistaId) where.transportistaId = transportistaId;
     if (operadorId) where.operadorId = operadorId;
+    if (tipoResiduoId) where.residuos = { some: { tipoResiduoId: tipoResiduoId as string } };
 
     if (fechaDesde || fechaHasta) {
       where.createdAt = {};
@@ -57,10 +58,14 @@ export const getManifiestos = async (req: AuthRequest, res: Response, next: Next
         ? { createdAt: dir }
         : sortBy === 'estado'
           ? { estado: dir }
-          : estado === 'ENTREGADO' ? { fechaEntrega: 'desc' }
-        : estado === 'RECIBIDO' ? { fechaRecepcion: 'desc' }
-        : estado === 'TRATADO' ? { fechaCierre: 'desc' }
-        : { createdAt: 'desc' };
+          : sortBy === 'generador'
+            ? { generador: { razonSocial: dir } }
+            : sortBy === 'operador'
+              ? { operador: { razonSocial: dir } }
+              : estado === 'ENTREGADO' ? { fechaEntrega: 'desc' }
+            : estado === 'RECIBIDO' ? { fechaRecepcion: 'desc' }
+            : estado === 'TRATADO' ? { fechaCierre: 'desc' }
+            : { createdAt: 'desc' };
 
     const [manifiestos, total] = await Promise.all([
       prisma.manifiesto.findMany({

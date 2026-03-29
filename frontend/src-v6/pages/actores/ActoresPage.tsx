@@ -26,9 +26,11 @@ import {
   Trash2,
   ArrowLeft,
   Download,
+  FileDown,
   List,
   Grid3X3,
   Loader2,
+  Printer,
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -38,6 +40,7 @@ import { Modal, ConfirmModal } from '../../components/ui/Modal';
 import { Table, Pagination } from '../../components/ui/Table';
 import { Tabs, TabList, Tab } from '../../components/ui/Tabs';
 import { downloadCsv } from '../../utils/exportCsv';
+import { exportReportePDF } from '../../utils/exportPdf';
 import {
   useGeneradores,
   useTransportistas,
@@ -257,6 +260,31 @@ export const ActoresPage: React.FC = () => {
 
   const updateField = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }));
 
+  const handleExportPdf = () => {
+    exportReportePDF({
+      titulo: 'Gestión de Actores',
+      subtitulo: 'Generadores, transportistas y operadores registrados',
+      periodo: `Total: ${totalCount} actores`,
+      kpis: [
+        { label: 'Total Actores', value: totalCount },
+        { label: 'Generadores', value: generadoresCount },
+        { label: 'Transportistas', value: transportistasCount },
+        { label: 'Operadores', value: operadoresCount },
+      ],
+      tabla: {
+        headers: ['Razón Social', 'CUIT', 'Tipo', 'Email', 'Teléfono', 'Estado'],
+        rows: actoresFiltrados.map(a => [
+          a.razonSocial || '',
+          a.cuit || '',
+          tipoConfig[a.tipo as keyof typeof tipoConfig]?.label || a.tipo,
+          a.email || '',
+          a.telefono || '',
+          (a.activo !== false && a.estado !== 'inactivo') ? 'Activo' : 'Inactivo',
+        ]),
+      },
+    });
+  };
+
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
   // Table columns
@@ -450,6 +478,7 @@ export const ActoresPage: React.FC = () => {
             </div>
           </div>
           <div className="flex gap-2">
+            <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={14} />Imprimir</button>
             <Button
               variant="outline"
               leftIcon={<Download size={18} />}
@@ -461,10 +490,11 @@ export const ActoresPage: React.FC = () => {
                 Telefono: a.telefono,
                 Domicilio: a.domicilio,
                 Estado: (a.activo !== false && a.estado !== 'inactivo') ? 'Activo' : 'Inactivo',
-              })), 'actores')}
+              })), 'actores', { titulo: 'Gestion de Actores', periodo: 'Todos los periodos', filtros: [activeTab !== 'todos' ? `Tipo: ${activeTab}` : '', filtroEstado !== 'todos' ? `Estado: ${filtroEstado}` : ''].filter(Boolean).join(', ') || 'Sin filtros', total: actoresData.length })}
             >
-              Exportar
+              CSV
             </Button>
+            <button onClick={handleExportPdf} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="Exportar PDF"><FileDown size={14} />PDF</button>
             <Button leftIcon={<Plus size={18} />} onClick={() => setModalCrear(true)}>
               Nuevo Actor
             </Button>

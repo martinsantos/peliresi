@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  FlaskConical, Layers, MapPin, FileCheck, Calendar, Search, ChevronUp, ChevronDown,
+  FlaskConical, Layers, MapPin, FileCheck, Calendar, Search, ChevronUp, ChevronDown, Download, FileDown, Printer, Filter,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -12,12 +12,18 @@ import { Badge } from '../../../components/ui/BadgeV2';
 import { CHART_COLORS } from '../../../utils/chart-colors';
 import { KpiCard } from '../../../components/charts/KpiCard';
 import { useOperadores } from '../../../hooks/useActores';
+import { downloadCsv } from './shared';
+import { exportReportePDF } from '../../../utils/exportPdf';
+import type { CentroControlData } from '../../../hooks/useCentroControl';
 
 export default function OperadoresTab({
+  ccData,
   periodoLabel,
+  incluirTodos = true,
 }: {
-  ccData?: any; // Keep for compatibility but unused
+  ccData?: CentroControlData | null;
   periodoLabel: string;
+  incluirTodos?: boolean;
 }) {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
@@ -32,9 +38,28 @@ export default function OperadoresTab({
     return sortConfig.direction === 'asc' ? <ChevronUp size={12} className="ml-1 text-primary-600 inline" /> : <ChevronDown size={12} className="ml-1 text-primary-600 inline" />;
   };
 
-  // Fetch ALL operadores from database (limit raised to 5000 on backend)
+  // Fetch ALL operadores (used in "Ver Todos" mode)
   const { data: paginatedData, isLoading } = useOperadores({ limit: 5000 });
-  const operadores = paginatedData?.items || [];
+  const allOperadores = paginatedData?.items || [];
+
+  // Date-filtered operadores from Centro de Control
+  const ccOperadores = useMemo(() => {
+    if (!ccData?.operadores?.length) return [];
+    return ccData.operadores.map((o: any) => ({
+      ...o,
+      // Map ccData fields to expected shape for table compatibility
+      numeroHabilitacion: '',
+      tratamientos: [],
+      tipoOperador: '',
+      activo: true,
+      cantRecibidos: o.cantRecibidos || 0,
+      cantTratados: o.cantTratados || 0,
+    }));
+  }, [ccData]);
+
+  // Choose data source: ccData when date-filtered, full API when "Ver Todos"
+  const isDateFiltered = !incluirTodos && ccOperadores.length > 0;
+  const operadores = isDateFiltered ? ccOperadores : allOperadores;
 
   const filtered = useMemo(() => {
     let list = operadores;
@@ -59,6 +84,8 @@ export default function OperadoresTab({
           case 'habilitacion': return dir * (a.numeroHabilitacion || '').localeCompare(b.numeroHabilitacion || '', 'es');
           case 'categoria': return dir * (a.categoria || '').localeCompare(b.categoria || '', 'es');
           case 'tratamientos': return dir * ((a.tratamientos?.length || 0) - (b.tratamientos?.length || 0));
+          case 'recibidos': return dir * ((a.cantRecibidos || 0) - (b.cantRecibidos || 0));
+          case 'tratados': return dir * ((a.cantTratados || 0) - (b.cantTratados || 0));
           case 'estado': return dir * (Number(b.activo) - Number(a.activo));
           default: return 0;
         }
@@ -70,7 +97,7 @@ export default function OperadoresTab({
   const byCategoria = useMemo(() => {
     const map: Record<string, number> = {};
     for (const o of operadores) {
-      const cat = (o.categoria || '').trim() || 'Sin categoria';
+      const cat = ((o as any).categoria || '').trim() || 'Sin categoria';
       map[cat] = (map[cat] || 0) + 1;
     }
     const sorted = Object.entries(map)
@@ -94,11 +121,20 @@ export default function OperadoresTab({
     ];
   }, [operadores]);
 
-  // Count by tipo using tipoOperador field (FIJO, IN_SITU)
+  // Count by tipo using tipoOperador field (FIJO, IN_SITU) -- only meaningful in "Ver Todos" mode
   const byTipo = useMemo(() => {
+    if (isDateFiltered) {
+      // ccData operadores have cantRecibidos/cantTratados -- show activity breakdown instead
+      const totalRecibidos = operadores.reduce((sum: number, o: any) => sum + (o.cantRecibidos || 0), 0);
+      const totalTratados = operadores.reduce((sum: number, o: any) => sum + (o.cantTratados || 0), 0);
+      const result = [];
+      if (totalRecibidos > 0) result.push({ name: 'Recibidos', value: totalRecibidos, fill: '#3B82F6' });
+      if (totalTratados > 0) result.push({ name: 'Tratados', value: totalTratados, fill: '#10B981' });
+      return result;
+    }
     const map: Record<string, number> = {};
     for (const o of operadores) {
-      const tipo = o.tipoOperador || 'Sin definir';
+      const tipo = (o as any).tipoOperador || 'Sin definir';
       map[tipo] = (map[tipo] || 0) + 1;
     }
     const labels: Record<string, string> = { FIJO: 'Planta Fija', IN_SITU: 'In Situ', 'Sin definir': 'Sin definir' };
@@ -107,14 +143,18 @@ export default function OperadoresTab({
       .map(([key, value]) => ({ name: labels[key] || key, value, fill: colors[key] || '#8B5CF6' }))
       .filter(x => x.value > 0)
       .sort((a, b) => b.value - a.value);
-  }, [operadores]);
+  }, [operadores, isDateFiltered]);
 
-  // Count tratamientos
+  // Count tratamientos (only available from full API)
   const totalTratamientos = useMemo(() => {
     return operadores.reduce((sum: number, o: any) => sum + (o.tratamientos?.length || 0), 0);
   }, [operadores]);
 
-  if (isLoading) {
+  // Activity totals for date-filtered mode
+  const totalRecibidos = useMemo(() => operadores.reduce((sum: number, o: any) => sum + (o.cantRecibidos || 0), 0), [operadores]);
+  const totalTratados = useMemo(() => operadores.reduce((sum: number, o: any) => sum + (o.cantTratados || 0), 0), [operadores]);
+
+  if (isLoading && incluirTodos) {
     return (
       <div className="flex flex-col items-center justify-center py-24">
         <div className="w-16 h-16 rounded-full border-4 border-primary-100 border-t-primary-500 animate-spin" />
@@ -125,23 +165,50 @@ export default function OperadoresTab({
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center gap-2 px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-xl">
-        <Calendar size={14} className="text-blue-600 shrink-0" />
-        <span className="text-xs font-medium text-blue-800">
-          Mostrando: <strong>Todos los operadores registrados ({operadores.length})</strong>
-        </span>
+      <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl ${
+        isDateFiltered
+          ? 'bg-amber-50 border border-amber-200'
+          : 'bg-blue-50 border border-blue-200'
+      }`}>
+        {isDateFiltered ? (
+          <>
+            <Filter size={14} className="text-amber-600 shrink-0" />
+            <span className="text-xs font-medium text-amber-800">
+              Mostrando <strong>{operadores.length} operadores con actividad</strong> en el periodo: <strong>{periodoLabel}</strong>
+            </span>
+          </>
+        ) : (
+          <>
+            <Calendar size={14} className="text-blue-600 shrink-0" />
+            <span className="text-xs font-medium text-blue-800">
+              Mostrando: <strong>Todos los operadores registrados ({operadores.length})</strong>
+            </span>
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        <KpiCard icon={FlaskConical} label="Total Operadores" value={paginatedData?.total || operadores.length} color="from-blue-600 to-blue-700" />
+        <KpiCard icon={FlaskConical} label="Total Operadores" value={operadores.length} color="from-blue-600 to-blue-700" />
         <KpiCard icon={Layers} label="Categorias" value={byCategoria.length} color="from-purple-600 to-purple-700" sub="tipos" />
-        <KpiCard icon={FileCheck} label="Tratamientos" value={totalTratamientos} color="from-emerald-600 to-emerald-700" sub="autorizados" />
-        <KpiCard icon={MapPin} label="Planta Fija" value={byTipo.find(x => x.name === 'Planta Fija')?.value || 0} color="from-cyan-600 to-cyan-700" sub="plantas fijas" />
+        {isDateFiltered ? (
+          <>
+            <KpiCard icon={FileCheck} label="Recibidos" value={totalRecibidos} color="from-cyan-600 to-cyan-700" sub="en periodo" />
+            <KpiCard icon={FileCheck} label="Tratados" value={totalTratados} color="from-emerald-600 to-emerald-700" sub="en periodo" />
+          </>
+        ) : (
+          <>
+            <KpiCard icon={FileCheck} label="Tratamientos" value={totalTratamientos} color="from-emerald-600 to-emerald-700" sub="autorizados" />
+            <KpiCard icon={MapPin} label="Planta Fija" value={byTipo.find(x => x.name === 'Planta Fija')?.value || 0} color="from-cyan-600 to-cyan-700" sub="plantas fijas" />
+          </>
+        )}
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
         <Card className="border-0 shadow-sm">
-          <CardHeader title="Por Tipo de Operación" subtitle="FIJO vs IN SITU" />
+          <CardHeader
+            title={isDateFiltered ? 'Actividad en Periodo' : 'Por Tipo de Operacion'}
+            subtitle={isDateFiltered ? 'Manifiestos recibidos vs tratados' : 'FIJO vs IN SITU'}
+          />
           <CardContent>
             {byTipo.length > 0 ? (
               <ResponsiveContainer width="100%" height={320}>
@@ -172,7 +239,7 @@ export default function OperadoresTab({
         </Card>
 
         <Card className="border-0 shadow-sm">
-          <CardHeader title="Por Categoría" subtitle="Distribución de operadores" />
+          <CardHeader title="Por Categoria" subtitle="Distribucion de operadores" />
           <CardContent>
             {byCategoria.length > 0 ? (
               <ResponsiveContainer width="100%" height={320}>
@@ -198,7 +265,7 @@ export default function OperadoresTab({
       <Card className="border-0 shadow-sm">
         <CardHeader
           title={`Listado de Operadores (${filtered.length})`}
-          subtitle="Plantas de tratamiento registradas en el sistema"
+          subtitle={isDateFiltered ? `Operadores con actividad en ${periodoLabel}` : 'Plantas de tratamiento registradas en el sistema'}
           action={
             <div className="flex items-center gap-2">
               <div className="relative">
@@ -213,11 +280,70 @@ export default function OperadoresTab({
               </div>
               <input
                 type="text"
-                placeholder="Categoría..."
+                placeholder="Categoria..."
                 value={categoriaFilter}
                 onChange={e => setCategoriaFilter(e.target.value)}
                 className="px-3 py-1.5 rounded-lg border border-neutral-200 text-xs text-neutral-700 w-32"
               />
+              <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={13} />Imprimir</button>
+              <button
+                onClick={() => {
+                  const headers = isDateFiltered
+                    ? ['Razon Social', 'CUIT', 'Categoria', 'Recibidos', 'Tratados']
+                    : ['Razon Social', 'CUIT', 'Habilitacion', 'Categoria', 'Tratamientos', 'Estado'];
+                  const rows = filtered.map((o: any) => isDateFiltered
+                    ? [o.razonSocial, o.cuit, o.categoria || '-', o.cantRecibidos || 0, o.cantTratados || 0]
+                    : [o.razonSocial, o.cuit, o.numeroHabilitacion || '-', o.categoria || '-', o.tratamientos?.length || 0, o.activo ? 'Activo' : 'Inactivo']
+                  );
+                  downloadCsv(`operadores-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows, {
+                    titulo: 'Reporte de Operadores',
+                    periodo: periodoLabel || 'Todos los periodos',
+                    filtros: [searchQuery ? `Busqueda: ${searchQuery}` : '', categoriaFilter ? `Categoria: ${categoriaFilter}` : ''].filter(Boolean).join(', ') || 'Sin filtros',
+                    total: filtered.length,
+                  });
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg border border-primary-200 transition-colors"
+                title="Exportar a CSV"
+              >
+                <Download size={13} />
+                CSV
+              </button>
+              <button
+                onClick={() => {
+                  exportReportePDF({
+                    titulo: 'Reporte de Operadores',
+                    subtitulo: `${filtered.length} operadores`,
+                    periodo: periodoLabel || 'Todos los periodos',
+                    kpis: isDateFiltered
+                      ? [
+                          { label: 'Total', value: operadores.length },
+                          { label: 'Categorias', value: byCategoria.length },
+                          { label: 'Recibidos', value: totalRecibidos },
+                          { label: 'Tratados', value: totalTratados },
+                        ]
+                      : [
+                          { label: 'Total', value: operadores.length },
+                          { label: 'Categorias', value: byCategoria.length },
+                          { label: 'Tratamientos', value: totalTratamientos },
+                          { label: 'Planta Fija', value: byTipo.find(x => x.name === 'Planta Fija')?.value || 0 },
+                        ],
+                    tabla: {
+                      headers: isDateFiltered
+                        ? ['Razon Social', 'CUIT', 'Categoria', 'Recibidos', 'Tratados']
+                        : ['Razon Social', 'CUIT', 'Habilitacion', 'Categoria', 'Tratamientos', 'Estado'],
+                      rows: filtered.map((o: any) => isDateFiltered
+                        ? [o.razonSocial, o.cuit, o.categoria || '-', o.cantRecibidos || 0, o.cantTratados || 0]
+                        : [o.razonSocial, o.cuit, o.numeroHabilitacion || '-', o.categoria || '-', o.tratamientos?.length || 0, o.activo ? 'Activo' : 'Inactivo']
+                      ),
+                    },
+                  });
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors"
+                title="Exportar a PDF"
+              >
+                <FileDown size={13} />
+                PDF
+              </button>
             </div>
           }
         />
@@ -226,12 +352,23 @@ export default function OperadoresTab({
             <table className="w-full text-left">
               <thead className="bg-neutral-50/80 border-b border-neutral-200 sticky top-0 z-10">
                 <tr>
-                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('razonSocial')}>Razón Social<SortIcon col="razonSocial" /></th>
+                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('razonSocial')}>Razon Social<SortIcon col="razonSocial" /></th>
                   <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('cuit')}>CUIT<SortIcon col="cuit" /></th>
-                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('habilitacion')}>Habilitación<SortIcon col="habilitacion" /></th>
-                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('categoria')}>Categoría<SortIcon col="categoria" /></th>
-                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('tratamientos')}>Tratamientos<SortIcon col="tratamientos" /></th>
-                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('estado')}>Estado<SortIcon col="estado" /></th>
+                  {!isDateFiltered && (
+                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('habilitacion')}>Habilitacion<SortIcon col="habilitacion" /></th>
+                  )}
+                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('categoria')}>Categoria<SortIcon col="categoria" /></th>
+                  {isDateFiltered ? (
+                    <>
+                      <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('recibidos')}>Recibidos<SortIcon col="recibidos" /></th>
+                      <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('tratados')}>Tratados<SortIcon col="tratados" /></th>
+                    </>
+                  ) : (
+                    <>
+                      <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('tratamientos')}>Tratamientos<SortIcon col="tratamientos" /></th>
+                      <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('estado')}>Estado<SortIcon col="estado" /></th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
@@ -241,23 +378,38 @@ export default function OperadoresTab({
                       {o.razonSocial}
                     </td>
                     <td className="px-4 py-3 text-sm text-neutral-600 font-mono text-xs">{o.cuit}</td>
-                    <td className="px-4 py-3 text-sm text-neutral-600 font-mono text-xs">{o.numeroHabilitacion || '-'}</td>
+                    {!isDateFiltered && (
+                      <td className="px-4 py-3 text-sm text-neutral-600 font-mono text-xs">{o.numeroHabilitacion || '-'}</td>
+                    )}
                     <td className="px-4 py-3 text-sm text-neutral-600 hidden md:table-cell max-w-[150px] truncate" title={o.categoria}>
                       {o.categoria || '-'}
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <Badge variant="soft" color="primary">{o.tratamientos?.length || 0}</Badge>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <Badge variant="soft" color={o.activo ? 'green' : 'red'}>
-                        {o.activo ? 'Activo' : 'Inactivo'}
-                      </Badge>
-                    </td>
+                    {isDateFiltered ? (
+                      <>
+                        <td className="px-4 py-3 text-center">
+                          <Badge variant="soft" color="primary">{o.cantRecibidos || 0}</Badge>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <Badge variant="soft" color="green">{o.cantTratados || 0}</Badge>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-4 py-3 text-center">
+                          <Badge variant="soft" color="primary">{o.tratamientos?.length || 0}</Badge>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <Badge variant="soft" color={o.activo ? 'green' : 'red'}>
+                            {o.activo ? 'Activo' : 'Inactivo'}
+                          </Badge>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-12 text-center text-neutral-400 text-sm">Sin operadores que coincidan</td>
+                    <td colSpan={isDateFiltered ? 5 : 6} className="px-4 py-12 text-center text-neutral-400 text-sm">Sin operadores que coincidan</td>
                   </tr>
                 )}
               </tbody>

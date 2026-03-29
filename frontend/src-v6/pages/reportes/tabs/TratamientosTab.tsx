@@ -7,15 +7,18 @@
 
 import React, { useState, useMemo } from 'react';
 import {
-  FlaskConical, AlertTriangle, Layers, Search, Calendar,
+  FlaskConical, AlertTriangle, Layers, Search, Calendar, Download, FileDown, Printer,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
 } from 'recharts';
 import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
+import { Button } from '../../../components/ui/ButtonV2';
 import { Badge } from '../../../components/ui/BadgeV2';
 import { KpiCard } from '../../../components/charts/KpiCard';
+import { downloadCsv } from '../../../utils/exportCsv';
+import { exportReportePDF } from '../../../utils/exportPdf';
 import {
   CATEGORIAS_TRATAMIENTO,
   TODOS_LOS_METODOS,
@@ -120,6 +123,60 @@ export default function TratamientosTab({
     }
     return list;
   }, [searchQuery, catFilter]);
+
+  const handleExportCsv = () => {
+    downloadCsv(
+      filtered.map(m => {
+        const cat = CATEGORIAS_TRATAMIENTO.find(c => c.metodos.includes(m));
+        return {
+          Categoría: cat?.nombre || '',
+          Método: m.nombre,
+          Descripción: m.descripcion,
+          'Corrientes Y': m.corrientesY.join(', '),
+          'Cant. Operadores': m.operadores.length,
+          Operadores: m.operadores.map(o => {
+            const enr = getOperadorEnriched(o.cuit, OPERADORES_DATA);
+            return enr ? `${enr.empresa} (${o.tipo})` : o.cuit;
+          }).join('; '),
+          Riesgo: getRiesgoMetodo(m),
+        };
+      }),
+      'reporte-tratamientos',
+      {
+        titulo: 'Reporte de Tratamientos',
+        periodo: `${STATS_TRATAMIENTOS.totalMetodos} metodos en ${STATS_TRATAMIENTOS.totalCategorias} categorias`,
+        filtros: [searchQuery ? `Busqueda: ${searchQuery}` : '', catFilter ? `Categoria: ${catFilter}` : ''].filter(Boolean).join(', ') || 'Sin filtros',
+        total: filtered.length,
+      }
+    );
+  };
+
+  const handleExportPdf = () => {
+    exportReportePDF({
+      titulo: 'Reporte de Tratamientos',
+      subtitulo: 'Métodos de tratamiento de residuos peligrosos',
+      periodo: `${STATS_TRATAMIENTOS.totalMetodos} métodos en ${STATS_TRATAMIENTOS.totalCategorias} categorías`,
+      kpis: [
+        { label: 'Total Métodos', value: STATS_TRATAMIENTOS.totalMetodos },
+        { label: 'Categorías', value: STATS_TRATAMIENTOS.totalCategorias },
+        { label: 'Operadores', value: STATS_TRATAMIENTOS.totalOperadores },
+        { label: 'Riesgo Crítico', value: STATS_TRATAMIENTOS.metodosCriticos },
+      ],
+      tabla: {
+        headers: ['Categoría', 'Método', 'Corrientes Y', 'Operadores', 'Riesgo'],
+        rows: filtered.map(m => {
+          const cat = CATEGORIAS_TRATAMIENTO.find(c => c.metodos.includes(m));
+          return [
+            cat?.nombre || '',
+            m.nombre,
+            m.corrientesY.join(', '),
+            m.operadores.length,
+            getRiesgoMetodo(m),
+          ];
+        }),
+      },
+    });
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -237,6 +294,9 @@ export default function TratamientosTab({
                   <option key={c.id} value={c.id}>{c.nombre}</option>
                 ))}
               </select>
+              <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={14} />Imprimir</button>
+              <button onClick={handleExportCsv} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg border border-primary-200 transition-colors" title="Exportar CSV"><Download size={14} />CSV</button>
+              <button onClick={handleExportPdf} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="Exportar PDF"><FileDown size={14} />PDF</button>
             </div>
           }
         />

@@ -10,7 +10,7 @@ import {
   ArrowLeft, Factory, MapPin, Phone, Mail, Calendar, Download,
   CheckCircle, AlertTriangle, Biohazard, Shield, FileText,
   DollarSign, ClipboardList, Plus, Pencil, Trash2, X,
-  Building2, Award, BookOpen,
+  Building2, Award, BookOpen, Route,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -19,7 +19,6 @@ import { Tabs, TabList, Tab, TabPanel } from '../../components/ui/Tabs';
 import { Input } from '../../components/ui/Input';
 import { toast } from '../../components/ui/Toast';
 import { useGenerador } from '../../hooks/useActores';
-import { useManifiestos } from '../../hooks/useManifiestos';
 import { usePagosTEF, useCreatePago, useUpdatePago, useDeletePago, useDDJJ, useCreateDDJJ, useUpdateDDJJ, useDeleteDDJJ, useDocumentos, useUploadDocumento, useRevisarDocumento, useDeleteDocumento } from '../../hooks/useGeneradorFiscal';
 import { downloadCsv } from '../../utils/exportCsv';
 import { useGeneradoresEnrichment } from '../../hooks/useEnrichment';
@@ -28,6 +27,7 @@ import DocumentUpload from '../../components/DocumentUpload';
 import CalculadoraTEF from '../../components/CalculadoraTEF';
 import type { PagoTEF, DeclaracionJurada } from '../../services/generador-fiscal.service';
 import api from '../../services/api';
+import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
 
 // ===== Inline CRUD Modal =====
 function CrudModal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
@@ -137,7 +137,6 @@ const GeneradorDetallePage: React.FC = () => {
   const location = useLocation();
   // Removed isMobile — React Router handles basename
 
-  const [historialPage, setHistorialPage] = useState(1);
   const [pagoModal, setPagoModal] = useState<{ open: boolean; editing?: PagoTEF }>({ open: false });
   const [ddjjModal, setDdjjModal] = useState<{ open: boolean; editing?: DeclaracionJurada }>({ open: false });
 
@@ -145,7 +144,6 @@ const GeneradorDetallePage: React.FC = () => {
   const GENERADORES_DATA = enrichmentData?.generadores || {};
 
   const { data: apiGenerador, isLoading } = useGenerador(id || '');
-  const { data: manifiestoData } = useManifiestos({ generadorId: id, limit: 20, page: historialPage }, { enabled: !!id });
   const { data: pagos = [] } = usePagosTEF(id || '');
   const { data: ddjjList = [] } = useDDJJ(id || '');
   const { data: documentos = [] } = useDocumentos(id || '');
@@ -347,7 +345,7 @@ const GeneradorDetallePage: React.FC = () => {
           <Tab id="residuos" icon={<Biohazard size={16} />}>Residuos</Tab>
           <Tab id="fiscal" icon={<DollarSign size={16} />}>Situacion Fiscal</Tab>
           <Tab id="ddjj" icon={<ClipboardList size={16} />}>DDJJ y Documentos</Tab>
-          <Tab id="historial" icon={<FileText size={16} />}>Historial</Tab>
+          <Tab id="historial" icon={<Route size={16} />}>Trazabilidad</Tab>
         </TabList>
 
         {/* ===== Tab 1: Info General (expanded) ===== */}
@@ -626,58 +624,13 @@ const GeneradorDetallePage: React.FC = () => {
           </div>
         </TabPanel>
 
-        {/* ===== Tab 5: Historial ===== */}
+        {/* ===== Tab 5: Trazabilidad ===== */}
         <TabPanel id="historial">
-          <Card>
-            <CardHeader title="Historial de Manifiestos" icon={<FileText size={20} />} />
-            <CardContent>
-              {(manifiestoData?.items?.length ?? 0) > 0 ? (
-                <table className="w-full table-fixed">
-                  <thead className="bg-neutral-50">
-                    <tr>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Numero</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Estado</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '22%' }}>Transportista</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden md:table-cell" style={{ width: '18%' }}>Fecha</th>
-                      <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Accion</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-neutral-100">
-                    {manifiestoData!.items.map((m: any) => (
-                      <tr key={m.id} className="hover:bg-neutral-50 transition-colors">
-                        <td className="px-3 py-2.5 font-mono text-sm font-semibold text-neutral-900">{m.numero}</td>
-                        <td className="px-3 py-2.5">
-                          <Badge variant="soft" color={
-                            m.estado === 'TRATADO' ? 'success' :
-                            m.estado === 'EN_TRANSITO' ? 'warning' :
-                            m.estado === 'CANCELADO' || m.estado === 'RECHAZADO' ? 'error' : 'neutral'
-                          }>
-                            {m.estado}
-                          </Badge>
-                        </td>
-                        <td className="px-3 py-2.5 text-sm text-neutral-700 hidden md:table-cell">{m.transportista?.razonSocial || '-'}</td>
-                        <td className="px-3 py-2.5 text-sm text-neutral-600 hidden md:table-cell">{m.createdAt ? new Date(m.createdAt).toLocaleDateString('es-AR') : '-'}</td>
-                        <td className="px-3 py-2.5 text-right">
-                          <Button variant="ghost" size="sm" onClick={() => navigate(`/manifiestos/${m.id}`)}>Ver</Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <p className="text-sm text-neutral-400 text-center py-6">Sin manifiestos registrados</p>
-              )}
-              {(manifiestoData?.totalPages ?? 0) > 1 && (
-                <div className="flex items-center justify-between pt-4 border-t border-neutral-100 mt-2">
-                  <p className="text-sm text-neutral-500">Pagina {manifiestoData!.page} de {manifiestoData!.totalPages} · {manifiestoData!.total} total</p>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" disabled={historialPage === 1} onClick={() => setHistorialPage(p => p - 1)}>Anterior</Button>
-                    <Button variant="outline" size="sm" disabled={historialPage === manifiestoData!.totalPages} onClick={() => setHistorialPage(p => p + 1)}>Siguiente</Button>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <TrazabilidadTimeline
+            actorType="generador"
+            actorId={id || ''}
+            emptyLabel="generador"
+          />
         </TabPanel>
       </Tabs>
 

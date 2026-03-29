@@ -18,6 +18,7 @@ import {
 import {
   Search,
   Download,
+  FileDown,
   AlertTriangle,
   AlertCircle,
   CheckCircle2,
@@ -32,6 +33,7 @@ import {
   Trash2,
   Loader2,
   ShieldCheck,
+  Printer,
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -43,6 +45,7 @@ import { Modal, ConfirmModal } from '../../components/ui/Modal';
 import { Tabs, TabList, Tab, TabPanel } from '../../components/ui/Tabs';
 import { toast } from '../../components/ui/Toast';
 import { downloadCsv } from '../../utils/exportCsv';
+import { exportReportePDF } from '../../utils/exportPdf';
 import { CORRIENTES_Y } from '../../data/corrientes-y';
 import {
   CATEGORIAS_TRATAMIENTO,
@@ -284,7 +287,37 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
       'Capacidad (tn/mes)': t.capacidad || '',
       Estado: t.activo ? 'Activo' : 'Inactivo',
     }));
-    downloadCsv(rows, 'autorizaciones-tratamiento');
+    downloadCsv(rows, 'autorizaciones-tratamiento', {
+      titulo: 'Autorizaciones de Tratamiento',
+      periodo: 'Todos los periodos',
+      filtros: [searchTerm ? `Busqueda: ${searchTerm}` : '', filtroOperador ? `Operador filtrado` : ''].filter(Boolean).join(', ') || 'Sin filtros',
+      total: filtered.length,
+    });
+  };
+
+  const handleExportPdf = () => {
+    exportReportePDF({
+      titulo: 'Autorizaciones de Tratamiento',
+      subtitulo: 'Listado de tratamientos autorizados por operador',
+      periodo: `Total: ${allTratamientos.length} autorizaciones`,
+      kpis: [
+        { label: 'Total Autorizaciones', value: allTratamientos.length },
+        { label: 'Activas', value: allTratamientos.filter(t => t.activo).length },
+        { label: 'Operadores', value: new Set(allTratamientos.map(t => t.operadorId)).size },
+        { label: 'Inactivas', value: allTratamientos.filter(t => !t.activo).length },
+      ],
+      tabla: {
+        headers: ['Operador', 'CUIT', 'Tipo Residuo', 'Método', 'Capacidad', 'Estado'],
+        rows: filtered.map(t => [
+          t.operador?.razonSocial || '',
+          t.operador?.cuit || '',
+          `${t.tipoResiduo?.codigo || ''} ${t.tipoResiduo?.nombre || ''}`.trim(),
+          t.metodo,
+          t.capacidad ? `${t.capacidad} tn/mes` : '',
+          t.activo ? 'Activo' : 'Inactivo',
+        ]),
+      },
+    });
   };
 
   return (
@@ -358,9 +391,11 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
               <option key={o.id} value={o.id}>{o.razonSocial || o.nombre}</option>
             ))}
           </select>
+          <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={14} />Imprimir</button>
           <Button variant="outline" leftIcon={<Download size={16} />} onClick={handleExport}>
-            Exportar CSV
+            CSV
           </Button>
+          <button onClick={handleExportPdf} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="Exportar PDF"><FileDown size={14} />PDF</button>
           <Button leftIcon={<Plus size={16} />} onClick={openCreate}>
             Nueva Autorización
           </Button>
@@ -705,7 +740,39 @@ const CatalogoTab: React.FC<{
         Riesgo: getRiesgoMetodo(m),
       };
     });
-    downloadCsv(rows, 'catalogo-tratamientos');
+    downloadCsv(rows, 'catalogo-tratamientos', {
+      titulo: 'Catalogo de Metodos de Tratamiento',
+      periodo: `${STATS_TRATAMIENTOS.totalMetodos} metodos en ${STATS_TRATAMIENTOS.totalCategorias} categorias`,
+      filtros: [searchTerm ? `Busqueda: ${searchTerm}` : '', filtroCategoria ? `Categoria: ${filtroCategoria}` : '', filtroRiesgo ? `Riesgo: ${filtroRiesgo}` : '', filtroCorriente ? `Corriente: ${filtroCorriente}` : ''].filter(Boolean).join(', ') || 'Sin filtros',
+      total: metodosFiltrados.length,
+    });
+  };
+
+  const handleExportPdf = () => {
+    exportReportePDF({
+      titulo: 'Catálogo de Métodos de Tratamiento',
+      subtitulo: 'Métodos registrados con operadores habilitados',
+      periodo: `${STATS_TRATAMIENTOS.totalMetodos} métodos en ${STATS_TRATAMIENTOS.totalCategorias} categorías`,
+      kpis: [
+        { label: 'Total Métodos', value: STATS_TRATAMIENTOS.totalMetodos },
+        { label: 'Categorías', value: STATS_TRATAMIENTOS.totalCategorias },
+        { label: 'Operadores', value: STATS_TRATAMIENTOS.totalOperadores },
+        { label: 'Riesgo Crítico', value: STATS_TRATAMIENTOS.metodosCriticos },
+      ],
+      tabla: {
+        headers: ['Categoría', 'Método', 'Corrientes Y', 'Operadores', 'Riesgo'],
+        rows: metodosFiltrados.map(m => {
+          const cat = CATEGORIAS_TRATAMIENTO.find(c => c.metodos.includes(m));
+          return [
+            cat?.nombre || '',
+            m.nombre,
+            m.corrientesY.join(', '),
+            m.operadores.length,
+            getRiesgoMetodo(m),
+          ];
+        }),
+      },
+    });
   };
 
   const getCatForMetodo = (m: MetodoTratamiento) =>
@@ -872,9 +939,11 @@ const CatalogoTab: React.FC<{
             <option value="medio">Medio (3-4)</option>
             <option value="bajo">Bajo (5+)</option>
           </select>
+          <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={14} />Imprimir</button>
           <Button variant="outline" leftIcon={<Download size={16} />} onClick={handleExport}>
             CSV
           </Button>
+          <button onClick={handleExportPdf} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="Exportar PDF"><FileDown size={14} />PDF</button>
         </div>
         {(searchTerm || filtroCategoria || filtroRiesgo || filtroCorriente) && (
           <div className="mt-2 flex items-center gap-2">

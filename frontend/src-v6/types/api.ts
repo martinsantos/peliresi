@@ -136,12 +136,13 @@ export interface ManifiestoFilters {
   generadorId?: string;
   transportistaId?: string;
   operadorId?: string;
+  tipoResiduoId?: string;
   fechaDesde?: string;
   fechaHasta?: string;
   search?: string;
   page?: number;
   limit?: number;
-  sortBy?: 'createdAt' | 'numero' | 'estado';
+  sortBy?: 'createdAt' | 'numero' | 'estado' | 'generador' | 'operador';
   sortOrder?: 'asc' | 'desc';
 }
 

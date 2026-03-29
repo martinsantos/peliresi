@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Factory, Package, MapPin, FileText, Calendar, Search, ChevronUp, ChevronDown,
+  Factory, Package, MapPin, FileText, Calendar, Search, ChevronUp, ChevronDown, Download, FileDown, Printer, Filter,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -13,14 +13,20 @@ import { CHART_COLORS } from '../../../utils/chart-colors';
 import { ChartTooltip } from '../../../components/charts/ChartTooltip';
 import { KpiCard } from '../../../components/charts/KpiCard';
 import { useGeneradores } from '../../../hooks/useActores';
+import { downloadCsv } from './shared';
+import { exportReportePDF } from '../../../utils/exportPdf';
+import type { CentroControlData } from '../../../hooks/useCentroControl';
 
-const TOP_N = 6; // top N categories in pie, rest → "Otros"
+const TOP_N = 6; // top N categories in pie, rest -> "Otros"
 
 export default function GeneradoresTab({
+  ccData,
   periodoLabel,
+  incluirTodos = true,
 }: {
-  ccData?: any;
+  ccData?: CentroControlData | null;
   periodoLabel: string;
+  incluirTodos?: boolean;
 }) {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
@@ -35,14 +41,27 @@ export default function GeneradoresTab({
     return sortConfig.direction === 'asc' ? <ChevronUp size={12} className="ml-1 text-primary-600 inline" /> : <ChevronDown size={12} className="ml-1 text-primary-600 inline" />;
   };
 
-  // Fetch ALL generadores (limit raised to 5000 on backend)
+  // Fetch ALL generadores (used in "Ver Todos" mode)
   const { data: paginatedData, isLoading } = useGeneradores({ limit: 5000 });
-  const generadores = (paginatedData?.items || []).map((g: any) => ({
+  const allGeneradores = useMemo(() => (paginatedData?.items || []).map((g: any) => ({
     ...g,
     cantManifiestos: g._count?.manifiestos || 0,
-    // Derive departamento from DB fields, fallback to domicilio text
     depto: g.domicilioRealDepto || g.domicilioLegalDepto || '',
-  }));
+  })), [paginatedData]);
+
+  // Date-filtered generadores from Centro de Control
+  const ccGeneradores = useMemo(() => {
+    if (!ccData?.generadores?.length) return [];
+    return ccData.generadores.map((g: any) => ({
+      ...g,
+      cantManifiestos: g.cantManifiestos || 0,
+      depto: '',
+    }));
+  }, [ccData]);
+
+  // Choose data source: ccData when date-filtered, full API when "Ver Todos"
+  const isDateFiltered = !incluirTodos && ccGeneradores.length > 0;
+  const generadores = isDateFiltered ? ccGeneradores : allGeneradores;
 
   const filtered = useMemo(() => {
     let list = generadores;
@@ -69,7 +88,7 @@ export default function GeneradoresTab({
     return list;
   }, [generadores, searchQuery, categoriaFilter, sortConfig]);
 
-  // Aggregate by categoria — top N + "Otros"
+  // Aggregate by categoria -- top N + "Otros"
   const byCategoria = useMemo(() => {
     const map: Record<string, number> = {};
     for (const g of generadores) {
@@ -129,7 +148,7 @@ export default function GeneradoresTab({
     return cats.size;
   }, [generadores]);
 
-  if (isLoading) {
+  if (isLoading && incluirTodos) {
     return (
       <div className="flex flex-col items-center justify-center py-24">
         <div className="w-16 h-16 rounded-full border-4 border-primary-100 border-t-primary-500 animate-spin" />
@@ -140,18 +159,33 @@ export default function GeneradoresTab({
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl">
-        <Calendar size={14} className="text-amber-600 shrink-0" />
-        <span className="text-xs font-medium text-amber-800">
-          Generadores filtrados por: <strong>{periodoLabel}</strong>
-        </span>
+      <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl ${
+        isDateFiltered
+          ? 'bg-amber-50 border border-amber-200'
+          : 'bg-blue-50 border border-blue-200'
+      }`}>
+        {isDateFiltered ? (
+          <>
+            <Filter size={14} className="text-amber-600 shrink-0" />
+            <span className="text-xs font-medium text-amber-800">
+              Mostrando <strong>{generadores.length} generadores con actividad</strong> en el periodo: <strong>{periodoLabel}</strong>
+            </span>
+          </>
+        ) : (
+          <>
+            <Calendar size={14} className="text-blue-600 shrink-0" />
+            <span className="text-xs font-medium text-blue-800">
+              Mostrando: <strong>Todos los generadores registrados ({generadores.length})</strong>
+            </span>
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        <KpiCard icon={Factory} label="Total Generadores" value={paginatedData?.total || generadores.length} color="from-purple-600 to-purple-700" />
+        <KpiCard icon={Factory} label="Total Generadores" value={generadores.length} color="from-purple-600 to-purple-700" />
         <KpiCard icon={Package} label="Categorias" value={uniqueCategories} color="from-indigo-600 to-indigo-700" sub="tipos" />
         <KpiCard icon={MapPin} label="Departamentos" value={byDep.filter(d => d.name !== 'Sin departamento').length} color="from-violet-600 to-violet-700" sub="con presencia" />
-        <KpiCard icon={FileText} label="Manifiestos" value={generadores.reduce((s, g) => s + g.cantManifiestos, 0)} color="from-emerald-600 to-emerald-700" sub="generados" />
+        <KpiCard icon={FileText} label="Manifiestos" value={generadores.reduce((s: number, g: any) => s + g.cantManifiestos, 0)} color="from-emerald-600 to-emerald-700" sub={isDateFiltered ? 'en periodo' : 'generados'} />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
@@ -170,7 +204,7 @@ export default function GeneradoresTab({
                     paddingAngle={3}
                     dataKey="value"
                     stroke="none"
-                    label={({ name, percent, cx, x }: any) => {
+                    label={({ name, percent }: any) => {
                       if ((percent ?? 0) < 0.03) return null;
                       const short = name.length > 18 ? name.substring(0, 15) + '...' : name;
                       return `${short} ${((percent ?? 0) * 100).toFixed(0)}%`;
@@ -193,7 +227,7 @@ export default function GeneradoresTab({
         <Card className="border-0 shadow-sm">
           <CardHeader title="Por Departamento" subtitle="Top departamentos con generadores" />
           <CardContent>
-            {byDep.length > 0 ? (
+            {byDep.length > 0 && byDep.some(d => d.name !== 'Sin departamento') ? (
               <ResponsiveContainer width="100%" height={320}>
                 <BarChart data={byDep} layout="vertical" margin={{ left: 10, right: 20, top: 5, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
@@ -204,7 +238,9 @@ export default function GeneradoresTab({
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[320px] flex items-center justify-center text-neutral-400">Sin datos</div>
+              <div className="h-[320px] flex items-center justify-center text-neutral-400">
+                {isDateFiltered ? 'Datos de departamento no disponibles con filtro de fecha' : 'Sin datos'}
+              </div>
             )}
           </CardContent>
         </Card>
@@ -213,7 +249,7 @@ export default function GeneradoresTab({
       <Card className="border-0 shadow-sm">
         <CardHeader
           title={`Listado de Generadores (${filtered.length})`}
-          subtitle="Generadores registrados en el sistema"
+          subtitle={isDateFiltered ? `Generadores con actividad en ${periodoLabel}` : 'Generadores registrados en el sistema'}
           action={
             <div className="flex items-center gap-2">
               <div className="relative">
@@ -233,6 +269,48 @@ export default function GeneradoresTab({
                 onChange={e => setCategoriaFilter(e.target.value)}
                 className="px-3 py-1.5 rounded-lg border border-neutral-200 text-xs text-neutral-700 w-32"
               />
+              <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={13} />Imprimir</button>
+              <button
+                onClick={() => {
+                  const headers = ['Razon Social', 'CUIT', 'Categoria', 'Departamento', 'Manifiestos'];
+                  const rows = filtered.map(g => [g.razonSocial, g.cuit, g.categoria || '-', g.depto || '-', g.cantManifiestos]);
+                  downloadCsv(`generadores-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows, {
+                    titulo: 'Reporte de Generadores',
+                    periodo: periodoLabel || 'Todos los periodos',
+                    filtros: [searchQuery ? `Busqueda: ${searchQuery}` : '', categoriaFilter ? `Categoria: ${categoriaFilter}` : ''].filter(Boolean).join(', ') || 'Sin filtros',
+                    total: filtered.length,
+                  });
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg border border-primary-200 transition-colors"
+                title="Exportar a CSV"
+              >
+                <Download size={13} />
+                CSV
+              </button>
+              <button
+                onClick={() => {
+                  exportReportePDF({
+                    titulo: 'Reporte de Generadores',
+                    subtitulo: `${filtered.length} generadores`,
+                    periodo: periodoLabel || 'Todos los periodos',
+                    kpis: [
+                      { label: 'Total', value: generadores.length },
+                      { label: 'Categorias', value: uniqueCategories },
+                      { label: 'Departamentos', value: byDep.filter(d => d.name !== 'Sin departamento').length },
+                      { label: 'Manifiestos', value: generadores.reduce((s: number, g: any) => s + g.cantManifiestos, 0) },
+                    ],
+                    tabla: {
+                      headers: ['Razon Social', 'CUIT', 'Categoria', 'Departamento', 'Manifiestos'],
+                      rows: filtered.map(g => [g.razonSocial, g.cuit, g.categoria || '-', g.depto || '-', g.cantManifiestos]),
+                    },
+                  });
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors"
+                title="Exportar a PDF"
+              >
+                <FileDown size={13} />
+                PDF
+              </button>
             </div>
           }
         />
@@ -244,7 +322,9 @@ export default function GeneradoresTab({
                   <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('razonSocial')}>Razon Social<SortIcon col="razonSocial" /></th>
                   <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">CUIT</th>
                   <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('categoria')}>Categoria<SortIcon col="categoria" /></th>
-                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('departamento')}>Departamento<SortIcon col="departamento" /></th>
+                  {!isDateFiltered && (
+                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('departamento')}>Departamento<SortIcon col="departamento" /></th>
+                  )}
                   <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('manifiestos')}>Manifiestos<SortIcon col="manifiestos" /></th>
                 </tr>
               </thead>
@@ -254,7 +334,9 @@ export default function GeneradoresTab({
                     <td className="px-4 py-3 text-sm font-medium text-neutral-900 max-w-[200px] truncate">{g.razonSocial}</td>
                     <td className="px-4 py-3 text-sm text-neutral-600 font-mono text-xs">{g.cuit}</td>
                     <td className="px-4 py-3 text-sm text-neutral-600 hidden md:table-cell max-w-[150px] truncate" title={g.categoria}>{g.categoria || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-neutral-600 hidden md:table-cell">{g.depto || '—'}</td>
+                    {!isDateFiltered && (
+                      <td className="px-4 py-3 text-sm text-neutral-600 hidden md:table-cell">{g.depto || '\u2014'}</td>
+                    )}
                     <td className="px-4 py-3 text-center">
                       <Badge variant="soft" color="primary">{g.cantManifiestos}</Badge>
                     </td>
@@ -262,7 +344,7 @@ export default function GeneradoresTab({
                 ))}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-12 text-center text-neutral-400 text-sm">Sin generadores que coincidan</td>
+                    <td colSpan={isDateFiltered ? 4 : 5} className="px-4 py-12 text-center text-neutral-400 text-sm">Sin generadores que coincidan</td>
                   </tr>
                 )}
               </tbody>

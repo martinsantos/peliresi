@@ -98,6 +98,7 @@ const ReportesPage: React.FC = () => {
     const range = computeDateRange(days);
     setFechaDesde(range.desde);
     setFechaHasta(range.hasta);
+    setIncluirTodos(days === 0);
   }, []);
 
   // ── Queries — reports (only fetch if filters exist, i.e. dates are set) ──
@@ -257,14 +258,14 @@ const ReportesPage: React.FC = () => {
               <input
                 type="date"
                 value={fechaDesde}
-                onChange={e => { setFechaDesde(e.target.value); setDatePreset(-1); }}
+                onChange={e => { setFechaDesde(e.target.value); setDatePreset(-1); setIncluirTodos(false); }}
                 className="px-2 py-1 rounded border border-neutral-200 text-neutral-600 text-xs"
               />
               <span>—</span>
               <input
                 type="date"
                 value={fechaHasta}
-                onChange={e => { setFechaHasta(e.target.value); setDatePreset(-1); }}
+                onChange={e => { setFechaHasta(e.target.value); setDatePreset(-1); setIncluirTodos(false); }}
                 className="px-2 py-1 rounded border border-neutral-200 text-neutral-600 text-xs"
               />
             </div>
@@ -363,8 +364,8 @@ const ReportesPage: React.FC = () => {
         <>
           {activeTab === 'departamentos' && <DepartamentosTab ccData={ccData || null} onSelectDep={handleSelectDep} periodoLabel={periodoLabel} />}
           {activeTab === 'mapa' && <MapaActoresTab ccData={ccData || null} onSelectDep={handleSelectDep} periodoLabel={periodoLabel} incluirTodos={incluirTodos} onToggleIncluirTodos={setIncluirTodos} />}
-          {activeTab === 'generadores' && <GeneradoresTab ccData={ccData || null} periodoLabel={periodoLabel} />}
-          {activeTab === 'operadores' && <OperadoresTab ccData={ccData || null} periodoLabel={periodoLabel} />}
+          {activeTab === 'generadores' && <GeneradoresTab ccData={ccData || null} periodoLabel={periodoLabel} incluirTodos={incluirTodos} />}
+          {activeTab === 'operadores' && <OperadoresTab ccData={ccData || null} periodoLabel={periodoLabel} incluirTodos={incluirTodos} />}
           {activeTab === 'tratamientos' && <TratamientosTab periodoLabel={periodoLabel} />}
         </>
       )}

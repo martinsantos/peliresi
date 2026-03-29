@@ -19,9 +19,11 @@ import {
   Eye,
   Trash2,
   Download,
+  FileDown,
   Loader2,
   MapPin,
   Clock,
+  Printer,
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -32,7 +34,9 @@ import { Table, Pagination } from '../../components/ui/Table';
 import { SearchInput } from '../../components/ui/SearchInput';
 import { toast } from '../../components/ui/Toast';
 import { downloadCsv } from '../../utils/exportCsv';
+import { exportReportePDF } from '../../utils/exportPdf';
 import { useAuth } from '../../contexts/AuthContext';
+import { formatRelativeTime } from '../../utils/formatters';
 import {
   useTransportistas,
   useCreateTransportista,
@@ -69,8 +73,8 @@ const TransportistasPage: React.FC = () => {
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [filtroLocalidad, setFiltroLocalidad] = useState('todas');
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState<string | undefined>(undefined);
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortBy, setSortBy] = useState<string | undefined>('ultimaActividad');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [modalCrear, setModalCrear] = useState(false);
   const [modalEditar, setModalEditar] = useState(false);
   const [modalEliminar, setModalEliminar] = useState(false);
@@ -104,6 +108,7 @@ const TransportistasPage: React.FC = () => {
       choferesCount: Array.isArray(t.choferes) ? t.choferes.length : 0,
       activo: t.activo !== false,
       createdAt: t.createdAt,
+      ultimaActividad: t.ultimaActividad || null,
       _raw: t,
     })),
     [transportistasData]
@@ -141,6 +146,7 @@ const TransportistasPage: React.FC = () => {
     localidad: 'localidad',
     flota: 'vehiculosCount',
     choferes: 'choferesCount',
+    ultimaActividad: 'ultimaActividad',
     estado: 'activo',
   };
 
@@ -290,9 +296,42 @@ const TransportistasPage: React.FC = () => {
         Estado: t.activo ? 'Activo' : 'Inactivo',
         Alta: t.createdAt ? new Date(t.createdAt).toLocaleDateString() : '',
       })),
-      'admin-transportistas'
+      'admin-transportistas',
+      {
+        titulo: 'Admin Transportistas',
+        periodo: 'Todos los periodos',
+        filtros: [filtroEstado !== 'todos' ? `Estado: ${filtroEstado}` : '', filtroLocalidad !== 'todas' ? `Localidad: ${filtroLocalidad}` : ''].filter(Boolean).join(', ') || 'Sin filtros',
+        total: filteredData.length,
+      }
     );
     toast.success('Exportar', 'CSV descargado');
+  };
+
+  const handleExportPdf = () => {
+    const totalVehiculos = filteredData.reduce((sum, t) => sum + t.vehiculosCount, 0);
+    exportReportePDF({
+      titulo: 'Admin Transportistas',
+      subtitulo: 'Panel de gestión de transportistas de residuos peligrosos',
+      periodo: `Total: ${stats.total} transportistas`,
+      kpis: [
+        { label: 'Total', value: stats.total },
+        { label: 'Activos', value: stats.activos },
+        { label: 'Inactivos', value: stats.inactivos },
+        { label: 'Vehículos', value: totalVehiculos },
+      ],
+      tabla: {
+        headers: ['Razón Social', 'CUIT', 'Habilitación', 'Email', 'Vehículos', 'Choferes', 'Estado'],
+        rows: filteredData.map(t => [
+          t.razonSocial,
+          t.cuit,
+          t.numeroHabilitacion,
+          t.email,
+          t.vehiculosCount,
+          t.choferesCount,
+          t.activo ? 'Activo' : 'Inactivo',
+        ]),
+      },
+    });
   };
 
   const renderForm = () => (
@@ -449,6 +488,18 @@ const TransportistasPage: React.FC = () => {
       ),
     },
     {
+      key: 'ultimaActividad',
+      width: '10%',
+      header: 'Actividad',
+      sortable: true,
+      hiddenBelow: 'xl' as const,
+      render: (row: typeof tableData[0]) => row.ultimaActividad ? (
+        <span className="text-xs text-neutral-600">{formatRelativeTime(row.ultimaActividad)}</span>
+      ) : (
+        <span className="text-xs text-neutral-400">Sin actividad</span>
+      ),
+    },
+    {
       key: 'estado',
       width: '8%',
       header: 'Estado',
@@ -519,9 +570,11 @@ const TransportistasPage: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-2">
+          <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={14} />Imprimir</button>
           <Button variant="outline" leftIcon={<Download size={18} />} onClick={handleExport}>
-            Exportar
+            CSV
           </Button>
+          <button onClick={handleExportPdf} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="Exportar PDF"><FileDown size={14} />PDF</button>
           <Button leftIcon={<Plus size={18} />} onClick={() => navigate('/admin/actores/transportistas/nuevo')}>
             Nuevo Transportista
           </Button>

@@ -21,6 +21,8 @@ import {
   Download,
   Loader2,
   RefreshCw,
+  FileDown,
+  Printer,
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -31,7 +33,9 @@ import { Table, Pagination } from '../../components/ui/Table';
 import { SearchInput } from '../../components/ui/SearchInput';
 import { toast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
+import { formatRelativeTime } from '../../utils/formatters';
 import { downloadCsv } from '../../utils/exportCsv';
+import { exportReportePDF } from '../../utils/exportPdf';
 import {
   useOperadores,
   useCreateOperador,
@@ -68,8 +72,8 @@ const AdminOperadoresPage: React.FC = () => {
   const [filtroCorriente, setFiltroCorriente] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState<string | undefined>(undefined);
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortBy, setSortBy] = useState<string | undefined>('ultimaActividad');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [modalCrear, setModalCrear] = useState(false);
   const [modalEliminar, setModalEliminar] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; razonSocial: string } | null>(null);
@@ -109,6 +113,7 @@ const AdminOperadoresPage: React.FC = () => {
         manifiestosProcesados: o._count?.manifiestos || 0,
         activo: o.activo !== false,
         createdAt: o.createdAt,
+        ultimaActividad: o.ultimaActividad || null,
         _raw: o,
         // DB fields with CSV enrichment fallback
         certificado: enriched?.certificado || null,
@@ -141,6 +146,7 @@ const AdminOperadoresPage: React.FC = () => {
   const OPER_COL_MAP: Record<string, string> = {
     operador: 'razonSocial',
     tipo: 'categoria',
+    ultimaActividad: 'ultimaActividad',
     estado: 'activo',
   };
 
@@ -220,9 +226,33 @@ const AdminOperadoresPage: React.FC = () => {
         Manifiestos: o.manifiestosProcesados,
         Estado: o.activo ? 'Activo' : 'Inactivo',
       })),
-      'admin-operadores'
+      'admin-operadores',
+      {
+        titulo: 'Admin Operadores',
+        periodo: 'Todos los periodos',
+        filtros: [filtroTipo ? `Tipo: ${filtroTipo}` : '', filtroCorriente ? `Corriente: ${filtroCorriente}` : '', filtroEstado !== 'todos' ? `Estado: ${filtroEstado}` : ''].filter(Boolean).join(', ') || 'Sin filtros',
+        total: filteredData.length,
+      }
     );
     toast.success('Exportar', 'CSV descargado');
+  };
+
+  const handleExportPdf = () => {
+    exportReportePDF({
+      titulo: 'Admin Operadores',
+      subtitulo: `${filteredData.length} operadores${filtroTipo ? ` — Tipo: ${filtroTipo}` : ''}${filtroEstado !== 'todos' ? ` — ${filtroEstado}` : ''}`,
+      periodo: new Date().toLocaleDateString('es-AR'),
+      kpis: [
+        { label: 'Total', value: stats.total },
+        { label: 'Activos', value: stats.activos },
+        { label: 'Inactivos', value: stats.inactivos },
+        { label: 'Filtrados', value: stats.filtrados },
+      ],
+      tabla: {
+        headers: ['Razon Social', 'CUIT', 'Tipo', 'Habilitacion', 'Corrientes', 'Tratamientos', 'Estado'],
+        rows: filteredData.map(o => [o.razonSocial, o.cuit, o.tipoOperador || o.categoria, o.numeroHabilitacion, o.corrientes.join(', '), o.tratamientosCount, o.activo ? 'Activo' : 'Inactivo']),
+      },
+    });
   };
 
   const renderForm = () => (
@@ -411,6 +441,18 @@ const AdminOperadoresPage: React.FC = () => {
       },
     },
     {
+      key: 'ultimaActividad',
+      width: '10%',
+      header: 'Actividad',
+      sortable: true,
+      hiddenBelow: 'xl' as const,
+      render: (row: typeof tableData[0]) => row.ultimaActividad ? (
+        <span className="text-xs text-neutral-600">{formatRelativeTime(row.ultimaActividad)}</span>
+      ) : (
+        <span className="text-xs text-neutral-400">Sin actividad</span>
+      ),
+    },
+    {
       key: 'estado',
       width: '8%',
       header: 'Estado',
@@ -488,8 +530,12 @@ const AdminOperadoresPage: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-2">
+          <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={14} />Imprimir</button>
           <Button variant="outline" leftIcon={<Download size={18} />} onClick={handleExport}>
-            Exportar
+            CSV
+          </Button>
+          <Button variant="outline" leftIcon={<FileDown size={18} />} onClick={handleExportPdf} className="text-error-700 border-error-200 hover:bg-error-50">
+            PDF
           </Button>
           <Button leftIcon={<Plus size={18} />} onClick={() => navigate('/admin/actores/operadores/nuevo')}>
             Nuevo Operador

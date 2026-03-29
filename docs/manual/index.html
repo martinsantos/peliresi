@@ -17,9 +17,9 @@
   <button class="hamburger" id="hamburgerBtn" aria-label="Menu">
     <span></span><span></span><span></span>
   </button>
-  <img src="screenshots/logo-mendoza.webp" alt="Gobierno de Mendoza" style="height:28px;width:auto;margin-right:8px;">
   <div class="logo">SITREP <span>Mendoza</span></div>
   <span class="version">v2026.10</span>
+  <img src="screenshots/logo-mendoza.webp" alt="Gobierno de Mendoza" style="height:24px;width:auto;margin-left:8px;">
   <span class="doc-title">Manual del Sistema de Trazabilidad de Residuos Peligrosos</span>
   <div class="header-actions">
     <button class="header-action-btn" id="btnShare" onclick="shareManual()" aria-label="Compartir" title="Compartir">
@@ -1329,7 +1329,42 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <tr><td>Configuracion Perfil</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td><td>Si</td></tr>
 </tbody>
 </table>
-<p><strong>Inspector:</strong> No es un rol sino una propiedad de usuario. Los inspectores pueden ver reportes completos de todo el sistema, independientemente de su rol base.</p>
+<div class="callout callout-info" style="margin-top:1.5rem; margin-bottom:1.5rem;">
+<h4 style="margin-top:0;">Modo Inspector</h4>
+<p><strong>Inspector</strong> no es un rol sino una <strong>propiedad</strong> que se puede activar en cualquier usuario existente. Un usuario con modo Inspector activado puede ver <strong>reportes completos de todo el sistema</strong>, independientemente de su rol base.</p>
+
+<p><strong>C&oacute;mo activarlo:</strong></p>
+<ol>
+  <li>Ingresar como <strong>Administrador DGFA</strong> (solo el super admin puede asignarlo)</li>
+  <li>Ir a <strong>Usuarios</strong> en el men&uacute; lateral</li>
+  <li>Click en <strong>Editar</strong> (icono l&aacute;piz) en el usuario deseado</li>
+  <li>En el modal de edici&oacute;n, al final aparece el toggle <strong>&ldquo;Inspector&rdquo;</strong> con la descripci&oacute;n <em>&ldquo;Puede ver reportes completos de todo el sistema&rdquo;</em></li>
+  <li>Activar el toggle y guardar</li>
+</ol>
+
+<p><strong>Qu&eacute; cambia para un usuario Inspector:</strong></p>
+<ul>
+  <li>En <strong>Reportes &rarr; Manifiestos</strong>: ve todos los manifiestos del sistema (no solo los propios)</li>
+  <li>En <strong>Reportes &rarr; Residuos Tratados</strong>: ve todos los tratamientos (no solo los de su operador)</li>
+  <li>En <strong>Reportes &rarr; Transporte</strong>: ve todos los transportistas (no solo los involucrados en sus manifiestos)</li>
+</ul>
+
+<p><strong>Qu&eacute; NO cambia:</strong></p>
+<ul>
+  <li>El rol del usuario sigue siendo el mismo (Generador, Transportista, Operador, etc.)</li>
+  <li>No obtiene permisos de administraci&oacute;n (no puede crear/editar/eliminar usuarios, actores, etc.)</li>
+  <li>No puede acceder a Auditor&iacute;a, Carga Masiva ni otras funciones exclusivas de Admin</li>
+</ul>
+
+<p><strong>Casos de uso t&iacute;picos:</strong></p>
+<ul>
+  <li>Inspectores de la DPA que necesitan visi&oacute;n global de reportes sin ser administradores</li>
+  <li>Auditores externos con acceso de solo lectura a estad&iacute;sticas completas</li>
+  <li>Directivos de empresas generadoras/operadoras que necesitan datos cruzados del sistema</li>
+</ul>
+
+<p>En la tabla de usuarios, los inspectores se identifican con un <strong>badge &iacute;ndigo &ldquo;Inspector&rdquo;</strong> junto a su nombre.</p>
+</div>
 
 <h4>Registro de Auditoria - Campos Detallados</h4>
 <table>
@@ -8007,6 +8042,61 @@ curl https://sitrep.ultimamilla.com.ar/api/health
 <li>Para RPO menor, agregar backups cada 6 horas: <code>0 */6 * * *</code> en cron.</li>
 </ul>
 </div>
+
+</section>
+
+<!-- ============================================================ -->
+<!-- CHANGELOG v2026.10 — 2026-03-29                              -->
+<!-- ============================================================ -->
+<section id="changelog-v2026-10" data-role="all">
+<h2>16. Novedades v2026.10 (29 marzo 2026)</h2>
+
+<h3>16.1 Manifiestos — Infinite Scroll con Sticky Headers</h3>
+<p>El listado de manifiestos (<code>/manifiestos</code>) fue rediseñado completamente:</p>
+<ul>
+<li><strong>Infinite scroll:</strong> ya no hay botones Anterior/Siguiente. Al scrollear hacia abajo, las siguientes paginas se cargan automaticamente via IntersectionObserver.</li>
+<li><strong>Sticky group headers:</strong> los manifiestos se agrupan segun la columna de ordenamiento activa, con un encabezado que permanece fijo al scrollear:
+  <ul>
+    <li>Ordenar por <strong>Actividad</strong> &rarr; headers muestran el mes (ej: "Marzo 2026")</li>
+    <li>Ordenar por <strong>Estado</strong> &rarr; headers muestran el estado (ej: "Borrador", "Tratado")</li>
+    <li>Ordenar por <strong>Generador</strong> &rarr; headers muestran el nombre del generador</li>
+    <li>Ordenar por <strong>Operador</strong> &rarr; headers muestran el nombre del operador</li>
+    <li>Ordenar por <strong>N&deg; Manifiesto</strong> &rarr; headers muestran la serie (ej: "Serie 2026")</li>
+  </ul>
+</li>
+<li><strong>Todas las columnas son sorteables:</strong> click en el encabezado de cualquier columna para ordenar ascendente/descendente.</li>
+<li><strong>Filtros avanzados:</strong> nuevo panel expandible con filtros por Generador y Operador (dropdowns), ademas de los filtros de Estado, Desde/Hasta que ya existian.</li>
+<li><strong>Columna Actividad:</strong> muestra fecha y hora (antes solo mostraba fecha).</li>
+<li><strong>Columna Operador:</strong> nueva columna visible en pantallas xl+.</li>
+<li><strong>Layout div-based:</strong> se reemplazo la tabla HTML por CSS Grid para soporte confiable de <code>position: sticky</code> en los group headers.</li>
+</ul>
+
+<h3>16.2 Trazabilidad en Actores — Componente Compartido</h3>
+<p>La pestana "Trazabilidad" en las paginas de detalle de actores (Generador, Transportista, Operador) fue extraida a un componente compartido <code>TrazabilidadTimeline</code>:</p>
+<ul>
+<li><strong>Infinite scroll:</strong> el componente maneja su propia carga de datos con paginacion automatica.</li>
+<li><strong>Sticky month headers:</strong> los manifiestos se agrupan por mes con encabezados que permanecen visibles al scrollear.</li>
+<li><strong>Filtros client-side:</strong> filtrar por mes y por estado sobre los datos acumulados.</li>
+<li><strong>Conteo de residuos:</strong> cada item muestra cuantos residuos contiene.</li>
+<li><strong>Responsive:</strong> diseño adaptado para movil con padding reducido, texto compacto y arrow oculta.</li>
+<li><strong>Actores relacionados:</strong> cada item muestra los actores relevantes (generador, transportista u operador segun corresponda).</li>
+</ul>
+
+<h3>16.3 Catalogo de Residuos — Modal con Tabs Internavegable</h3>
+<p>El modal de detalle de cada tipo de residuo en <code>/admin/residuos</code> fue rediseñado con un sistema de tabs:</p>
+<ul>
+<li><strong>Tab Info:</strong> descripcion, categoria, corriente Y, caracteristicas, tecnologias de tratamiento.</li>
+<li><strong>Tab Operadores (N):</strong> lista scrolleable de todos los operadores autorizados para esa corriente. Cada operador es clickeable y navega a su pagina de detalle. Muestra CUIT y metodo de tratamiento.</li>
+<li><strong>Tab Generadores (N):</strong> lista scrolleable de generadores inscriptos para esa corriente, filtrados del catalogo. Cada generador es clickeable y navega a su pagina de detalle.</li>
+<li><strong>Tab Manifiestos (N):</strong> lista real de manifiestos vinculados a ese tipo de residuo, obtenidos via API (nuevo filtro <code>tipoResiduoId</code>). Cada manifiesto es clickeable. Carga lazy (solo al activar el tab).</li>
+</ul>
+
+<h3>16.4 Backend — Nuevos Filtros de Ordenamiento</h3>
+<ul>
+<li><strong><code>sortBy=generador</code></strong>: ordena manifiestos por razon social del generador (Prisma relation sort).</li>
+<li><strong><code>sortBy=operador</code></strong>: ordena manifiestos por razon social del operador.</li>
+<li><strong><code>tipoResiduoId</code></strong>: nuevo filtro en <code>GET /api/manifiestos</code> — filtra manifiestos que contengan un tipo de residuo especifico (via <code>residuos.some</code>).</li>
+</ul>
 
 </section>
 

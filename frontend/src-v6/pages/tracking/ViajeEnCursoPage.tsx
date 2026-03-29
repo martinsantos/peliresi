@@ -154,7 +154,7 @@ const ViajeEnCursoPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
-  const isMobile = location.pathname.startsWith('/mobile');
+  // Removed isMobile — React Router handles basename
 
   const { data: apiData, isLoading, isError } = useManifiesto(id || '');
   const manifiesto = apiData;
@@ -268,7 +268,7 @@ const ViajeEnCursoPage: React.FC = () => {
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link to={isMobile ? '/mobile/centro-control' : '/centro-control'}>
+        <Link to="/centro-control">
           <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />}>
             Volver
           </Button>
@@ -291,7 +291,7 @@ const ViajeEnCursoPage: React.FC = () => {
             )}
           </p>
         </div>
-        <Link to={isMobile ? `/mobile/manifiestos/${id}` : `/manifiestos/${id}`}>
+        <Link to={`/manifiestos/${id}`}>
           <Button variant="outline" leftIcon={<FileText size={16} />}>
             Ver Manifiesto
           </Button>
@@ -613,7 +613,7 @@ const ViajeEnCursoPage: React.FC = () => {
           {/* Action */}
           <Card>
             <CardContent>
-              <Link to={isMobile ? `/mobile/manifiestos/${id}` : `/manifiestos/${id}`} className="block">
+              <Link to={`/manifiestos/${id}`} className="block">
                 <Button fullWidth leftIcon={<ExternalLink size={16} />}>
                   Ver Detalle Completo
                 </Button>

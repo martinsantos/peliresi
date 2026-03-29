@@ -12,7 +12,7 @@ import { Card } from '../../components/ui/CardV2';
 
 const NotFoundPage: React.FC = () => {
   const location = useLocation();
-  const isMobile = location.pathname.startsWith('/mobile');
+  // Removed isMobile — React Router handles basename
 
   return (
     <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-6">
@@ -30,7 +30,7 @@ const NotFoundPage: React.FC = () => {
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Link to={isMobile ? "/mobile/dashboard" : "/dashboard"}>
+          <Link to="/dashboard">
             <Button leftIcon={<Home size={18} />}>
               Ir al Dashboard
             </Button>

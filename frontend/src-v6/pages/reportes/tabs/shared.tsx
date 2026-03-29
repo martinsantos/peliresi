@@ -1,13 +1,32 @@
 // Shared utilities for report tabs
 import React from 'react';
 
+// ── CSV metadata type ──
+export interface CsvMetadata {
+  titulo?: string;
+  fecha?: string;
+  periodo?: string;
+  filtros?: string;
+  total?: number;
+}
+
 // ── CSV download helper ──
-export function downloadCsv(filename: string, headers: string[], rows: (string | number)[][]) {
+export function downloadCsv(filename: string, headers: string[], rows: (string | number)[][], metadata?: CsvMetadata) {
   const escape = (v: string | number) => {
     const s = String(v);
     return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const csv = [headers.map(escape).join(','), ...rows.map(r => r.map(escape).join(','))].join('\n');
+  const metaLines: string[] = [];
+  if (metadata) {
+    if (metadata.titulo) metaLines.push(`# SITREP - ${metadata.titulo}`);
+    metaLines.push(`# Fecha de exportacion: ${metadata.fecha || new Date().toLocaleDateString('es-AR')}`);
+    if (metadata.periodo) metaLines.push(`# Periodo: ${metadata.periodo}`);
+    if (metadata.filtros) metaLines.push(`# Filtros: ${metadata.filtros}`);
+    if (metadata.total != null) metaLines.push(`# Total registros: ${metadata.total}`);
+    metaLines.push('#');
+  }
+  const dataLines = [headers.map(escape).join(','), ...rows.map(r => r.map(escape).join(','))];
+  const csv = [...metaLines, ...dataLines].join('\n');
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

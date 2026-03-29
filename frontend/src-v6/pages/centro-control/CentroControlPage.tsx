@@ -538,7 +538,7 @@ export const CentroControlPage: React.FC = () => {
         {kpis.map((kpi, i) => {
           const Icon = kpi.icon;
           return (
-            <div key={i} className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${kpi.gradient} p-4 group hover:shadow-lg transition-all duration-300 hover-lift cursor-pointer`} onClick={() => kpi.href && navigate(`${isMobile ? '/mobile' : ''}${kpi.href}`)}>
+            <div key={i} className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${kpi.gradient} p-4 group hover:shadow-lg transition-all duration-300 hover-lift cursor-pointer`} onClick={() => kpi.href && navigate(`${kpi.href}`)}>
               <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-white/10 -translate-y-1/3 translate-x-1/3 group-hover:scale-125 transition-transform duration-500" />
               <div className="relative">
                 <div className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center mb-2">
@@ -565,7 +565,7 @@ export const CentroControlPage: React.FC = () => {
                 <div
                   key={stage.key}
                   className="relative flex flex-col items-center justify-center rounded-xl transition-all duration-500 hover:scale-[1.02] group cursor-pointer"
-                  onClick={() => navigate(`${isMobile ? '/mobile' : ''}/manifiestos?estado=${stage.key}`)}
+                  onClick={() => navigate(`/manifiestos?estado=${stage.key}`)}
                   style={{
                     flex: `${widthPercent} 1 0%`,
                     backgroundColor: stage.color + '18',
@@ -709,8 +709,7 @@ export const CentroControlPage: React.FC = () => {
                                 href="#"
                                 onClick={(e) => {
                                   e.preventDefault();
-                                  const prefix = isMobile ? '/mobile' : '';
-                                  navigate(`${prefix}/manifiestos/${m.manifiestoId}`);
+                                  navigate(`/manifiestos/${m.manifiestoId}`);
                                 }}
                                 style={{ color: '#0D8A4F', fontWeight: 600, fontSize: '12px', display: 'block', marginTop: '6px' }}
                               >
@@ -889,8 +888,7 @@ export const CentroControlPage: React.FC = () => {
                               className="mt-2 w-full text-center text-xs font-semibold text-primary-700 bg-primary-100 hover:bg-primary-200 rounded-lg py-1.5 transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                const prefix = isMobile ? '/mobile' : '';
-                                navigate(`${prefix}/manifiestos/${m.manifiestoId}`);
+                                navigate(`/manifiestos/${m.manifiestoId}`);
                               }}
                             >
                               Ver detalle del viaje
@@ -961,8 +959,7 @@ export const CentroControlPage: React.FC = () => {
                             className="mt-2 w-full text-center text-xs font-semibold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 rounded-lg py-1.5 transition-colors"
                             onClick={(e) => {
                               e.stopPropagation();
-                              const prefix = isMobile ? '/mobile' : '';
-                              navigate(`${prefix}/manifiestos/${m.id}`);
+                              navigate(`/manifiestos/${m.id}`);
                             }}
                           >
                             Ver detalle del viaje

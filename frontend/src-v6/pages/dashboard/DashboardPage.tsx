@@ -40,9 +40,7 @@ import { formatRelativeTime } from '../../utils/formatters';
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const isMobile = location.pathname.includes('/mobile');
-
-  const route = (path: string) => isMobile ? `/mobile${path}` : path;
+  const route = (path: string) => path;
 
   // Try real API data
   const { data: dashStats, isLoading: loadingStats, isError: errorStats } = useDashboardStats();
@@ -231,8 +229,7 @@ const GeneradorDashboard: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { currentUser } = useAuth();
-  const isMobile = location.pathname.includes('/mobile');
-  const route = (path: string) => isMobile ? `/mobile${path}` : path;
+  const route = (path: string) => path;
 
   const { data: dashStats } = useDashboardStats();
   const { data: recentManifiestos } = useManifiestos({ limit: 4 });
@@ -347,8 +344,7 @@ const TransportistaDashboard: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { currentUser } = useAuth();
-  const isMobile = location.pathname.includes('/mobile');
-  const route = (path: string) => isMobile ? `/mobile${path}` : path;
+  const route = (path: string) => path;
 
   const { data: dashStats } = useDashboardStats();
   const { data: tripsEnTransito } = useManifiestos({ estado: EstadoManifiesto.EN_TRANSITO, limit: 5 });
@@ -532,8 +528,7 @@ const OperadorDashboard: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { currentUser } = useAuth();
-  const isMobile = location.pathname.includes('/mobile');
-  const route = (path: string) => isMobile ? `/mobile${path}` : path;
+  const route = (path: string) => path;
 
   const { data: dashStats } = useDashboardStats();
 

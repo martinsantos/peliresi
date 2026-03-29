@@ -151,6 +151,12 @@ export function DepartamentoDetalleModal({
       `departamento_${departamento.replace(/\s+/g, '_').toLowerCase()}_${new Date().toISOString().split('T')[0]}.csv`,
       ['Tipo', 'Razón Social', 'CUIT', 'Categoría', 'Actividad'],
       filteredActors.map(a => [tipoLabel[a.tipo], a.razonSocial, a.cuit, a.categoria, a.actividad]),
+      {
+        titulo: `Departamento ${departamento}`,
+        periodo: 'Todos los periodos',
+        filtros: tipoFilter ? `Tipo: ${tipoFilter}` : 'Todos los tipos',
+        total: filteredActors.length,
+      }
     );
   };
 

@@ -28,6 +28,7 @@ import {
   User,
   Eye,
   Download,
+  FileDown,
   ChevronLeft,
   ChevronRight,
   MapPin,
@@ -36,6 +37,7 @@ import {
   UserCheck,
   UserX,
   ShieldCheck,
+  Printer,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -47,6 +49,7 @@ import { Table, Pagination } from '../../components/ui/Table';
 import { Tabs, TabList, Tab } from '../../components/ui/Tabs';
 import { useUsuarios, useCreateUsuario, useDeleteUsuario, useUpdateUsuario, useToggleUsuarioActivo } from '../../hooks/useUsuarios';
 import { downloadCsv } from '../../utils/exportCsv';
+import { exportReportePDF } from '../../utils/exportPdf';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
 import type { Rol } from '../../types/models';
@@ -351,6 +354,31 @@ const UsuariosPage: React.FC = () => {
     );
   };
 
+  const handleExportPdf = () => {
+    exportReportePDF({
+      titulo: 'Gestión de Usuarios',
+      subtitulo: 'Usuarios registrados en el sistema SITREP',
+      periodo: `Total: ${stats.total} usuarios`,
+      kpis: [
+        { label: 'Total', value: stats.total },
+        { label: 'Activos', value: stats.activos },
+        { label: 'Generadores', value: stats.generadores },
+        { label: 'Transportistas', value: stats.transportistas },
+      ],
+      tabla: {
+        headers: ['Nombre', 'Email', 'Rol', 'Sector', 'Estado', 'Último Acceso'],
+        rows: usuariosFiltrados.map(u => [
+          u.nombre,
+          u.email,
+          rolConfig[u.rol as keyof typeof rolConfig]?.label || u.rol,
+          u.sector,
+          u.estado === 'activo' ? 'Activo' : u.estado === 'pendiente' ? 'Pendiente' : 'Inactivo',
+          u.ultimoAcceso,
+        ]),
+      },
+    });
+  };
+
   // Columnas para la tabla
   const columns = [
     {
@@ -622,9 +650,11 @@ const UsuariosPage: React.FC = () => {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" leftIcon={<Download size={18} />} onClick={() => downloadCsv(usuarios.map(u => ({ Nombre: u.nombre, Email: u.email, Teléfono: u.telefono, Rol: u.rol, Sector: u.sector, Estado: u.estado, UltimoAcceso: u.ultimoAcceso })), 'usuarios')}>
-              Exportar
+            <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={14} />Imprimir</button>
+            <Button variant="outline" leftIcon={<Download size={18} />} onClick={() => downloadCsv(usuarios.map(u => ({ Nombre: u.nombre, Email: u.email, Teléfono: u.telefono, Rol: u.rol, Sector: u.sector, Estado: u.estado, UltimoAcceso: u.ultimoAcceso })), 'usuarios', { titulo: 'Gestion de Usuarios', periodo: 'Todos los periodos', total: usuarios.length })}>
+              CSV
             </Button>
+            <button onClick={handleExportPdf} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="Exportar PDF"><FileDown size={14} />PDF</button>
             <Button leftIcon={<UserPlus size={18} />} onClick={() => setModalCrear(true)}>
               Nuevo Usuario
             </Button>

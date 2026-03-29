@@ -24,6 +24,8 @@ import {
   ShieldAlert,
   ShieldX,
   RefreshCw,
+  FileDown,
+  Printer,
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -33,7 +35,9 @@ import { Table, Pagination } from '../../components/ui/Table';
 import { SearchInput } from '../../components/ui/SearchInput';
 import { toast } from '../../components/ui/Toast';
 import { downloadCsv } from '../../utils/exportCsv';
+import { exportReportePDF } from '../../utils/exportPdf';
 import { useAuth } from '../../contexts/AuthContext';
+import { formatRelativeTime } from '../../utils/formatters';
 import {
   useGeneradores,
   useDeleteGenerador,
@@ -55,8 +59,8 @@ const AdminGeneradoresPage: React.FC = () => {
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [filtroCompliance, setFiltroCompliance] = useState('todos');
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState<string | undefined>(undefined);
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortBy, setSortBy] = useState<string | undefined>('ultimaActividad');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [modalEliminar, setModalEliminar] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; razonSocial: string } | null>(null);
 
@@ -95,6 +99,7 @@ const AdminGeneradoresPage: React.FC = () => {
         numeroInscripcion: g.numeroInscripcion || '-',
         activo: g.activo !== false,
         createdAt: g.createdAt,
+        ultimaActividad: g.ultimaActividad || null,
         _raw: g,
         compliance,
         // DB fields with JSON enrichment fallback
@@ -126,6 +131,7 @@ const AdminGeneradoresPage: React.FC = () => {
   const GEN_COL_MAP: Record<string, string> = {
     generador: 'razonSocial',
     categoria: 'categoria',
+    ultimaActividad: 'ultimaActividad',
     estado: 'activo',
   };
 
@@ -176,9 +182,33 @@ const AdminGeneradoresPage: React.FC = () => {
         Estado: g.activo ? 'Activo' : 'Inactivo',
         Alta: g.createdAt ? new Date(g.createdAt).toLocaleDateString() : '',
       })),
-      'admin-generadores'
+      'admin-generadores',
+      {
+        titulo: 'Admin Generadores',
+        periodo: 'Todos los periodos',
+        filtros: [filtroCategoria ? `Categoria: ${filtroCategoria}` : '', filtroRubro ? `Rubro: ${filtroRubro}` : '', filtroEstado !== 'todos' ? `Estado: ${filtroEstado}` : '', filtroCompliance !== 'todos' ? `Compliance: ${filtroCompliance}` : ''].filter(Boolean).join(', ') || 'Sin filtros',
+        total: filteredData.length,
+      }
     );
     toast.success('Exportar', 'CSV descargado');
+  };
+
+  const handleExportPdf = () => {
+    exportReportePDF({
+      titulo: 'Admin Generadores',
+      subtitulo: `${filteredData.length} generadores${filtroCategoria ? ` — Categoria: ${filtroCategoria}` : ''}${filtroEstado !== 'todos' ? ` — ${filtroEstado}` : ''}`,
+      periodo: new Date().toLocaleDateString('es-AR'),
+      kpis: [
+        { label: 'Total', value: stats.total },
+        { label: 'Activos', value: stats.activos },
+        { label: 'Al dia', value: stats.alDia },
+        { label: 'Con deuda', value: stats.conDeuda },
+      ],
+      tabla: {
+        headers: ['Razon Social', 'CUIT', 'Categoria', 'Rubro', 'Email', 'Inscripcion', 'Estado'],
+        rows: filteredData.map(g => [g.razonSocial, g.cuit, g.categoria, g.rubro || '-', g.email, g.numeroInscripcion, g.activo ? 'Activo' : 'Inactivo']),
+      },
+    });
   };
 
   const columns = [
@@ -310,6 +340,18 @@ const AdminGeneradoresPage: React.FC = () => {
       },
     },
     {
+      key: 'ultimaActividad',
+      width: '10%',
+      header: 'Actividad',
+      sortable: true,
+      hiddenBelow: 'xl' as const,
+      render: (row: typeof tableData[0]) => row.ultimaActividad ? (
+        <span className="text-xs text-neutral-600">{formatRelativeTime(row.ultimaActividad)}</span>
+      ) : (
+        <span className="text-xs text-neutral-400">Sin actividad</span>
+      ),
+    },
+    {
       key: 'estado',
       width: '7%',
       header: 'Estado',
@@ -387,8 +429,12 @@ const AdminGeneradoresPage: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-2">
+          <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={14} />Imprimir</button>
           <Button variant="outline" leftIcon={<Download size={18} />} onClick={handleExport}>
-            Exportar
+            CSV
+          </Button>
+          <Button variant="outline" leftIcon={<FileDown size={18} />} onClick={handleExportPdf} className="text-error-700 border-error-200 hover:bg-error-50">
+            PDF
           </Button>
           <Button leftIcon={<Plus size={18} />} onClick={() => navigate('/admin/actores/generadores/nuevo')}>
             Nuevo Generador

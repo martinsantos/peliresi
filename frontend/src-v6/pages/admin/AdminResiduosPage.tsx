@@ -12,6 +12,7 @@ import {
   Leaf,
   Beaker,
   Download,
+  FileDown,
   Loader2,
   Flame,
   Plus,
@@ -23,6 +24,7 @@ import {
   X,
   Building2,
   Users,
+  Printer,
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -34,8 +36,11 @@ import { SearchInput } from '../../components/ui/SearchInput';
 import { useTiposResiduoEnriched, useCatalogoGeneradores, useCreateTipoResiduo, useUpdateTipoResiduo, useDeleteTipoResiduo } from '../../hooks/useCatalogos';
 import { toast } from '../../components/ui/Toast';
 import { downloadCsv } from '../../utils/exportCsv';
+import { exportReportePDF } from '../../utils/exportPdf';
 import { CORRIENTES_Y, CORRIENTES_Y_CODES } from '../../data/corrientes-y';
 import { useOperadoresEnrichment } from '../../hooks/useEnrichment';
+import { useOperadores } from '../../hooks/useOperadores';
+import { useManifiestos } from '../../hooks/useManifiestos';
 import { useNavigate } from 'react-router-dom';
 
 /** Parse corrientes Basel codes from various formats: "Y8-Y48", "Y8,Y48", "Y4/Y8/Y9" */
@@ -78,6 +83,15 @@ export const AdminResiduosPage: React.FC = () => {
   const { data: enrichmentData } = useOperadoresEnrichment();
   const OPERADORES_DATA = enrichmentData?.operadores || {};
   const OPERADORES_POR_CORRIENTE = enrichmentData?.porCorriente || {};
+  // DB operadores for CUIT→ID mapping (navigation)
+  const { data: dbOperadores } = useOperadores({ limit: 200 });
+  const operadorIdByCuit = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const op of dbOperadores?.items || []) {
+      if (op.cuit) map[op.cuit] = op.id;
+    }
+    return map;
+  }, [dbOperadores]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -324,9 +338,43 @@ export const AdminResiduosPage: React.FC = () => {
         Tecnologias: r.tecnologias.join('; '),
         Estado: r.activo ? 'Activo' : 'Inactivo',
       })),
-      'catalogo-residuos'
+      'catalogo-residuos',
+      {
+        titulo: 'Catalogo de Residuos',
+        periodo: 'Todos los periodos',
+        filtros: [corrienteFilter ? `Corriente: ${corrienteFilter}` : '', peligrosidadFilter ? `Peligrosidad: ${peligrosidadFilter}` : '', estadoFilter ? `Estado: ${estadoFilter}` : ''].filter(Boolean).join(', ') || 'Sin filtros',
+        total: filteredData.length,
+      }
     );
     toast.success('Exportar', 'CSV descargado');
+  };
+
+  const handleExportPdf = () => {
+    exportReportePDF({
+      titulo: 'Catálogo de Residuos',
+      subtitulo: 'Tipos de residuos, corrientes Y y operadores autorizados',
+      periodo: `Total: ${statsTotal} tipos de residuos`,
+      kpis: [
+        { label: 'Total Tipos', value: statsTotal },
+        { label: 'Peligrosos', value: statsPeligrosos },
+        { label: 'No Peligrosos', value: statsNoPeligrosos },
+        { label: 'Corrientes Y', value: corrientesActivas },
+      ],
+      tabla: {
+        headers: ['Código', 'Nombre', 'Categoría', 'Corriente Y', 'Tipo', 'Peligrosidad', 'Operadores', 'Manifiestos', 'Estado'],
+        rows: filteredData.map(r => [
+          r.codigo,
+          r.nombre,
+          r.categoria,
+          r.corrienteY || '',
+          r.tipo,
+          r.peligrosidad,
+          r.operadoresCount,
+          r.manifestosCount,
+          r.activo ? 'Activo' : 'Inactivo',
+        ]),
+      },
+    });
   };
 
   const renderForm = () => (
@@ -356,15 +404,32 @@ export const AdminResiduosPage: React.FC = () => {
     </div>
   );
 
-  // Build operador names for the detail modal from enrichment data
-  const getOperadorNames = (r: ResiduoDisplay): { nombre: string; metodo: string }[] => {
+  // Build generador list filtered by corriente for the detail modal
+  const getGeneradoresForCorriente = (corrienteY: string): { id: string; nombre: string; cuit: string }[] => {
+    if (!corrienteY) return [];
+    return generadoresArr
+      .filter((gen: any) => {
+        const corrientes = parseCorrientes((gen as any).corrientesControl || (gen as any).categoriasControl || (gen as any).categoria);
+        return corrientes.includes(corrienteY);
+      })
+      .map((gen: any) => ({
+        id: gen.id,
+        nombre: gen.razonSocial || gen.nombre || gen.cuit || '—',
+        cuit: gen.cuit || '',
+      }));
+  };
+
+  // Build operador names for the detail modal from enrichment data + DB IDs
+  const getOperadorNames = (r: ResiduoDisplay): { cuit: string; nombre: string; metodo: string; dbId?: string }[] => {
     if (!r.corrienteY) return [];
     const cuits = OPERADORES_POR_CORRIENTE[r.corrienteY] || [];
-    return cuits.slice(0, 20).map(cuit => {
+    return cuits.map(cuit => {
       const op = OPERADORES_DATA[cuit];
       return {
+        cuit,
         nombre: op?.razonSocial || op?.razon_social || cuit,
         metodo: op?.tecnologia?.split(/,/)[0]?.trim() || 'No especificado',
+        dbId: operadorIdByCuit[cuit],
       };
     });
   };
@@ -528,9 +593,11 @@ export const AdminResiduosPage: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-2">
+          <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={14} />Imprimir</button>
           <Button variant="outline" leftIcon={<Download size={18} />} onClick={handleExport}>
-            Exportar
+            CSV
           </Button>
+          <button onClick={handleExportPdf} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="Exportar PDF"><FileDown size={14} />PDF</button>
           <Button leftIcon={<Plus size={18} />} onClick={() => { setForm(INITIAL_FORM); setModalCrear(true); }}>
             Nuevo Tipo
           </Button>
@@ -773,10 +840,9 @@ export const AdminResiduosPage: React.FC = () => {
         {detalleResiduo && <ResiduoDetalleContent
           residuo={detalleResiduo}
           operadorNames={getOperadorNames(detalleResiduo)}
-          onNavigateManifiestos={() => {
-            setModalDetalle(false);
-            navigate(`/manifiestos`);
-          }}
+          generadoresList={getGeneradoresForCorriente(detalleResiduo.corrienteY)}
+          onClose={() => { setModalDetalle(false); setDetalleResiduo(null); }}
+          onNavigate={(path) => { setModalDetalle(false); setDetalleResiduo(null); navigate(path); }}
         />}
       </Modal>
     </div>
@@ -784,153 +850,177 @@ export const AdminResiduosPage: React.FC = () => {
 };
 
 // ========================================
-// DETAIL MODAL CONTENT
+// DETAIL MODAL CONTENT — Tabs design
 // ========================================
 const ResiduoDetalleContent: React.FC<{
   residuo: ResiduoDisplay;
-  operadorNames: { nombre: string; metodo: string }[];
-  onNavigateManifiestos: () => void;
-}> = ({ residuo, operadorNames, onNavigateManifiestos }) => {
+  operadorNames: { cuit: string; nombre: string; metodo: string; dbId?: string }[];
+  generadoresList: { id: string; nombre: string; cuit: string }[];
+  onClose: () => void;
+  onNavigate: (path: string) => void;
+}> = ({ residuo, operadorNames, generadoresList, onClose, onNavigate }) => {
+  const [tab, setTab] = useState<'info' | 'operadores' | 'generadores' | 'manifiestos'>('info');
+  const { data: manifData, isLoading: manifLoading } = useManifiestos(
+    { tipoResiduoId: residuo.id, limit: 50 },
+    { enabled: tab === 'manifiestos' }, // lazy: only fetch when tab is active
+  );
+
   const peligrosidadColors: Record<string, string> = {
     'Tóxico': 'error', 'Inflamable': 'error', 'Corrosivo': 'warning', 'Reactivo': 'warning',
     'alta': 'error', 'media': 'warning', 'baja': 'info', 'ninguna': 'success',
   };
 
+  const tabs = [
+    { id: 'info' as const, label: 'Info' },
+    { id: 'operadores' as const, label: `Operadores (${Math.max(operadorNames.length, residuo.operadoresDbCount)})` },
+    { id: 'generadores' as const, label: `Generadores (${generadoresList.length || residuo.generadoresCount})` },
+    { id: 'manifiestos' as const, label: `Manifiestos (${residuo.manifestosCount})` },
+  ];
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-start gap-4">
-        <div className={`w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 ${
-          residuo.tipo === 'Peligroso' ? 'bg-error-100' : 'bg-success-100'
-        }`}>
-          {residuo.tipo === 'Peligroso' ? (
-            <AlertTriangle size={28} className="text-error-600" />
-          ) : (
-            <Leaf size={28} className="text-success-600" />
-          )}
+      <div className="flex items-start gap-3">
+        <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${residuo.tipo === 'Peligroso' ? 'bg-error-100' : 'bg-success-100'}`}>
+          {residuo.tipo === 'Peligroso' ? <AlertTriangle size={24} className="text-error-600" /> : <Leaf size={24} className="text-success-600" />}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-xl font-bold text-neutral-900">{residuo.codigo}</h3>
-            <Badge variant="soft" color={peligrosidadColors[residuo.peligrosidad]}>
-              {residuo.peligrosidad.charAt(0).toUpperCase() + residuo.peligrosidad.slice(1)}
-            </Badge>
-            {residuo.corrienteY && (
-              <Badge variant="outline" color="warning">{residuo.corrienteY}</Badge>
-            )}
-            <Badge variant="soft" color={residuo.activo ? 'success' : 'neutral'}>
-              {residuo.activo ? 'Activo' : 'Inactivo'}
-            </Badge>
+            <h3 className="text-lg font-bold text-neutral-900">{residuo.codigo}</h3>
+            <Badge variant="soft" color={peligrosidadColors[residuo.peligrosidad]}>{residuo.peligrosidad}</Badge>
+            {residuo.corrienteY && <Badge variant="outline" color="warning">{residuo.corrienteY}</Badge>}
           </div>
-          <p className="text-neutral-600 mt-1">{residuo.nombre}</p>
+          <p className="text-sm text-neutral-600 mt-0.5">{residuo.nombre}</p>
         </div>
       </div>
 
-      {/* Section 1: Description and characteristics */}
-      <div className="bg-neutral-50 rounded-xl p-4 space-y-3">
-        <h4 className="text-sm font-semibold text-neutral-700 uppercase tracking-wider">Informacion</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <p className="text-xs text-neutral-500 mb-0.5">Descripcion</p>
-            <p className="text-sm text-neutral-900">{residuo.descripcion}</p>
-          </div>
-          <div>
-            <p className="text-xs text-neutral-500 mb-0.5">Categoria</p>
-            <p className="text-sm text-neutral-900">{residuo.categoria}</p>
-          </div>
-          {residuo.corrienteDesc && (
-            <div>
-              <p className="text-xs text-neutral-500 mb-0.5">Corriente Y</p>
-              <p className="text-sm text-neutral-900">{residuo.corrienteY} - {residuo.corrienteDesc}</p>
-            </div>
-          )}
-          {residuo.caracteristicas && (
-            <div>
-              <p className="text-xs text-neutral-500 mb-0.5">Caracteristicas</p>
-              <p className="text-sm text-neutral-900">{residuo.caracteristicas}</p>
-            </div>
-          )}
-        </div>
+      {/* Tab bar */}
+      <div className="flex gap-1 border-b border-neutral-200 overflow-x-auto">
+        {tabs.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`px-3 py-2 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
+              tab === t.id
+                ? 'border-primary-500 text-primary-700'
+                : 'border-transparent text-neutral-500 hover:text-neutral-700'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      {/* Section 2: Operadores */}
-      <div className="bg-blue-50 rounded-xl p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <FlaskConical size={16} className="text-blue-600" />
-          <h4 className="text-sm font-semibold text-blue-800">
-            Operadores autorizados ({Math.max(operadorNames.length, residuo.operadoresDbCount)})
-          </h4>
-        </div>
-        {operadorNames.length > 0 ? (
-          <div className="space-y-1.5 max-h-48 overflow-y-auto">
-            {operadorNames.map((op, i) => (
-              <div key={i} className="px-3 py-2 bg-white rounded-lg">
-                <p className="text-sm font-medium text-neutral-900 truncate">{op.nombre}</p>
-                <p className="text-xs text-neutral-500 truncate mt-0.5" title={op.metodo}>{op.metodo}</p>
+      {/* Tab content — fixed height so modal doesn't jump */}
+      <div className="min-h-[300px] max-h-[50vh] overflow-y-auto">
+        {/* ── Info tab ── */}
+        {tab === 'info' && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs text-neutral-500 mb-0.5">Descripcion</p>
+                <p className="text-sm text-neutral-900">{residuo.descripcion}</p>
               </div>
-            ))}
+              <div>
+                <p className="text-xs text-neutral-500 mb-0.5">Categoria</p>
+                <p className="text-sm text-neutral-900">{residuo.categoria}</p>
+              </div>
+              {residuo.corrienteDesc && (
+                <div>
+                  <p className="text-xs text-neutral-500 mb-0.5">Corriente Y</p>
+                  <p className="text-sm text-neutral-900">{residuo.corrienteY} - {residuo.corrienteDesc}</p>
+                </div>
+              )}
+              {residuo.caracteristicas && (
+                <div>
+                  <p className="text-xs text-neutral-500 mb-0.5">Caracteristicas</p>
+                  <p className="text-sm text-neutral-900">{residuo.caracteristicas}</p>
+                </div>
+              )}
+            </div>
+            {residuo.tecnologias.length > 0 && (
+              <div className="pt-3 border-t border-neutral-100">
+                <p className="text-xs text-neutral-500 mb-2">Tecnologias de tratamiento</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {residuo.tecnologias.map((t, i) => <Badge key={i} variant="outline" color="neutral">{t}</Badge>)}
+                </div>
+              </div>
+            )}
           </div>
-        ) : (
-          <p className="text-sm text-blue-700/60">Sin operadores autorizados registrados</p>
+        )}
+
+        {/* ── Operadores tab ── */}
+        {tab === 'operadores' && (
+          <div className="space-y-1.5">
+            {operadorNames.length > 0 ? operadorNames.map((op, i) => (
+              <button
+                key={i}
+                onClick={() => op.dbId ? onNavigate(`/actores/operadores/${op.dbId}`) : undefined}
+                className={`w-full text-left px-3 py-2.5 bg-neutral-50 rounded-lg transition-colors ${op.dbId ? 'hover:bg-blue-50 cursor-pointer' : ''}`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium text-neutral-900 truncate">{op.nombre}</p>
+                  {op.dbId && <ExternalLink size={12} className="text-blue-400 shrink-0" />}
+                </div>
+                <p className="text-xs text-neutral-500 truncate mt-0.5">{op.metodo}</p>
+                <p className="text-[10px] text-neutral-400 font-mono mt-0.5">{op.cuit}</p>
+              </button>
+            )) : (
+              <p className="text-sm text-neutral-400 text-center py-8">Sin operadores autorizados</p>
+            )}
+          </div>
+        )}
+
+        {/* ── Generadores tab ── */}
+        {tab === 'generadores' && (
+          <div className="space-y-1.5">
+            {generadoresList.length > 0 ? generadoresList.map((gen) => (
+              <button
+                key={gen.id}
+                onClick={() => onNavigate(`/admin/actores/generadores/${gen.id}`)}
+                className="w-full text-left px-3 py-2.5 bg-neutral-50 rounded-lg hover:bg-purple-50 cursor-pointer transition-colors"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium text-neutral-900 truncate">{gen.nombre}</p>
+                  <ExternalLink size={12} className="text-purple-400 shrink-0" />
+                </div>
+                {gen.cuit && <p className="text-[10px] text-neutral-400 font-mono mt-0.5">{gen.cuit}</p>}
+              </button>
+            )) : (
+              <p className="text-sm text-neutral-400 text-center py-8">Sin generadores inscriptos para corriente {residuo.corrienteY}</p>
+            )}
+          </div>
+        )}
+
+        {/* ── Manifiestos tab ── */}
+        {tab === 'manifiestos' && (
+          <div className="space-y-1.5">
+            {manifLoading ? (
+              <div className="flex items-center justify-center py-8"><Loader2 size={24} className="animate-spin text-primary-500" /></div>
+            ) : (manifData?.items || []).length > 0 ? (manifData!.items.map((m: any) => (
+              <button
+                key={m.id}
+                onClick={() => onNavigate(`/manifiestos/${m.id}`)}
+                className="w-full text-left px-3 py-2.5 bg-neutral-50 rounded-lg hover:bg-primary-50 cursor-pointer transition-colors"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-sm font-semibold text-neutral-900">{m.numero}</span>
+                  <Badge variant="soft" color={
+                    m.estado === 'TRATADO' ? 'success' : m.estado === 'EN_TRANSITO' ? 'warning' :
+                    m.estado === 'CANCELADO' || m.estado === 'RECHAZADO' ? 'error' : 'neutral'
+                  } className="text-[10px]">{m.estado?.replace(/_/g, ' ')}</Badge>
+                </div>
+                <div className="flex items-center gap-3 mt-0.5 text-xs text-neutral-500">
+                  {m.generador?.razonSocial && <span>Gen: {m.generador.razonSocial}</span>}
+                  {m.operador?.razonSocial && <span>Op: {m.operador.razonSocial}</span>}
+                </div>
+              </button>
+            ))) : (
+              <p className="text-sm text-neutral-400 text-center py-8">Sin manifiestos vinculados</p>
+            )}
+          </div>
         )}
       </div>
-
-      {/* Section 3: Generadores */}
-      <div className="bg-purple-50 rounded-xl p-4">
-        <div className="flex items-center gap-2">
-          <Factory size={16} className="text-purple-600" />
-          <h4 className="text-sm font-semibold text-purple-800">
-            Generadores inscriptos ({residuo.generadoresCount})
-          </h4>
-        </div>
-        {residuo.generadoresCount > 0 ? (
-          <p className="text-sm text-purple-700 mt-2">
-            {residuo.generadoresCount} generador{residuo.generadoresCount !== 1 ? 'es' : ''} registrado{residuo.generadoresCount !== 1 ? 's' : ''} con corriente {residuo.corrienteY}
-          </p>
-        ) : (
-          <p className="text-sm text-purple-700/60 mt-2">Sin generadores inscriptos para esta corriente</p>
-        )}
-      </div>
-
-      {/* Section 4: Manifiestos */}
-      <div className="bg-primary-50 rounded-xl p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <FileText size={16} className="text-primary-600" />
-            <h4 className="text-sm font-semibold text-primary-800">
-              Manifiestos ({residuo.manifestosCount})
-            </h4>
-          </div>
-          {residuo.manifestosCount > 0 && (
-            <button
-              onClick={onNavigateManifiestos}
-              className="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-800 font-medium transition-colors"
-            >
-              Ver manifiestos
-              <ExternalLink size={14} />
-            </button>
-          )}
-        </div>
-        {residuo.manifestosCount > 0 ? (
-          <p className="text-sm text-primary-700 mt-2">
-            {residuo.manifestosCount} manifiesto{residuo.manifestosCount !== 1 ? 's' : ''} vinculado{residuo.manifestosCount !== 1 ? 's' : ''} con este tipo de residuo
-          </p>
-        ) : (
-          <p className="text-sm text-primary-700/60 mt-2">Sin manifiestos vinculados</p>
-        )}
-      </div>
-
-      {/* Tecnologias */}
-      {residuo.tecnologias.length > 0 && (
-        <div className="pt-2 border-t border-neutral-200">
-          <p className="text-xs text-neutral-500 mb-2">Tecnologias de tratamiento</p>
-          <div className="flex flex-wrap gap-1.5">
-            {residuo.tecnologias.map((t, i) => (
-              <Badge key={i} variant="outline" color="neutral">{t}</Badge>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

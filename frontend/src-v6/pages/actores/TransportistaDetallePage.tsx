@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import type { Transportista, Vehiculo, Chofer, Manifiesto } from '../../types/models';
+import type { Transportista, Vehiculo, Chofer } from '../../types/models';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -28,6 +28,7 @@ import {
   FlaskConical,
   ChevronDown,
   ChevronUp,
+  Route,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -43,9 +44,9 @@ import {
   useUpdateChofer,
   useDeleteChofer,
 } from '../../hooks/useActores';
-import { useManifiestos } from '../../hooks/useManifiestos';
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from '../../components/ui/Toast';
+import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
 
 const EMPTY_VEHICULO = { patente: '', marca: '', modelo: '', anio: new Date().getFullYear(), capacidad: 0, numeroHabilitacion: '', vencimiento: '' };
 const EMPTY_CHOFER = { nombre: '', apellido: '', dni: '', licencia: '', vencimiento: '', telefono: '' };
@@ -66,12 +67,10 @@ const TransportistaDetallePage: React.FC = () => {
   const [deleteVehiculoItem, setDeleteVehiculoItem] = useState<Vehiculo | null>(null);
   const [deleteChoferItem, setDeleteChoferItem] = useState<Chofer | null>(null);
   const [corrientesExpanded, setCorrientesExpanded] = useState(false);
-  const [historialPage, setHistorialPage] = useState(1);
   const [flotaSort, setFlotaSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const [choferSort, setChoferSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
   const { data: apiTransportista, isLoading } = useTransportista(id || '');
-  const { data: manifiestoData } = useManifiestos({ transportistaId: id, limit: 20, page: historialPage }, { enabled: !!id });
   const createVehiculo = useCreateVehiculo();
   const createChofer = useCreateChofer();
   const updateVehiculo = useUpdateVehiculo();
@@ -369,7 +368,7 @@ const TransportistaDetallePage: React.FC = () => {
         <TabList>
           <Tab id="info" icon={<Truck size={16} />}>Información General</Tab>
           <Tab id="flota" icon={<Users size={16} />}>Flota y Conductores</Tab>
-          <Tab id="historial" icon={<FileText size={16} />}>Historial</Tab>
+          <Tab id="historial" icon={<Route size={16} />}>Trazabilidad</Tab>
         </TabList>
 
         {/* Tab: Info General */}
@@ -699,66 +698,13 @@ const TransportistaDetallePage: React.FC = () => {
           </div>
         </TabPanel>
 
-        {/* Tab: Historial de Manifiestos */}
+        {/* Tab: Trazabilidad */}
         <TabPanel id="historial">
-          <Card>
-            <CardHeader title="Historial de Manifiestos" icon={<FileText size={20} />} />
-            <CardContent>
-              {(manifiestoData?.items?.length ?? 0) > 0 ? (
-                <table className="w-full table-fixed">
-                  <thead className="bg-neutral-50">
-                    <tr>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Número</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Estado</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden lg:table-cell" style={{ width: '22%' }}>Generador</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden lg:table-cell" style={{ width: '18%' }}>Fecha</th>
-                      <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase" style={{ width: '20%' }}>Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-neutral-100">
-                    {manifiestoData!.items.map((m: Manifiesto) => (
-                      <tr key={m.id} className="hover:bg-neutral-50 transition-colors">
-                        <td className="px-3 py-2.5 font-mono text-sm font-semibold text-neutral-900">{m.numero}</td>
-                        <td className="px-3 py-2.5">
-                          <Badge variant="soft" color={
-                            m.estado === 'TRATADO' ? 'success' :
-                            m.estado === 'EN_TRANSITO' ? 'warning' :
-                            m.estado === 'CANCELADO' || m.estado === 'RECHAZADO' ? 'error' : 'neutral'
-                          }>
-                            {m.estado}
-                          </Badge>
-                        </td>
-                        <td className="px-3 py-2.5 text-sm text-neutral-700 hidden lg:table-cell">{m.generador?.razonSocial || '-'}</td>
-                        <td className="px-3 py-2.5 text-sm text-neutral-600 hidden lg:table-cell">{m.createdAt ? new Date(m.createdAt).toLocaleDateString('es-AR') : '-'}</td>
-                        <td className="px-3 py-2.5 text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => navigate(`/manifiestos/${m.id}`)}
-                          >
-                            Ver
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <p className="text-sm text-neutral-400 text-center py-6">Sin manifiestos registrados</p>
-              )}
-              {(manifiestoData?.totalPages ?? 0) > 1 && (
-                <div className="flex items-center justify-between pt-4 border-t border-neutral-100 mt-2">
-                  <p className="text-sm text-neutral-500">
-                    Página {manifiestoData!.page} de {manifiestoData!.totalPages} · {manifiestoData!.total} total
-                  </p>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" disabled={historialPage === 1} onClick={() => setHistorialPage(p => p - 1)}>Anterior</Button>
-                    <Button variant="outline" size="sm" disabled={historialPage === manifiestoData!.totalPages} onClick={() => setHistorialPage(p => p + 1)}>Siguiente</Button>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <TrazabilidadTimeline
+            actorType="transportista"
+            actorId={id || ''}
+            emptyLabel="transportista"
+          />
         </TabPanel>
       </Tabs>
 

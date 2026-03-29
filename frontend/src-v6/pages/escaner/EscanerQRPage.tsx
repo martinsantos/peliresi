@@ -108,8 +108,6 @@ const EscanerQRPage: React.FC = () => {
 
   const handleViewManifiesto = async () => {
     if (!scanResult) return;
-    const isMobile = window.location.pathname.includes('/mobile') || window.location.pathname.includes('/app');
-
     // Offline check: verify we have this manifiesto cached before navigating
     if (!navigator.onLine && currentUser?.id) {
       const cached = await getCachedManifiestos(currentUser.id);
@@ -124,7 +122,7 @@ const EscanerQRPage: React.FC = () => {
       }
     }
 
-    navigate(isMobile ? `/mobile/manifiestos/${scanResult}` : `/manifiestos/${scanResult}`);
+    navigate(`/manifiestos/${scanResult}`);
   };
 
   // -----------------------------------------------------------

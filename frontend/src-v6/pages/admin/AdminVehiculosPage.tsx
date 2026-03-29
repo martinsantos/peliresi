@@ -11,13 +11,15 @@ import {
   Wrench,
   FileText,
   Download,
+  FileDown,
   Eye,
   Edit,
   Trash2,
   User,
   AlertTriangle,
   CheckCircle2,
-  Loader2
+  Loader2,
+  Printer,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -31,6 +33,7 @@ import { useTransportistas, useUpdateVehiculo, useDeleteVehiculo, useUpdateChofe
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from '../../components/ui/Toast';
 import { downloadCsv } from '../../utils/exportCsv';
+import { exportReportePDF } from '../../utils/exportPdf';
 
 interface VehiculoDisplay {
   id: string;
@@ -550,6 +553,33 @@ export const AdminVehiculosPage: React.FC = () => {
     },
   ];
 
+  const handleExportPdf = () => {
+    exportReportePDF({
+      titulo: 'Flota de Vehículos',
+      subtitulo: 'Gestión de vehículos de transporte de residuos peligrosos',
+      periodo: `Total: ${statsTotal} vehículos`,
+      kpis: [
+        { label: 'Total Vehículos', value: statsTotal },
+        { label: 'Disponibles', value: statsDisponibles },
+        { label: 'Inactivos', value: statsInactivos },
+        { label: 'Vencidos', value: statsVencidos },
+      ],
+      tabla: {
+        headers: ['Patente', 'Marca', 'Modelo', 'Año', 'Capacidad', 'Transportista', 'Habilitación', 'Estado'],
+        rows: filteredData.map(v => [
+          v.patente,
+          v.marca,
+          v.modelo,
+          v.anio,
+          v.capacidad,
+          v.transportista,
+          v.habilitacion,
+          v.activo ? 'Disponible' : 'Inactivo',
+        ]),
+      },
+    });
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -560,9 +590,13 @@ export const AdminVehiculosPage: React.FC = () => {
             Gestión de flota de transporte
           </p>
         </div>
-        <Button variant="outline" leftIcon={<Download size={18} />} onClick={() => downloadCsv(allVehicles.map(v => ({ Patente: v.patente, Marca: v.marca, Modelo: v.modelo, Año: v.anio, Capacidad: v.capacidad, Transportista: v.transportista, Habilitación: v.habilitacion, Estado: v.estado })), 'vehiculos')}>
-          Exportar
-        </Button>
+        <div className="flex gap-2">
+          <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={14} />Imprimir</button>
+          <Button variant="outline" leftIcon={<Download size={18} />} onClick={() => downloadCsv(allVehicles.map(v => ({ Patente: v.patente, Marca: v.marca, Modelo: v.modelo, Año: v.anio, Capacidad: v.capacidad, Transportista: v.transportista, Habilitación: v.habilitacion, Estado: v.estado })), 'vehiculos', { titulo: 'Flota de Vehiculos', periodo: 'Todos los periodos', total: allVehicles.length })}>
+            CSV
+          </Button>
+          <button onClick={handleExportPdf} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="Exportar PDF"><FileDown size={14} />PDF</button>
+        </div>
       </div>
 
       {/* Stats */}
