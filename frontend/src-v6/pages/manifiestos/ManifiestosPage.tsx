@@ -317,6 +317,29 @@ const ManifiestosPage: React.FC = () => {
           {showFilters && (
             <div className="mt-3 pt-3 border-t border-neutral-100 flex flex-wrap gap-3 items-end">
               <div className="flex flex-col gap-1 w-full sm:w-auto">
+                <label className="text-xs font-medium text-neutral-500">Ordenar por</label>
+                <div className="flex gap-2">
+                  <select
+                    value={sortBy}
+                    onChange={(e) => handleSort(e.target.value as SortCol)}
+                    className="text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-primary-300 flex-1"
+                  >
+                    <option value="createdAt">Fecha</option>
+                    <option value="numero">Número</option>
+                    <option value="estado">Estado</option>
+                    <option value="generador">Generador</option>
+                    <option value="operador">Operador</option>
+                  </select>
+                  <button
+                    onClick={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')}
+                    className="flex items-center gap-1 px-3 py-2 text-sm border border-neutral-200 rounded-xl bg-white hover:bg-neutral-50 transition-colors"
+                  >
+                    {sortOrder === 'desc' ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
+                    {sortOrder === 'desc' ? 'Desc' : 'Asc'}
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-col gap-1 w-full sm:w-auto">
                 <label className="text-xs font-medium text-neutral-500">Generador</label>
                 <select value={generadorFilter} onChange={(e) => setGeneradorFilter(e.target.value)} className="text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-primary-300 w-full sm:max-w-[220px]">
                   <option value="">Todos</option>
@@ -330,13 +353,15 @@ const ManifiestosPage: React.FC = () => {
                   {(operadoresData?.items || []).map((o: any) => <option key={o.id} value={o.id}>{o.razonSocial}</option>)}
                 </select>
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-neutral-500">Desde</label>
-                <input type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} className="text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-primary-300" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-neutral-500">Hasta</label>
-                <input type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} className="text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-primary-300" />
+              <div className="flex gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-neutral-500">Desde</label>
+                  <input type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} className="text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-primary-300" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-neutral-500">Hasta</label>
+                  <input type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} className="text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-primary-300" />
+                </div>
               </div>
               {(fechaDesde || fechaHasta || generadorFilter || operadorFilter) && (
                 <button onClick={() => { setFechaDesde(''); setFechaHasta(''); setGeneradorFilter(''); setOperadorFilter(''); }} className="flex items-center gap-1 text-xs text-neutral-500 hover:text-error-600 px-2 py-2"><X size={13} /> Limpiar</button>

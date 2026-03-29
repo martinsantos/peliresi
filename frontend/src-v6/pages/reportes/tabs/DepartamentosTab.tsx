@@ -298,13 +298,13 @@ export function DepartamentoDetalleModal({
             {filteredActors.length} de {allActors.length} actores
           </span>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" leftIcon={<Printer size={14} />} onClick={handlePrint}>
+            <Button variant="outline" size="sm" leftIcon={<Printer size={14} />} onClick={handlePrint} className="hidden sm:inline-flex">
               Imprimir
             </Button>
-            <Button variant="outline" size="sm" leftIcon={<Download size={14} />} onClick={handleExportCSV}>
+            <Button variant="outline" size="sm" leftIcon={<Download size={14} />} onClick={handleExportCSV} className="hidden sm:inline-flex">
               CSV
             </Button>
-            <Button size="sm" leftIcon={<FileDown size={14} />} onClick={handleExportPDF}>
+            <Button size="sm" leftIcon={<FileDown size={14} />} onClick={handleExportPDF} className="hidden sm:inline-flex">
               PDF
             </Button>
           </div>

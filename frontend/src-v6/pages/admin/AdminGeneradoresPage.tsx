@@ -429,11 +429,11 @@ const AdminGeneradoresPage: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={14} />Imprimir</button>
-          <Button variant="outline" leftIcon={<Download size={18} />} onClick={handleExport}>
+          <button onClick={() => window.print()} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={14} />Imprimir</button>
+          <Button variant="outline" leftIcon={<Download size={18} />} onClick={handleExport} className="hidden sm:inline-flex">
             CSV
           </Button>
-          <Button variant="outline" leftIcon={<FileDown size={18} />} onClick={handleExportPdf} className="text-error-700 border-error-200 hover:bg-error-50">
+          <Button variant="outline" leftIcon={<FileDown size={18} />} onClick={handleExportPdf} className="hidden sm:inline-flex text-error-700 border-error-200 hover:bg-error-50">
             PDF
           </Button>
           <Button leftIcon={<Plus size={18} />} onClick={() => navigate('/admin/actores/generadores/nuevo')}>

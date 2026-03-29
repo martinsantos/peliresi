@@ -391,11 +391,11 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
               <option key={o.id} value={o.id}>{o.razonSocial || o.nombre}</option>
             ))}
           </select>
-          <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={14} />Imprimir</button>
-          <Button variant="outline" leftIcon={<Download size={16} />} onClick={handleExport}>
+          <button onClick={() => window.print()} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={14} />Imprimir</button>
+          <Button variant="outline" leftIcon={<Download size={16} />} onClick={handleExport} className="hidden sm:inline-flex">
             CSV
           </Button>
-          <button onClick={handleExportPdf} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="Exportar PDF"><FileDown size={14} />PDF</button>
+          <button onClick={handleExportPdf} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="Exportar PDF"><FileDown size={14} />PDF</button>
           <Button leftIcon={<Plus size={16} />} onClick={openCreate}>
             Nueva Autorización
           </Button>
@@ -939,11 +939,11 @@ const CatalogoTab: React.FC<{
             <option value="medio">Medio (3-4)</option>
             <option value="bajo">Bajo (5+)</option>
           </select>
-          <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={14} />Imprimir</button>
-          <Button variant="outline" leftIcon={<Download size={16} />} onClick={handleExport}>
+          <button onClick={() => window.print()} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={14} />Imprimir</button>
+          <Button variant="outline" leftIcon={<Download size={16} />} onClick={handleExport} className="hidden sm:inline-flex">
             CSV
           </Button>
-          <button onClick={handleExportPdf} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="Exportar PDF"><FileDown size={14} />PDF</button>
+          <button onClick={handleExportPdf} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="Exportar PDF"><FileDown size={14} />PDF</button>
         </div>
         {(searchTerm || filtroCategoria || filtroRiesgo || filtroCorriente) && (
           <div className="mt-2 flex items-center gap-2">

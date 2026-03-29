@@ -285,7 +285,7 @@ export default function OperadoresTab({
                 onChange={e => setCategoriaFilter(e.target.value)}
                 className="px-3 py-1.5 rounded-lg border border-neutral-200 text-xs text-neutral-700 w-32"
               />
-              <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={13} />Imprimir</button>
+              <button onClick={() => window.print()} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={13} />Imprimir</button>
               <button
                 onClick={() => {
                   const headers = isDateFiltered
@@ -302,7 +302,7 @@ export default function OperadoresTab({
                     total: filtered.length,
                   });
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg border border-primary-200 transition-colors"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg border border-primary-200 transition-colors"
                 title="Exportar a CSV"
               >
                 <Download size={13} />
@@ -338,7 +338,7 @@ export default function OperadoresTab({
                     },
                   });
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors"
                 title="Exportar a PDF"
               >
                 <FileDown size={13} />
