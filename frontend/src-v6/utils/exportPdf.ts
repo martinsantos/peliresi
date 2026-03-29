@@ -4,8 +4,22 @@
  * Genera reportes PDF profesionales con jsPDF + autoTable
  */
 
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+// Dynamic imports — jsPDF (407KB) + autoTable only load when user actually exports
+// Saves ~500KB from initial bundle load
+let _jsPDF: typeof import('jspdf').default | null = null;
+let _autoTable: typeof import('jspdf-autotable').default | null = null;
+
+async function loadPdfLibs() {
+  if (!_jsPDF) {
+    const [jspdfMod, autoTableMod] = await Promise.all([
+      import('jspdf'),
+      import('jspdf-autotable'),
+    ]);
+    _jsPDF = jspdfMod.default;
+    _autoTable = autoTableMod.default;
+  }
+  return { jsPDF: _jsPDF, autoTable: _autoTable! };
+}
 
 interface KPI {
   label: string;
@@ -28,7 +42,8 @@ const DARK_COLOR: [number, number, number] = [18, 26, 38]; // #121A26
 const GRAY_COLOR: [number, number, number] = [107, 114, 128];
 const LIGHT_BG: [number, number, number] = [249, 250, 251];
 
-export function exportReportePDF(config: ExportConfig) {
+export async function exportReportePDF(config: ExportConfig) {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF('p', 'mm', 'a4');
   const pageWidth = doc.internal.pageSize.getWidth();
   let y = 15;

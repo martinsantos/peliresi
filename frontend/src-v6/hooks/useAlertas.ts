@@ -16,6 +16,7 @@ export function useReglasAlerta() {
   return useQuery({
     queryKey: KEYS.reglas,
     queryFn: () => alertaService.listReglas(),
+    staleTime: 60_000,
   });
 }
 
@@ -31,6 +32,7 @@ export function useAlertas(filters?: AlertaFilters, enabled = true) {
   return useQuery({
     queryKey: KEYS.alertas(filters),
     queryFn: () => alertaService.listAlertas(filters),
+    staleTime: 30_000,
     enabled,
   });
 }
@@ -65,5 +67,6 @@ export function useAnomalias(manifiestoId?: string) {
   return useQuery({
     queryKey: KEYS.anomalias(manifiestoId),
     queryFn: () => alertaService.listAnomalias(manifiestoId),
+    staleTime: 60_000,
   });
 }

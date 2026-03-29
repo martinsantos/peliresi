@@ -175,64 +175,57 @@ export const getDashboardStats = async (req: AuthRequest, res: Response, next: N
       where.operadorId = req.user.operador.id;
     }
 
-    // Contar manifiestos por estado
-    const [borradores, aprobados, enTransito, entregados, recibidos, enTratamiento, tratados, rechazados, cancelados, total] = await Promise.all([
-      prisma.manifiesto.count({ where: { ...where, estado: 'BORRADOR' } }),
-      prisma.manifiesto.count({ where: { ...where, estado: 'APROBADO' } }),
-      prisma.manifiesto.count({ where: { ...where, estado: 'EN_TRANSITO' } }),
-      prisma.manifiesto.count({ where: { ...where, estado: 'ENTREGADO' } }),
-      prisma.manifiesto.count({ where: { ...where, estado: 'RECIBIDO' } }),
-      prisma.manifiesto.count({ where: { ...where, estado: 'EN_TRATAMIENTO' } }),
-      prisma.manifiesto.count({ where: { ...where, estado: 'TRATADO' } }),
-      prisma.manifiesto.count({ where: { ...where, estado: 'RECHAZADO' } }),
-      prisma.manifiesto.count({ where: { ...where, estado: 'CANCELADO' } }),
-      prisma.manifiesto.count({ where })
+    // Optimized: 1 groupBy + 2 queries instead of 12 individual counts
+    const [estadoCounts, recientes, enTransitoList] = await Promise.all([
+      // Single groupBy replaces 10 individual count queries
+      prisma.manifiesto.groupBy({
+        by: ['estado'],
+        where,
+        _count: true,
+      }),
+      // Recent manifiestos
+      prisma.manifiesto.findMany({
+        where,
+        orderBy: { updatedAt: 'desc' },
+        take: 5,
+        include: { generador: true, transportista: true, operador: true },
+      }),
+      // In-transit with latest tracking
+      prisma.manifiesto.findMany({
+        where: { ...where, estado: 'EN_TRANSITO' },
+        include: {
+          generador: true, transportista: true, operador: true,
+          tracking: { orderBy: { timestamp: 'desc' }, take: 1 },
+        },
+      }),
     ]);
 
-    // Obtener manifiestos recientes
-    const recientes = await prisma.manifiesto.findMany({
-      where,
-      orderBy: { updatedAt: 'desc' },
-      take: 5,
-      include: {
-        generador: true,
-        transportista: true,
-        operador: true
-      }
-    });
-
-    // Manifiestos en transito con ultimo tracking
-    const enTransitoList = await prisma.manifiesto.findMany({
-      where: { ...where, estado: 'EN_TRANSITO' },
-      include: {
-        generador: true,
-        transportista: true,
-        operador: true,
-        tracking: {
-          orderBy: { timestamp: 'desc' },
-          take: 1
-        }
-      }
-    });
+    // Build stats map from groupBy result
+    const byEstado: Record<string, number> = {};
+    let total = 0;
+    for (const row of estadoCounts) {
+      byEstado[row.estado] = row._count;
+      total += row._count;
+    }
 
     res.json({
       success: true,
       data: {
         estadisticas: {
-          borradores,
-          aprobados,
-          enTransito,
-          entregados,
-          recibidos,
-          enTratamiento,
-          tratados,
-          rechazados,
-          cancelados,
-          total
+          borradores: byEstado['BORRADOR'] || 0,
+          aprobados: byEstado['APROBADO'] || 0,
+          enTransito: byEstado['EN_TRANSITO'] || 0,
+          entregados: byEstado['ENTREGADO'] || 0,
+          recibidos: byEstado['RECIBIDO'] || 0,
+          enTratamiento: byEstado['EN_TRATAMIENTO'] || 0,
+          tratados: byEstado['TRATADO'] || 0,
+          rechazados: byEstado['RECHAZADO'] || 0,
+          cancelados: byEstado['CANCELADO'] || 0,
+          total,
         },
         recientes,
-        enTransitoList
-      }
+        enTransitoList,
+      },
     });
   } catch (error) {
     next(error);

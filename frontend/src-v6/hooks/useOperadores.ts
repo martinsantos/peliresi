@@ -15,6 +15,7 @@ export function useOperadores(filters?: ActorFilters) {
   return useQuery({
     queryKey: KEYS.operadores(filters),
     queryFn: () => actoresService.listOperadores(filters),
+    staleTime: 60_000,
   });
 }
 

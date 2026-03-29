@@ -192,16 +192,6 @@ export const DemoAppOnboarding: React.FC = () => {
   const role = currentUser?.rol as UserRole | undefined;
   const slides = role ? ROLE_SLIDES[role] : [];
 
-  // Auto-trigger disabled - onboarding can be shown manually via help button
-  // useEffect(() => {
-  //   if (!role) return;
-  //   const done = localStorage.getItem(storageKey(role));
-  //   if (!done) {
-  //     const timer = setTimeout(() => setVisible(true), 1200);
-  //     return () => clearTimeout(timer);
-  //   }
-  // }, [role]);
-
   const dismiss = useCallback(() => {
     setVisible(false);
     if (role) localStorage.setItem(storageKey(role), 'true');

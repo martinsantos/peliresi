@@ -4,11 +4,11 @@
  * Routing principal con todas las páginas
  */
 
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense } from 'react';
 import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
 
 // ========================================
-// CONTEXTS
+// CONTEXTS & COMPONENTS
 // ========================================
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -22,110 +22,24 @@ import { AuthLayout } from './layouts/AuthLayout';
 import { MobileLayout } from './layouts/MobileLayout';
 
 // ========================================
-// PAGES - Lazy loaded (32 páginas totales)
+// PAGES — shared lazy imports (single source of truth)
 // ========================================
-
-// Auth
-const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
-const LandingPage = lazy(() => import('./pages/auth/LandingPage'));
-const RegistroPage = lazy(() => import('./pages/auth/RegistroPage'));
-const VerificarEmailPage = lazy(() => import('./pages/auth/VerificarEmailPage'));
-const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'));
-const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
-const ReclamarCuentaPage = lazy(() => import('./pages/auth/ReclamarCuentaPage'));
-
-// Dashboard & Centro de Control
-const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'));
-const CentroControlPage = lazy(() => import('./pages/centro-control/CentroControlPage'));
-
-// Manifiestos
-const ManifiestosPage = lazy(() => import('./pages/manifiestos/ManifiestosPage'));
-const ManifiestoDetallePage = lazy(() => import('./pages/manifiestos/ManifiestoDetallePage'));
-const NuevoManifiestoPage = lazy(() => import('./pages/manifiestos/NuevoManifiestoPage'));
-const EditarManifiestoPage = lazy(() => import('./pages/manifiestos/EditarManifiestoPage'));
-
-// Tracking (TrackingPage eliminated — functionality merged into CentroControlPage)
-const ViajeEnCursoPage = lazy(() => import('./pages/tracking/ViajeEnCursoPage'));
-
-// Transporte
-const TransportePerfilPage = lazy(() => import('./pages/transporte/TransportePerfilPage'));
-const ViajeEnCursoTransportista = lazy(() => import('./pages/transporte/ViajeEnCursoTransportista'));
-
-// Actores
-const ActoresPage = lazy(() => import('./pages/actores/ActoresPage'));
-const OperadoresPage = lazy(() => import('./pages/actores/OperadoresPage'));
-const OperadorDetallePage = lazy(() => import('./pages/actores/OperadorDetallePage'));
-const TransportistasPage = lazy(() => import('./pages/actores/TransportistasPage'));
-const TransportistaDetallePage = lazy(() => import('./pages/actores/TransportistaDetallePage'));
-
-// Reportes
-const ReportesPage = lazy(() => import('./pages/reportes/ReportesPage'));
-
-// Alertas
-const AlertasPage = lazy(() => import('./pages/alertas/AlertasPage'));
-
-// Configuración
-const ConfiguracionPage = lazy(() => import('./pages/configuracion/ConfiguracionPage'));
-
-// Admin - Usuarios
-const UsuariosPage = lazy(() => import('./pages/usuarios/UsuariosPage'));
-
-// Admin - Sectoriales
-const AdminGeneradoresPage = lazy(() => import('./pages/admin/AdminGeneradoresPage'));
-const GeneradorDetallePage = lazy(() => import('./pages/admin/GeneradorDetallePage'));
-const NuevoGeneradorPage = lazy(() => import('./pages/admin/NuevoGeneradorPage'));
-const AdminOperadoresPage = lazy(() => import('./pages/admin/AdminOperadoresPage'));
-const NuevoOperadorPage = lazy(() => import('./pages/admin/NuevoOperadorPage'));
-const NuevoTransportistaPage = lazy(() => import('./pages/admin/NuevoTransportistaPage'));
-const AdminRenovacionesPage = lazy(() => import('./pages/admin/AdminRenovacionesPage'));
-const AdminVehiculosPage = lazy(() => import('./pages/admin/AdminVehiculosPage'));
-const AdminResiduosPage = lazy(() => import('./pages/admin/AdminResiduosPage'));
-const AdminTratamientosPage = lazy(() => import('./pages/admin/AdminTratamientosPage'));
-const AdminBlockchainPage = lazy(() => import('./pages/admin/AdminBlockchainPage'));
-
-// Auditoría
-const AuditoriaPage = lazy(() => import('./pages/auditoria/AuditoriaPage'));
-
-// Carga Masiva
-const CargaMasivaPage = lazy(() => import('./pages/carga-masiva/CargaMasivaPage'));
-
-// Perfil
-const PerfilPage = lazy(() => import('./pages/perfil/PerfilPage'));
-
-// Mobile
-const MobileDashboardPage = lazy(() => import('./pages/mobile/MobileDashboardPage'));
-
-// User Switcher
-const UserSwitcherPage = lazy(() => import('./pages/auth/UserSwitcherPage'));
-
-// Notificaciones
-const NotificacionesPage = lazy(() => import('./pages/notificaciones/NotificacionesPage'));
-
-// Ayuda
-const AyudaPage = lazy(() => import('./pages/ayuda/AyudaPage'));
-
-// Escaner QR
-const EscanerQRPage = lazy(() => import('./pages/escaner/EscanerQRPage'));
-
-// Verificación pública de manifiesto (sin auth)
-const VerificarManifiestoPage = lazy(() => import('./pages/manifiestos/VerificarManifiestoPage'));
-
-// Estadísticas
-const EstadisticasPage = lazy(() => import('./pages/estadisticas/EstadisticasPage'));
-
-// Inscripcion publica
-const InscripcionWizardPage = lazy(() => import('./pages/public/InscripcionWizardPage'));
-
-// Solicitudes
-const MiSolicitudPage = lazy(() => import('./pages/solicitud/MiSolicitudPage'));
-const AdminSolicitudesPage = lazy(() => import('./pages/admin/AdminSolicitudesPage'));
-const SolicitudDetallePage = lazy(() => import('./pages/admin/SolicitudDetallePage'));
-
-// Solicitar Cambios
-const SolicitarCambiosPage = lazy(() => import('./pages/perfil/SolicitarCambiosPage'));
-
-// 404
-const NotFoundPage = lazy(() => import('./pages/shared/NotFoundPage'));
+import {
+  LoginPage, LandingPage, RegistroPage, VerificarEmailPage, ForgotPasswordPage,
+  ResetPasswordPage, ReclamarCuentaPage, UserSwitcherPage,
+  DashboardPage, CentroControlPage,
+  ManifiestosPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
+  ViajeEnCursoPage, TransportePerfilPage, ViajeEnCursoTransportista,
+  ActoresPage, OperadoresPage, OperadorDetallePage, TransportistasPage, TransportistaDetallePage,
+  ReportesPage, AlertasPage, ConfiguracionPage,
+  UsuariosPage, AdminGeneradoresPage, GeneradorDetallePage, NuevoGeneradorPage,
+  AdminOperadoresPage, NuevoOperadorPage, NuevoTransportistaPage,
+  AdminRenovacionesPage, AdminVehiculosPage, AdminResiduosPage, AdminTratamientosPage, AdminBlockchainPage,
+  AdminSolicitudesPage, SolicitudDetallePage,
+  AuditoriaPage, CargaMasivaPage, PerfilPage, SolicitarCambiosPage,
+  MobileDashboardPage, NotificacionesPage, AyudaPage, EscanerQRPage, EstadisticasPage,
+  InscripcionWizardPage, MiSolicitudPage, NotFoundPage,
+} from './routes/pages';
 
 // ========================================
 // COMPONENTE DE CARGA

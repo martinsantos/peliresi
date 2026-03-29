@@ -15,7 +15,7 @@ const PERFILES = [
   { tipo: 'ADMIN_OPERADOR',      label: 'Adm. Operadores',      desc: 'Gestión del grupo operador',            icon: ShieldPlus,  color: 'bg-teal-500',    border: 'border-teal-200 hover:border-teal-400' },
 ];
 
-const APP_URL = 'https://sitrep.ultimamilla.com.ar/app/';
+const APP_URL = import.meta.env.VITE_APP_URL || '/app/';
 
 const LandingPage: React.FC = () => {
   const { currentUser } = useAuth();

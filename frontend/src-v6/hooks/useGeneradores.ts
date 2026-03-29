@@ -15,6 +15,7 @@ export function useGeneradores(filters?: ActorFilters) {
   return useQuery({
     queryKey: KEYS.generadores(filters),
     queryFn: () => actoresService.listGeneradores(filters),
+    staleTime: 60_000,
   });
 }
 

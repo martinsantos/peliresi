@@ -283,10 +283,14 @@ const UsuariosPage: React.FC = () => {
       toast.error('Error', 'Completa los campos obligatorios: nombre, email y rol');
       return;
     }
+    if (!editandoUsuario && (!formPassword || formPassword.length < 6)) {
+      toast.error('Error', 'La contraseña es obligatoria y debe tener al menos 6 caracteres');
+      return;
+    }
     createMutation.mutate(
       {
         email: formEmail,
-        password: formPassword || 'temp123',
+        password: formPassword,
         nombre: formNombre,
         apellido: formApellido,
         rol: formRol as Rol,

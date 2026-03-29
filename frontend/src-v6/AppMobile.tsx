@@ -5,59 +5,26 @@
  * Todas las rutas usan MobileLayout directamente
  */
 
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense } from 'react';
 import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { MobileLayout } from './layouts/MobileLayout';
 
-// Pages - Lazy loaded
-const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
-const ReclamarCuentaPage = lazy(() => import('./pages/auth/ReclamarCuentaPage'));
-const MobileDashboardPage = lazy(() => import('./pages/mobile/MobileDashboardPage'));
-const CentroControlPage = lazy(() => import('./pages/centro-control/CentroControlPage'));
-const ManifiestosPage = lazy(() => import('./pages/manifiestos/ManifiestosPage'));
-const ManifiestoDetallePage = lazy(() => import('./pages/manifiestos/ManifiestoDetallePage'));
-const NuevoManifiestoPage = lazy(() => import('./pages/manifiestos/NuevoManifiestoPage'));
-const ViajeEnCursoPage = lazy(() => import('./pages/tracking/ViajeEnCursoPage'));
-const TransportePerfilPage = lazy(() => import('./pages/transporte/TransportePerfilPage'));
-const ViajeEnCursoTransportista = lazy(() => import('./pages/transporte/ViajeEnCursoTransportista'));
-const ActoresPage = lazy(() => import('./pages/actores/ActoresPage'));
-const OperadoresPage = lazy(() => import('./pages/actores/OperadoresPage'));
-const OperadorDetallePage = lazy(() => import('./pages/actores/OperadorDetallePage'));
-const TransportistasPage = lazy(() => import('./pages/actores/TransportistasPage'));
-const TransportistaDetallePage = lazy(() => import('./pages/actores/TransportistaDetallePage'));
-const ReportesPage = lazy(() => import('./pages/reportes/ReportesPage'));
-const AlertasPage = lazy(() => import('./pages/alertas/AlertasPage'));
-const NotificacionesPage = lazy(() => import('./pages/notificaciones/NotificacionesPage'));
-const ConfiguracionPage = lazy(() => import('./pages/configuracion/ConfiguracionPage'));
-const PerfilPage = lazy(() => import('./pages/perfil/PerfilPage'));
-const AyudaPage = lazy(() => import('./pages/ayuda/AyudaPage'));
-const UserSwitcherPage = lazy(() => import('./pages/auth/UserSwitcherPage'));
-const UsuariosPage = lazy(() => import('./pages/usuarios/UsuariosPage'));
-const AdminGeneradoresPage = lazy(() => import('./pages/admin/AdminGeneradoresPage'));
-const GeneradorDetallePage = lazy(() => import('./pages/admin/GeneradorDetallePage'));
-const NuevoGeneradorPage = lazy(() => import('./pages/admin/NuevoGeneradorPage'));
-const AdminOperadoresPage = lazy(() => import('./pages/admin/AdminOperadoresPage'));
-const AdminVehiculosPage = lazy(() => import('./pages/admin/AdminVehiculosPage'));
-const AdminResiduosPage = lazy(() => import('./pages/admin/AdminResiduosPage'));
-const AuditoriaPage = lazy(() => import('./pages/auditoria/AuditoriaPage'));
-const CargaMasivaPage = lazy(() => import('./pages/carga-masiva/CargaMasivaPage'));
-const EscanerQRPage = lazy(() => import('./pages/escaner/EscanerQRPage'));
-const EstadisticasPage = lazy(() => import('./pages/estadisticas/EstadisticasPage'));
-const NotFoundPage = lazy(() => import('./pages/shared/NotFoundPage'));
-const VerificarManifiestoPage = lazy(() => import('./pages/manifiestos/VerificarManifiestoPage'));
-const InscripcionWizardPage = lazy(() => import('./pages/public/InscripcionWizardPage'));
-const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'));
-const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
-const RegistroPage = lazy(() => import('./pages/auth/RegistroPage'));
-const MiSolicitudPage = lazy(() => import('./pages/solicitud/MiSolicitudPage'));
-const AdminSolicitudesPage = lazy(() => import('./pages/admin/AdminSolicitudesPage'));
-const SolicitudDetallePage = lazy(() => import('./pages/admin/SolicitudDetallePage'));
-const AdminBlockchainPage = lazy(() => import('./pages/admin/AdminBlockchainPage'));
-const AdminTratamientosPage = lazy(() => import('./pages/admin/AdminTratamientosPage'));
-const AdminRenovacionesPage = lazy(() => import('./pages/admin/AdminRenovacionesPage'));
-const SolicitarCambiosPage = lazy(() => import('./pages/perfil/SolicitarCambiosPage'));
-const EditarManifiestoPage = lazy(() => import('./pages/manifiestos/EditarManifiestoPage'));
+// Pages — shared lazy imports (single source of truth with App.tsx)
+import {
+  LoginPage, ReclamarCuentaPage, RegistroPage, ForgotPasswordPage, ResetPasswordPage, UserSwitcherPage,
+  MobileDashboardPage, CentroControlPage,
+  ManifiestosPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
+  ViajeEnCursoPage, TransportePerfilPage, ViajeEnCursoTransportista,
+  ActoresPage, OperadoresPage, OperadorDetallePage, TransportistasPage, TransportistaDetallePage,
+  ReportesPage, AlertasPage, NotificacionesPage, ConfiguracionPage,
+  UsuariosPage, AdminGeneradoresPage, GeneradorDetallePage, NuevoGeneradorPage,
+  AdminOperadoresPage, AdminVehiculosPage, AdminResiduosPage, AdminTratamientosPage, AdminBlockchainPage,
+  AdminRenovacionesPage, AdminSolicitudesPage, SolicitudDetallePage,
+  AuditoriaPage, CargaMasivaPage, PerfilPage, SolicitarCambiosPage,
+  AyudaPage, EscanerQRPage, EstadisticasPage,
+  InscripcionWizardPage, MiSolicitudPage, NotFoundPage,
+} from './routes/pages';
 
 const PageLoader: React.FC = () => (
   <div className="min-h-screen flex items-center justify-center bg-neutral-50">
