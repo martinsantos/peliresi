@@ -2,41 +2,32 @@
  * SITREP v6 - Admin Generadores Page
  * ==================================
  * Panel administrativo para generadores de residuos
- * Integra datos de la API + enriquecimiento JSON (certificado, rubro, actividad, categorías Y)
+ * Integra datos de la API + enriquecimiento JSON (certificado, rubro, actividad, categorias Y)
+ *
+ * Migrated to GenericCRUDPage — layout handled by the generic component,
+ * page owns data hooks, enrichment, columns, and business logic.
  */
 
 import React, { useState, useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   Factory,
-  Plus,
-  Search,
-  AlertTriangle,
   CheckCircle,
   Phone,
   Mail,
   Edit,
   Eye,
   Trash2,
-  Download,
-  Loader2,
   ShieldCheck,
   ShieldAlert,
   ShieldX,
   RefreshCw,
-  FileDown,
-  Printer,
 } from 'lucide-react';
-import { Card, CardContent } from '../../components/ui/CardV2';
-import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
-import { ConfirmModal } from '../../components/ui/Modal';
-import { Table, Pagination } from '../../components/ui/Table';
-import { SearchInput } from '../../components/ui/SearchInput';
+import { Card } from '../../components/ui/CardV2';
 import { toast } from '../../components/ui/Toast';
-import { downloadCsv } from '../../utils/exportCsv';
-import { exportReportePDF } from '../../utils/exportPdf';
 import { useAuth } from '../../contexts/AuthContext';
+import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { formatRelativeTime } from '../../utils/formatters';
 import {
   useGeneradores,
@@ -45,14 +36,18 @@ import {
 import type { GeneradorEnriched } from '../../data/generadores-enrichment';
 import { CORRIENTES_Y, parseCorrientes } from '../../data/corrientes-y';
 import { useGeneradoresEnrichment } from '../../hooks/useEnrichment';
+import { GenericCRUDPage } from '../../components/crud/GenericCRUDPage';
+import type { CRUDFilter, CRUDStatCard, Column } from '../../components/crud/GenericCRUDPage.types';
 
 const AdminGeneradoresPage: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { isAdmin, impersonateUser } = useAuth();
+  const { isAdmin } = useAuth();
+  const { impersonateUser } = useImpersonation();
   const { data: enrichmentData } = useGeneradoresEnrichment();
   const GENERADORES_DATA = enrichmentData?.generadores || {};
   const TOP_RUBROS = enrichmentData?.topRubros || [];
+
+  // ── State ──
   const [busqueda, setBusqueda] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [filtroRubro, setFiltroRubro] = useState('');
@@ -61,10 +56,9 @@ const AdminGeneradoresPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState<string | undefined>('ultimaActividad');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [modalEliminar, setModalEliminar] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; razonSocial: string } | null>(null);
 
-  // API hooks
+  // ── API hooks ──
   const { data: apiData, isLoading, isError, error } = useGeneradores({ page: currentPage, limit: 20, search: busqueda || undefined, sortBy, sortOrder });
   const deleteMutation = useDeleteGenerador();
 
@@ -72,12 +66,11 @@ const AdminGeneradoresPage: React.FC = () => {
   const total = apiData?.total || generadoresData.length;
   const totalPages = apiData?.totalPages || 1;
 
-  // Map to display format + merge JSON enrichment + compute compliance
+  // ── Map to display format + merge JSON enrichment + compute compliance ──
   const tableData = useMemo(() =>
     generadoresData.map((g: any) => {
       const enriched: GeneradorEnriched | null = GENERADORES_DATA[g.cuit] || null;
 
-      // Compliance: green = TEF paid + DDJJ presented + habilitado; yellow = partial; red = 2+ years unpaid
       const pagosRecent = g.pagos || [];
       const ddjjRecent = g.ddjj || [];
       const tefPaid = pagosRecent.some((p: any) => p.fechaPago != null);
@@ -102,7 +95,6 @@ const AdminGeneradoresPage: React.FC = () => {
         ultimaActividad: g.ultimaActividad || null,
         _raw: g,
         compliance,
-        // DB fields with JSON enrichment fallback
         certificado: enriched?.certificado || null,
         rubro: g.rubro || enriched?.rubro || null,
         actividad: g.actividad || enriched?.actividad || null,
@@ -115,7 +107,7 @@ const AdminGeneradoresPage: React.FC = () => {
     [generadoresData]
   );
 
-  // Client-side filters (rubro, categoria, estado, compliance); sort is server-side
+  // ── Client-side filters ──
   const filteredData = useMemo(() => {
     return tableData.filter((g) => {
       if (filtroRubro && g.rubro !== filtroRubro) return false;
@@ -128,6 +120,7 @@ const AdminGeneradoresPage: React.FC = () => {
     });
   }, [tableData, filtroRubro, filtroCategoria, filtroEstado, filtroCompliance]);
 
+  // ── Sort mapping ──
   const GEN_COL_MAP: Record<string, string> = {
     generador: 'razonSocial',
     categoria: 'categoria',
@@ -141,84 +134,97 @@ const AdminGeneradoresPage: React.FC = () => {
     setCurrentPage(1);
   };
 
-  const stats = {
+  // ── Stats ──
+  const statsData = {
     total,
     activos: generadoresData.filter((g: any) => g.activo !== false).length,
     alDia: tableData.filter(g => g.compliance === 'verde').length,
     conDeuda: tableData.filter(g => g.compliance === 'rojo').length,
   };
 
-  const openEditar = (row: typeof tableData[0]) => {
-    navigate(`/admin/actores/generadores/${row.id}/editar`);
-  };
+  const statCards: CRUDStatCard[] = [
+    { label: 'Total Generadores', value: statsData.total, icon: <Factory size={20} className="text-purple-600" />, iconBg: 'bg-purple-100', iconColor: 'text-purple-600' },
+    { label: 'Activos', value: statsData.activos, icon: <CheckCircle size={20} className="text-success-600" />, iconBg: 'bg-success-100', iconColor: 'text-success-600' },
+    { label: 'Al dia', value: statsData.alDia, icon: <ShieldCheck size={20} className="text-emerald-600" />, iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' },
+    { label: 'Con deuda', value: statsData.conDeuda, icon: <ShieldX size={20} className="text-error-600" />, iconBg: 'bg-error-100', iconColor: 'text-error-600' },
+  ];
 
+  // ── Filters ──
+  const filters: CRUDFilter[] = [
+    {
+      key: 'rubro',
+      value: filtroRubro,
+      onChange: (v) => { setFiltroRubro(v); setCurrentPage(1); },
+      placeholder: 'Todos los rubros',
+      options: [
+        { value: '', label: 'Todos los rubros' },
+        ...TOP_RUBROS.map((r: string) => ({
+          value: r,
+          label: r.length > 35 ? r.substring(0, 33) + '...' : r,
+        })),
+      ],
+    },
+    {
+      key: 'categoria',
+      value: filtroCategoria,
+      onChange: (v) => { setFiltroCategoria(v); setCurrentPage(1); },
+      placeholder: 'Todas las categorias',
+      options: [
+        { value: '', label: 'Todas las categorias' },
+        { value: 'Grandes', label: 'Grandes Generadores' },
+        { value: 'Medianos', label: 'Medianos Generadores' },
+        { value: 'Pequenos', label: 'Pequenos Generadores' },
+      ],
+    },
+    {
+      key: 'estado',
+      value: filtroEstado,
+      onChange: (v) => { setFiltroEstado(v); setCurrentPage(1); },
+      placeholder: 'Todos los estados',
+      options: [
+        { value: 'todos', label: 'Todos los estados' },
+        { value: 'activo', label: 'Activo' },
+        { value: 'inactivo', label: 'Inactivo' },
+      ],
+    },
+    {
+      key: 'compliance',
+      value: filtroCompliance,
+      onChange: (v) => { setFiltroCompliance(v); setCurrentPage(1); },
+      placeholder: 'Compliance: Todos',
+      options: [
+        { value: 'todos', label: 'Compliance: Todos' },
+        { value: 'verde', label: 'Al dia' },
+        { value: 'amarillo', label: 'Parcial' },
+        { value: 'rojo', label: 'Con deuda' },
+        { value: 'sin_datos', label: 'Sin datos' },
+      ],
+    },
+  ];
+
+  // ── Delete handler ──
   const handleEliminar = async () => {
     if (!deleteTarget) return;
     try {
       await deleteMutation.mutateAsync(deleteTarget.id);
       toast.success('Eliminado', `Generador ${deleteTarget.razonSocial} eliminado`);
-      setModalEliminar(false);
       setDeleteTarget(null);
     } catch (err: any) {
       toast.error('Error', err?.response?.data?.message || 'No se pudo eliminar');
     }
   };
 
-  const handleExport = () => {
-    downloadCsv(
-      filteredData.map(g => ({
-        'Razón Social': g.razonSocial,
-        CUIT: g.cuit,
-        Certificado: g.certificado || '',
-        Categoría: g.categoria,
-        Rubro: g.rubro || '',
-        Actividad: g.actividad || '',
-        'Categorías Y': g.categoriasControl.join(', '),
-        'Email (original)': g.emailOriginal || '',
-        Email: g.email,
-        Teléfono: g.telefono,
-        Domicilio: g.domicilio,
-        Inscripción: g.numeroInscripcion,
-        Estado: g.activo ? 'Activo' : 'Inactivo',
-        Alta: g.createdAt ? new Date(g.createdAt).toLocaleDateString() : '',
-      })),
-      'admin-generadores',
-      {
-        titulo: 'Admin Generadores',
-        periodo: 'Todos los periodos',
-        filtros: [filtroCategoria ? `Categoria: ${filtroCategoria}` : '', filtroRubro ? `Rubro: ${filtroRubro}` : '', filtroEstado !== 'todos' ? `Estado: ${filtroEstado}` : '', filtroCompliance !== 'todos' ? `Compliance: ${filtroCompliance}` : ''].filter(Boolean).join(', ') || 'Sin filtros',
-        total: filteredData.length,
-      }
-    );
-    toast.success('Exportar', 'CSV descargado');
-  };
+  // ── Columns ──
+  type Row = typeof tableData[0];
 
-  const handleExportPdf = () => {
-    exportReportePDF({
-      titulo: 'Admin Generadores',
-      subtitulo: `${filteredData.length} generadores${filtroCategoria ? ` — Categoria: ${filtroCategoria}` : ''}${filtroEstado !== 'todos' ? ` — ${filtroEstado}` : ''}`,
-      periodo: new Date().toLocaleDateString('es-AR'),
-      kpis: [
-        { label: 'Total', value: stats.total },
-        { label: 'Activos', value: stats.activos },
-        { label: 'Al dia', value: stats.alDia },
-        { label: 'Con deuda', value: stats.conDeuda },
-      ],
-      tabla: {
-        headers: ['Razon Social', 'CUIT', 'Categoria', 'Rubro', 'Email', 'Inscripcion', 'Estado'],
-        rows: filteredData.map(g => [g.razonSocial, g.cuit, g.categoria, g.rubro || '-', g.email, g.numeroInscripcion, g.activo ? 'Activo' : 'Inactivo']),
-      },
-    });
-  };
-
-  const columns = [
+  const columns: Column<Row>[] = [
     {
       key: 'generador',
-      width: '25%',
+      width: '22%',
       header: 'Generador',
       sortable: true,
       truncate: true,
-      render: (row: typeof tableData[0]) => (
+      render: (row: Row) => (
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
             <Factory size={20} className="text-purple-600" />
@@ -238,10 +244,10 @@ const AdminGeneradoresPage: React.FC = () => {
     {
       key: 'categoria',
       width: '9%',
-      header: 'Categoría',
+      header: 'Categoria',
       sortable: true,
       hiddenBelow: 'xl' as const,
-      render: (row: typeof tableData[0]) => {
+      render: (row: Row) => {
         const cat = row.categoria !== '-' ? row.categoria : null;
         return cat ? (
           <Badge variant="soft" color={cat.includes('Grande') ? 'error' : cat.includes('Mediano') ? 'warning' : 'info'}>
@@ -257,7 +263,7 @@ const AdminGeneradoresPage: React.FC = () => {
       width: '10%',
       header: 'Corrientes Y',
       hiddenBelow: '2xl' as const,
-      render: (row: typeof tableData[0]) => row.categoriasControl.length > 0 ? (
+      render: (row: Row) => row.categoriasControl.length > 0 ? (
         <div className="flex flex-wrap gap-1">
           {row.categoriasControl.slice(0, 3).map((code: string) => (
             <Badge key={code} variant="outline" color="warning" className="text-xs" title={CORRIENTES_Y[code] || code}>
@@ -276,10 +282,10 @@ const AdminGeneradoresPage: React.FC = () => {
     },
     {
       key: 'rubro',
-      width: '13%',
+      width: '11%',
       header: 'Rubro / Actividad',
       hiddenBelow: '2xl' as const,
-      render: (row: typeof tableData[0]) => {
+      render: (row: Row) => {
         const text = row.rubro || row.actividad;
         return text ? (
           <p className="text-xs text-neutral-600 leading-tight line-clamp-2" title={`${row.rubro || ''}${row.actividad ? ' — ' + row.actividad : ''}`}>
@@ -292,10 +298,10 @@ const AdminGeneradoresPage: React.FC = () => {
     },
     {
       key: 'contacto',
-      width: '13%',
+      width: '11%',
       header: 'Contacto',
       hiddenBelow: '2xl' as const,
-      render: (row: typeof tableData[0]) => {
+      render: (row: Row) => {
         const mail = row.emailOriginal || row.email;
         return (
           <div className="text-xs min-w-0">
@@ -321,7 +327,7 @@ const AdminGeneradoresPage: React.FC = () => {
       width: '8%',
       header: 'Compliance',
       hiddenBelow: 'xl' as const,
-      render: (row: typeof tableData[0]) => {
+      render: (row: Row) => {
         const cfg = {
           verde: { icon: ShieldCheck, color: 'text-success-600', bg: 'bg-success-50', label: 'Al dia' },
           amarillo: { icon: ShieldAlert, color: 'text-warning-600', bg: 'bg-warning-50', label: 'Parcial' },
@@ -345,7 +351,7 @@ const AdminGeneradoresPage: React.FC = () => {
       header: 'Actividad',
       sortable: true,
       hiddenBelow: 'xl' as const,
-      render: (row: typeof tableData[0]) => row.ultimaActividad ? (
+      render: (row: Row) => row.ultimaActividad ? (
         <span className="text-xs text-neutral-600">{formatRelativeTime(row.ultimaActividad)}</span>
       ) : (
         <span className="text-xs text-neutral-400">Sin actividad</span>
@@ -356,7 +362,7 @@ const AdminGeneradoresPage: React.FC = () => {
       width: '7%',
       header: 'Estado',
       sortable: true,
-      render: (row: typeof tableData[0]) => (
+      render: (row: Row) => (
         <Badge variant="soft" color={row.activo ? 'success' : 'warning'}>
           {row.activo ? 'Activo' : 'Inactivo'}
         </Badge>
@@ -367,12 +373,12 @@ const AdminGeneradoresPage: React.FC = () => {
       width: '12%',
       header: '',
       align: 'right' as const,
-      render: (row: typeof tableData[0]) => (
+      render: (row: Row) => (
         <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
           {isAdmin && row._raw?.usuarioId && row.activo && (
             <button
               className="p-1 text-amber-500 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
-              title="Acceso Comodín — ver como este generador"
+              title="Acceso Comodin — ver como este generador"
               onClick={async (e) => {
                 e.stopPropagation();
                 try { await impersonateUser(row._raw.usuarioId); }
@@ -391,7 +397,7 @@ const AdminGeneradoresPage: React.FC = () => {
           </button>
           <button
             className="p-1 text-neutral-400 hover:text-info-600 hover:bg-info-50 rounded-lg transition-colors"
-            onClick={(e) => { e.stopPropagation(); openEditar(row); }}
+            onClick={(e) => { e.stopPropagation(); navigate(`/admin/actores/generadores/${row.id}/editar`); }}
             title="Editar"
           >
             <Edit size={14} />
@@ -405,7 +411,7 @@ const AdminGeneradoresPage: React.FC = () => {
           </button>
           <button
             className="p-1 text-neutral-400 hover:text-error-600 hover:bg-error-50 rounded-lg transition-colors"
-            onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: row.id, razonSocial: row.razonSocial }); setModalEliminar(true); }}
+            onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: row.id, razonSocial: row.razonSocial }); }}
             title="Eliminar"
           >
             <Trash2 size={14} />
@@ -415,194 +421,121 @@ const AdminGeneradoresPage: React.FC = () => {
     },
   ];
 
+  // ── Render via GenericCRUDPage ──
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-purple-100 rounded-xl">
-            <Factory size={24} className="text-purple-600" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold text-neutral-900">Admin Generadores</h2>
-            <p className="text-neutral-600">Panel de gestión de generadores de residuos</p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={() => window.print()} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={14} />Imprimir</button>
-          <Button variant="outline" leftIcon={<Download size={18} />} onClick={handleExport} className="hidden sm:inline-flex">
-            CSV
-          </Button>
-          <Button variant="outline" leftIcon={<FileDown size={18} />} onClick={handleExportPdf} className="hidden sm:inline-flex text-error-700 border-error-200 hover:bg-error-50">
-            PDF
-          </Button>
-          <Button leftIcon={<Plus size={18} />} onClick={() => navigate('/admin/actores/generadores/nuevo')}>
-            Nuevo Generador
-          </Button>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Factory size={20} className="text-purple-600" />
+    <GenericCRUDPage<Row>
+      // Page metadata
+      title="Admin Generadores"
+      subtitle="Panel de gestion de generadores de residuos"
+      icon={<Factory size={24} className="text-purple-600" />}
+      iconBg="bg-purple-100"
+      // Data
+      data={filteredData}
+      isLoading={isLoading}
+      isError={isError}
+      errorMessage={(error as Error)?.message}
+      loadingMessage="Cargando generadores..."
+      // Table
+      columns={columns}
+      getRowKey={(row) => row.id}
+      onRowClick={(row) => navigate(`/admin/actores/generadores/${row.id}`)}
+      emptyMessage="No se encontraron generadores"
+      // Search
+      searchValue={busqueda}
+      onSearchChange={(v) => { setBusqueda(v); setCurrentPage(1); }}
+      searchPlaceholder="Buscar por razon social, CUIT o domicilio..."
+      // Filters
+      filters={filters}
+      // Stats
+      stats={statCards}
+      // Sort
+      sort={{ onSort: handleSort }}
+      // Pagination
+      pagination={{
+        currentPage,
+        totalPages,
+        totalItems: total,
+        itemsPerPage: 20,
+        onPageChange: setCurrentPage,
+      }}
+      // Actions
+      onNew={() => navigate('/admin/actores/generadores/nuevo')}
+      newLabel="Nuevo Generador"
+      // CSV export
+      csvExport={{
+        mapRow: (g: Row) => ({
+          'Razon Social': g.razonSocial,
+          CUIT: g.cuit,
+          Certificado: g.certificado || '',
+          Categoria: g.categoria,
+          Rubro: g.rubro || '',
+          Actividad: g.actividad || '',
+          'Categorias Y': g.categoriasControl.join(', '),
+          'Email (original)': g.emailOriginal || '',
+          Email: g.email,
+          Telefono: g.telefono,
+          Domicilio: g.domicilio,
+          Inscripcion: g.numeroInscripcion,
+          Estado: g.activo ? 'Activo' : 'Inactivo',
+          Alta: g.createdAt ? new Date(g.createdAt).toLocaleDateString() : '',
+        }),
+        filename: 'admin-generadores',
+        metadata: {
+          titulo: 'Admin Generadores',
+          periodo: 'Todos los periodos',
+          filtros: [filtroCategoria ? `Categoria: ${filtroCategoria}` : '', filtroRubro ? `Rubro: ${filtroRubro}` : '', filtroEstado !== 'todos' ? `Estado: ${filtroEstado}` : '', filtroCompliance !== 'todos' ? `Compliance: ${filtroCompliance}` : ''].filter(Boolean).join(', ') || 'Sin filtros',
+          total: filteredData.length,
+        },
+      }}
+      // PDF export
+      pdfExport={{
+        titulo: 'Admin Generadores',
+        subtitulo: `${filteredData.length} generadores${filtroCategoria ? ` — Categoria: ${filtroCategoria}` : ''}${filtroEstado !== 'todos' ? ` — ${filtroEstado}` : ''}`,
+        periodo: new Date().toLocaleDateString('es-AR'),
+        kpis: [
+          { label: 'Total', value: statsData.total },
+          { label: 'Activos', value: statsData.activos },
+          { label: 'Al dia', value: statsData.alDia },
+          { label: 'Con deuda', value: statsData.conDeuda },
+        ],
+        tabla: {
+          headers: ['Razon Social', 'CUIT', 'Categoria', 'Rubro', 'Email', 'Inscripcion', 'Estado'],
+          rows: filteredData.map(g => [g.razonSocial, g.cuit, g.categoria, g.rubro || '-', g.email, g.numeroInscripcion, g.activo ? 'Activo' : 'Inactivo']),
+        },
+      }}
+      // Delete
+      deleteConfig={{
+        target: deleteTarget ? { id: deleteTarget.id, label: deleteTarget.razonSocial } : null,
+        onDelete: handleEliminar,
+        onClose: () => setDeleteTarget(null),
+        isLoading: deleteMutation.isPending,
+        title: 'Eliminar Generador',
+      }}
+      renderMobileCard={(row) => (
+        <Card className="p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center shrink-0">
+                <Factory size={16} className="text-purple-600" />
               </div>
-              <div>
-                <p className="text-2xl font-bold text-neutral-900">{stats.total}</p>
-                <p className="text-sm text-neutral-600">Total Generadores</p>
+              <div className="min-w-0">
+                <p className="font-medium text-sm text-neutral-900 truncate">{row.razonSocial}</p>
+                <p className="text-xs text-neutral-500 font-mono">{row.cuit}</p>
               </div>
             </div>
-          </CardContent>
+            <Badge variant="soft" color={row.activo ? 'success' : 'warning'} className="shrink-0 ml-2">
+              {row.activo ? 'Activo' : 'Inactivo'}
+            </Badge>
+          </div>
+          {(row.categoria || row.rubro) && (
+            <div className="flex items-center gap-2 mt-2 text-xs text-neutral-500">
+              {row.categoria && <span className="bg-neutral-100 px-2 py-0.5 rounded">{row.categoria}</span>}
+              {row.rubro && <span className="truncate">{row.rubro}</span>}
+            </div>
+          )}
         </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-success-100 rounded-lg">
-                <CheckCircle size={20} className="text-success-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-neutral-900">{stats.activos}</p>
-                <p className="text-sm text-neutral-600">Activos</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-emerald-100 rounded-lg">
-                <ShieldCheck size={20} className="text-emerald-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-neutral-900">{stats.alDia}</p>
-                <p className="text-sm text-neutral-600">Al dia</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-error-100 rounded-lg">
-                <ShieldX size={20} className="text-error-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-neutral-900">{stats.conDeuda}</p>
-                <p className="text-sm text-neutral-600">Con deuda</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <SearchInput
-                value={busqueda}
-                onChange={(v) => { setBusqueda(v); setCurrentPage(1); }}
-                placeholder="Buscar por razón social, CUIT o domicilio..."
-                size="md"
-              />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <select
-                value={filtroRubro}
-                onChange={(e) => { setFiltroRubro(e.target.value); setCurrentPage(1); }}
-                className="px-4 h-10 rounded-xl border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
-              >
-                <option value="">Todos los rubros</option>
-                {TOP_RUBROS.map(r => (
-                  <option key={r} value={r}>{r.length > 35 ? r.substring(0, 33) + '...' : r}</option>
-                ))}
-              </select>
-              <select
-                value={filtroCategoria}
-                onChange={(e) => { setFiltroCategoria(e.target.value); setCurrentPage(1); }}
-                className="px-4 h-10 rounded-xl border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
-              >
-                <option value="">Todas las categorías</option>
-                <option value="Grandes">Grandes Generadores</option>
-                <option value="Medianos">Medianos Generadores</option>
-                <option value="Pequeños">Pequeños Generadores</option>
-              </select>
-              <select
-                value={filtroEstado}
-                onChange={(e) => { setFiltroEstado(e.target.value); setCurrentPage(1); }}
-                className="px-4 h-10 rounded-xl border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
-              >
-                <option value="todos">Todos los estados</option>
-                <option value="activo">Activo</option>
-                <option value="inactivo">Inactivo</option>
-              </select>
-              <select
-                value={filtroCompliance}
-                onChange={(e) => { setFiltroCompliance(e.target.value); setCurrentPage(1); }}
-                className="px-4 h-10 rounded-xl border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
-              >
-                <option value="todos">Compliance: Todos</option>
-                <option value="verde">Al dia</option>
-                <option value="amarillo">Parcial</option>
-                <option value="rojo">Con deuda</option>
-                <option value="sin_datos">Sin datos</option>
-              </select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Table */}
-      <Card>
-        {isLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 size={32} className="animate-spin text-primary-500" />
-            <span className="ml-3 text-neutral-600">Cargando generadores...</span>
-          </div>
-        ) : isError ? (
-          <div className="flex items-center justify-center py-16 text-error-600">
-            <span>Error al cargar datos: {(error as Error)?.message || 'Error desconocido'}</span>
-          </div>
-        ) : (
-          <>
-            <Table
-              data={filteredData}
-              columns={columns}
-              keyExtractor={(row) => row.id}
-              sortable={true}
-              onSort={handleSort}
-              onRowClick={(row) => navigate(`/admin/actores/generadores/${row.id}`)}
-              emptyMessage="No se encontraron generadores"
-              stickyHeader
-              fixedLayout
-            />
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalItems={total}
-              itemsPerPage={20}
-              onPageChange={setCurrentPage}
-            />
-          </>
-        )}
-      </Card>
-
-      {/* Modal eliminar */}
-      <ConfirmModal
-        isOpen={modalEliminar}
-        onClose={() => { setModalEliminar(false); setDeleteTarget(null); }}
-        onConfirm={handleEliminar}
-        title="Eliminar Generador"
-        description={`¿Está seguro que desea eliminar a "${deleteTarget?.razonSocial}"? Esta acción no se puede deshacer.`}
-        confirmText="Eliminar"
-        variant="danger"
-        isLoading={deleteMutation.isPending}
-      />
-    </div>
+      )}
+    />
   );
 };
 

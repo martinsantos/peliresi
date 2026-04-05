@@ -315,21 +315,24 @@ const ManifiestosPage: React.FC = () => {
             </div>
           </div>
           {showFilters && (
-            <div className="mt-3 pt-3 border-t border-neutral-100 flex flex-wrap gap-3 items-end">
+            <div className="mt-3 pt-3 border-t border-neutral-100 flex flex-col sm:flex-row flex-wrap gap-3 items-stretch sm:items-end">
               <div className="flex flex-col gap-1 w-full sm:w-auto">
                 <label className="text-xs font-medium text-neutral-500">Ordenar por</label>
                 <div className="flex gap-2">
-                  <select
-                    value={sortBy}
-                    onChange={(e) => handleSort(e.target.value as SortCol)}
-                    className="text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-primary-300 flex-1"
-                  >
-                    <option value="createdAt">Fecha</option>
-                    <option value="numero">Número</option>
-                    <option value="estado">Estado</option>
-                    <option value="generador">Generador</option>
-                    <option value="operador">Operador</option>
-                  </select>
+                  <div className="flex-1">
+                    <Select
+                      value={sortBy}
+                      onChange={(val) => handleSort(val as SortCol)}
+                      options={[
+                        { value: 'createdAt', label: 'Fecha' },
+                        { value: 'numero', label: 'Número' },
+                        { value: 'estado', label: 'Estado' },
+                        { value: 'generador', label: 'Generador' },
+                        { value: 'operador', label: 'Operador' },
+                      ]}
+                      size="sm"
+                    />
+                  </div>
                   <button
                     onClick={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')}
                     className="flex items-center gap-1 px-3 py-2 text-sm border border-neutral-200 rounded-xl bg-white hover:bg-neutral-50 transition-colors"
@@ -339,19 +342,29 @@ const ManifiestosPage: React.FC = () => {
                   </button>
                 </div>
               </div>
-              <div className="flex flex-col gap-1 w-full sm:w-auto">
-                <label className="text-xs font-medium text-neutral-500">Generador</label>
-                <select value={generadorFilter} onChange={(e) => setGeneradorFilter(e.target.value)} className="text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-primary-300 w-full sm:max-w-[220px]">
-                  <option value="">Todos</option>
-                  {(generadoresData?.items || []).map((g: any) => <option key={g.id} value={g.id}>{g.razonSocial}</option>)}
-                </select>
+              <div className="flex flex-col gap-1 w-full sm:w-auto sm:max-w-[220px]">
+                <Select
+                  label="Generador"
+                  value={generadorFilter}
+                  onChange={(val) => setGeneradorFilter(val)}
+                  options={[
+                    { value: '', label: 'Todos' },
+                    ...(generadoresData?.items || []).map((g: any) => ({ value: g.id, label: g.razonSocial })),
+                  ]}
+                  size="sm"
+                />
               </div>
-              <div className="flex flex-col gap-1 w-full sm:w-auto">
-                <label className="text-xs font-medium text-neutral-500">Operador</label>
-                <select value={operadorFilter} onChange={(e) => setOperadorFilter(e.target.value)} className="text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-primary-300 w-full sm:max-w-[220px]">
-                  <option value="">Todos</option>
-                  {(operadoresData?.items || []).map((o: any) => <option key={o.id} value={o.id}>{o.razonSocial}</option>)}
-                </select>
+              <div className="flex flex-col gap-1 w-full sm:w-auto sm:max-w-[220px]">
+                <Select
+                  label="Operador"
+                  value={operadorFilter}
+                  onChange={(val) => setOperadorFilter(val)}
+                  options={[
+                    { value: '', label: 'Todos' },
+                    ...(operadoresData?.items || []).map((o: any) => ({ value: o.id, label: o.razonSocial })),
+                  ]}
+                  size="sm"
+                />
               </div>
               <div className="flex gap-3">
                 <div className="flex flex-col gap-1">
@@ -379,11 +392,11 @@ const ManifiestosPage: React.FC = () => {
 
         {/* ── Mobile Card View ──────────────────────────────── */}
         {allRows.length > 0 && (
-          <div className="md:hidden space-y-1 mt-3">
+          <div className="md:hidden space-y-1 mt-3 -mx-4 px-4 overflow-visible">
             {allRows.map((m, idx) => (
               <React.Fragment key={m.id}>
                 {isGroupStart(idx) && (
-                  <div className="sticky z-[2] -mx-1 px-3 py-1.5 bg-neutral-100/95 backdrop-blur-sm border-b border-neutral-200 rounded-t-lg mt-3 first:mt-0" style={{ top: `${filterBarH}px` }}>
+                  <div className="sticky z-10 -mx-4 px-4 py-1.5 bg-neutral-100/95 backdrop-blur-sm border-b border-neutral-200 mt-3 first:mt-0" style={{ top: `${filterBarH}px` }}>
                     <div className="flex items-center gap-1.5">
                       <Calendar size={11} className="text-primary-500" />
                       <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-600">{getGroupLabel(getGroupKey(m, sortBy), sortBy)}</span>
@@ -423,7 +436,7 @@ const ManifiestosPage: React.FC = () => {
           <div className="hidden md:block mt-3 rounded-xl border border-[#E0E0DC] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
             <div ref={scrollRef} className="overflow-y-auto rounded-xl" style={{ maxHeight: 'calc(100vh - 220px)' }}>
               {/* Column header — sticky */}
-              <div ref={theadRefCb} className="sticky top-0 z-10 bg-[#F5F5F3] border-b border-neutral-200 grid grid-cols-[minmax(140px,1.2fr)_1.5fr_100px_100px] lg:grid-cols-[minmax(140px,1.2fr)_1.5fr_100px_160px_70px_100px] xl:grid-cols-[minmax(140px,1.2fr)_1.3fr_1.3fr_100px_160px_70px_100px] items-center px-1">
+              <div ref={theadRefCb} className="sticky top-0 z-10 bg-[#F5F5F3] border-b border-neutral-200 shadow-[0_1px_0_rgba(0,0,0,0.04)] grid grid-cols-[minmax(140px,1.2fr)_1.5fr_100px_100px] lg:grid-cols-[minmax(140px,1.2fr)_1.5fr_100px_160px_70px_100px] xl:grid-cols-[minmax(140px,1.2fr)_1.3fr_1.3fr_100px_160px_70px_100px] items-center px-1">
                 <div className="px-3 py-2 text-[11px] font-semibold text-neutral-600 uppercase tracking-wider">
                   <button onClick={() => handleSort('numero')} className="flex items-center gap-1 hover:text-primary-600 transition-colors">N° Manifiesto <SortIcon col="numero" /></button>
                 </div>
@@ -447,7 +460,7 @@ const ManifiestosPage: React.FC = () => {
               {allRows.map((m, idx) => (
                 <React.Fragment key={m.id}>
                   {isGroupStart(idx) && (
-                    <div className="sticky z-[5] bg-neutral-100/95 backdrop-blur-sm px-4 py-1.5 border-y border-neutral-200 flex items-center gap-1.5" style={{ top: `${theadH}px` }}>
+                    <div className="sticky z-[5] bg-neutral-100 px-4 py-1.5 border-b border-neutral-200 flex items-center gap-1.5" style={{ top: `${theadH}px` }}>
                       <Calendar size={12} className="text-primary-500" />
                       <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-600">{getGroupLabel(getGroupKey(m, sortBy), sortBy)}</span>
                     </div>

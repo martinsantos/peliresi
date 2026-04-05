@@ -19,6 +19,7 @@ import {
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
+import { Select } from '../../components/ui/Select';
 import { Badge } from '../../components/ui/BadgeV2';
 import { toast } from '../../components/ui/Toast';
 import { useGenerador, useCreateGenerador, useUpdateGenerador } from '../../hooks/useActores';
@@ -392,13 +393,16 @@ const NuevoGeneradorPage: React.FC = () => {
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">Categoria</label>
-                  <select value={form.categoria} onChange={e => up('categoria', e.target.value)} className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm bg-white">
-                    <option value="">Seleccionar...</option>
-                    {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
+                <Select
+                  label="Categoria"
+                  value={form.categoria}
+                  onChange={(val) => up('categoria', val)}
+                  options={[
+                    { value: '', label: 'Seleccionar...' },
+                    ...CATEGORIAS.map(c => ({ value: c, label: c })),
+                  ]}
+                  size="base"
+                />
                 <Input label="N Inscripcion DGFA" value={form.numeroInscripcion} onChange={e => up('numeroInscripcion', e.target.value)} placeholder="G-000XXX" />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -426,13 +430,16 @@ const NuevoGeneradorPage: React.FC = () => {
                 <Input label="Calle / Ruta" value={form.domicilioLegalCalle} onChange={e => up('domicilioLegalCalle', e.target.value)} placeholder="Av. San Martin 1234" />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Input label="Localidad" value={form.domicilioLegalLocalidad} onChange={e => up('domicilioLegalLocalidad', e.target.value)} placeholder="Ciudad de Mendoza" />
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">Departamento</label>
-                    <select value={form.domicilioLegalDepto} onChange={e => up('domicilioLegalDepto', e.target.value)} className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm bg-white">
-                      <option value="">Seleccionar...</option>
-                      {DEPARTAMENTOS_MENDOZA.map(d => <option key={d} value={d}>{d}</option>)}
-                    </select>
-                  </div>
+                  <Select
+                    label="Departamento"
+                    value={form.domicilioLegalDepto}
+                    onChange={(val) => up('domicilioLegalDepto', val)}
+                    options={[
+                      { value: '', label: 'Seleccionar...' },
+                      ...DEPARTAMENTOS_MENDOZA.map(d => ({ value: d, label: d })),
+                    ]}
+                    size="base"
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -451,13 +458,16 @@ const NuevoGeneradorPage: React.FC = () => {
                   <Input label="Calle / Ruta" value={form.domicilioRealCalle} onChange={e => up('domicilioRealCalle', e.target.value)} placeholder="Ruta 40 km 3200" />
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Input label="Localidad" value={form.domicilioRealLocalidad} onChange={e => up('domicilioRealLocalidad', e.target.value)} placeholder="Lujan de Cuyo" />
-                    <div>
-                      <label className="block text-sm font-medium text-neutral-700 mb-1">Departamento</label>
-                      <select value={form.domicilioRealDepto} onChange={e => up('domicilioRealDepto', e.target.value)} className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm bg-white">
-                        <option value="">Seleccionar...</option>
-                        {DEPARTAMENTOS_MENDOZA.map(d => <option key={d} value={d}>{d}</option>)}
-                      </select>
-                    </div>
+                    <Select
+                      label="Departamento"
+                      value={form.domicilioRealDepto}
+                      onChange={(val) => up('domicilioRealDepto', val)}
+                      options={[
+                        { value: '', label: 'Seleccionar...' },
+                        ...DEPARTAMENTOS_MENDOZA.map(d => ({ value: d, label: d })),
+                      ]}
+                      size="base"
+                    />
                   </div>
                   <Input label="Coordenadas Geograficas" value={form.coordenadas} onChange={e => up('coordenadas', e.target.value)} placeholder="lat -32.89, long -68.83" />
                 </CardContent>
@@ -549,13 +559,16 @@ const NuevoGeneradorPage: React.FC = () => {
                   <Input label="Monto MxR ($)" type="number" value={form.montoMxR} onChange={e => up('montoMxR', e.target.value)} placeholder="0.00" />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">Categoria Individual</label>
-                    <select value={form.categoriaIndividual} onChange={e => up('categoriaIndividual', e.target.value)} className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm bg-white">
-                      <option value="">Sin categoria</option>
-                      {CATEGORIAS_INDIVIDUALES.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
+                  <Select
+                    label="Categoria Individual"
+                    value={form.categoriaIndividual}
+                    onChange={(val) => up('categoriaIndividual', val)}
+                    options={[
+                      { value: '', label: 'Sin categoria' },
+                      ...CATEGORIAS_INDIVIDUALES.map(c => ({ value: c, label: c })),
+                    ]}
+                    size="base"
+                  />
                   <div className="flex items-center pt-6">
                     <label className="flex items-center gap-2 text-sm text-neutral-700 cursor-pointer">
                       <input type="checkbox" checked={form.libroOperatoria} onChange={e => up('libroOperatoria', e.target.checked)} className="rounded border-neutral-300" />

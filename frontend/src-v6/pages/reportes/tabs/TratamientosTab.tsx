@@ -16,6 +16,7 @@ import {
 import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
 import { Button } from '../../../components/ui/ButtonV2';
 import { Badge } from '../../../components/ui/BadgeV2';
+import { Select } from '../../../components/ui/Select';
 import { KpiCard } from '../../../components/charts/KpiCard';
 import { downloadCsv } from '../../../utils/exportCsv';
 import { exportReportePDF } from '../../../utils/exportPdf';
@@ -284,16 +285,17 @@ export default function TratamientosTab({
                   className="pl-8 pr-3 py-1.5 rounded-lg border border-neutral-200 text-xs text-neutral-700 w-44"
                 />
               </div>
-              <select
+              <Select
                 value={catFilter}
-                onChange={e => setCatFilter(e.target.value)}
-                className="px-3 py-1.5 rounded-lg border border-neutral-200 text-xs text-neutral-700"
-              >
-                <option value="">Todas las categorías</option>
-                {CATEGORIAS_TRATAMIENTO.map(c => (
-                  <option key={c.id} value={c.id}>{c.nombre}</option>
-                ))}
-              </select>
+                onChange={(val) => setCatFilter(val)}
+                placeholder="Todas las categorías"
+                options={[
+                  { value: '', label: 'Todas las categorías' },
+                  ...CATEGORIAS_TRATAMIENTO.map(c => ({ value: c.id, label: c.nombre })),
+                ]}
+                size="sm"
+                isFullWidth={false}
+              />
               <button onClick={() => window.print()} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={14} />Imprimir</button>
               <button onClick={handleExportCsv} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg border border-primary-200 transition-colors" title="Exportar CSV"><Download size={14} />CSV</button>
               <button onClick={handleExportPdf} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="Exportar PDF"><FileDown size={14} />PDF</button>

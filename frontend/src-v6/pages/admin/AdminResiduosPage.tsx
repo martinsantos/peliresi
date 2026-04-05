@@ -35,6 +35,7 @@ import { Table, Pagination } from '../../components/ui/Table';
 import { SearchInput } from '../../components/ui/SearchInput';
 import { useTiposResiduoEnriched, useCatalogoGeneradores, useCreateTipoResiduo, useUpdateTipoResiduo, useDeleteTipoResiduo } from '../../hooks/useCatalogos';
 import { toast } from '../../components/ui/Toast';
+import { Select } from '../../components/ui/Select';
 import { downloadCsv } from '../../utils/exportCsv';
 import { exportReportePDF } from '../../utils/exportPdf';
 import { CORRIENTES_Y, CORRIENTES_Y_CODES } from '../../data/corrientes-y';
@@ -379,26 +380,24 @@ export const AdminResiduosPage: React.FC = () => {
 
   const renderForm = () => (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <Input label="Codigo *" value={form.codigo} onChange={(e) => updateField('codigo', e.target.value)} placeholder="Y1-001" />
         <Input label="Nombre *" value={form.nombre} onChange={(e) => updateField('nombre', e.target.value)} placeholder="Desechos clinicos" />
       </div>
       <Input label="Descripcion" value={form.descripcion} onChange={(e) => updateField('descripcion', e.target.value)} placeholder="Descripcion del tipo de residuo" />
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <Input label="Categoria *" value={form.categoria} onChange={(e) => updateField('categoria', e.target.value)} placeholder="Y1 - Desechos clinicos" />
-        <div>
-          <label className="block text-sm font-medium text-neutral-700 mb-1.5">Peligrosidad *</label>
-          <select
-            value={form.peligrosidad}
-            onChange={(e) => updateField('peligrosidad', e.target.value)}
-            className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
-          >
-            <option value="alta">Alta</option>
-            <option value="media">Media</option>
-            <option value="baja">Baja</option>
-            <option value="ninguna">Ninguna</option>
-          </select>
-        </div>
+        <Select
+          label="Peligrosidad *"
+          value={form.peligrosidad}
+          onChange={(val) => updateField('peligrosidad', val)}
+          options={[
+            { value: 'alta', label: 'Alta' },
+            { value: 'media', label: 'Media' },
+            { value: 'baja', label: 'Baja' },
+            { value: 'ninguna', label: 'Ninguna' },
+          ]}
+        />
       </div>
       <Input label="Caracteristicas" value={form.caracteristicas} onChange={(e) => updateField('caracteristicas', e.target.value)} placeholder="Inflamable, toxico, corrosivo..." />
     </div>
@@ -427,7 +426,7 @@ export const AdminResiduosPage: React.FC = () => {
       const op = OPERADORES_DATA[cuit];
       return {
         cuit,
-        nombre: op?.razonSocial || op?.razon_social || cuit,
+        nombre: op?.empresa || cuit,
         metodo: op?.tecnologia?.split(/,/)[0]?.trim() || 'No especificado',
         dbId: operadorIdByCuit[cuit],
       };
@@ -685,36 +684,43 @@ export const AdminResiduosPage: React.FC = () => {
               />
             </div>
             <div className="flex flex-wrap gap-2">
-              <select
+              <Select
                 value={corrienteFilter}
-                onChange={(e) => { setCorrienteFilter(e.target.value); setCurrentPage(1); }}
-                className="px-4 h-10 rounded-xl border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
-              >
-                <option value="">Todas las corrientes</option>
-                {CORRIENTES_Y_CODES.map(code => (
-                  <option key={code} value={code}>{code} -- {CORRIENTES_Y[code].substring(0, 40)}</option>
-                ))}
-              </select>
-              <select
+                onChange={(val) => { setCorrienteFilter(val); setCurrentPage(1); }}
+                placeholder="Todas las corrientes"
+                options={[
+                  { value: '', label: 'Todas las corrientes' },
+                  ...CORRIENTES_Y_CODES.map(code => ({ value: code, label: `${code} -- ${CORRIENTES_Y[code].substring(0, 40)}` })),
+                ]}
+                size="sm"
+                isFullWidth={false}
+              />
+              <Select
                 value={peligrosidadFilter}
-                onChange={(e) => { setPeligrosidadFilter(e.target.value); setCurrentPage(1); }}
-                className="px-4 h-10 rounded-xl border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
-              >
-                <option value="">Todas las peligrosidades</option>
-                <option value="alta">Alta</option>
-                <option value="media">Media</option>
-                <option value="baja">Baja</option>
-                <option value="ninguna">Ninguna</option>
-              </select>
-              <select
+                onChange={(val) => { setPeligrosidadFilter(val); setCurrentPage(1); }}
+                placeholder="Todas las peligrosidades"
+                options={[
+                  { value: '', label: 'Todas las peligrosidades' },
+                  { value: 'alta', label: 'Alta' },
+                  { value: 'media', label: 'Media' },
+                  { value: 'baja', label: 'Baja' },
+                  { value: 'ninguna', label: 'Ninguna' },
+                ]}
+                size="sm"
+                isFullWidth={false}
+              />
+              <Select
                 value={estadoFilter}
-                onChange={(e) => { setEstadoFilter(e.target.value); setCurrentPage(1); }}
-                className="px-4 h-10 rounded-xl border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
-              >
-                <option value="">Todos los estados</option>
-                <option value="activo">Activo</option>
-                <option value="inactivo">Inactivo</option>
-              </select>
+                onChange={(val) => { setEstadoFilter(val); setCurrentPage(1); }}
+                placeholder="Todos los estados"
+                options={[
+                  { value: '', label: 'Todos los estados' },
+                  { value: 'activo', label: 'Activo' },
+                  { value: 'inactivo', label: 'Inactivo' },
+                ]}
+                size="sm"
+                isFullWidth={false}
+              />
             </div>
           </div>
           {(corrienteFilter || peligrosidadFilter || estadoFilter) && (
@@ -762,6 +768,22 @@ export const AdminResiduosPage: React.FC = () => {
           </div>
         ) : (
           <>
+            {/* Mobile cards */}
+            <div className="md:hidden space-y-2 p-3">
+              {paginatedData.map((r) => (
+                <div key={r.id} className="bg-white rounded-xl border border-neutral-100 p-3 cursor-pointer active:scale-[0.98] transition-transform" onClick={() => openDetalle(r)}>
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-mono font-semibold text-sm text-neutral-900">{r.codigo}</p>
+                      <p className="text-xs text-neutral-600 truncate mt-0.5">{r.descripcion}</p>
+                    </div>
+                    {r.corrienteY && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 shrink-0 ml-2">{r.corrienteY}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* Desktop table */}
+            <div className="hidden md:block">
             <Table
               data={paginatedData}
               columns={columns}
@@ -771,6 +793,7 @@ export const AdminResiduosPage: React.FC = () => {
               onRowClick={openDetalle}
               stickyHeader
             />
+            </div>
             <Pagination
               currentPage={currentPage}
               totalPages={totalFilteredPages}
@@ -840,7 +863,7 @@ export const AdminResiduosPage: React.FC = () => {
         {detalleResiduo && <ResiduoDetalleContent
           residuo={detalleResiduo}
           operadorNames={getOperadorNames(detalleResiduo)}
-          generadoresList={getGeneradoresForCorriente(detalleResiduo.corrienteY)}
+          generadoresList={getGeneradoresForCorriente(detalleResiduo.corrienteY || '')}
           onClose={() => { setModalDetalle(false); setDetalleResiduo(null); }}
           onNavigate={(path) => { setModalDetalle(false); setDetalleResiduo(null); navigate(path); }}
         />}

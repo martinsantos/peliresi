@@ -11,6 +11,7 @@ import {
 import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
 import { Button } from '../../../components/ui/ButtonV2';
 import { Badge } from '../../../components/ui/BadgeV2';
+import { Select } from '../../../components/ui/Select';
 import { ChartTooltip } from '../../../components/charts/ChartTooltip';
 import { KpiCard } from '../../../components/charts/KpiCard';
 import { ACTOR_COLORS } from '../../../utils/map-icons';
@@ -216,16 +217,18 @@ export function DepartamentoDetalleModal({
         {/* Filter bar */}
         <div className="flex flex-wrap items-center gap-2 px-6 py-3 border-b border-neutral-100 print:hidden">
           <Filter size={14} className="text-neutral-400" />
-          <select
+          <Select
             value={tipoFilter}
-            onChange={e => setTipoFilter(e.target.value as 'todos' | 'generador' | 'transportista' | 'operador')}
-            className="px-2.5 py-1.5 rounded-lg border border-neutral-200 text-xs font-medium text-neutral-700 bg-white"
-          >
-            <option value="todos">Todos los tipos</option>
-            <option value="generador">Generadores</option>
-            <option value="transportista">Transportistas</option>
-            <option value="operador">Operadores</option>
-          </select>
+            onChange={(val) => setTipoFilter(val as 'todos' | 'generador' | 'transportista' | 'operador')}
+            options={[
+              { value: 'todos', label: 'Todos los tipos' },
+              { value: 'generador', label: 'Generadores' },
+              { value: 'transportista', label: 'Transportistas' },
+              { value: 'operador', label: 'Operadores' },
+            ]}
+            size="sm"
+            isFullWidth={false}
+          />
           <div className="relative">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
             <input
@@ -398,22 +401,20 @@ export default function DepartamentosTab({
       {/* Department filter */}
       <div className="flex flex-wrap items-center gap-3 p-4 bg-white rounded-2xl border border-neutral-100 shadow-sm">
         <Filter size={16} className="text-neutral-400" />
-        <select
+        <Select
           value={depFilter}
-          onChange={e => {
-            const val = e.target.value;
+          onChange={(val) => {
             setDepFilter(val);
             if (val) onSelectDep(val);
           }}
-          className="px-3 py-1.5 rounded-lg border border-neutral-200 text-xs font-medium text-neutral-700 bg-white"
-        >
-          <option value="">Todos los departamentos</option>
-          {depStats.map(d => (
-            <option key={d.departamento} value={d.departamento}>
-              {d.departamento} ({d.total})
-            </option>
-          ))}
-        </select>
+          placeholder="Todos los departamentos"
+          options={[
+            { value: '', label: 'Todos los departamentos' },
+            ...depStats.map(d => ({ value: d.departamento, label: `${d.departamento} (${d.total})` })),
+          ]}
+          size="sm"
+          isFullWidth={false}
+        />
         {depFilter && (
           <button
             onClick={() => setDepFilter('')}

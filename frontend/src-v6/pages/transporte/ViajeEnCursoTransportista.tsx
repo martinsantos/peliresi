@@ -520,7 +520,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
                   <Clock className="text-white/80" size={20} />
                   <span className="text-4xl font-bold tabular-nums text-white drop-shadow-sm">{formatTimer(elapsedTime)}</span>
                 </div>
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/30">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-4 border-t border-white/30">
                   <div className="text-center">
                     <p className="text-xs text-white/90 mb-1 font-medium tracking-wide">DESTINO</p>
                     <p className="text-sm font-bold text-white drop-shadow-sm">{m.operador?.razonSocial || '-'}</p>
@@ -542,7 +542,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
             </div>
 
             {/* Action buttons */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3">
               <button
                 onClick={handlePausar}
                 disabled={registrarIncidente.isPending}

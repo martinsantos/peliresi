@@ -568,25 +568,30 @@ export const AlertasPage: React.FC = () => {
         </div>
 
         {/* Event type */}
-        <select
+        <Select
           value={filtroEvento}
-          onChange={(e) => changeFilter(setFiltroEvento, e.target.value)}
-          className="px-3 py-1.5 rounded-lg border border-neutral-200 bg-white text-xs text-neutral-700 focus:border-primary-500 focus:outline-none"
-        >
-          <option value="">Todos los eventos</option>
-          {EVENTO_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
+          onChange={(val) => changeFilter(setFiltroEvento, val)}
+          placeholder="Todos los eventos"
+          options={[
+            { value: '', label: 'Todos los eventos' },
+            ...EVENTO_OPTIONS.map(o => ({ value: o.value, label: o.label })),
+          ]}
+          size="sm"
+          isFullWidth={false}
+        />
 
         {/* Read/unread */}
-        <select
+        <Select
           value={filtroLeidas}
-          onChange={(e) => changeFilter(setFiltroLeidas, e.target.value)}
-          className="px-3 py-1.5 rounded-lg border border-neutral-200 bg-white text-xs text-neutral-700 focus:border-primary-500 focus:outline-none"
-        >
-          <option value="todas">Todas</option>
-          <option value="no-leidas">Pendientes</option>
-          <option value="leidas">Leídas</option>
-        </select>
+          onChange={(val) => changeFilter(setFiltroLeidas, val)}
+          options={[
+            { value: 'todas', label: 'Todas' },
+            { value: 'no-leidas', label: 'Pendientes' },
+            { value: 'leidas', label: 'Leídas' },
+          ]}
+          size="sm"
+          isFullWidth={false}
+        />
 
         <span className="ml-auto text-xs text-neutral-400">
           {alertasFiltradas.length} alerta{alertasFiltradas.length !== 1 ? 's' : ''}
@@ -765,7 +770,22 @@ export const AlertasPage: React.FC = () => {
           Nueva Regla
         </Button>
       </div>
-      <Card>
+      {/* Mobile cards */}
+      <div className="md:hidden space-y-2">
+        {(Array.isArray(reglas) ? reglas : []).map((r: any) => (
+          <div key={r.id} className="bg-white rounded-xl border border-neutral-100 p-3">
+            <div className="flex items-center justify-between">
+              <p className="font-medium text-sm text-neutral-900 truncate flex-1">{r.nombre}</p>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded ${r.activa ? 'bg-green-50 text-green-700' : 'bg-neutral-100 text-neutral-500'}`}>
+                {r.activa ? 'Activa' : 'Inactiva'}
+              </span>
+            </div>
+            <p className="text-xs text-neutral-500 mt-1">{r.evento || r.tipo}</p>
+          </div>
+        ))}
+      </div>
+      {/* Desktop table */}
+      <Card className="hidden md:block">
         <Table
           data={Array.isArray(reglas) ? reglas : []}
           columns={reglasColumns}

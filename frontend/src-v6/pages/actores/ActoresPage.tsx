@@ -39,6 +39,7 @@ import { Badge } from '../../components/ui/BadgeV2';
 import { Modal, ConfirmModal } from '../../components/ui/Modal';
 import { Table, Pagination } from '../../components/ui/Table';
 import { Tabs, TabList, Tab } from '../../components/ui/Tabs';
+import { Select } from '../../components/ui/Select';
 import { downloadCsv } from '../../utils/exportCsv';
 import { exportReportePDF } from '../../utils/exportPdf';
 import {
@@ -439,15 +440,16 @@ export const ActoresPage: React.FC = () => {
               />
             </div>
             <div className="flex gap-2">
-              <select
+              <Select
                 value={filtroEstado}
-                onChange={(e) => { setFiltroEstado(e.target.value); setCurrentPage(1); }}
-                className="px-4 py-2 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
-              >
-                <option value="todos">Todos los estados</option>
-                <option value="activo">Activos</option>
-                <option value="inactivo">Inactivos</option>
-              </select>
+                onChange={(val) => { setFiltroEstado(val); setCurrentPage(1); }}
+                options={[
+                  { value: 'todos', label: 'Todos los estados' },
+                  { value: 'activo', label: 'Activos' },
+                  { value: 'inactivo', label: 'Inactivos' },
+                ]}
+                size="sm"
+              />
             </div>
           </div>
         </div>
@@ -572,19 +574,79 @@ export const ActoresPage: React.FC = () => {
           </Card>
         ) : vistaMode === 'list' ? (
           <>
-            <Table
-              data={actoresPaginados}
-              columns={columns}
-              keyExtractor={(row) => `${row.tipo}-${row.id}`}
-              selectable
-              selectedKeys={selectedRows}
-              onSelectionChange={setSelectedRows}
-              sortable={true}
-              onSort={(key, dir) => setSortConfig({ key, direction: dir })}
-              onRowClick={verDetalle}
-              stickyHeader
-              emptyMessage="No se encontraron actores"
-            />
+            {/* Mobile card view */}
+            <div className="md:hidden space-y-3">
+              {actoresPaginados.length === 0 ? (
+                <div className="py-12 text-center">
+                  <Users className="mx-auto text-neutral-300 mb-3" size={40} />
+                  <p className="text-neutral-500">No se encontraron actores</p>
+                </div>
+              ) : actoresPaginados.map((actor) => {
+                const config = tipoConfig[actor.tipo as keyof typeof tipoConfig] || tipoConfig['generador'];
+                const Icon = config.icon;
+                const isActivo = actor.activo !== false && actor.estado !== 'inactivo';
+                return (
+                  <Card
+                    key={`m-${actor.tipo}-${actor.id}`}
+                    className="hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => verDetalle(actor)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-${config.color}-100`}>
+                          <Icon size={18} className={`text-${config.color}-600`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-neutral-900 truncate">{actor.razonSocial}</p>
+                              <p className="text-xs text-neutral-500 font-mono">{actor.cuit}</p>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <Badge variant="soft" color={config.color} className="text-xs">{config.label}</Badge>
+                              <Badge variant="soft" color={isActivo ? 'success' : 'neutral'} className="text-xs">
+                                {isActivo ? 'Activo' : 'Inactivo'}
+                              </Badge>
+                            </div>
+                          </div>
+                          {(actor.email || actor.telefono) && (
+                            <div className="flex items-center gap-3 mt-2 text-xs text-neutral-500">
+                              {actor.email && (
+                                <span className="flex items-center gap-1 truncate">
+                                  <Mail size={12} /> {actor.email}
+                                </span>
+                              )}
+                              {actor.telefono && (
+                                <span className="flex items-center gap-1 shrink-0">
+                                  <Phone size={12} /> {actor.telefono}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <ChevronRight size={16} className="text-neutral-300 shrink-0 mt-2" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+            {/* Desktop table view */}
+            <div className="hidden md:block">
+              <Table
+                data={actoresPaginados}
+                columns={columns}
+                keyExtractor={(row) => `${row.tipo}-${row.id}`}
+                selectable
+                selectedKeys={selectedRows}
+                onSelectionChange={setSelectedRows}
+                sortable={true}
+                onSort={(key, dir) => setSortConfig({ key, direction: dir })}
+                onRowClick={verDetalle}
+                stickyHeader
+                emptyMessage="No se encontraron actores"
+              />
+            </div>
             {totalPages > 1 && (
               <Pagination
                 currentPage={currentPage}
@@ -700,7 +762,7 @@ export const ActoresPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div className="p-4 bg-neutral-50 rounded-xl">
                 <div className="flex items-center gap-2 text-neutral-600 mb-1">
                   <FileText size={16} />
@@ -765,33 +827,31 @@ export const ActoresPage: React.FC = () => {
         }
       >
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">Tipo de Actor</label>
-            <select
-              value={form.tipo}
-              onChange={(e) => updateField('tipo', e.target.value)}
-              className="w-full px-4 py-2 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
-            >
-              <option value="generador">Generador</option>
-              <option value="transportista">Transportista</option>
-              <option value="operador">Operador</option>
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
+          <Select
+            label="Tipo de Actor"
+            value={form.tipo}
+            onChange={(val) => updateField('tipo', val)}
+            options={[
+              { value: 'generador', label: 'Generador' },
+              { value: 'transportista', label: 'Transportista' },
+              { value: 'operador', label: 'Operador' },
+            ]}
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Input label="Razon Social" value={form.razonSocial} onChange={(e) => updateField('razonSocial', e.target.value)} placeholder="Empresa S.A." />
             <Input label="CUIT" value={form.cuit} onChange={(e) => updateField('cuit', e.target.value)} placeholder="30-12345678-9" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Input label="Email" type="email" value={form.email} onChange={(e) => updateField('email', e.target.value)} placeholder="contacto@empresa.com" />
             <Input label="Telefono" value={form.telefono} onChange={(e) => updateField('telefono', e.target.value)} placeholder="+54 261 ..." />
           </div>
           <Input label="Domicilio" value={form.domicilio} onChange={(e) => updateField('domicilio', e.target.value)} placeholder="Av. San Martin 1234, Mendoza" />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Input label="Nombre Responsable" value={form.nombre} onChange={(e) => updateField('nombre', e.target.value)} placeholder="Juan Perez" />
             <Input label="Password inicial" type="password" value={form.password} onChange={(e) => updateField('password', e.target.value)} placeholder="Min. 8 caracteres" />
           </div>
           {form.tipo === 'generador' && (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <Input label="N. Inscripcion" value={form.numeroInscripcion} onChange={(e) => updateField('numeroInscripcion', e.target.value)} placeholder="DGFA-2024-XXXX" />
               <Input label="Categoria" value={form.categoria} onChange={(e) => updateField('categoria', e.target.value)} placeholder="Grandes Generadores" />
             </div>
@@ -800,7 +860,7 @@ export const ActoresPage: React.FC = () => {
             <Input label="N. Habilitacion" value={form.numeroHabilitacion} onChange={(e) => updateField('numeroHabilitacion', e.target.value)} placeholder="HAB-TR-2024-XXXX" />
           )}
           {form.tipo === 'operador' && (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <Input label="N. Habilitacion" value={form.numeroHabilitacion} onChange={(e) => updateField('numeroHabilitacion', e.target.value)} placeholder="HAB-OP-2024-XXXX" />
               <Input label="Categoria" value={form.categoria} onChange={(e) => updateField('categoria', e.target.value)} placeholder="Incineracion" />
             </div>

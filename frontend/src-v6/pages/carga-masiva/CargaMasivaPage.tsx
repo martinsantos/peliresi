@@ -21,6 +21,7 @@ import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { toast } from '../../components/ui/Toast';
+import { Select } from '../../components/ui/Select';
 import api from '../../services/api';
 
 // Type for upload results
@@ -221,16 +222,16 @@ const CargaMasivaPage: React.FC = () => {
         <CardContent>
           {/* Tipo selector */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-neutral-700 mb-1.5">Tipo de carga</label>
-            <select
+            <Select
+              label="Tipo de carga"
               value={tipoSeleccionado}
-              onChange={(e) => setTipoSeleccionado(e.target.value)}
-              className="px-4 py-2 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
-            >
-              <option value="generadores">Generadores</option>
-              <option value="transportistas">Transportistas</option>
-              <option value="operadores">Operadores</option>
-            </select>
+              onChange={(val) => setTipoSeleccionado(val)}
+              options={[
+                { value: 'generadores', label: 'Generadores' },
+                { value: 'transportistas', label: 'Transportistas' },
+                { value: 'operadores', label: 'Operadores' },
+              ]}
+            />
           </div>
 
           <div

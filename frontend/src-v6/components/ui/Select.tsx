@@ -49,9 +49,9 @@ interface SelectProps {
 // SIZE STYLES
 // ========================================
 const sizeStyles: Record<SelectSize, string> = {
-  sm: 'h-9 px-3 text-sm',
-  base: 'h-11 px-4 text-sm',
-  lg: 'h-14 px-5 text-base',
+  sm: 'h-9 px-3 text-xs sm:text-sm',
+  base: 'h-10 sm:h-11 px-3 sm:px-4 text-sm',
+  lg: 'h-11 sm:h-14 px-4 sm:px-5 text-sm sm:text-base',
 };
 
 // ========================================
@@ -97,13 +97,17 @@ export const Select: React.FC<SelectProps> = ({
     const openUpward = spaceBelow < dropdownMaxH && spaceAbove > spaceBelow;
 
     const viewportW = window.innerWidth;
-    const maxLeft = viewportW - rect.width - 8;
-    const clampedLeft = Math.min(rect.left, Math.max(0, maxLeft));
+    const isMobile = viewportW < 640;
+    // On mobile, use nearly full viewport width for readability
+    const dropdownW = isMobile ? Math.min(viewportW - 32, 400) : rect.width;
+    const dropdownLeft = isMobile
+      ? Math.max(16, (viewportW - dropdownW) / 2)
+      : Math.min(rect.left, Math.max(0, viewportW - rect.width - 8));
 
     return {
       position: 'fixed' as const,
-      left: clampedLeft,
-      width: rect.width,
+      left: dropdownLeft,
+      width: dropdownW,
       zIndex: 9999,
       ...(openUpward
         ? { bottom: viewportH - rect.top + 4 }
@@ -213,7 +217,7 @@ export const Select: React.FC<SelectProps> = ({
       )}
 
       {/* Options */}
-      <div className="max-h-60 overflow-auto py-1 overscroll-contain">
+      <div className="max-h-72 sm:max-h-60 overflow-auto py-1 overscroll-contain">
         {filteredOptions.length === 0 ? (
           <div className="px-4 py-3 text-sm text-neutral-500 text-center">
             No se encontraron opciones
@@ -226,7 +230,7 @@ export const Select: React.FC<SelectProps> = ({
               onClick={() => handleSelect(option.value)}
               disabled={option.disabled}
               className={cn(
-                'w-full flex items-center justify-between px-4 py-2.5 text-sm text-left',
+                'w-full flex items-center justify-between px-4 py-3 sm:py-2.5 text-sm text-left',
                 'hover:bg-neutral-50 active:bg-neutral-100 transition-colors',
                 option.disabled && 'opacity-50 cursor-not-allowed',
                 value === option.value && 'bg-primary-50 text-primary-600 font-medium'

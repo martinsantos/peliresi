@@ -6,131 +6,38 @@
  *
  * Phase 1: Account creation (POST /api/solicitudes/iniciar)
  * Phase 2: Multi-step wizard to complete the solicitud
+ *
+ * Orchestrator: manages step state, navigation, form data aggregation.
+ * Step UI is delegated to components in ./inscripcion/steps/.
  */
 
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, ArrowRight, Send, Upload, Check,
-  Building2, FileText, MapPin, Users, Shield,
-  Factory, FlaskConical, AlertCircle, Loader2,
-  Eye, EyeOff, X, Paperclip, ClipboardList, Calculator, Truck, Car,
+  ArrowLeft, ArrowRight, Send, Check,
+  Factory, FlaskConical, AlertCircle, Loader2, Truck,
 } from 'lucide-react';
 import { Button } from '../../components/ui/ButtonV2';
-import CalculadoraTEF, { type TEFInputs, type CalculadoraTEFHandle } from '../../components/CalculadoraTEF';
 import api from '../../services/api';
-import axios from 'axios';
 
-// ========================================
-// CONSTANTS
-// ========================================
+// Shared constants & types
+import {
+  STEPS_GENERADOR,
+  STEPS_OPERADOR,
+  STEPS_TRANSPORTISTA,
+  DOCS_GENERADOR,
+  DOCS_OPERADOR,
+  DOCS_TRANSPORTISTA,
+  type RegistrationData,
+  type TipoActor,
+} from './inscripcion/shared';
 
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
-
-const DEPARTAMENTOS_MENDOZA = [
-  'Capital', 'Godoy Cruz', 'Guaymallen', 'Las Heras', 'Lujan de Cuyo',
-  'Maipu', 'San Rafael', 'General Alvear', 'Junin', 'La Paz',
-  'Lavalle', 'Malargue', 'Rivadavia', 'San Carlos', 'San Martin',
-  'Santa Rosa', 'Tunuyan', 'Tupungato',
-];
-
-const CATEGORIAS_GENERADOR = ['Grandes Generadores', 'Medianos Generadores', 'Pequenos Generadores'];
-
-const DOCS_GENERADOR = [
-  { tipo: 'CONSTANCIA_AFIP', nombre: 'Constancia AFIP' },
-  { tipo: 'MEMORIA_TECNICA', nombre: 'Memoria Tecnica' },
-  { tipo: 'CERTIFICADO_HABILITACION', nombre: 'Certificado de Habilitacion' },
-];
-
-const DOCS_OPERADOR = [
-  { tipo: 'CONSTANCIA_AFIP', nombre: 'Constancia AFIP' },
-  { tipo: 'CERTIFICADO_HABILITACION', nombre: 'Certificado de Habilitacion' },
-  { tipo: 'RESOLUCION_DPA', nombre: 'Resolucion DPA' },
-];
-
-const DOCS_TRANSPORTISTA = [
-  { tipo: 'CONSTANCIA_AFIP', nombre: 'Constancia AFIP' },
-  { tipo: 'CERTIFICADO_HABILITACION', nombre: 'Habilitacion de Transporte' },
-  { tipo: 'SEGURO_AMBIENTAL', nombre: 'Seguro Ambiental' },
-];
-
-interface StepDef {
-  id: number;
-  label: string;
-  icon: React.FC<{ size?: number; className?: string }>;
-}
-
-const STEPS_GENERADOR: StepDef[] = [
-  { id: 1, label: 'Establecimiento', icon: Factory },
-  { id: 2, label: 'Regulatorio', icon: ClipboardList },
-  { id: 3, label: 'Domicilios', icon: MapPin },
-  { id: 4, label: 'Adicional', icon: Shield },
-  { id: 5, label: 'Calculo TEF', icon: Calculator },
-  { id: 6, label: 'Documentos', icon: FileText },
-  { id: 7, label: 'Resumen', icon: Check },
-];
-
-const STEPS_OPERADOR: StepDef[] = [
-  { id: 1, label: 'Establecimiento', icon: FlaskConical },
-  { id: 2, label: 'Regulatorio', icon: ClipboardList },
-  { id: 3, label: 'Domicilios', icon: MapPin },
-  { id: 4, label: 'Representantes', icon: Users },
-  { id: 5, label: 'Corrientes', icon: Shield },
-  { id: 6, label: 'Calculo TEF', icon: Calculator },
-  { id: 7, label: 'Documentos', icon: FileText },
-  { id: 8, label: 'Resumen', icon: Check },
-];
-
-const STEPS_TRANSPORTISTA: StepDef[] = [
-  { id: 1, label: 'Datos Basicos', icon: Truck },
-  { id: 2, label: 'Habilitacion', icon: Shield },
-  { id: 3, label: 'Vehiculos', icon: Car },
-  { id: 4, label: 'Documentos', icon: FileText },
-  { id: 5, label: 'Resumen', icon: Check },
-];
-
-// ========================================
-// HELPERS
-// ========================================
-
-function FieldError({ show, msg }: { show: boolean; msg: string }) {
-  if (!show) return null;
-  return (
-    <p className="flex items-center gap-1 text-xs text-error-600 mt-1">
-      <AlertCircle size={12} /> {msg}
-    </p>
-  );
-}
-
-function SectionTitle({ icon: Icon, title }: { icon: React.FC<{ size?: number; className?: string }>; title: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-4">
-      <Icon size={20} className="text-[#0D8A4F]" />
-      <h3 className="text-lg font-bold text-neutral-900">{title}</h3>
-    </div>
-  );
-}
-
-const inputCls = (hasError = false) =>
-  `w-full px-4 h-10 rounded-xl border ${hasError ? 'border-error-400 bg-error-50' : 'border-neutral-200'} focus:border-[#0D8A4F] focus:ring-2 focus:ring-[#0D8A4F]/20 focus:outline-none text-sm bg-white transition-colors`;
-
-const selectCls = (hasError = false) =>
-  `w-full px-4 h-10 rounded-xl border ${hasError ? 'border-error-400 bg-error-50' : 'border-neutral-200'} focus:border-[#0D8A4F] focus:ring-2 focus:ring-[#0D8A4F]/20 focus:outline-none text-sm bg-white transition-colors`;
-
-const labelCls = 'block text-sm font-medium text-neutral-700 mb-1';
-
-function validateCuit(cuit: string): boolean {
-  const digits = cuit.replace(/\D/g, '');
-  return digits.length === 11;
-}
-
-function validatePassword(pw: string): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
-  if (pw.length < 8) errors.push('Minimo 8 caracteres');
-  if (!/[A-Z]/.test(pw)) errors.push('Al menos 1 mayuscula');
-  if (!/\d/.test(pw)) errors.push('Al menos 1 numero');
-  return { valid: errors.length === 0, errors };
-}
+// Step components
+import { StepCuenta } from './inscripcion/steps/StepCuenta';
+import { StepEmpresa } from './inscripcion/steps/StepEmpresa';
+import { StepDocumentos } from './inscripcion/steps/StepDocumentos';
+import { StepTEF, type StepTEFHandle } from './inscripcion/steps/StepTEF';
+import { StepResumen } from './inscripcion/steps/StepResumen';
 
 // ========================================
 // COMPONENT
@@ -142,7 +49,7 @@ const InscripcionWizardPage: React.FC = () => {
   const isGenerador = tipo === 'generador';
   const isOperador = tipo === 'operador';
   const isTransportista = tipo === 'transportista';
-  const tipoActor = isGenerador ? 'GENERADOR' : isOperador ? 'OPERADOR' : 'TRANSPORTISTA';
+  const tipoActor: TipoActor = isGenerador ? 'GENERADOR' : isOperador ? 'OPERADOR' : 'TRANSPORTISTA';
   const steps = isGenerador ? STEPS_GENERADOR : isOperador ? STEPS_OPERADOR : STEPS_TRANSPORTISTA;
   const totalSteps = steps.length;
 
@@ -151,13 +58,9 @@ const InscripcionWizardPage: React.FC = () => {
   const [solicitudId, setSolicitudId] = useState<string | null>(null);
 
   // Phase 1 - Registration
-  const [reg, setReg] = useState({
+  const [reg, setReg] = useState<RegistrationData>({
     nombre: '', email: '', password: '', confirmPassword: '', cuit: '',
   });
-  const [showPassword, setShowPassword] = useState(false);
-  const [regSubmitting, setRegSubmitting] = useState(false);
-  const [regError, setRegError] = useState<string | null>(null);
-  const [regAttempted, setRegAttempted] = useState(false);
 
   // Phase 2 - Wizard
   const [step, setStep] = useState(1);
@@ -167,129 +70,18 @@ const InscripcionWizardPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [activeDocTipo, setActiveDocTipo] = useState<string | null>(null);
+  const [regError, setRegError] = useState<string | null>(null);
+
+  // TEF ref for snapshotting values
+  const tefRef = useRef<StepTEFHandle>(null);
 
   const up = useCallback((field: string, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }));
   }, []);
 
-  // Imperative ref to read TEF values on demand (no render coupling = no loops)
-  const tefRef = useRef<CalculadoraTEFHandle>(null);
-
-  // Snapshot TEF values into form when leaving the TEF step
-  const snapshotTEF = useCallback(() => {
-    if (!tefRef.current) return;
-    const r = tefRef.current.getResult();
-    const inputs = tefRef.current.getInputs();
-    setForm(prev => ({
-      ...prev,
-      factorR: r.R.toFixed(4),
-      montoMxR: r.TEF.toFixed(2),
-      tefInputs: JSON.stringify(inputs),
-      tefPersonal: String(inputs.personal),
-      tefSuperficie: String(inputs.superficieM2),
-      tefPotencia: String(inputs.potenciaHP),
-      tefZona: inputs.zona,
-    }));
-  }, []);
-
-  // Shared TEF step renderer (used by generador step 5, operador step 6)
-  const tefCorrientesRaw = isGenerador ? form.corrientesControl : form.corrientesY;
-  const tefCorrientesYList = useMemo(() =>
-    (tefCorrientesRaw || '').split(/[,;/]/).map(s => s.trim()).filter(s => /^Y\d+$/i.test(s)),
-    [tefCorrientesRaw],
-  );
-  const tefTieneISO = !!form.certificacionISO;
-  const tefInitialInputs = useMemo<TEFInputs | null>(() => {
-    if (!form.tefInputs) return null;
-    try { return JSON.parse(form.tefInputs); } catch { return null; }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only on mount — after that CalculadoraTEF owns its state
-
-  function renderTEFStep() {
-    return (
-      <div className="space-y-4">
-        <SectionTitle icon={Calculator} title="Calculo TEF (Tasa por Evaluacion Fiscal)" />
-        <p className="text-sm text-neutral-500">
-          Calculadora completa segun Decreto 2625/99. Complete los coeficientes para obtener la tasa.
-          {tefCorrientesYList.length === 0 && (
-            <span className="block mt-1 text-amber-600 font-medium">
-              Ingrese corrientes Y en el paso anterior para calcular el coeficiente C.
-            </span>
-          )}
-        </p>
-        <CalculadoraTEF
-          ref={tefRef}
-          corrientesY={tefCorrientesYList}
-          tieneISO={tefTieneISO}
-          inline={true}
-          initialInputs={tefInitialInputs}
-        />
-      </div>
-    );
-  }
-
   const upReg = useCallback((field: string, value: string) => {
     setReg(prev => ({ ...prev, [field]: value }));
   }, []);
-
-  // ========================================
-  // PHASE 1 - Registration
-  // ========================================
-
-  const regErrors = (): Record<string, string> => {
-    const e: Record<string, string> = {};
-    if (!reg.nombre.trim()) e.nombre = 'Nombre es obligatorio';
-    if (!reg.email.trim()) e.email = 'Email es obligatorio';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(reg.email)) e.email = 'Email invalido';
-    if (!reg.cuit.trim()) e.cuit = 'CUIT es obligatorio';
-    else if (!validateCuit(reg.cuit)) e.cuit = 'CUIT debe tener 11 digitos';
-    if (!reg.password) e.password = 'Password es obligatorio';
-    else {
-      const pw = validatePassword(reg.password);
-      if (!pw.valid) e.password = pw.errors.join(', ');
-    }
-    if (reg.password !== reg.confirmPassword) e.confirmPassword = 'Las passwords no coinciden';
-    return e;
-  };
-
-  const handleRegistration = async () => {
-    setRegAttempted(true);
-    const errors = regErrors();
-    if (Object.keys(errors).length > 0) return;
-
-    setRegSubmitting(true);
-    setRegError(null);
-    try {
-      const res = await axios.post(`${API_BASE}/solicitudes/iniciar`, {
-        nombre: reg.nombre,
-        email: reg.email,
-        password: reg.password,
-        cuit: reg.cuit.replace(/\D/g, ''),
-        tipoActor,
-      });
-      const data = res.data?.data || res.data;
-      setSolicitudId(data.solicitudId || data.id);
-
-      // If the response includes a token, store it for Phase 2 API calls
-      if (data.token) {
-        localStorage.setItem('sitrep_access_token', data.token);
-      }
-      if (data.refreshToken) {
-        localStorage.setItem('sitrep_refresh_token', data.refreshToken);
-      }
-
-      setPhase(2);
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'Error al crear la cuenta';
-      setRegError(msg);
-    } finally {
-      setRegSubmitting(false);
-    }
-  };
-
-  const rErr = regAttempted ? regErrors() : {};
 
   // ========================================
   // PHASE 2 - Wizard navigation
@@ -297,14 +89,8 @@ const InscripcionWizardPage: React.FC = () => {
 
   const getStepErrors = (s: number): string[] => {
     const errs: string[] = [];
-    if (isGenerador) {
-      if (s === 1) {
-        if (!form.razonSocial?.trim()) errs.push('Razon Social es obligatoria');
-      }
-    } else {
-      if (s === 1) {
-        if (!form.razonSocial?.trim()) errs.push('Razon Social es obligatoria');
-      }
+    if (s === 1) {
+      if (!form.razonSocial?.trim()) errs.push('Razon Social es obligatoria');
     }
     return errs;
   };
@@ -313,8 +99,13 @@ const InscripcionWizardPage: React.FC = () => {
 
   const tefStepNumber = isGenerador ? 5 : isOperador ? 6 : -1;
 
+  const snapshotTEF = useCallback(() => {
+    if (!tefRef.current) return;
+    const tefValues = tefRef.current.snapshotTEF();
+    setForm(prev => ({ ...prev, ...tefValues }));
+  }, []);
+
   const leaveStep = () => {
-    // Snapshot TEF values into form when leaving the calculator step
     if (step === tefStepNumber) snapshotTEF();
   };
 
@@ -343,23 +134,13 @@ const InscripcionWizardPage: React.FC = () => {
   };
 
   // File handling
-  const triggerFileInput = (tipo: string) => {
-    setActiveDocTipo(tipo);
-    fileInputRef.current?.click();
-  };
+  const handleAddFile = useCallback((tipo: string, file: File) => {
+    setAdjuntos(prev => ({ ...prev, [tipo]: file }));
+  }, []);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && activeDocTipo) {
-      setAdjuntos(prev => ({ ...prev, [activeDocTipo]: file }));
-    }
-    // Reset input
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const removeFile = (tipo: string) => {
+  const handleRemoveFile = useCallback((tipo: string) => {
     setAdjuntos(prev => { const n = { ...prev }; delete n[tipo]; return n; });
-  };
+  }, []);
 
   // Submit
   const handleSubmit = async () => {
@@ -401,6 +182,41 @@ const InscripcionWizardPage: React.FC = () => {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // ========================================
+  // Determine which step content to render
+  // ========================================
+
+  const getDocsForType = () => {
+    if (isGenerador) return DOCS_GENERADOR;
+    if (isOperador) return DOCS_OPERADOR;
+    return DOCS_TRANSPORTISTA;
+  };
+
+  /** Maps the current wizard step to the corresponding step component */
+  const renderStepContent = () => {
+    // Determine which logical step we're on
+    // Generador: 1-4=empresa, 5=TEF, 6=docs, 7=resumen
+    // Operador:  1-5=empresa, 6=TEF, 7=docs, 8=resumen
+    // Transport: 1-3=empresa, 4=docs, 5=resumen
+
+    if (isGenerador) {
+      if (step <= 4) return <StepEmpresa step={step} form={form} up={up} attempted={attempted} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} />;
+      if (step === 5) return <StepTEF ref={tefRef} form={form} isGenerador={isGenerador} isOperador={isOperador} />;
+      if (step === 6) return <StepDocumentos docs={getDocsForType()} adjuntos={adjuntos} onAddFile={handleAddFile} onRemoveFile={handleRemoveFile} />;
+      if (step === 7) return <StepResumen reg={reg} form={form} adjuntos={adjuntos} tipoActor={tipoActor} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} regError={regError} />;
+    } else if (isOperador) {
+      if (step <= 5) return <StepEmpresa step={step} form={form} up={up} attempted={attempted} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} />;
+      if (step === 6) return <StepTEF ref={tefRef} form={form} isGenerador={isGenerador} isOperador={isOperador} />;
+      if (step === 7) return <StepDocumentos docs={getDocsForType()} adjuntos={adjuntos} onAddFile={handleAddFile} onRemoveFile={handleRemoveFile} />;
+      if (step === 8) return <StepResumen reg={reg} form={form} adjuntos={adjuntos} tipoActor={tipoActor} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} regError={regError} />;
+    } else if (isTransportista) {
+      if (step <= 3) return <StepEmpresa step={step} form={form} up={up} attempted={attempted} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} />;
+      if (step === 4) return <StepDocumentos docs={getDocsForType()} adjuntos={adjuntos} onAddFile={handleAddFile} onRemoveFile={handleRemoveFile} />;
+      if (step === 5) return <StepResumen reg={reg} form={form} adjuntos={adjuntos} tipoActor={tipoActor} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} regError={regError} />;
+    }
+    return null;
   };
 
   // ========================================
@@ -448,126 +264,16 @@ const InscripcionWizardPage: React.FC = () => {
 
   if (phase === 1) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100 flex items-center justify-center p-4">
-        <div className="w-full max-w-lg">
-          {/* Header */}
-          <div className="text-center mb-6">
-            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3 ${isGenerador ? 'bg-purple-100' : isOperador ? 'bg-blue-100' : 'bg-orange-100'}`}>
-              {isGenerador
-                ? <Factory size={28} className="text-purple-600" />
-                : isOperador ? <FlaskConical size={28} className="text-blue-600" />
-                : <Truck size={28} className="text-orange-600" />
-              }
-            </div>
-            <h1 className="text-2xl font-bold text-neutral-900">
-              Inscripcion como {isGenerador ? 'Generador' : isOperador ? 'Operador' : 'Transportista'}
-            </h1>
-            <p className="text-sm text-neutral-500 mt-1">
-              Registro Provincial de {isGenerador ? 'Generadores' : isOperador ? 'Operadores' : 'Transportistas'} de RRPP - Ley 5917
-            </p>
-          </div>
-
-          {/* Registration Form */}
-          <div className="bg-white rounded-2xl border border-neutral-200 shadow-lg p-6 space-y-4">
-            <h3 className="text-base font-semibold text-neutral-800">Paso 1: Crear cuenta</h3>
-
-            <div>
-              <label className={labelCls}>Nombre completo *</label>
-              <input
-                type="text" value={reg.nombre}
-                onChange={e => upReg('nombre', e.target.value)}
-                placeholder="Juan Perez"
-                className={inputCls(!!rErr.nombre)}
-              />
-              <FieldError show={!!rErr.nombre} msg={rErr.nombre || ''} />
-            </div>
-
-            <div>
-              <label className={labelCls}>Email *</label>
-              <input
-                type="email" value={reg.email}
-                onChange={e => upReg('email', e.target.value)}
-                placeholder="correo@empresa.com"
-                className={inputCls(!!rErr.email)}
-              />
-              <FieldError show={!!rErr.email} msg={rErr.email || ''} />
-            </div>
-
-            <div>
-              <label className={labelCls}>CUIT *</label>
-              <input
-                type="text" value={reg.cuit}
-                onChange={e => upReg('cuit', e.target.value)}
-                placeholder="30-12345678-9"
-                className={inputCls(!!rErr.cuit)}
-              />
-              <FieldError show={!!rErr.cuit} msg={rErr.cuit || ''} />
-            </div>
-
-            <div>
-              <label className={labelCls}>Password *</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={reg.password}
-                  onChange={e => upReg('password', e.target.value)}
-                  placeholder="Min 8 chars, 1 mayuscula, 1 numero"
-                  className={inputCls(!!rErr.password)}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(p => !p)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-              <FieldError show={!!rErr.password} msg={rErr.password || ''} />
-            </div>
-
-            <div>
-              <label className={labelCls}>Confirmar password *</label>
-              <input
-                type="password"
-                value={reg.confirmPassword}
-                onChange={e => upReg('confirmPassword', e.target.value)}
-                placeholder="Repetir password"
-                className={inputCls(!!rErr.confirmPassword)}
-              />
-              <FieldError show={!!rErr.confirmPassword} msg={rErr.confirmPassword || ''} />
-            </div>
-
-            {regError && (
-              <div className="bg-error-50 border border-error-200 rounded-xl p-3 text-sm text-error-700">
-                {regError}
-              </div>
-            )}
-
-            <Button
-              variant="primary" fullWidth
-              isLoading={regSubmitting}
-              onClick={handleRegistration}
-              rightIcon={<ArrowRight size={16} />}
-            >
-              Crear cuenta y continuar
-            </Button>
-
-            <button
-              onClick={() => setPhase(2)}
-              className="w-full mt-2 py-2 text-sm text-neutral-400 hover:text-[#0D8A4F] transition-colors"
-            >
-              Saltar al formulario (modo prueba) &rarr;
-            </button>
-
-            <p className="text-xs text-neutral-400 text-center mt-2">
-              Ya tenes cuenta?{' '}
-              <button onClick={() => navigate('/login')} className="text-[#0D8A4F] font-medium hover:underline">
-                Inicia sesion
-              </button>
-            </p>
-          </div>
-        </div>
-      </div>
+      <StepCuenta
+        tipoActor={tipoActor}
+        isGenerador={isGenerador}
+        isOperador={isOperador}
+        isTransportista={isTransportista}
+        reg={reg}
+        onRegChange={upReg}
+        onPhase2={(solId) => { setSolicitudId(solId); setPhase(2); }}
+        onSkip={() => setPhase(2)}
+      />
     );
   }
 
@@ -576,704 +282,6 @@ const InscripcionWizardPage: React.FC = () => {
   // ========================================
 
   const isLastStep = step === totalSteps;
-
-  // Determine which step content to render based on tipo
-  const renderGeneradorStep = () => {
-    switch (step) {
-      case 1: return (
-        <div className="space-y-4">
-          <SectionTitle icon={Factory} title="Datos del Establecimiento" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Razon Social *</label>
-              <input value={form.razonSocial || ''} onChange={e => up('razonSocial', e.target.value)}
-                placeholder="Empresa S.A." className={inputCls(attempted.has(1) && !form.razonSocial?.trim())} />
-              <FieldError show={attempted.has(1) && !form.razonSocial?.trim()} msg="Razon Social es obligatoria" />
-            </div>
-            <div>
-              <label className={labelCls}>Domicilio</label>
-              <input value={form.domicilio || ''} onChange={e => up('domicilio', e.target.value)}
-                placeholder="Calle 123, Ciudad" className={inputCls()} />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Telefono</label>
-              <input value={form.telefono || ''} onChange={e => up('telefono', e.target.value)}
-                placeholder="0261-4XXXXXX" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Email de contacto</label>
-              <input type="email" value={form.emailContacto || ''} onChange={e => up('emailContacto', e.target.value)}
-                placeholder="contacto@empresa.com" className={inputCls()} />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Actividad</label>
-              <input value={form.actividad || ''} onChange={e => up('actividad', e.target.value)}
-                placeholder="Ej: Fabricacion de pinturas" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Rubro</label>
-              <input value={form.rubro || ''} onChange={e => up('rubro', e.target.value)}
-                placeholder="Ej: Industria quimica" className={inputCls()} />
-            </div>
-          </div>
-        </div>
-      );
-
-      case 2: return (
-        <div className="space-y-4">
-          <SectionTitle icon={ClipboardList} title="Datos Regulatorios" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>N de Inscripcion</label>
-              <input value={form.numeroInscripcion || ''} onChange={e => up('numeroInscripcion', e.target.value)}
-                placeholder="G-000XXX" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Categoria</label>
-              <select value={form.categoria || ''} onChange={e => up('categoria', e.target.value)} className={selectCls()}>
-                <option value="">Seleccionar...</option>
-                {CATEGORIAS_GENERADOR.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Expediente Inscripcion</label>
-              <input value={form.expedienteInscripcion || ''} onChange={e => up('expedienteInscripcion', e.target.value)}
-                placeholder="EXP-XXXX-XXXX" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Resolucion Inscripcion</label>
-              <input value={form.resolucionInscripcion || ''} onChange={e => up('resolucionInscripcion', e.target.value)}
-                placeholder="RES-XXXX" className={inputCls()} />
-            </div>
-          </div>
-        </div>
-      );
-
-      case 3: return (
-        <div className="space-y-4">
-          <SectionTitle icon={MapPin} title="Domicilios" />
-          <h4 className="text-sm font-semibold text-neutral-700">Domicilio Legal</h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className={labelCls}>Calle</label>
-              <input value={form.domicilioLegalCalle || ''} onChange={e => up('domicilioLegalCalle', e.target.value)}
-                placeholder="Av. San Martin 123" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Localidad</label>
-              <input value={form.domicilioLegalLocalidad || ''} onChange={e => up('domicilioLegalLocalidad', e.target.value)}
-                placeholder="Mendoza" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Departamento</label>
-              <select value={form.domicilioLegalDepto || ''} onChange={e => up('domicilioLegalDepto', e.target.value)} className={selectCls()}>
-                <option value="">Seleccionar...</option>
-                {DEPARTAMENTOS_MENDOZA.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <h4 className="text-sm font-semibold text-neutral-700 mt-4">Domicilio Real</h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className={labelCls}>Calle</label>
-              <input value={form.domicilioRealCalle || ''} onChange={e => up('domicilioRealCalle', e.target.value)}
-                placeholder="Ruta 40 km 5" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Localidad</label>
-              <input value={form.domicilioRealLocalidad || ''} onChange={e => up('domicilioRealLocalidad', e.target.value)}
-                placeholder="Lujan de Cuyo" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Departamento</label>
-              <select value={form.domicilioRealDepto || ''} onChange={e => up('domicilioRealDepto', e.target.value)} className={selectCls()}>
-                <option value="">Seleccionar...</option>
-                {DEPARTAMENTOS_MENDOZA.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-          </div>
-        </div>
-      );
-
-      case 4: return (
-        <div className="space-y-4">
-          <SectionTitle icon={Shield} title="Datos Adicionales" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Corrientes de Control</label>
-              <input value={form.corrientesControl || ''} onChange={e => up('corrientesControl', e.target.value)}
-                placeholder="Y1, Y2, Y3..." className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Categoria Individual</label>
-              <select value={form.categoriaIndividual || ''} onChange={e => up('categoriaIndividual', e.target.value)} className={selectCls()}>
-                <option value="">Seleccionar...</option>
-                <option value="MINIMA">Minima</option>
-                <option value="INDIVIDUAL">Individual</option>
-                <option value="2000-3000">2000-3000</option>
-              </select>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Libro de Operatoria</label>
-              <input value={form.libroOperatoria || ''} onChange={e => up('libroOperatoria', e.target.value)}
-                placeholder="N de libro" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Certificacion ISO</label>
-              <input type="date" value={form.certificacionISO || ''} onChange={e => up('certificacionISO', e.target.value)}
-                className={inputCls()} />
-            </div>
-          </div>
-        </div>
-      );
-
-      case 5: return renderTEFStep();
-      case 6: return renderDocumentos(DOCS_GENERADOR);
-      case 7: return renderResumen();
-      default: return null;
-    }
-  };
-
-  const renderOperadorStep = () => {
-    switch (step) {
-      case 1: return (
-        <div className="space-y-4">
-          <SectionTitle icon={FlaskConical} title="Datos del Establecimiento" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Razon Social *</label>
-              <input value={form.razonSocial || ''} onChange={e => up('razonSocial', e.target.value)}
-                placeholder="Operador S.A." className={inputCls(attempted.has(1) && !form.razonSocial?.trim())} />
-              <FieldError show={attempted.has(1) && !form.razonSocial?.trim()} msg="Razon Social es obligatoria" />
-            </div>
-            <div>
-              <label className={labelCls}>Domicilio</label>
-              <input value={form.domicilio || ''} onChange={e => up('domicilio', e.target.value)}
-                placeholder="Calle 123, Ciudad" className={inputCls()} />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Telefono</label>
-              <input value={form.telefono || ''} onChange={e => up('telefono', e.target.value)}
-                placeholder="0261-4XXXXXX" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Email de contacto</label>
-              <input type="email" value={form.emailContacto || ''} onChange={e => up('emailContacto', e.target.value)}
-                placeholder="contacto@operador.com" className={inputCls()} />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Tipo de Operador</label>
-              <select value={form.tipoOperador || ''} onChange={e => up('tipoOperador', e.target.value)} className={selectCls()}>
-                <option value="">Seleccionar...</option>
-                <option value="TRATAMIENTO">Tratamiento</option>
-                <option value="DISPOSICION_FINAL">Disposicion Final</option>
-                <option value="ALMACENAMIENTO">Almacenamiento</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>Tecnologia</label>
-              <input value={form.tecnologia || ''} onChange={e => up('tecnologia', e.target.value)}
-                placeholder="Ej: Incineracion, neutralizacion" className={inputCls()} />
-            </div>
-          </div>
-        </div>
-      );
-
-      case 2: return (
-        <div className="space-y-4">
-          <SectionTitle icon={ClipboardList} title="Datos Regulatorios" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>N de Habilitacion</label>
-              <input value={form.numeroHabilitacion || ''} onChange={e => up('numeroHabilitacion', e.target.value)}
-                placeholder="HAB-XXXX" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Categoria</label>
-              <input value={form.categoria || ''} onChange={e => up('categoria', e.target.value)}
-                placeholder="Categoria del operador" className={inputCls()} />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Expediente Inscripcion</label>
-              <input value={form.expedienteInscripcion || ''} onChange={e => up('expedienteInscripcion', e.target.value)}
-                placeholder="EXP-XXXX-XXXX" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Certificado Numero</label>
-              <input value={form.certificadoNumero || ''} onChange={e => up('certificadoNumero', e.target.value)}
-                placeholder="CERT-XXXX" className={inputCls()} />
-            </div>
-          </div>
-          <div>
-            <label className={labelCls}>Resolucion DPA</label>
-            <input value={form.resolucionDPA || ''} onChange={e => up('resolucionDPA', e.target.value)}
-              placeholder="RES-DPA-XXXX" className={inputCls()} />
-          </div>
-        </div>
-      );
-
-      case 3: return (
-        <div className="space-y-4">
-          <SectionTitle icon={MapPin} title="Domicilios" />
-          <h4 className="text-sm font-semibold text-neutral-700">Domicilio Legal</h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className={labelCls}>Calle</label>
-              <input value={form.domicilioLegalCalle || ''} onChange={e => up('domicilioLegalCalle', e.target.value)}
-                placeholder="Av. San Martin 123" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Localidad</label>
-              <input value={form.domicilioLegalLocalidad || ''} onChange={e => up('domicilioLegalLocalidad', e.target.value)}
-                placeholder="Mendoza" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Departamento</label>
-              <select value={form.domicilioLegalDepto || ''} onChange={e => up('domicilioLegalDepto', e.target.value)} className={selectCls()}>
-                <option value="">Seleccionar...</option>
-                {DEPARTAMENTOS_MENDOZA.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <h4 className="text-sm font-semibold text-neutral-700 mt-4">Domicilio Real</h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className={labelCls}>Calle</label>
-              <input value={form.domicilioRealCalle || ''} onChange={e => up('domicilioRealCalle', e.target.value)}
-                placeholder="Ruta 40 km 5" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Localidad</label>
-              <input value={form.domicilioRealLocalidad || ''} onChange={e => up('domicilioRealLocalidad', e.target.value)}
-                placeholder="Lujan de Cuyo" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Departamento</label>
-              <select value={form.domicilioRealDepto || ''} onChange={e => up('domicilioRealDepto', e.target.value)} className={selectCls()}>
-                <option value="">Seleccionar...</option>
-                {DEPARTAMENTOS_MENDOZA.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-          </div>
-        </div>
-      );
-
-      case 4: return (
-        <div className="space-y-4">
-          <SectionTitle icon={Users} title="Representantes" />
-          <h4 className="text-sm font-semibold text-neutral-700">Representante Legal</h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className={labelCls}>Nombre</label>
-              <input value={form.representanteLegalNombre || ''} onChange={e => up('representanteLegalNombre', e.target.value)}
-                placeholder="Nombre completo" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>DNI</label>
-              <input value={form.representanteLegalDNI || ''} onChange={e => up('representanteLegalDNI', e.target.value)}
-                placeholder="12345678" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Telefono</label>
-              <input value={form.representanteLegalTelefono || ''} onChange={e => up('representanteLegalTelefono', e.target.value)}
-                placeholder="0261-XXXXXXX" className={inputCls()} />
-            </div>
-          </div>
-
-          <h4 className="text-sm font-semibold text-neutral-700 mt-4">Representante Tecnico</h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className={labelCls}>Nombre</label>
-              <input value={form.representanteTecnicoNombre || ''} onChange={e => up('representanteTecnicoNombre', e.target.value)}
-                placeholder="Nombre completo" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Matricula</label>
-              <input value={form.representanteTecnicoMatricula || ''} onChange={e => up('representanteTecnicoMatricula', e.target.value)}
-                placeholder="MAT-XXXX" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Telefono</label>
-              <input value={form.representanteTecnicoTelefono || ''} onChange={e => up('representanteTecnicoTelefono', e.target.value)}
-                placeholder="0261-XXXXXXX" className={inputCls()} />
-            </div>
-          </div>
-        </div>
-      );
-
-      case 5: return (
-        <div className="space-y-4">
-          <SectionTitle icon={Shield} title="Corrientes de Residuos (Y)" />
-          <p className="text-sm text-neutral-500">
-            Indique las corrientes de residuos que el operador esta habilitado a recibir y tratar.
-          </p>
-          <div>
-            <label className={labelCls}>Corrientes Y</label>
-            <textarea
-              value={form.corrientesY || ''}
-              onChange={e => up('corrientesY', e.target.value)}
-              placeholder="Y1, Y2, Y3... (separadas por coma)"
-              rows={4}
-              className="w-full px-4 py-3 rounded-xl border border-neutral-200 focus:border-[#0D8A4F] focus:ring-2 focus:ring-[#0D8A4F]/20 focus:outline-none text-sm bg-white transition-colors resize-none"
-            />
-          </div>
-        </div>
-      );
-
-      case 6: return renderTEFStep();
-      case 7: return renderDocumentos(DOCS_OPERADOR);
-      case 8: return renderResumen();
-      default: return null;
-    }
-  };
-
-  const renderTransportistaStep = () => {
-    switch (step) {
-      case 1: return (
-        <div className="space-y-4">
-          <SectionTitle icon={Truck} title="Datos del Transportista" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Razon Social *</label>
-              <input value={form.razonSocial || ''} onChange={e => up('razonSocial', e.target.value)}
-                placeholder="Transporte S.A." className={inputCls(attempted.has(1) && !form.razonSocial?.trim())} />
-              <FieldError show={attempted.has(1) && !form.razonSocial?.trim()} msg="Razon Social es obligatoria" />
-            </div>
-            <div>
-              <label className={labelCls}>Domicilio</label>
-              <input value={form.domicilio || ''} onChange={e => up('domicilio', e.target.value)}
-                placeholder="Calle 123, Ciudad" className={inputCls()} />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Telefono</label>
-              <input value={form.telefono || ''} onChange={e => up('telefono', e.target.value)}
-                placeholder="0261-4XXXXXX" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Email de contacto</label>
-              <input type="email" value={form.emailContacto || ''} onChange={e => up('emailContacto', e.target.value)}
-                placeholder="contacto@transporte.com" className={inputCls()} />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Localidad</label>
-              <input value={form.localidad || ''} onChange={e => up('localidad', e.target.value)}
-                placeholder="Godoy Cruz, Mendoza" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Coordenadas</label>
-              <input value={form.coordenadas || ''} onChange={e => up('coordenadas', e.target.value)}
-                placeholder="-32.89, -68.83" className={inputCls()} />
-            </div>
-          </div>
-        </div>
-      );
-      case 2: return (
-        <div className="space-y-4">
-          <SectionTitle icon={Shield} title="Habilitacion y Datos DPA" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>N de Habilitacion</label>
-              <input value={form.numeroHabilitacion || ''} onChange={e => up('numeroHabilitacion', e.target.value)}
-                placeholder="HAB-TR-XXXX" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Vencimiento Habilitacion</label>
-              <input type="date" value={form.vencimientoHabilitacion || ''} onChange={e => up('vencimientoHabilitacion', e.target.value)} className={inputCls()} />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Expediente DPA</label>
-              <input value={form.expedienteDPA || ''} onChange={e => up('expedienteDPA', e.target.value)} placeholder="EXP-DPA-XXXX" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Resolucion DPA</label>
-              <input value={form.resolucionDPA || ''} onChange={e => up('resolucionDPA', e.target.value)} placeholder="0359/24" className={inputCls()} />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Resolucion SSP</label>
-              <input value={form.resolucionSSP || ''} onChange={e => up('resolucionSSP', e.target.value)} placeholder="SSP-XXXX" className={inputCls()} />
-            </div>
-            <div>
-              <label className={labelCls}>Corrientes Autorizadas</label>
-              <input value={form.corrientesAutorizadas || ''} onChange={e => up('corrientesAutorizadas', e.target.value)} placeholder="Y4, Y8, Y9" className={inputCls()} />
-            </div>
-          </div>
-        </div>
-      );
-      case 3: return (
-        <div className="space-y-4">
-          <SectionTitle icon={Car} title="Vehiculos y Choferes" />
-          <p className="text-sm text-neutral-500">
-            Describa los vehiculos y choferes habilitados. Un dato por linea.
-          </p>
-          <div>
-            <label className={labelCls}>Vehiculos (patente, marca, modelo, capacidad — uno por linea)</label>
-            <textarea value={form.vehiculosDesc || ''} onChange={e => up('vehiculosDesc', e.target.value)}
-              placeholder={"AB123CD, Mercedes, Atego 1726, 10 tn\nXY456ZW, Iveco, Tector, 8 tn"} rows={5}
-              className="w-full px-4 py-3 rounded-xl border border-neutral-200 focus:border-[#0D8A4F] focus:ring-2 focus:ring-[#0D8A4F]/20 focus:outline-none text-sm bg-white transition-colors resize-none font-mono" />
-          </div>
-          <div>
-            <label className={labelCls}>Choferes (nombre, DNI, licencia — uno por linea)</label>
-            <textarea value={form.choferesDesc || ''} onChange={e => up('choferesDesc', e.target.value)}
-              placeholder={"Juan Perez, 12345678, LIC-001\nMaria Lopez, 87654321, LIC-002"} rows={4}
-              className="w-full px-4 py-3 rounded-xl border border-neutral-200 focus:border-[#0D8A4F] focus:ring-2 focus:ring-[#0D8A4F]/20 focus:outline-none text-sm bg-white transition-colors resize-none font-mono" />
-          </div>
-        </div>
-      );
-      case 4: return renderDocumentos(DOCS_TRANSPORTISTA);
-      case 5: return renderResumen();
-      default: return null;
-    }
-  };
-
-  // Shared: Documents step
-  function renderDocumentos(docs: { tipo: string; nombre: string }[]) {
-    return (
-      <div className="space-y-4">
-        <SectionTitle icon={FileText} title="Documentos" />
-        <p className="text-sm text-neutral-500">
-          Adjunte los documentos requeridos. Formatos aceptados: PDF, JPG, PNG (max 10MB).
-        </p>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf,.jpg,.jpeg,.png"
-          className="hidden"
-          onChange={handleFileSelect}
-        />
-        <div className="space-y-3">
-          {docs.map(doc => {
-            const attached = adjuntos[doc.tipo];
-            return (
-              <div key={doc.tipo} className="flex items-center justify-between p-3 rounded-xl border border-neutral-200 bg-neutral-50">
-                <div className="flex items-center gap-3">
-                  <Paperclip size={16} className="text-neutral-400" />
-                  <div>
-                    <p className="text-sm font-medium text-neutral-800">{doc.nombre}</p>
-                    {attached && (
-                      <p className="text-xs text-[#0D8A4F]">{attached.name} ({(attached.size / 1024).toFixed(0)} KB)</p>
-                    )}
-                  </div>
-                </div>
-                {attached ? (
-                  <button onClick={() => removeFile(doc.tipo)} className="p-1.5 rounded-lg hover:bg-error-100 text-error-500 transition-colors">
-                    <X size={16} />
-                  </button>
-                ) : (
-                  <Button variant="outline" size="sm" leftIcon={<Upload size={14} />} onClick={() => triggerFileInput(doc.tipo)}>
-                    Adjuntar
-                  </Button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  // Shared: Summary step
-  function renderResumen() {
-    const sections: { label: string; fields: { label: string; value: string }[] }[] = [];
-
-    // Account info
-    sections.push({
-      label: 'Cuenta',
-      fields: [
-        { label: 'Nombre', value: reg.nombre },
-        { label: 'Email', value: reg.email },
-        { label: 'CUIT', value: reg.cuit },
-        { label: 'Tipo', value: tipoActor },
-      ],
-    });
-
-    // Establecimiento
-    const estFields = [
-      { label: 'Razon Social', value: form.razonSocial || '' },
-      { label: 'Domicilio', value: form.domicilio || '' },
-      { label: 'Telefono', value: form.telefono || '' },
-      { label: 'Email contacto', value: form.emailContacto || '' },
-    ];
-    if (isGenerador) {
-      estFields.push({ label: 'Actividad', value: form.actividad || '' });
-      estFields.push({ label: 'Rubro', value: form.rubro || '' });
-    } else {
-      estFields.push({ label: 'Tipo Operador', value: form.tipoOperador || '' });
-      estFields.push({ label: 'Tecnologia', value: form.tecnologia || '' });
-    }
-    sections.push({ label: 'Establecimiento', fields: estFields });
-
-    // Regulatorio
-    const regFields: { label: string; value: string }[] = [];
-    if (isGenerador) {
-      regFields.push(
-        { label: 'N Inscripcion', value: form.numeroInscripcion || '' },
-        { label: 'Categoria', value: form.categoria || '' },
-        { label: 'Expediente', value: form.expedienteInscripcion || '' },
-        { label: 'Resolucion', value: form.resolucionInscripcion || '' },
-      );
-    } else {
-      regFields.push(
-        { label: 'N Habilitacion', value: form.numeroHabilitacion || '' },
-        { label: 'Categoria', value: form.categoria || '' },
-        { label: 'Expediente', value: form.expedienteInscripcion || '' },
-        { label: 'Certificado N', value: form.certificadoNumero || '' },
-        { label: 'Resolucion DPA', value: form.resolucionDPA || '' },
-      );
-    }
-    sections.push({ label: 'Regulatorio', fields: regFields });
-
-    // Domicilios
-    sections.push({
-      label: 'Domicilios',
-      fields: [
-        { label: 'Legal - Calle', value: form.domicilioLegalCalle || '' },
-        { label: 'Legal - Localidad', value: form.domicilioLegalLocalidad || '' },
-        { label: 'Legal - Depto', value: form.domicilioLegalDepto || '' },
-        { label: 'Real - Calle', value: form.domicilioRealCalle || '' },
-        { label: 'Real - Localidad', value: form.domicilioRealLocalidad || '' },
-        { label: 'Real - Depto', value: form.domicilioRealDepto || '' },
-      ],
-    });
-
-    // Operador-specific
-    if (isOperador) {
-      sections.push({
-        label: 'Representantes',
-        fields: [
-          { label: 'Legal - Nombre', value: form.representanteLegalNombre || '' },
-          { label: 'Legal - DNI', value: form.representanteLegalDNI || '' },
-          { label: 'Legal - Telefono', value: form.representanteLegalTelefono || '' },
-          { label: 'Tecnico - Nombre', value: form.representanteTecnicoNombre || '' },
-          { label: 'Tecnico - Matricula', value: form.representanteTecnicoMatricula || '' },
-          { label: 'Tecnico - Telefono', value: form.representanteTecnicoTelefono || '' },
-        ],
-      });
-      sections.push({
-        label: 'Corrientes',
-        fields: [
-          { label: 'Corrientes Y', value: form.corrientesY || '' },
-        ],
-      });
-    } else {
-      sections.push({
-        label: 'Adicional',
-        fields: [
-          { label: 'Corrientes Control', value: form.corrientesControl || '' },
-          { label: 'Categoria Individual', value: form.categoriaIndividual || '' },
-          { label: 'Libro Operatoria', value: form.libroOperatoria || '' },
-          { label: 'Certificacion ISO', value: form.certificacionISO || '' },
-        ],
-      });
-    }
-
-    // TEF
-    const tefFields: { label: string; value: string }[] = [
-      { label: 'Factor R', value: form.factorR || '' },
-      { label: 'Monto MxR', value: form.montoMxR ? `$ ${form.montoMxR}` : '' },
-      { label: 'Personal', value: form.tefPersonal || '' },
-      { label: 'Superficie (m2)', value: form.tefSuperficie || '' },
-      { label: 'Zona', value: form.tefZona || '' },
-    ];
-    if (isGenerador) tefFields.push({ label: 'Potencia (HP)', value: form.tefPotencia || '' });
-    if (isOperador) tefFields.push({ label: 'Capacidad (tn/mes)', value: form.tefCapacidad || '' });
-    if (!isTransportista) sections.push({ label: 'Calculo TEF', fields: tefFields });
-
-    // Transportista-specific
-    if (isTransportista) {
-      sections.push({
-        label: 'Habilitacion DPA',
-        fields: [
-          { label: 'Habilitacion', value: form.numeroHabilitacion || '' },
-          { label: 'Vencimiento', value: form.vencimientoHabilitacion || '' },
-          { label: 'Expediente DPA', value: form.expedienteDPA || '' },
-          { label: 'Resolucion DPA', value: form.resolucionDPA || '' },
-          { label: 'Resolucion SSP', value: form.resolucionSSP || '' },
-          { label: 'Corrientes', value: form.corrientesAutorizadas || '' },
-        ],
-      });
-      if (form.vehiculosDesc || form.choferesDesc) {
-        sections.push({
-          label: 'Vehiculos y Choferes',
-          fields: [
-            { label: 'Vehiculos', value: form.vehiculosDesc || '' },
-            { label: 'Choferes', value: form.choferesDesc || '' },
-          ],
-        });
-      }
-    }
-
-    // Documents
-    const docEntries = Object.entries(adjuntos);
-    if (docEntries.length > 0) {
-      sections.push({
-        label: 'Documentos adjuntos',
-        fields: docEntries.map(([tipo, file]) => ({
-          label: tipo.replace(/_/g, ' '),
-          value: `${file.name} (${(file.size / 1024).toFixed(0)} KB)`,
-        })),
-      });
-    }
-
-    return (
-      <div className="space-y-4">
-        <SectionTitle icon={Check} title="Resumen de la Solicitud" />
-        <p className="text-sm text-neutral-500">
-          Revise los datos antes de enviar. Podra volver a pasos anteriores para corregir.
-        </p>
-
-        {regError && (
-          <div className="bg-error-50 border border-error-200 rounded-xl p-3 text-sm text-error-700">
-            {regError}
-          </div>
-        )}
-
-        {sections.map(section => (
-          <div key={section.label} className="rounded-xl border border-neutral-200 overflow-hidden">
-            <div className="bg-neutral-50 px-4 py-2 border-b border-neutral-200">
-              <h4 className="text-sm font-semibold text-neutral-700">{section.label}</h4>
-            </div>
-            <div className="px-4 py-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
-              {section.fields
-                .filter(f => f.value)
-                .map(f => (
-                  <div key={f.label} className="flex justify-between text-sm py-0.5">
-                    <span className="text-neutral-500">{f.label}</span>
-                    <span className="text-neutral-900 font-medium text-right max-w-[60%] truncate">{f.value}</span>
-                  </div>
-                ))}
-              {section.fields.every(f => !f.value) && (
-                <p className="text-sm text-neutral-400 italic col-span-2">Sin datos ingresados</p>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100 py-8 px-4">
@@ -1334,7 +342,7 @@ const InscripcionWizardPage: React.FC = () => {
 
         {/* Step Content */}
         <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 min-h-[320px]">
-          {isGenerador ? renderGeneradorStep() : isOperador ? renderOperadorStep() : renderTransportistaStep()}
+          {renderStepContent()}
         </div>
 
         {/* Navigation Buttons */}

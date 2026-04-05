@@ -226,7 +226,7 @@ const PerfilPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-4 animate-fade-in">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div className="p-3 bg-neutral-50 rounded-xl">
                       <div className="flex items-center gap-2 text-neutral-500 mb-1">
                         <User size={14} />

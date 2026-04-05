@@ -94,7 +94,7 @@ interface NotificationBellProps {
   basePath?: string;
 }
 
-export const NotificationBell: React.FC<NotificationBellProps> = ({ basePath = '' }) => {
+export const NotificationBell: React.FC<NotificationBellProps> = React.memo(function NotificationBell({ basePath = '' }) {
   const [isOpen, setIsOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -290,6 +290,6 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ basePath = '
       )}
     </div>
   );
-};
+});
 
 export default NotificationBell;

@@ -47,10 +47,12 @@ import { Modal, ConfirmModal } from '../../components/ui/Modal';
 import { toast } from '../../components/ui/Toast';
 import { Table, Pagination } from '../../components/ui/Table';
 import { Tabs, TabList, Tab } from '../../components/ui/Tabs';
+import { Select } from '../../components/ui/Select';
 import { useUsuarios, useCreateUsuario, useDeleteUsuario, useUpdateUsuario, useToggleUsuarioActivo } from '../../hooks/useUsuarios';
 import { downloadCsv } from '../../utils/exportCsv';
 import { exportReportePDF } from '../../utils/exportPdf';
 import { useAuth } from '../../contexts/AuthContext';
+import { useImpersonation } from '../../contexts/ImpersonationContext';
 import api from '../../services/api';
 import type { Rol } from '../../types/models';
 
@@ -134,7 +136,8 @@ const UsuariosPage: React.FC = () => {
   const [sortBy, setSortBy] = useState<string | undefined>(undefined);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-  const { isAdmin, currentUser, impersonateUser } = useAuth();
+  const { isAdmin, currentUser } = useAuth();
+  const { impersonateUser } = useImpersonation();
 
   // Real API data
   const { data: apiData, isLoading: apiLoading, isError: apiError } = useUsuarios({ sortBy, sortOrder });
@@ -283,7 +286,7 @@ const UsuariosPage: React.FC = () => {
       toast.error('Error', 'Completa los campos obligatorios: nombre, email y rol');
       return;
     }
-    if (!editandoUsuario && (!formPassword || formPassword.length < 6)) {
+    if (!formPassword || formPassword.length < 6) {
       toast.error('Error', 'La contraseña es obligatoria y debe tener al menos 6 caracteres');
       return;
     }
@@ -613,27 +616,29 @@ const UsuariosPage: React.FC = () => {
               />
             </div>
             <div className="flex gap-2">
-              <select
+              <Select
                 value={filtroRol}
-                onChange={(e) => { setFiltroRol(e.target.value); setCurrentPage(1); }}
-                className="px-4 py-2 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
-              >
-                <option value="todos">Todos los roles</option>
-                <option value="ADMIN">Administradores</option>
-                <option value="GENERADOR">Generadores</option>
-                <option value="TRANSPORTISTA">Transportistas</option>
-                <option value="OPERADOR">Operadores</option>
-              </select>
-              <select
+                onChange={(val) => { setFiltroRol(val); setCurrentPage(1); }}
+                options={[
+                  { value: 'todos', label: 'Todos los roles' },
+                  { value: 'ADMIN', label: 'Administradores' },
+                  { value: 'GENERADOR', label: 'Generadores' },
+                  { value: 'TRANSPORTISTA', label: 'Transportistas' },
+                  { value: 'OPERADOR', label: 'Operadores' },
+                ]}
+                size="sm"
+              />
+              <Select
                 value={filtroEstado}
-                onChange={(e) => { setFiltroEstado(e.target.value); setCurrentPage(1); }}
-                className="px-4 py-2 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
-              >
-                <option value="todos">Todos los estados</option>
-                <option value="activo">Activos</option>
-                <option value="pendiente">Pendientes</option>
-                <option value="inactivo">Inactivos</option>
-              </select>
+                onChange={(val) => { setFiltroEstado(val); setCurrentPage(1); }}
+                options={[
+                  { value: 'todos', label: 'Todos los estados' },
+                  { value: 'activo', label: 'Activos' },
+                  { value: 'pendiente', label: 'Pendientes' },
+                  { value: 'inactivo', label: 'Inactivos' },
+                ]}
+                size="sm"
+              />
             </div>
           </div>
         </div>
@@ -724,6 +729,30 @@ const UsuariosPage: React.FC = () => {
         {/* Table or Grid content - filtered by activeTab state, no TabPanel needed */}
         {vistaMode === 'list' ? (
           <>
+            {/* Mobile cards */}
+            <div className="md:hidden space-y-2">
+              {usuariosPaginados.map((u) => (
+                <div key={u.id} className="bg-white rounded-xl border border-neutral-100 p-3 cursor-pointer active:scale-[0.98] transition-transform" onClick={() => verUsuario(u)}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-primary-700">
+                        {(u.nombre || u.email || '?')[0].toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm text-neutral-900 truncate">{u.nombre || u.email}</p>
+                        <p className="text-xs text-neutral-500 truncate">{u.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-600">{u.rol}</span>
+                      <span className={`w-2 h-2 rounded-full ${u.estado === 'activo' ? 'bg-green-500' : 'bg-neutral-300'}`} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* Desktop table */}
+            <div className="hidden md:block">
             <Table
               data={usuariosPaginados}
               columns={columns}
@@ -740,6 +769,7 @@ const UsuariosPage: React.FC = () => {
               onRowClick={verUsuario}
               stickyHeader
             />
+            </div>
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
@@ -904,7 +934,7 @@ const UsuariosPage: React.FC = () => {
             </div>
 
             {/* Info Grid */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div className="p-4 bg-neutral-50 rounded-xl">
                 <p className="text-sm text-neutral-500 mb-1">Sector/Empresa</p>
                 <p className="font-medium text-neutral-900">{usuarioSeleccionado.sector}</p>
@@ -1002,45 +1032,43 @@ const UsuariosPage: React.FC = () => {
         }
       >
         <div className="space-y-4 animate-fade-in">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Input label="Nombre" placeholder="Juan" value={formNombre} onChange={(e) => setFormNombre(e.target.value)} />
             <Input label="Apellido" placeholder="Perez" value={formApellido} onChange={(e) => setFormApellido(e.target.value)} />
           </div>
           <Input label="Email" type="email" placeholder="usuario@empresa.com" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} />
           <Input label="Contrasena" type="password" placeholder="Contrasena temporal" value={formPassword} onChange={(e) => setFormPassword(e.target.value)} />
           <Input label="Telefono" placeholder="+54 261 123-4567" value={formTelefono} onChange={(e) => setFormTelefono(e.target.value)} />
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1.5">Rol</label>
-              <select
-                value={formRol}
-                onChange={(e) => setFormRol(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
-              >
-                <option value="">Seleccionar rol</option>
-                <option value="ADMIN">Super Administrador</option>
-                <option value="ADMIN_GENERADOR">Admin de Generadores</option>
-                <option value="ADMIN_TRANSPORTISTA">Admin de Transporte</option>
-                <option value="ADMIN_OPERADOR">Admin de Operadores</option>
-                <option value="GENERADOR">Generador</option>
-                <option value="TRANSPORTISTA">Transportista</option>
-                <option value="OPERADOR">Operador</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1.5">Sector/Empresa</label>
-              <select
-                value={formSector}
-                onChange={(e) => setFormSector(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
-              >
-                <option value="">Seleccionar sector</option>
-                <option value="DGFA">DGFA</option>
-                <option value="Hospital Central">Hospital Central</option>
-                <option value="Transportes Andes">Transportes Andes</option>
-                <option value="Planta Las Heras">Planta Las Heras</option>
-              </select>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <Select
+              label="Rol"
+              value={formRol}
+              onChange={(val) => setFormRol(val)}
+              placeholder="Seleccionar rol"
+              options={[
+                { value: '', label: 'Seleccionar rol' },
+                { value: 'ADMIN', label: 'Super Administrador' },
+                { value: 'ADMIN_GENERADOR', label: 'Admin de Generadores' },
+                { value: 'ADMIN_TRANSPORTISTA', label: 'Admin de Transporte' },
+                { value: 'ADMIN_OPERADOR', label: 'Admin de Operadores' },
+                { value: 'GENERADOR', label: 'Generador' },
+                { value: 'TRANSPORTISTA', label: 'Transportista' },
+                { value: 'OPERADOR', label: 'Operador' },
+              ]}
+            />
+            <Select
+              label="Sector/Empresa"
+              value={formSector}
+              onChange={(val) => setFormSector(val)}
+              placeholder="Seleccionar sector"
+              options={[
+                { value: '', label: 'Seleccionar sector' },
+                { value: 'DGFA', label: 'DGFA' },
+                { value: 'Hospital Central', label: 'Hospital Central' },
+                { value: 'Transportes Andes', label: 'Transportes Andes' },
+                { value: 'Planta Las Heras', label: 'Planta Las Heras' },
+              ]}
+            />
           </div>
         </div>
       </Modal>
@@ -1103,22 +1131,21 @@ const UsuariosPage: React.FC = () => {
                   <p className="font-semibold text-red-900">{usuarioSeleccionado.nombre}</p>
                   <p className="text-sm text-red-700 mt-1">Super Administrador &rarr; rol inferior</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">Nuevo rol</label>
-                  <select
-                    value={promoverTargetRol}
-                    onChange={(e) => setPromoverTargetRol(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-red-500 focus:outline-none"
-                  >
-                    <option value="">Seleccionar rol destino...</option>
-                    <option value="ADMIN_GENERADOR">Admin de Generadores</option>
-                    <option value="ADMIN_TRANSPORTISTA">Admin de Transporte</option>
-                    <option value="ADMIN_OPERADOR">Admin de Operadores</option>
-                    <option value="GENERADOR">Generador</option>
-                    <option value="TRANSPORTISTA">Transportista</option>
-                    <option value="OPERADOR">Operador</option>
-                  </select>
-                </div>
+                <Select
+                  label="Nuevo rol"
+                  value={promoverTargetRol}
+                  onChange={(val) => setPromoverTargetRol(val)}
+                  placeholder="Seleccionar rol destino..."
+                  options={[
+                    { value: '', label: 'Seleccionar rol destino...' },
+                    { value: 'ADMIN_GENERADOR', label: 'Admin de Generadores' },
+                    { value: 'ADMIN_TRANSPORTISTA', label: 'Admin de Transporte' },
+                    { value: 'ADMIN_OPERADOR', label: 'Admin de Operadores' },
+                    { value: 'GENERADOR', label: 'Generador' },
+                    { value: 'TRANSPORTISTA', label: 'Transportista' },
+                    { value: 'OPERADOR', label: 'Operador' },
+                  ]}
+                />
                 <p className="text-sm text-neutral-600">
                   Esto removera el acceso de Super Admin. Ingresa tu clave para confirmar.
                 </p>

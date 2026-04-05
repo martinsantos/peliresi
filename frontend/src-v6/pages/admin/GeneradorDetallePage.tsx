@@ -63,12 +63,12 @@ function PagoForm({ initial, onSave, onCancel, isPending }: {
   const up = (k: string, v: any) => setF(p => ({ ...p, [k]: v }));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3">
         <Input label="Ano *" type="number" value={String(f.anio)} onChange={e => up('anio', Number(e.target.value))} />
         <Input label="Monto TEF ($)" type="number" value={String(f.montoTEF)} onChange={e => up('montoTEF', e.target.value)} />
       </div>
       <Input label="Resolucion" value={f.resolucion} onChange={e => up('resolucion', e.target.value)} placeholder="412/2019" />
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3">
         <Input label="Fecha notificado" type="date" value={f.fechaNotificado} onChange={e => up('fechaNotificado', e.target.value)} />
         <Input label="Fecha pago" type="date" value={f.fechaPago} onChange={e => up('fechaPago', e.target.value)} />
       </div>
@@ -77,7 +77,7 @@ function PagoForm({ initial, onSave, onCancel, isPending }: {
         <label className="flex items-center gap-2"><input type="checkbox" checked={f.pagoFueraTermino} onChange={e => up('pagoFueraTermino', e.target.checked)} className="rounded" /> Fuera de termino</label>
         <label className="flex items-center gap-2"><input type="checkbox" checked={f.habilitado} onChange={e => up('habilitado', e.target.checked)} className="rounded" /> Habilitado</label>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3">
         <Input label="GEDO Notificacion" value={f.gedoNotificacion} onChange={e => up('gedoNotificacion', e.target.value)} />
         <Input label="GEDO Resolucion" value={f.gedoResolucion} onChange={e => up('gedoResolucion', e.target.value)} />
       </div>
@@ -105,7 +105,7 @@ function DDJJForm({ initial, onSave, onCancel, isPending }: {
   const up = (k: string, v: any) => setF(p => ({ ...p, [k]: v }));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3">
         <Input label="Ano *" type="number" value={String(f.anio)} onChange={e => up('anio', Number(e.target.value))} />
         <Input label="Numero GDE" value={f.numeroGDE} onChange={e => up('numeroGDE', e.target.value)} placeholder="1122009" />
       </div>

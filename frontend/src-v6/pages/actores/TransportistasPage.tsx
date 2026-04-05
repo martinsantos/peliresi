@@ -31,11 +31,13 @@ import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Modal, ConfirmModal } from '../../components/ui/Modal';
 import { Table, Pagination } from '../../components/ui/Table';
+import { Select } from '../../components/ui/Select';
 import { SearchInput } from '../../components/ui/SearchInput';
 import { toast } from '../../components/ui/Toast';
 import { downloadCsv } from '../../utils/exportCsv';
 import { exportReportePDF } from '../../utils/exportPdf';
 import { useAuth } from '../../contexts/AuthContext';
+import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { formatRelativeTime } from '../../utils/formatters';
 import {
   useTransportistas,
@@ -68,7 +70,8 @@ const TransportistasPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { isAdmin, impersonateUser } = useAuth();
+  const { isAdmin } = useAuth();
+  const { impersonateUser } = useImpersonation();
   const [busqueda, setBusqueda] = useState(searchParams.get('q') || '');
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [filtroLocalidad, setFiltroLocalidad] = useState('todas');
@@ -336,19 +339,19 @@ const TransportistasPage: React.FC = () => {
 
   const renderForm = () => (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <Input label="Razón Social" value={form.razonSocial} onChange={(e) => updateField('razonSocial', e.target.value)} placeholder="Empresa S.A." />
         <Input label="CUIT" value={form.cuit} onChange={(e) => updateField('cuit', e.target.value)} placeholder="30-12345678-9" />
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <Input label="Email" type="email" value={form.email} onChange={(e) => updateField('email', e.target.value)} placeholder="contacto@empresa.com" />
         <Input label="Teléfono" value={form.telefono} onChange={(e) => updateField('telefono', e.target.value)} placeholder="+54 261 ..." />
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <Input label="Domicilio" value={form.domicilio} onChange={(e) => updateField('domicilio', e.target.value)} placeholder="Av. Libertador 1234, Mendoza" />
         <Input label="Localidad" value={form.localidad} onChange={(e) => updateField('localidad', e.target.value)} placeholder="Godoy Cruz, Mendoza" />
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <Input label="N° Habilitación" value={form.numeroHabilitacion} onChange={(e) => updateField('numeroHabilitacion', e.target.value)} placeholder="HAB-TR-2024-XXXX" />
         <Input label="Vencimiento Habilitación" type="date" value={form.vencimientoHabilitacion} onChange={(e) => updateField('vencimientoHabilitacion', e.target.value)} />
       </div>
@@ -356,21 +359,21 @@ const TransportistasPage: React.FC = () => {
       {/* Datos DPA */}
       <div className="border-t border-neutral-100 pt-4 mt-2">
         <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-3">Datos DPA</p>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <Input label="Expediente DPA" value={form.expedienteDPA} onChange={(e) => updateField('expedienteDPA', e.target.value)} placeholder="EXP-DPA-XXXX" />
           <Input label="Resolución DPA" value={form.resolucionDPA} onChange={(e) => updateField('resolucionDPA', e.target.value)} placeholder="0359/24" />
         </div>
-        <div className="grid grid-cols-2 gap-4 mt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-4">
           <Input label="Resolución SSP" value={form.resolucionSSP} onChange={(e) => updateField('resolucionSSP', e.target.value)} placeholder="SSP-XXXX" />
           <Input label="Corrientes Autorizadas" value={form.corrientesAutorizadas} onChange={(e) => updateField('corrientesAutorizadas', e.target.value)} placeholder="Y4, Y8, Y9" />
         </div>
-        <div className="grid grid-cols-2 gap-4 mt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-4">
           <Input label="Acta Inspección" value={form.actaInspeccion} onChange={(e) => updateField('actaInspeccion', e.target.value)} placeholder="rp-g000040" />
           <Input label="Acta Inspección 2" value={form.actaInspeccion2} onChange={(e) => updateField('actaInspeccion2', e.target.value)} placeholder="" />
         </div>
       </div>
       {!editId && (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <Input label="Nombre Responsable" value={form.nombre} onChange={(e) => updateField('nombre', e.target.value)} placeholder="Juan Perez" />
           <Input label="Password inicial" type="password" value={form.password} onChange={(e) => updateField('password', e.target.value)} placeholder="Min. 8 caracteres" />
         </div>
@@ -381,7 +384,7 @@ const TransportistasPage: React.FC = () => {
   const columns = [
     {
       key: 'transportista',
-      width: '24%',
+      width: '30%',
       header: 'Transportista',
       sortable: true,
       render: (row: typeof tableData[0]) => (
@@ -398,9 +401,9 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'habilitacion',
-      width: '14%',
+      width: '12%',
       header: 'Habilitación',
-      hiddenBelow: 'lg' as const,
+      hiddenBelow: 'xl' as const,
       render: (row: typeof tableData[0]) => {
         const status = getVencimientoStatus(row.vencimientoHabilitacion);
         return (
@@ -421,7 +424,7 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'localidad',
-      width: '12%',
+      width: '10%',
       header: 'Localidad',
       sortable: true,
       hiddenBelow: 'xl' as const,
@@ -443,7 +446,7 @@ const TransportistasPage: React.FC = () => {
       width: '7%',
       header: 'Vehículos',
       sortable: true,
-      hiddenBelow: 'lg' as const,
+      hiddenBelow: 'xl' as const,
       render: (row: typeof tableData[0]) => (
         <div className="text-center">
           <p className="text-sm font-bold text-neutral-900">{row.vehiculosCount}</p>
@@ -456,7 +459,7 @@ const TransportistasPage: React.FC = () => {
       width: '7%',
       header: 'Choferes',
       sortable: true,
-      hiddenBelow: 'lg' as const,
+      hiddenBelow: 'xl' as const,
       render: (row: typeof tableData[0]) => (
         <div className="text-center">
           <p className="text-sm font-bold text-neutral-900">{row.choferesCount}</p>
@@ -466,9 +469,9 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'contacto',
-      width: '18%',
+      width: '15%',
       header: 'Contacto',
-      hiddenBelow: 'xl' as const,
+      hiddenBelow: '2xl' as const,
       render: (row: typeof tableData[0]) => (
         <div className="text-xs min-w-0">
           {row.email && (
@@ -489,10 +492,10 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'ultimaActividad',
-      width: '10%',
+      width: '9%',
       header: 'Actividad',
       sortable: true,
-      hiddenBelow: 'xl' as const,
+      hiddenBelow: '2xl' as const,
       render: (row: typeof tableData[0]) => row.ultimaActividad ? (
         <span className="text-xs text-neutral-600">{formatRelativeTime(row.ultimaActividad)}</span>
       ) : (
@@ -649,26 +652,26 @@ const TransportistasPage: React.FC = () => {
                 size="md"
               />
             </div>
-            <div className="flex flex-wrap gap-2">
-              <select
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Select
                 value={filtroEstado}
-                onChange={(e) => { setFiltroEstado(e.target.value); setCurrentPage(1); }}
-                className="px-4 h-10 rounded-xl border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
-              >
-                <option value="todos">Todos los estados</option>
-                <option value="activo">Activo</option>
-                <option value="inactivo">Inactivo</option>
-              </select>
-              <select
+                onChange={(v) => { setFiltroEstado(v); setCurrentPage(1); }}
+                options={[
+                  { value: 'todos', label: 'Todos los estados' },
+                  { value: 'activo', label: 'Activo' },
+                  { value: 'inactivo', label: 'Inactivo' },
+                ]}
+                size="sm"
+              />
+              <Select
                 value={filtroLocalidad}
-                onChange={(e) => { setFiltroLocalidad(e.target.value); setCurrentPage(1); }}
-                className="px-4 h-10 rounded-xl border border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
-              >
-                <option value="todas">Todas las localidades</option>
-                {localidadesUnicas.map(loc => (
-                  <option key={loc} value={loc}>{loc}</option>
-                ))}
-              </select>
+                onChange={(v) => { setFiltroLocalidad(v); setCurrentPage(1); }}
+                options={[
+                  { value: 'todas', label: 'Todas las localidades' },
+                  ...localidadesUnicas.map(loc => ({ value: loc, label: loc })),
+                ]}
+                size="sm"
+              />
             </div>
           </div>
         </CardContent>
@@ -687,17 +690,51 @@ const TransportistasPage: React.FC = () => {
           </div>
         ) : (
           <>
-            <Table
-              data={filteredData}
-              columns={columns}
-              keyExtractor={(row) => row.id}
-              sortable={true}
-              onSort={handleSort}
-              onRowClick={(row) => navigate(`/admin/actores/transportistas/${row.id}`)}
-              emptyMessage="No se encontraron transportistas"
-              stickyHeader
-              fixedLayout
-            />
+            {/* Mobile cards */}
+            <div className="md:hidden space-y-2 p-3">
+              {filteredData.length === 0 ? (
+                <p className="text-center text-neutral-500 py-8 text-sm">No se encontraron transportistas</p>
+              ) : (
+                filteredData.map(row => (
+                  <div key={row.id} className="bg-white rounded-xl border border-neutral-100 p-3 cursor-pointer active:scale-[0.98] transition-transform" onClick={() => navigate(`/admin/actores/transportistas/${row.id}`)}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center shrink-0">
+                          <Truck size={16} className="text-orange-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm text-neutral-900 truncate">{row.razonSocial}</p>
+                          <p className="text-xs text-neutral-500 font-mono">{row.cuit}</p>
+                        </div>
+                      </div>
+                      <Badge variant="soft" color={row.activo ? 'success' : 'warning'} className="shrink-0 ml-2">
+                        {row.activo ? 'Activo' : 'Inactivo'}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-3 mt-2 text-xs text-neutral-500">
+                      <span>{row.numeroHabilitacion || '—'}</span>
+                      <span>{row.vehiculosCount} veh.</span>
+                      <span>{row.choferesCount} chof.</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden md:block">
+              <Table
+                data={filteredData}
+                columns={columns}
+                keyExtractor={(row) => row.id}
+                sortable={true}
+                onSort={handleSort}
+                onRowClick={(row) => navigate(`/admin/actores/transportistas/${row.id}`)}
+                emptyMessage="No se encontraron transportistas"
+                stickyHeader
+                fixedLayout
+              />
+            </div>
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}

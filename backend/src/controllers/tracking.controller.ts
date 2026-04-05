@@ -246,24 +246,17 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
     }
 
     // ── Estadísticas ──
+    // 4 Prisma queries + 1 raw SQL replaces the previous 12 individual count() calls
     const [
       totalManifiestos,
-      enTransitoActivos,
       generadoresActivos,
       operadoresActivos,
-      // Pipeline: count per estado filtered by date
-      borradores,
-      aprobados,
-      enTransitoCount,
-      entregados,
-      recibidos,
-      enTratamiento,
-      tratados,
-      rechazados,
+      // Single raw SQL GROUP BY replaces 8 per-estado count() queries
+      estadoCounts,
+      residuosAgg,
+      manifiestosPorDia,
     ] = await Promise.all([
       prisma.manifiesto.count({ where: { createdAt: dateFilter } }),
-      // KPI: EN_TRANSITO en el período (mismo criterio que pipeline — usa fechaRetiro)
-      prisma.manifiesto.count({ where: { estado: 'EN_TRANSITO', fechaRetiro: dateFilter } }),
       prisma.generador.count({
         where: {
           activo: true,
@@ -276,36 +269,55 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
           manifiestos: { some: { fechaRecepcion: dateFilter } },
         },
       }),
-      prisma.manifiesto.count({ where: { estado: 'BORRADOR', createdAt: dateFilter } }),
-      prisma.manifiesto.count({ where: { estado: 'APROBADO', createdAt: dateFilter } }),
-      // Pipeline EN_TRANSITO: use fechaRetiro (when transport confirmed pickup) as the period anchor
-      prisma.manifiesto.count({ where: { estado: 'EN_TRANSITO', fechaRetiro: dateFilter } }),
-      prisma.manifiesto.count({ where: { estado: 'ENTREGADO', OR: [{ createdAt: dateFilter }, { fechaEntrega: dateFilter }] } }),
-      prisma.manifiesto.count({ where: { estado: 'RECIBIDO', OR: [{ createdAt: dateFilter }, { fechaRecepcion: dateFilter }] } }),
-      prisma.manifiesto.count({ where: { estado: 'EN_TRATAMIENTO', OR: [{ createdAt: dateFilter }, { fechaRecepcion: dateFilter }] } }),
-      prisma.manifiesto.count({ where: { estado: 'TRATADO', OR: [{ createdAt: dateFilter }, { fechaCierre: dateFilter }] } }),
-      prisma.manifiesto.count({ where: { estado: 'RECHAZADO', createdAt: dateFilter } }),
+      // One query for all 8 estado counts (replaces 8 individual prisma.manifiesto.count calls)
+      prisma.$queryRaw<{ estado: string; cnt: bigint }[]>`
+        SELECT estado, COUNT(*)::bigint as cnt FROM manifiestos
+        WHERE (
+          (estado IN ('BORRADOR', 'APROBADO', 'RECHAZADO') AND "createdAt" >= ${desde} AND "createdAt" <= ${hasta})
+          OR (estado = 'EN_TRANSITO' AND "fechaRetiro" >= ${desde} AND "fechaRetiro" <= ${hasta})
+          OR (estado = 'ENTREGADO' AND ("createdAt" >= ${desde} AND "createdAt" <= ${hasta} OR "fechaEntrega" >= ${desde} AND "fechaEntrega" <= ${hasta}))
+          OR (estado = 'RECIBIDO' AND ("createdAt" >= ${desde} AND "createdAt" <= ${hasta} OR "fechaRecepcion" >= ${desde} AND "fechaRecepcion" <= ${hasta}))
+          OR (estado = 'EN_TRATAMIENTO' AND ("createdAt" >= ${desde} AND "createdAt" <= ${hasta} OR "fechaRecepcion" >= ${desde} AND "fechaRecepcion" <= ${hasta}))
+          OR (estado = 'TRATADO' AND ("createdAt" >= ${desde} AND "createdAt" <= ${hasta} OR "fechaCierre" >= ${desde} AND "fechaCierre" <= ${hasta}))
+        )
+        GROUP BY estado
+      `,
+      // Toneladas en el período (sum of cantidades in kg, convert)
+      prisma.manifiestoResiduo.aggregate({
+        _sum: { cantidad: true },
+        where: {
+          manifiesto: { createdAt: dateFilter },
+          unidad: { in: ['kg', 'toneladas'] },
+        },
+      }),
+      // Manifiestos por día
+      prisma.$queryRawUnsafe<Array<{ fecha: string; cantidad: bigint }>>(
+        `SELECT DATE("createdAt") as fecha, COUNT(*)::bigint as cantidad
+         FROM manifiestos
+         WHERE "createdAt" >= $1 AND "createdAt" <= $2
+         GROUP BY DATE("createdAt")
+         ORDER BY fecha ASC`,
+        desde,
+        hasta
+      ),
     ]);
 
-    // Toneladas en el período (sum of cantidades in kg, convert)
-    const residuosAgg = await prisma.manifiestoResiduo.aggregate({
-      _sum: { cantidad: true },
-      where: {
-        manifiesto: { createdAt: dateFilter },
-        unidad: { in: ['kg', 'toneladas'] },
-      },
-    });
+    // Map raw SQL estado counts to a lookup object
+    const countMap: Record<string, number> = {};
+    for (const row of estadoCounts) {
+      countMap[row.estado] = Number(row.cnt);
+    }
+    const borradores = countMap['BORRADOR'] || 0;
+    const aprobados = countMap['APROBADO'] || 0;
+    const enTransitoCount = countMap['EN_TRANSITO'] || 0;
+    const entregados = countMap['ENTREGADO'] || 0;
+    const recibidos = countMap['RECIBIDO'] || 0;
+    const enTratamiento = countMap['EN_TRATAMIENTO'] || 0;
+    const tratados = countMap['TRATADO'] || 0;
+    const rechazados = countMap['RECHAZADO'] || 0;
 
-    // Manifiestos por día
-    const manifiestosPorDia = await prisma.$queryRawUnsafe<Array<{ fecha: string; cantidad: bigint }>>(
-      `SELECT DATE("createdAt") as fecha, COUNT(*)::bigint as cantidad
-       FROM manifiestos
-       WHERE "createdAt" >= $1 AND "createdAt" <= $2
-       GROUP BY DATE("createdAt")
-       ORDER BY fecha ASC`,
-      desde,
-      hasta
-    );
+    // KPI: enTransitoActivos uses same data as the pipeline EN_TRANSITO count
+    const enTransitoActivos = enTransitoCount;
 
     result.estadisticas = {
       totalManifiestos,

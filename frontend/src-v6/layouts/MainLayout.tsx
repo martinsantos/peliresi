@@ -44,6 +44,7 @@ import { ConnectivityIndicator } from '../components/ConnectivityIndicator';
 import { OnboardingTour, resetOnboardingTour } from '../components/OnboardingTour';
 import { DemoAppOnboarding } from '../components/DemoAppOnboarding';
 import { useAuth } from '../contexts/AuthContext';
+import { useImpersonation } from '../contexts/ImpersonationContext';
 import { ImpersonationBanner } from '../components/ImpersonationBanner';
 
 // ========================================
@@ -68,7 +69,8 @@ export const MainLayout: React.FC = () => {
   }, []);
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isAdminTransportista, isAdminGenerador, isAdminOperador, canAccess, isLoading, impersonationData, exitImpersonation } = useAuth();
+  const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isAdminTransportista, isAdminGenerador, isAdminOperador, canAccess, isLoading } = useAuth();
+  const { impersonationData, exitImpersonation } = useImpersonation();
 
   // Guard: show loading or redirect if no user
   if (isLoading) {

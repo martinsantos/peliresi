@@ -10,7 +10,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { WifiOff, Wifi } from 'lucide-react';
 import { useConnectivity } from '../hooks/useConnectivity';
 
-export const ConnectivityIndicator: React.FC = () => {
+export const ConnectivityIndicator: React.FC = React.memo(function ConnectivityIndicator() {
   const { isOnline } = useConnectivity({ enablePing: false });
 
   // Track whether we've ever been offline so we can show "restored" message
@@ -69,6 +69,6 @@ export const ConnectivityIndicator: React.FC = () => {
       )}
     </div>
   );
-};
+});
 
 export default ConnectivityIndicator;

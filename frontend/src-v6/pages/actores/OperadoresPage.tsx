@@ -31,6 +31,7 @@ import { Badge } from '../../components/ui/BadgeV2';
 import { Input } from '../../components/ui/Input';
 import { Modal, ConfirmModal } from '../../components/ui/Modal';
 import { toast } from '../../components/ui/Toast';
+import { Select } from '../../components/ui/Select';
 import {
   useOperadores,
   useCreateOperador,
@@ -148,20 +149,20 @@ const OperadoresPage: React.FC = () => {
 
   const renderForm = () => (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <Input label="Razon Social" value={form.razonSocial} onChange={(e) => updateField('razonSocial', e.target.value)} placeholder="Empresa S.A." />
         <Input label="CUIT" value={form.cuit} onChange={(e) => updateField('cuit', e.target.value)} placeholder="30-12345678-9" />
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <Input label="Email" type="email" value={form.email} onChange={(e) => updateField('email', e.target.value)} placeholder="contacto@empresa.com" />
         <Input label="Telefono" value={form.telefono} onChange={(e) => updateField('telefono', e.target.value)} placeholder="+54 261 ..." />
       </div>
       <Input label="Domicilio" value={form.domicilio} onChange={(e) => updateField('domicilio', e.target.value)} placeholder="Ruta 40 Km 1234, Guaymallen" />
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <Input label="N. Habilitacion" value={form.numeroHabilitacion} onChange={(e) => updateField('numeroHabilitacion', e.target.value)} placeholder="HAB-OP-2024-XXXX" />
         <Input label="Categoria" value={form.categoria} onChange={(e) => updateField('categoria', e.target.value)} placeholder="Incineracion" />
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <Input label="Nombre Responsable" value={form.nombre} onChange={(e) => updateField('nombre', e.target.value)} placeholder="Juan Perez" />
         <Input label="Password inicial" type="password" value={form.password} onChange={(e) => updateField('password', e.target.value)} placeholder="Min. 8 caracteres" />
       </div>
@@ -258,15 +259,18 @@ const OperadoresPage: React.FC = () => {
             />
           </div>
           <div className="flex gap-2">
-            <select
+            <Select
               value={filtroEstado}
-              onChange={(e) => setFiltroEstado(e.target.value)}
-              className="px-4 py-2 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
-            >
-              <option value="">Todos los estados</option>
-              <option value="ACTIVO">Activo</option>
-              <option value="INACTIVO">Inactivo</option>
-            </select>
+              onChange={(val) => setFiltroEstado(val)}
+              placeholder="Todos los estados"
+              options={[
+                { value: '', label: 'Todos los estados' },
+                { value: 'ACTIVO', label: 'Activo' },
+                { value: 'INACTIVO', label: 'Inactivo' },
+              ]}
+              size="sm"
+              isFullWidth={false}
+            />
             <div className="flex bg-neutral-100 rounded-lg p-1">
               <button
                 onClick={() => setVista('lista')}

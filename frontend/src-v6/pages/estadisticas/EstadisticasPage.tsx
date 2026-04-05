@@ -185,7 +185,7 @@ const EstadisticasPage: React.FC = () => {
                 <p className="text-sm text-primary-700">Total Manifiestos</p>
                 <p className="text-3xl font-bold text-primary-900">{stats.total}</p>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3">
                 <div className="p-3 bg-info-50 rounded-lg text-center">
                   <p className="text-2xl font-bold text-info-900">{stats.enTransito}</p>
                   <p className="text-xs text-info-700">En tránsito</p>

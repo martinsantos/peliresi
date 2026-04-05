@@ -14,6 +14,7 @@ export default defineConfig({
           'vendor-charts': ['recharts'],
           'vendor-maps': ['leaflet', 'react-leaflet'],
           'vendor-pdf': ['jspdf', 'jspdf-autotable'],
+          'vendor-qr': ['jsqr', 'qrcode.react'],
         },
       },
     },

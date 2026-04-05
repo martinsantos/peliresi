@@ -79,7 +79,7 @@ const dotColors: Record<string, string> = {
   neutral: 'bg-neutral-500',
 };
 
-export const Badge: React.FC<BadgeProps> = ({
+export const Badge: React.FC<BadgeProps> = React.memo(function Badge({
   variant = 'default',
   color = 'neutral',
   size = 'md',
@@ -88,7 +88,7 @@ export const Badge: React.FC<BadgeProps> = ({
   children,
   className,
   ...props
-}) => {
+}) {
   const colorKey = color || 'neutral';
   const colorStyle = colorStyles[variant]?.[colorKey] || colorStyles[variant]?.['neutral'] || '';
 
@@ -117,6 +117,6 @@ export const Badge: React.FC<BadgeProps> = ({
       {children}
     </span>
   );
-};
+});
 
 export default Badge;

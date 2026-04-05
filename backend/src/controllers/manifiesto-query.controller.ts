@@ -2,12 +2,18 @@ import { Response, NextFunction } from 'express';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import prisma from '../lib/prisma';
+import { parsePagination } from '../utils/pagination';
+import { applyRoleFilter } from '../utils/roleFilter';
+import { MANIFIESTO_DETAIL_INCLUDE } from '../utils/manifiestoIncludes';
 
 // Obtener todos los manifiestos
 export const getManifiestos = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { estado, generadorId, transportistaId, operadorId, tipoResiduoId, search, fechaDesde, fechaHasta, page = 1, limit = 10, sortBy, sortOrder } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
+    const { estado, generadorId, transportistaId, operadorId, tipoResiduoId, search, fechaDesde, fechaHasta, page, limit, sortBy, sortOrder } = req.query;
+    const { skip, take, page: pageNum, limit: limitNum } = parsePagination(
+        { page: page as string, limit: limit as string },
+        { limit: 10, maxLimit: 500 }
+    );
 
     const where: any = {};
 
@@ -42,13 +48,7 @@ export const getManifiestos = async (req: AuthRequest, res: Response, next: Next
     }
 
     // Filtrar segun el rol del usuario
-    if (req.user.rol === 'GENERADOR' && req.user.generador) {
-      where.generadorId = req.user.generador.id;
-    } else if (req.user.rol === 'TRANSPORTISTA' && req.user.transportista) {
-      where.transportistaId = req.user.transportista.id;
-    } else if (req.user.rol === 'OPERADOR' && req.user.operador) {
-      where.operadorId = req.user.operador.id;
-    }
+    applyRoleFilter(where, req.user);
 
     // Ordering: explicit sortBy/sortOrder take precedence over smart state-based ordering
     const dir = sortOrder === 'asc' ? 'asc' : 'desc';
@@ -71,7 +71,7 @@ export const getManifiestos = async (req: AuthRequest, res: Response, next: Next
       prisma.manifiesto.findMany({
         where,
         skip,
-        take: Number(limit),
+        take,
         orderBy,
         include: {
           generador: true,
@@ -96,10 +96,10 @@ export const getManifiestos = async (req: AuthRequest, res: Response, next: Next
       data: {
         manifiestos,
         pagination: {
-          page: Number(page),
-          limit: Number(limit),
+          page: pageNum,
+          limit: limitNum,
           total,
-          pages: Math.ceil(total / Number(limit))
+          pages: Math.ceil(total / limitNum)
         }
       }
     });
@@ -115,37 +115,7 @@ export const getManifiestoById = async (req: AuthRequest, res: Response, next: N
 
     const manifiesto = await prisma.manifiesto.findUnique({
       where: { id },
-      include: {
-        generador: true,
-        transportista: {
-          include: {
-            vehiculos: true,
-            choferes: true
-          }
-        },
-        operador: true,
-        residuos: {
-          include: {
-            tipoResiduo: true
-          }
-        },
-        eventos: {
-          orderBy: { createdAt: 'desc' },
-          include: {
-            usuario: {
-              select: {
-                nombre: true,
-                apellido: true,
-                rol: true
-              }
-            }
-          }
-        },
-        tracking: {
-          orderBy: { timestamp: 'desc' },
-          take: 100
-        }
-      }
+      include: MANIFIESTO_DETAIL_INCLUDE,
     });
 
     if (!manifiesto) {
@@ -167,13 +137,7 @@ export const getDashboardStats = async (req: AuthRequest, res: Response, next: N
     const where: any = {};
 
     // Filtrar segun rol
-    if (req.user.rol === 'GENERADOR' && req.user.generador) {
-      where.generadorId = req.user.generador.id;
-    } else if (req.user.rol === 'TRANSPORTISTA' && req.user.transportista) {
-      where.transportistaId = req.user.transportista.id;
-    } else if (req.user.rol === 'OPERADOR' && req.user.operador) {
-      where.operadorId = req.user.operador.id;
-    }
+    applyRoleFilter(where, req.user);
 
     // Optimized: 1 groupBy + 2 queries instead of 12 individual counts
     const [estadoCounts, recientes, enTransitoList] = await Promise.all([

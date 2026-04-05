@@ -20,6 +20,7 @@ import {
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
+import { Select } from '../../components/ui/Select';
 import { Badge } from '../../components/ui/BadgeV2';
 import { toast } from '../../components/ui/Toast';
 import { useOperador, useCreateOperador, useUpdateOperador } from '../../hooks/useActores';
@@ -426,20 +427,26 @@ const NuevoOperadorPage: React.FC = () => {
                 <Input label="Telefono" value={form.telefono} onChange={e => up('telefono', e.target.value)} placeholder="+54 261 4XX-XXXX" />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">Tipo de Operador</label>
-                  <select value={form.tipoOperador} onChange={e => up('tipoOperador', e.target.value)} className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm bg-white">
-                    <option value="">Seleccionar...</option>
-                    {TIPO_OPERADOR.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">Categoria</label>
-                  <select value={form.categoria} onChange={e => up('categoria', e.target.value)} className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm bg-white">
-                    <option value="">Seleccionar...</option>
-                    {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
+                <Select
+                  label="Tipo de Operador"
+                  value={form.tipoOperador}
+                  onChange={(val) => up('tipoOperador', val)}
+                  options={[
+                    { value: '', label: 'Seleccionar...' },
+                    ...TIPO_OPERADOR.map(t => ({ value: t, label: t })),
+                  ]}
+                  size="base"
+                />
+                <Select
+                  label="Categoria"
+                  value={form.categoria}
+                  onChange={(val) => up('categoria', val)}
+                  options={[
+                    { value: '', label: 'Seleccionar...' },
+                    ...CATEGORIAS.map(c => ({ value: c, label: c })),
+                  ]}
+                  size="base"
+                />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input label="N Habilitacion DPA" value={form.numeroHabilitacion} onChange={e => up('numeroHabilitacion', e.target.value)} placeholder="O-000XXX" />
@@ -472,13 +479,16 @@ const NuevoOperadorPage: React.FC = () => {
                 <Input label="Calle / Ruta" value={form.domicilioLegalCalle} onChange={e => up('domicilioLegalCalle', e.target.value)} placeholder="Av. San Martin 1234" />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Input label="Localidad" value={form.domicilioLegalLocalidad} onChange={e => up('domicilioLegalLocalidad', e.target.value)} placeholder="Ciudad de Mendoza" />
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">Departamento</label>
-                    <select value={form.domicilioLegalDepto} onChange={e => up('domicilioLegalDepto', e.target.value)} className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm bg-white">
-                      <option value="">Seleccionar...</option>
-                      {DEPARTAMENTOS_MENDOZA.map(d => <option key={d} value={d}>{d}</option>)}
-                    </select>
-                  </div>
+                  <Select
+                    label="Departamento"
+                    value={form.domicilioLegalDepto}
+                    onChange={(val) => up('domicilioLegalDepto', val)}
+                    options={[
+                      { value: '', label: 'Seleccionar...' },
+                      ...DEPARTAMENTOS_MENDOZA.map(d => ({ value: d, label: d })),
+                    ]}
+                    size="base"
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -500,13 +510,16 @@ const NuevoOperadorPage: React.FC = () => {
                   <Input label="Calle / Ruta" value={form.domicilioRealCalle} onChange={e => up('domicilioRealCalle', e.target.value)} placeholder="Ruta 40 km 3200" />
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Input label="Localidad" value={form.domicilioRealLocalidad} onChange={e => up('domicilioRealLocalidad', e.target.value)} placeholder="Lujan de Cuyo" />
-                    <div>
-                      <label className="block text-sm font-medium text-neutral-700 mb-1">Departamento</label>
-                      <select value={form.domicilioRealDepto} onChange={e => up('domicilioRealDepto', e.target.value)} className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm bg-white">
-                        <option value="">Seleccionar...</option>
-                        {DEPARTAMENTOS_MENDOZA.map(d => <option key={d} value={d}>{d}</option>)}
-                      </select>
-                    </div>
+                    <Select
+                      label="Departamento"
+                      value={form.domicilioRealDepto}
+                      onChange={(val) => up('domicilioRealDepto', val)}
+                      options={[
+                        { value: '', label: 'Seleccionar...' },
+                        ...DEPARTAMENTOS_MENDOZA.map(d => ({ value: d, label: d })),
+                      ]}
+                      size="base"
+                    />
                   </div>
                   <Input label="Coordenadas Geograficas" value={form.coordenadas} onChange={e => up('coordenadas', e.target.value)} placeholder="lat -32.89, long -68.83" />
                 </CardContent>

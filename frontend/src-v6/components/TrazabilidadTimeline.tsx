@@ -112,11 +112,11 @@ function buildFilters(actorType: ActorType, actorId: string, page: number): Mani
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-const TrazabilidadTimeline: React.FC<TrazabilidadTimelineProps> = ({
+const TrazabilidadTimeline: React.FC<TrazabilidadTimelineProps> = React.memo(function TrazabilidadTimeline({
   actorType,
   actorId,
   emptyLabel,
-}) => {
+}) {
   const navigate = useNavigate();
 
   // Infinite scroll state
@@ -417,6 +417,6 @@ const TrazabilidadTimeline: React.FC<TrazabilidadTimelineProps> = ({
       </div>
     </Card>
   );
-};
+});
 
 export default TrazabilidadTimeline;

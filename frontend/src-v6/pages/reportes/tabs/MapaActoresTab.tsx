@@ -8,6 +8,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Card } from '../../../components/ui/CardV2';
 import { Badge } from '../../../components/ui/BadgeV2';
+import { Select } from '../../../components/ui/Select';
 import { ACTOR_ICONS, ACTOR_COLORS, createClusterIcon } from '../../../utils/map-icons';
 import { getDepartamento, DEPARTAMENTOS_MENDOZA } from '../../../utils/mendoza-departamentos';
 import { clusterMarkers, downloadCsv } from './shared';
@@ -202,16 +203,17 @@ export default function MapaActoresTab({
         <div className="flex flex-wrap items-center gap-3 p-3.5 bg-white rounded-2xl border border-neutral-100 shadow-sm">
           <Layers size={16} className="text-neutral-400" />
           {/* Departamento filter */}
-          <select
+          <Select
             value={selectedDep}
-            onChange={e => setSelectedDep(e.target.value)}
-            className="h-8 px-2 pr-7 text-xs border border-neutral-200 rounded-lg bg-white text-neutral-700 focus:border-primary-400 focus:ring-1 focus:ring-primary-200 outline-none"
-          >
-            <option value="">Todos los deptos.</option>
-            {DEPARTAMENTOS_MENDOZA.map(d => (
-              <option key={d.nombre} value={d.nombre}>{d.nombre}</option>
-            ))}
-          </select>
+            onChange={(val) => setSelectedDep(val)}
+            placeholder="Todos los deptos."
+            options={[
+              { value: '', label: 'Todos los deptos.' },
+              ...DEPARTAMENTOS_MENDOZA.map(d => ({ value: d.nombre, label: d.nombre })),
+            ]}
+            size="sm"
+            isFullWidth={false}
+          />
           <span className="w-px h-5 bg-neutral-200" />
           {([
             { key: 'generadores' as const, label: 'Generadores', color: 'bg-purple-500', activeClass: 'bg-purple-50 border-purple-300 text-purple-700 shadow-sm', count: selectedDep ? filteredGen.length : totalGen },

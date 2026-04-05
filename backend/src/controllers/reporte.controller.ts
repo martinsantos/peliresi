@@ -2,6 +2,9 @@ import { Response, NextFunction } from 'express';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import prisma from '../lib/prisma';
+import { parsePagination } from '../utils/pagination';
+import { applyRoleFilter, isFullAccess as checkFullAccess } from '../utils/roleFilter';
+import { MANIFIESTO_LIST_INCLUDE } from '../utils/manifiestoIncludes';
 
 // Sanitize CSV cell to prevent CSV injection (formula injection via =, +, -, @, \t, \r)
 function sanitizeCsvCell(value: any): string {
@@ -15,11 +18,12 @@ function sanitizeCsvCell(value: any): string {
 // Reporte de manifiestos por período (CU-A11) — with pagination + SQL aggregation
 export const reporteManifiestosPorPeriodo = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const { fechaInicio, fechaFin, estado, tipoResiduoId, page = '1', limit = '100' } = req.query;
+        const { fechaInicio, fechaFin, estado, tipoResiduoId, page, limit } = req.query;
 
-        const pageNum = Math.max(1, Number(page));
-        const limitNum = Math.min(500, Math.max(1, Number(limit)));
-        const skip = (pageNum - 1) * limitNum;
+        const { skip, take: limitNum, page: pageNum } = parsePagination(
+            { page: page as string, limit: limit as string },
+            { limit: 100, maxLimit: 500 }
+        );
 
         const where: any = {};
 
@@ -39,27 +43,13 @@ export const reporteManifiestosPorPeriodo = async (req: AuthRequest, res: Respon
         }
 
         // Filtrar por rol (ADMIN, ADMIN_*, esInspector → sin filtro)
-        const isFullAccess = ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'].includes(req.user.rol) || req.user.esInspector;
-        if (!isFullAccess) {
-            if (req.user.rol === 'GENERADOR' && req.user.generador) {
-                where.generadorId = req.user.generador.id;
-            } else if (req.user.rol === 'TRANSPORTISTA' && req.user.transportista) {
-                where.transportistaId = req.user.transportista.id;
-            } else if (req.user.rol === 'OPERADOR' && req.user.operador) {
-                where.operadorId = req.user.operador.id;
-            }
-        }
+        applyRoleFilter(where, req.user);
 
         // Run paginated query + count + aggregations in parallel
         const [manifiestos, totalCount, porEstadoRaw, totalResiduosAgg] = await Promise.all([
             prisma.manifiesto.findMany({
                 where,
-                include: {
-                    generador: { select: { razonSocial: true, cuit: true } },
-                    transportista: { select: { razonSocial: true, cuit: true } },
-                    operador: { select: { razonSocial: true, cuit: true } },
-                    residuos: { include: { tipoResiduo: true } }
-                },
+                include: MANIFIESTO_LIST_INCLUDE,
                 orderBy: { createdAt: 'desc' },
                 skip,
                 take: limitNum,
@@ -137,11 +127,12 @@ export const reporteManifiestosPorPeriodo = async (req: AuthRequest, res: Respon
 // Reporte de residuos tratados por operador (CU-O12) — with pagination
 export const reporteResiduosTratados = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const { fechaInicio, fechaFin, page = '1', limit = '100' } = req.query;
+        const { fechaInicio, fechaFin, page, limit } = req.query;
 
-        const pageNum = Math.max(1, Number(page));
-        const limitNum = Math.min(500, Math.max(1, Number(limit)));
-        const skip = (pageNum - 1) * limitNum;
+        const { skip, take: limitNum, page: pageNum } = parsePagination(
+            { page: page as string, limit: limit as string },
+            { limit: 100, maxLimit: 500 }
+        );
 
         const where: any = {
             estado: 'TRATADO'
@@ -155,16 +146,7 @@ export const reporteResiduosTratados = async (req: AuthRequest, res: Response, n
         }
 
         // Filtrar por rol (ADMIN, ADMIN_*, esInspector → sin filtro)
-        const isFullAccess = ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'].includes(req.user.rol) || req.user.esInspector;
-        if (!isFullAccess) {
-            if (req.user.rol === 'GENERADOR' && req.user.generador) {
-                where.generadorId = req.user.generador.id;
-            } else if (req.user.rol === 'TRANSPORTISTA' && req.user.transportista) {
-                where.transportistaId = req.user.transportista.id;
-            } else if (req.user.rol === 'OPERADOR' && req.user.operador) {
-                where.operadorId = req.user.operador.id;
-            }
-        }
+        applyRoleFilter(where, req.user);
 
         const [manifiestos, totalCount] = await Promise.all([
             prisma.manifiesto.findMany({
@@ -245,11 +227,12 @@ export const reporteResiduosTratados = async (req: AuthRequest, res: Response, n
 // Reporte de transporte — with pagination + _count aggregation
 export const reporteTransporte = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const { fechaInicio, fechaFin, page = '1', limit = '50' } = req.query;
+        const { fechaInicio, fechaFin, page, limit } = req.query;
 
-        const pageNum = Math.max(1, Number(page));
-        const limitNum = Math.min(200, Math.max(1, Number(limit)));
-        const skip = (pageNum - 1) * limitNum;
+        const { skip, take: limitNum, page: pageNum } = parsePagination(
+            { page: page as string, limit: limit as string },
+            { limit: 50, maxLimit: 200 }
+        );
 
         const manifiestoWhere: any = {};
 
@@ -260,7 +243,7 @@ export const reporteTransporte = async (req: AuthRequest, res: Response, next: N
         }
 
         // Role-based filtering (ADMIN, ADMIN_*, esInspector → sin filtro)
-        const isFullAccess = ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'].includes(req.user.rol) || req.user.esInspector;
+        const isFullAccess = checkFullAccess(req.user);
         const transportistaWhere: any = {};
 
         if (!isFullAccess) {
@@ -363,26 +346,41 @@ export const getLogAuditoria = async (req: AuthRequest, res: Response, next: Nex
             throw new AppError('Acceso no autorizado', 403);
         }
 
-        const { fechaInicio, fechaFin, tipo, manifiestoId, page = 1, limit = 50 } = req.query;
-        const skip = (Number(page) - 1) * Number(limit);
+        const { fechaInicio, fechaFin, tipo, manifiestoId, usuarioId, accion, page, limit, sortBy, sortOrder } = req.query;
+        const { skip, take: limitNum, page: pageNum, limit: limitVal } = parsePagination(
+            { page: page as string, limit: limit as string },
+            { limit: 200, maxLimit: 1000 }
+        );
 
         const where: any = {};
 
         if (fechaInicio || fechaFin) {
             where.createdAt = {};
             if (fechaInicio) where.createdAt.gte = new Date(fechaInicio as string);
-            if (fechaFin) where.createdAt.lte = new Date(fechaFin as string);
+            if (fechaFin) {
+                const end = new Date(fechaFin as string);
+                end.setHours(23, 59, 59, 999);
+                where.createdAt.lte = end;
+            }
         }
 
         if (tipo) where.tipo = tipo;
+        if (accion) where.tipo = accion;
         if (manifiestoId) where.manifiestoId = manifiestoId;
+        if (usuarioId) where.usuarioId = usuarioId;
+
+        // Build orderBy — supports sorting by usuario.nombre, tipo, createdAt
+        const dir = (sortOrder as string) === 'asc' ? 'asc' : 'desc';
+        let orderBy: any = { createdAt: dir };
+        if (sortBy === 'usuario') orderBy = { usuario: { nombre: dir } };
+        else if (sortBy === 'tipo' || sortBy === 'accion') orderBy = { tipo: dir };
 
         const [eventos, total] = await Promise.all([
             prisma.eventoManifiesto.findMany({
                 where,
                 skip,
-                take: Number(limit),
-                orderBy: { createdAt: 'desc' },
+                take: limitNum,
+                orderBy,
                 include: {
                     usuario: {
                         select: { nombre: true, apellido: true, email: true, rol: true }
@@ -423,10 +421,10 @@ export const getLogAuditoria = async (req: AuthRequest, res: Response, next: Nex
                     }, {})
                 },
                 pagination: {
-                    page: Number(page),
-                    limit: Number(limit),
+                    page: pageNum,
+                    limit: limitVal,
                     total,
-                    pages: Math.ceil(total / Number(limit))
+                    pages: Math.ceil(total / limitVal)
                 }
             }
         });

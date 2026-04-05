@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Leaf, ArrowLeft, User, Mail, Lock, Phone, Building2, AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { authService } from '../../services/auth.service';
+import { Select } from '../../components/ui/Select';
 
 type RolType = 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR' | 'ADMIN_TRANSPORTISTA' | 'ADMIN_GENERADOR' | 'ADMIN_OPERADOR';
 
@@ -112,18 +113,14 @@ const RegistroPage: React.FC = () => {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Tipo de cuenta */}
-        <div>
-          <label className="block text-sm font-medium text-neutral-700 mb-1.5">Tipo de cuenta</label>
-          <select
-            value={rol}
-            onChange={e => setRol(e.target.value as RolType)}
-            className="w-full h-11 px-3 border border-neutral-200 rounded-xl text-sm focus:border-[#1B5E3C] focus:ring-4 focus:ring-[#1B5E3C]/15 outline-none"
-          >
-            {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-          </select>
-        </div>
+        <Select
+          label="Tipo de cuenta"
+          value={rol}
+          onChange={(val) => setRol(val as RolType)}
+          options={ROLES.map(r => ({ value: r.value, label: r.label }))}
+        />
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3">
           <div>
             <label className="block text-sm font-medium text-neutral-700 mb-1.5">Nombre *</label>
             <div className="relative">
@@ -157,7 +154,7 @@ const RegistroPage: React.FC = () => {
           {form.password && <PasswordStrength password={form.password} />}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3">
           <div>
             <label className="block text-sm font-medium text-neutral-700 mb-1.5">CUIT</label>
             <input value={form.cuit} onChange={set('cuit')} placeholder="20-12345678-9" className="w-full h-11 px-3 border border-neutral-200 rounded-xl text-sm focus:border-[#1B5E3C] focus:ring-4 focus:ring-[#1B5E3C]/15 outline-none" />

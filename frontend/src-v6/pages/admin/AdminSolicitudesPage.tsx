@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
 import { Badge } from '../../components/ui/BadgeV2';
+import { Select } from '../../components/ui/Select';
 import { useSolicitudes } from '../../hooks/useSolicitudes';
 import type { EstadoSolicitud, SolicitudInscripcion } from '../../types/api';
 
@@ -93,27 +94,33 @@ const AdminSolicitudesPage: React.FC = () => {
       {/* Filter Bar */}
       <div className="flex items-center gap-3 flex-wrap">
         <Filter size={16} className="text-neutral-400" />
-        <select
+        <Select
           value={estado}
-          onChange={e => { setEstado(e.target.value); setPage(1); }}
-          className="h-9 px-3 rounded-lg border border-neutral-200 text-sm bg-white"
-        >
-          <option value="">Todos los estados</option>
-          <option value="ENVIADA">Pendientes</option>
-          <option value="EN_REVISION">En Revision</option>
-          <option value="OBSERVADA">Observadas</option>
-          <option value="APROBADA">Aprobadas</option>
-          <option value="RECHAZADA">Rechazadas</option>
-        </select>
-        <select
+          onChange={(val) => { setEstado(val); setPage(1); }}
+          placeholder="Todos los estados"
+          options={[
+            { value: '', label: 'Todos los estados' },
+            { value: 'ENVIADA', label: 'Pendientes' },
+            { value: 'EN_REVISION', label: 'En Revision' },
+            { value: 'OBSERVADA', label: 'Observadas' },
+            { value: 'APROBADA', label: 'Aprobadas' },
+            { value: 'RECHAZADA', label: 'Rechazadas' },
+          ]}
+          size="sm"
+          isFullWidth={false}
+        />
+        <Select
           value={tipoActor}
-          onChange={e => { setTipoActor(e.target.value); setPage(1); }}
-          className="h-9 px-3 rounded-lg border border-neutral-200 text-sm bg-white"
-        >
-          <option value="">Todos los tipos</option>
-          <option value="GENERADOR">Generadores</option>
-          <option value="OPERADOR">Operadores</option>
-        </select>
+          onChange={(val) => { setTipoActor(val); setPage(1); }}
+          placeholder="Todos los tipos"
+          options={[
+            { value: '', label: 'Todos los tipos' },
+            { value: 'GENERADOR', label: 'Generadores' },
+            { value: 'OPERADOR', label: 'Operadores' },
+          ]}
+          size="sm"
+          isFullWidth={false}
+        />
         <div className="relative flex-1 min-w-[200px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
           <input

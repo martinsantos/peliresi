@@ -251,7 +251,7 @@ const GeneradorDashboard: React.FC = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
@@ -279,7 +279,7 @@ const GeneradorDashboard: React.FC = () => {
       </div>
 
       {/* Acciones principales */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <Button 
           size="lg" 
           leftIcon={<Plus size={20} />}
@@ -439,7 +439,7 @@ const TransportistaDashboard: React.FC = () => {
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
@@ -467,7 +467,7 @@ const TransportistaDashboard: React.FC = () => {
       </div>
 
       {/* Acciones */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <Button
           size="lg"
           leftIcon={<MapPin size={20} />}
@@ -549,7 +549,7 @@ const OperadorDashboard: React.FC = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
@@ -577,7 +577,7 @@ const OperadorDashboard: React.FC = () => {
       </div>
 
       {/* Acciones */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <Button 
           size="lg" 
           leftIcon={<QrCode size={20} />}

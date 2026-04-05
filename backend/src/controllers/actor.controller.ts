@@ -4,14 +4,17 @@ import bcrypt from 'bcryptjs';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { auditarActor } from '../utils/auditoria';
+import { parsePagination } from '../utils/pagination';
 
 // ============== GENERADORES (CU-A06) ==============
 
 export const getGeneradores = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const { search, activo, page = 1, limit = 10, sortBy, sortOrder } = req.query;
-        const limitNum = Math.min(5000, Math.max(1, Number(limit)));
-        const skip = (Number(page) - 1) * limitNum;
+        const { search, activo, page, limit, sortBy, sortOrder } = req.query;
+        const { skip, take: limitNum, page: pageNum } = parsePagination(
+            { page: page as string, limit: limit as string },
+            { limit: 10, maxLimit: 5000 }
+        );
         const order: 'asc' | 'desc' = sortOrder === 'desc' ? 'desc' : 'asc';
         const GEN_SORT: Record<string, any> = {
             razonSocial: { razonSocial: order },
@@ -67,7 +70,7 @@ export const getGeneradores = async (req: AuthRequest, res: Response, next: Next
             success: true,
             data: {
                 generadores: mapped,
-                pagination: { page: Number(page), limit: limitNum, total, pages: Math.ceil(total / limitNum) }
+                pagination: { page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) }
             }
         });
     } catch (error) {
@@ -249,9 +252,11 @@ export const deleteGenerador = async (req: AuthRequest, res: Response, next: Nex
 
 export const getTransportistas = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const { search, activo, page = 1, limit = 10, sortBy, sortOrder } = req.query;
-        const limitNum = Math.min(500, Math.max(1, Number(limit)));
-        const skip = (Number(page) - 1) * limitNum;
+        const { search, activo, page, limit, sortBy, sortOrder } = req.query;
+        const { skip, take: limitNum, page: pageNum } = parsePagination(
+            { page: page as string, limit: limit as string },
+            { limit: 10, maxLimit: 500 }
+        );
         const order: 'asc' | 'desc' = sortOrder === 'desc' ? 'desc' : 'asc';
         const TRANS_SORT: Record<string, any> = {
             razonSocial: { razonSocial: order },
@@ -309,7 +314,7 @@ export const getTransportistas = async (req: AuthRequest, res: Response, next: N
             success: true,
             data: {
                 transportistas: mappedT,
-                pagination: { page: Number(page), limit: limitNum, total, pages: Math.ceil(total / limitNum) }
+                pagination: { page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) }
             }
         });
     } catch (error) {
@@ -664,9 +669,11 @@ export const deleteChofer = async (req: AuthRequest, res: Response, next: NextFu
 
 export const getOperadores = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const { search, activo, page = 1, limit = 10, sortBy, sortOrder } = req.query;
-        const limitNum = Math.min(5000, Math.max(1, Number(limit)));
-        const skip = (Number(page) - 1) * limitNum;
+        const { search, activo, page, limit, sortBy, sortOrder } = req.query;
+        const { skip, take: limitNum, page: pageNum } = parsePagination(
+            { page: page as string, limit: limit as string },
+            { limit: 10, maxLimit: 5000 }
+        );
         const order: 'asc' | 'desc' = sortOrder === 'desc' ? 'desc' : 'asc';
         const OPER_SORT: Record<string, any> = {
             razonSocial: { razonSocial: order },
@@ -721,7 +728,7 @@ export const getOperadores = async (req: AuthRequest, res: Response, next: NextF
             success: true,
             data: {
                 operadores: mappedO,
-                pagination: { page: Number(page), limit: limitNum, total, pages: Math.ceil(total / limitNum) }
+                pagination: { page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) }
             }
         });
     } catch (error) {

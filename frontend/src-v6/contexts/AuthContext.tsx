@@ -4,14 +4,15 @@
  * Contexto de autenticacion contra API real
  */
 
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import OnboardingWizard from '../components/OnboardingWizard';
 import { authService } from '../services/auth.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { clearUserOfflineData } from '../services/offline-sync';
 import { clearSyncQueue } from '../services/indexeddb';
 import { useSessionTimeout } from '../hooks/useSessionTimeout';
-import { getAccessToken, getRefreshToken, setTokens, clearTokens, api } from '../services/api';
+import { getAccessToken, clearTokens } from '../services/api';
+import { ImpersonationProvider } from './ImpersonationContext';
 import type { Usuario } from '../types/models';
 
 // ========================================
@@ -33,13 +34,6 @@ export interface User {
   esInspector?: boolean;
 }
 
-export interface ImpersonationData {
-  adminToken: string;
-  adminRefreshToken: string;
-  adminUser: User;
-  impersonatedUser: User;
-}
-
 export interface AuthContextType {
   currentUser: User | null;
   users: User[];
@@ -56,9 +50,6 @@ export interface AuthContextType {
   canAccess: (permission: string) => boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  impersonateUser: (userId: string) => Promise<void>;
-  exitImpersonation: () => void;
-  impersonationData: ImpersonationData | null;
   isRestricted: boolean;
   solicitudId: string | null;
   isDemo: boolean;
@@ -118,11 +109,6 @@ function apiUserToUser(u: Usuario): User {
 }
 
 // ========================================
-// IMPERSONATION STORAGE KEY
-// ========================================
-const IMPERSONATION_KEY = 'sitrep_impersonation';
-
-// ========================================
 // CONTEXT
 // ========================================
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -163,11 +149,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [impersonationData, setImpersonationData] = useState<ImpersonationData | null>(null);
   const [isRestricted, setIsRestricted] = useState(false);
   const [solicitudId, setSolicitudId] = useState<string | null>(null);
 
-  // On mount: check for existing token and validate it; restore impersonation state
+  // On mount: check for existing token and validate it
   useEffect(() => {
     const initAuth = async () => {
       const token = getAccessToken();
@@ -176,29 +161,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const apiUser = await authService.getMe();
           const mapped = apiUserToUser(apiUser);
           setCurrentUser(mapped);
-
-          // Restore impersonation if active (survives page reload)
-          const saved = localStorage.getItem(IMPERSONATION_KEY);
-          if (saved) {
-            try {
-              const parsed = JSON.parse(saved);
-              setImpersonationData({
-                adminToken: parsed.adminToken,
-                adminRefreshToken: parsed.adminRefreshToken,
-                adminUser: parsed.adminUser,
-                impersonatedUser: mapped, // fresh data from current JWT
-              });
-            } catch {
-              localStorage.removeItem(IMPERSONATION_KEY);
-            }
-          }
-
           setIsLoading(false);
           return;
         } catch {
           // Token invalid, clear it
           clearTokens();
-          localStorage.removeItem(IMPERSONATION_KEY);
+          localStorage.removeItem('sitrep_impersonation');
         }
       }
       setIsLoading(false);
@@ -248,7 +216,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsRestricted(false);
       setSolicitudId(null);
       // Clean up impersonation and trip-related localStorage
-      localStorage.removeItem(IMPERSONATION_KEY);
+      localStorage.removeItem('sitrep_impersonation');
       localStorage.removeItem('sitrep_active_trip_id');
       const keysToClean: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
@@ -271,43 +239,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const dismissOnboarding = useCallback(() => {
     setShowOnboarding(false);
   }, []);
-
-  // Impersonar usuario (solo ADMIN) — full page reload clears React Query cache
-  const impersonateUser = useCallback(async (userId: string) => {
-    const adminToken = getAccessToken() || '';
-    const adminRefreshToken = getRefreshToken() || '';
-    const adminUser = currentUser!;
-
-    const resp = await api.post(`/admin/impersonate/${userId}`);
-    const { user: targetUser, tokens } = resp.data.data;
-
-    // Persist admin tokens in localStorage BEFORE reload (survives page unload)
-    localStorage.setItem(IMPERSONATION_KEY, JSON.stringify({
-      adminToken,
-      adminRefreshToken,
-      adminUser,
-    }));
-
-    // Set the impersonated user's tokens
-    setTokens(tokens.accessToken, tokens.refreshToken);
-
-    // Full page reload: clears React Query cache + initAuth runs with new JWT
-    window.location.href = '/dashboard';
-  }, [currentUser]);
-
-  // Salir de impersonación — full page reload to restore admin state cleanly
-  const exitImpersonation = useCallback(() => {
-    if (!impersonationData) return;
-
-    // Restore admin tokens
-    setTokens(impersonationData.adminToken, impersonationData.adminRefreshToken);
-
-    // Clear impersonation from localStorage
-    localStorage.removeItem(IMPERSONATION_KEY);
-
-    // Full page reload to admin usuarios panel
-    window.location.href = '/admin/usuarios';
-  }, [impersonationData]);
 
   // Switch user — real API login with known credentials
   const switchUser = useCallback(async (userId: number) => {
@@ -344,8 +275,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return currentUser.permisos.includes(permission);
   }, [currentUser]);
 
-  // Build users list from DEMO_CREDENTIALS for UserSwitcher
-  const users: User[] = Object.entries(DEMO_CREDENTIALS).map(([id, c]) => ({
+  // Build users list from DEMO_CREDENTIALS for UserSwitcher (stable reference)
+  const users = useMemo<User[]>(() => Object.entries(DEMO_CREDENTIALS).map(([id, c]) => ({
     id: Number(id),
     nombre: c.nombre,
     email: c.email,
@@ -355,9 +286,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     telefono: '',
     ubicacion: '',
     permisos: [],
-  }));
+  })), []);
 
-  const value: AuthContextType = {
+  const value = useMemo<AuthContextType>(() => ({
     currentUser,
     users,
     switchUser,
@@ -373,9 +304,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     canAccess,
     login,
     logout,
-    impersonateUser,
-    exitImpersonation,
-    impersonationData,
     isRestricted,
     solicitudId,
     isDemo: false,
@@ -383,11 +311,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     authError,
     showOnboarding,
     dismissOnboarding,
-  };
+  }), [currentUser, users, switchUser, getUsersByRole, canAccess, login, logout, isRestricted, solicitudId, isLoading, authError, showOnboarding, dismissOnboarding]);
 
   return (
     <AuthContext.Provider value={value}>
-      {children}
+      <ImpersonationProvider>
+        {children}
+      </ImpersonationProvider>
       {showOnboarding && currentUser && (
         <OnboardingWizard
           rol={currentUser.rol}

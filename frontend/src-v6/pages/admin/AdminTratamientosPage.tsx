@@ -381,16 +381,17 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
               leftIcon={<Search size={18} />}
             />
           </div>
-          <select
+          <Select
             value={filtroOperador}
-            onChange={(e) => { setFiltroOperador(e.target.value); setCurrentPage(1); }}
-            className="px-4 py-2.5 rounded-xl border-2 border-neutral-200 bg-white text-sm font-medium focus:border-primary-500 focus:outline-none hover:border-neutral-300 transition-colors"
-          >
-            <option value="">Todos los operadores ({operadoresList.length})</option>
-            {operadoresList.map((o: any) => (
-              <option key={o.id} value={o.id}>{o.razonSocial || o.nombre}</option>
-            ))}
-          </select>
+            onChange={(val) => { setFiltroOperador(val); setCurrentPage(1); }}
+            placeholder={`Todos los operadores (${operadoresList.length})`}
+            options={[
+              { value: '', label: `Todos los operadores (${operadoresList.length})` },
+              ...operadoresList.map((o: any) => ({ value: String(o.id), label: o.razonSocial || o.nombre })),
+            ]}
+            size="sm"
+            isFullWidth={false}
+          />
           <button onClick={() => window.print()} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={14} />Imprimir</button>
           <Button variant="outline" leftIcon={<Download size={16} />} onClick={handleExport} className="hidden sm:inline-flex">
             CSV
@@ -908,37 +909,42 @@ const CatalogoTab: React.FC<{
               leftIcon={<Search size={18} />}
             />
           </div>
-          <select
+          <Select
             value={filtroCategoria}
-            onChange={(e) => { setFiltroCategoria(e.target.value as CategoriaId | ''); setCurrentPage(1); }}
-            className="px-3 py-2 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
-          >
-            <option value="">Todas las categorías</option>
-            {CATEGORIAS_TRATAMIENTO.map(c => (
-              <option key={c.id} value={c.id}>{c.nombre} ({c.metodos.length})</option>
-            ))}
-          </select>
-          <select
+            onChange={(val) => { setFiltroCategoria(val as CategoriaId | ''); setCurrentPage(1); }}
+            placeholder="Todas las categorías"
+            options={[
+              { value: '', label: 'Todas las categorías' },
+              ...CATEGORIAS_TRATAMIENTO.map(c => ({ value: c.id, label: `${c.nombre} (${c.metodos.length})` })),
+            ]}
+            size="sm"
+            isFullWidth={false}
+          />
+          <Select
             value={filtroCorriente}
-            onChange={(e) => { setFiltroCorriente(e.target.value); setCurrentPage(1); }}
-            className="px-3 py-2 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
-          >
-            <option value="">Todas las corrientes</option>
-            {corrientesUnicas.map(y => (
-              <option key={y} value={y}>{y} — {(CORRIENTES_Y[y] || '').substring(0, 40)}</option>
-            ))}
-          </select>
-          <select
+            onChange={(val) => { setFiltroCorriente(val); setCurrentPage(1); }}
+            placeholder="Todas las corrientes"
+            options={[
+              { value: '', label: 'Todas las corrientes' },
+              ...corrientesUnicas.map(y => ({ value: y, label: `${y} — ${(CORRIENTES_Y[y] || '').substring(0, 40)}` })),
+            ]}
+            size="sm"
+            isFullWidth={false}
+          />
+          <Select
             value={filtroRiesgo}
-            onChange={(e) => { setFiltroRiesgo(e.target.value); setCurrentPage(1); }}
-            className="px-3 py-2 rounded-xl border-2 border-neutral-200 bg-white text-sm focus:border-primary-500 focus:outline-none"
-          >
-            <option value="">Todos los riesgos</option>
-            <option value="critico">Crítico (1 operador)</option>
-            <option value="alto">Alto (2 operadores)</option>
-            <option value="medio">Medio (3-4)</option>
-            <option value="bajo">Bajo (5+)</option>
-          </select>
+            onChange={(val) => { setFiltroRiesgo(val); setCurrentPage(1); }}
+            placeholder="Todos los riesgos"
+            options={[
+              { value: '', label: 'Todos los riesgos' },
+              { value: 'critico', label: 'Crítico (1 operador)' },
+              { value: 'alto', label: 'Alto (2 operadores)' },
+              { value: 'medio', label: 'Medio (3-4)' },
+              { value: 'bajo', label: 'Bajo (5+)' },
+            ]}
+            size="sm"
+            isFullWidth={false}
+          />
           <button onClick={() => window.print()} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={14} />Imprimir</button>
           <Button variant="outline" leftIcon={<Download size={16} />} onClick={handleExport} className="hidden sm:inline-flex">
             CSV

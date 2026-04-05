@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import prisma from '../lib/prisma';
+import { generarNumeroManifiesto } from '../utils/manifiestoNumber';
 
 // Re-export split modules so existing imports (e.g. routes) continue to work
 export { getManifiestos, getManifiestoById, getDashboardStats, getSyncInicial, getManifiestosEsperados } from './manifiesto-query.controller';
@@ -25,29 +26,7 @@ const createManifiestoSchema = z.object({
   })).min(1, 'Debe incluir al menos un residuo'),
 });
 
-// Generar numero de manifiesto unico
-const generarNumeroManifiesto = async (): Promise<string> => {
-  const año = new Date().getFullYear();
-  const manifiestos = await prisma.manifiesto.findMany({
-    where: {
-      numero: {
-        startsWith: `${año}-`
-      }
-    },
-    select: { numero: true },
-  });
-
-  let maxNum = 0;
-  for (const m of manifiestos) {
-    const suffix = m.numero.replace(`${año}-`, '');
-    const parsed = parseInt(suffix, 10);
-    if (!isNaN(parsed) && parsed > maxNum) {
-      maxNum = parsed;
-    }
-  }
-
-  return `${año}-${(maxNum + 1).toString().padStart(6, '0')}`;
-};
+// generarNumeroManifiesto moved to ../utils/manifiestoNumber.ts (O(1) via findFirst+orderBy)
 
 // Verificar manifiesto publicamente (sin auth) — usado por QR codes
 export const verificarManifiesto = async (req: Request, res: Response, next: NextFunction) => {

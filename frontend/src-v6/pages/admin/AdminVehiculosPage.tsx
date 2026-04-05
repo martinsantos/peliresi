@@ -1015,16 +1015,16 @@ export const AdminVehiculosPage: React.FC = () => {
         }
       >
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Input label="Patente" value={vehiculoForm.patente} onChange={(e) => setVehiculoForm(f => ({ ...f, patente: e.target.value }))} />
             <Input label="Marca" value={vehiculoForm.marca} onChange={(e) => setVehiculoForm(f => ({ ...f, marca: e.target.value }))} />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Input label="Modelo" value={vehiculoForm.modelo} onChange={(e) => setVehiculoForm(f => ({ ...f, modelo: e.target.value }))} />
             <Input label="Año" type="number" value={vehiculoForm.anio} onChange={(e) => setVehiculoForm(f => ({ ...f, anio: e.target.value }))} />
           </div>
           <Input label="Capacidad (kg)" type="number" value={vehiculoForm.capacidad} onChange={(e) => setVehiculoForm(f => ({ ...f, capacidad: e.target.value }))} />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Input label="N° Habilitación" value={vehiculoForm.numeroHabilitacion} onChange={(e) => setVehiculoForm(f => ({ ...f, numeroHabilitacion: e.target.value }))} />
             <Input label="Vencimiento Habilitación" type="date" value={vehiculoForm.vencimiento} onChange={(e) => setVehiculoForm(f => ({ ...f, vencimiento: e.target.value }))} />
           </div>
@@ -1063,15 +1063,15 @@ export const AdminVehiculosPage: React.FC = () => {
         }
       >
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Input label="Nombre" value={choferForm.nombre} onChange={(e) => setChoferForm(f => ({ ...f, nombre: e.target.value }))} />
             <Input label="Apellido" value={choferForm.apellido} onChange={(e) => setChoferForm(f => ({ ...f, apellido: e.target.value }))} />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Input label="DNI" value={choferForm.dni} onChange={(e) => setChoferForm(f => ({ ...f, dni: e.target.value }))} />
             <Input label="Licencia" value={choferForm.licencia} onChange={(e) => setChoferForm(f => ({ ...f, licencia: e.target.value }))} />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Input label="Teléfono" value={choferForm.telefono} onChange={(e) => setChoferForm(f => ({ ...f, telefono: e.target.value }))} />
             <Input label="Venc. Licencia" type="date" value={choferForm.vencimiento} onChange={(e) => setChoferForm(f => ({ ...f, vencimiento: e.target.value }))} />
           </div>

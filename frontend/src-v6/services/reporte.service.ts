@@ -44,8 +44,18 @@ export const reporteService = {
     return data.data;
   },
 
-  async auditoria(filters?: ReporteFilters): Promise<ReporteData> {
-    const { data } = await api.get('/reportes/auditoria', { params: mapFilters(filters) });
+  async auditoria(filters?: ReporteFilters & { page?: number; limit?: number; accion?: string; usuarioId?: string; sortBy?: string; sortOrder?: string }): Promise<ReporteData> {
+    const mapped = mapFilters(filters);
+    const params: Record<string, string | number | undefined> = {
+      ...mapped,
+      page: filters?.page,
+      limit: filters?.limit,
+      accion: filters?.accion,
+      usuarioId: filters?.usuarioId,
+      sortBy: filters?.sortBy,
+      sortOrder: filters?.sortOrder,
+    };
+    const { data } = await api.get('/reportes/auditoria', { params });
     return data.data;
   },
 

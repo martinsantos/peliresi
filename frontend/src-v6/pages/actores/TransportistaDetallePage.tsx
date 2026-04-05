@@ -352,7 +352,7 @@ const TransportistaDetallePage: React.FC = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <Card className="p-4">
           <p className="text-sm text-neutral-500">Vehículos</p>
           <p className="text-3xl font-bold text-neutral-900">{transportista.flota.length}</p>
@@ -746,7 +746,7 @@ const TransportistaDetallePage: React.FC = () => {
         }
       >
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">Patente *</label>
               <input type="text" className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none" placeholder="ABC123"
@@ -758,7 +758,7 @@ const TransportistaDetallePage: React.FC = () => {
                 value={vehiculoForm.marca} onChange={e => setVehiculoForm(p => ({ ...p, marca: e.target.value }))} />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">Modelo *</label>
               <input type="text" className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none" placeholder="Actros 2545"
@@ -770,7 +770,7 @@ const TransportistaDetallePage: React.FC = () => {
                 value={vehiculoForm.anio} onChange={e => setVehiculoForm(p => ({ ...p, anio: Number(e.target.value) }))} />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">Capacidad (kg)</label>
               <input type="number" className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none" placeholder="15000"
@@ -828,7 +828,7 @@ const TransportistaDetallePage: React.FC = () => {
         }
       >
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">Nombre *</label>
               <input type="text" className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none" placeholder="Juan"
@@ -840,7 +840,7 @@ const TransportistaDetallePage: React.FC = () => {
                 value={choferForm.apellido} onChange={e => setChoferForm(p => ({ ...p, apellido: e.target.value }))} />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">DNI *</label>
               <input type="text" className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none" placeholder="12345678"
@@ -852,7 +852,7 @@ const TransportistaDetallePage: React.FC = () => {
                 value={choferForm.telefono} onChange={e => setChoferForm(p => ({ ...p, telefono: e.target.value }))} />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">N° Licencia *</label>
               <input type="text" className="w-full px-4 h-10 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none" placeholder="LIC-001"

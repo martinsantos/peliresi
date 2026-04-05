@@ -408,21 +408,18 @@ export const EditarManifiestoPage: React.FC = () => {
                         placeholder="0"
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-neutral-600 mb-1">
-                        Unidad
-                      </label>
-                      <select
-                        value={residuo.unidad}
-                        onChange={(e) => handleResiduoChange(index, 'unidad', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg border border-neutral-200 focus:border-primary-500 focus:outline-none"
-                      >
-                        <option value="kg">kg</option>
-                        <option value="tn">tn</option>
-                        <option value="lt">lt</option>
-                        <option value="un">un</option>
-                      </select>
-                    </div>
+                    <Select
+                      label="Unidad"
+                      value={residuo.unidad}
+                      onChange={(val) => handleResiduoChange(index, 'unidad', val)}
+                      options={[
+                        { value: 'kg', label: 'kg' },
+                        { value: 'tn', label: 'tn' },
+                        { value: 'lt', label: 'lt' },
+                        { value: 'un', label: 'un' },
+                      ]}
+                      size="sm"
+                    />
                   </div>
                 </div>
               ))}

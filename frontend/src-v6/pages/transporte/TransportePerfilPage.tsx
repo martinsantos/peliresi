@@ -217,7 +217,7 @@ const TransportePerfilPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
                     <div>
                       <div className="flex items-center gap-1 text-white/70 mb-1">
                         <MapPin size={12} />
@@ -321,7 +321,7 @@ const TransportePerfilPage: React.FC = () => {
                 </button>
               )}
               {(currentUser?.telefono || currentUser?.ubicacion) && (
-                <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-neutral-100">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-4 pt-4 border-t border-neutral-100">
                   {currentUser.telefono && (
                     <div>
                       <p className="text-xs text-neutral-500">Teléfono</p>
@@ -357,7 +357,7 @@ const TransportePerfilPage: React.FC = () => {
                   </div>
                 </div>
                 {(viajeEnCurso.transportista?.domicilio || viajeEnCurso.transportista?.telefono) && (
-                  <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-neutral-100">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-4 pt-4 border-t border-neutral-100">
                     {viajeEnCurso.transportista.domicilio && (
                       <div>
                         <p className="text-xs text-neutral-500">Domicilio</p>

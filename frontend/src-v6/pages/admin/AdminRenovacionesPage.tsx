@@ -12,6 +12,7 @@ import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Modal } from '../../components/ui/Modal';
+import { Select } from '../../components/ui/Select';
 import { Table, Pagination } from '../../components/ui/Table';
 import { toast } from '../../components/ui/Toast';
 import {
@@ -115,27 +116,41 @@ const AdminRenovacionesPage: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <Filter size={16} className="text-neutral-400" />
-        <select value={anio} onChange={e => { setAnio(Number(e.target.value)); setPage(1); }}
-          className="h-9 px-3 rounded-lg border border-neutral-200 text-sm bg-white">
-          {[currentYear, currentYear - 1, currentYear - 2].map(y => (
-            <option key={y} value={y}>{y}</option>
-          ))}
-        </select>
-        <select value={tipoActor} onChange={e => { setTipoActor(e.target.value); setPage(1); }}
-          className="h-9 px-3 rounded-lg border border-neutral-200 text-sm bg-white">
-          <option value="">Todos los actores</option>
-          <option value="GENERADOR">Generadores</option>
-          <option value="OPERADOR">Operadores</option>
-        </select>
-        <select value={estado} onChange={e => { setEstado(e.target.value); setPage(1); }}
-          className="h-9 px-3 rounded-lg border border-neutral-200 text-sm bg-white">
-          <option value="">Todos los estados</option>
-          <option value="PENDIENTE">Pendientes</option>
-          <option value="APROBADA">Aprobadas</option>
-          <option value="RECHAZADA">Rechazadas</option>
-        </select>
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <Filter size={16} className="text-neutral-400 hidden sm:block" />
+        <div className="w-full sm:w-36">
+          <Select
+            value={String(anio)}
+            onChange={(val) => { setAnio(Number(val)); setPage(1); }}
+            options={[currentYear, currentYear - 1, currentYear - 2].map(y => ({ value: String(y), label: String(y) }))}
+            size="sm"
+          />
+        </div>
+        <div className="w-full sm:w-48">
+          <Select
+            value={tipoActor}
+            onChange={(val) => { setTipoActor(val); setPage(1); }}
+            options={[
+              { value: '', label: 'Todos los actores' },
+              { value: 'GENERADOR', label: 'Generadores' },
+              { value: 'OPERADOR', label: 'Operadores' },
+            ]}
+            size="sm"
+          />
+        </div>
+        <div className="w-full sm:w-48">
+          <Select
+            value={estado}
+            onChange={(val) => { setEstado(val); setPage(1); }}
+            options={[
+              { value: '', label: 'Todos los estados' },
+              { value: 'PENDIENTE', label: 'Pendientes' },
+              { value: 'APROBADA', label: 'Aprobadas' },
+              { value: 'RECHAZADA', label: 'Rechazadas' },
+            ]}
+            size="sm"
+          />
+        </div>
       </div>
 
       {/* Table */}
@@ -282,7 +297,7 @@ const AdminRenovacionesPage: React.FC = () => {
       {selectedRenov && (
         <Modal isOpen onClose={() => setSelectedRenov(null)} title={`Renovacion ${selectedRenov.anio} — ${actorName(selectedRenov)}`} size="lg">
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <p className="text-xs text-neutral-500">Tipo Actor</p>
                 <p className="font-medium">{selectedRenov.tipoActor}</p>
