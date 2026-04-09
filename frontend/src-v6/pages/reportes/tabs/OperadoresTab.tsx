@@ -5,12 +5,12 @@ import {
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell,
 } from 'recharts';
 import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
 import { Badge } from '../../../components/ui/BadgeV2';
 import { CHART_COLORS } from '../../../utils/chart-colors';
 import { KpiCard } from '../../../components/charts/KpiCard';
+import { CategoryBarChart } from '../../../components/charts/CategoryBarChart';
 import { useOperadores } from '../../../hooks/useActores';
 import { downloadCsv } from './shared';
 import { exportReportePDF } from '../../../utils/exportPdf';
@@ -210,31 +210,9 @@ export default function OperadoresTab({
             subtitle={isDateFiltered ? 'Manifiestos recibidos vs tratados' : 'FIJO vs IN SITU'}
           />
           <CardContent>
-            {byTipo.length > 0 ? (
-              <ResponsiveContainer width="100%" height={320}>
-                <PieChart>
-                  <Pie
-                    data={byTipo}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={70}
-                    outerRadius={120}
-                    paddingAngle={3}
-                    dataKey="value"
-                    stroke="none"
-                    label={({ name, percent }: any) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
-                    labelLine={{ stroke: '#94a3b8', strokeWidth: 1 }}
-                  >
-                    {byTipo.map((entry, i) => (
-                      <Cell key={i} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value: any, name: any) => [value, name]} />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-[320px] flex items-center justify-center text-neutral-400">Sin datos</div>
-            )}
+            <div className="max-h-[320px] overflow-y-auto pr-2">
+              <CategoryBarChart data={byTipo} maxItems={10} emptyMessage="Sin datos" />
+            </div>
           </CardContent>
         </Card>
 

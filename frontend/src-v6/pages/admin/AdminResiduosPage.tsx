@@ -611,9 +611,9 @@ export const AdminResiduosPage: React.FC = () => {
               <div className="p-2 bg-info-100 rounded-lg">
                 <FlaskConical size={20} className="text-info-600" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-2xl font-bold text-neutral-900">{statsTotal}</p>
-                <p className="text-sm text-neutral-600">Total Tipos</p>
+                <p className="text-sm text-neutral-600 truncate">Total Tipos</p>
               </div>
             </div>
           </CardContent>
@@ -624,9 +624,9 @@ export const AdminResiduosPage: React.FC = () => {
               <div className="p-2 bg-error-100 rounded-lg">
                 <AlertTriangle size={20} className="text-error-600" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-2xl font-bold text-neutral-900">{statsPeligrosos}</p>
-                <p className="text-sm text-neutral-600">Peligrosos</p>
+                <p className="text-sm text-neutral-600 truncate">Peligrosos</p>
               </div>
             </div>
           </CardContent>
@@ -637,9 +637,9 @@ export const AdminResiduosPage: React.FC = () => {
               <div className="p-2 bg-success-100 rounded-lg">
                 <Leaf size={20} className="text-success-600" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-2xl font-bold text-neutral-900">{statsNoPeligrosos}</p>
-                <p className="text-sm text-neutral-600">No Peligrosos</p>
+                <p className="text-sm text-neutral-600 truncate">No Peligrosos</p>
               </div>
             </div>
           </CardContent>
@@ -650,9 +650,9 @@ export const AdminResiduosPage: React.FC = () => {
               <div className="p-2 bg-warning-100 rounded-lg">
                 <Flame size={20} className="text-warning-600" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-2xl font-bold text-neutral-900">{corrientesActivas}</p>
-                <p className="text-sm text-neutral-600">Corrientes Y</p>
+                <p className="text-sm text-neutral-600 truncate">Corrientes Y</p>
               </div>
             </div>
           </CardContent>
@@ -663,9 +663,9 @@ export const AdminResiduosPage: React.FC = () => {
               <div className="p-2 bg-primary-100 rounded-lg">
                 <FileText size={20} className="text-primary-600" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-2xl font-bold text-neutral-900">{totalManifiestos}</p>
-                <p className="text-sm text-neutral-600">Manifiestos</p>
+                <p className="text-sm text-neutral-600 truncate">Manifiestos</p>
               </div>
             </div>
           </CardContent>

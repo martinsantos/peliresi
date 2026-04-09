@@ -312,7 +312,7 @@ export function Pagination({
   };
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-4 py-3 border-t border-neutral-200 bg-white">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-3 sm:px-4 py-3 border-t border-neutral-200 bg-white max-w-full overflow-hidden">
       <div className="flex items-center gap-4 text-sm text-neutral-600">
         <span>
           Mostrando <strong className="text-neutral-900">{startItem}-{endItem}</strong> de{' '}
@@ -337,11 +337,11 @@ export function Pagination({
         )}
       </div>
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 flex-wrap justify-center max-w-full">
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="px-3 py-1.5 text-sm font-medium text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           Anterior
         </button>
@@ -369,7 +369,7 @@ export function Pagination({
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="px-3 py-1.5 text-sm font-medium text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           Siguiente
         </button>

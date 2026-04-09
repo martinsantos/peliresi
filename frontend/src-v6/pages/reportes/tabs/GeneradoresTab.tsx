@@ -5,13 +5,13 @@ import {
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell,
 } from 'recharts';
 import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
 import { Badge } from '../../../components/ui/BadgeV2';
 import { CHART_COLORS } from '../../../utils/chart-colors';
 import { ChartTooltip } from '../../../components/charts/ChartTooltip';
 import { KpiCard } from '../../../components/charts/KpiCard';
+import { CategoryBarChart } from '../../../components/charts/CategoryBarChart';
 import { useGeneradores } from '../../../hooks/useActores';
 import { downloadCsv } from './shared';
 import { exportReportePDF } from '../../../utils/exportPdf';
@@ -192,35 +192,9 @@ export default function GeneradoresTab({
         <Card className="border-0 shadow-sm">
           <CardHeader title="Por Categoria" subtitle={`Distribucion de generadores (top ${TOP_N})`} />
           <CardContent>
-            {byCategoria.length > 0 ? (
-              <ResponsiveContainer width="100%" height={320}>
-                <PieChart>
-                  <Pie
-                    data={byCategoria}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={70}
-                    outerRadius={120}
-                    paddingAngle={3}
-                    dataKey="value"
-                    stroke="none"
-                    label={({ name, percent }: any) => {
-                      if ((percent ?? 0) < 0.03) return null;
-                      const short = name.length > 18 ? name.substring(0, 15) + '...' : name;
-                      return `${short} ${((percent ?? 0) * 100).toFixed(0)}%`;
-                    }}
-                    labelLine={{ stroke: '#94a3b8', strokeWidth: 1 }}
-                  >
-                    {byCategoria.map((entry, i) => (
-                      <Cell key={i} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value: any, name: any, props: any) => [value, props.payload.fullName || name]} />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-[320px] flex items-center justify-center text-neutral-400">Sin datos</div>
-            )}
+            <div className="max-h-[320px] overflow-y-auto pr-2">
+              <CategoryBarChart data={byCategoria} maxItems={10} emptyMessage="Sin datos" />
+            </div>
           </CardContent>
         </Card>
 

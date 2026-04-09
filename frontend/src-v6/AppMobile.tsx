@@ -19,7 +19,8 @@ import {
   ActoresPage, OperadoresPage, OperadorDetallePage, TransportistasPage, TransportistaDetallePage,
   ReportesPage, AlertasPage, NotificacionesPage, ConfiguracionPage,
   UsuariosPage, AdminGeneradoresPage, GeneradorDetallePage, NuevoGeneradorPage,
-  AdminOperadoresPage, AdminVehiculosPage, AdminResiduosPage, AdminTratamientosPage, AdminBlockchainPage,
+  AdminOperadoresPage, NuevoOperadorPage, NuevoTransportistaPage,
+  AdminVehiculosPage, AdminResiduosPage, AdminTratamientosPage, AdminBlockchainPage,
   AdminRenovacionesPage, AdminSolicitudesPage, SolicitudDetallePage,
   AuditoriaPage, CargaMasivaPage, PerfilPage, SolicitarCambiosPage,
   AyudaPage, EscanerQRPage, EstadisticasPage,
@@ -121,12 +122,33 @@ function AppMobile() {
             <Route path="/manifiestos/:id" element={<ManifiestoDetallePage />} />
             <Route path="/transporte/perfil" element={<TransportePerfilPage />} />
             <Route path="/transporte/viaje/:id" element={<ViajeEnCursoTransportista />} />
+            {/* Actores overview */}
             <Route path="/actores" element={<ActoresPage />} />
+            <Route path="/admin/actores" element={<ActoresPage />} />
+
+            {/* Legacy paths (kept for compatibility with bookmarks/links) */}
             <Route path="/actores/operadores" element={<OperadoresPage />} />
             <Route path="/actores/operadores/:id" element={<OperadorDetallePage />} />
-            <Route path="/admin/actores/operadores/:id" element={<OperadorDetallePage />} />
             <Route path="/actores/transportistas" element={<TransportistasPage />} />
             <Route path="/actores/transportistas/:id" element={<TransportistaDetallePage />} />
+
+            {/* Canonical paths (match App.tsx web routes) */}
+            <Route path="/admin/actores/transportistas" element={<TransportistasPage />} />
+            <Route path="/admin/actores/transportistas/nuevo" element={<NuevoTransportistaPage />} />
+            <Route path="/admin/actores/transportistas/:id/editar" element={<NuevoTransportistaPage />} />
+            <Route path="/admin/actores/transportistas/:id" element={<TransportistaDetallePage />} />
+
+            <Route path="/admin/actores/operadores" element={<AdminOperadoresPage />} />
+            <Route path="/admin/actores/operadores/nuevo" element={<NuevoOperadorPage />} />
+            <Route path="/admin/actores/operadores/:id/editar" element={<NuevoOperadorPage />} />
+            <Route path="/admin/actores/operadores/:id/renovar" element={<NuevoOperadorPage />} />
+            <Route path="/admin/actores/operadores/:id" element={<OperadorDetallePage />} />
+
+            <Route path="/admin/actores/generadores" element={<AdminGeneradoresPage />} />
+            <Route path="/admin/actores/generadores/nuevo" element={<NuevoGeneradorPage />} />
+            <Route path="/admin/actores/generadores/:id/editar" element={<NuevoGeneradorPage />} />
+            <Route path="/admin/actores/generadores/:id/renovar" element={<NuevoGeneradorPage />} />
+            <Route path="/admin/actores/generadores/:id" element={<GeneradorDetallePage />} />
             <Route path="/reportes" element={<ReportesPage />} />
             <Route path="/alertas" element={<AlertasPage />} />
             <Route path="/notificaciones" element={<NotificacionesPage />} />

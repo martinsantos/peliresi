@@ -10,14 +10,14 @@ import {
   FlaskConical, AlertTriangle, Layers, Search, Calendar, Download, FileDown, Printer,
 } from 'lucide-react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts';
 import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
 import { Button } from '../../../components/ui/ButtonV2';
 import { Badge } from '../../../components/ui/BadgeV2';
 import { Select } from '../../../components/ui/Select';
 import { KpiCard } from '../../../components/charts/KpiCard';
+import { CategoryBarChart } from '../../../components/charts/CategoryBarChart';
 import { downloadCsv } from '../../../utils/exportCsv';
 import { exportReportePDF } from '../../../utils/exportPdf';
 import {
@@ -203,27 +203,9 @@ export default function TratamientosTab({
         <Card className="border-0 shadow-sm">
           <CardHeader title="Métodos por Categoría" subtitle="Distribución de los 47 métodos" />
           <CardContent>
-            <ResponsiveContainer width="100%" height={320}>
-              <PieChart>
-                <Pie
-                  data={byCategory}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={65}
-                  outerRadius={115}
-                  paddingAngle={2}
-                  dataKey="value"
-                  stroke="none"
-                  label={({ name, percent }: any) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
-                  labelLine={{ stroke: '#94a3b8', strokeWidth: 1 }}
-                >
-                  {byCategory.map((entry, i) => (
-                    <Cell key={i} fill={entry.fill} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value: any, _: any, props: any) => [value, props.payload.fullName || _]} />
-              </PieChart>
-            </ResponsiveContainer>
+            <div className="max-h-[320px] overflow-y-auto pr-2">
+              <CategoryBarChart data={byCategory} maxItems={12} emptyMessage="Sin datos" />
+            </div>
           </CardContent>
         </Card>
 

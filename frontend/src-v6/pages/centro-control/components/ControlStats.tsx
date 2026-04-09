@@ -17,13 +17,14 @@ import {
   Radio,
 } from 'lucide-react';
 import {
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
+  ResponsiveContainer, Tooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area,
 } from 'recharts';
 import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
 import { Badge } from '../../../components/ui/BadgeV2';
 import { ESTADO_CHART_COLORS } from '../../../utils/chart-colors';
 import { ChartTooltip } from '../../../components/charts/ChartTooltip';
+import { CategoryBarChart } from '../../../components/charts/CategoryBarChart';
 import type { CentroControlData } from '../../../hooks/useCentroControl';
 
 const ESTADO_PIPELINE = ['BORRADOR', 'APROBADO', 'EN_TRANSITO', 'ENTREGADO', 'RECIBIDO', 'TRATADO'] as const;
@@ -149,13 +150,13 @@ export const ControlStats: React.FC<ControlStatsProps> = ({
       <Card className="border-0 shadow-sm">
         <CardHeader title="Pipeline de Manifiestos" subtitle="Flujo de trabajo: BORRADOR → TRATADO" />
         <CardContent>
-          <div className="flex items-stretch gap-1 h-16 sm:h-20">
+          <div className="flex items-stretch gap-1 h-16 sm:h-20 w-full overflow-hidden">
             {pipelineData.map((stage, i) => {
               const widthPercent = Math.max(8, (stage.count / pipelineTotal) * 100);
               return (
                 <div
                   key={stage.key}
-                  className="relative flex flex-col items-center justify-center rounded-xl transition-all duration-500 hover:scale-[1.02] group cursor-pointer"
+                  className="relative flex flex-col items-center justify-center rounded-xl transition-all duration-500 hover:scale-[1.02] group cursor-pointer min-w-0 overflow-hidden"
                   onClick={() => navigate(`/manifiestos?estado=${stage.key}`)}
                   style={{
                     flex: `${widthPercent} 1 0%`,
@@ -164,8 +165,8 @@ export const ControlStats: React.FC<ControlStatsProps> = ({
                   }}
                   title={`${stage.name}: ${stage.count}`}
                 >
-                  <span className="text-lg sm:text-2xl font-extrabold" style={{ color: stage.color }}>{stage.count}</span>
-                  <span className="text-[10px] sm:text-xs font-medium text-neutral-500 leading-tight text-center px-1">{stage.name}</span>
+                  <span className="text-base sm:text-2xl font-extrabold truncate w-full text-center" style={{ color: stage.color }}>{stage.count}</span>
+                  <span className="text-[9px] sm:text-xs font-medium text-neutral-500 leading-tight text-center px-0.5 truncate w-full">{stage.name}</span>
                   {i < pipelineData.length - 1 && (
                     <ChevronRight size={16} className="absolute -right-2.5 text-neutral-300 z-10 hidden sm:block" />
                   )}
@@ -278,35 +279,12 @@ export const ControlStats: React.FC<ControlStatsProps> = ({
         <Card className="border-0 shadow-sm">
           <CardHeader title="Distribución por Estado" subtitle="Proporción actual de manifiestos" />
           <CardContent>
-            {donutData.length > 0 ? (
-              <div className="h-[250px] sm:h-[300px]">
-                <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={80}>
-                  <PieChart>
-                    <Pie data={donutData} cx="50%" cy="50%" innerRadius={65} outerRadius={110} paddingAngle={3} dataKey="value" stroke="none">
-                      {donutData.map((entry, i) => (
-                        <Cell key={i} fill={entry.fill} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<ChartTooltip />} />
-                    <text x="50%" y="46%" textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 28, fontWeight: 800 }} className="fill-neutral-900">
-                      {donutTotal}
-                    </text>
-                    <text x="50%" y="56%" textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 12 }} className="fill-neutral-500">
-                      Total
-                    </text>
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="h-[250px] sm:h-[300px] flex items-center justify-center text-neutral-400">Sin datos</div>
-            )}
-            <div className="flex flex-wrap gap-3 mt-2 justify-center">
-              {donutData.map((d, i) => (
-                <div key={i} className="flex items-center gap-1.5 text-xs">
-                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.fill }} />
-                  <span className="text-neutral-600">{d.name} ({d.value})</span>
-                </div>
-              ))}
+            <div className="mb-3 text-center">
+              <p className="text-3xl font-extrabold text-neutral-900">{donutTotal}</p>
+              <p className="text-xs text-neutral-500">Total manifiestos</p>
+            </div>
+            <div className="max-h-[250px] sm:max-h-[300px] overflow-y-auto pr-2">
+              <CategoryBarChart data={donutData} maxItems={10} emptyMessage="Sin datos" />
             </div>
           </CardContent>
         </Card>

@@ -5,6 +5,7 @@ import prisma from '../lib/prisma';
 import { parsePagination } from '../utils/pagination';
 import { applyRoleFilter, isFullAccess as checkFullAccess } from '../utils/roleFilter';
 import { MANIFIESTO_LIST_INCLUDE } from '../utils/manifiestoIncludes';
+import { parseDateRange } from '../utils/dateRange';
 
 // Sanitize CSV cell to prevent CSV injection (formula injection via =, +, -, @, \t, \r)
 function sanitizeCsvCell(value: any): string {
@@ -27,12 +28,9 @@ export const reporteManifiestosPorPeriodo = async (req: AuthRequest, res: Respon
 
         const where: any = {};
 
-        // Filtros de fecha
-        if (fechaInicio || fechaFin) {
-            where.createdAt = {};
-            if (fechaInicio) where.createdAt.gte = new Date(fechaInicio as string);
-            if (fechaFin) where.createdAt.lte = new Date(fechaFin as string);
-        }
+        // Filtros de fecha (validados)
+        const dateFilter = parseDateRange(fechaInicio, fechaFin);
+        if (dateFilter) where.createdAt = dateFilter;
 
         // Filtrar por estado
         if (estado) where.estado = estado;
@@ -138,12 +136,9 @@ export const reporteResiduosTratados = async (req: AuthRequest, res: Response, n
             estado: 'TRATADO'
         };
 
-        // Filtros de fecha
-        if (fechaInicio || fechaFin) {
-            where.fechaCierre = {};
-            if (fechaInicio) where.fechaCierre.gte = new Date(fechaInicio as string);
-            if (fechaFin) where.fechaCierre.lte = new Date(fechaFin as string);
-        }
+        // Filtros de fecha (validados)
+        const dateFilter2 = parseDateRange(fechaInicio, fechaFin);
+        if (dateFilter2) where.fechaCierre = dateFilter2;
 
         // Filtrar por rol (ADMIN, ADMIN_*, esInspector → sin filtro)
         applyRoleFilter(where, req.user);
@@ -236,11 +231,8 @@ export const reporteTransporte = async (req: AuthRequest, res: Response, next: N
 
         const manifiestoWhere: any = {};
 
-        if (fechaInicio || fechaFin) {
-            manifiestoWhere.createdAt = {};
-            if (fechaInicio) manifiestoWhere.createdAt.gte = new Date(fechaInicio as string);
-            if (fechaFin) manifiestoWhere.createdAt.lte = new Date(fechaFin as string);
-        }
+        const dateFilter3 = parseDateRange(fechaInicio, fechaFin);
+        if (dateFilter3) manifiestoWhere.createdAt = dateFilter3;
 
         // Role-based filtering (ADMIN, ADMIN_*, esInspector → sin filtro)
         const isFullAccess = checkFullAccess(req.user);
@@ -354,15 +346,8 @@ export const getLogAuditoria = async (req: AuthRequest, res: Response, next: Nex
 
         const where: any = {};
 
-        if (fechaInicio || fechaFin) {
-            where.createdAt = {};
-            if (fechaInicio) where.createdAt.gte = new Date(fechaInicio as string);
-            if (fechaFin) {
-                const end = new Date(fechaFin as string);
-                end.setHours(23, 59, 59, 999);
-                where.createdAt.lte = end;
-            }
-        }
+        const auditDateFilter = parseDateRange(fechaInicio, fechaFin);
+        if (auditDateFilter) where.createdAt = auditDateFilter;
 
         if (tipo) where.tipo = tipo;
         if (accion) where.tipo = accion;
@@ -442,11 +427,8 @@ export const exportarCSV = async (req: AuthRequest, res: Response, next: NextFun
         const { fechaInicio, fechaFin } = req.query;
 
         const where: any = {};
-        if (fechaInicio || fechaFin) {
-            where.createdAt = {};
-            if (fechaInicio) where.createdAt.gte = new Date(fechaInicio as string);
-            if (fechaFin) where.createdAt.lte = new Date(fechaFin as string);
-        }
+        const csvDateFilter = parseDateRange(fechaInicio, fechaFin);
+        if (csvDateFilter) where.createdAt = csvDateFilter;
 
         let csvContent = '';
         let filename = '';

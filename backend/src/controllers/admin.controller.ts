@@ -7,6 +7,7 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 import { verificarVencimientos } from '../jobs/vencimiento.job';
 import { emailService } from '../services/email.service';
 import { generateTokens } from './auth.controller';
+import { parseDateRange } from '../utils/dateRange';
 
 // ============== USUARIOS CRUD (Admin) ==============
 
@@ -413,15 +414,8 @@ export const getEmailQueue = async (req: AuthRequest, res: Response, next: NextF
     const where: any = {};
     if (estado) where.estado = estado;
     if (to) where.to = { contains: to as string, mode: 'insensitive' };
-    if (fechaDesde || fechaHasta) {
-      where.createdAt = {};
-      if (fechaDesde) where.createdAt.gte = new Date(fechaDesde as string);
-      if (fechaHasta) {
-        const end = new Date(fechaHasta as string);
-        end.setHours(23, 59, 59, 999);
-        where.createdAt.lte = end;
-      }
-    }
+    const emailDateFilter = parseDateRange(fechaDesde, fechaHasta, 'fechaDesde', 'fechaHasta');
+    if (emailDateFilter) where.createdAt = emailDateFilter;
 
     const [data, total] = await Promise.all([
       prisma.emailQueue.findMany({

@@ -5,6 +5,7 @@ import prisma from '../lib/prisma';
 import { parsePagination } from '../utils/pagination';
 import { applyRoleFilter } from '../utils/roleFilter';
 import { MANIFIESTO_DETAIL_INCLUDE } from '../utils/manifiestoIncludes';
+import { parseDateParam } from '../utils/dateRange';
 
 // Obtener todos los manifiestos
 export const getManifiestos = async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -23,13 +24,14 @@ export const getManifiestos = async (req: AuthRequest, res: Response, next: Next
     if (operadorId) where.operadorId = operadorId;
     if (tipoResiduoId) where.residuos = { some: { tipoResiduoId: tipoResiduoId as string } };
 
-    if (fechaDesde || fechaHasta) {
+    const desdeDate = parseDateParam(fechaDesde, 'fechaDesde');
+    const hastaDate = parseDateParam(fechaHasta, 'fechaHasta');
+    if (desdeDate || hastaDate) {
       where.createdAt = {};
-      if (fechaDesde) where.createdAt.gte = new Date(fechaDesde as string);
-      if (fechaHasta) {
-        const hasta = new Date(fechaHasta as string);
-        if (hasta.getUTCHours() === 0) hasta.setTime(hasta.getTime() + 86399999);
-        where.createdAt.lte = hasta;
+      if (desdeDate) where.createdAt.gte = desdeDate;
+      if (hastaDate) {
+        if (hastaDate.getUTCHours() === 0) hastaDate.setTime(hastaDate.getTime() + 86399999);
+        where.createdAt.lte = hastaDate;
       }
     }
 

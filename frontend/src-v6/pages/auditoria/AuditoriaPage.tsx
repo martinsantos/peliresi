@@ -245,11 +245,11 @@ const AuditoriaPage: React.FC = () => {
             </div>
           </div>
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0 w-full sm:w-auto">
               <Calendar size={14} className="text-neutral-400 shrink-0" />
-              <input type="date" value={fechaDesde} onChange={e => { setFechaDesde(e.target.value); setCurrentPage(1); }} className="text-sm border border-neutral-200 rounded-lg px-2 py-1.5 w-36" />
+              <input type="date" value={fechaDesde} onChange={e => { setFechaDesde(e.target.value); setCurrentPage(1); }} className="text-sm border border-neutral-200 rounded-lg px-2 py-1.5 w-32 sm:w-36 min-w-0" />
               <span className="text-xs text-neutral-400">a</span>
-              <input type="date" value={fechaHasta} onChange={e => { setFechaHasta(e.target.value); setCurrentPage(1); }} className="text-sm border border-neutral-200 rounded-lg px-2 py-1.5 w-36" />
+              <input type="date" value={fechaHasta} onChange={e => { setFechaHasta(e.target.value); setCurrentPage(1); }} className="text-sm border border-neutral-200 rounded-lg px-2 py-1.5 w-32 sm:w-36 min-w-0" />
             </div>
             <div className="flex gap-1.5 flex-wrap">
               <button onClick={() => setQuickDateRange(1)} className="text-xs px-2 py-1 rounded-lg border border-neutral-200 hover:bg-neutral-50">Hoy</button>
@@ -364,7 +364,7 @@ const AuditoriaPage: React.FC = () => {
           <span>Pág. {currentPage}/{totalPages} — {totalItems.toLocaleString()} registros</span>
           <Select value={itemsPerPage.toString()} onChange={(val) => { setItemsPerPage(Number(val)); setCurrentPage(1); }} options={ITEMS_PER_PAGE_OPTIONS} size="sm" isFullWidth={false} />
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-wrap justify-center max-w-full">
           <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setCurrentPage(1)}>
             <ChevronLeft size={14} /><ChevronLeft size={14} className="-ml-2" />
           </Button>
@@ -375,8 +375,10 @@ const AuditoriaPage: React.FC = () => {
             const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
             const page = start + i;
             if (page > totalPages) return null;
+            // On mobile, only show current page (hide 4 surrounding)
+            const isCurrent = page === currentPage;
             return (
-              <Button key={page} variant={page === currentPage ? 'primary' : 'outline'} size="sm" onClick={() => setCurrentPage(page)} className="min-w-[36px]">
+              <Button key={page} variant={isCurrent ? 'primary' : 'outline'} size="sm" onClick={() => setCurrentPage(page)} className={`min-w-[36px] ${isCurrent ? '' : 'hidden sm:inline-flex'}`}>
                 {page}
               </Button>
             );

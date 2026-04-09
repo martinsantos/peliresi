@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import logger from '../utils/logger';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { parseDateParam } from '../utils/dateRange';
 
 // Get super admin email from env — no fallback to avoid accidental access
 const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL;
@@ -26,8 +27,8 @@ export const getAnalyticsSummary = async (req: Request, res: Response) => {
     try {
         const { desde, hasta } = req.query;
 
-        const startDate = desde ? new Date(desde as string) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // Last 7 days
-        const endDate = hasta ? new Date(hasta as string) : new Date();
+        const startDate = parseDateParam(desde, 'desde') ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // Last 7 days
+        const endDate = parseDateParam(hasta, 'hasta') ?? new Date();
 
         // Total requests
         const totalRequests = await prisma.analyticsLog.count({
@@ -148,10 +149,12 @@ export const getAnalyticsLogs = async (req: Request, res: Response) => {
         if (path) where.path = { contains: path as string };
         if (method) where.method = method;
         if (statusCode) where.statusCode = parseInt(statusCode as string);
-        if (desde || hasta) {
+        const logsDateGte = parseDateParam(desde, 'desde');
+        const logsDateLte = parseDateParam(hasta, 'hasta');
+        if (logsDateGte || logsDateLte) {
             where.timestamp = {};
-            if (desde) where.timestamp.gte = new Date(desde as string);
-            if (hasta) where.timestamp.lte = new Date(hasta as string);
+            if (logsDateGte) where.timestamp.gte = logsDateGte;
+            if (logsDateLte) where.timestamp.lte = logsDateLte;
         }
 
         const [logs, total] = await Promise.all([

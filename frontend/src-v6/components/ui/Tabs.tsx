@@ -107,7 +107,7 @@ export function TabList({ children, className }: TabListProps) {
   };
 
   return (
-    <div className={cn('flex items-center overflow-x-auto scrollbar-hide -mx-1 px-1', variantStyles[variant], className)} role="tablist">
+    <div className={cn('flex items-center overflow-x-auto scrollbar-hide max-w-full', variantStyles[variant], className)} role="tablist">
       {children}
     </div>
   );
