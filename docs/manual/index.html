@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SITREP — Manual del Sistema | v2026.10</title>
+<title>SITREP — Manual del Sistema | v2026.11</title>
 <meta name="description" content="Manual completo del Sistema de Trazabilidad de Residuos Peligrosos - Provincia de Mendoza">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,7 +18,7 @@
     <span></span><span></span><span></span>
   </button>
   <div class="logo">SITREP <span>Mendoza</span></div>
-  <span class="version">v2026.10</span>
+  <span class="version">v2026.11</span>
   <img src="screenshots/logo-mendoza.webp" alt="Gobierno de Mendoza" style="height:24px;width:auto;margin-left:8px;">
   <span class="doc-title">Manual del Sistema de Trazabilidad de Residuos Peligrosos</span>
   <div class="header-actions">
@@ -8049,7 +8049,7 @@ curl https://sitrep.ultimamilla.com.ar/api/health
 <!-- CHANGELOG v2026.10 — 2026-03-29                              -->
 <!-- ============================================================ -->
 <section id="changelog-v2026-10" data-role="all">
-<h2>16. Novedades v2026.10 (29 marzo 2026)</h2>
+<h2>16. Novedades v2026.10 — v2026.11 (29 marzo - 9 abril 2026)</h2>
 
 <h3>16.1 Manifiestos — Infinite Scroll con Sticky Headers</h3>
 <p>El listado de manifiestos (<code>/manifiestos</code>) fue rediseñado completamente:</p>
@@ -8115,15 +8115,351 @@ curl https://sitrep.ultimamilla.com.ar/api/health
 <li><strong>Total de assets verificados:</strong> 201 imagenes/iconos/animaciones — 100% resolviendo correctamente en produccion.</li>
 </ul>
 
-<h3>16.7 Optimizacion de Performance</h3>
+<h3>16.7 Optimizacion de Performance — Backend y Bundle</h3>
+<p>Refactoring profundo de los puntos calientes del backend y reduccion del bundle inicial.</p>
+
+<h4>Backend hot paths</h4>
 <ul>
 <li><strong>Dashboard backend:</strong> 12 queries individuales reemplazadas por 1 <code>groupBy</code> + 2 <code>findMany</code> en <code>Promise.all</code>. Reduccion ~70% en latencia del endpoint <code>/manifiestos/dashboard</code>.</li>
+<li><strong>generarNumeroManifiesto O(n) &rarr; O(1):</strong> antes el algoritmo cargaba todos los manifiestos del año (<code>findMany</code>) y buscaba el max en JS. Ahora usa <code>findFirst</code> con <code>orderBy: { numero: 'desc' }</code> + <code>take: 1</code>. Aprovecha el indice unico sobre <code>numero</code>. Mejora de ~100x con 1000+ manifiestos.</li>
+<li><strong>Tracking stats — 12 queries &rarr; 6:</strong> en el endpoint del Centro de Control, las 8 <code>count()</code> per-estado fueron consolidadas en una sola raw SQL <code>GROUP BY estado</code> con logica de fecha por estado. Las otras 4 <code>count()</code> se mantienen porque consultan tablas distintas. Throughput &uarr; 2.4x.</li>
+<li><strong>Utilidades compartidas (DRY):</strong> 3 utilities nuevas en <code>backend/src/utils/</code>:
+  <ul>
+    <li><code>parsePagination(query, defaults)</code> — 5 controllers usaban el mismo boilerplate de Math.max/Math.min para validar page/limit.</li>
+    <li><code>applyRoleFilter(where, user)</code> + <code>isFullAccess(user)</code> — la logica de filtrado por rol GENERADOR/TRANSPORTISTA/OPERADOR se duplicaba en 6+ controllers.</li>
+    <li><code>MANIFIESTO_LIST_INCLUDE</code> y <code>MANIFIESTO_DETAIL_INCLUDE</code> — los includes de Prisma para manifiestos estaban replicados en 7+ controllers.</li>
+  </ul>
+</li>
+<li><strong>asyncHandler wrapper:</strong> nueva utility para envolver controllers async sin try/catch boilerplate. Errores se propagan al middleware central.</li>
+</ul>
+
+<h4>Bundle frontend</h4>
+<ul>
 <li><strong>jsPDF lazy loading:</strong> la libreria PDF (407KB + autoTable) se carga via <code>dynamic import</code> solo cuando el usuario exporta. No se incluye en el bundle inicial.</li>
+<li><strong>QR libraries lazy chunk:</strong> <code>jsqr</code> + <code>qrcode.react</code> extraidas al chunk <code>vendor-qr</code>. La pagina <code>EscanerQRPage</code> bajo de <strong>141.62 KB &rarr; 11.35 KB</strong> en el bundle inicial (-92%).</li>
+<li><strong>vendor-charts -15KB:</strong> tras eliminar PieChart de Recharts (reemplazo por CategoryBarChart), el chunk vendor-charts bajo de 377KB &rarr; 362KB.</li>
 <li><strong>staleTime en queries:</strong> agregado a <code>useAlertas</code> (30s), <code>useReglas</code> (60s), <code>useAnomalias</code> (60s), <code>useOperadores</code> (60s), <code>useGeneradores</code> (60s). Evita refetches innecesarios al cambiar de tab o enfocar la ventana.</li>
 <li><strong>QueryClient unificado:</strong> configuracion compartida entre Web y PWA en <code>lib/queryClient.ts</code>. Previamente tenian configs distintas (retry funcion vs retry:1).</li>
 <li><strong>Rutas unificadas:</strong> 99 lazy imports duplicados entre <code>App.tsx</code> y <code>AppMobile.tsx</code> extraidos a <code>routes/pages.ts</code> — single source of truth.</li>
-<li><strong>DEMO_MODE desactivado en produccion.</strong></li>
 </ul>
+
+<h4>Componentes pesados descompuestos</h4>
+<ul>
+<li><strong>InscripcionWizardPage:</strong> 1383 lineas &rarr; 391 lineas + 5 componentes Step (-72%).</li>
+<li><strong>CentroControlPage:</strong> 1157 &rarr; 288 + 4 componentes (-75%).</li>
+<li><strong>ManifiestoActions:</strong> 824 &rarr; 167 + 2 componentes (-80%).</li>
+<li><strong>AuthContext split:</strong> 414 lineas separadas en <code>AuthContext</code> + nuevo <code>ImpersonationContext</code>. Menos re-renders cuando solo cambia el estado de impersonacion.</li>
+<li><strong>GenericCRUDPage:</strong> componente config-driven que reemplaza 6 paginas admin CRUD casi identicas (~3000 lineas eliminadas).</li>
+</ul>
+
+<div class="info-box">
+<strong>Resultado neto:</strong> -2,962 lineas en archivos existentes, +5,576 lineas nuevas (testing + utilidades + descomposicion) &rarr; codigo mas mantenible con misma funcionalidad.
+</div>
+
+<!-- ============================================================
+     16.8 — Testing Integral
+     ============================================================ -->
+<h3>16.8 Testing Integral — Vitest + Playwright + Stress</h3>
+<p>Infraestructura de testing creada desde cero. Pre-2026.10 el sistema solo tenia tests bash/curl. Ahora hay tres capas:</p>
+
+<h4>Capa 1 — Unit tests (Vitest)</h4>
+<ul>
+<li><strong>Backend Vitest:</strong> <code>backend/vitest.config.ts</code> + 6 test files con <strong>61 tests</strong> que cubren middlewares (auth, errorHandler), utilities (asyncHandler, manifiestoNumber, pagination, roleFilter) y mocks de Prisma con <code>vitest-mock-extended</code>.</li>
+<li><strong>Frontend Vitest:</strong> <code>frontend/vitest.config.ts</code> + 5 test files con <strong>63 tests</strong> que cubren formatters, services API, hooks, contexts (AuthContext) y componentes (ErrorBoundary).</li>
+<li><strong>Coverage thresholds:</strong> 20% lines/branches/functions (intencionalmente bajos al inicio, ratchet up over time).</li>
+<li><strong>Como correr:</strong>
+<pre>cd backend && npm test         # 61 tests, ~400ms
+cd frontend && npm test        # 63 tests, ~3s
+npm run test:coverage          # con cobertura</pre>
+</li>
+</ul>
+
+<h4>Capa 2 — E2E tests (Playwright)</h4>
+<ul>
+<li><strong>Specs en <code>frontend/e2e/</code>:</strong>
+  <ul>
+    <li><code>api-health.spec.ts</code> — 6 tests del health API</li>
+    <li><code>auth.spec.ts</code> — 3 tests de login flow</li>
+    <li><code>dashboard.spec.ts</code> — 1 test de dashboard tras login</li>
+    <li><code>pwa-routing.spec.ts</code> — 6 tests de regresion para rutas canonicas <code>/admin/actores/*</code> en PWA</li>
+    <li><code>full-crawl.spec.ts</code> — visita 49 rutas (26 web + 23 PWA) capturando console errors y network 500s</li>
+    <li><code>visual-audit.spec.ts</code> — 5 viewports x 14 paginas para detectar overflow horizontal</li>
+    <li><code>pwa-load.spec.ts</code> — 19 rutas canonicas x 3 iteraciones para validar PWA bajo carga moderada</li>
+  </ul>
+</li>
+<li><strong>Como correr contra produccion:</strong>
+<pre>cd frontend
+PLAYWRIGHT_BASE_URL=https://sitrep.ultimamilla.com.ar \
+  npx playwright test --project=chromium</pre>
+</li>
+</ul>
+
+<h4>Capa 3 — Stress / Load tests (bash)</h4>
+<p>19 scripts en <code>backend/tests/</code>. Los principales:</p>
+<table>
+<thead><tr><th>Script</th><th>Tests/Carga</th><th>Cubre</th></tr></thead>
+<tbody>
+<tr><td><code>smoke-test.sh</code></td><td>48 endpoints</td><td>API health basico</td></tr>
+<tr><td><code>cross-platform-workflow-test.sh</code></td><td>59 tests</td><td>Lifecycle completo BORRADOR&rarr;TRATADO con 4 roles</td></tr>
+<tr><td><code>multiuser-concurrent-test.sh</code></td><td>7 escenarios</td><td>Race conditions, sesiones simultaneas</td></tr>
+<tr><td><code>mundo-real-stress-test.sh</code></td><td>50 users, ~2700 req</td><td>Carga sostenida con datos reales</td></tr>
+<tr><td><code>date-validation-stress-test.sh</code> <em>(nuevo)</em></td><td>7 endpoints x 60 req</td><td>Fechas invalidas no producen 500</td></tr>
+<tr><td><code>pagination-stress-test.sh</code> <em>(nuevo)</em></td><td>6 escenarios, 1050 req</td><td>Paginacion server-side bajo carga</td></tr>
+<tr><td><code>sort-stress-test.sh</code> <em>(nuevo)</em></td><td>6 sorts x 100 req</td><td>Sort server-side de auditoria</td></tr>
+<tr><td><code>search-safety-test.sh</code> <em>(nuevo)</em></td><td>13 payloads</td><td>SQL injection, XSS, JNDI, path traversal</td></tr>
+</tbody>
+</table>
+
+<h4>CI orchestration</h4>
+<p><code>scripts/test-all.sh</code> corre las 4 suites en orden y reporta PASS/FAIL agregado. Variable <code>SKIP_E2E=1</code> para entornos sin browser.</p>
+
+<h4>Reportes historicos</h4>
+<p>Cada run de stress se guarda en <code>backend/tests/reports/</code>:</p>
+<ul>
+<li><code>BASELINE-PRE-STRESS-*.md</code> — metricas de servidor antes del stress</li>
+<li><code>STRESS-TOTAL-*.md</code> — resumen consolidado por suite</li>
+<li><code>REPORTE-INTEGRAL-*.md</code> — resultados del test integral 124-test</li>
+</ul>
+
+<div class="info-box">
+<strong>Documentacion completa:</strong> ver <code>docs/TESTING.md</code> en el repo para guia de cada suite, como agregar tests, y como interpretar reportes.
+</div>
+
+<!-- ============================================================
+     16.9 — Date Validation y Error Handling
+     ============================================================ -->
+<h3>16.9 Date Validation y Error Handling — Eliminacion de 500s</h3>
+<p>Auditoria F1-F6 (abril 2026) detecto que varios endpoints devolvian <strong>500 Internal Server Error</strong> cuando recibian fechas invalidas como query params:</p>
+<pre>GET /api/reportes/manifiestos?fechaInicio=BAD&amp;fechaFin=ALSOBAD
+&rarr; 500 (causado por <code>new Date('BAD')</code> &rarr; Invalid Date &rarr; Prisma rechaza)</pre>
+
+<h4>Causa raiz</h4>
+<p>El patron <code>new Date(req.query.fechaInicio as string)</code> producia <code>Invalid Date</code> cuando el input no era parseable. Al pasar ese objeto a Prisma como <code>gte</code>/<code>lte</code>, Prisma lanzaba <code>PrismaClientValidationError</code> que el middleware traducia a 500.</p>
+
+<h4>Fix — Nueva utility <code>parseDateRange</code></h4>
+<p>Archivo: <code>backend/src/utils/dateRange.ts</code></p>
+<pre>// Parsea fecha y throws AppError(400) con mensaje claro si es invalida
+export function parseDateParam(value: unknown, paramName: string, endOfDay = false): Date | undefined {
+  if (value == null || value === '') return undefined;
+  const d = new Date(value as string);
+  if (isNaN(d.getTime())) {
+    throw new AppError(
+      `Parametro '${paramName}' invalido: '${value}' no es una fecha valida (formato esperado: YYYY-MM-DD)`,
+      400
+    );
+  }
+  if (endOfDay) d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+export function parseDateRange(fechaInicio, fechaFin) {
+  const gte = parseDateParam(fechaInicio, 'fechaInicio');
+  const lte = parseDateParam(fechaFin, 'fechaFin', /* endOfDay */ true);
+  if (gte == null && lte == null) return undefined;
+  return { ...(gte && { gte }), ...(lte && { lte }) };
+}</pre>
+
+<h4>Endpoints corregidos (10 instancias en 5 controllers)</h4>
+<table>
+<thead><tr><th>Controller</th><th>Endpoints</th></tr></thead>
+<tbody>
+<tr><td><code>reporte.controller.ts</code></td><td>manifiestos, tratados, transporte, auditoria, exportarCSV (5)</td></tr>
+<tr><td><code>tracking.controller.ts</code></td><td>centro-control/actividad (1)</td></tr>
+<tr><td><code>manifiesto-query.controller.ts</code></td><td>lista manifiestos con filtro fecha (1)</td></tr>
+<tr><td><code>admin.controller.ts</code></td><td>email-queue (1)</td></tr>
+<tr><td><code>analytics.controller.ts</code></td><td>summary, logs (2)</td></tr>
+</tbody>
+</table>
+
+<h4>Antes vs Despues</h4>
+<pre>// ANTES (crashea con 500)
+if (fechaInicio || fechaFin) {
+  where.createdAt = {};
+  if (fechaInicio) where.createdAt.gte = new Date(fechaInicio as string);
+  if (fechaFin) where.createdAt.lte = new Date(fechaFin as string);
+}
+
+// DESPUES (devuelve 400 con mensaje)
+const dateFilter = parseDateRange(fechaInicio, fechaFin);
+if (dateFilter) where.createdAt = dateFilter;</pre>
+
+<h4>Verificacion bajo stress</h4>
+<p>El nuevo script <code>date-validation-stress-test.sh</code> envia 60 requests concurrentes con fechas invalidas a 7 endpoints diferentes. Resultado del run del 9 abril 2026:</p>
+<ul>
+<li><strong>420 requests totales</strong></li>
+<li><strong>420 HTTP 400</strong> (todos validados correctamente)</li>
+<li><strong>0 HTTP 500</strong> (fix completamente efectivo)</li>
+</ul>
+
+<div class="info-box">
+<strong>Para el frontend:</strong> los date inputs en el panel de filtros pueden mostrar el mensaje del 400 directamente al usuario (ej: en un toast). El error response tiene shape <code>{ success: false, status: 400, message: "Parametro 'fechaInicio' invalido: ..." }</code>.
+</div>
+
+<!-- ============================================================
+     16.10 — Charts: Pie a Bar Horizontal
+     ============================================================ -->
+<h3>16.10 Charts — De Pie/Donut a Horizontal Bar</h3>
+<p>Los pie/donut charts no escalan bien con multiples categorias y labels largos. En la pestana <strong>Reportes &rarr; Manifiestos</strong>, el donut "Distribucion por Tipo de Residuo" mostraba 18 categorias con labels que se solapaban entre si y con el grafico.</p>
+
+<h4>Solucion</h4>
+<p>Nuevo componente <code>frontend/src-v6/components/charts/CategoryBarChart.tsx</code>:</p>
+<ul>
+<li><strong>Horizontal bar chart</strong> con label a la izquierda y valor + porcentaje a la derecha</li>
+<li><strong>Sort por valor descendente</strong> automatico</li>
+<li><strong>Agrupamiento "Otros (N)"</strong> cuando excede <code>maxItems</code> (default 10)</li>
+<li><strong>Truncate</strong> en labels para evitar overflow</li>
+<li><strong>Tooltip</strong> con nombre completo al hover (cuando se trunca)</li>
+<li><strong>Scroll vertical</strong> cuando hay muchas categorias</li>
+<li><strong>Sin dependencias externas</strong> — pure CSS, sin Recharts (que aporta &gt;300KB)</li>
+</ul>
+
+<h4>API del componente</h4>
+<pre>&lt;CategoryBarChart
+  data={tipoData}                      // [{ name, fullName?, value, fill? }]
+  maxItems={12}                        // top N + "Otros (N-12)"
+  showPercent={true}                   // mostrar % junto al valor
+  valueSuffix="kg"                     // sufijo opcional
+  emptyMessage="Sin datos"
+/&gt;</pre>
+
+<h4>7 charts reemplazados</h4>
+<ol>
+<li>Reportes &rarr; Manifiestos &rarr; "Distribucion por Tipo de Residuo"</li>
+<li>Reportes &rarr; Tratados &rarr; "Distribucion por Codigo de Residuo"</li>
+<li>Reportes &rarr; Generadores &rarr; "Por Categoria (top 6)"</li>
+<li>Reportes &rarr; Operadores &rarr; "Por Tipo de Operacion"</li>
+<li>Reportes &rarr; Tratamientos &rarr; "Metodos por Categoria (10)"</li>
+<li>Centro de Control &rarr; "Distribucion por Estado"</li>
+<li>Centro de Control &rarr; "Donut Pipeline" (eliminado, ahora bar chart con total separado)</li>
+</ol>
+
+<h4>Bonus: bundle reduction</h4>
+<p>Al eliminar todos los <code>PieChart</code>/<code>Pie</code>/<code>Cell</code> imports de Recharts en estos 6 archivos, el chunk <code>vendor-charts</code> bajo de <strong>377 KB &rarr; 362 KB</strong> (-15 KB).</p>
+
+<!-- ============================================================
+     16.11 — PWA Routing Canonico
+     ============================================================ -->
+<h3>16.11 PWA Routing — Paths Canonicos /admin/actores/*</h3>
+<p>Bug reportado: al visitar <code>/app/admin/actores/transportistas/:id</code> en la PWA, aparecia la pagina <strong>404 Pagina no encontrada</strong>.</p>
+
+<h4>Causa raiz</h4>
+<p>El router de la PWA (<code>src-v6/AppMobile.tsx</code>) tenia paths distintos al router web (<code>src-v6/App.tsx</code>):</p>
+<table>
+<thead><tr><th>Web (App.tsx) — canonical</th><th>PWA (AppMobile.tsx) — antes</th></tr></thead>
+<tbody>
+<tr><td><code>/admin/actores/transportistas/:id</code></td><td><code>/actores/transportistas/:id</code> (sin <code>/admin</code>)</td></tr>
+<tr><td><code>/admin/actores/operadores/:id</code></td><td><code>/admin/actores/operadores/:id</code> (presente)</td></tr>
+<tr><td><code>/admin/actores/generadores/:id</code></td><td><code>/admin/generadores/:id</code> (sin <code>/actores</code>)</td></tr>
+</tbody>
+</table>
+<p>Cuando un componente compartido (TransportistasPage) usaba <code>navigate('/admin/actores/transportistas/' + id)</code>, en la PWA caia en la ruta wildcard 404.</p>
+
+<h4>Fix</h4>
+<p>Agregadas 14 rutas canonicas a <code>AppMobile.tsx</code>, manteniendo las legacy como aliases (no romper bookmarks):</p>
+<pre>// Canonical paths (match App.tsx)
+&lt;Route path="/admin/actores" element={&lt;ActoresPage /&gt;} /&gt;
+&lt;Route path="/admin/actores/transportistas" element={&lt;TransportistasPage /&gt;} /&gt;
+&lt;Route path="/admin/actores/transportistas/nuevo" element={&lt;NuevoTransportistaPage /&gt;} /&gt;
+&lt;Route path="/admin/actores/transportistas/:id/editar" element={&lt;NuevoTransportistaPage /&gt;} /&gt;
+&lt;Route path="/admin/actores/transportistas/:id" element={&lt;TransportistaDetallePage /&gt;} /&gt;
+&lt;Route path="/admin/actores/operadores" element={&lt;AdminOperadoresPage /&gt;} /&gt;
+&lt;Route path="/admin/actores/operadores/nuevo" element={&lt;NuevoOperadorPage /&gt;} /&gt;
+&lt;Route path="/admin/actores/operadores/:id/editar" element={&lt;NuevoOperadorPage /&gt;} /&gt;
+&lt;Route path="/admin/actores/operadores/:id/renovar" element={&lt;NuevoOperadorPage /&gt;} /&gt;
+&lt;Route path="/admin/actores/operadores/:id" element={&lt;OperadorDetallePage /&gt;} /&gt;
+&lt;Route path="/admin/actores/generadores" element={&lt;AdminGeneradoresPage /&gt;} /&gt;
+&lt;Route path="/admin/actores/generadores/nuevo" element={&lt;NuevoGeneradorPage /&gt;} /&gt;
+&lt;Route path="/admin/actores/generadores/:id/editar" element={&lt;NuevoGeneradorPage /&gt;} /&gt;
+&lt;Route path="/admin/actores/generadores/:id/renovar" element={&lt;NuevoGeneradorPage /&gt;} /&gt;
+&lt;Route path="/admin/actores/generadores/:id" element={&lt;GeneradorDetallePage /&gt;} /&gt;</pre>
+
+<h4>Tests de regresion</h4>
+<p>Nuevo spec <code>frontend/e2e/pwa-routing.spec.ts</code> con 6 tests que verifican directamente las URLs canonicas contra produccion. Tambien se agrego <code>pwa-load.spec.ts</code> que recorre 19 rutas x 3 iteraciones (57 visitas) capturando console errors, network 500s, y deteccion de paginas 404.</p>
+
+<div class="info-box">
+<strong>Principio:</strong> los paths deben ser identicos entre web y PWA. La web es la fuente de verdad (paths canonicos). La PWA agrega los canonicos Y mantiene los legacy como aliases.
+</div>
+
+<!-- ============================================================
+     16.12 — Operaciones e Incident Recovery
+     ============================================================ -->
+<h3>16.12 Operaciones — Incident Recovery + Migration Runbook</h3>
+
+<h4>Incidente del 8 abril 2026 — OpenLiteSpeed conflict</h4>
+<p>Tras un reinicio del VPS, el sitio dejo de responder. SSH entraba lento (banner timeout), HTTPS quedaba colgado tras el handshake.</p>
+
+<h5>Diagnostico</h5>
+<pre># puertos abiertos pero apps no responden
+nc -zv 23.105.176.45 80   # OK
+nc -zv 23.105.176.45 443  # OK
+curl https://sitrep.ultimamilla.com.ar/api/health  # timeout
+ssh root@23.105.176.45 "systemctl status nginx"
+# nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+
+ssh root@23.105.176.45 "ss -tlnp | grep -E ':80|:443'"
+# litespeed PIDs 1738/1739 ocupando los puertos</pre>
+
+<h5>Causa</h5>
+<p><code>lshttpd</code> (OpenLiteSpeed, instalado por un panel de hosting) tenia <code>enabled</code> a nivel systemd. Al reiniciar el server arranco antes que nginx y ocupo los puertos 80/443. Nginx fallo silenciosamente.</p>
+
+<h5>Fix aplicado</h5>
+<pre>ssh root@23.105.176.45 "
+  systemctl stop lshttpd
+  systemctl start nginx
+  systemctl disable lshttpd
+"</pre>
+
+<p>Verificacion: <code>curl https://sitrep.ultimamilla.com.ar/api/health</code> &rarr; <code>{"status":"ok","db":"connected"}</code>. Smoke test 48/48 PASS.</p>
+
+<h4>Runbook — Recuperacion rapida</h4>
+<table>
+<thead><tr><th>Sintoma</th><th>Comando</th></tr></thead>
+<tbody>
+<tr><td>API no responde</td><td><code>ssh root@VPS "pm2 list && pm2 logs sitrep-backend --lines 50 --nostream"</code></td></tr>
+<tr><td>PM2 vacio tras reboot</td><td><code>pm2 resurrect</code> (lee dump guardado)</td></tr>
+<tr><td>nginx failed</td><td><code>systemctl status nginx; nginx -t; ss -tlnp \| grep -E ':80\|:443'</code></td></tr>
+<tr><td>DB no conecta</td><td><code>docker ps \| grep directus-admin-database; docker logs directus-admin-database-1 --tail 50</code></td></tr>
+<tr><td>OOM</td><td><code>free -h; pm2 restart sitrep-backend</code></td></tr>
+<tr><td>Disco lleno</td><td><code>df -h /; ncdu /var/www; du -sh /opt/sitrep-backups</code></td></tr>
+<tr><td>Otro proceso ocupo puertos</td><td><code>ss -tlnp \| grep -E ':80\|:443'; systemctl stop &lt;servicio&gt;</code></td></tr>
+</tbody>
+</table>
+
+<h4>Comandos de monitoreo</h4>
+<pre># Server health
+ssh root@VPS "uptime && free -h && df -h / && pm2 list | grep sitrep"
+
+# DB health
+docker exec directus-admin-database-1 pg_isready -U directus -d trazabilidad_rrpp
+
+# Backup status
+ls -lt /opt/sitrep-backups/sitrep-db-*.sql.gz | head -3
+
+# Smoke test produccion
+bash backend/tests/smoke-test.sh https://sitrep.ultimamilla.com.ar</pre>
+
+<div class="warn-box">
+<strong>Atencion:</strong> el disco esta al 91% (7.2GB libres). Los backups crecen ~120MB/dia. Monitorear con cron, considerar limpieza agresiva o cross-server rsync.
+</div>
+
+<h4>Migracion a servidor VPN</h4>
+<p>Plan de migracion completo a servidor VPN-only documentado en <code>DEPLOY-VPN-SERVER.md</code> en la raiz del repo. Cubre 10 fases:</p>
+<ol>
+<li>Pre-migration checklist</li>
+<li>Base server setup (Ubuntu 22.04, Node 20, Docker, Nginx, Certbot)</li>
+<li>PostgreSQL dedicado (NO compartido con Directus)</li>
+<li>Let's Encrypt DNS-01 challenge (HTTP-01 no funciona detras de VPN)</li>
+<li>CI/CD via VPN (3 opciones: self-hosted runner, bastion, manual)</li>
+<li>Data migration (pg_dump &rarr; SCP &rarr; psql)</li>
+<li>Secrets migration</li>
+<li>DNS cutover (TTL bajo, monitor logs)</li>
+<li>Post-cutover verification (smoke + e2e + manual QA)</li>
+<li>Rollback plan (30 dias old server vivo)</li>
+</ol>
+
+<p>Scripts auxiliares en <code>scripts/migration/</code>: preflight, db-dump, db-restore, verify, rollback.</p>
+
+<p>Runbook operacional en <code>docs/RUNBOOK.md</code> — comandos de uso diario, deploy, logs, backups, recuperacion.</p>
 
 </section>
 
