@@ -75,20 +75,27 @@ export const getManifiestos = async (req: AuthRequest, res: Response, next: Next
         skip,
         take,
         orderBy,
-        include: {
-          generador: true,
-          transportista: true,
-          operador: true,
-          residuos: {
-            include: {
-              tipoResiduo: true
-            }
-          },
-          eventos: {
-            orderBy: { createdAt: 'desc' },
-            take: 5
-          }
-        }
+        select: {
+          id: true,
+          numero: true,
+          estado: true,
+          modalidad: true,
+          createdAt: true,
+          updatedAt: true,
+          fechaRetiro: true,
+          fechaEntrega: true,
+          fechaRecepcion: true,
+          fechaCierre: true,
+          observaciones: true,
+          blockchainStatus: true,
+          generadorId: true,
+          transportistaId: true,
+          operadorId: true,
+          generador: { select: { id: true, razonSocial: true, cuit: true } },
+          transportista: { select: { id: true, razonSocial: true, cuit: true } },
+          operador: { select: { id: true, razonSocial: true, cuit: true } },
+          residuos: { select: { cantidad: true, unidad: true } },
+        },
       }),
       prisma.manifiesto.count({ where })
     ]);
