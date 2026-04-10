@@ -41,49 +41,78 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
     ctx.lineJoin = 'round';
   }, [penColor, lineWidth]);
 
-  const getPos = (e: React.MouseEvent | React.TouchEvent) => {
+  const isDrawingRef = useRef(false);
+
+  const getPos = (e: MouseEvent | TouchEvent) => {
     const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
 
-    if ('touches' in e) {
+    if ('touches' in e && e.touches.length > 0) {
       const touch = e.touches[0];
       return {
         x: (touch.clientX - rect.left) * scaleX,
         y: (touch.clientY - rect.top) * scaleY,
       };
     }
+    const me = e as MouseEvent;
     return {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY,
+      x: (me.clientX - rect.left) * scaleX,
+      y: (me.clientY - rect.top) * scaleY,
     };
   };
 
-  const startDraw = (e: React.MouseEvent | React.TouchEvent) => {
+  const startDraw = useCallback((e: MouseEvent | TouchEvent) => {
     e.preventDefault();
     const ctx = getCtx();
     if (!ctx) return;
     const { x, y } = getPos(e);
     ctx.beginPath();
     ctx.moveTo(x, y);
+    isDrawingRef.current = true;
     setIsDrawing(true);
     setHasContent(true);
-  };
+  }, [getCtx]);
 
-  const draw = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDrawing) return;
+  const draw = useCallback((e: MouseEvent | TouchEvent) => {
+    if (!isDrawingRef.current) return;
     e.preventDefault();
     const ctx = getCtx();
     if (!ctx) return;
     const { x, y } = getPos(e);
     ctx.lineTo(x, y);
     ctx.stroke();
-  };
+  }, [getCtx]);
 
-  const endDraw = () => {
+  const endDraw = useCallback(() => {
+    isDrawingRef.current = false;
     setIsDrawing(false);
-  };
+  }, []);
+
+  // Register touch handlers with { passive: false } to allow preventDefault
+  // React synthetic events are passive by default in modern Chrome, causing
+  // "Unable to preventDefault inside passive event listener" warnings.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.addEventListener('touchstart', startDraw, { passive: false });
+    canvas.addEventListener('touchmove', draw, { passive: false });
+    canvas.addEventListener('touchend', endDraw);
+    canvas.addEventListener('mousedown', startDraw as EventListener);
+    canvas.addEventListener('mousemove', draw as EventListener);
+    canvas.addEventListener('mouseup', endDraw);
+    canvas.addEventListener('mouseleave', endDraw);
+    return () => {
+      canvas.removeEventListener('touchstart', startDraw);
+      canvas.removeEventListener('touchmove', draw);
+      canvas.removeEventListener('touchend', endDraw);
+      canvas.removeEventListener('mousedown', startDraw as EventListener);
+      canvas.removeEventListener('mousemove', draw as EventListener);
+      canvas.removeEventListener('mouseup', endDraw);
+      canvas.removeEventListener('mouseleave', endDraw);
+    };
+  }, [startDraw, draw, endDraw]);
 
   const handleClear = () => {
     const canvas = canvasRef.current;
@@ -115,13 +144,6 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
           height={height}
           className="w-full cursor-crosshair touch-none"
           style={{ aspectRatio: `${width}/${height}` }}
-          onMouseDown={startDraw}
-          onMouseMove={draw}
-          onMouseUp={endDraw}
-          onMouseLeave={endDraw}
-          onTouchStart={startDraw}
-          onTouchMove={draw}
-          onTouchEnd={endDraw}
         />
         {!hasContent && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
