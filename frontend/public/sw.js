@@ -1,7 +1,7 @@
 // Service Worker para modo Offline-First (CU-T09)
 // Scope: / (main site)
-const CACHE_NAME = 'trazabilidad-rrpp-v23';
-const RUNTIME_CACHE = 'runtime-cache-v23';
+const CACHE_NAME = 'trazabilidad-rrpp-v24';
+const RUNTIME_CACHE = 'runtime-cache-v24';
 
 // Recursos críticos para cachear en instalación
 const PRECACHE_URLS = [
@@ -11,7 +11,7 @@ const PRECACHE_URLS = [
 
 // Instalación del Service Worker
 self.addEventListener('install', (event) => {
-    console.log('[SW] Installing Service Worker v13...');
+    console.log('[SW] Installing Service Worker v24...');
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then((cache) => {
@@ -30,7 +30,7 @@ self.addEventListener('install', (event) => {
 
 // Activación del Service Worker
 self.addEventListener('activate', (event) => {
-    console.log('[SW] Activando Service Worker v13...');
+    console.log('[SW] Activando Service Worker v24...');
     event.waitUntil(
         caches.keys().then((cacheNames) => {
             const currentCaches = [CACHE_NAME, RUNTIME_CACHE];
@@ -61,29 +61,39 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Navigation requests (HTML pages): network-first, never cache HTML to avoid stale asset references
+    // Navigation requests (HTML pages): network-first with safe fallback
     if (request.mode === 'navigate') {
         event.respondWith(
-            fetch(request).catch(() => {
-                return caches.match(request).then((cached) => cached || caches.match('/offline.html'));
-            })
+            fetch(request)
+                .then((response) => response)
+                .catch(async () => {
+                    const cached = await caches.match(request);
+                    if (cached) return cached;
+                    const offline = await caches.match('/offline.html');
+                    if (offline) return offline;
+                    // Last resort: return a minimal HTML response to avoid SW error
+                    return new Response('<html><body><h1>Offline</h1><p>Sin conexion. Intente de nuevo.</p></body></html>', {
+                        headers: { 'Content-Type': 'text/html' }
+                    });
+                })
         );
         return;
     }
 
     // Static assets: network-first with cache fallback
     event.respondWith(
-        caches.open(RUNTIME_CACHE).then((cache) => {
-            return fetch(request)
-                .then((response) => {
-                    if (response.status === 200) {
-                        cache.put(request, response.clone());
-                    }
-                    return response;
-                })
-                .catch(() => {
-                    return cache.match(request);
-                });
+        caches.open(RUNTIME_CACHE).then(async (cache) => {
+            try {
+                const response = await fetch(request);
+                if (response && response.status === 200) {
+                    cache.put(request, response.clone());
+                }
+                return response;
+            } catch {
+                const cached = await cache.match(request);
+                // Always return a Response — never undefined
+                return cached || new Response('', { status: 408, statusText: 'Offline' });
+            }
         })
     );
 });
@@ -127,4 +137,4 @@ self.addEventListener('push', (event) => {
     );
 });
 
-console.log('[SW] Service Worker v13 cargado');
+console.log('[SW] Service Worker v24 cargado');
