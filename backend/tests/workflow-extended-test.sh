@@ -143,8 +143,25 @@ except: pass
 }
 
 get_tipo_residuo_id() {
-  curl -s "$API/catalogos/tipos-residuos" \
-    | python3 -c "
+  # Get a residuo type that the operador is authorized to treat
+  local oper_id="$1" token="$2"
+  local result=""
+  if [ -n "$oper_id" ] && [ -n "$token" ]; then
+    result=$(curl -s "$API/catalogos/operadores" -H "Authorization: Bearer $token" \
+      | python3 -c "
+import sys, json
+try:
+    ops = json.load(sys.stdin)['data']['operadores']
+    op = next((o for o in ops if o['id'] == '$oper_id'), None)
+    if op and op.get('tratamientos'):
+        print(op['tratamientos'][0]['tipoResiduoId'])
+except: pass
+" 2>/dev/null)
+  fi
+  # Fallback to first from global catalog
+  if [ -z "$result" ]; then
+    result=$(curl -s "$API/catalogos/tipos-residuos" \
+      | python3 -c "
 import sys, json
 try:
     d = json.load(sys.stdin)
@@ -152,7 +169,9 @@ try:
     items = data if isinstance(data, list) else data.get('tiposResiduos', data.get('tipos', data.get('items', [])))
     if items: print(items[0]['id'])
 except: pass
-" 2>/dev/null
+" 2>/dev/null)
+  fi
+  echo "$result"
 }
 
 # Build manifiesto creation body
@@ -237,7 +256,7 @@ section "Fetching catalog IDs"
 GEN_CAT_ID=$(get_generador_id "$ADMIN_TOKEN")
 TRANS_CAT_ID=$(get_transportista_id "$ADMIN_TOKEN")
 OPER_CAT_ID=$(get_operador_id "$ADMIN_TOKEN")
-TIPO_ID=$(get_tipo_residuo_id)
+TIPO_ID=$(get_tipo_residuo_id "$OPER_CAT_ID" "$ADMIN_TOKEN")
 
 [ -n "$GEN_CAT_ID" ]   && pass "Generador catalog id: ${GEN_CAT_ID:0:8}..."   || fail "No generadores in catalog"
 [ -n "$TRANS_CAT_ID" ] && pass "Transportista catalog id: ${TRANS_CAT_ID:0:8}..." || fail "No transportistas in catalog"

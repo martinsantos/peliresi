@@ -133,6 +133,7 @@ echo "Date:   $(date '+%Y-%m-%d %H:%M:%S')"
 subsection "Fase 0: Autenticación de roles primarios"
 
 TOKEN_ADMIN=$(login "admin@dgfa.mendoza.gov.ar" "admin123")
+sleep 1
 if [ -z "$TOKEN_ADMIN" ]; then
   echo -e "  ${RED}FATAL: No se pudo autenticar como ADMIN. Abortando.${NC}"
   exit 1
@@ -141,9 +142,11 @@ echo -e "  ${GREEN}OK${NC} ADMIN"
 
 TOKEN_GEN=$(login "quimica.mendoza@industria.com" "gen123")
 [ -n "$TOKEN_GEN" ] && echo -e "  ${GREEN}OK${NC} GENERADOR-1" || { log_warn "GENERADOR-1 auth fallida"; TOKEN_GEN=""; }
+sleep 1
 
 TOKEN_TRANS=$(login "transportes.andes@logistica.com" "trans123")
 [ -n "$TOKEN_TRANS" ] && echo -e "  ${GREEN}OK${NC} TRANSPORTISTA-1" || { log_warn "TRANSPORTISTA-1 auth fallida"; TOKEN_TRANS=""; }
+sleep 1
 
 TOKEN_OPER=$(login "tratamiento.residuos@planta.com" "op123")
 [ -n "$TOKEN_OPER" ] && echo -e "  ${GREEN}OK${NC} OPERADOR-1" || { log_warn "OPERADOR-1 auth fallida"; TOKEN_OPER=""; }
@@ -528,13 +531,18 @@ except Exception:
     print('')
 " 2>/dev/null)
 
-  # Obtener un tipo de residuo para el body
-  RESIDUO_ID=$(api_get "/catalogos/residuos?limit=1" "$TOKEN_ADMIN" | python3 -c "
+  # Obtener un tipo de residuo que el operador tenga autorizado
+  RESIDUO_ID=$(api_get "/catalogos/operadores" "$TOKEN_ADMIN" | python3 -c "
 import sys, json
 try:
     d = json.load(sys.stdin)
-    items = d.get('data', {}).get('residuos', d.get('data', {}).get('items', []))
-    print(items[0]['id'] if items else '')
+    ops = d.get('data', {}).get('operadores', [])
+    oper_id = '$OPER_ACTOR_ID'
+    op = next((o for o in ops if o['id'] == oper_id), ops[0] if ops else None)
+    if op and op.get('tratamientos'):
+        print(op['tratamientos'][0]['tipoResiduoId'])
+    else:
+        print('')
 except Exception:
     print('')
 " 2>/dev/null)
@@ -551,7 +559,7 @@ body = {
   'operadorId': '$OPER_ACTOR_ID',
   'fechaRetiroEstimada': '2026-04-01T10:00:00.000Z',
   'observaciones': 'S5 concurrent test',
-  'residuos': [{'residuoId': '$RESIDUO_ID', 'cantidad': 1.0, 'unidad': 'kg', 'descripcion': 'Test'}]
+  'residuos': [{'tipoResiduoId': '$RESIDUO_ID', 'cantidad': 1.0, 'unidad': 'kg', 'descripcion': 'Test'}]
 }
 print(json.dumps(body))
 ")

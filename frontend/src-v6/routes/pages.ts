@@ -19,6 +19,7 @@ export const UserSwitcherPage = lazy(() => import('../pages/auth/UserSwitcherPag
 // Dashboard & Centro de Control
 export const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
 export const CentroControlPage = lazy(() => import('../pages/centro-control/CentroControlPage'));
+export const WarRoomPage = lazy(() => import('../pages/monitor/WarRoomPage'));
 
 // Manifiestos
 export const ManifiestosPage = lazy(() => import('../pages/manifiestos/ManifiestosPage'));

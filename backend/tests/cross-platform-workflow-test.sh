@@ -230,7 +230,26 @@ subsection "Phase 3: Catalog data availability"
 GENERADOR_ACTOR_ID=$(api_call "GET" "/catalogos/generadores" "$ADMIN_TOKEN" | json_extract "data.generadores.0.id")
 TRANSPORTISTA_ACTOR_ID=$(api_call "GET" "/catalogos/transportistas" "$ADMIN_TOKEN" | json_extract "data.transportistas.0.id")
 OPERADOR_ACTOR_ID=$(api_call "GET" "/catalogos/operadores" "$ADMIN_TOKEN" | json_extract "data.operadores.0.id")
-TIPO_RESIDUO_ID=$(api_call "GET" "/catalogos/tipos-residuos" "$ADMIN_TOKEN" | json_extract "data.tiposResiduos.0.id")
+# Get a residuo type that the selected operador is authorized to treat
+OPER_CATALOG_RESP=$(api_call "GET" "/catalogos/operadores" "$ADMIN_TOKEN")
+TIPO_RESIDUO_ID=$(echo "$OPER_CATALOG_RESP" | python3 -c "
+import sys, json
+try:
+    ops = json.load(sys.stdin)['data']['operadores']
+    oper_id = '$OPERADOR_ACTOR_ID'
+    op = next((o for o in ops if o['id'] == oper_id), None)
+    if op and op.get('tratamientos'):
+        print(op['tratamientos'][0]['tipoResiduoId'])
+    else:
+        # Fallback: first residuo from catalog
+        pass
+except Exception:
+    pass
+" 2>/dev/null)
+# Fallback if operator lookup failed
+if [ -z "$TIPO_RESIDUO_ID" ]; then
+  TIPO_RESIDUO_ID=$(api_call "GET" "/catalogos/tipos-residuos" "$ADMIN_TOKEN" | json_extract "data.tiposResiduos.0.id")
+fi
 
 echo -n "  Generador actor: "
 if [ -n "$GENERADOR_ACTOR_ID" ]; then echo -e "${GREEN}${GENERADOR_ACTOR_ID:0:8}...${NC}"; else echo -e "${RED}NOT FOUND${NC}"; fi
@@ -603,10 +622,29 @@ fi
 if [ -n "$MANIFIESTO_ID" ]; then
   subsection "Step 9: Register Treatment [OPERADOR → EN_TRATAMIENTO]"
 
-  TRATAMIENTO_BODY='{
-    "metodoTratamiento": "Incineración controlada",
-    "observaciones": "Tratamiento iniciado - test cross-platform"
-  }'
+  # Get the authorized treatment method for this operador (field is 'metodo' in TratamientoAutorizado)
+  METODO_AUTORIZADO=$(echo "$OPER_CATALOG_RESP" | python3 -c "
+import sys, json
+try:
+    ops = json.load(sys.stdin)['data']['operadores']
+    op = next((o for o in ops if o['id'] == '$OPERADOR_ACTOR_ID'), None)
+    if op and op.get('tratamientos'):
+        # Find treatment matching the residuo used, or fallback to first
+        for t in op['tratamientos']:
+            if t.get('tipoResiduoId') == '$TIPO_RESIDUO_ID' and t.get('metodo'):
+                print(t['metodo']); break
+        else:
+            for t in op['tratamientos']:
+                if t.get('metodo'):
+                    print(t['metodo']); break
+except: pass
+" 2>/dev/null)
+  [ -z "$METODO_AUTORIZADO" ] && METODO_AUTORIZADO=""
+
+  TRATAMIENTO_BODY="{
+    \"metodoTratamiento\": \"$METODO_AUTORIZADO\",
+    \"observaciones\": \"Tratamiento iniciado - test cross-platform\"
+  }"
 
   TRATAMIENTO_RESP=$(api_call "POST" "/manifiestos/$MANIFIESTO_ID/tratamiento" "$OPER_TOKEN" "$TRATAMIENTO_BODY")
   TRATAMIENTO_SUCCESS=$(echo "$TRATAMIENTO_RESP" | json_extract "success")
@@ -630,10 +668,10 @@ fi
 if [ -n "$MANIFIESTO_ID" ]; then
   subsection "Step 10: Close Manifest [OPERADOR → TRATADO]"
 
-  CIERRE_BODY='{
-    "metodoTratamiento": "Incineración controlada a 1200°C",
-    "observaciones": "Disposición final completada - test cross-platform"
-  }'
+  CIERRE_BODY="{
+    \"metodoTratamiento\": \"$METODO_AUTORIZADO\",
+    \"observaciones\": \"Disposición final completada - test cross-platform\"
+  }"
 
   CIERRE_RESP=$(api_call "POST" "/manifiestos/$MANIFIESTO_ID/cerrar" "$OPER_TOKEN" "$CIERRE_BODY")
   CIERRE_SUCCESS=$(echo "$CIERRE_RESP" | json_extract "success")

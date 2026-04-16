@@ -5,7 +5,9 @@
 
 set -uo pipefail
 
-BASE="${1:-https://sitrep.ultimamilla.com.ar/api}"
+_INPUT="${1:-https://sitrep.ultimamilla.com.ar}"
+BASE="${_INPUT%/}"
+[[ "$BASE" != */api ]] && BASE="$BASE/api"
 PASS=0
 FAIL=0
 BUGS=""
@@ -57,7 +59,9 @@ login() {
 echo ""
 echo "Autenticando..."
 TOKEN_ADMIN=$(login "admin@dgfa.mendoza.gov.ar" "admin123")
+sleep 1
 TOKEN_TRANS=$(login "transportes.andes@logistica.com" "trans123")
+sleep 1
 TOKEN_GEN=$(login "quimica.mendoza@industria.com" "gen123")
 
 [ -n "$TOKEN_ADMIN" ] && echo -e "  ${GREEN}OK${NC} ADMIN" || { echo -e "  ${RED}ERROR${NC} No ADMIN token"; exit 1; }

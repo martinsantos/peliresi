@@ -35,6 +35,7 @@ import {
   HelpCircle,
   BookOpen,
   FileCheck,
+  Radio,
 } from 'lucide-react';
 import { Button } from '../components/ui/ButtonV2';
 import { Badge } from '../components/ui/BadgeV2';
@@ -115,6 +116,7 @@ export const MainLayout: React.FC = () => {
     // Centro de Control para Admin, Transportista y todos los Admin Sectoriales
     if (isAdmin || isTransportista || isAdminTransportista || isAdminOperador || isAdminGenerador) {
       items.push({ path: '/centro-control', icon: Command, label: 'Centro de Control' });
+      items.push({ path: '/monitor', icon: Radio, label: 'Monitor' });
     }
 
     // Manifiestos para todos

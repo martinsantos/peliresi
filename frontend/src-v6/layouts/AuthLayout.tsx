@@ -22,11 +22,18 @@ export const AuthLayout: React.FC = () => {
         {/* Content */}
         <div className="relative z-10 flex flex-col justify-between p-12 text-white">
           <div>
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                <Leaf size={28} />
+            {/* Gobierno de Mendoza + SITREP */}
+            <div className="flex items-center gap-2.5 mb-6">
+              <img src="/escudo-mendoza-blanco.webp" alt="Gobierno de Mendoza" className="h-11 w-auto" />
+              <span className="leading-tight" style={{ fontFamily: "'Lato', sans-serif" }}>
+                <span className="block text-base font-bold tracking-tight">MENDOZA</span>
+                <span className="block text-sm font-light">GOBIERNO</span>
+              </span>
+              <div className="w-px h-9 bg-white/30 mx-1" />
+              <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center">
+                <Leaf size={24} />
               </div>
-              <span className="text-2xl font-bold">SITREP v6</span>
+              <span className="text-xl font-bold">SITREP</span>
             </div>
             <h1 className="text-4xl xl:text-5xl font-bold leading-tight mb-6">
               Sistema de<br />
@@ -66,12 +73,18 @@ export const AuthLayout: React.FC = () => {
       {/* Right side - Form (wider) */}
       <div className="flex-1 flex items-center justify-center p-6 lg:p-12 overflow-y-auto">
         <div className="w-full max-w-lg">
-          {/* Mobile logo */}
-          <div className="lg:hidden flex items-center justify-center gap-3 mb-8">
-            <div className="w-10 h-10 bg-primary-500 rounded-xl flex items-center justify-center text-white">
-              <Leaf size={20} />
+          {/* Mobile logo — Gobierno de Mendoza + SITREP */}
+          <div className="lg:hidden flex items-center justify-center gap-2 mb-8">
+            <img src="/escudo-mendoza-color.webp" alt="Gobierno de Mendoza" className="h-8 w-auto" />
+            <span className="leading-tight" style={{ fontFamily: "'Lato', sans-serif" }}>
+              <span className="block text-xs font-bold text-[#007F90] tracking-tight">MENDOZA</span>
+              <span className="block text-[10px] font-light text-[#007F90]">GOBIERNO</span>
+            </span>
+            <div className="w-px h-7 bg-neutral-300 mx-0.5" />
+            <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center text-white">
+              <Leaf size={16} />
             </div>
-            <span className="text-xl font-bold text-neutral-900">SITREP v6</span>
+            <span className="text-sm font-bold text-neutral-900">SITREP</span>
           </div>
           
           <Outlet />

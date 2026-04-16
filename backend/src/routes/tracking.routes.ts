@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { isAuthenticated } from '../middlewares/auth.middleware';
 import { getActividadCentroControl } from '../controllers/tracking.controller';
+import { getTimeline, getMonitorLive, getForecast, getActiveDays } from '../controllers/monitor.controller';
 
 const router = Router();
 
@@ -49,5 +50,19 @@ router.use(isAuthenticated);
  */
 // Centro de Control — actividad con capas
 router.get('/actividad', getActividadCentroControl);
+
+// ─── War Room Monitor endpoints ───────────────────────────────────────────────
+
+// Timeline cronológico unificado (PLAYBACK mode)
+router.get('/timeline', getTimeline);
+
+// Snapshot live optimizado (LIVE mode)
+router.get('/monitor-live', getMonitorLive);
+
+// Forecast de manifiestos pendientes (FORECAST mode)
+router.get('/forecast', getForecast);
+
+// Active days for date navigator
+router.get('/active-days', getActiveDays);
 
 export default router;

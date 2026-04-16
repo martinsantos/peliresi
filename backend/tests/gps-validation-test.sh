@@ -6,7 +6,9 @@
 
 set -uo pipefail
 
-BASE="${1:-https://sitrep.ultimamilla.com.ar/api}"
+_INPUT="${1:-https://sitrep.ultimamilla.com.ar}"
+BASE="${_INPUT%/}"
+[[ "$BASE" != */api ]] && BASE="$BASE/api"
 PASS=0
 FAIL=0
 
@@ -29,11 +31,25 @@ assert_status() {
   fi
 }
 
-# Login admin
-TOKEN=$(curl -s -X POST "$BASE/auth/login" \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@dgfa.mendoza.gov.ar","password":"admin123"}' | \
-  python3 -c "import sys,json; print(json.load(sys.stdin)['data']['tokens']['accessToken'])" 2>/dev/null)
+# Login admin (with retry on rate limit)
+_do_login() {
+  curl -s -X POST "$BASE/auth/login" \
+    -H "Content-Type: application/json" \
+    -d '{"email":"admin@dgfa.mendoza.gov.ar","password":"admin123"}' | \
+    python3 -c "
+import sys,json
+try:
+    d=json.load(sys.stdin)
+    print(d.get('data',{}).get('tokens',{}).get('accessToken',''))
+except: print('')
+" 2>/dev/null
+}
+TOKEN=$(_do_login)
+if [ -z "$TOKEN" ]; then
+  echo -e "  ${YELLOW}Rate limited, waiting 61s...${NC}"
+  sleep 61
+  TOKEN=$(_do_login)
+fi
 
 [ -z "$TOKEN" ] && echo "ERROR: no token" && exit 1
 echo -e "  ${GREEN}OK${NC} token obtenido"

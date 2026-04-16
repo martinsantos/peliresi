@@ -395,16 +395,50 @@ echo "  Operadores:"
 echo -e "    1: ${OPER_NAME_1:-?} (${OPER_ID_1:0:8}...)"
 echo -e "    2: ${OPER_NAME_2:-?} (${OPER_ID_2:0:8}...)"
 
-# Get residuo type IDs (need multiple)
-RESIDUOS_CATALOG=$(api_call "GET" "/catalogos/tipos-residuos" "$ADMIN_TOKEN")
-RES_IDS=()
-for i in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14; do
-  RID=$(echo "$RESIDUOS_CATALOG" | json_extract "data.tiposResiduos.$i.id")
-  if [ -n "$RID" ] && [ "$RID" != "" ]; then
-    RES_IDS+=("$RID")
-  fi
-done
-echo "  Tipos de residuos encontrados: ${#RES_IDS[@]}"
+# Get residuo type IDs authorized by the operadores (not global catalog)
+# This ensures manifiestos use residuos the operador can actually treat
+RES_IDS_OPER1=()
+RES_IDS_OPER2=()
+
+# Extract authorized residuo IDs per operador from their tratamientos
+_extract_oper_residuos() {
+  local oper_id="$1"
+  echo "$OPER_CATALOG" | python3 -c "
+import sys, json
+try:
+    ops = json.load(sys.stdin)['data']['operadores']
+    op = next((o for o in ops if o['id'] == '$oper_id'), None)
+    if op:
+        for t in op.get('tratamientos', []):
+            print(t['tipoResiduoId'])
+except: pass
+" 2>/dev/null
+}
+
+while IFS= read -r rid; do
+  [ -n "$rid" ] && RES_IDS_OPER1+=("$rid")
+done < <(_extract_oper_residuos "$OPER_ID_1")
+
+while IFS= read -r rid; do
+  [ -n "$rid" ] && RES_IDS_OPER2+=("$rid")
+done < <(_extract_oper_residuos "$OPER_ID_2")
+
+# Fallback: if no authorized residuos found, use global catalog
+if [ ${#RES_IDS_OPER1[@]} -eq 0 ] || [ ${#RES_IDS_OPER2[@]} -eq 0 ]; then
+  RESIDUOS_CATALOG=$(api_call "GET" "/catalogos/tipos-residuos" "$ADMIN_TOKEN")
+  FALLBACK_IDS=()
+  for i in 0 1 2 3 4 5; do
+    RID=$(echo "$RESIDUOS_CATALOG" | json_extract "data.tiposResiduos.$i.id")
+    [ -n "$RID" ] && FALLBACK_IDS+=("$RID")
+  done
+  [ ${#RES_IDS_OPER1[@]} -eq 0 ] && RES_IDS_OPER1=("${FALLBACK_IDS[@]}")
+  [ ${#RES_IDS_OPER2[@]} -eq 0 ] && RES_IDS_OPER2=("${FALLBACK_IDS[@]}")
+fi
+
+# Combined array for backward compat (used by res_id helper)
+RES_IDS=("${RES_IDS_OPER1[@]}")
+echo "  Operador 1 residuos autorizados: ${#RES_IDS_OPER1[@]}"
+echo "  Operador 2 residuos autorizados: ${#RES_IDS_OPER2[@]}"
 
 # Validate we have enough data
 if [ -z "$GEN_ID_1" ] || [ -z "$TRANS_ID_1" ] || [ -z "$OPER_ID_1" ] || [ ${#RES_IDS[@]} -lt 2 ]; then
@@ -425,22 +459,40 @@ pass "All catalog data available"
 [ -z "$TRANS2_TOKEN" ] && TRANS2_TOKEN="$TRANS1_TOKEN"
 [ -z "$OPER2_TOKEN" ] && OPER2_TOKEN="$OPER1_TOKEN"
 
-# Build residuo JSON helpers (use modular indices to handle fewer than 15 types)
-res_id() {
-  local IDX=$(( $1 % ${#RES_IDS[@]} ))
-  echo "${RES_IDS[$IDX]}"
+# Build residuo JSON helpers — pick from authorized residuos per operador
+# Usage: res_id_for OPER_NUM INDEX  (OPER_NUM = 1 or 2)
+res_id_for() {
+  local oper_num="$1" idx="$2"
+  if [ "$oper_num" = "2" ]; then
+    local arr_len=${#RES_IDS_OPER2[@]}
+    [ "$arr_len" -eq 0 ] && echo "" && return
+    echo "${RES_IDS_OPER2[$(( idx % arr_len ))]}"
+  else
+    local arr_len=${#RES_IDS_OPER1[@]}
+    [ "$arr_len" -eq 0 ] && echo "" && return
+    echo "${RES_IDS_OPER1[$(( idx % arr_len ))]}"
+  fi
 }
 
+# Backward compat: default to oper 1
+res_id() {
+  res_id_for 1 "$1"
+}
+
+# residuos_json_2 OPER_NUM [IDX1 IDX2]
 residuos_json_2() {
+  local on="${1:-1}" i1="${2:-0}" i2="${3:-1}"
   echo "[
-    {\"tipoResiduoId\": \"$(res_id $1)\", \"cantidad\": $((RANDOM % 500 + 50)), \"unidad\": \"kg\", \"descripcion\": \"Residuo tipo Y$(($1+1)) test\"},
-    {\"tipoResiduoId\": \"$(res_id $2)\", \"cantidad\": $((RANDOM % 300 + 30)), \"unidad\": \"kg\", \"descripcion\": \"Residuo tipo Y$(($2+1)) test\"}
+    {\"tipoResiduoId\": \"$(res_id_for $on $i1)\", \"cantidad\": $((RANDOM % 500 + 50)), \"unidad\": \"kg\", \"descripcion\": \"Residuo test A\"},
+    {\"tipoResiduoId\": \"$(res_id_for $on $i2)\", \"cantidad\": $((RANDOM % 300 + 30)), \"unidad\": \"kg\", \"descripcion\": \"Residuo test B\"}
   ]"
 }
 
+# residuos_json_1 OPER_NUM [IDX]
 residuos_json_1() {
+  local on="${1:-1}" i1="${2:-0}"
   echo "[
-    {\"tipoResiduoId\": \"$(res_id $1)\", \"cantidad\": $((RANDOM % 400 + 100)), \"unidad\": \"kg\", \"descripcion\": \"Residuo tipo Y$(($1+1)) test\"}
+    {\"tipoResiduoId\": \"$(res_id_for $on $i1)\", \"cantidad\": $((RANDOM % 400 + 100)), \"unidad\": \"kg\", \"descripcion\": \"Residuo test\"}
   ]"
 }
 
@@ -458,72 +510,72 @@ echo ""
 # Each created by the corresponding generador's token
 
 subsection "Batch 1: 5 manifiestos for FULL CYCLE (-> TRATADO)"
-create_manifiesto "$GEN1_TOKEN" "$GEN_ID_1" "$TRANS_ID_1" "$OPER_ID_1" "$(residuos_json_2 0 5)" "Full cycle #1 Quimica->TRANS1->OPER1"
+create_manifiesto "$GEN1_TOKEN" "$GEN_ID_1" "$TRANS_ID_1" "$OPER_ID_1" "$(residuos_json_2 1 0 1)" "Full cycle #1 Quimica->TRANS1->OPER1"
 M1="$LAST_CREATED_ID"; [ -n "$M1" ] && echo -e "  ${GREEN}OK${NC} #1 ${M1:0:12}..." || fail "Create #1"
 sleep 0.5
-create_manifiesto "$GEN2_TOKEN" "$GEN_ID_2" "$TRANS_ID_1" "$OPER_ID_1" "$(residuos_json_2 7 8)" "Full cycle #2 Petroquim->TRANS1->OPER1"
+create_manifiesto "$GEN2_TOKEN" "$GEN_ID_2" "$TRANS_ID_1" "$OPER_ID_1" "$(residuos_json_2 1 1 2)" "Full cycle #2 Petroquim->TRANS1->OPER1"
 M2="$LAST_CREATED_ID"; [ -n "$M2" ] && echo -e "  ${GREEN}OK${NC} #2 ${M2:0:12}..." || fail "Create #2"
 sleep 0.5
-create_manifiesto "$GEN3_TOKEN" "$GEN_ID_3" "$TRANS_ID_2" "$OPER_ID_2" "$(residuos_json_2 10 14)" "Full cycle #3 Lab->TRANS2->OPER2"
+create_manifiesto "$GEN3_TOKEN" "$GEN_ID_3" "$TRANS_ID_2" "$OPER_ID_2" "$(residuos_json_2 2 0 1)" "Full cycle #3 Lab->TRANS2->OPER2"
 M3="$LAST_CREATED_ID"; [ -n "$M3" ] && echo -e "  ${GREEN}OK${NC} #3 ${M3:0:12}..." || fail "Create #3"
 sleep 0.5
-create_manifiesto "$GEN1_TOKEN" "$GEN_ID_1" "$TRANS_ID_2" "$OPER_ID_2" "$(residuos_json_2 6 11)" "Full cycle #4 Quimica->TRANS2->OPER2"
+create_manifiesto "$GEN1_TOKEN" "$GEN_ID_1" "$TRANS_ID_2" "$OPER_ID_2" "$(residuos_json_2 2 1 2)" "Full cycle #4 Quimica->TRANS2->OPER2"
 M4="$LAST_CREATED_ID"; [ -n "$M4" ] && echo -e "  ${GREEN}OK${NC} #4 ${M4:0:12}..." || fail "Create #4"
 sleep 0.5
-create_manifiesto "$GEN2_TOKEN" "$GEN_ID_2" "$TRANS_ID_1" "$OPER_ID_2" "$(residuos_json_2 9 13)" "Full cycle #5 Petroquim->TRANS1->OPER2"
+create_manifiesto "$GEN2_TOKEN" "$GEN_ID_2" "$TRANS_ID_1" "$OPER_ID_2" "$(residuos_json_2 2 0 2)" "Full cycle #5 Petroquim->TRANS1->OPER2"
 M5="$LAST_CREATED_ID"; [ -n "$M5" ] && echo -e "  ${GREEN}OK${NC} #5 ${M5:0:12}..." || fail "Create #5"
 sleep 0.5
 
 subsection "Batch 2: 5 manifiestos for EN_TRANSITO (GPS trails)"
-create_manifiesto "$GEN1_TOKEN" "$GEN_ID_1" "$TRANS_ID_1" "$OPER_ID_1" "$(residuos_json_2 0 1)" "En transito #6 Ruta A"
+create_manifiesto "$GEN1_TOKEN" "$GEN_ID_1" "$TRANS_ID_1" "$OPER_ID_1" "$(residuos_json_2 1 0 1)" "En transito #6 Ruta A"
 M6="$LAST_CREATED_ID"; [ -n "$M6" ] && echo -e "  ${GREEN}OK${NC} #6 ${M6:0:12}..." || fail "Create #6"
 sleep 0.5
-create_manifiesto "$GEN1_TOKEN" "$GEN_ID_1" "$TRANS_ID_1" "$OPER_ID_1" "$(residuos_json_2 1 2)" "En transito #7 Ruta A-bis"
+create_manifiesto "$GEN1_TOKEN" "$GEN_ID_1" "$TRANS_ID_1" "$OPER_ID_1" "$(residuos_json_2 1 1 2)" "En transito #7 Ruta A-bis"
 M7="$LAST_CREATED_ID"; [ -n "$M7" ] && echo -e "  ${GREEN}OK${NC} #7 ${M7:0:12}..." || fail "Create #7"
 sleep 0.5
-create_manifiesto "$GEN2_TOKEN" "$GEN_ID_2" "$TRANS_ID_2" "$OPER_ID_2" "$(residuos_json_2 5 7)" "En transito #8 Ruta B"
+create_manifiesto "$GEN2_TOKEN" "$GEN_ID_2" "$TRANS_ID_2" "$OPER_ID_2" "$(residuos_json_2 2 0 1)" "En transito #8 Ruta B"
 M8="$LAST_CREATED_ID"; [ -n "$M8" ] && echo -e "  ${GREEN}OK${NC} #8 ${M8:0:12}..." || fail "Create #8"
 sleep 0.5
-create_manifiesto "$GEN2_TOKEN" "$GEN_ID_2" "$TRANS_ID_2" "$OPER_ID_2" "$(residuos_json_2 7 8)" "En transito #9 Ruta B-bis"
+create_manifiesto "$GEN2_TOKEN" "$GEN_ID_2" "$TRANS_ID_2" "$OPER_ID_2" "$(residuos_json_2 2 1 2)" "En transito #9 Ruta B-bis"
 M9="$LAST_CREATED_ID"; [ -n "$M9" ] && echo -e "  ${GREEN}OK${NC} #9 ${M9:0:12}..." || fail "Create #9"
 sleep 0.5
-create_manifiesto "$GEN3_TOKEN" "$GEN_ID_3" "$TRANS_ID_1" "$OPER_ID_1" "$(residuos_json_2 10 12)" "En transito #10 Ruta C"
+create_manifiesto "$GEN3_TOKEN" "$GEN_ID_3" "$TRANS_ID_1" "$OPER_ID_1" "$(residuos_json_2 1 0 2)" "En transito #10 Ruta C"
 M10="$LAST_CREATED_ID"; [ -n "$M10" ] && echo -e "  ${GREEN}OK${NC} #10 ${M10:0:12}..." || fail "Create #10"
 sleep 0.5
 
 subsection "Batch 3: 3 manifiestos for RECIBIDO"
-create_manifiesto "$GEN1_TOKEN" "$GEN_ID_1" "$TRANS_ID_1" "$OPER_ID_1" "$(residuos_json_2 2 3)" "Recibido #11"
+create_manifiesto "$GEN1_TOKEN" "$GEN_ID_1" "$TRANS_ID_1" "$OPER_ID_1" "$(residuos_json_2 1 0 2)" "Recibido #11"
 M11="$LAST_CREATED_ID"; [ -n "$M11" ] && echo -e "  ${GREEN}OK${NC} #11 ${M11:0:12}..." || fail "Create #11"
 sleep 0.5
-create_manifiesto "$GEN2_TOKEN" "$GEN_ID_2" "$TRANS_ID_2" "$OPER_ID_2" "$(residuos_json_2 4 8)" "Recibido #12"
+create_manifiesto "$GEN2_TOKEN" "$GEN_ID_2" "$TRANS_ID_2" "$OPER_ID_2" "$(residuos_json_2 2 0 1)" "Recibido #12"
 M12="$LAST_CREATED_ID"; [ -n "$M12" ] && echo -e "  ${GREEN}OK${NC} #12 ${M12:0:12}..." || fail "Create #12"
 sleep 0.5
-create_manifiesto "$GEN3_TOKEN" "$GEN_ID_3" "$TRANS_ID_1" "$OPER_ID_2" "$(residuos_json_2 9 14)" "Recibido #13"
+create_manifiesto "$GEN3_TOKEN" "$GEN_ID_3" "$TRANS_ID_1" "$OPER_ID_2" "$(residuos_json_2 2 0 1)" "Recibido #13"
 M13="$LAST_CREATED_ID"; [ -n "$M13" ] && echo -e "  ${GREEN}OK${NC} #13 ${M13:0:12}..." || fail "Create #13"
 sleep 0.5
 
 subsection "Batch 4: 2 manifiestos for RECHAZADO"
-create_manifiesto "$GEN1_TOKEN" "$GEN_ID_1" "$TRANS_ID_2" "$OPER_ID_1" "$(residuos_json_2 6 11)" "Rechazado #14"
+create_manifiesto "$GEN1_TOKEN" "$GEN_ID_1" "$TRANS_ID_2" "$OPER_ID_1" "$(residuos_json_2 1 0 1)" "Rechazado #14"
 M14="$LAST_CREATED_ID"; [ -n "$M14" ] && echo -e "  ${GREEN}OK${NC} #14 ${M14:0:12}..." || fail "Create #14"
 sleep 0.5
-create_manifiesto "$GEN2_TOKEN" "$GEN_ID_2" "$TRANS_ID_1" "$OPER_ID_2" "$(residuos_json_1 13)" "Rechazado #15"
+create_manifiesto "$GEN2_TOKEN" "$GEN_ID_2" "$TRANS_ID_1" "$OPER_ID_2" "$(residuos_json_1 2 0)" "Rechazado #15"
 M15="$LAST_CREATED_ID"; [ -n "$M15" ] && echo -e "  ${GREEN}OK${NC} #15 ${M15:0:12}..." || fail "Create #15"
 sleep 0.5
 
 subsection "Batch 5: 5 manifiestos for BORRADOR (stress padding)"
-create_manifiesto "$ADMIN_TOKEN" "$GEN_ID_1" "$TRANS_ID_1" "$OPER_ID_1" "$(residuos_json_1 0)" "Borrador padding #16"
+create_manifiesto "$ADMIN_TOKEN" "$GEN_ID_1" "$TRANS_ID_1" "$OPER_ID_1" "$(residuos_json_1 1 0)" "Borrador padding #16"
 M16="$LAST_CREATED_ID"; [ -n "$M16" ] && echo -e "  ${GREEN}OK${NC} #16" || fail "Create #16"
 sleep 0.5
-create_manifiesto "$ADMIN_TOKEN" "$GEN_ID_2" "$TRANS_ID_2" "$OPER_ID_2" "$(residuos_json_1 3)" "Borrador padding #17"
+create_manifiesto "$ADMIN_TOKEN" "$GEN_ID_2" "$TRANS_ID_2" "$OPER_ID_2" "$(residuos_json_1 2 0)" "Borrador padding #17"
 M17="$LAST_CREATED_ID"; [ -n "$M17" ] && echo -e "  ${GREEN}OK${NC} #17" || fail "Create #17"
 sleep 0.5
-create_manifiesto "$ADMIN_TOKEN" "$GEN_ID_3" "$TRANS_ID_1" "$OPER_ID_2" "$(residuos_json_1 5)" "Borrador padding #18"
+create_manifiesto "$ADMIN_TOKEN" "$GEN_ID_3" "$TRANS_ID_1" "$OPER_ID_2" "$(residuos_json_1 2 1)" "Borrador padding #18"
 M18="$LAST_CREATED_ID"; [ -n "$M18" ] && echo -e "  ${GREEN}OK${NC} #18" || fail "Create #18"
 sleep 0.5
-create_manifiesto "$ADMIN_TOKEN" "$GEN_ID_1" "$TRANS_ID_2" "$OPER_ID_1" "$(residuos_json_1 8)" "Borrador padding #19"
+create_manifiesto "$ADMIN_TOKEN" "$GEN_ID_1" "$TRANS_ID_2" "$OPER_ID_1" "$(residuos_json_1 1 1)" "Borrador padding #19"
 M19="$LAST_CREATED_ID"; [ -n "$M19" ] && echo -e "  ${GREEN}OK${NC} #19" || fail "Create #19"
 sleep 0.5
-create_manifiesto "$ADMIN_TOKEN" "$GEN_ID_2" "$TRANS_ID_1" "$OPER_ID_1" "$(residuos_json_1 11)" "Borrador padding #20"
+create_manifiesto "$ADMIN_TOKEN" "$GEN_ID_2" "$TRANS_ID_1" "$OPER_ID_1" "$(residuos_json_1 1 2)" "Borrador padding #20"
 M20="$LAST_CREATED_ID"; [ -n "$M20" ] && echo -e "  ${GREEN}OK${NC} #20" || fail "Create #20"
 
 echo ""

@@ -27,7 +27,7 @@ import { MobileLayout } from './layouts/MobileLayout';
 import {
   LoginPage, LandingPage, RegistroPage, VerificarEmailPage, ForgotPasswordPage,
   ResetPasswordPage, ReclamarCuentaPage, UserSwitcherPage,
-  DashboardPage, CentroControlPage,
+  DashboardPage, CentroControlPage, WarRoomPage,
   ManifiestosPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
   ViajeEnCursoPage, TransportePerfilPage, ViajeEnCursoTransportista,
   ActoresPage, OperadoresPage, OperadorDetallePage, TransportistasPage, TransportistaDetallePage,
@@ -177,6 +177,11 @@ function App() {
             <Route path="/mobile/admin/actores/operadores/:id" element={<OperadorDetallePage />} />
             <Route path="/mobile/admin/renovaciones" element={<AdminRenovacionesPage />} />
           </Route>
+        </Route>
+
+        {/* War Room Monitor — full-screen, outside MainLayout */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/monitor" element={<WarRoomPage />} />
         </Route>
 
         {/* Main Routes - Protected */}

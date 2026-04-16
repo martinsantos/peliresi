@@ -7,13 +7,14 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Leaf, AlertCircle, Factory, Truck, FlaskConical, ShieldCheck } from 'lucide-react';
-import { useAuth, DEMO_CREDENTIALS } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 
-const DEMO_USERS = [
-  { label: 'Administrador', sublabel: 'DGFA', userId: 1, color: 'bg-primary-500' },
-  { label: 'Generador', sublabel: 'Química Mendoza', userId: 5, color: 'bg-purple-500' },
-  { label: 'Transportista', sublabel: 'Transportes Andes', userId: 13, color: 'bg-orange-500' },
-  { label: 'Operador', sublabel: 'Tratamiento Residuos', userId: 19, color: 'bg-blue-500' },
+// Accesos rápidos — siempre visibles para facilitar el testing
+const QUICK_LOGINS = [
+  { label: 'Administrador', sublabel: 'DGFA',               color: 'bg-primary-500', email: 'admin@dgfa.mendoza.gov.ar',          password: 'admin123'  },
+  { label: 'Generador',     sublabel: 'Química Mendoza',    color: 'bg-purple-500',  email: 'quimica.mendoza@industria.com',       password: 'gen123'    },
+  { label: 'Transportista', sublabel: 'Transportes Andes',  color: 'bg-orange-500',  email: 'transportes.andes@logistica.com',     password: 'trans123'  },
+  { label: 'Operador',      sublabel: 'Tratamiento Residuos',color: 'bg-blue-500',   email: 'tratamiento.residuos@planta.com',     password: 'op123'     },
 ];
 
 const LoginPage: React.FC = () => {
@@ -24,6 +25,7 @@ const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,36 +45,33 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  const handleDemoUser = async (userId: number) => {
-    const creds = DEMO_CREDENTIALS[userId];
-    if (!creds) return;
-    setLoading(true);
+  const handleQuickLogin = (q: typeof QUICK_LOGINS[number], idx: number) => {
+    setSelectedUserId(idx);
+    setEmail(q.email);
+    setPassword(q.password);
+    setShowPassword(false);
     setError(null);
-    try {
-      await login(creds.email, creds.password);
-      navigate('/dashboard');
-    } catch (err: any) {
-      setError(authError || err?.response?.data?.message || 'Error al iniciar sesión.');
-    } finally {
-      setLoading(false);
-    }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 flex items-start md:items-center justify-center px-4 py-8 md:py-12">
     <div className="w-full max-w-md animate-fade-in-up">
-      {/* Header */}
+      {/* Header — Gobierno de Mendoza + SITREP */}
       <div className="text-center mb-4 md:mb-6">
-        <div className="flex items-center justify-center gap-3 mb-2 md:mb-3">
-          <img src="/logo-mendoza.webp" alt="Gobierno de Mendoza" className="h-10 md:h-12 w-auto" />
-          <div className="w-px h-8 bg-neutral-200" />
-          <div className="w-11 h-11 md:w-13 md:h-13 bg-[#1B5E3C] rounded-xl flex items-center justify-center shadow-lg">
-            <Leaf size={24} className="text-white" />
+        <div className="hidden lg:flex items-center justify-center gap-2.5 mb-2">
+          <img src="/escudo-mendoza-color.webp" alt="Escudo Provincia de Mendoza" className="h-9 w-auto" />
+          <span className="text-left leading-tight" style={{ fontFamily: "'Lato', sans-serif" }}>
+            <span className="block text-sm font-bold text-[#007F90] tracking-tight">MENDOZA</span>
+            <span className="block text-[11px] font-light text-[#007F90]">GOBIERNO</span>
+          </span>
+          <div className="w-px h-8 bg-neutral-300" />
+          <div className="flex items-center gap-1.5">
+            <div className="w-9 h-9 bg-[#1B5E3C] rounded-xl flex items-center justify-center shadow-lg">
+              <Leaf size={20} className="text-white" />
+            </div>
+            <span className="text-sm font-extrabold text-neutral-900 tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" }}>SITREP</span>
           </div>
         </div>
-        <h2 className="text-xl md:text-2xl font-bold text-neutral-900 mb-0.5" style={{ fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: '-0.03em' }}>
-          SITREP v6
-        </h2>
         <p className="text-xs md:text-sm text-neutral-600">
           Sistema de Trazabilidad de Residuos Peligrosos
         </p>
@@ -92,20 +91,27 @@ const LoginPage: React.FC = () => {
           Selecciona un perfil para ingresar
         </p>
         <div className="grid grid-cols-2 gap-2 md:gap-3 stagger-children">
-          {DEMO_USERS.map((user) => (
-            <button
-              key={user.userId}
-              onClick={() => handleDemoUser(user.userId)}
-              disabled={loading}
-              className="p-3 md:p-4 text-left rounded-xl border-2 border-neutral-200 bg-white hover:border-primary-500 hover:bg-primary-50 transition-all active:scale-[0.97] disabled:opacity-50"
-            >
-              <div className={`w-7 h-7 md:w-8 md:h-8 ${user.color} rounded-lg flex items-center justify-center text-white text-xs font-bold mb-1.5 md:mb-2`}>
-                {user.label[0]}
-              </div>
-              <p className="font-semibold text-sm text-neutral-900">{user.label}</p>
-              <p className="text-xs text-neutral-500">{user.sublabel}</p>
-            </button>
-          ))}
+          {QUICK_LOGINS.map((q, idx) => {
+            const isSelected = selectedUserId === idx;
+            return (
+              <button
+                key={idx}
+                onClick={() => handleQuickLogin(q, idx)}
+                disabled={loading}
+                className={`p-3 md:p-4 text-left rounded-xl border-2 transition-all active:scale-[0.97] disabled:opacity-50 ${
+                  isSelected
+                    ? 'border-[#1B5E3C] bg-emerald-50 shadow-md'
+                    : 'border-neutral-200 bg-white hover:border-primary-500 hover:bg-primary-50'
+                }`}
+              >
+                <div className={`w-7 h-7 md:w-8 md:h-8 ${q.color} rounded-lg flex items-center justify-center text-white text-xs font-bold mb-1.5 md:mb-2`}>
+                  {q.label[0]}
+                </div>
+                <p className="font-semibold text-sm text-neutral-900">{q.label}</p>
+                <p className="text-xs text-neutral-500">{q.sublabel}</p>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -257,9 +263,12 @@ const LoginPage: React.FC = () => {
         </Link>
       </p>
 
-      {/* Logo Gobierno de Mendoza — pie */}
-      <div className="mt-6 flex justify-center opacity-50">
-        <img src="/logo-mendoza.webp" alt="Gobierno de Mendoza" className="h-7 md:h-8 w-auto" />
+      {/* Gobierno de Mendoza — pie */}
+      <div className="mt-6 flex items-center justify-center gap-1.5 opacity-50">
+        <img src="/escudo-mendoza-color.webp" alt="Gobierno de Mendoza" className="h-6 md:h-7 w-auto" />
+        <span className="text-[10px] md:text-xs text-neutral-500" style={{ fontFamily: "'Lato', sans-serif" }}>
+          <span className="font-bold">MENDOZA</span> <span className="font-light">GOBIERNO</span>
+        </span>
       </div>
     </div>
     </div>

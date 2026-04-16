@@ -1,0 +1,578 @@
+/* ==========================================================================
+   War Room Monitor — Styles
+   Pure CSS animations and layout for the War Room real-time monitor page.
+   ========================================================================== */
+
+/* ---------------------------------------------------------------------------
+   Color Constants (referenced throughout)
+   ---------------------------------------------------------------------------
+   Institutional green:  #0D8A4F / #1B5E3C
+   Generador (purple):   #7C3AED
+   Transportista (orange):#D97706
+   Operador (blue):      #2563EB
+   En Transito (red):    #EF4444
+
+   Event colors:
+     CREACION:    #22c55e
+     FIRMA:       #eab308
+     RETIRO:      #f97316
+     ENTREGA:     #ef4444
+     RECEPCION:   #3b82f6
+     TRATAMIENTO: #8b5cf6
+     CIERRE:      #fbbf24
+     INCIDENTE:   #dc2626
+
+   Easing curves:
+     ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1)
+     ease-spring:   cubic-bezier(0.34, 1.56, 0.64, 1)
+   --------------------------------------------------------------------------- */
+
+
+/* ==========================================================================
+   1. Layout Grid
+   ========================================================================== */
+
+.wr-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    "header  header"
+    "sidebar map"
+    "bottom  bottom";
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background: #f8f8f6;
+}
+
+.wr-layout-header  { grid-area: header; z-index: 10; }
+.wr-layout-sidebar { grid-area: sidebar; overflow-y: auto; z-index: 5; }
+.wr-layout-map     { grid-area: map; min-height: 0; position: relative; }
+.wr-layout-bottom  { grid-area: bottom; z-index: 10; }
+
+.wr-panel {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+              0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+}
+
+.wr-panel-dark {
+  background: rgba(23, 23, 23, 0.9);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3),
+              0 4px 6px -4px rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+}
+
+
+/* ==========================================================================
+   2. Marker Animations
+   ========================================================================== */
+
+.wr-marker-pulse {
+  animation: wr-breathing 3s ease-in-out infinite;
+}
+
+@keyframes wr-breathing {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.05); }
+}
+
+.wr-marker-transit {
+  position: relative;
+}
+
+.wr-marker-transit::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid #EF4444;
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+  animation: wr-transit-ring 2s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes wr-popup-appear {
+  0% { transform: translateY(10px) scale(0.8); opacity: 0; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes wr-ring-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+@keyframes wr-transit-ring {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.5);
+    opacity: 0;
+  }
+}
+
+.wr-marker-transit-selected::after {
+  animation: wr-transit-ring-fast 1.5s ease-out infinite;
+  border-width: 3px;
+}
+
+@keyframes wr-transit-ring-fast {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(3);
+    opacity: 0;
+  }
+}
+
+.wr-event-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  transform: translate(-50%, -50%) scale(0.5);
+  opacity: 1;
+  animation: wr-event-expand 1.5s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes wr-event-expand {
+  0% {
+    transform: translate(-50%, -50%) scale(0.5);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(3);
+    opacity: 0;
+  }
+}
+
+
+/* ==========================================================================
+   3. Event Pulse Animations (one per event type)
+   ========================================================================== */
+
+.wr-pulse-creacion    { animation: wr-pulse-creacion-kf    1.5s ease-out; }
+.wr-pulse-firma       { animation: wr-pulse-firma-kf       1.5s ease-out; }
+.wr-pulse-retiro      { animation: wr-pulse-retiro-kf      1.5s ease-out; }
+.wr-pulse-entrega     { animation: wr-pulse-entrega-kf     1.5s ease-out; }
+.wr-pulse-recepcion   { animation: wr-pulse-recepcion-kf   1.5s ease-out; }
+.wr-pulse-tratamiento { animation: wr-pulse-tratamiento-kf 1.5s ease-out; }
+.wr-pulse-cierre      { animation: wr-pulse-cierre-kf      1.5s ease-out; }
+.wr-pulse-incidente   { animation: wr-pulse-incidente-kf   1.5s ease-out; }
+
+@keyframes wr-pulse-creacion-kf {
+  0%   { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
+  100% { box-shadow: 0 0 0 20px rgba(34, 197, 94, 0); }
+}
+
+@keyframes wr-pulse-firma-kf {
+  0%   { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.5); }
+  100% { box-shadow: 0 0 0 20px rgba(234, 179, 8, 0); }
+}
+
+@keyframes wr-pulse-retiro-kf {
+  0%   { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.5); }
+  100% { box-shadow: 0 0 0 20px rgba(249, 115, 22, 0); }
+}
+
+@keyframes wr-pulse-entrega-kf {
+  0%   { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+  100% { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); }
+}
+
+@keyframes wr-pulse-recepcion-kf {
+  0%   { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5); }
+  100% { box-shadow: 0 0 0 20px rgba(59, 130, 246, 0); }
+}
+
+@keyframes wr-pulse-tratamiento-kf {
+  0%   { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.5); }
+  100% { box-shadow: 0 0 0 20px rgba(139, 92, 246, 0); }
+}
+
+@keyframes wr-pulse-cierre-kf {
+  0%   { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.5); }
+  100% { box-shadow: 0 0 0 20px rgba(251, 191, 36, 0); }
+}
+
+@keyframes wr-pulse-incidente-kf {
+  0%   { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.5); }
+  100% { box-shadow: 0 0 0 20px rgba(220, 38, 38, 0); }
+}
+
+
+/* ==========================================================================
+   4. Flowing Dots on Polylines
+   ========================================================================== */
+
+.wr-flowing-line {
+  stroke-dasharray: 8 12;
+  animation: wr-flow-dash 1.5s linear infinite;
+}
+
+@keyframes wr-flow-dash {
+  0%   { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -20; }
+}
+
+
+/* ==========================================================================
+   5. Animated Counter
+   ========================================================================== */
+
+.wr-counter {
+  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  overflow: hidden;
+}
+
+.wr-counter-digit {
+  display: inline-block;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+
+/* ==========================================================================
+   6. Pipeline Funnel
+   ========================================================================== */
+
+.wr-funnel-bar {
+  height: 28px;
+  border-radius: 6px;
+  transition: width 0.5s ease-out;
+  position: relative;
+  overflow: hidden;
+}
+
+.wr-funnel-flow {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.7);
+  animation: wr-funnel-particle 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes wr-funnel-particle {
+  0% {
+    left: 0;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    left: 100%;
+    opacity: 0;
+  }
+}
+
+
+/* ==========================================================================
+   7. Activity Gauge
+   ========================================================================== */
+
+.wr-gauge-needle {
+  transform-origin: bottom center;
+  transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+
+/* ==========================================================================
+   8. Timeline Scrubber
+   ========================================================================== */
+
+.wr-scrubber {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: #e5e7eb;
+  outline: none;
+  cursor: pointer;
+  transition: box-shadow 0.2s ease;
+}
+
+.wr-scrubber:hover {
+  box-shadow: 0 0 0 4px rgba(13, 138, 79, 0.15);
+}
+
+.wr-scrubber::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right, #0D8A4F var(--progress, 0%), #e5e7eb var(--progress, 0%));
+}
+
+.wr-scrubber::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right, #0D8A4F var(--progress, 0%), #e5e7eb var(--progress, 0%));
+}
+
+.wr-scrubber::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 3px solid #0D8A4F;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  margin-top: -6px;
+  cursor: grab;
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+.wr-scrubber::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 3px solid #0D8A4F;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  cursor: grab;
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+.wr-scrubber::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 0 6px rgba(13, 138, 79, 0.2);
+  transform: scale(1.1);
+}
+
+.wr-scrubber::-moz-range-thumb:hover {
+  box-shadow: 0 0 0 6px rgba(13, 138, 79, 0.2);
+  transform: scale(1.1);
+}
+
+.wr-scrubber:active::-webkit-slider-thumb {
+  cursor: grabbing;
+}
+
+.wr-scrubber:active::-moz-range-thumb {
+  cursor: grabbing;
+}
+
+
+/* ==========================================================================
+   9. Cinema Mode Overrides
+   ========================================================================== */
+
+.wr-cinema .wr-panel {
+  background: rgba(23, 23, 23, 0.85);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #f5f5f5;
+}
+
+.wr-cinema .wr-scrubber {
+  background: #374151;
+}
+
+.wr-cinema .wr-scrubber::-webkit-slider-runnable-track {
+  background: linear-gradient(to right, #0D8A4F var(--progress, 0%), #374151 var(--progress, 0%));
+}
+
+.wr-cinema .wr-scrubber::-moz-range-track {
+  background: linear-gradient(to right, #0D8A4F var(--progress, 0%), #374151 var(--progress, 0%));
+}
+
+.wr-cinema .leaflet-container {
+  filter: brightness(0.85) saturate(1.1);
+}
+
+
+/* ==========================================================================
+   10. Entrance Animations
+   ========================================================================== */
+
+.wr-enter-left {
+  animation: wr-slide-left 0.4s cubic-bezier(0.19, 1, 0.22, 1) both;
+}
+
+.wr-enter-right {
+  animation: wr-slide-right 0.4s cubic-bezier(0.19, 1, 0.22, 1) both;
+}
+
+.wr-enter-up {
+  animation: wr-slide-up 0.4s cubic-bezier(0.19, 1, 0.22, 1) both;
+}
+
+.wr-enter-fade {
+  animation: wr-fade-in 0.3s ease-out both;
+}
+
+@keyframes wr-slide-left {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes wr-slide-right {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes wr-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes wr-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+
+/* ==========================================================================
+   11. Event Feed Items
+   ========================================================================== */
+
+.wr-event-item {
+  animation: wr-slide-left 0.35s cubic-bezier(0.19, 1, 0.22, 1) both;
+}
+
+.wr-event-item:nth-child(1) { animation-delay: 0s; }
+.wr-event-item:nth-child(2) { animation-delay: 0.04s; }
+.wr-event-item:nth-child(3) { animation-delay: 0.08s; }
+.wr-event-item:nth-child(4) { animation-delay: 0.12s; }
+.wr-event-item:nth-child(5) { animation-delay: 0.16s; }
+.wr-event-item:nth-child(6) { animation-delay: 0.2s; }
+.wr-event-item:nth-child(7) { animation-delay: 0.24s; }
+.wr-event-item:nth-child(8) { animation-delay: 0.28s; }
+
+.wr-event-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: wr-dot-appear 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes wr-dot-appear {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+
+/* ==========================================================================
+   12. LIVE Badge
+   ========================================================================== */
+
+.wr-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: wr-live-pulse 2s ease-in-out infinite;
+}
+
+@keyframes wr-live-pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5);
+  }
+  50% {
+    opacity: 0.8;
+    box-shadow: 0 0 0 6px rgba(34, 197, 94, 0);
+  }
+}
+
+
+/* ==========================================================================
+   13. Mode Badges
+   ========================================================================== */
+
+.wr-badge-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: rgba(34, 197, 94, 0.12);
+  color: #16a34a;
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+.wr-badge-playback {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.wr-badge-forecast {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: rgba(139, 92, 246, 0.12);
+  color: #7c3aed;
+  border: 1px solid rgba(139, 92, 246, 0.25);
+}

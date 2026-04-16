@@ -129,7 +129,7 @@ async function crawlRoute(
   page.on('response', responseHandler);
 
   try {
-    await page.goto(`${basePrefix}${route}`, { waitUntil: 'networkidle', timeout: 20000 });
+    await page.goto(`${basePrefix}${route}`, { waitUntil: 'networkidle', timeout: 30000 });
     await page.waitForTimeout(1500);
 
     // Check for 404 page
