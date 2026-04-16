@@ -4,8 +4,8 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowRight, MapPin, Package, Clock } from 'lucide-react';
-import { EVENT_COLORS } from '../utils/war-room-icons';
+import { ArrowRight, MapPin, Package, FileText, CheckCircle, Truck, Box, FlaskConical, Zap } from 'lucide-react';
+import { EVENT_COLORS, RESIDUO_PALETTE } from '../utils/war-room-icons';
 import { formatTimeShort } from '../utils/formatters';
 
 interface Props {
@@ -32,13 +32,13 @@ interface Props {
 }
 
 const WORKFLOW_STATES = [
-  { key: 'borrador', label: 'BOR', dateKey: null },
-  { key: 'aprobado', label: 'APR', dateKey: 'firma' },
-  { key: 'enTransito', label: 'TRA', dateKey: 'retiro' },
-  { key: 'entregado', label: 'ENT', dateKey: 'entrega' },
-  { key: 'recibido', label: 'REC', dateKey: 'recepcion' },
-  { key: 'enTratamiento', label: 'TRT', dateKey: null },
-  { key: 'tratado', label: 'FIN', dateKey: 'cierre' },
+  { key: 'borrador',      label: 'BOR', dateKey: null,       Icon: FileText },
+  { key: 'aprobado',      label: 'APR', dateKey: 'firma',    Icon: CheckCircle },
+  { key: 'enTransito',    label: 'TRA', dateKey: 'retiro',   Icon: Truck },
+  { key: 'entregado',     label: 'ENT', dateKey: 'entrega',  Icon: Box },
+  { key: 'recibido',      label: 'REC', dateKey: 'recepcion',Icon: Package },
+  { key: 'enTratamiento', label: 'TRT', dateKey: null,       Icon: FlaskConical },
+  { key: 'tratado',       label: 'FIN', dateKey: 'cierre',   Icon: Zap },
 ] as const;
 
 // Map eventoTipo to workflow progress index
@@ -94,19 +94,27 @@ export const DepartureBoard: React.FC<Props> = ({ event, eventIndex, totalEvents
   return (
     <div
       key={animKey}
-      className="bg-neutral-900 rounded-lg border overflow-hidden departure-board-enter"
-      style={{ borderColor, maxWidth: 300 }}
+      className="bg-neutral-900 rounded-xl overflow-hidden departure-board-enter-v2"
+      style={{ borderLeft: `4px solid ${borderColor}`, maxWidth: 300, boxShadow: `0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06)` }}
     >
+      {/* Header especial para CREACION */}
+      {tipo === 'CREACION' && (
+        <div className="px-3 py-1.5 bg-emerald-900/50 border-b border-emerald-700/30 flex items-center gap-1.5">
+          <span className="text-emerald-300 text-base leading-none">✦</span>
+          <span className="text-[11px] text-emerald-300 font-bold tracking-wide uppercase">Nuevo Manifiesto</span>
+        </div>
+      )}
+
       {/* Header: type badge + time + counter */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-800">
         <span
-          className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
+          className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider"
           style={{ backgroundColor: borderColor + '22', color: borderColor }}
         >
           {EVENT_LABELS[tipo] || tipo}
         </span>
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-mono text-neutral-400">
+          <span className="text-[11px] font-mono text-neutral-400 tabular-nums">
             {formatTimeShort(event.timestamp)}
           </span>
           <span className="text-[10px] font-mono text-neutral-600 tabular-nums">
@@ -115,9 +123,9 @@ export const DepartureBoard: React.FC<Props> = ({ event, eventIndex, totalEvents
         </div>
       </div>
 
-      {/* Manifest number */}
-      <div className="px-3 pt-2 pb-1">
-        <span className="text-lg font-bold font-mono text-white tracking-wide">
+      {/* Manifest number — grande */}
+      <div className="px-3 pt-3 pb-1">
+        <span className="text-3xl font-black font-mono text-white tracking-wider leading-none">
           {event.manifiestoNumero}
         </span>
       </div>
@@ -136,7 +144,7 @@ export const DepartureBoard: React.FC<Props> = ({ event, eventIndex, totalEvents
         {event.transportista && (
           <div className="flex items-center gap-1.5 pl-2">
             <ArrowRight size={10} className="text-neutral-600" />
-            <span className="text-[10px] text-orange-400 font-medium truncate">
+            <span className="text-[11px] text-orange-400 font-semibold truncate">
               {typeof event.transportista === 'string' ? event.transportista : event.transportista?.razonSocial}
             </span>
           </div>
@@ -152,46 +160,53 @@ export const DepartureBoard: React.FC<Props> = ({ event, eventIndex, totalEvents
         )}
       </div>
 
-      {/* Residuos */}
+      {/* Residuos — pills de color */}
       {event.residuos && event.residuos.length > 0 && (
         <div className="px-3 py-1.5 border-t border-neutral-800">
-          <div className="flex items-center gap-1 mb-1">
+          <div className="flex items-center gap-1 mb-1.5">
             <Package size={10} className="text-neutral-500" />
-            <span className="text-[9px] uppercase text-neutral-500 font-semibold tracking-wide">Residuos</span>
+            <span className="text-[9px] uppercase text-neutral-500 font-bold tracking-wide">Residuos</span>
           </div>
-          <div className="space-y-0.5">
-            {event.residuos.slice(0, 3).map((r, i) => (
-              <div key={i} className="flex items-center gap-1.5 text-[10px]">
-                <span className="text-yellow-500 font-mono font-bold">{r.codigo}</span>
-                <span className="text-neutral-400 truncate flex-1">{r.nombre}</span>
-                <span className="text-neutral-500 tabular-nums">{r.cantidad} {r.unidad}</span>
-              </div>
+          <div className="flex flex-wrap gap-1">
+            {event.residuos.slice(0, 4).map((r, i) => (
+              <span
+                key={i}
+                className="text-[10px] px-2 py-0.5 rounded-full border font-mono"
+                style={{
+                  background: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length] + '20',
+                  color: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length],
+                  borderColor: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length] + '40',
+                }}
+              >
+                {r.codigo} · {r.cantidad} {r.unidad}
+              </span>
             ))}
-            {event.residuos.length > 3 && (
-              <span className="text-[9px] text-neutral-600">+{event.residuos.length - 3} mas</span>
+            {event.residuos.length > 4 && (
+              <span className="text-[9px] text-neutral-600 self-center">+{event.residuos.length - 4}</span>
             )}
           </div>
         </div>
       )}
 
-      {/* Workflow timeline dots */}
-      <div className="px-3 py-2 border-t border-neutral-800">
-        <div className="flex items-center justify-between mb-1.5">
+      {/* Workflow timeline — iconos Lucide */}
+      <div className="px-3 py-2.5 border-t border-neutral-800">
+        <div className="flex items-center justify-between mb-2">
           {WORKFLOW_STATES.map((ws, i) => {
+            const { Icon } = ws;
             const filled = i <= progressIdx;
             const active = i === progressIdx;
             return (
               <div key={ws.key} className="flex flex-col items-center gap-0.5">
                 <div
-                  className={`w-2.5 h-2.5 rounded-full border transition-all ${
-                    active ? 'scale-125' : ''
-                  }`}
+                  className={`w-6 h-6 rounded-full border flex items-center justify-center transition-all ${active ? 'scale-125' : ''}`}
                   style={{
-                    backgroundColor: filled ? borderColor : 'transparent',
-                    borderColor: filled ? borderColor : '#525252',
-                    boxShadow: active ? `0 0 6px ${borderColor}` : 'none',
+                    backgroundColor: filled ? borderColor + 'cc' : 'transparent',
+                    borderColor: filled ? borderColor : '#404040',
+                    boxShadow: active ? `0 0 10px ${borderColor}80` : 'none',
                   }}
-                />
+                >
+                  <Icon size={11} color={filled ? '#fff' : '#525252'} />
+                </div>
                 <span className={`text-[7px] font-mono ${filled ? 'text-neutral-300' : 'text-neutral-700'}`}>
                   {ws.label}
                 </span>
@@ -203,7 +218,7 @@ export const DepartureBoard: React.FC<Props> = ({ event, eventIndex, totalEvents
         <div className="h-1 bg-neutral-800 rounded-full overflow-hidden">
           <div
             className="h-full rounded-full transition-all duration-500"
-            style={{ width: `${progressPct}%`, backgroundColor: borderColor }}
+            style={{ width: `${progressPct}%`, background: `linear-gradient(to right, ${borderColor}99, ${borderColor})` }}
           />
         </div>
       </div>
@@ -214,23 +229,6 @@ export const DepartureBoard: React.FC<Props> = ({ event, eventIndex, totalEvents
           {event.descripcion}
         </p>
       </div>
-
-      {/* CSS animation */}
-      <style>{`
-        .departure-board-enter {
-          animation: db-slide-in 0.3s ease-out;
-        }
-        @keyframes db-slide-in {
-          from {
-            opacity: 0;
-            transform: translateY(-8px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
     </div>
   );
 };
@@ -245,18 +243,18 @@ const RouteNode: React.FC<{
 }> = ({ label, name, cuit, coords, color }) => (
   <div className="flex items-start gap-1.5">
     <span
-      className="text-[8px] font-bold px-1 py-0.5 rounded mt-0.5 flex-shrink-0"
+      className="text-[10px] font-bold px-1.5 py-0.5 rounded mt-0.5 flex-shrink-0"
       style={{ backgroundColor: color + '22', color }}
     >
       {label}
     </span>
     <div className="min-w-0 flex-1">
-      <p className="text-[11px] text-neutral-200 font-medium truncate leading-tight">{name}</p>
-      <div className="flex items-center gap-1.5 text-[9px] text-neutral-600">
+      <p className="text-[13px] text-neutral-200 font-semibold truncate leading-tight">{name}</p>
+      <div className="flex items-center gap-1.5 text-[10px] text-neutral-600">
         {cuit && <span className="font-mono">{cuit}</span>}
         {coords && coords[0] !== 0 && (
           <span className="flex items-center gap-0.5">
-            <MapPin size={7} />
+            <MapPin size={8} />
             {coords[0].toFixed(2)}, {coords[1].toFixed(2)}
           </span>
         )}

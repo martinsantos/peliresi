@@ -3,12 +3,35 @@
  * Sharp, brilliant visual style: gradient bars, crisp borders, vivid colors
  */
 
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Factory, FlaskConical, Package, Beaker, Droplets } from 'lucide-react';
 import type { MonitorMode } from '../WarRoomPage';
 import type { MonitorLiveResponse, ForecastResponse, TimelineResponse } from '../api/monitor-api';
 import { formatNumber } from '../utils/formatters';
 import { EventFeed } from './EventFeed';
+
+// ─── AnimatedCounter ─────────────────────────────────────────────────────────
+
+function AnimatedCounter({ value }: { value: number }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const prevRef = useRef(value);
+  useEffect(() => {
+    const start = prevRef.current;
+    const end = value;
+    if (start === end || !ref.current) { prevRef.current = end; return; }
+    const duration = 300;
+    const startTime = performance.now();
+    const step = (now: number) => {
+      const t = Math.min((now - startTime) / duration, 1);
+      const eased = 1 - Math.pow(1 - t, 3);
+      if (ref.current) ref.current.textContent = String(Math.round(start + (end - start) * eased));
+      if (t < 1) requestAnimationFrame(step);
+      else prevRef.current = end;
+    };
+    requestAnimationFrame(step);
+  }, [value]);
+  return <span ref={ref}>{value}</span>;
+}
 
 // ─── Residuo color palette ──────────────────────────────────────────────────
 
@@ -52,6 +75,9 @@ interface Props {
     descripcion: string;
     timestamp: string;
     manifiestoNumero: string;
+    generador?: { razonSocial: string };
+    operador?: { razonSocial: string };
+    residuos?: Array<{ codigo: string; nombre: string; cantidad: number; unidad: string }>;
   }>;
   currentEventId?: string;
 }
@@ -81,49 +107,41 @@ export const DashboardPanels: React.FC<Props> = ({
       {/* ── Pipeline Funnel ── */}
       <div className="wr-panel p-3">
         <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-3">Pipeline</h3>
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1.5">
           {stages.map(estado => {
             const count = porEstado[estado] || 0;
             const pct = maxEstado > 0 ? (count / maxEstado) * 100 : 0;
             const colors = ESTADO_COLORS[estado] || ESTADO_COLORS.BORRADOR;
-            const barTooSmall = pct < 20;
 
             return (
               <div key={estado} className="flex items-center gap-2">
                 {/* Label */}
-                <span className="text-[10px] text-neutral-500 w-20 truncate font-medium">
+                <span className="text-[10px] text-neutral-500 w-[72px] truncate font-medium flex-shrink-0">
                   {ESTADO_LABELS[estado] || estado}
                 </span>
 
                 {/* Bar container */}
                 <div
-                  className="flex-1 h-6 overflow-hidden relative"
-                  style={{ backgroundColor: colors.base + '10' }}
+                  className="flex-1 h-7 rounded-md overflow-hidden relative"
+                  style={{ backgroundColor: colors.base + '12' }}
                 >
-                  {/* Solid bar — flat, high contrast, no gradient */}
+                  {/* Gradient bar with shimmer */}
                   <div
-                    className="h-full transition-all duration-300"
+                    className="wr-funnel-bar-gradient h-full"
                     style={{
-                      width: `${Math.max(pct, count > 0 ? 4 : 0)}%`,
-                      backgroundColor: colors.dark,
+                      width: `${Math.max(pct, count > 0 ? 5 : 0)}%`,
+                      background: `linear-gradient(to right, ${colors.dark}cc, ${colors.base})`,
                     }}
                   />
-
-                  {/* Number */}
-                  {count > 0 && (
-                    <span
-                      className="absolute inset-y-0 flex items-center text-xs font-black tabular-nums font-mono tracking-tight"
-                      style={{
-                        right: barTooSmall ? undefined : '6px',
-                        left: barTooSmall ? `${Math.max(pct, 5)}%` : undefined,
-                        paddingLeft: barTooSmall ? '4px' : undefined,
-                        color: barTooSmall ? colors.dark : '#fff',
-                      }}
-                    >
-                      {formatNumber(count)}
-                    </span>
-                  )}
                 </div>
+
+                {/* Number — fuera de la barra, siempre visible */}
+                <span
+                  className="text-sm font-black tabular-nums font-mono w-8 text-right flex-shrink-0"
+                  style={{ color: count > 0 ? colors.dark : '#d1d5db' }}
+                >
+                  <AnimatedCounter value={count} />
+                </span>
               </div>
             );
           })}
@@ -138,22 +156,20 @@ export const DashboardPanels: React.FC<Props> = ({
             const maxGen = Math.max(...liveData.topGeneradores.slice(0, 3).map(g => g.cantidad), 1);
             return liveData.topGeneradores.slice(0, 3).map((g, i) => (
               <div key={i} className="flex items-center gap-2 mb-1.5 relative">
-                <div className="w-6 h-6 rounded-sm flex items-center justify-center"
+                <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0"
                   style={{ backgroundColor: '#7c3aed' }}>
-                  <Factory size={13} className="text-white" />
+                  <Factory size={15} className="text-white" />
                 </div>
                 <div className="flex-1 min-w-0 relative">
-                  {/* Background bar */}
                   <div
                     className="absolute inset-0 rounded-sm transition-all duration-300"
-                    style={{
-                      width: `${(g.cantidad / maxGen) * 100}%`,
-                      backgroundColor: '#7c3aed25',
-                    }}
+                    style={{ width: `${(g.cantidad / maxGen) * 100}%`, backgroundColor: '#7c3aed20' }}
                   />
-                  <div className="relative flex items-center justify-between px-1.5 py-0.5">
-                    <span className="text-xs text-neutral-700 truncate">{g.razonSocial}</span>
-                    <span className="text-xs font-bold text-neutral-900 tabular-nums font-mono ml-2">{g.cantidad}</span>
+                  <div className="relative flex items-center justify-between px-1.5 py-1">
+                    <span className="text-[13px] font-semibold text-neutral-700 truncate">{g.razonSocial}</span>
+                    <span className="text-sm font-black text-neutral-900 tabular-nums font-mono ml-2">
+                      <AnimatedCounter value={g.cantidad} />
+                    </span>
                   </div>
                 </div>
               </div>
@@ -165,22 +181,20 @@ export const DashboardPanels: React.FC<Props> = ({
             const maxOper = Math.max(...liveData.topOperadores.slice(0, 3).map(o => o.cantidad), 1);
             return liveData.topOperadores.slice(0, 3).map((o, i) => (
               <div key={i} className="flex items-center gap-2 mb-1.5 relative">
-                <div className="w-6 h-6 rounded-sm flex items-center justify-center"
+                <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0"
                   style={{ backgroundColor: '#2563eb' }}>
-                  <FlaskConical size={13} className="text-white" />
+                  <FlaskConical size={15} className="text-white" />
                 </div>
                 <div className="flex-1 min-w-0 relative">
-                  {/* Background bar */}
                   <div
                     className="absolute inset-0 rounded-sm transition-all duration-300"
-                    style={{
-                      width: `${(o.cantidad / maxOper) * 100}%`,
-                      backgroundColor: '#2563eb25',
-                    }}
+                    style={{ width: `${(o.cantidad / maxOper) * 100}%`, backgroundColor: '#2563eb20' }}
                   />
-                  <div className="relative flex items-center justify-between px-1.5 py-0.5">
-                    <span className="text-xs text-neutral-700 truncate">{o.razonSocial}</span>
-                    <span className="text-xs font-bold text-neutral-900 tabular-nums font-mono ml-2">{o.cantidad}</span>
+                  <div className="relative flex items-center justify-between px-1.5 py-1">
+                    <span className="text-[13px] font-semibold text-neutral-700 truncate">{o.razonSocial}</span>
+                    <span className="text-sm font-black text-neutral-900 tabular-nums font-mono ml-2">
+                      <AnimatedCounter value={o.cantidad} />
+                    </span>
                   </div>
                 </div>
               </div>

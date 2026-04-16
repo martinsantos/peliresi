@@ -89,6 +89,7 @@ const WarRoomPage: React.FC = () => {
 
   // Auto-continue: when enabled, advance to next day when playback finishes
   const [autoContinue, setAutoContinue] = useState(true);
+  const [isDayTransitioning, setIsDayTransitioning] = useState(false);
 
   // Auto-start playback at 50x when timeline data loads
   const [autoStarted, setAutoStarted] = useState<string | null>(null);
@@ -123,10 +124,16 @@ const WarRoomPage: React.FC = () => {
       const nextDay = idx >= 0 && idx < sorted.length - 1 ? sorted[idx + 1] : null;
 
       if (nextDay && nextDay <= todayISO()) {
-        // Immediate transition — no delay, keep the speed
-        setPlaybackDate(nextDay);
-        setAutoStarted(null);
-        playback.reset();
+        // Transición con overlay visual breve (500ms) antes de cargar el nuevo día
+        setIsDayTransitioning(true);
+        playback.pause();
+        const timer = setTimeout(() => {
+          setPlaybackDate(nextDay);
+          setAutoStarted(null);
+          playback.reset();
+          setIsDayTransitioning(false);
+        }, 500);
+        return () => clearTimeout(timer);
       }
     }
   }, [mode, autoContinue, playback.isPlaying, playback.progress, playbackDate, activeDays]);
@@ -239,7 +246,7 @@ const WarRoomPage: React.FC = () => {
     return { lat: undefined, lng: undefined };
   }, []);
 
-  // Build event feed items from playback processedEvents
+  // Build event feed items from playback processedEvents — incluye generador/residuos para CREACION
   const playbackEventFeed = useMemo(() => {
     if (mode !== 'PLAYBACK') return [];
     return playback.processedEvents
@@ -254,6 +261,9 @@ const WarRoomPage: React.FC = () => {
           longitud: coords.lng,
           timestamp: ev.timestamp,
           manifiestoNumero: ev.manifiestoNumero,
+          generador: ev.generador ? { razonSocial: ev.generador.razonSocial } : undefined,
+          operador: ev.operador ? { razonSocial: ev.operador.razonSocial } : undefined,
+          residuos: ev.residuos,
         };
       });
   }, [mode, playback.processedEvents, resolveCoords]);
@@ -356,6 +366,7 @@ const WarRoomPage: React.FC = () => {
           actores={actores || null}
           enTransito={enTransito}
           mode={mode}
+          currentHour={mode === 'PLAYBACK' ? playback.currentHour : undefined}
           playbackTrips={mode === 'PLAYBACK' ? playback.activeTrips : undefined}
           currentEvent={currentEventForMap}
           playbackEvents={mode === 'PLAYBACK' ? playbackEventFeed.map(e => ({
@@ -366,6 +377,14 @@ const WarRoomPage: React.FC = () => {
             numero: e.manifiestoNumero,
           })).filter(e => e.lat !== 0 && e.lng !== 0) : undefined}
         />
+        {/* Overlay de transición al cambiar de día */}
+        {isDayTransitioning && (
+          <div className="absolute inset-0 z-[2000] flex items-center justify-center pointer-events-none wr-day-transition-overlay">
+            <div className="bg-black/60 backdrop-blur-sm px-6 py-3 rounded-xl border border-white/10">
+              <span className="text-white/80 font-mono text-sm tracking-widest">{playbackDate}</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Bottom Panel — KPIs + Timeline Controls */}
@@ -382,6 +401,7 @@ const WarRoomPage: React.FC = () => {
           onAutoContinueToggle={() => setAutoContinue(v => !v)}
           activeDays={activeDays}
           playback={playbackControls}
+          currentHour={mode === 'PLAYBACK' ? playback.currentHour : undefined}
         />
       </div>
     </div>

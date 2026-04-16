@@ -6,7 +6,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { Play, Pause, Calendar, FileText, Truck, Weight, TrendingUp, RotateCcw, ChevronLeft, ChevronRight, SkipBack, SkipForward } from 'lucide-react';
+import { Play, Pause, Calendar, FileText, Truck, Weight, TrendingUp, RotateCcw, ChevronLeft, ChevronRight, SkipBack, SkipForward, Sun, Sunrise, Sunset, Moon } from 'lucide-react';
 import type { MonitorMode } from '../WarRoomPage';
 import type { MonitorLiveResponse, TimelineResponse } from '../api/monitor-api';
 import { formatNumber, formatTimeShort } from '../utils/formatters';
@@ -41,6 +41,7 @@ interface Props {
   autoContinue?: boolean;
   onAutoContinueToggle?: () => void;
   activeDays?: string[];
+  currentHour?: number; // 0–23 — para indicador hora en PLAYBACK
 }
 
 /** Format "2026-03-16" -> "16 mar 2026" */
@@ -59,7 +60,7 @@ const SPEED_ORDER: PlaybackSpeed[] = ['fast', 'normal', 'slow'];
 
 export const TimelineControls: React.FC<Props> = ({
   mode, liveData, playbackDate, onDateChange, onSwitchToPlayback, timelineData, isLoading, playback,
-  autoContinue, onAutoContinueToggle, activeDays,
+  autoContinue, onAutoContinueToggle, activeDays, currentHour,
 }) => {
   // Smart date navigation — find prev/next active day relative to current playbackDate
   const sortedDays = useMemo(() => (activeDays || []).slice().sort(), [activeDays]);
@@ -219,12 +220,24 @@ export const TimelineControls: React.FC<Props> = ({
                   {playback.currentEventIndex + 1} / {playback.totalEventCount}
                 </span>
 
-                {/* Current event timestamp */}
+                {/* Current event timestamp + indicador hora día/noche */}
                 {playback.currentEventTimestamp && (
                   <span className="text-[11px] font-mono text-neutral-500 tabular-nums flex-shrink-0">
                     {formatTimeShort(playback.currentEventTimestamp)}
                   </span>
                 )}
+                {currentHour !== undefined && (() => {
+                  const HourIcon = currentHour >= 6 && currentHour < 10 ? Sunrise
+                    : currentHour >= 10 && currentHour < 18 ? Sun
+                    : currentHour >= 18 && currentHour < 21 ? Sunset
+                    : Moon;
+                  return (
+                    <span className="flex items-center gap-1 text-[11px] font-mono text-neutral-400 flex-shrink-0">
+                      <HourIcon size={12} className="opacity-70" />
+                      {String(currentHour).padStart(2, '0')}h
+                    </span>
+                  );
+                })()}
 
                 {/* Speed chips — fast/normal/slow */}
                 <div className="flex items-center gap-1 flex-shrink-0">

@@ -6,7 +6,7 @@
 import React, { useRef, useEffect } from 'react';
 import type { MonitorMode } from '../WarRoomPage';
 import { formatTimeShort } from '../utils/formatters';
-import { EVENT_COLORS } from '../utils/war-room-icons';
+import { EVENT_COLORS, RESIDUO_PALETTE } from '../utils/war-room-icons';
 
 interface EventItem {
   id: string;
@@ -16,6 +16,9 @@ interface EventItem {
   longitud?: number;
   timestamp: string;
   manifiestoNumero: string;
+  generador?: { razonSocial: string };
+  operador?: { razonSocial: string };
+  residuos?: Array<{ codigo: string; nombre: string; cantidad: number; unidad: string }>;
 }
 
 interface Props {
@@ -103,6 +106,28 @@ export const EventFeed: React.FC<Props> = ({ eventos, mode, onEventClick, curren
                   <span className="font-bold">{ev.manifiestoNumero}</span>
                   {' — '}{ev.descripcion}
                 </p>
+                {ev.tipo === 'CREACION' && ev.generador && (
+                  <p className="text-[10px] text-emerald-600 font-semibold truncate mt-0.5">
+                    {ev.generador.razonSocial}
+                  </p>
+                )}
+                {ev.tipo === 'CREACION' && ev.residuos && ev.residuos.length > 0 && (
+                  <div className="flex gap-1 mt-1 flex-wrap">
+                    {ev.residuos.slice(0, 2).map((r, i) => (
+                      <span
+                        key={i}
+                        className="text-[9px] px-1.5 py-0.5 rounded-full border font-mono"
+                        style={{
+                          background: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length] + '18',
+                          color: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length],
+                          borderColor: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length] + '40',
+                        }}
+                      >
+                        {r.codigo} · {r.cantidad} {r.unidad}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           );

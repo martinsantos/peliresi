@@ -4,7 +4,7 @@
  * PLAYBACK mode: HIDES static actors, shows only event action (trips, flashes, camera follows)
  */
 
-import React, { useMemo, useEffect, useRef } from 'react';
+import React, { useMemo, useEffect, useRef, memo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
@@ -44,7 +44,7 @@ function makeTooltipIcon(text: string): L.DivIcon {
   });
 }
 
-// ─── PlaybackCamera — simplified, follows currentEvent directly ─────────────
+// ─── PlaybackCamera — pan suave solo si el evento está fuera del viewport ────
 function PlaybackCamera({ currentEvent }: { currentEvent: { lat: number; lng: number } | null }) {
   const map = useMap();
   const prevRef = useRef('');
@@ -54,19 +54,26 @@ function PlaybackCamera({ currentEvent }: { currentEvent: { lat: number; lng: nu
     const key = `${currentEvent.lat.toFixed(4)},${currentEvent.lng.toFixed(4)}`;
     if (key === prevRef.current) return;
     prevRef.current = key;
-    map.flyTo([currentEvent.lat, currentEvent.lng], 15, { duration: 1.0 });
+
+    const pt = L.latLng(currentEvent.lat, currentEvent.lng);
+    const bounds = map.getBounds();
+    // Solo mover si el evento está fuera del viewport actual
+    if (!bounds.contains(pt)) {
+      map.panTo(pt, { animate: true, duration: 0.5, easeLinearity: 0.5 });
+    }
   }, [currentEvent, map]);
 
   return null;
 }
 
-// ─── Imperative layer: truck markers + trails + floating tooltips ─────────────
+// ─── Imperative layer: truck markers + trails degradados + floating tooltips ──
 function PlaybackLayer({ trips }: {
   trips: Map<string, { lat: number; lng: number; trail: [number, number][] }>;
 }) {
   const map = useMap();
   const markersRef = useRef<Map<string, L.Marker>>(new Map());
-  const polylinesRef = useRef<Map<string, L.Polyline>>(new Map());
+  // Trail: múltiples segmentos por trip (gradiente de opacidad)
+  const polylinesRef = useRef<Map<string, L.Polyline[]>>(new Map());
   const tooltipsRef = useRef<Map<string, L.Marker>>(new Map());
   const truckIconRef = useRef(makeTruckIcon());
 
@@ -75,7 +82,9 @@ function PlaybackLayer({ trips }: {
 
     // Remove stale
     markersRef.current.forEach((m, id) => { if (!currentIds.has(id)) { map.removeLayer(m); markersRef.current.delete(id); } });
-    polylinesRef.current.forEach((p, id) => { if (!currentIds.has(id)) { map.removeLayer(p); polylinesRef.current.delete(id); } });
+    polylinesRef.current.forEach((segs, id) => {
+      if (!currentIds.has(id)) { segs.forEach(p => map.removeLayer(p)); polylinesRef.current.delete(id); }
+    });
     tooltipsRef.current.forEach((t, id) => { if (!currentIds.has(id)) { map.removeLayer(t); tooltipsRef.current.delete(id); } });
 
     trips.forEach((trip, id) => {
@@ -91,25 +100,34 @@ function PlaybackLayer({ trips }: {
         markersRef.current.set(id, marker);
       }
 
-      // Trail polyline
-      let pl = polylinesRef.current.get(id);
-      if (pl) {
-        pl.setLatLngs(trip.trail);
-      } else if (trip.trail.length > 1) {
-        pl = L.polyline(trip.trail, { color: '#DC2626', weight: 5, opacity: 0.8 }).addTo(map);
-        polylinesRef.current.set(id, pl);
+      // Trail con gradiente de opacidad — 4 segmentos, más opaco en la punta
+      const prevSegs = polylinesRef.current.get(id) ?? [];
+      prevSegs.forEach(p => map.removeLayer(p));
+      const trail = trip.trail;
+      const newSegs: L.Polyline[] = [];
+      if (trail.length > 1) {
+        const n = trail.length;
+        const SEGMENTS = 4;
+        for (let s = 0; s < SEGMENTS; s++) {
+          const from = Math.floor((s / SEGMENTS) * n);
+          const to = Math.min(Math.floor(((s + 1) / SEGMENTS) * n) + 1, n);
+          const slice = trail.slice(from, to);
+          if (slice.length < 2) continue;
+          const opacity = 0.10 + (s / (SEGMENTS - 1)) * 0.70;
+          const weight = s < 2 ? 2 : 4;
+          newSegs.push(L.polyline(slice, { color: '#DC2626', weight, opacity }).addTo(map));
+        }
       }
+      polylinesRef.current.set(id, newSegs);
 
       // Floating tooltip
-      const tooltipContent = `<span style="font-weight:800;color:#EF4444;">EN TRÁNSITO</span> ${shortId} <span style="color:#9ca3af;">${trip.trail.length}pts</span>`;
+      const tooltipContent = `<span style="font-weight:800;color:#EF4444;">EN TRÁNSITO</span> ${shortId} <span style="color:#9ca3af;">${trail.length}pts</span>`;
       let tt = tooltipsRef.current.get(id);
       if (tt) {
         tt.setLatLng(pos);
-        const newIcon = makeTooltipIcon(tooltipContent);
-        tt.setIcon(newIcon);
+        tt.setIcon(makeTooltipIcon(tooltipContent));
       } else {
-        const ttIcon = makeTooltipIcon(tooltipContent);
-        tt = L.marker(pos, { icon: ttIcon, zIndexOffset: 4000, interactive: false }).addTo(map);
+        tt = L.marker(pos, { icon: makeTooltipIcon(tooltipContent), zIndexOffset: 4000, interactive: false }).addTo(map);
         tooltipsRef.current.set(id, tt);
       }
     });
@@ -119,7 +137,7 @@ function PlaybackLayer({ trips }: {
   useEffect(() => {
     return () => {
       markersRef.current.forEach(m => map.removeLayer(m));
-      polylinesRef.current.forEach(p => map.removeLayer(p));
+      polylinesRef.current.forEach(segs => segs.forEach(p => map.removeLayer(p)));
       tooltipsRef.current.forEach(t => map.removeLayer(t));
       markersRef.current.clear();
       polylinesRef.current.clear();
@@ -197,7 +215,7 @@ function EventFlash({ events }: { events: Array<{ lat: number; lng: number; tipo
           animation:wr-popup-appear 0.3s ease-out;
           text-transform:uppercase;
         ">
-          <span style="margin-right:4px;">${ev.tipo === 'INCIDENTE' ? '⚠' : '●'}</span>
+          <span style="margin-right:4px;">${ev.tipo === 'CREACION' ? '✦' : ev.tipo === 'INCIDENTE' ? '⚠' : '●'}</span>
           ${label}${ev.numero ? ' — ' + ev.numero : ''}
         </div>`,
         iconSize: [200, 30],
@@ -238,14 +256,25 @@ interface Props {
   actores: { generadores: ActorPosition[]; transportistas: ActorPosition[]; operadores: ActorPosition[] } | null;
   enTransito: EnTransitoItem[];
   mode: MonitorMode;
+  currentHour?: number; // 0–23 — para overlay día/noche en PLAYBACK
   // Playback-specific
   playbackTrips?: Map<string, { lat: number; lng: number; trail: [number, number][] }>;
   currentEvent?: { lat: number; lng: number; tipo: string; manifiestoNumero: string } | null;
   playbackEvents?: Array<{ id: string; tipo: string; lat: number; lng: number; numero?: string }>;
 }
 
-export const WarRoomMap: React.FC<Props> = ({ cinemaMode, actores, enTransito, mode, playbackTrips, currentEvent, playbackEvents }) => {
+export const WarRoomMap: React.FC<Props> = ({ cinemaMode, actores, enTransito, mode, currentHour, playbackTrips, currentEvent, playbackEvents }) => {
   const tiles = cinemaMode ? DARK_TILES : VOYAGER_TILES;
+
+  // Overlay día/noche — sutil, máx opacity 0.12
+  const dayOverlayColor = useMemo(() => {
+    if (currentHour === undefined || mode !== 'PLAYBACK') return null;
+    if (currentHour >= 0  && currentHour < 6)  return 'rgba(20,40,80,0.12)';
+    if (currentHour >= 6  && currentHour < 10) return 'rgba(255,200,100,0.08)';
+    if (currentHour >= 10 && currentHour < 17) return null;
+    if (currentHour >= 17 && currentHour < 20) return 'rgba(255,120,50,0.08)';
+    return 'rgba(20,40,80,0.12)';
+  }, [currentHour, mode]);
 
   const visibleGeneradores = useMemo(() => {
     if (!actores?.generadores) return [];
@@ -265,6 +294,7 @@ export const WarRoomMap: React.FC<Props> = ({ cinemaMode, actores, enTransito, m
   }), []);
 
   return (
+    <div className="relative w-full h-full">
     <MapContainer center={MENDOZA_CENTER} zoom={10} className="w-full h-full" zoomControl={false} attributionControl={false}>
       <TileLayer url={tiles} attribution={ATTRIBUTION} />
 
@@ -461,5 +491,10 @@ export const WarRoomMap: React.FC<Props> = ({ cinemaMode, actores, enTransito, m
         );
       })}
     </MapContainer>
+    {/* Overlay día/noche — pointer-events: none, no bloquea interacción con el mapa */}
+    {dayOverlayColor && (
+      <div className="wr-day-overlay" style={{ backgroundColor: dayOverlayColor }} />
+    )}
+    </div>
   );
 };

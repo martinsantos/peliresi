@@ -46,6 +46,7 @@ export interface PlaybackState {
   currentTime: number;
   startTime: number;
   endTime: number;
+  currentHour: number; // 0–23, hora local del evento actual (para ciclo día/noche)
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -141,6 +142,7 @@ export function useTimeline(events: TimelineEvent[] | null) {
     currentTime: 0,
     startTime: 0,
     endTime: 0,
+    currentHour: 12,
   });
 
   // ── Process a single timeline entry (mutates refs) ────────────────────────
@@ -281,6 +283,10 @@ export function useTimeline(events: TimelineEvent[] | null) {
       ? eventoListRef.current[idx].unixMs
       : startTimeRef.current;
 
+    const currentHour = idx >= 0 && idx < eventoListRef.current.length
+      ? new Date(eventoListRef.current[idx].unixMs).getHours()
+      : 12;
+
     setState({
       isPlaying: isPlayingRef.current,
       speed: numericSpeedRef.current,
@@ -295,6 +301,7 @@ export function useTimeline(events: TimelineEvent[] | null) {
       currentTime,
       startTime: startTimeRef.current,
       endTime: endTimeRef.current,
+      currentHour,
     });
   }, []);
 
@@ -386,6 +393,7 @@ export function useTimeline(events: TimelineEvent[] | null) {
         currentTime: 0,
         startTime: 0,
         endTime: 0,
+        currentHour: 12,
       });
       return;
     }
@@ -422,6 +430,7 @@ export function useTimeline(events: TimelineEvent[] | null) {
       currentTime: start,
       startTime: start,
       endTime: end,
+      currentHour: 12,
     });
   }, [events, clearPlayInterval]);
 

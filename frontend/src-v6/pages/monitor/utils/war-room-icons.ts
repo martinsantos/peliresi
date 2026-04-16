@@ -4,6 +4,11 @@ import L from 'leaflet';
 // Color constants
 // ---------------------------------------------------------------------------
 
+export const RESIDUO_PALETTE = [
+  '#059669', '#7c3aed', '#dc2626', '#d97706',
+  '#2563eb', '#0891b2', '#be185d', '#65a30d',
+] as const;
+
 export const ACTOR_COLORS = {
   generador: '#7C3AED',
   transportista: '#D97706',
@@ -102,6 +107,24 @@ export function createEnTransitoIcon(selected = false): L.DivIcon {
     iconSize: [36, 36],
     iconAnchor: [18, 18],
     popupAnchor: [0, -20],
+  });
+}
+
+export function createCreacionIcon(): L.DivIcon {
+  return L.divIcon({
+    className: '',
+    html: `<div style="
+      width:28px;height:28px;background:#22c55e;border-radius:50%;
+      display:flex;align-items:center;justify-content:center;
+      box-shadow:0 0 12px rgba(34,197,94,0.6),0 2px 6px rgba(0,0,0,0.3);
+      border:2px solid white;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+        stroke="white" stroke-width="2.5" stroke-linecap="round">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg></div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -16],
   });
 }
 

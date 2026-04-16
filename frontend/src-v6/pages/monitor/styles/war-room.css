@@ -81,8 +81,8 @@
 }
 
 @keyframes wr-breathing {
-  0%, 100% { transform: scale(1); }
-  50%      { transform: scale(1.05); }
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(0,0,0,0.3)); }
+  50%       { filter: drop-shadow(0 0 8px rgba(255,255,255,0.4)) drop-shadow(0 0 4px rgba(0,0,0,0.2)); }
 }
 
 .wr-marker-transit {
@@ -561,6 +561,76 @@
   background: rgba(59, 130, 246, 0.12);
   color: #2563eb;
   border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+/* ==========================================================================
+   14. Day/Night overlay sobre el mapa
+   ========================================================================== */
+
+.wr-day-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 400;
+  transition: background-color 500ms ease;
+}
+
+/* ==========================================================================
+   15. Funnel bars con shimmer
+   ========================================================================== */
+
+.wr-funnel-bar-gradient {
+  border-radius: 6px;
+  position: relative;
+  overflow: hidden;
+  transition: width 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+.wr-funnel-bar-gradient::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.18) 50%, transparent 100%);
+  animation: wr-shimmer-bar 2.5s ease-in-out infinite;
+}
+
+@keyframes wr-shimmer-bar {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* ==========================================================================
+   16. DepartureBoard — animación slide-up mejorada
+   ========================================================================== */
+
+@keyframes db-slide-up-v2 {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.departure-board-enter-v2 {
+  animation: db-slide-up-v2 0.35s cubic-bezier(0.19, 1, 0.22, 1) both;
+}
+
+/* ==========================================================================
+   17. Transición de día — overlay al cambiar fecha
+   ========================================================================== */
+
+.wr-day-transition-overlay {
+  animation: wr-day-flash 0.5s ease-in-out both;
+}
+
+@keyframes wr-day-flash {
+  0%   { opacity: 0; }
+  30%  { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 .wr-badge-forecast {
