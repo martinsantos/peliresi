@@ -5,7 +5,7 @@
  * Modulo autonomo — no importa componentes del app principal
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Radio, Play, Pause, FastForward, Calendar, Film, X, Leaf, Clock } from 'lucide-react';
@@ -67,7 +67,6 @@ const WarRoomPage: React.FC = () => {
         }
         return todayISO(); // Fallback to today
       });
-      setAutoStarted(null);
     }
     setModeRaw(newMode);
   }, [activeDays]);
@@ -77,7 +76,6 @@ const WarRoomPage: React.FC = () => {
     if (mode === 'PLAYBACK' && !playbackDate && activeDays.length > 0) {
       const sorted = [...activeDays].sort();
       setPlaybackDate(sorted[sorted.length - 1]);
-      setAutoStarted(null);
     }
   }, [mode, playbackDate, activeDays]);
 
@@ -91,23 +89,26 @@ const WarRoomPage: React.FC = () => {
   const [autoContinue, setAutoContinue] = useState(true);
   const [isDayTransitioning, setIsDayTransitioning] = useState(false);
 
-  // Auto-start playback at 50x when timeline data loads
-  const [autoStarted, setAutoStarted] = useState<string | null>(null);
+  // Auto-start playback at 50x cuando llegan datos nuevos para el día actual.
+  // Trackea por referencia del objeto data (no por fecha) para evitar race condition:
+  // si se guarda la fecha cuando los datos son del día anterior, cuando llega la data
+  // real el guard ya está satisfecho y nunca arranca.
+  const autoStartedDataRef = useRef<object | null>(null);
   useEffect(() => {
     if (
       mode === 'PLAYBACK' &&
       timelineData.data &&
       timelineData.data.eventos.length > 0 &&
-      autoStarted !== playbackDate
+      timelineData.data !== autoStartedDataRef.current
     ) {
+      autoStartedDataRef.current = timelineData.data;
       playback.setSpeed(50);
       const timer = setTimeout(() => {
         playback.play();
       }, 200);
-      setAutoStarted(playbackDate);
       return () => clearTimeout(timer);
     }
-  }, [mode, timelineData.data, playbackDate, autoStarted]);
+  }, [mode, timelineData.data]);
 
   // Auto-continue to next ACTIVE day — seamless, no visible pause
   useEffect(() => {
@@ -192,14 +193,12 @@ const WarRoomPage: React.FC = () => {
   const handleSwitchToPlayback = useCallback((date?: string) => {
     const d = date || todayISO();
     setPlaybackDate(d);
-    setAutoStarted(null); // Reset auto-start tracking for new date
     setMode('PLAYBACK');
   }, []);
 
   // Handle date change in playback
   const handleDateChange = useCallback((d: string) => {
     setPlaybackDate(d);
-    setAutoStarted(null);
     playback.reset();
     setMode('PLAYBACK');
   }, [playback]);
