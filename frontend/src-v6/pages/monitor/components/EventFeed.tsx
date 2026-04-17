@@ -46,7 +46,7 @@ export const EventFeed: React.FC<Props> = ({ eventos, mode, onEventClick, curren
 
   if (eventos.length === 0) {
     return (
-      <div className="wr-panel p-3 flex-1 min-h-0">
+      <div className="wr-panel p-3 min-h-[160px]">
         <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">Eventos</h3>
         <p className="text-xs text-neutral-400 text-center py-4">Sin eventos recientes</p>
       </div>
@@ -54,12 +54,12 @@ export const EventFeed: React.FC<Props> = ({ eventos, mode, onEventClick, curren
   }
 
   return (
-    <div className="wr-panel p-3 flex-1 min-h-0 flex flex-col">
+    <div className="wr-panel p-3 min-h-[220px] flex flex-col">
       <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">
         Eventos
         <span className="ml-1.5 text-neutral-400 font-normal">({eventos.length})</span>
       </h3>
-      <div ref={scrollRef} className="overflow-y-auto flex-1 -mr-1 pr-1 space-y-0.5">
+      <div ref={scrollRef} className="overflow-y-auto max-h-[320px] -mr-1 pr-1 space-y-0.5">
         {eventos.map((ev, i) => {
           const color = EVENT_COLORS[ev.tipo as keyof typeof EVENT_COLORS] || '#94a3b8';
           const isActive = currentEventId && ev.id === currentEventId;

@@ -252,7 +252,7 @@ const RouteNode: React.FC<{
       <p className="text-[13px] text-neutral-200 font-semibold truncate leading-tight">{name}</p>
       <div className="flex items-center gap-1.5 text-[10px] text-neutral-600">
         {cuit && <span className="font-mono">{cuit}</span>}
-        {coords && coords[0] !== 0 && (
+        {coords && coords[0] != null && coords[0] !== 0 && coords[1] != null && (
           <span className="flex items-center gap-0.5">
             <MapPin size={8} />
             {coords[0].toFixed(2)}, {coords[1].toFixed(2)}
