@@ -128,9 +128,10 @@ const WarRoomPage: React.FC = () => {
         setIsDayTransitioning(true);
         playback.pause();
         const timer = setTimeout(() => {
-          setPlaybackDate(nextDay);
-          setAutoStarted(null);
           playback.reset();
+          setPlaybackDate(nextDay);
+          // No resetear autoStarted — el efecto auto-start detecta el cambio
+          // porque autoStarted (día anterior) !== playbackDate (nuevo día)
           setIsDayTransitioning(false);
         }, 500);
         return () => clearTimeout(timer);
