@@ -87,7 +87,6 @@ const WarRoomPage: React.FC = () => {
 
   // Auto-continue: when enabled, advance to next day when playback finishes
   const [autoContinue, setAutoContinue] = useState(true);
-  const [isDayTransitioning, setIsDayTransitioning] = useState(false);
 
   // Auto-start playback at 50x cuando llegan datos nuevos para el día actual.
   // Trackea por referencia del objeto data (no por fecha) para evitar race condition:
@@ -125,17 +124,8 @@ const WarRoomPage: React.FC = () => {
       const nextDay = idx >= 0 && idx < sorted.length - 1 ? sorted[idx + 1] : null;
 
       if (nextDay && nextDay <= todayISO()) {
-        // Transición con overlay visual breve (500ms) antes de cargar el nuevo día
-        setIsDayTransitioning(true);
-        playback.pause();
-        const timer = setTimeout(() => {
-          playback.reset();
-          setPlaybackDate(nextDay);
-          // No resetear autoStarted — el efecto auto-start detecta el cambio
-          // porque autoStarted (día anterior) !== playbackDate (nuevo día)
-          setIsDayTransitioning(false);
-        }, 500);
-        return () => clearTimeout(timer);
+        playback.reset();
+        setPlaybackDate(nextDay);
       }
     }
   }, [mode, autoContinue, playback.isPlaying, playback.progress, playbackDate, activeDays]);
@@ -298,6 +288,7 @@ const WarRoomPage: React.FC = () => {
     const ev = playback.currentEvent;
     const coords = resolveCoords(ev);
     if (coords.lat == null || coords.lng == null) return null;
+    if (Math.abs(coords.lat) < 0.001 && Math.abs(coords.lng) < 0.001) return null;
     return {
       lat: coords.lat,
       lng: coords.lng,
@@ -377,14 +368,6 @@ const WarRoomPage: React.FC = () => {
             numero: e.manifiestoNumero,
           })).filter(e => e.lat !== 0 && e.lng !== 0) : undefined}
         />
-        {/* Overlay de transición al cambiar de día */}
-        {isDayTransitioning && (
-          <div className="absolute inset-0 z-[2000] flex items-center justify-center pointer-events-none wr-day-transition-overlay">
-            <div className="bg-black/60 backdrop-blur-sm px-6 py-3 rounded-xl border border-white/10">
-              <span className="text-white/80 font-mono text-sm tracking-widest">{playbackDate}</span>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Bottom Panel — KPIs + Timeline Controls */}

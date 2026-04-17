@@ -646,3 +646,12 @@
   color: #7c3aed;
   border: 1px solid rgba(139, 92, 246, 0.25);
 }
+
+/* Highlight sutil al aparecer un evento nuevo en el feed */
+@keyframes wr-event-arrive {
+  0%   { background-color: rgba(13, 138, 79, 0.08); }
+  100% { background-color: transparent; }
+}
+.wr-event-arrive {
+  animation: wr-event-arrive 1.2s ease-out forwards;
+}

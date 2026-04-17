@@ -1,12 +1,26 @@
 /**
- * EventFeed — Scrollable event timeline with sharp, brilliant styling
- * Colored left borders, ring-effect dots, bold timestamps, crisp badges
+ * EventFeed — Scrollable event timeline
+ * Colored left borders, bold manifest numbers, Lucide icons per event type
  */
 
 import React, { useRef, useEffect } from 'react';
+import { Plus, PenLine, Truck, Package, FlaskConical, Zap, AlertTriangle, XCircle, RotateCcw } from 'lucide-react';
 import type { MonitorMode } from '../WarRoomPage';
 import { formatTimeShort } from '../utils/formatters';
 import { EVENT_COLORS, RESIDUO_PALETTE } from '../utils/war-room-icons';
+
+const TIPO_ICONS: Record<string, React.ElementType> = {
+  CREACION:    Plus,
+  FIRMA:       PenLine,
+  RETIRO:      Truck,
+  ENTREGA:     Package,
+  RECEPCION:   Package,
+  TRATAMIENTO: FlaskConical,
+  CIERRE:      Zap,
+  INCIDENTE:   AlertTriangle,
+  CANCELACION: XCircle,
+  RECHAZO:     RotateCcw,
+};
 
 interface EventItem {
   id: string;
@@ -26,9 +40,10 @@ interface Props {
   mode: MonitorMode;
   onEventClick?: (lat: number, lng: number) => void;
   currentEventId?: string;
+  className?: string;
 }
 
-export const EventFeed: React.FC<Props> = ({ eventos, mode, onEventClick, currentEventId }) => {
+export const EventFeed: React.FC<Props> = ({ eventos, mode, onEventClick, currentEventId, className }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to top when new events arrive
@@ -46,43 +61,36 @@ export const EventFeed: React.FC<Props> = ({ eventos, mode, onEventClick, curren
 
   if (eventos.length === 0) {
     return (
-      <div className="wr-panel p-3 min-h-[160px]">
-        <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">Eventos</h3>
+      <div className={`wr-panel p-3 flex flex-col min-h-0 ${className ?? ''}`}>
         <p className="text-xs text-neutral-400 text-center py-4">Sin eventos recientes</p>
       </div>
     );
   }
 
   return (
-    <div className="wr-panel p-3 min-h-[220px] flex flex-col">
-      <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">
-        Eventos
-        <span className="ml-1.5 text-neutral-400 font-normal">({eventos.length})</span>
-      </h3>
-      <div ref={scrollRef} className="overflow-y-auto max-h-[320px] -mr-1 pr-1 space-y-0.5">
+    <div className={`wr-panel p-3 flex flex-col min-h-0 ${className ?? ''}`}>
+      <div ref={scrollRef} className="overflow-y-auto flex-1 min-h-0 -mr-1 pr-1 space-y-0.5">
         {eventos.map((ev, i) => {
           const color = EVENT_COLORS[ev.tipo as keyof typeof EVENT_COLORS] || '#94a3b8';
           const isActive = currentEventId && ev.id === currentEventId;
+          const TipoIcon = TIPO_ICONS[ev.tipo];
           return (
             <div
               key={ev.id}
               className={`wr-event-item flex items-start gap-2 py-1.5 pr-1 rounded-sm cursor-pointer transition-colors ${
-                isActive ? 'bg-neutral-100 ring-1 ring-neutral-300' : 'hover:bg-neutral-50/80'
-              }`}
+                isActive ? 'bg-emerald-50' : 'hover:bg-neutral-50/80'
+              } ${i === 0 ? 'wr-event-arrive' : ''}`}
               style={{
                 animationDelay: `${i * 40}ms`,
-                borderLeft: isActive ? `3px solid ${color}` : `2px solid ${color}`,
-                paddingLeft: '8px',
+                borderLeft: isActive ? `4px solid ${color}` : `2px solid ${color}50`,
+                paddingLeft: isActive ? '7px' : '8px',
               }}
               onClick={() => handleClick(ev)}
             >
-              {/* Dot with ring effect */}
+              {/* Dot */}
               <div
-                className="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0"
-                style={{
-                  backgroundColor: color,
-                  boxShadow: `0 0 0 2px ${color}30, 0 0 4px ${color}50`,
-                }}
+                className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
+                style={{ backgroundColor: color }}
               />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
@@ -90,7 +98,7 @@ export const EventFeed: React.FC<Props> = ({ eventos, mode, onEventClick, curren
                     {formatTimeShort(ev.timestamp)}
                   </span>
                   <span
-                    className="text-[9px] uppercase px-1 py-0.5 rounded-sm"
+                    className="text-[9px] uppercase px-1.5 py-0.5 rounded-sm flex items-center gap-0.5"
                     style={{
                       backgroundColor: color + '20',
                       color,
@@ -99,12 +107,14 @@ export const EventFeed: React.FC<Props> = ({ eventos, mode, onEventClick, curren
                       border: `1px solid ${color}30`,
                     }}
                   >
+                    {TipoIcon && <TipoIcon size={8} strokeWidth={2.5} />}
                     {ev.tipo}
                   </span>
                 </div>
-                <p className="text-[11px] text-neutral-600 truncate">
-                  <span className="font-bold">{ev.manifiestoNumero}</span>
-                  {' — '}{ev.descripcion}
+                <p className="text-[11px] leading-tight truncate">
+                  <span className="font-black text-neutral-800 font-mono tracking-tight">{ev.manifiestoNumero}</span>
+                  <span className="text-neutral-300 mx-1">·</span>
+                  <span className="text-neutral-500 text-[10px]">{ev.descripcion}</span>
                 </p>
                 {ev.tipo === 'CREACION' && ev.generador && (
                   <p className="text-[10px] text-emerald-600 font-semibold truncate mt-0.5">
@@ -113,14 +123,14 @@ export const EventFeed: React.FC<Props> = ({ eventos, mode, onEventClick, curren
                 )}
                 {ev.tipo === 'CREACION' && ev.residuos && ev.residuos.length > 0 && (
                   <div className="flex gap-1 mt-1 flex-wrap">
-                    {ev.residuos.slice(0, 2).map((r, i) => (
+                    {ev.residuos.slice(0, 2).map((r, ri) => (
                       <span
-                        key={i}
+                        key={ri}
                         className="text-[9px] px-1.5 py-0.5 rounded-full border font-mono"
                         style={{
-                          background: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length] + '18',
-                          color: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length],
-                          borderColor: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length] + '40',
+                          background: RESIDUO_PALETTE[ri % RESIDUO_PALETTE.length] + '18',
+                          color: RESIDUO_PALETTE[ri % RESIDUO_PALETTE.length],
+                          borderColor: RESIDUO_PALETTE[ri % RESIDUO_PALETTE.length] + '40',
                         }}
                       >
                         {r.codigo} · {r.cantidad} {r.unidad}
