@@ -83,6 +83,7 @@
     <a href="#mod-inscripcion" class="nav-link level-2">3.12 Inscripcion, Wizards y TEF</a>
     <a href="#mod-emails" class="nav-link level-2">3.13 Emails y Alertas</a>
     <a href="#mod-renovaciones" class="nav-link level-2">3.14 Renovaciones Anuales</a>
+    <a href="#mod-monitor" class="nav-link level-2">3.15 Monitor War Room</a>
   </div>
 
   <div class="nav-section-title" onclick="toggleNavGroup(this)">4. Aplicacion Movil</div>
@@ -2462,6 +2463,157 @@ Los actores registrados (generadores, operadores) deben renovar su inscripcion a
 
 <h4>3.14.3 Datos de la Renovacion</h4>
 <p>Cada renovacion registra: anio, tipo de cambio, datos anteriores y nuevos (JSON), documentos adjuntos, fecha de aprobacion/rechazo, y quien la proceso.</p>
+</section>
+
+<!-- ============================================================ -->
+<!-- SECTION 3.15: MONITOR WAR ROOM                                -->
+<!-- ============================================================ -->
+
+<section id="mod-monitor" data-role="admin">
+<h3>3.15 Monitor War Room</h3>
+<div class="section-intro">
+El Monitor War Room es el centro de mando operacional de SITREP. Ofrece una vista en tiempo real o historica de toda la actividad de residuos peligrosos en la provincia: manifiestos en curso, viajes activos con GPS, eventos recientes y estadisticas dinamicas. Esta disenado para operaciones de seguimiento continuo y auditoria retrospectiva.
+</div>
+
+<p>Acceso: menu lateral <strong>Monitor</strong> (icono Activity). Solo disponible para el rol <strong>ADMIN</strong>.</p>
+
+<h4>3.15.1 Modos de Operacion</h4>
+<p>El Monitor tiene tres modos seleccionables en la barra superior:</p>
+<table>
+<thead><tr><th>Modo</th><th>Badge</th><th>Descripcion</th></tr></thead>
+<tbody>
+<tr>
+  <td><strong>LIVE</strong></td>
+  <td><code>● EN VIVO</code> (verde pulsante)</td>
+  <td>Datos en tiempo real. Auto-refresco cada 30 segundos. Muestra viajes activos con GPS, manifiestos recientes y contadores por estado. El mapa centra automaticamente en el primer evento nuevo.</td>
+</tr>
+<tr>
+  <td><strong>PLAYBACK</strong></td>
+  <td><code>▶ PLAYBACK</code> (azul)</td>
+  <td>Reproduccion historica de un dia seleccionado. El timeline avanza evento por evento. Las estadisticas y contadores reflejan el estado acumulado hasta el momento reproducido. Permite ver como evoluciono la actividad a lo largo del dia.</td>
+</tr>
+<tr>
+  <td><strong>FORECAST</strong></td>
+  <td><code>◆ FORECAST</code> (amber)</td>
+  <td>Vista predictiva basada en patrones historicos de los ultimos 30 dias. Muestra proyecciones de volumen, tipos de residuo esperados y tendencias por generador u operador.</td>
+</tr>
+</tbody>
+</table>
+
+<h4>3.15.2 Layout y Paneles</h4>
+<p>La pantalla se divide en dos zonas redimensionables con un divisor arrastrable:</p>
+<ul>
+  <li><strong>Barra lateral izquierda (fija 320px):</strong> Contiene los widgets de estadisticas y el feed de eventos.</li>
+  <li><strong>Area del mapa (resto de la pantalla):</strong> Mapa interactivo con capas de generadores, operadores, transportistas y viajes. El ancho del area se puede ajustar arrastrando el divisor central (entre 25% y 75% del total).</li>
+</ul>
+
+<h4>3.15.3 Sistema de Widgets</h4>
+<p>La barra lateral contiene seis widgets configurables. Cada widget puede estar en uno de tres estados:</p>
+<table>
+<thead><tr><th>Estado</th><th>Descripcion</th></tr></thead>
+<tbody>
+<tr><td><strong>visible</strong></td><td>Widget expandido y mostrando datos.</td></tr>
+<tr><td><strong>minimized</strong></td><td>Solo el encabezado visible; ocupa minimo espacio.</td></tr>
+<tr><td><strong>closed</strong></td><td>Oculto. Se puede reabrir desde el menu de configuracion de widgets.</td></tr>
+</tbody>
+</table>
+
+<p><strong>Widgets disponibles:</strong></p>
+<table>
+<thead><tr><th>Widget</th><th>Clave</th><th>Contenido</th></tr></thead>
+<tbody>
+<tr><td>Pipeline de Estados</td><td><code>pipeline</code></td><td>Contadores por estado: BORRADOR, APROBADO, EN_TRANSITO, ENTREGADO, RECIBIDO, EN_TRATAMIENTO, TRATADO. En modo PLAYBACK refleja el estado acumulado hasta el momento reproducido.</td></tr>
+<tr><td>Manifiestos</td><td><code>manifiestos</code></td><td>Tarjeta del manifiesto mas reciente: numero, estado con badge de color, actores involucrados, residuos con pills de colores.</td></tr>
+<tr><td>Viajes en Transito</td><td><code>viajes</code></td><td>Lista de manifiestos EN_TRANSITO con transportista, origen, destino y ultima posicion GPS. Click en un viaje abre su panel flotante detallado.</td></tr>
+<tr><td>Residuos</td><td><code>residuos</code></td><td>Top 5 tipos de residuo activos con barras de progreso proporcionales. En PLAYBACK: agrega residuos de todos los eventos del dia hasta el momento actual.</td></tr>
+<tr><td>Actores Activos</td><td><code>actores</code></td><td>Top generadores y operadores con conteo de manifiestos en el periodo.</td></tr>
+<tr><td>Tratamiento</td><td><code>tratamiento</code></td><td>Metodos de tratamiento activos y volumenes. Solo visible cuando hay datos de tratamiento disponibles.</td></tr>
+</tbody>
+</table>
+
+<p>Los estados de cada widget se persisten en <code>localStorage</code> (clave <code>wr-widget-states-v2</code>) y se restauran automaticamente en la proxima sesion.</p>
+
+<h4>3.15.4 Controles de Playback</h4>
+<p>En modo PLAYBACK, aparece una barra de controles en la parte inferior de la pantalla:</p>
+<ul>
+  <li><strong>Selector de fecha:</strong> Elige el dia a reproducir.</li>
+  <li><strong>Play / Pause:</strong> Inicia o detiene la reproduccion automatica.</li>
+  <li><strong>← / →:</strong> Salta al evento anterior o siguiente manualmente.</li>
+  <li><strong>Velocidad:</strong> Selector de velocidad de reproduccion: 0.5×, 1×, 2×, 5×, 10×.</li>
+  <li><strong>Contador de posicion:</strong> Muestra el evento actual sobre el total (ej. <code>12 / 47</code>).</li>
+</ul>
+
+<h4>3.15.5 Atajos de Teclado</h4>
+<p>El Monitor responde a atajos de teclado cuando el foco no esta en un campo de texto:</p>
+<table>
+<thead><tr><th>Tecla</th><th>Accion</th><th>Modo</th></tr></thead>
+<tbody>
+<tr><td><kbd>Espacio</kbd></td><td>Play / Pause</td><td>PLAYBACK</td></tr>
+<tr><td><kbd>←</kbd></td><td>Evento anterior</td><td>PLAYBACK</td></tr>
+<tr><td><kbd>→</kbd></td><td>Evento siguiente</td><td>PLAYBACK</td></tr>
+<tr><td><kbd>+</kbd></td><td>Aumentar velocidad</td><td>PLAYBACK</td></tr>
+<tr><td><kbd>-</kbd></td><td>Reducir velocidad</td><td>PLAYBACK</td></tr>
+<tr><td><kbd>F</kbd></td><td>Activar / desactivar modo cine (pantalla completa del mapa)</td><td>Todos</td></tr>
+<tr><td><kbd>L</kbd></td><td>Cambiar a modo LIVE</td><td>Todos</td></tr>
+<tr><td><kbd>P</kbd></td><td>Cambiar a modo PLAYBACK</td><td>Todos</td></tr>
+</tbody>
+</table>
+
+<h4>3.15.6 Paneles Flotantes Arrastrables</h4>
+<p>Al hacer click en un evento del feed lateral o en un viaje de la lista, se abre un <strong>panel flotante</strong> sobre el mapa. Estos paneles:</p>
+<ul>
+  <li>Se pueden <strong>arrastrar</strong> libremente por la pantalla tomando el encabezado.</li>
+  <li>Se pueden <strong>minimizar</strong> (colapsa el contenido, queda solo el encabezado).</li>
+  <li>Se pueden <strong>cerrar</strong> con el boton X.</li>
+  <li>Al hacer click en un panel ya abierto con el mismo ID, lo trae al frente (sin duplicar).</li>
+  <li>El mapa, el playback y los widgets continuan funcionando debajo sin interrupcion.</li>
+  <li>Se pueden tener multiples paneles abiertos simultaneamente.</li>
+</ul>
+
+<p><strong>Panel de Manifiesto</strong> — aparece al hacer click en un evento del feed:</p>
+<ul>
+  <li>Numero de manifiesto (grande, fuente monoespaciada)</li>
+  <li>Badge del tipo de evento (CREACION, FIRMA, RETIRO, ENTREGA, etc.) con color semantico</li>
+  <li>Timestamp del evento</li>
+  <li>Generador → Transportista → Operador (fila con badges de color)</li>
+  <li>Pills de residuos con colores de la paleta de categorias</li>
+  <li>Flujo de estados del manifiesto (7 puntos, el activo resaltado)</li>
+  <li>Descripcion del evento</li>
+</ul>
+
+<p><strong>Panel de Viaje</strong> — aparece al hacer click en un viaje EN_TRANSITO:</p>
+<ul>
+  <li>Numero de manifiesto (borde izquierdo naranja)</li>
+  <li>Transportista, vehiculo (patente), chofer</li>
+  <li>Ruta: Origen → Destino</li>
+  <li>Cantidad de puntos GPS registrados y velocidad actual</li>
+  <li>Pills de residuos transportados</li>
+</ul>
+
+<h4>3.15.7 Mapa Interactivo</h4>
+<p>El mapa Leaflet muestra las siguientes capas:</p>
+<table>
+<thead><tr><th>Capa</th><th>Icono</th><th>Descripcion</th></tr></thead>
+<tbody>
+<tr><td>Generadores</td><td>Cuadrado violeta con Factory</td><td>Establecimientos generadores activos en el periodo.</td></tr>
+<tr><td>Transportistas</td><td>Diamante naranja con Truck</td><td>Transportistas habilitados.</td></tr>
+<tr><td>Operadores</td><td>Cuadrado azul con FlaskConical</td><td>Plantas de tratamiento.</td></tr>
+<tr><td>En Transito</td><td>Circulo rojo pulsante</td><td>Manifiestos EN_TRANSITO con ultima posicion GPS conocida. Click: vuela al punto en el mapa.</td></tr>
+<tr><td>Flash de evento</td><td>Circulo de color animado</td><td>Destellos temporales (3 segundos) al recibir nuevos eventos en LIVE o avanzar en PLAYBACK.</td></tr>
+</tbody>
+</table>
+<p>Los marcadores se agrupan automaticamente en clusters cuando hay mas de 50 actores por zona. El mapa persiste la posicion y nivel de zoom entre sesiones (localStorage <code>wr-map-*</code>).</p>
+
+<h4>3.15.8 Feed de Eventos</h4>
+<p>La seccion inferior de la barra lateral muestra un historial desplazable de eventos ordenados del mas reciente al mas antiguo. Cada item muestra:</p>
+<ul>
+  <li>Hora del evento (formato HH:MM:SS)</li>
+  <li>Badge de tipo de evento con icono Lucide y color semantico</li>
+  <li>Numero de manifiesto (negrita, monoespaciado)</li>
+  <li>Descripcion breve del evento</li>
+  <li>Para eventos CREACION: nombre del generador y pills de residuos (hasta 2)</li>
+</ul>
+<p>En modo PLAYBACK, el feed muestra todos los eventos del dia hasta el momento reproducido. En LIVE, muestra los ultimos eventos recibidos. Click en cualquier evento abre el panel flotante de manifiesto correspondiente.</p>
 </section>
 
 <!-- ============================================================ -->
