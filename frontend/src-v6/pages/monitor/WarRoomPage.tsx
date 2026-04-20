@@ -18,6 +18,7 @@ import { WarRoomHeader } from './components/WarRoomHeader';
 import { DashboardPanels } from './components/DashboardPanels';
 import { DepartureBoard } from './components/DepartureBoard';
 import { EventFeed } from './components/EventFeed';
+import { FloatingPanelLayer, useFloatingPanels } from './components/FloatingPanelLayer';
 import { TimelineControls } from './components/TimelineControls';
 import { todayISO } from './utils/formatters';
 import type { EnTransitoItem } from './api/monitor-api';
@@ -26,12 +27,19 @@ import './styles/war-room.css';
 
 export type MonitorMode = 'LIVE' | 'PLAYBACK' | 'FORECAST';
 
+// Speed maps — outside component to avoid recreating each render
+const SPEED_TO_NUM: Record<string, number> = { fast: 100, normal: 50, slow: 10 };
+const NUM_TO_SPEED = (n: number): 'fast' | 'normal' | 'slow' =>
+  n >= 100 ? 'fast' : n >= 50 ? 'normal' : 'slow';
+
 const WarRoomPage: React.FC = () => {
   const navigate = useNavigate();
   const [mode, setModeRaw] = useState<MonitorMode>('LIVE');
   const [cinemaMode, setCinemaMode] = useState(false);
   const [playbackDate, setPlaybackDate] = useState<string | null>(null);
   const [playbackDias, setPlaybackDias] = useState(1);
+  const [forcedFlyTo, setForcedFlyTo] = useState<{ lat: number; lng: number } | null>(null);
+  const { panels, openPanel, closePanel, bringToFront, movePanel, minimizePanel } = useFloatingPanels();
 
   // Data hooks — only enabled for their respective modes
   const liveData = useWarRoomData(mode === 'LIVE');
@@ -177,7 +185,9 @@ const WarRoomPage: React.FC = () => {
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [navigate, mode, playback.isPlaying, playback.speed]);
+  }, [navigate, mode, playback.isPlaying, playback.speed,
+      playback.play, playback.pause, playback.setSpeed,
+      playback.skipEvents, playback.skipToNextEvent, playback.skipToPrevEvent]);
 
   // Switch to PLAYBACK mode with today's date
   const handleSwitchToPlayback = useCallback((date?: string) => {
@@ -277,11 +287,6 @@ const WarRoomPage: React.FC = () => {
     };
   }, [mode, playback.counters]);
 
-  // Speed mapping: useTimeline uses numeric, TimelineControls uses string labels
-  const SPEED_TO_NUM: Record<string, number> = { fast: 100, normal: 50, slow: 10 };
-  const NUM_TO_SPEED = (n: number): 'fast' | 'normal' | 'slow' =>
-    n >= 100 ? 'fast' : n >= 50 ? 'normal' : 'slow';
-
   // Resolve currentEvent with coordinates for the map camera
   const currentEventForMap = useMemo(() => {
     if (mode !== 'PLAYBACK' || !playback.currentEvent) return null;
@@ -296,6 +301,37 @@ const WarRoomPage: React.FC = () => {
       manifiestoNumero: ev.manifiestoNumero || '',
     };
   }, [mode, playback.currentEvent, resolveCoords]);
+
+  // currentEvent for sidebar widget — useMemo avoids IIFE in JSX creating new object each render
+  const currentEventForSidebar = useMemo(() => {
+    if (mode === 'PLAYBACK') return playback.currentEvent ?? null;
+    if (mode === 'LIVE' && liveData.data?.eventosRecientes?.length) {
+      const e = liveData.data!.eventosRecientes[0];
+      return { timestamp: e.timestamp, eventoTipo: e.tipo, manifiestoNumero: e.manifiestoNumero, descripcion: e.descripcion };
+    }
+    return null;
+  }, [mode, playback.currentEvent, liveData.data]);
+
+  // Floating panel callbacks
+  const handleEventOpen = useCallback((event: {
+    tipo: string; timestamp: string; manifiestoNumero: string; descripcion: string;
+    generador?: { razonSocial: string }; operador?: { razonSocial: string };
+    residuos?: Array<{ codigo: string; nombre: string; cantidad: number; unidad: string }>;
+  }) => {
+    openPanel('manifiesto', {
+      timestamp: event.timestamp,
+      eventoTipo: event.tipo,
+      manifiestoNumero: event.manifiestoNumero,
+      descripcion: event.descripcion,
+      generador: event.generador,
+      operador: event.operador,
+      residuos: event.residuos,
+    }, `m-${event.manifiestoNumero}`);
+  }, [openPanel]);
+
+  const handleViajeOpen = useCallback((viaje: EnTransitoItem) => {
+    openPanel('viaje', viaje, `v-${viaje.manifiestoId}`);
+  }, [openPanel]);
 
   // Build playback controls object for TimelineControls (new event-driven interface)
   const playbackControls = mode === 'PLAYBACK' && timelineData.data ? {
@@ -337,11 +373,26 @@ const WarRoomPage: React.FC = () => {
           playbackCounters={playbackCountersForPipeline}
           playbackEvents={eventosRecientes}
           currentEventId={mode === 'PLAYBACK' && playback.currentEvent ? `pb-0-${playback.currentEvent.manifiestoId}` : undefined}
+          enTransito={enTransito}
+          currentEvent={currentEventForSidebar}
+          currentEventIndex={mode === 'PLAYBACK' ? playback.currentEventIndex : 0}
+          totalEventCount={mode === 'PLAYBACK' ? playback.totalEventCount : (liveData.data?.estadisticas?.total ?? 0)}
+          onTripClick={(lat, lng) => setForcedFlyTo({ lat, lng })}
+          onEventOpen={handleEventOpen}
+          onViajeOpen={handleViajeOpen}
         />
       </div>
 
       {/* Map */}
       <div className="wr-layout-map">
+        {/* Floating panels — over the map, draggable */}
+        <FloatingPanelLayer
+          panels={panels}
+          onClose={closePanel}
+          onBringToFront={bringToFront}
+          onMove={movePanel}
+          onMinimize={minimizePanel}
+        />
         {/* DepartureBoard — sticky overlay top-left of map */}
         {mode === 'PLAYBACK' && playback.currentEvent && (
           <div className="absolute top-3 left-3 z-[1001] w-72 pointer-events-none">
@@ -359,7 +410,7 @@ const WarRoomPage: React.FC = () => {
           mode={mode}
           currentHour={mode === 'PLAYBACK' ? playback.currentHour : undefined}
           playbackTrips={mode === 'PLAYBACK' ? playback.activeTrips : undefined}
-          currentEvent={currentEventForMap}
+          currentEvent={currentEventForMap ?? (forcedFlyTo ? { lat: forcedFlyTo.lat, lng: forcedFlyTo.lng, tipo: 'GPS', manifiestoNumero: '' } : null)}
           playbackEvents={mode === 'PLAYBACK' ? playbackEventFeed.map(e => ({
             id: e.id,
             tipo: e.tipo,

@@ -38,7 +38,7 @@ interface EventItem {
 interface Props {
   eventos: EventItem[];
   mode: MonitorMode;
-  onEventClick?: (lat: number, lng: number) => void;
+  onEventClick?: (event: EventItem) => void;
   currentEventId?: string;
   className?: string;
 }
@@ -54,9 +54,7 @@ export const EventFeed: React.FC<Props> = ({ eventos, mode, onEventClick, curren
   }, [eventos.length]);
 
   const handleClick = (ev: EventItem) => {
-    if (onEventClick && ev.latitud && ev.longitud) {
-      onEventClick(ev.latitud, ev.longitud);
-    }
+    onEventClick?.(ev);
   };
 
   if (eventos.length === 0) {

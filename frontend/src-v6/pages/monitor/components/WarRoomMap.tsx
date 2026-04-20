@@ -152,7 +152,9 @@ function PlaybackLayer({ trips }: {
 // Tracks shown events by ID. Clears shownRef when events list shrinks (new day).
 function EventFlash({ events }: { events: Array<{ lat: number; lng: number; tipo: string; id: string; numero?: string; desc?: string }> }) {
   const map = useMap();
-  const shownRef = useRef<Set<string>>(new Set());
+  // FIFO bounded set (max 200): shownIdsRef tracks order, shownSetRef for O(1) lookup
+  const shownIdsRef = useRef<string[]>([]);
+  const shownSetRef = useRef<Set<string>>(new Set());
   const prevCountRef = useRef(0);
   const pendingTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
   const pendingMarkersRef = useRef<Set<L.Layer>>(new Set());
@@ -160,12 +162,10 @@ function EventFlash({ events }: { events: Array<{ lat: number; lng: number; tipo
   // Clear state when events list shrinks (new day / reset)
   useEffect(() => {
     if (events.length < prevCountRef.current) {
-      // New day or reset — clear all tracking
-      shownRef.current.clear();
-      // Remove all pending markers
+      shownIdsRef.current = [];
+      shownSetRef.current.clear();
       pendingMarkersRef.current.forEach(m => map.removeLayer(m));
       pendingMarkersRef.current.clear();
-      // Clear all pending timers
       pendingTimersRef.current.forEach(t => clearTimeout(t));
       pendingTimersRef.current.clear();
     }
@@ -174,8 +174,13 @@ function EventFlash({ events }: { events: Array<{ lat: number; lng: number; tipo
 
   useEffect(() => {
     for (const ev of events) {
-      if (shownRef.current.has(ev.id)) continue;
-      shownRef.current.add(ev.id);
+      if (shownSetRef.current.has(ev.id)) continue;
+      // Add to FIFO bounded set
+      shownSetRef.current.add(ev.id);
+      shownIdsRef.current.push(ev.id);
+      if (shownIdsRef.current.length > 200) {
+        shownSetRef.current.delete(shownIdsRef.current.shift()!);
+      }
 
       const color = EVENT_COLORS[ev.tipo] || '#94a3b8';
 
@@ -233,7 +238,7 @@ function EventFlash({ events }: { events: Array<{ lat: number; lng: number; tipo
       }, 3000);
       pendingTimersRef.current.add(timer);
     }
-    if (shownRef.current.size > 500) shownRef.current.clear();
+    // (FIFO eviction above — no hard-clear needed)
   }, [events, map]);
 
   // Cleanup on unmount — remove all pending markers and clear timers
