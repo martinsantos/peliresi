@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { apiClient } from '../services/api';
+import api from '../services/api';
 
 const SW_SCOPE_PWA  = '/app/';
 const SW_SCOPE_WEB  = '/';
@@ -13,7 +13,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 
 async function getVapidKey(): Promise<string | null> {
   try {
-    const res = await apiClient.get<{ data: { publicKey: string } }>('/notificaciones/push/vapid-key');
+    const res = await api.get<{ data: { publicKey: string } }>('/push/vapid-key');
     return res.data.data.publicKey;
   } catch {
     return null;
@@ -23,9 +23,9 @@ async function getVapidKey(): Promise<string | null> {
 async function suscribir(registration: ServiceWorkerRegistration, vapidKey: string) {
   const sub = await registration.pushManager.subscribe({
     userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(vapidKey),
+    applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as ArrayBuffer,
   });
-  await apiClient.post('/notificaciones/push/subscribe', sub.toJSON());
+  await api.post('/push/subscribe', sub.toJSON());
 }
 
 export function usePushNotifications() {
@@ -54,7 +54,7 @@ export function usePushNotifications() {
       const existing = await reg.pushManager.getSubscription();
       if (existing) {
         // Renovar en backend por si expiró
-        await apiClient.post('/notificaciones/push/subscribe', existing.toJSON()).catch(() => {});
+        await api.post('/push/subscribe', existing.toJSON()).catch(() => {});
         return;
       }
 
