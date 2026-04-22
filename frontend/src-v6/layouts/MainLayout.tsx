@@ -41,6 +41,8 @@ import { Button } from '../components/ui/ButtonV2';
 import { Badge } from '../components/ui/BadgeV2';
 import { UserSwitcher } from '../components/ui/UserSwitcher';
 import { NotificationBell } from '../components/NotificationBell';
+import { NotificacionesPoller } from '../components/NotificacionesPoller';
+import { ToastContainer } from '../components/ui/Toast';
 import { ConnectivityIndicator } from '../components/ConnectivityIndicator';
 import { OnboardingTour, resetOnboardingTour } from '../components/OnboardingTour';
 import { DemoAppOnboarding } from '../components/DemoAppOnboarding';
@@ -182,6 +184,8 @@ export const MainLayout: React.FC = () => {
 
   return (
     <div className={`h-screen bg-[#F8F8F6] flex flex-col overflow-hidden ${impersonationData ? 'pt-10' : ''}`}>
+      <NotificacionesPoller />
+      <ToastContainer />
       {/* Impersonation banner — amber bar above everything */}
       {impersonationData && (
         <ImpersonationBanner

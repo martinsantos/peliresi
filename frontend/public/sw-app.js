@@ -172,3 +172,22 @@ self.addEventListener('message', (event) => {
 });
 
 console.log(`[SW-App] Service Worker ${SW_VERSION} loaded`);
+
+// ========================================
+// NOTIFICATION CLICK — abrir/enfocar la app
+// ========================================
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || '/app/';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes('/app/') && 'focus' in client) {
+          client.navigate(url);
+          return client.focus();
+        }
+      }
+      return clients.openWindow(url);
+    })
+  );
+});

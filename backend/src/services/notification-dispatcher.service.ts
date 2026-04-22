@@ -2,6 +2,7 @@ import { Rol, TipoNotificacion, PrioridadNotificacion } from '@prisma/client';
 import prisma from '../lib/prisma';
 import logger from '../utils/logger';
 import { emailService } from './email.service';
+import { enviarPushAlUsuario } from './push.service';
 
 class NotificationService {
     // Helper: get all active admin user IDs (reused across multiple event handlers)
@@ -65,9 +66,15 @@ class NotificationService {
                 // Telegram channel (placeholder — requires Telegram Bot API)
                 if (user.notifTelegram && user.telegramChatId) {
                     logger.info({ channel: 'Telegram', chatId: user.telegramChatId }, `${data.titulo}: ${data.mensaje}`);
-                    // TODO: Integrate with Telegram Bot API
-                    // await telegramService.send(user.telegramChatId, `*${data.titulo}*\n${data.mensaje}`);
                 }
+
+                // Push channel — enviar a todos los dispositivos suscritos del usuario
+                await enviarPushAlUsuario(data.usuarioId, {
+                    title: data.titulo,
+                    body:  data.mensaje,
+                    url:   data.manifiestoId ? `/manifiestos/${data.manifiestoId}` : '/',
+                    tag:   data.manifiestoId ?? data.tipo,
+                }).catch(() => {});
             } catch (err) {
                 logger.error({ err }, 'Error sending notification via channels');
             }
