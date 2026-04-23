@@ -49,6 +49,8 @@ import type { UserRole } from '../contexts/AuthContext';
 import { useMobilePrefix } from '../hooks/useMobilePrefix';
 import { useActiveTripRecovery } from '../hooks/useActiveTripRecovery';
 import { useOfflineSync } from '../hooks/useOfflineSync';
+import { NotificacionesPoller } from '../components/NotificacionesPoller';
+import { ToastContainer, toast } from '../components/ui/Toast';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -119,6 +121,21 @@ export const MobileLayout: React.FC = () => {
 
   // Auto-sync data to IndexedDB for offline use
   useOfflineSync();
+
+  // Bienvenida al cambiar de perfil (solo PWA)
+  const prevUserIdRef = React.useRef<string | null>(null);
+  useEffect(() => {
+    if (!currentUser) return;
+    if (prevUserIdRef.current !== null && prevUserIdRef.current !== String(currentUser.id)) {
+      toast.add({
+        type: 'success',
+        title: `Bienvenido, ${currentUser.nombre}`,
+        message: `Sesión iniciada como ${roleConfig[currentUser.rol]?.label ?? currentUser.rol}`,
+        duration: 5000,
+      });
+    }
+    prevUserIdRef.current = String(currentUser.id);
+  }, [currentUser?.id]);
 
   // Track active trip for TRANSPORTISTA — must be before any conditional returns (Rules of Hooks)
   const [activeTripId, setActiveTripId] = useState<string | null>(null);
@@ -266,6 +283,8 @@ export const MobileLayout: React.FC = () => {
 
   return (
     <div className="h-screen overflow-hidden bg-[#F8F8F6] flex flex-col tap-transparent">
+      <NotificacionesPoller />
+      <ToastContainer />
       {/* Demo mode banner */}
       {isDemo && (
         <div className="bg-amber-500 text-white text-center text-xs sm:text-sm py-1 font-medium sticky top-0 z-50">

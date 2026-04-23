@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { isAuthenticated, hasRole } from '../middlewares/auth.middleware';
+import { getVapidPublicKey, subscribe, unsubscribe } from '../controllers/push.controller';
 import {
     getNotificaciones,
     marcarLeida,
@@ -23,6 +24,11 @@ import {
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
+
+// Push — clave pública es pública (sin auth), subscribe/unsubscribe requieren auth
+router.get('/push/vapid-key', getVapidPublicKey);
+router.post('/push/subscribe',   isAuthenticated, subscribe);
+router.post('/push/unsubscribe', isAuthenticated, unsubscribe);
 
 // Todas las rutas requieren autenticacion
 router.use(isAuthenticated);

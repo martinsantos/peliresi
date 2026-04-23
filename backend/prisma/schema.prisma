@@ -46,9 +46,10 @@ model Usuario {
   manifiestosCreados Manifiesto[]    @relation("UsuarioManifiestos")
   eventos         EventoManifiesto[]
   auditorias      Auditoria[]         @relation("UsuarioAuditorias")
-  notificaciones  Notificacion[]
-  reglasCreadas   ReglaAlerta[]       @relation("ReglasCreadas")
-  solicitudes     SolicitudInscripcion[]
+  notificaciones    Notificacion[]
+  reglasCreadas     ReglaAlerta[]       @relation("ReglasCreadas")
+  solicitudes       SolicitudInscripcion[]
+  pushSubscripciones PushSubscripcion[]
 
   @@map("usuarios")
 }
@@ -886,6 +887,20 @@ enum EmailEstado {
   FALLIDO
   DIGEST_PENDIENTE
   SUPRIMIDO
+}
+
+model PushSubscripcion {
+  id        String   @id @default(cuid())
+  usuarioId String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@map("push_subscripciones")
 }
 
 model EmailQueue {

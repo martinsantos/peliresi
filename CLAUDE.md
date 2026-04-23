@@ -102,7 +102,8 @@ ssh root@23.105.176.45 "docker exec -it directus-admin-database-1 psql -U direct
 | `/api/centro-control/*` | Actividad por capas, mapa, estadísticas GPS |
 | `/api/blockchain/*` | Certificación: status, registrar, verificar, integridad |
 | `/api/solicitudes/*` | Inscripcion publica wizard + arbitracion admin |
-| `/api/notificaciones/*` | Push + alertas |
+| `/api/notificaciones/*` | Alertas in-app, reglas, anomalías |
+| `/api/push/*` | Push nativo: `vapid-key` (pública), `subscribe`, `unsubscribe` |
 | `/api/search/*` | Búsqueda global Cmd+K |
 
 ### Roles y Permisos
@@ -138,7 +139,8 @@ BORRADOR → APROBADO → RECIBIDO → EN_TRATAMIENTO → TRATADO
 - **porTipoResiduo** en `/api/reportes/manifiestos` retorna `{ cantidad, unidad }` (objetos), NO números planos.
 - **GPS rate limit**: 600 req/min/IP para soportar 50+ transportistas en NAT compartido.
 - **Prisma RHEL**: `npx prisma generate` en servidor requerido tras cada deploy (binarios Ubuntu ≠ RHEL).
-- **Service Worker**: versión actual `trazabilidad-rrpp-v24` en `frontend/public/sw.js`. Incrementar con cada deploy frontend.
+- **Service Worker**: versión actual `trazabilidad-rrpp-v26` en `frontend/public/sw.js` y `sw-app.js`. Incrementar con cada deploy frontend.
+- **Push Notifications**: VAPID keys en `.env` (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_EMAIL`). Tabla `push_subscripciones`. Rutas: `GET /api/push/vapid-key` (pública), `POST /api/push/subscribe` (auth). `enviarPushAlUsuario()` en `push.service.ts`. Prioridades: CRITICA/ALTA → urgency `high` + vibración diferenciada; CRITICA además `requireInteraction:true`. `notificarPorRol()` también despacha push.
 - **`registrarIncidente`**: acepta `tipo` o `tipoIncidente` del frontend.
 - **Blockchain**: 2 sellos (GENESIS en APROBADO, CIERRE en TRATADO) + rolling hash en cada estado. Tabla `blockchain_sellos`.
 - **Email**: cola en DB `email_queue`, flush cada 5min. Kill switch: `DISABLE_EMAILS=true`.

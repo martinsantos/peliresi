@@ -152,14 +152,24 @@ self.addEventListener('sync', (event) => {
 // ========================================
 self.addEventListener('push', (event) => {
   const data = event.data ? event.data.json() : {};
-  event.waitUntil(
-    self.registration.showNotification(data.title || 'SITREP', {
-      body: data.body || 'Nueva notificacion',
-      icon: '/app/icon-192.png',
-      badge: '/app/icon-192.png',
-      data
-    })
-  );
+  const prioridad = data.prioridad || 'NORMAL';
+  const esCritica = prioridad === 'CRITICA';
+  const esAlta    = prioridad === 'ALTA' || esCritica;
+
+  const options = {
+    body:               data.body  || 'Nueva notificacion',
+    icon:               data.icon  || '/app/icon-192.png',
+    badge:              data.badge || '/app/icon-192.png',
+    tag:                data.tag   || 'sitrep-default',
+    renotify:           !!data.tag,
+    requireInteraction: esCritica,
+    vibrate:            esCritica ? [300, 100, 300, 100, 300]
+                      : esAlta    ? [200, 100, 200]
+                      :             [100],
+    data,
+  };
+
+  event.waitUntil(self.registration.showNotification(data.title || 'SITREP', options));
 });
 
 // ========================================
@@ -172,3 +182,22 @@ self.addEventListener('message', (event) => {
 });
 
 console.log(`[SW-App] Service Worker ${SW_VERSION} loaded`);
+
+// ========================================
+// NOTIFICATION CLICK — abrir/enfocar la app
+// ========================================
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || '/app/';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes('/app/') && 'focus' in client) {
+          client.navigate(url);
+          return client.focus();
+        }
+      }
+      return clients.openWindow(url);
+    })
+  );
+});
