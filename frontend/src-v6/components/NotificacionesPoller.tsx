@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { apiClient } from '../services/api';
+import api from '../services/api';
 import { toast } from './ui/Toast';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 
@@ -14,7 +14,7 @@ interface Notificacion {
 }
 
 async function fetchNoLeidas(): Promise<Notificacion[]> {
-  const res = await apiClient.get<{ data: { notificaciones: Notificacion[] } }>(
+  const res = await api.get<{ data: { notificaciones: Notificacion[] } }>(
     '/notificaciones?limit=10&soloNoLeidas=true'
   );
   return res.data.data?.notificaciones ?? [];
