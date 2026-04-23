@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
+import { enviarPushAlUsuario } from '../services/push.service';
 
 export async function getVapidPublicKey(_req: Request, res: Response) {
   const key = process.env.VAPID_PUBLIC_KEY;
@@ -16,11 +17,22 @@ export async function subscribe(req: Request, res: Response) {
 
   const usuarioId = (req as any).user.id;
 
+  const esNuevo = !(await prisma.pushSubscripcion.findUnique({ where: { endpoint }, select: { id: true } }));
+
   await prisma.pushSubscripcion.upsert({
     where:  { endpoint },
     update: { p256dh: keys.p256dh, auth: keys.auth, userAgent: req.headers['user-agent'] ?? null },
     create: { usuarioId, endpoint, p256dh: keys.p256dh, auth: keys.auth, userAgent: req.headers['user-agent'] ?? null },
   });
+
+  if (esNuevo) {
+    enviarPushAlUsuario(usuarioId, {
+      title: '¡Bienvenido a SITREP!',
+      body: 'Las notificaciones push están activas. Te avisaremos cuando haya novedades en tus manifiestos.',
+      url: '/dashboard',
+      tag: 'bienvenida',
+    }).catch(() => {});
+  }
 
   res.json({ success: true });
 }
