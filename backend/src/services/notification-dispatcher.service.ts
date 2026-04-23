@@ -70,10 +70,11 @@ class NotificationService {
 
                 // Push channel — enviar a todos los dispositivos suscritos del usuario
                 await enviarPushAlUsuario(data.usuarioId, {
-                    title: data.titulo,
-                    body:  data.mensaje,
-                    url:   data.manifiestoId ? `/manifiestos/${data.manifiestoId}` : '/',
-                    tag:   data.manifiestoId ?? data.tipo,
+                    title:     data.titulo,
+                    body:      data.mensaje,
+                    url:       data.manifiestoId ? `/manifiestos/${data.manifiestoId}` : '/',
+                    tag:       data.manifiestoId ?? data.tipo,
+                    prioridad: (data.prioridad ?? 'NORMAL') as any,
                 }).catch(() => {});
             } catch (err) {
                 logger.error({ err }, 'Error sending notification via channels');
@@ -83,7 +84,7 @@ class NotificationService {
         return notif;
     }
 
-    // Notificar a usuarios por rol
+    // Notificar a usuarios por rol (DB + push a cada uno)
     async notificarPorRol(rol: string, data: {
         tipo: TipoNotificacion;
         titulo: string;
@@ -97,17 +98,32 @@ class NotificationService {
             select: { id: true }
         });
 
-        const notificaciones = usuarios.map(u => ({
-            usuarioId: u.id,
-            tipo: data.tipo,
-            titulo: data.titulo,
-            mensaje: data.mensaje,
-            datos: data.datos ? JSON.stringify(data.datos) : null,
-            manifiestoId: data.manifiestoId,
-            prioridad: data.prioridad || 'NORMAL'
-        }));
+        const prioridad = data.prioridad || 'NORMAL';
 
-        return prisma.notificacion.createMany({ data: notificaciones });
+        await prisma.notificacion.createMany({
+            data: usuarios.map(u => ({
+                usuarioId:    u.id,
+                tipo:         data.tipo,
+                titulo:       data.titulo,
+                mensaje:      data.mensaje,
+                datos:        data.datos ? JSON.stringify(data.datos) : null,
+                manifiestoId: data.manifiestoId,
+                prioridad,
+            })),
+        });
+
+        // Push a cada usuario del rol (fire-and-forget)
+        setImmediate(() => {
+            Promise.all(usuarios.map(u =>
+                enviarPushAlUsuario(u.id, {
+                    title:     data.titulo,
+                    body:      data.mensaje,
+                    url:       data.manifiestoId ? `/manifiestos/${data.manifiestoId}` : '/',
+                    tag:       data.manifiestoId ?? data.tipo,
+                    prioridad: prioridad as any,
+                }).catch(() => {})
+            ));
+        });
     }
 
     // Notificar cambio de estado de manifiesto

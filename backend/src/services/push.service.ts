@@ -10,6 +10,8 @@ if (VAPID_PUBLIC && VAPID_PRIVATE) {
   webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC, VAPID_PRIVATE);
 }
 
+export type PushPrioridad = 'BAJA' | 'NORMAL' | 'ALTA' | 'CRITICA';
+
 export interface PushPayload {
   title: string;
   body: string;
@@ -17,7 +19,15 @@ export interface PushPayload {
   badge?: string;
   url?: string;
   tag?: string;
+  prioridad?: PushPrioridad;
 }
+
+const urgencyMap: Record<PushPrioridad, webpush.Urgency> = {
+  BAJA:    'low',
+  NORMAL:  'normal',
+  ALTA:    'high',
+  CRITICA: 'high',
+};
 
 export async function enviarPushAlUsuario(usuarioId: string, payload: PushPayload): Promise<void> {
   if (!VAPID_PUBLIC || !VAPID_PRIVATE) return;
@@ -25,13 +35,15 @@ export async function enviarPushAlUsuario(usuarioId: string, payload: PushPayloa
   const subs = await prisma.pushSubscripcion.findMany({ where: { usuarioId } });
   if (subs.length === 0) return;
 
+  const prioridad: PushPrioridad = payload.prioridad ?? 'NORMAL';
   const data = JSON.stringify({
-    title: payload.title,
-    body:  payload.body,
-    icon:  payload.icon  ?? '/app/icon-192.png',
-    badge: payload.badge ?? '/app/icon-192.png',
-    url:   payload.url   ?? '/',
-    tag:   payload.tag,
+    title:    payload.title,
+    body:     payload.body,
+    icon:     payload.icon  ?? '/app/icon-192.png',
+    badge:    payload.badge ?? '/app/icon-192.png',
+    url:      payload.url   ?? '/',
+    tag:      payload.tag,
+    prioridad,
   });
 
   const stale: string[] = [];
@@ -41,7 +53,7 @@ export async function enviarPushAlUsuario(usuarioId: string, payload: PushPayloa
       await webpush.sendNotification(
         { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } } as webpush.PushSubscription,
         data,
-        { TTL: 86400 }
+        { TTL: 86400, urgency: urgencyMap[prioridad] }
       );
     } catch (err: any) {
       if (err.statusCode === 410 || err.statusCode === 404) {

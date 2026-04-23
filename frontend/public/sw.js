@@ -1,7 +1,7 @@
 // Service Worker para modo Offline-First (CU-T09)
 // Scope: / (main site)
-const CACHE_NAME = 'trazabilidad-rrpp-v24';
-const RUNTIME_CACHE = 'runtime-cache-v24';
+const CACHE_NAME = 'trazabilidad-rrpp-v26';
+const RUNTIME_CACHE = 'runtime-cache-v26';
 
 // Recursos críticos para cachear en instalación
 const PRECACHE_URLS = [
@@ -11,7 +11,7 @@ const PRECACHE_URLS = [
 
 // Instalación del Service Worker
 self.addEventListener('install', (event) => {
-    console.log('[SW] Installing Service Worker v24...');
+    console.log('[SW] Installing Service Worker v26...');
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then((cache) => {
@@ -30,7 +30,7 @@ self.addEventListener('install', (event) => {
 
 // Activación del Service Worker
 self.addEventListener('activate', (event) => {
-    console.log('[SW] Activando Service Worker v24...');
+    console.log('[SW] Activando Service Worker v26...');
     event.waitUntil(
         caches.keys().then((cacheNames) => {
             const currentCaches = [CACHE_NAME, RUNTIME_CACHE];
@@ -121,23 +121,29 @@ async function syncManifiestos() {
     });
 }
 
-// Notificaciones Push (para futuro)
 self.addEventListener('push', (event) => {
     const data = event.data ? event.data.json() : {};
-    const title = data.title || 'Trazabilidad RRPP';
+    const prioridad = data.prioridad || 'NORMAL';
+    const esCritica = prioridad === 'CRITICA';
+    const esAlta    = prioridad === 'ALTA' || esCritica;
+
     const options = {
-        body: data.body || 'Nueva notificación',
-        icon: '/icon-192.png',
-        badge: '/icon-192.png',
-        data: data
+        body:              data.body  || 'Nueva notificación',
+        icon:              data.icon  || '/app/icon-192.png',
+        badge:             data.badge || '/app/icon-192.png',
+        tag:               data.tag   || 'sitrep-default',
+        renotify:          !!data.tag,
+        requireInteraction: esCritica,
+        vibrate:           esCritica ? [300, 100, 300, 100, 300]
+                         : esAlta    ? [200, 100, 200]
+                         :             [100],
+        data,
     };
 
-    event.waitUntil(
-        self.registration.showNotification(title, options)
-    );
+    event.waitUntil(self.registration.showNotification(data.title || 'SITREP', options));
 });
 
-console.log('[SW] Service Worker v24 cargado');
+console.log('[SW] Service Worker v26 cargado');
 
 // ========================================
 // NOTIFICATION CLICK — abrir/enfocar la web
