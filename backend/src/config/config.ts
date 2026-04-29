@@ -27,6 +27,9 @@ export const config = {
   // CORS
   CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:5173',
 
+  // Turnstile Captcha
+  TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY || '',
+
   // Blockchain
   BLOCKCHAIN_ENABLED: process.env.BLOCKCHAIN_ENABLED === 'true',
   BLOCKCHAIN_RPC_URL: process.env.BLOCKCHAIN_RPC_URL || '',
