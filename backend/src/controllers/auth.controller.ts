@@ -8,6 +8,7 @@ import { config } from '../config/config';
 import { AppError } from '../middlewares/errorHandler';
 import prisma from '../lib/prisma';
 import { emailService } from '../services/email.service';
+import { validatePasswordStrength } from '../utils/passwordStrength';
 
 // CUIT normalization: accepts "30711235961" or "30-71123596-1" → "30-71123596-1"
 function normalizeCuit(raw: string): string | null {
@@ -34,14 +35,6 @@ const registerSchema = z.object({
   telefono: z.string().optional(),
   cuit: z.string().optional(),
 });
-
-// Password strength validation
-function validatePasswordStrength(password: string): string | null {
-  if (password.length < 8) return 'La contraseña debe tener al menos 8 caracteres';
-  if (!/[A-Z]/.test(password)) return 'La contraseña debe contener al menos una mayúscula';
-  if (!/[0-9]/.test(password)) return 'La contraseña debe contener al menos un número';
-  return null;
-}
 
 // Generar tokens JWT
 export const generateTokens = (userId: string, restricted = false) => {

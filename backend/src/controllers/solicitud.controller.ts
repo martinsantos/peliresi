@@ -10,6 +10,7 @@ import logger from '../utils/logger';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { emailService } from '../services/email.service';
+import { validatePasswordStrength } from '../utils/passwordStrength';
 
 // ── CUIT normalization (same pattern as auth.controller) ────────────
 function normalizeCuit(raw: string): string | null {
@@ -18,13 +19,7 @@ function normalizeCuit(raw: string): string | null {
   return `${digits.slice(0, 2)}-${digits.slice(2, 10)}-${digits.slice(10)}`;
 }
 
-// ── Password strength validation (same pattern as auth.controller) ──
-function validatePasswordStrength(password: string): string | null {
-  if (password.length < 8) return 'La contrasena debe tener al menos 8 caracteres';
-  if (!/[A-Z]/.test(password)) return 'La contrasena debe contener al menos una mayuscula';
-  if (!/[0-9]/.test(password)) return 'La contrasena debe contener al menos un numero';
-  return null;
-}
+// ── Password strength: imported from shared utility ──
 
 // ── Multer setup for document uploads ───────────────────────────────
 const uploadDir = path.join(process.cwd(), 'uploads', 'solicitudes');
