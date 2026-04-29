@@ -45,6 +45,15 @@ SECURITY_SCRIPTS=(
   "auth-endpoint-security-test.sh"
   "brute-force-test.sh"
   "captcha-test.sh"
+  # ── FASE 3: Advanced Security Tests ──
+  "idor-permission-matrix-test.sh"
+  "npm-audit-gate.sh"
+  "file-upload-abuse-test.sh"
+  "mass-assignment-test.sh"
+  "workflow-abuse-test.sh"
+  "zod-schema-fuzzing-test.sh"
+  "redos-deep-nesting-test.sh"
+  "host-header-injection-test.sh"
 )
 
 echo -e "${BOLD}${CYAN}╔══════════════════════════════════════════════════════╗${NC}"

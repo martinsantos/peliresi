@@ -108,7 +108,8 @@ test_public "POST" "/auth/login" "200" '{"email":"admin@dgfa.mendoza.gov.ar","pa
 test_public "POST" "/auth/login" "401" '{"email":"fake@test.com","password":"wrong"}'
 test_endpoint "GET" "/auth/profile" "200"
 test_endpoint "POST" "/auth/change-password" "400" '{"currentPassword":"wrong","newPassword":"NewPass123"}'
-test_endpoint "POST" "/auth/logout" "200"
+# logout movido al final de los tests autenticados para no revocar el token antes
+# test_endpoint "POST" "/auth/logout" "200"
 
 echo ""
 echo "--- Manifiestos ---"
@@ -233,6 +234,9 @@ echo "--- Blockchain ---"
 if [ -n "$MANIFIESTO_ID" ]; then
   test_endpoint "GET" "/blockchain/manifiesto/$MANIFIESTO_ID" "200"
 fi
+# Logout: revoca el token, último test autenticado
+test_endpoint "POST" "/auth/logout" "200"
+
 test_public "GET" "/blockchain/verificar/0000000000000000000000000000000000000000000000000000000000000000" "200"
 
 echo ""
