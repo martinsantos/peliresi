@@ -19,6 +19,7 @@ import trackingRoutes from './routes/tracking.routes';
 import adminRoutes from './routes/admin.routes';
 import searchRoutes from './routes/search.routes';
 import { analyticsMiddleware, flushAnalytics } from './middlewares/analytics.middleware';
+import { sanitizeBody } from './middlewares/sanitize.middleware';
 import prisma from './lib/prisma';
 import { domainEvents } from './services/domainEvent.service';
 import logger from './utils/logger';
@@ -55,6 +56,7 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
+app.use(sanitizeBody);
 
 // Rate limiting - General API (600 req/min to support 50+ phones behind shared NAT/CGNAT)
 const generalLimiter = rateLimit({

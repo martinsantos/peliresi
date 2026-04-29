@@ -35,6 +35,8 @@ model Usuario {
   emailVerificationToken  String?
   passwordResetToken      String?
   passwordResetExpires    DateTime?
+  intentosFallidos        Int       @default(0)
+  bloqueadoHasta          DateTime?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 

@@ -212,6 +212,9 @@ export const verifyEmail = async (req: Request, res: Response, next: NextFunctio
 };
 
 // ── LOGIN ──────────────────────────────────────────────────────────
+const MAX_INTENTOS = 5;
+const BLOQUEO_MINUTOS = 15;
+
 export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = loginSchema.safeParse(req.body);
@@ -227,8 +230,33 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
 
     if (!user) throw new AppError('Credenciales inválidas', 401);
 
+    // Check account lockout
+    if (user.bloqueadoHasta && user.bloqueadoHasta > new Date()) {
+      const restanteMin = Math.ceil((user.bloqueadoHasta.getTime() - Date.now()) / 60000);
+      throw new AppError(`Cuenta bloqueada por ${restanteMin} minuto(s) por muchos intentos fallidos`, 429);
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) throw new AppError('Credenciales inválidas', 401);
+    if (!isMatch) {
+      // Increment failed attempts
+      const nuevosIntentos = (user.intentosFallidos || 0) + 1;
+      const updateData: { intentosFallidos: number; bloqueadoHasta?: Date } = {
+        intentosFallidos: nuevosIntentos,
+      };
+      if (nuevosIntentos >= MAX_INTENTOS) {
+        updateData.bloqueadoHasta = new Date(Date.now() + BLOQUEO_MINUTOS * 60 * 1000);
+      }
+      await prisma.usuario.update({ where: { id: user.id }, data: updateData });
+      throw new AppError('Credenciales inválidas', 401);
+    }
+
+    // Reset lockout on successful login
+    if (user.intentosFallidos > 0 || user.bloqueadoHasta) {
+      await prisma.usuario.update({
+        where: { id: user.id },
+        data: { intentosFallidos: 0, bloqueadoHasta: null },
+      });
+    }
 
     if (!user.emailVerified) {
       throw new AppError('Verificá tu email antes de iniciar sesión', 403);
