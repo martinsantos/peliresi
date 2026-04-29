@@ -7,7 +7,7 @@ API="$BASE_URL/api"
 PASS=0; FAIL=0; ERRORS=""
 GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[1;33m'; NC='\033[0m'; BOLD='\033[1m'
 CURL=$(which curl)
-json_extract() { python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('$1', d.get('data', {}).get('$1', '')))" 2>/dev/null; }
+json_extract() { python3 -c "import sys,json; d=json.load(sys.stdin); v=d.get('$1','') if isinstance(d,dict) else ''; print(v if v else (d.get('data',{}).get('$1','') if isinstance(d.get('data'),dict) else ''))" 2>/dev/null; }
 section() { echo ""; echo -e "${BOLD}--- $1 ---${NC}"; }
 
 # Auth with retry (avoid rate limiting)
