@@ -182,7 +182,12 @@ if [ -n "$TRATADO_ID" ]; then
     -H "Authorization: Bearer $TOKEN" | \
     python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data']['blockchain'].get('blockchainStatus',''))" 2>/dev/null)
 
+  SHOULD_REGISTER=false
   if [ "$TRATADO_BC_STATUS" != "CONFIRMADO" ]; then
+    SHOULD_REGISTER=true
+  fi
+
+  if [ "$SHOULD_REGISTER" = "true" ]; then
     # Register on blockchain
     REG_RESP=$($CURL -s -X POST "${API}/blockchain/registrar/$TRATADO_ID" \
       -H "Content-Type: application/json" \
@@ -194,19 +199,21 @@ if [ -n "$TRATADO_ID" ]; then
       echo -e "  ${GREEN}PASS${NC} Blockchain registration: txHash=${REG_HASH:0:20}..."
       PASS=$((PASS + 1))
     else
-      echo -e "  ${RED}FAIL${NC} Blockchain registration failed"
+      REG_ERR=$(echo "$REG_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('error', d.get('message','unknown')))" 2>/dev/null)
+      echo -e "  ${RED}FAIL${NC} Blockchain registration failed: $REG_ERR"
       FAIL=$((FAIL + 1))
-      ERRORS="$ERRORS\n  FAIL blockchain registration"
+      ERRORS="$ERRORS\n  FAIL blockchain registration: $REG_ERR"
     fi
   else
     echo -e "  ${YELLOW}SKIP${NC} TRATADO manifest already CONFIRMADO on blockchain"
     SKIP=$((SKIP + 1))
   fi
 
-  # Verify the manifest has sellos (uses new blockchain data if just registered)
-  VERIFY_RESP=$($CURL -s "${API}/blockchain/manifiesto/$TRATADO_ID" \
-    -H "Authorization: Bearer $TOKEN")
-  VERIFY_SELLOS=$(echo "$VERIFY_RESP" | python3 -c "
+  # Verify sellos — only when registration succeeded or already confirmed
+  if [ "$SHOULD_REGISTER" = "false" ] || [ "$REG_SUCCESS" = "True" ] || [ "$REG_SUCCESS" = "true" ]; then
+    VERIFY_RESP=$($CURL -s "${API}/blockchain/manifiesto/$TRATADO_ID" \
+      -H "Authorization: Bearer $TOKEN")
+    VERIFY_SELLOS=$(echo "$VERIFY_RESP" | python3 -c "
 import sys, json
 try:
     d = json.load(sys.stdin)
@@ -215,13 +222,14 @@ try:
     print(len(sellos))
 except: print('0')
 " 2>/dev/null)
-  if [ "$VERIFY_SELLOS" -ge 2 ] 2>/dev/null; then
-    echo -e "  ${GREEN}PASS${NC} Blockchain sellos count: $VERIFY_SELLOS (GENESIS + CIERRE)"
-    PASS=$((PASS + 1))
-  else
-    echo -e "  ${RED}FAIL${NC} Expected >=2 sellos, got $VERIFY_SELLOS"
-    FAIL=$((FAIL + 1))
-    ERRORS="$ERRORS\n  FAIL Expected >=2 sellos, got $VERIFY_SELLOS"
+    if [ "$VERIFY_SELLOS" -ge 2 ] 2>/dev/null; then
+      echo -e "  ${GREEN}PASS${NC} Blockchain sellos count: $VERIFY_SELLOS (GENESIS + CIERRE)"
+      PASS=$((PASS + 1))
+    else
+      echo -e "  ${RED}FAIL${NC} Expected >=2 sellos, got $VERIFY_SELLOS"
+      FAIL=$((FAIL + 1))
+      ERRORS="$ERRORS\n  FAIL Expected >=2 sellos, got $VERIFY_SELLOS"
+    fi
   fi
 else
   echo -e "  ${YELLOW}SKIP${NC} No TRATADO manifests for blockchain test"
