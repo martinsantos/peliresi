@@ -15,27 +15,23 @@ export const options = {
   },
 };
 
-export default function () {
+export function setup() {
   const loginRes = http.post(`${BASE_URL}/auth/login`, JSON.stringify({
     email: 'admin@dgfa.mendoza.gov.ar',
     password: 'admin123',
   }), { headers: { 'Content-Type': 'application/json' } });
+  const token = JSON.parse(loginRes.body).data.tokens.accessToken;
+  return { token, headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } };
+}
 
-  check(loginRes, { 'login status 200': (r) => r.status === 200 });
+export default function (data) {
+  const { headers } = data;
 
-  if (loginRes.status === 200) {
-    const token = JSON.parse(loginRes.body).data.tokens.accessToken;
-    const headers = {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    };
+  const manifiestosRes = http.get(`${BASE_URL}/manifiestos?limit=10`, { headers });
+  check(manifiestosRes, { 'manifiestos status 200': (r) => r.status === 200 });
 
-    const manifiestosRes = http.get(`${BASE_URL}/manifiestos?limit=10`, { headers });
-    check(manifiestosRes, { 'manifiestos status 200': (r) => r.status === 200 });
-
-    const dashRes = http.get(`${BASE_URL}/manifiestos/dashboard`, { headers });
-    check(dashRes, { 'dashboard status 200': (r) => r.status === 200 });
-  }
+  const dashRes = http.get(`${BASE_URL}/manifiestos/dashboard`, { headers });
+  check(dashRes, { 'dashboard status 200': (r) => r.status === 200 });
 
   sleep(1);
 }

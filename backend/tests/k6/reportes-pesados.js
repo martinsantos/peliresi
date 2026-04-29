@@ -18,33 +18,25 @@ export const options = {
 const DATE_FROM = '2024-01-01';
 const DATE_TO = '2026-12-31';
 
-export default function () {
+export function setup() {
   const loginRes = http.post(`${BASE_URL}/auth/login`, JSON.stringify({
     email: 'admin@dgfa.mendoza.gov.ar',
     password: 'admin123',
   }), { headers: { 'Content-Type': 'application/json' } });
-
-  check(loginRes, { 'login status 200': (r) => r.status === 200 });
-
-  if (loginRes.status !== 200) {
-    sleep(1);
-    return;
-  }
-
   const token = JSON.parse(loginRes.body).data.tokens.accessToken;
-  const headers = {
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json',
-  };
+  return { token, headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } };
+}
 
-  // Reportes con rangos de fecha amplios
+export default function (data) {
+  const { headers } = data;
+
   const reportEndpoints = [
     `${BASE_URL}/reportes/manifiestos?fechaDesde=${DATE_FROM}&fechaHasta=${DATE_TO}`,
     `${BASE_URL}/reportes/manifiestos?fechaDesde=${DATE_FROM}&fechaHasta=${DATE_TO}&agruparPor=estado`,
     `${BASE_URL}/reportes/manifiestos?fechaDesde=${DATE_FROM}&fechaHasta=${DATE_TO}&agruparPor=tipoResiduo`,
     `${BASE_URL}/analytics/manifiestos-por-mes?fechaDesde=${DATE_FROM}&fechaHasta=${DATE_TO}`,
     `${BASE_URL}/analytics/residuos-por-tipo?fechaDesde=${DATE_FROM}&fechaHasta=${DATE_TO}`,
-    `${BASE_URL}/analytics/por-estado?fechaDesde=${DATE_FROM}&fechaHasta=${DATE_TO}`,
+    `${BASE_URL}/analytics/manifiestos-por-estado?fechaDesde=${DATE_FROM}&fechaHasta=${DATE_TO}`,
     `${BASE_URL}/analytics/tiempo-promedio?fechaDesde=${DATE_FROM}&fechaHasta=${DATE_TO}`,
   ];
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-BASE_URL="${1:-https://sitrep.ultimamilla.com.ar/api}"
+export BASE_URL="${1:-https://sitrep.ultimamilla.com.ar/api}"
 SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)/k6"
 
 echo "=== SITREP STRESS TESTS ==="
@@ -9,7 +9,7 @@ echo ""
 for SCRIPT in "$SCRIPTS_DIR"/*.js; do
   NAME=$(basename "$SCRIPT")
   echo "--- Running $NAME ---"
-  BASE_URL="$BASE_URL" k6 run "$SCRIPT"
+  k6 run "$SCRIPT"
   echo ""
 done
 

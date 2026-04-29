@@ -15,24 +15,17 @@ export const options = {
   },
 };
 
-export default function () {
+export function setup() {
   const loginRes = http.post(`${BASE_URL}/auth/login`, JSON.stringify({
     email: 'admin@dgfa.mendoza.gov.ar',
     password: 'admin123',
   }), { headers: { 'Content-Type': 'application/json' } });
-
-  check(loginRes, { 'login status 200': (r) => r.status === 200 });
-
-  if (loginRes.status !== 200) {
-    sleep(1);
-    return;
-  }
-
   const token = JSON.parse(loginRes.body).data.tokens.accessToken;
-  const headers = {
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json',
-  };
+  return { token, headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } };
+}
+
+export default function (data) {
+  const { headers } = data;
 
   // Consultar páginas 1, 2, 3 con distintos límites
   const pages = [
