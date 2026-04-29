@@ -76,12 +76,18 @@ if [ "$UNSUB_SUCCESS" = "True" ] || [ "$UNSUB_SUCCESS" = "true" ]; then
   echo -e "  ${GREEN}PASS${NC} Unsubscribe successful"
   PASS=$((PASS + 1))
 else
-  echo -e "  ${YELLOW}WARN${NC} Unsubscribe may not be implemented"
-  WARN=$((WARN + 1))
+  echo -e "  ${RED}FAIL${NC} Unsubscribe failed"
+  FAIL=$((FAIL + 1))
+  ERRORS="$ERRORS\n  FAIL Unsubscribe"
 fi
 
 # Summary
 echo ""; echo -e "${BOLD}RESULTS:${NC}"
 echo -e "  ${GREEN}PASS: $PASS${NC}"
 echo -e "  ${RED}FAIL: $FAIL${NC}"
+if [ $FAIL -gt 0 ]; then
+  echo -e "${RED}FAILURES:${NC}"
+  echo -e "$ERRORS"
+  echo ""
+fi
 [ $FAIL -gt 0 ] && exit 1 || exit 0
