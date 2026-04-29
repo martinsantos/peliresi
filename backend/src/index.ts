@@ -77,6 +77,21 @@ const authLimiter = rateLimit({
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 
+// Rate limiting - Sensitive auth endpoints (forgot-password, verify-email, reset-password, claim-account, refresh-token)
+// These are vulnerable to enumeration and abuse — stricter limit than login
+const sensitiveAuthLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 3, // 3 attempts per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Demasiados intentos, intente de nuevo en un minuto' },
+});
+app.use('/api/auth/forgot-password', sensitiveAuthLimiter);
+app.use('/api/auth/verify-email', sensitiveAuthLimiter);
+app.use('/api/auth/reset-password', sensitiveAuthLimiter);
+app.use('/api/auth/claim-account', sensitiveAuthLimiter);
+app.use('/api/auth/refresh-token', sensitiveAuthLimiter);
+
 // Analytics middleware (tracks all API requests)
 if (process.env.ENABLE_ANALYTICS === 'true') {
   app.use(analyticsMiddleware);
@@ -238,6 +253,17 @@ domainEvents.subscribe(alertaSubscriber);
 iniciarVencimientoJob();
 iniciarBlockchainJob();
 iniciarRecordatorioJob();
+
+// Token blacklist cleanup — purge expired entries every hour
+setInterval(async () => {
+  try {
+    await prisma.refreshToken.deleteMany({
+      where: { expiresAt: { lt: new Date() } },
+    });
+  } catch {
+    // Log but don't crash on cleanup errors
+  }
+}, 60 * 60 * 1000);
 
 // Iniciar el servidor
 const PORT = config.PORT;

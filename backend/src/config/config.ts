@@ -20,7 +20,9 @@ export const config = {
 
   // JWT
   JWT_SECRET: process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production',
-  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '24h',
+  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '15m',
+  JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key-change-in-production',
+  JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
 
   // CORS
   CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:5173',
@@ -38,9 +40,19 @@ if (!config.DATABASE_URL) {
 }
 
 // En producción: fallar rápido si JWT_SECRET es el valor inseguro por defecto
-if (config.NODE_ENV === 'production' && config.JWT_SECRET === 'your-super-secret-jwt-key-change-in-production') {
-  logger.error('FATAL: JWT_SECRET is using the insecure default value in production. Set a strong secret in .env');
-  process.exit(1);
+if (config.NODE_ENV === 'production') {
+  if (config.JWT_SECRET === 'your-super-secret-jwt-key-change-in-production') {
+    logger.error('FATAL: JWT_SECRET is using the insecure default value in production. Set a strong secret in .env');
+    process.exit(1);
+  }
+  if (config.JWT_REFRESH_SECRET === 'your-refresh-secret-key-change-in-production') {
+    logger.error('FATAL: JWT_REFRESH_SECRET is using the insecure default value in production. Set a strong secret in .env');
+    process.exit(1);
+  }
+  if (config.JWT_SECRET === config.JWT_REFRESH_SECRET) {
+    logger.error('FATAL: JWT_SECRET and JWT_REFRESH_SECRET must be different in production.');
+    process.exit(1);
+  }
 }
 
 export default config;
