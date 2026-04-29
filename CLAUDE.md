@@ -34,9 +34,21 @@ Sistema de gestión y trazabilidad de residuos peligrosos — Provincia de Mendo
 ## Deployment
 
 ### Frontend
+
+> **⚠️ `VITE_API_URL` es obligatorio al buildear para un dominio distinto al default.**
+> Sin él, los bundles quedan con `sitrep.ultimamilla.com.ar/api` hardcodeado y el login falla.
+
 ```bash
+# Deploy a sitrep.ultimamilla.com.ar (default — sin prefijo necesario)
 cd frontend && npm run build
 npx vite build --config vite.config.app.ts
+
+# Deploy a sitrepprd1.mendoza.gov.ar (u otro dominio)
+cd frontend && VITE_API_URL=https://sitrepprd1.mendoza.gov.ar/api npm run build
+VITE_API_URL=https://sitrepprd1.mendoza.gov.ar/api npx vite build --config vite.config.app.ts
+```
+
+```bash
 cd dist && tar czf /tmp/sitrep-frontend.tar.gz . && cd ..
 cd dist-app && tar czf /tmp/sitrep-app.tar.gz . && cd ..
 scp /tmp/sitrep-frontend.tar.gz /tmp/sitrep-app.tar.gz root@23.105.176.45:/tmp/
