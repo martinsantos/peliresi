@@ -20,11 +20,15 @@ vi.mock('../../config/config', () => ({
 
 // Mock prisma
 const mockFindUnique = vi.fn();
+const mockRefreshFindFirst = vi.fn();
 vi.mock('../../lib/prisma', () => ({
   __esModule: true,
   default: {
     usuario: {
       findUnique: (...args: unknown[]) => mockFindUnique(...args),
+    },
+    refreshToken: {
+      findFirst: (...args: unknown[]) => mockRefreshFindFirst(...args),
     },
   },
 }));
@@ -52,6 +56,8 @@ function createToken(payload: object): string {
 describe('isAuthenticated middleware', () => {
   beforeEach(() => {
     mockFindUnique.mockReset();
+    mockRefreshFindFirst.mockReset();
+    mockRefreshFindFirst.mockResolvedValue(null);
   });
 
   it('calls next with 401 error when no authorization header', async () => {

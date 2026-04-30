@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { register, login, getProfile, logout, refreshToken, changePassword, verifyEmail, forgotPassword, resetPassword, claimAccount } from '../controllers/auth.controller';
 import { isAuthenticated } from '../middlewares/auth.middleware';
+import { verifyCaptcha } from '../middlewares/captcha.middleware';
 
 const router = Router();
 
@@ -54,7 +55,7 @@ router.get('/test', (req: Request, res: Response) => {
  *         description: Datos invalidos o email duplicado
  */
 // Publicas
-router.post('/register', register);
+router.post('/register', verifyCaptcha, register);
 
 /**
  * @openapi
@@ -169,7 +170,7 @@ router.get('/verify-email', verifyEmail);
  *       200:
  *         description: Email de recuperacion enviado (siempre retorna 200 por seguridad)
  */
-router.post('/forgot-password', forgotPassword);
+router.post('/forgot-password', verifyCaptcha, forgotPassword);
 
 /**
  * @openapi
@@ -223,7 +224,7 @@ router.post('/reset-password', resetPassword);
  *       400:
  *         description: Datos invalidos
  */
-router.post('/claim-account', claimAccount);
+router.post('/claim-account', verifyCaptcha, claimAccount);
 
 /**
  * @openapi

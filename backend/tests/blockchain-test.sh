@@ -10,6 +10,7 @@ BASE_URL="${1:-http://localhost:3002}"
 API="$BASE_URL/api"
 PASS=0
 FAIL=0
+SKIP=0
 ERRORS=""
 
 # Colors
@@ -166,6 +167,75 @@ else
   FAIL=$((FAIL + 1))
 fi
 
+# ── Phase 6: Blockchain Registration ──
+echo ""
+echo "--- Phase 6: Blockchain Registration ---"
+
+# Get a TRATADO manifest for blockchain test
+TRATADO_ID=$($CURL -s "${API}/manifiestos?estado=TRATADO&limit=1" \
+  -H "Authorization: Bearer $TOKEN" | \
+  python3 -c "import sys,json; d=json.load(sys.stdin); ms=d['data']['manifiestos']; print(ms[0]['id'] if ms else '')" 2>/dev/null)
+
+if [ -n "$TRATADO_ID" ]; then
+  # Check if already blockchain-registered
+  TRATADO_BC_STATUS=$($CURL -s "${API}/blockchain/manifiesto/$TRATADO_ID" \
+    -H "Authorization: Bearer $TOKEN" | \
+    python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data']['blockchain'].get('blockchainStatus',''))" 2>/dev/null)
+
+  SHOULD_REGISTER=false
+  if [ "$TRATADO_BC_STATUS" != "CONFIRMADO" ]; then
+    SHOULD_REGISTER=true
+  fi
+
+  if [ "$SHOULD_REGISTER" = "true" ]; then
+    # Register on blockchain
+    REG_RESP=$($CURL -s -X POST "${API}/blockchain/registrar/$TRATADO_ID" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer $TOKEN")
+    REG_SUCCESS=$(echo "$REG_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('success', False))" 2>/dev/null)
+    REG_HASH=$(echo "$REG_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('transactionHash',''))" 2>/dev/null)
+
+    if [ "$REG_SUCCESS" = "True" ] || [ "$REG_SUCCESS" = "true" ]; then
+      echo -e "  ${GREEN}PASS${NC} Blockchain registration: txHash=${REG_HASH:0:20}..."
+      PASS=$((PASS + 1))
+    else
+      REG_ERR=$(echo "$REG_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('error', d.get('message','unknown')))" 2>/dev/null)
+      echo -e "  ${RED}FAIL${NC} Blockchain registration failed: $REG_ERR"
+      FAIL=$((FAIL + 1))
+      ERRORS="$ERRORS\n  FAIL blockchain registration: $REG_ERR"
+    fi
+  else
+    echo -e "  ${YELLOW}SKIP${NC} TRATADO manifest already CONFIRMADO on blockchain"
+    SKIP=$((SKIP + 1))
+  fi
+
+  # Verify sellos — only when registration succeeded or already confirmed
+  if [ "$SHOULD_REGISTER" = "false" ] || [ "$REG_SUCCESS" = "True" ] || [ "$REG_SUCCESS" = "true" ]; then
+    VERIFY_RESP=$($CURL -s "${API}/blockchain/manifiesto/$TRATADO_ID" \
+      -H "Authorization: Bearer $TOKEN")
+    VERIFY_SELLOS=$(echo "$VERIFY_RESP" | python3 -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+    bc = d['data'].get('blockchain', {})
+    sellos = bc.get('sellos', [])
+    print(len(sellos))
+except: print('0')
+" 2>/dev/null)
+    if [ "$VERIFY_SELLOS" -ge 2 ] 2>/dev/null; then
+      echo -e "  ${GREEN}PASS${NC} Blockchain sellos count: $VERIFY_SELLOS (GENESIS + CIERRE)"
+      PASS=$((PASS + 1))
+    else
+      echo -e "  ${RED}FAIL${NC} Expected >=2 sellos, got $VERIFY_SELLOS"
+      FAIL=$((FAIL + 1))
+      ERRORS="$ERRORS\n  FAIL Expected >=2 sellos, got $VERIFY_SELLOS"
+    fi
+  fi
+else
+  echo -e "  ${YELLOW}SKIP${NC} No TRATADO manifests for blockchain test"
+  SKIP=$((SKIP + 1))
+fi
+
 # ── Summary ──
 echo ""
 echo "============================================"
@@ -173,6 +243,7 @@ echo "RESULTS"
 echo "============================================"
 echo -e "  ${GREEN}PASS: $PASS${NC}"
 echo -e "  ${RED}FAIL: $FAIL${NC}"
+echo -e "  ${YELLOW}SKIP: $SKIP${NC}"
 echo ""
 
 if [ $FAIL -gt 0 ]; then

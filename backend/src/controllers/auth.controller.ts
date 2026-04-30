@@ -8,6 +8,7 @@ import { config } from '../config/config';
 import { AppError } from '../middlewares/errorHandler';
 import prisma from '../lib/prisma';
 import { emailService } from '../services/email.service';
+import { validatePasswordStrength } from '../utils/passwordStrength';
 
 // CUIT normalization: accepts "30711235961" or "30-71123596-1" → "30-71123596-1"
 function normalizeCuit(raw: string): string | null {
@@ -35,20 +36,14 @@ const registerSchema = z.object({
   cuit: z.string().optional(),
 });
 
-// Password strength validation
-function validatePasswordStrength(password: string): string | null {
-  if (password.length < 8) return 'La contraseña debe tener al menos 8 caracteres';
-  if (!/[A-Z]/.test(password)) return 'La contraseña debe contener al menos una mayúscula';
-  if (!/[0-9]/.test(password)) return 'La contraseña debe contener al menos un número';
-  return null;
-}
-
 // Generar tokens JWT
-export const generateTokens = (userId: string) => {
+export const generateTokens = (userId: string, restricted = false) => {
+  const payload: Record<string, unknown> = { id: userId };
+  if (restricted) payload.restricted = true;
   const options: SignOptions = { expiresIn: config.JWT_EXPIRES_IN as StringValue };
-  const accessToken = jwt.sign({ id: userId }, config.JWT_SECRET as string, options);
-  const refreshOptions: SignOptions = { expiresIn: '7d' as StringValue };
-  const refreshToken = jwt.sign({ id: userId }, config.JWT_SECRET as string, refreshOptions);
+  const accessToken = jwt.sign(payload, config.JWT_SECRET as string, options);
+  const refreshOptions: SignOptions = { expiresIn: config.JWT_REFRESH_EXPIRES_IN as StringValue };
+  const refreshToken = jwt.sign(payload, config.JWT_REFRESH_SECRET as string, refreshOptions);
   return { accessToken, refreshToken };
 };
 
@@ -217,6 +212,9 @@ export const verifyEmail = async (req: Request, res: Response, next: NextFunctio
 };
 
 // ── LOGIN ──────────────────────────────────────────────────────────
+const MAX_INTENTOS = 5;
+const BLOQUEO_MINUTOS = 15;
+
 export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = loginSchema.safeParse(req.body);
@@ -232,8 +230,33 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
 
     if (!user) throw new AppError('Credenciales inválidas', 401);
 
+    // Check account lockout
+    if (user.bloqueadoHasta && user.bloqueadoHasta > new Date()) {
+      const restanteMin = Math.ceil((user.bloqueadoHasta.getTime() - Date.now()) / 60000);
+      throw new AppError(`Cuenta bloqueada por ${restanteMin} minuto(s) por muchos intentos fallidos`, 429);
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) throw new AppError('Credenciales inválidas', 401);
+    if (!isMatch) {
+      // Increment failed attempts
+      const nuevosIntentos = (user.intentosFallidos || 0) + 1;
+      const updateData: { intentosFallidos: number; bloqueadoHasta?: Date } = {
+        intentosFallidos: nuevosIntentos,
+      };
+      if (nuevosIntentos >= MAX_INTENTOS) {
+        updateData.bloqueadoHasta = new Date(Date.now() + BLOQUEO_MINUTOS * 60 * 1000);
+      }
+      await prisma.usuario.update({ where: { id: user.id }, data: updateData });
+      throw new AppError('Credenciales inválidas', 401);
+    }
+
+    // Reset lockout on successful login
+    if (user.intentosFallidos > 0 || user.bloqueadoHasta) {
+      await prisma.usuario.update({
+        where: { id: user.id },
+        data: { intentosFallidos: 0, bloqueadoHasta: null },
+      });
+    }
 
     if (!user.emailVerified) {
       throw new AppError('Verificá tu email antes de iniciar sesión', 403);
@@ -250,10 +273,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       });
       if (solicitudPendiente) {
         // Issue restricted token
-        const options: SignOptions = { expiresIn: config.JWT_EXPIRES_IN as StringValue };
-        const accessToken = jwt.sign({ id: user.id, restricted: true }, config.JWT_SECRET as string, options);
-        const refreshOptions: SignOptions = { expiresIn: '7d' as StringValue };
-        const refreshToken = jwt.sign({ id: user.id, restricted: true }, config.JWT_SECRET as string, refreshOptions);
+        const { accessToken, refreshToken } = generateTokens(user.id, true);
 
         const userData = {
           id: user.id, email: user.email, rol: user.rol, nombre: user.nombre,
@@ -410,6 +430,26 @@ export const getProfile = async (req: Request & { user?: any }, res: Response, n
 // ── LOGOUT ────────────────────────────────────────────────────────
 export const logout = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // Blacklist the access token so it can't be used again
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+    if (token && (req as any).user?.id) {
+      try {
+        const decoded = jwt.decode(token) as { exp?: number } | null;
+        if (decoded?.exp) {
+          await prisma.refreshToken.create({
+            data: {
+              token,
+              usuarioId: (req as any).user.id,
+              revocado: true,
+              expiresAt: new Date(decoded.exp * 1000),
+            },
+          });
+        }
+      } catch {
+        // If token decode fails, skip blacklisting — still return success
+      }
+    }
     res.json({ success: true, message: 'Sesión cerrada correctamente' });
   } catch (error) {
     next(error);
@@ -449,9 +489,17 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
 
     let decoded: { id: string; restricted?: boolean };
     try {
-      decoded = jwt.verify(token, config.JWT_SECRET as string) as { id: string; restricted?: boolean };
+      decoded = jwt.verify(token, config.JWT_REFRESH_SECRET as string) as { id: string; restricted?: boolean };
     } catch {
       throw new AppError('Refresh token inválido o expirado', 401);
+    }
+
+    // Check token revocation (blacklist)
+    const blacklisted = await prisma.refreshToken.findFirst({
+      where: { token, revocado: true },
+    });
+    if (blacklisted) {
+      throw new AppError('Refresh token revocado', 401);
     }
 
     const user = await prisma.usuario.findUnique({ where: { id: decoded.id } });
@@ -463,12 +511,7 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
     }
 
     if (decoded.restricted) {
-      // Re-issue restricted tokens
-      const options: SignOptions = { expiresIn: config.JWT_EXPIRES_IN as StringValue };
-      const accessToken = jwt.sign({ id: user.id, restricted: true }, config.JWT_SECRET as string, options);
-      const refreshOptions: SignOptions = { expiresIn: '7d' as StringValue };
-      const refreshToken = jwt.sign({ id: user.id, restricted: true }, config.JWT_SECRET as string, refreshOptions);
-      return res.json({ success: true, data: { accessToken, refreshToken } });
+      return res.json({ success: true, data: generateTokens(user.id, true) });
     }
 
     res.json({ success: true, data: generateTokens(user.id) });

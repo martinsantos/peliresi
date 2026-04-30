@@ -23,7 +23,23 @@ import {
 } from '../controllers/notification.controller';
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage() });
+const ALLOWED_UPLOAD_MIMES = [
+  'text/csv',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain',
+];
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_UPLOAD_MIMES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      (cb as unknown as (err: Error) => void)(new Error('Tipo de archivo no permitido. Solo CSV, Excel (.xlsx, .xls) o texto plano.'));
+    }
+  },
+});
 
 // Push — clave pública es pública (sin auth), subscribe/unsubscribe requieren auth
 router.get('/push/vapid-key', getVapidPublicKey);

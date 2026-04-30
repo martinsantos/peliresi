@@ -38,9 +38,17 @@ export const isAuthenticated = async (
     }
 
     const token = authHeader.split(' ')[1];
-    
+
     // Verificar el token
     const decoded = jwt.verify(token, config.JWT_SECRET as string) as { id: string; restricted?: boolean };
+
+    // Check token revocation (blacklist)
+    const blacklisted = await prisma.refreshToken.findFirst({
+      where: { token, revocado: true },
+    });
+    if (blacklisted) {
+      throw new AppError('No autorizado - Token revocado, inicie sesión nuevamente', 401);
+    }
 
     // Obtener el usuario de la base de datos
     const user = await prisma.usuario.findUnique({
