@@ -150,6 +150,57 @@ for SCRIPT in "${SECURITY_SCRIPTS[@]}"; do
   echo ""
 done
 
+# ── CROSS-CUTTING INTEGRATION TESTS ────────────────────────────
+CROSS_CUTTING_SCRIPTS=(
+  "cross-solicitud-flow-test.sh"
+  "cross-manifiesto-lifecycle-test.sh"
+  "cross-carga-masiva-test.sh"
+  "cross-renovacion-flow-test.sh"
+)
+
+echo -e "${BOLD}${CYAN}┌──────────────────────────────────────────────────────────┐${NC}"
+echo -e "${BOLD}${CYAN}│     CROSS-CUTTING INTEGRATION TESTS                     │${NC}"
+echo -e "${BOLD}${CYAN}└──────────────────────────────────────────────────────────┘${NC}"
+echo ""
+
+for SCRIPT in "${CROSS_CUTTING_SCRIPTS[@]}"; do
+  SCRIPT_PATH="$SCRIPTS_DIR/$SCRIPT"
+
+  if [ ! -f "$SCRIPT_PATH" ]; then
+    echo -e "${YELLOW}SKIP${NC} $SCRIPT (file not found)"
+    SUITE_RESULTS+=("SKIP|$SCRIPT|0|0")
+    continue
+  fi
+
+  echo -e "${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "${BOLD}Running: $SCRIPT${NC}"
+  echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+  OUTPUT=$(bash "$SCRIPT_PATH" "$BASE_URL" 2>&1)
+  EXIT_CODE=$?
+
+  echo "$OUTPUT"
+
+  PASS_COUNT=$(echo "$OUTPUT" | grep -oE 'PASS[: ]+[0-9]+' | tail -1 | grep -oE '[0-9]+' || echo "0")
+  FAIL_COUNT=$(echo "$OUTPUT" | grep -oE 'FAIL[: ]+[0-9]+' | tail -1 | grep -oE '[0-9]+' || echo "0")
+
+  if [ -z "$PASS_COUNT" ] || [ "$PASS_COUNT" = "0" ]; then
+    PASS_COUNT=$(echo "$OUTPUT" | grep -c '✓\|PASS\b' 2>/dev/null || echo "0")
+  fi
+
+  TOTAL_PASS=$((TOTAL_PASS + PASS_COUNT))
+  TOTAL_FAIL=$((TOTAL_FAIL + FAIL_COUNT))
+
+  if [ "$EXIT_CODE" -eq 0 ]; then
+    SUITE_RESULTS+=("PASS|$SCRIPT|$PASS_COUNT|$FAIL_COUNT")
+    echo -e "\n${GREEN}✓ $SCRIPT: PASSED ($PASS_COUNT pass, $FAIL_COUNT fail)${NC}"
+  else
+    SUITE_RESULTS+=("FAIL|$SCRIPT|$PASS_COUNT|$FAIL_COUNT")
+    echo -e "\n${RED}✗ $SCRIPT: FAILED ($PASS_COUNT pass, $FAIL_COUNT fail)${NC}"
+  fi
+  echo ""
+done
+
 # ── FINAL SUMMARY ────────────────────────────────────────────
 echo -e "${BOLD}${CYAN}╔══════════════════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}${CYAN}║     FINAL RESULTS SUMMARY                            ║${NC}"
