@@ -7,19 +7,12 @@
 
 import pino from 'pino';
 
-const isProduction = process.env.NODE_ENV === 'production';
+const usePrettyTransport = process.env.NODE_ENV === 'development' || process.env.LOG_PRETTY === 'true';
 
 export const logger = pino({
-  level: process.env.LOG_LEVEL || (isProduction ? 'info' : 'debug'),
-  ...(isProduction
+  level: process.env.LOG_LEVEL || (usePrettyTransport ? 'debug' : 'info'),
+  ...(usePrettyTransport
     ? {
-        // JSON output for production (parseable by log aggregators)
-        formatters: {
-          level: (label) => ({ level: label }),
-        },
-        timestamp: pino.stdTimeFunctions.isoTime,
-      }
-    : {
         // Human-readable output for development
         transport: {
           target: 'pino-pretty',
@@ -29,6 +22,13 @@ export const logger = pino({
             ignore: 'pid,hostname',
           },
         },
+      }
+    : {
+        // JSON output for production (parseable by log aggregators)
+        formatters: {
+          level: (label) => ({ level: label }),
+        },
+        timestamp: pino.stdTimeFunctions.isoTime,
       }),
 });
 
