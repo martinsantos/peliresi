@@ -3,6 +3,7 @@ import prisma from '../lib/prisma';
 import PDFDocument from 'pdfkit';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { canAccessManifiesto } from '../utils/roleFilter';
 
 // ── Shared PDF helpers ──
 
@@ -155,6 +156,7 @@ export const generarPDFManifiesto = async (req: AuthRequest, res: Response, next
         });
 
         if (!manifiesto) throw new AppError('Manifiesto no encontrado', 404);
+        if (!canAccessManifiesto(req.user, manifiesto)) throw new AppError('Manifiesto no encontrado', 404);
 
         const doc = new PDFDocument({ margin: 50, size: 'A4' });
         res.setHeader('Content-Type', 'application/pdf');
@@ -392,6 +394,7 @@ export const generarCertificado = async (req: AuthRequest, res: Response, next: 
         });
 
         if (!manifiesto) throw new AppError('Manifiesto no encontrado', 404);
+        if (!canAccessManifiesto(req.user, manifiesto)) throw new AppError('Manifiesto no encontrado', 404);
         if (manifiesto.estado !== 'TRATADO') {
             throw new AppError('Solo se pueden generar certificados de manifiestos tratados', 400);
         }

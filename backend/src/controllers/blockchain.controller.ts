@@ -10,6 +10,7 @@ import {
   verificarIntegridad,
   verificarLote,
 } from '../services/blockchain.service';
+import { canAccessManifiesto } from '../utils/roleFilter';
 
 /**
  * GET /api/blockchain/manifiesto/:id
@@ -29,6 +30,9 @@ export const getBlockchainStatus = async (req: AuthRequest, res: Response, next:
           blockchainTimestamp: true,
           blockchainStatus: true,
           rollingHash: true,
+          generadorId: true,
+          transportistaId: true,
+          operadorId: true,
         },
       }),
       prisma.blockchainSello.findMany({
@@ -48,12 +52,20 @@ export const getBlockchainStatus = async (req: AuthRequest, res: Response, next:
     if (!manifiesto) {
       throw new AppError('Manifiesto no encontrado', 404);
     }
+    if (!canAccessManifiesto(req.user, manifiesto)) {
+      throw new AppError('Manifiesto no encontrado', 404);
+    }
+
+    const { generadorId, transportistaId, operadorId, ...blockchain } = manifiesto;
+    void generadorId;
+    void transportistaId;
+    void operadorId;
 
     res.json({
       success: true,
       data: {
         blockchain: {
-          ...manifiesto,
+          ...blockchain,
           sellos,
           enabled: config.BLOCKCHAIN_ENABLED,
           network: 'Ethereum Sepolia',
@@ -81,10 +93,19 @@ export const registrarBlockchain = async (req: AuthRequest, res: Response, next:
 
     const manifiesto = await prisma.manifiesto.findUnique({
       where: { id },
-      select: { estado: true, blockchainStatus: true },
+      select: {
+        estado: true,
+        blockchainStatus: true,
+        generadorId: true,
+        transportistaId: true,
+        operadorId: true,
+      },
     });
 
     if (!manifiesto) {
+      throw new AppError('Manifiesto no encontrado', 404);
+    }
+    if (!canAccessManifiesto(req.user, manifiesto)) {
       throw new AppError('Manifiesto no encontrado', 404);
     }
 

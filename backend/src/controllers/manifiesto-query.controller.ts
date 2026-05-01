@@ -3,7 +3,7 @@ import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import prisma from '../lib/prisma';
 import { parsePagination } from '../utils/pagination';
-import { applyRoleFilter } from '../utils/roleFilter';
+import { applyRoleFilter, canAccessManifiesto } from '../utils/roleFilter';
 import { MANIFIESTO_DETAIL_INCLUDE } from '../utils/manifiestoIncludes';
 import { parseDateParam } from '../utils/dateRange';
 
@@ -128,6 +128,9 @@ export const getManifiestoById = async (req: AuthRequest, res: Response, next: N
     });
 
     if (!manifiesto) {
+      throw new AppError('Manifiesto no encontrado', 404);
+    }
+    if (!canAccessManifiesto(req.user, manifiesto)) {
       throw new AppError('Manifiesto no encontrado', 404);
     }
 

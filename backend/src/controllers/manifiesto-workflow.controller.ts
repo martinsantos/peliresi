@@ -7,6 +7,7 @@ import prisma from '../lib/prisma';
 import { domainEvents } from '../services/domainEvent.service';
 import { computeRollingHash, computeClosureHash, hashManifiesto, registrarSello } from '../services/blockchain.service';
 import { invalidateGpsCache } from './manifiesto-gps.controller';
+import { assertCanAccessManifiesto } from '../utils/roleFilter';
 
 // Zod schemas
 const registrarIncidenteSchema = z.object({
@@ -67,6 +68,7 @@ async function updateRollingHash(
 export const firmarManifiesto = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    await assertCanAccessManifiesto(prisma, req.user, id);
     const userId = req.user.id;
 
     // Generate QR before transaction (async, no DB write)
@@ -165,6 +167,7 @@ export const firmarManifiesto = async (req: AuthRequest, res: Response, next: Ne
 export const confirmarRetiro = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    await assertCanAccessManifiesto(prisma, req.user, id);
     const { latitud, longitud, observaciones } = req.body;
     const userId = req.user.id;
 
@@ -254,6 +257,7 @@ export const confirmarRetiro = async (req: AuthRequest, res: Response, next: Nex
 export const confirmarEntrega = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    await assertCanAccessManifiesto(prisma, req.user, id);
     const { latitud, longitud, observaciones } = req.body;
     const userId = req.user.id;
 
@@ -331,6 +335,7 @@ export const confirmarEntrega = async (req: AuthRequest, res: Response, next: Ne
 export const confirmarRecepcion = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    await assertCanAccessManifiesto(prisma, req.user, id);
     const { observaciones, pesoReal } = req.body;
     const userId = req.user.id;
 
@@ -397,6 +402,7 @@ export const confirmarRecepcion = async (req: AuthRequest, res: Response, next: 
 export const confirmarRecepcionInSitu = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    await assertCanAccessManifiesto(prisma, req.user, id);
     const { observaciones } = req.body;
     const userId = req.user.id;
 
@@ -476,6 +482,7 @@ export const confirmarRecepcionInSitu = async (req: AuthRequest, res: Response, 
 export const cerrarManifiesto = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    await assertCanAccessManifiesto(prisma, req.user, id);
     const parsed = cerrarManifiestoSchema.safeParse(req.body);
     if (!parsed.success) {
       throw new AppError(parsed.error.issues[0].message, 400);
@@ -595,6 +602,7 @@ export const cerrarManifiesto = async (req: AuthRequest, res: Response, next: Ne
 export const rechazarCarga = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    await assertCanAccessManifiesto(prisma, req.user, id);
     const { motivo, descripcion, cantidadRechazada } = req.body;
     const userId = req.user.id;
 
@@ -660,6 +668,7 @@ export const rechazarCarga = async (req: AuthRequest, res: Response, next: NextF
 export const registrarIncidente = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    await assertCanAccessManifiesto(prisma, req.user, id);
     const parsed = registrarIncidenteSchema.safeParse(req.body);
     if (!parsed.success) {
       throw new AppError(parsed.error.issues[0].message, 400);
@@ -727,6 +736,7 @@ export const registrarIncidente = async (req: AuthRequest, res: Response, next: 
 export const registrarTratamiento = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    await assertCanAccessManifiesto(prisma, req.user, id);
     const { metodoTratamiento, metodo, fechaTratamiento, observaciones } = req.body;
     const metodoFinal = metodoTratamiento || metodo; // Accept both field names
     const userId = req.user.id;
@@ -823,6 +833,7 @@ export const registrarTratamiento = async (req: AuthRequest, res: Response, next
 export const revertirEstado = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    await assertCanAccessManifiesto(prisma, req.user, id);
     const { estadoNuevo, motivo } = req.body;
 
     const manifiesto = await prisma.manifiesto.findUnique({ where: { id } });
@@ -881,6 +892,7 @@ export const revertirEstado = async (req: AuthRequest, res: Response, next: Next
 export const registrarPesaje = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    await assertCanAccessManifiesto(prisma, req.user, id);
     const { residuosPesados, residuos, observaciones } = req.body; // Accept both formats
     const userId = req.user.id;
 
@@ -988,6 +1000,7 @@ export const registrarPesaje = async (req: AuthRequest, res: Response, next: Nex
 export const cancelarManifiesto = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    await assertCanAccessManifiesto(prisma, req.user, id);
     const { motivo } = req.body || {};
     const userId = req.user.id;
 

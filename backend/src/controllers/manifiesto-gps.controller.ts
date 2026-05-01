@@ -6,6 +6,7 @@ import prisma from '../lib/prisma';
 import { anomaliaDetector } from './notification.controller';
 import { domainEvents } from '../services/domainEvent.service';
 import { distanciaPuntoSegmento } from '../utils/geo';
+import { canAccessManifiesto } from '../utils/roleFilter';
 
 // Zod schema for GPS update validation
 const actualizarUbicacionSchema = z.object({
@@ -18,6 +19,9 @@ const actualizarUbicacionSchema = z.object({
 // GPS in-memory cache — optimized for high-frequency calls (30 clients x every 30s)
 type GpsCacheEntry = {
   ts: number;
+  generadorId: string | null;
+  transportistaId: string | null;
+  operadorId: string | null;
   fechaRetiro: Date | null;
   numero: string;
   genLat: number | null;
@@ -53,6 +57,9 @@ export const actualizarUbicacion = async (req: AuthRequest, res: Response, next:
     let cacheEntry = _enTransitoCache.get(id);
     const cacheExpired = !cacheEntry || Date.now() - cacheEntry.ts > EN_TRANSITO_CACHE_TTL;
     if (cacheExpired && cacheEntry) _enTransitoCache.delete(id); // evict stale entry
+    if (cacheEntry && !cacheExpired && !canAccessManifiesto(req.user, cacheEntry)) {
+      throw new AppError('Manifiesto no encontrado', 404);
+    }
     if (!cacheEntry || cacheExpired) {
       const manifiesto = await prisma.manifiesto.findUnique({
         where: { id },
@@ -61,17 +68,28 @@ export const actualizarUbicacion = async (req: AuthRequest, res: Response, next:
           estado: true,
           numero: true,
           fechaRetiro: true,
+          generadorId: true,
+          transportistaId: true,
+          operadorId: true,
           generador: { select: { latitud: true, longitud: true } },
           operador: { select: { latitud: true, longitud: true } },
         },
       });
 
-      if (!manifiesto || manifiesto.estado !== 'EN_TRANSITO') {
+      if (!manifiesto || !canAccessManifiesto(req.user, manifiesto)) {
+        _enTransitoCache.delete(id);
+        throw new AppError('Manifiesto no encontrado', 404);
+      }
+
+      if (manifiesto.estado !== 'EN_TRANSITO') {
         _enTransitoCache.delete(id);
         throw new AppError('Manifiesto no encontrado o no esta en transito', 404);
       }
       cacheEntry = {
         ts: Date.now(),
+        generadorId: manifiesto.generadorId,
+        transportistaId: manifiesto.transportistaId,
+        operadorId: manifiesto.operadorId,
         fechaRetiro: manifiesto.fechaRetiro,
         numero: manifiesto.numero,
         genLat: manifiesto.generador?.latitud ?? null,
@@ -143,10 +161,10 @@ export const getViajeActual = async (req: AuthRequest, res: Response, next: Next
 
     const manifiesto = await prisma.manifiesto.findUnique({
       where: { id },
-      select: { id: true, estado: true },
+      select: { id: true, estado: true, generadorId: true, transportistaId: true, operadorId: true },
     });
 
-    if (!manifiesto) {
+    if (!manifiesto || !canAccessManifiesto(req.user, manifiesto)) {
       throw new AppError('Manifiesto no encontrado', 404);
     }
 

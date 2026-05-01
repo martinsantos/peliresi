@@ -7,6 +7,7 @@ import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger';
 import { config } from './config/config';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
+import { isAuthenticated } from './middlewares/auth.middleware';
 import authRoutes from './routes/auth.routes';
 import manifiestoRoutes from './routes/manifiesto.routes';
 import catalogoRoutes from './routes/catalogo.routes';
@@ -94,7 +95,19 @@ app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   customCss: '.swagger-ui .topbar { display: none }',
   customSiteTitle: 'SITREP API Docs',
 }));
-app.get('/api/docs.json', (_req, res) => res.json(swaggerSpec));
+app.get('/api/docs.json', (req, res, next) => {
+  if (process.env.PUBLIC_DEMO_MODE === 'true') {
+    return res.json(swaggerSpec);
+  }
+
+  return isAuthenticated(req, res, (error?: unknown) => {
+    if (error) return next(error);
+    if ((req as { user?: { rol?: string } }).user?.rol !== 'ADMIN') {
+      return res.status(403).json({ success: false, message: 'No autorizado' });
+    }
+    return res.json(swaggerSpec);
+  });
+});
 
 // Rutas
 /**

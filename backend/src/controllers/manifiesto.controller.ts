@@ -4,6 +4,7 @@ import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import prisma from '../lib/prisma';
 import { generarNumeroManifiesto } from '../utils/manifiestoNumber';
+import { canAccessManifiesto } from '../utils/roleFilter';
 
 // Re-export split modules so existing imports (e.g. routes) continue to work
 export { getManifiestos, getManifiestoById, getDashboardStats, getSyncInicial, getManifiestosEsperados } from './manifiesto-query.controller';
@@ -212,7 +213,7 @@ export const updateManifiesto = async (req: AuthRequest, res: Response, next: Ne
     const { id } = req.params;
 
     const manifiesto = await prisma.manifiesto.findUnique({ where: { id } });
-    if (!manifiesto) {
+    if (!manifiesto || !canAccessManifiesto(req.user, manifiesto)) {
       throw new AppError('Manifiesto no encontrado', 404);
     }
 
@@ -268,7 +269,7 @@ export const deleteManifiesto = async (req: AuthRequest, res: Response, next: Ne
     const { id } = req.params;
 
     const manifiesto = await prisma.manifiesto.findUnique({ where: { id } });
-    if (!manifiesto) {
+    if (!manifiesto || !canAccessManifiesto(req.user, manifiesto)) {
       throw new AppError('Manifiesto no encontrado', 404);
     }
 

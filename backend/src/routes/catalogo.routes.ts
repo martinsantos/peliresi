@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { RequestHandler, Router } from 'express';
 import { isAuthenticated, requireAdminOrGenerador, requireAdminOrOperador } from '../middlewares/auth.middleware';
 import {
     getTiposResiduos,
@@ -22,6 +22,11 @@ import {
 } from '../controllers/catalogo.controller';
 
 const router = Router();
+
+const demoOrAuth: RequestHandler = (req, res, next) => {
+    if (process.env.PUBLIC_DEMO_MODE === 'true') return next();
+    return isAuthenticated(req, res, next);
+};
 
 /**
  * @openapi
@@ -49,9 +54,9 @@ const router = Router();
 // Rutas publicas (para selectores en formularios)
 router.get('/tipos-residuos', getTiposResiduos);
 
-// Enrichment data (static JSON, public — non-sensitive reference data)
-router.get('/enrichment/generadores', getGeneradoresEnrichment);
-router.get('/enrichment/operadores', getOperadoresEnrichment);
+// Enrichment data remains public only in demo mode.
+router.get('/enrichment/generadores', demoOrAuth, getGeneradoresEnrichment);
+router.get('/enrichment/operadores', demoOrAuth, getOperadoresEnrichment);
 
 // Rutas protegidas
 router.use(isAuthenticated);
