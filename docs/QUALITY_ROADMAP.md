@@ -22,6 +22,7 @@ SITREP esta en estado MVP avanzado / beta operativa. Backend, frontend web, PWA 
 - Evidencia de certificacion estandarizada en Markdown y JSON bajo `reports/test-runs/`.
 - Workflow manual `SITREP Certification Tests` agregado para ejecutar la matriz desde GitHub Actions.
 - El runner clasifica fallos por categoria para separar errores de aplicacion, red/ambiente, riesgos de dependencias y excepciones conocidas.
+- La matriz de certificacion ahora incluye checks no destructivos de configuracion, readiness operativa, superficie frontend/PWA/manual, compatibilidad mobile y accesibilidad estatica.
 
 ## Backlog recomendado
 
@@ -65,3 +66,4 @@ SITREP esta en estado MVP avanzado / beta operativa. Backend, frontend web, PWA 
    - Definir retencion de artefactos `reports/test-runs/` en CI.
    - Agregar soak extendido de 6-12 horas como corrida manual previa a certificacion final.
    - Agregar pruebas de backup/restore contra base temporal para evitar depender de restore destructivo sobre staging compartido.
+   - Complementar las heuristicas estaticas de accesibilidad con auditoria axe/manual formal antes de certificacion externa.

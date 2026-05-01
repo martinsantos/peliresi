@@ -194,7 +194,7 @@ Profiles:
 | `quick` | Local/CI fast validation: dependencies, typecheck, unit, coverage, build, audits, blockchain compile. | No |
 | `post-deploy` | Remote validation after deploy: API regression plus Playwright chromium. | No |
 | `production-smoke` | Minimal no-destructive production/VPN validation. | No |
-| `certification` | Full staging/test VPS matrix: static, API, workflow, security, integrity, frontend, ops/recovery, stress. | Only if explicitly enabled |
+| `certification` | Full staging/test VPS matrix: static, config, API, workflow, security, integrity, frontend/PWA, accessibility, compatibility, ops/recovery, stress. | Only if explicitly enabled |
 
 Example staging run:
 
@@ -215,6 +215,7 @@ Evidence generated per run:
 - `summary.json`: machine-readable report for CI or audit storage.
 - one `.log` file per step with command output.
 - each result includes a category: `APP_CHECK`, `APP_FAILURE`, `SECURITY_FAILURE`, `DEPENDENCY_CHECK`, `DEPENDENCY_RISK`, `ENVIRONMENT_CHECK`, `ENVIRONMENT_FAILURE`, `KNOWN_EXCEPTION`, or `SKIPPED_BY_POLICY`.
+- non-stress certification coverage includes configuration, health/live/ready, security headers, rate-limit headers, PWA/manual surface, mobile viewport, and dependency-free accessibility heuristics.
 
 Severity policy:
 

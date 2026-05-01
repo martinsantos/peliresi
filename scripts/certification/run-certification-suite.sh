@@ -316,6 +316,8 @@ restore_staging() {
 }
 
 static_suite() {
+  run_step "configuration" "static secure configuration" "HIGH" "bash scripts/certification/check-config.sh"
+
   run_autofix_step "static" "backend dependencies" "BLOCKER" \
     "cd backend && npm ci" \
     "cd backend && rm -rf node_modules && npm ci"
@@ -376,7 +378,21 @@ frontend_e2e_suite() {
     "cd frontend && PLAYWRIGHT_BASE_URL='$TARGET_URL' npx playwright test --project='$PLAYWRIGHT_PROJECT' --reporter=list"
 }
 
+frontend_surface_suite() {
+  run_step "frontend-surface" "pwa manual and app shell" "HIGH" "bash scripts/certification/check-frontend-surface.sh '$TARGET_URL'"
+}
+
+accessibility_suite() {
+  run_step "accessibility" "static accessibility heuristics" "MEDIUM" "python3 scripts/certification/check-accessibility-static.py"
+}
+
+compatibility_suite() {
+  run_step "compatibility" "playwright mobile viewport" "MEDIUM" \
+    "cd frontend && PLAYWRIGHT_BASE_URL='$TARGET_URL' npx playwright test --project=mobile --reporter=list"
+}
+
 ops_recovery_suite() {
+  run_step "ops-recovery" "operational readiness" "HIGH" "bash scripts/certification/check-operational-readiness.sh '$TARGET_URL'"
   run_step "ops-recovery" "migration verify" "HIGH" "bash scripts/migration/migration-verify.sh '$TARGET_URL'"
 
   if is_true "$ALLOW_DESTRUCTIVE_STAGING"; then
@@ -408,6 +424,8 @@ production_smoke_suite() {
   run_step "production-smoke" "smoke" "BLOCKER" "bash backend/tests/smoke-test.sh '$TARGET_URL'"
   run_step "production-smoke" "role enforcement" "BLOCKER" "bash backend/tests/role-enforcement-test.sh '$TARGET_URL'"
   run_step "production-smoke" "search safety" "HIGH" "bash backend/tests/search-safety-test.sh '$TARGET_URL'"
+  frontend_surface_suite
+  run_step "ops-recovery" "operational readiness" "HIGH" "bash scripts/certification/check-operational-readiness.sh '$TARGET_URL'"
 }
 
 preflight_suite() {
@@ -454,7 +472,9 @@ main() {
       ;;
     post-deploy)
       api_regression_suite
+      frontend_surface_suite
       frontend_e2e_suite
+      ops_recovery_suite
       ;;
     production-smoke)
       production_smoke_suite
@@ -466,7 +486,10 @@ main() {
       workflow_suite
       security_suite
       data_integrity_suite
+      frontend_surface_suite
       frontend_e2e_suite
+      accessibility_suite
+      compatibility_suite
       ops_recovery_suite
       stress_suite
       ;;
