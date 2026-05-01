@@ -21,6 +21,7 @@ SITREP esta en estado MVP avanzado / beta operativa. Backend, frontend web, PWA 
 - Runner de certificacion agregado en `scripts/certification/`, con perfiles `quick`, `post-deploy`, `production-smoke` y `certification`.
 - Evidencia de certificacion estandarizada en Markdown y JSON bajo `reports/test-runs/`.
 - Workflow manual `SITREP Certification Tests` agregado para ejecutar la matriz desde GitHub Actions.
+- El runner clasifica fallos por categoria para separar errores de aplicacion, red/ambiente, riesgos de dependencias y excepciones conocidas.
 
 ## Backlog recomendado
 
@@ -57,6 +58,7 @@ SITREP esta en estado MVP avanzado / beta operativa. Backend, frontend web, PWA 
    - Backend: migrar `nodemailer` a version mayor segura y probar envio/cola de emails.
    - Backend: migrar `uuid` a version mayor segura o reemplazar usos por `crypto.randomUUID()` donde aplique.
    - Backend: reemplazar `xlsx`, porque npm audit no ofrece fix para SheetJS OSS.
+   - Convertir las excepciones `KNOWN_EXCEPTION` en fallos bloqueantes cuando cada migracion este planificada y testeada.
 
 7. Certificacion
    - Configurar comandos reales de snapshot/restore para staging en `STAGING_SNAPSHOT_COMMAND` y `STAGING_RESTORE_COMMAND`.

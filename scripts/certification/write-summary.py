@@ -35,6 +35,7 @@ def main() -> int:
     ]
     warnings = [row for row in rows if row["status"] == "WARN"]
     skipped = [row for row in rows if row["status"] == "SKIP"]
+    categories = Counter(row.get("category", "UNCATEGORIZED") for row in rows)
 
     payload = {
         "profile": profile,
@@ -50,6 +51,7 @@ def main() -> int:
             "skip": counts.get("SKIP", 0),
             "fail": counts.get("FAIL", 0),
         },
+        "categories": dict(categories),
         "blocking_failures": blocking_failures,
         "warnings": warnings,
         "skipped": skipped,
@@ -81,20 +83,30 @@ def main() -> int:
         f"| SKIP | {counts.get('SKIP', 0)} |",
         f"| FAIL | {counts.get('FAIL', 0)} |",
         "",
+        "## Categories",
+        "",
+        "| Category | Count |",
+        "|----------|-------|",
     ]
+
+    for category, count in sorted(categories.items()):
+        lines.append(f"| {category} | {count} |")
+
+    lines.append("")
 
     if blocking_failures:
         lines.extend(
             [
                 "## Blocking Failures",
                 "",
-                "| Suite | Test | Severity | Log |",
-                "|-------|------|----------|-----|",
+                "| Suite | Test | Severity | Category | Log |",
+                "|-------|------|----------|----------|-----|",
             ]
         )
         for row in blocking_failures:
             lines.append(
-                f"| {row['suite']} | {row['name']} | {row['severity']} | `{row['log']}` |"
+                f"| {row['suite']} | {row['name']} | {row['severity']} | "
+                f"{row.get('category', 'UNCATEGORIZED')} | `{row['log']}` |"
             )
         lines.append("")
 
@@ -103,13 +115,14 @@ def main() -> int:
             [
                 "## Warnings",
                 "",
-                "| Suite | Test | Severity | Log |",
-                "|-------|------|----------|-----|",
+                "| Suite | Test | Severity | Category | Log |",
+                "|-------|------|----------|----------|-----|",
             ]
         )
         for row in warnings:
             lines.append(
-                f"| {row['suite']} | {row['name']} | {row['severity']} | `{row['log']}` |"
+                f"| {row['suite']} | {row['name']} | {row['severity']} | "
+                f"{row.get('category', 'UNCATEGORIZED')} | `{row['log']}` |"
             )
         lines.append("")
 
@@ -130,14 +143,14 @@ def main() -> int:
         [
             "## Full Results",
             "",
-            "| Suite | Test | Severity | Status | Duration |",
-            "|-------|------|----------|--------|----------|",
+            "| Suite | Test | Severity | Status | Category | Duration |",
+            "|-------|------|----------|--------|----------|----------|",
         ]
     )
     for row in rows:
         lines.append(
             f"| {row['suite']} | {row['name']} | {row['severity']} | "
-            f"{row['status']} | {row['duration_s']}s |"
+            f"{row['status']} | {row.get('category', 'UNCATEGORIZED')} | {row['duration_s']}s |"
         )
 
     summary_md.write_text("\n".join(lines) + "\n", encoding="utf-8")

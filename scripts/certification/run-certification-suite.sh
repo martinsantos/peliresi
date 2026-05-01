@@ -35,6 +35,9 @@ STAGING_SNAPSHOT_COMMAND="${STAGING_SNAPSHOT_COMMAND:-}"
 STAGING_RESTORE_COMMAND="${STAGING_RESTORE_COMMAND:-}"
 PLAYWRIGHT_PROJECT="${PLAYWRIGHT_PROJECT:-chromium}"
 SOAK_SECONDS="${SOAK_SECONDS:-1800}"
+NETWORK_RETRIES="${NETWORK_RETRIES:-2}"
+NETWORK_TIMEOUT="${NETWORK_TIMEOUT:-10}"
+OFFLINE_SKIP_AUDIT="${OFFLINE_SKIP_AUDIT:-false}"
 
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -42,7 +45,7 @@ WARN_COUNT=0
 SKIP_COUNT=0
 
 mkdir -p "$RUN_DIR"
-printf "suite\tname\tseverity\tstatus\tduration_s\tlog\tcommand\n" > "$RESULTS_TSV"
+printf "suite\tname\tseverity\tstatus\tduration_s\tlog\tcommand\tcategory\n" > "$RESULTS_TSV"
 
 slugify() {
   printf "%s" "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-//; s/-$//'
@@ -59,9 +62,67 @@ json_escape() {
   python3 -c 'import json,sys; print(json.dumps(sys.stdin.read())[1:-1])'
 }
 
+strict_network_required() {
+  [ "$RUN_PROFILE" = "certification" ] || [ "$RUN_PROFILE" = "post-deploy" ] || [ "$RUN_PROFILE" = "production-smoke" ] || is_true "${GITHUB_ACTIONS:-false}"
+}
+
+host_from_url() {
+  python3 - "$1" <<'PY'
+import sys
+from urllib.parse import urlparse
+print(urlparse(sys.argv[1]).hostname or sys.argv[1])
+PY
+}
+
+network_check() {
+  local suite="$1" name="$2" target="$3" severity="$4"
+  local slug log start end duration exit_code host command
+  slug="$(slugify "$suite-$name")"
+  log="$RUN_DIR/$slug.log"
+  host="$(host_from_url "$target")"
+  command="resolve $host and GET $target"
+  start="$(date +%s)"
+
+  echo "[$suite] $name"
+  echo "COMMAND: $command" > "$log"
+  echo "" >> "$log"
+
+  python3 - "$host" >> "$log" 2>&1 <<'PY'
+import socket
+import sys
+host = sys.argv[1]
+print(socket.gethostbyname(host))
+PY
+  exit_code=$?
+
+  if [ "$exit_code" -eq 0 ]; then
+    curl -fsS --max-time "$NETWORK_TIMEOUT" --retry "$NETWORK_RETRIES" "$target" >/dev/null 2>> "$log"
+    exit_code=$?
+  fi
+
+  end="$(date +%s)"
+  duration=$((end - start))
+
+  if [ "$exit_code" -eq 0 ]; then
+    echo "  PASS (${duration}s)"
+    record_result "$suite" "$name" "$severity" "PASS" "$duration" "$log" "$command" "ENVIRONMENT_CHECK"
+    return 0
+  fi
+
+  if strict_network_required; then
+    echo "  FAIL (${duration}s, environment/network)"
+    record_result "$suite" "$name" "$severity" "FAIL" "$duration" "$log" "$command" "ENVIRONMENT_FAILURE"
+    return 1
+  fi
+
+  echo "  WARN (${duration}s, environment/network)"
+  record_result "$suite" "$name" "$severity" "WARN" "$duration" "$log" "$command" "ENVIRONMENT_FAILURE"
+  return 0
+}
+
 record_result() {
-  local suite="$1" name="$2" severity="$3" status="$4" duration="$5" log="$6" command="$7"
-  printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\n" "$suite" "$name" "$severity" "$status" "$duration" "$log" "$command" >> "$RESULTS_TSV"
+  local suite="$1" name="$2" severity="$3" status="$4" duration="$5" log="$6" command="$7" category="${8:-APP_FAILURE}"
+  printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" "$suite" "$name" "$severity" "$status" "$duration" "$log" "$command" "$category" >> "$RESULTS_TSV"
   case "$status" in
     PASS) PASS_COUNT=$((PASS_COUNT + 1)) ;;
     WARN) WARN_COUNT=$((WARN_COUNT + 1)) ;;
@@ -88,18 +149,18 @@ run_step() {
 
   if [ "$exit_code" -eq 0 ]; then
     echo "  PASS (${duration}s)"
-    record_result "$suite" "$name" "$severity" "PASS" "$duration" "$log" "$command"
+    record_result "$suite" "$name" "$severity" "PASS" "$duration" "$log" "$command" "APP_CHECK"
     return 0
   fi
 
   if [ "$severity" = "WARN" ] || [ "$severity" = "MEDIUM" ] || [ "$severity" = "LOW" ]; then
     echo "  WARN (${duration}s, exit $exit_code)"
-    record_result "$suite" "$name" "$severity" "WARN" "$duration" "$log" "$command"
+    record_result "$suite" "$name" "$severity" "WARN" "$duration" "$log" "$command" "APP_FAILURE"
     return 0
   fi
 
   echo "  FAIL (${duration}s, exit $exit_code)"
-  record_result "$suite" "$name" "$severity" "FAIL" "$duration" "$log" "$command"
+  record_result "$suite" "$name" "$severity" "FAIL" "$duration" "$log" "$command" "APP_FAILURE"
   return 1
 }
 
@@ -111,7 +172,7 @@ run_skip() {
   printf "%s\n" "$reason" > "$log"
   echo "[$suite] $name"
   echo "  SKIP - $reason"
-  record_result "$suite" "$name" "$severity" "SKIP" "0" "$log" "$reason"
+  record_result "$suite" "$name" "$severity" "SKIP" "0" "$log" "$reason" "SKIPPED_BY_POLICY"
 }
 
 run_autofix_step() {
@@ -133,26 +194,90 @@ run_autofix_step() {
 
   if [ "$exit_code" -eq 0 ]; then
     echo "  PASS (${duration}s)"
-    record_result "$suite" "$name" "$severity" "PASS" "$duration" "$log" "$check_command"
+    record_result "$suite" "$name" "$severity" "PASS" "$duration" "$log" "$check_command" "APP_CHECK"
     return 0
   fi
 
   if ! is_true "$ALLOW_AUTOFIX"; then
     if [ "$severity" = "WARN" ] || [ "$severity" = "MEDIUM" ] || [ "$severity" = "LOW" ]; then
       echo "  WARN (${duration}s, exit $exit_code)"
-      record_result "$suite" "$name" "$severity" "WARN" "$duration" "$log" "$check_command"
+      record_result "$suite" "$name" "$severity" "WARN" "$duration" "$log" "$check_command" "APP_FAILURE"
       return 0
     fi
 
     echo "  FAIL (${duration}s, exit $exit_code)"
-    record_result "$suite" "$name" "$severity" "FAIL" "$duration" "$log" "$check_command"
+    record_result "$suite" "$name" "$severity" "FAIL" "$duration" "$log" "$check_command" "APP_FAILURE"
     return 1
   fi
 
   echo "  WARN (${duration}s, exit $exit_code; attempting autofix)"
-  record_result "$suite" "$name before autofix" "WARN" "WARN" "$duration" "$log" "$check_command"
+  record_result "$suite" "$name before autofix" "WARN" "WARN" "$duration" "$log" "$check_command" "APP_FAILURE"
   run_step "$suite" "$name autofix" "WARN" "$fix_command"
   run_step "$suite" "$name after autofix" "$severity" "$check_command"
+}
+
+npm_audit_step() {
+  local package_dir="$1" name="$2"
+  local suite="static" severity="MEDIUM" slug log start end duration exit_code command
+  slug="$(slugify "$suite-$name")"
+  log="$RUN_DIR/$slug.log"
+  command="cd $package_dir && npm audit --audit-level=high"
+  start="$(date +%s)"
+
+  echo "[$suite] $name"
+  echo "COMMAND: $command" > "$log"
+  echo "" >> "$log"
+
+  (cd "$ROOT" && bash -lc "$command") >> "$log" 2>&1
+  exit_code=$?
+  end="$(date +%s)"
+  duration=$((end - start))
+
+  if [ "$exit_code" -eq 0 ]; then
+    echo "  PASS (${duration}s)"
+    record_result "$suite" "$name" "$severity" "PASS" "$duration" "$log" "$command" "DEPENDENCY_CHECK"
+    return 0
+  fi
+
+  if grep -Eqi 'ENOTFOUND|EAI_AGAIN|audit endpoint returned an error|network|timeout|registry.npmjs.org' "$log"; then
+    if is_true "$OFFLINE_SKIP_AUDIT" && ! strict_network_required; then
+      echo "  SKIP (${duration}s, npm registry unavailable)"
+      record_result "$suite" "$name" "$severity" "SKIP" "$duration" "$log" "$command" "ENVIRONMENT_FAILURE"
+      return 0
+    fi
+
+    if strict_network_required; then
+      echo "  FAIL (${duration}s, npm registry unavailable)"
+      record_result "$suite" "$name" "HIGH" "FAIL" "$duration" "$log" "$command" "ENVIRONMENT_FAILURE"
+      return 1
+    fi
+
+    echo "  WARN (${duration}s, npm registry unavailable)"
+    record_result "$suite" "$name" "$severity" "WARN" "$duration" "$log" "$command" "ENVIRONMENT_FAILURE"
+    return 0
+  fi
+
+  if [ "$package_dir" = "backend" ] \
+    && grep -q 'nodemailer' "$log" \
+    && grep -q 'uuid' "$log" \
+    && grep -q 'xlsx' "$log" \
+    && grep -q '3 vulnerabilities' "$log"; then
+    echo "  WARN (${duration}s, known dependency exceptions)"
+    record_result "$suite" "$name" "$severity" "WARN" "$duration" "$log" "$command" "KNOWN_EXCEPTION"
+    return 0
+  fi
+
+  if is_true "$ALLOW_AUTOFIX"; then
+    echo "  WARN (${duration}s, attempting npm audit fix)"
+    record_result "$suite" "$name before autofix" "WARN" "WARN" "$duration" "$log" "$command" "DEPENDENCY_RISK"
+    run_step "$suite" "$name autofix" "WARN" "cd $package_dir && npm audit fix"
+    npm_audit_step "$package_dir" "$name after autofix"
+    return $?
+  fi
+
+  echo "  WARN (${duration}s, dependency risk)"
+  record_result "$suite" "$name" "$severity" "WARN" "$duration" "$log" "$command" "DEPENDENCY_RISK"
+  return 0
 }
 
 snapshot_staging() {
@@ -205,17 +330,13 @@ static_suite() {
   run_step "static" "backend unit tests" "BLOCKER" "cd backend && npm test"
   run_step "static" "backend coverage" "HIGH" "cd backend && npm run test:coverage"
   run_step "static" "backend build" "BLOCKER" "cd backend && npm run build"
-  run_autofix_step "static" "backend audit high" "MEDIUM" \
-    "cd backend && npm audit --audit-level=high" \
-    "cd backend && npm audit fix"
+  npm_audit_step "backend" "backend audit high"
 
   run_step "static" "frontend lint" "HIGH" "cd frontend && npm run lint -- --quiet"
   run_step "static" "frontend unit tests" "BLOCKER" "cd frontend && npm test"
   run_step "static" "frontend coverage" "HIGH" "cd frontend && npm run test:coverage"
   run_step "static" "frontend build" "BLOCKER" "cd frontend && npm run build"
-  run_autofix_step "static" "frontend audit high" "MEDIUM" \
-    "cd frontend && npm audit --audit-level=high" \
-    "cd frontend && npm audit fix"
+  npm_audit_step "frontend" "frontend audit high"
 
   run_step "static" "blockchain compile" "HIGH" "cd blockchain && npm run compile"
 }
@@ -289,6 +410,16 @@ production_smoke_suite() {
   run_step "production-smoke" "search safety" "HIGH" "bash backend/tests/search-safety-test.sh '$TARGET_URL'"
 }
 
+preflight_suite() {
+  if [ "$RUN_PROFILE" = "quick" ]; then
+    network_check "preflight" "npm registry" "https://registry.npmjs.org/-/ping" "MEDIUM"
+    return 0
+  fi
+
+  network_check "preflight" "target health reachability" "$TARGET_URL/api/health" "BLOCKER"
+  network_check "preflight" "npm registry" "https://registry.npmjs.org/-/ping" "MEDIUM"
+}
+
 write_summary() {
   local branch commit started
   branch="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
@@ -314,6 +445,8 @@ main() {
   echo "API:     $API_URL"
   echo "Report:  $RUN_DIR"
   echo ""
+
+  preflight_suite
 
   case "$RUN_PROFILE" in
     quick)

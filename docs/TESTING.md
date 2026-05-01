@@ -214,18 +214,22 @@ Evidence generated per run:
 - `summary.md`: human-readable certification report.
 - `summary.json`: machine-readable report for CI or audit storage.
 - one `.log` file per step with command output.
+- each result includes a category: `APP_CHECK`, `APP_FAILURE`, `SECURITY_FAILURE`, `DEPENDENCY_CHECK`, `DEPENDENCY_RISK`, `ENVIRONMENT_CHECK`, `ENVIRONMENT_FAILURE`, `KNOWN_EXCEPTION`, or `SKIPPED_BY_POLICY`.
 
 Severity policy:
 
 - `BLOCKER` and `HIGH` failures return non-zero and block certification.
 - `MEDIUM`, `LOW`, and `WARN` failures are recorded but do not hide known exceptions, such as backend dependency advisories that require breaking upgrades.
 - Destructive stress or restore drills are skipped unless `ALLOW_DESTRUCTIVE_STAGING=true`.
+- DNS/registry failures are classified as `ENVIRONMENT_FAILURE`; they are warnings for local `quick` runs and blocking in `post-deploy`, `production-smoke`, `certification`, and GitHub Actions.
+- `npm audit` results are classified separately from functional failures. The known backend advisories for `nodemailer`, `uuid`, and `xlsx` are recorded as `KNOWN_EXCEPTION` until the dependency migration backlog is executed.
 
 Autocorrection policy:
 
 - Disabled by default.
 - When `ALLOW_AUTOFIX=true`, the runner may run non-forced dependency fixes, reinstall inconsistent `node_modules`, and re-run checks.
 - It does not apply forced dependency upgrades, destructive migrations, or database cleanup unless destructive staging mode and explicit snapshot/restore commands are configured.
+- `OFFLINE_SKIP_AUDIT=true` can skip npm audit only for local non-strict runs; CI and certification still require registry access.
 
 GitHub Actions:
 
