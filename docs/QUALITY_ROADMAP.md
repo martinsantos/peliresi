@@ -18,6 +18,9 @@ SITREP esta en estado MVP avanzado / beta operativa. Backend, frontend web, PWA 
 - Scripts de deploy versionados en `scripts/cicd/` y usados por GitHub Actions para evitar drift con `/opt/scripts-cicd`.
 - Coverage gates alineados al baseline real para que `npm run test:coverage` pase y pueda subir gradualmente.
 - `npm audit fix` no forzado aplicado: frontend queda en 0 vulnerabilidades reportadas; backend baja a 3 vulnerabilidades residuales.
+- Runner de certificacion agregado en `scripts/certification/`, con perfiles `quick`, `post-deploy`, `production-smoke` y `certification`.
+- Evidencia de certificacion estandarizada en Markdown y JSON bajo `reports/test-runs/`.
+- Workflow manual `SITREP Certification Tests` agregado para ejecutar la matriz desde GitHub Actions.
 
 ## Backlog recomendado
 
@@ -45,7 +48,7 @@ SITREP esta en estado MVP avanzado / beta operativa. Backend, frontend web, PWA 
    - Cubrir flujo operador: QR, recepcion, pesaje, rechazo y cierre.
 
 5. Operacion
-   - Agregar smoke post-deploy obligatorio.
+   - Convertir `post-deploy` del runner de certificacion en gate automatico obligatorio despues del deploy.
    - Exponer version backend/frontend en health o panel admin.
    - Registrar denegaciones sensibles sin filtrar informacion al cliente.
    - Revisar alcance de sub-admins e inspectores.
@@ -54,3 +57,9 @@ SITREP esta en estado MVP avanzado / beta operativa. Backend, frontend web, PWA 
    - Backend: migrar `nodemailer` a version mayor segura y probar envio/cola de emails.
    - Backend: migrar `uuid` a version mayor segura o reemplazar usos por `crypto.randomUUID()` donde aplique.
    - Backend: reemplazar `xlsx`, porque npm audit no ofrece fix para SheetJS OSS.
+
+7. Certificacion
+   - Configurar comandos reales de snapshot/restore para staging en `STAGING_SNAPSHOT_COMMAND` y `STAGING_RESTORE_COMMAND`.
+   - Definir retencion de artefactos `reports/test-runs/` en CI.
+   - Agregar soak extendido de 6-12 horas como corrida manual previa a certificacion final.
+   - Agregar pruebas de backup/restore contra base temporal para evitar depender de restore destructivo sobre staging compartido.

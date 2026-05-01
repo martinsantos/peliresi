@@ -1,0 +1,63 @@
+name: SITREP Certification Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Test profile to run
+        required: true
+        default: post-deploy
+        type: choice
+        options:
+          - quick
+          - post-deploy
+          - production-smoke
+          - certification
+      target_url:
+        description: Target base URL
+        required: true
+        default: https://sitrep.ultimamilla.com.ar
+      allow_autofix:
+        description: Allow safe/staging autocorrections
+        required: true
+        default: false
+        type: boolean
+      allow_destructive_staging:
+        description: Allow destructive staging-only phases
+        required: true
+        default: false
+        type: boolean
+
+jobs:
+  certification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright browsers
+        if: ${{ inputs.profile == 'post-deploy' || inputs.profile == 'certification' }}
+        run: cd frontend && npx playwright install --with-deps chromium
+
+      - name: Run certification suite
+        env:
+          RUN_PROFILE: ${{ inputs.profile }}
+          TARGET_URL: ${{ inputs.target_url }}
+          ALLOW_AUTOFIX: ${{ inputs.allow_autofix }}
+          ALLOW_DESTRUCTIVE_STAGING: ${{ inputs.allow_destructive_staging }}
+          STAGING_SNAPSHOT_COMMAND: ${{ secrets.CERT_STAGING_SNAPSHOT_COMMAND }}
+          STAGING_RESTORE_COMMAND: ${{ secrets.CERT_STAGING_RESTORE_COMMAND }}
+          REPORT_DIR: reports/test-runs
+        run: bash scripts/certification/run-certification-suite.sh
+
+      - name: Upload certification report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sitrep-certification-report
+          path: reports/test-runs/

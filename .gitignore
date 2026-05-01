@@ -53,6 +53,7 @@ backend/prisma/migrations/
 coverage/
 .nyc_output/
 test-results*/
+reports/test-runs/
 
 # Temporary files
 tmp/
@@ -63,6 +64,7 @@ temp/
 .cache/
 .parcel-cache/
 .eslintcache
+__pycache__/
 
 # Debug
 *.pem

@@ -34,6 +34,12 @@ cd frontend && npm run test:e2e
 # All tests (orchestrated)
 bash scripts/test-all.sh
 
+# Certification runner profiles
+bash scripts/certification/run-certification-suite.sh quick
+RUN_PROFILE=post-deploy bash scripts/certification/run-certification-suite.sh
+RUN_PROFILE=production-smoke bash scripts/certification/run-certification-suite.sh
+RUN_PROFILE=certification ALLOW_AUTOFIX=true bash scripts/certification/run-certification-suite.sh
+
 # With coverage
 cd backend && npm run test:coverage
 cd frontend && npm run test:coverage
@@ -176,3 +182,52 @@ Post-deploy test target in the current test VPS:
 # From inside the VPS, this avoids public DNS noise while testing the deployed backend.
 bash /tmp/sitrep-smoke-test.sh http://127.0.0.1:3010
 ```
+
+## Certification Test Matrix
+
+`scripts/certification/run-certification-suite.sh` is the formal runner for certification evidence. It wraps the existing unit, E2E, smoke, role, security, integrity, operational, and stress scripts and writes a timestamped report under `reports/test-runs/`.
+
+Profiles:
+
+| Profile | Purpose | Destructive |
+|---------|---------|-------------|
+| `quick` | Local/CI fast validation: dependencies, typecheck, unit, coverage, build, audits, blockchain compile. | No |
+| `post-deploy` | Remote validation after deploy: API regression plus Playwright chromium. | No |
+| `production-smoke` | Minimal no-destructive production/VPN validation. | No |
+| `certification` | Full staging/test VPS matrix: static, API, workflow, security, integrity, frontend, ops/recovery, stress. | Only if explicitly enabled |
+
+Example staging run:
+
+```bash
+RUN_PROFILE=certification \
+TARGET_URL=https://sitrep.ultimamilla.com.ar \
+API_URL=https://sitrep.ultimamilla.com.ar/api \
+ALLOW_AUTOFIX=true \
+ALLOW_DESTRUCTIVE_STAGING=true \
+STAGING_SNAPSHOT_COMMAND='ssh root@23.105.176.45 /opt/scripts-cicd/backup_sitrep.sh' \
+STAGING_RESTORE_COMMAND='echo restore-command-not-configured' \
+bash scripts/certification/run-certification-suite.sh
+```
+
+Evidence generated per run:
+
+- `summary.md`: human-readable certification report.
+- `summary.json`: machine-readable report for CI or audit storage.
+- one `.log` file per step with command output.
+
+Severity policy:
+
+- `BLOCKER` and `HIGH` failures return non-zero and block certification.
+- `MEDIUM`, `LOW`, and `WARN` failures are recorded but do not hide known exceptions, such as backend dependency advisories that require breaking upgrades.
+- Destructive stress or restore drills are skipped unless `ALLOW_DESTRUCTIVE_STAGING=true`.
+
+Autocorrection policy:
+
+- Disabled by default.
+- When `ALLOW_AUTOFIX=true`, the runner may run non-forced dependency fixes, reinstall inconsistent `node_modules`, and re-run checks.
+- It does not apply forced dependency upgrades, destructive migrations, or database cleanup unless destructive staging mode and explicit snapshot/restore commands are configured.
+
+GitHub Actions:
+
+- `.github/workflows/certification-tests.yml` exposes the runner as a manual workflow.
+- The production deploy workflow remains fast and keeps deploy validation separate from destructive certification testing.
