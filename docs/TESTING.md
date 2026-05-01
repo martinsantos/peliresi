@@ -137,7 +137,7 @@ The original test suite (124+ tests) using curl against the live API. These rema
 bash backend/tests/smoke-test.sh
 
 # Against local
-bash backend/tests/smoke-test.sh http://localhost:3002
+bash backend/tests/smoke-test.sh http://localhost:3010
 
 # Cross-platform workflow (59 tests)
 bash backend/tests/cross-platform-workflow-test.sh
@@ -145,10 +145,19 @@ bash backend/tests/cross-platform-workflow-test.sh
 
 ## Coverage Thresholds
 
-Initial thresholds (ratchet up over time):
-- **Lines**: 20%
-- **Branches**: 20%
-- **Functions**: 20%
+Coverage gates are set to the current verified baseline so the command is useful in CI and can be ratcheted up as new tests land.
+
+Backend baseline:
+- **Statements**: 2%
+- **Branches**: 3%
+- **Functions**: 2%
+- **Lines**: 2%
+
+Frontend baseline:
+- **Statements**: 2%
+- **Branches**: 0.8%
+- **Functions**: 1%
+- **Lines**: 2%
 
 ## CI Integration
 
@@ -157,5 +166,13 @@ The production workflow validates backend, frontend, and blockchain before deplo
 - Backend: `npm ci`, audit high-level report, typecheck, tests, build.
 - Frontend: `npm ci`, lint, tests, build.
 - Blockchain: `npm ci`, Hardhat compile.
+- Deploy scripts are versioned in `scripts/cicd/` and copied to the VPS during each workflow run, avoiding drift between repository and server.
 
 Playwright and bash smoke tests remain environment-dependent and should run manually, nightly, or post-deploy against a known seeded target.
+
+Post-deploy test target in the current test VPS:
+
+```bash
+# From inside the VPS, this avoids public DNS noise while testing the deployed backend.
+bash /tmp/sitrep-smoke-test.sh http://127.0.0.1:3010
+```

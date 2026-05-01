@@ -10,7 +10,7 @@ El script verifica cada tabla de actor independientemente.
 
 Uso:
   python3 backend/tests/verify-actor-data.py                             # vs produccion
-  python3 backend/tests/verify-actor-data.py --api http://localhost:3002  # vs local
+  python3 backend/tests/verify-actor-data.py --api http://localhost:3010  # vs local
 
 Dependencias: python3, openpyxl (pip3 install openpyxl)
 """

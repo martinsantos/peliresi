@@ -11,7 +11,7 @@ dotenv.config({
 export const config = {
   // Configuración del servidor
   NODE_ENV: process.env.NODE_ENV || 'development',
-  PORT: parseInt(process.env.PORT || '3002', 10),
+  PORT: parseInt(process.env.PORT || '3010', 10),
 
   // Base de datos
   // Default apunta a trazabilidad_dev para evitar conexiones accidentales a producción

@@ -43,7 +43,7 @@ Internet/VPN
     ▼
 Nginx 1.28.3 (443 SSL)
     │
-    ├── /api/*     ─► Node.js 22 (systemd) :3002
+    ├── /api/*     -> Node.js 22 (systemd) :3010
     ├── /app/*     ─► PWA dist (/var/www/sitrep/app/)
     ├── /manual/*  ─► Manual HTML (/var/www/sitrep/manual/)
     └── /*         ─► SPA React (/var/www/sitrep/)

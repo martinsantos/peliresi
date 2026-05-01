@@ -3,10 +3,10 @@
 # SITREP Blockchain Validation Test
 # Tests the blockchain registration and verification flow
 # Usage: ./tests/blockchain-test.sh [BASE_URL]
-# Default: http://localhost:3002
+# Default: http://localhost:3010
 # ============================================================
 
-BASE_URL="${1:-http://localhost:3002}"
+BASE_URL="${1:-http://localhost:3010}"
 API="$BASE_URL/api"
 PASS=0
 FAIL=0

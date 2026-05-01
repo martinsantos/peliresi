@@ -9,6 +9,8 @@ on:
       - 'blockchain/**'
       - 'docs/manual/**'
       - 'docs/screenshots/**'
+      - 'scripts/cicd/**'
+      - '.github/workflows/deploy-production.yml'
   workflow_dispatch:
     inputs:
       deploy_target:
@@ -46,12 +48,13 @@ jobs:
       - name: Upload Source to VPS
         run: |
           scp -i ~/.ssh/deploy_key /tmp/sitrep-frontend-source.tar.gz root@${{ secrets.VPS_HOST }}:/tmp/
+          scp -i ~/.ssh/deploy_key scripts/cicd/deploy_sitrep_frontend_with_build.sh root@${{ secrets.VPS_HOST }}:/tmp/
 
       - name: Build and Deploy Frontend on VPS
         run: |
           ssh -i ~/.ssh/deploy_key root@${{ secrets.VPS_HOST }} << 'ENDSSH'
             export DRY_RUN=${{ env.DRY_RUN }}
-            bash /opt/scripts-cicd/deploy_sitrep_frontend_with_build.sh
+            bash /tmp/deploy_sitrep_frontend_with_build.sh
           ENDSSH
 
   validate-backend:
@@ -147,10 +150,11 @@ jobs:
       - name: Upload Source to VPS
         run: |
           scp -i ~/.ssh/deploy_key /tmp/sitrep-backend-source.tar.gz root@${{ secrets.VPS_HOST }}:/tmp/
+          scp -i ~/.ssh/deploy_key scripts/cicd/deploy_sitrep_backend_with_build.sh root@${{ secrets.VPS_HOST }}:/tmp/
 
       - name: Build and Deploy Backend on VPS
         run: |
           ssh -i ~/.ssh/deploy_key root@${{ secrets.VPS_HOST }} << 'ENDSSH'
             export DRY_RUN=${{ env.DRY_RUN }}
-            bash /opt/scripts-cicd/deploy_sitrep_backend_with_build.sh
+            bash /tmp/deploy_sitrep_backend_with_build.sh
           ENDSSH

@@ -2,7 +2,7 @@
 # Role Enforcement Test — SITREP
 # Verifica que NINGÚN rol puede ejecutar acciones fuera de sus permisos.
 # Uso: bash backend/tests/role-enforcement-test.sh [BASE_URL]
-# Ejemplo: bash backend/tests/role-enforcement-test.sh http://localhost:3002
+# Ejemplo: bash backend/tests/role-enforcement-test.sh http://localhost:3010
 
 set -uo pipefail
 

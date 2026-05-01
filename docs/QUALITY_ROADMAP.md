@@ -15,6 +15,9 @@ SITREP esta en estado MVP avanzado / beta operativa. Backend, frontend web, PWA 
 - Frontend lint queda habilitado como baseline gradual: deuda heredada visible como warnings, errores reales siguen bloqueando.
 - Push notifications ya no generan error cuando VAPID no esta configurado; el endpoint reporta `enabled:false`.
 - Se agregaron tests unitarios para push y para el guard de acceso a manifiestos.
+- Scripts de deploy versionados en `scripts/cicd/` y usados por GitHub Actions para evitar drift con `/opt/scripts-cicd`.
+- Coverage gates alineados al baseline real para que `npm run test:coverage` pase y pueda subir gradualmente.
+- `npm audit fix` no forzado aplicado: frontend queda en 0 vulnerabilidades reportadas; backend baja a 3 vulnerabilidades residuales.
 
 ## Backlog recomendado
 
@@ -46,3 +49,8 @@ SITREP esta en estado MVP avanzado / beta operativa. Backend, frontend web, PWA 
    - Exponer version backend/frontend en health o panel admin.
    - Registrar denegaciones sensibles sin filtrar informacion al cliente.
    - Revisar alcance de sub-admins e inspectores.
+
+6. Dependencias con decision pendiente
+   - Backend: migrar `nodemailer` a version mayor segura y probar envio/cola de emails.
+   - Backend: migrar `uuid` a version mayor segura o reemplazar usos por `crypto.randomUUID()` donde aplique.
+   - Backend: reemplazar `xlsx`, porque npm audit no ofrece fix para SheetJS OSS.

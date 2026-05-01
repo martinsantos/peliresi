@@ -407,12 +407,12 @@ Nginx esta vivo pero no puede conectarse al backend.
 
 ```bash
 # 1. Verificar backend en localhost
-curl http://localhost:3002/api/health
+curl http://localhost:3010/api/health
 
 # 2. Si esta caido, restart
 pm2 restart sitrep-backend
 sleep 3
-curl http://localhost:3002/api/health
+curl http://localhost:3010/api/health
 
 # 3. Si persiste, ver logs
 pm2 logs sitrep-backend --lines 100 --nostream
@@ -526,7 +526,7 @@ bash scripts/test-all.sh
 ssh root@<HOST> "pm2 restart sitrep-backend && systemctl reload nginx"
 
 # Status rapido
-ssh root@<HOST> "pm2 list | grep sitrep && systemctl is-active nginx && curl -s localhost:3002/api/health"
+ssh root@<HOST> "pm2 list | grep sitrep && systemctl is-active nginx && curl -s localhost:3010/api/health"
 
 # Limpiar logs PM2
 ssh root@<HOST> "pm2 flush"

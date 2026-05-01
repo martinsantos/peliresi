@@ -7,7 +7,7 @@
 # =============================================================================
 set -uo pipefail
 
-BASE_URL="${1:-http://localhost:3002}"
+BASE_URL="${1:-http://localhost:3010}"
 ADMIN_EMAIL="admin@dgfa.mendoza.gov.ar"
 ADMIN_PASS="admin123"
 TRANSPORTISTA_EMAIL="transportes.andes@logistica.com"

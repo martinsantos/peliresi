@@ -3468,8 +3468,8 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <tbody>
 <tr><td>Servidor</td><td>VPS en 23.105.176.45</td></tr>
 <tr><td>Dominio</td><td><code>sitrep.ultimamilla.com.ar</code></td></tr>
-<tr><td>PM2</td><td>Modo cluster, 2 instancias, puerto 3002, 512MB por instancia</td></tr>
-<tr><td>Nginx</td><td>Reverse proxy <code>/api/</code> hacia <code>localhost:3002</code>, SPA fallback para frontend</td></tr>
+<tr><td>PM2</td><td>Modo cluster, 2 instancias, puerto 3010, 512MB por instancia</td></tr>
+<tr><td>Nginx</td><td>Reverse proxy <code>/api/</code> hacia <code>localhost:3010</code>, SPA fallback para frontend</td></tr>
 <tr><td>SSL</td><td>Let's Encrypt (renovacion automatica)</td></tr>
 <tr><td>Docker</td><td>Contenedor PostgreSQL (<code>directus-admin-database-1</code>)</td></tr>
 </tbody>
@@ -3521,7 +3521,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <tr><td>Script</td><td><code>dist/index.js</code></td></tr>
 <tr><td>Exec mode</td><td>cluster</td></tr>
 <tr><td>Instances</td><td>2</td></tr>
-<tr><td>Port</td><td>3002</td></tr>
+<tr><td>Port</td><td>3010</td></tr>
 <tr><td>Max memory</td><td>512MB por instancia</td></tr>
 <tr><td>CWD</td><td><code>/var/www/sitrep-backend/</code></td></tr>
 </tbody>
@@ -3532,7 +3532,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <ul>
 <li><strong>Frontend principal:</strong> Sirve archivos estaticos desde <code>/var/www/sitrep/</code> con SPA fallback (<code>try_files $uri $uri/ /index.html</code>).</li>
 <li><strong>PWA App:</strong> Sirve desde <code>/var/www/sitrep/app/</code> con SPA fallback a <code>/app/app.html</code>.</li>
-<li><strong>API:</strong> Reverse proxy de <code>/api/</code> a <code>http://127.0.0.1:3002</code>.</li>
+<li><strong>API:</strong> Reverse proxy de <code>/api/</code> a <code>http://127.0.0.1:3010</code>.</li>
 <li><strong>SSL:</strong> Certificado Let's Encrypt con renovacion automatica via certbot.</li>
 <li><strong>Headers:</strong> Configuracion de cache para assets estaticos, compresion gzip, y headers de seguridad adicionales.</li>
 </ul>
@@ -6969,7 +6969,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <tbody>
 <tr><td>Node.js</td><td>v20.19.4</td><td>LTS, runtime de produccion</td></tr>
 <tr><td>PostgreSQL</td><td>15-alpine</td><td>Docker container <code>directus-admin-database-1</code></td></tr>
-<tr><td>PM2</td><td>Cluster mode</td><td>2 instancias, 512MB/inst, port 3002</td></tr>
+<tr><td>PM2</td><td>Cluster mode</td><td>2 instancias, 512MB/inst, port 3010</td></tr>
 <tr><td>Nginx</td><td>Reverse proxy</td><td>SSL Let's Encrypt, SPA fallback, gzip</td></tr>
 <tr><td>Docker</td><td>Solo PostgreSQL</td><td>Backend corre directo en PM2 (no Docker)</td></tr>
 <tr><td>Prisma binary targets</td><td>native + rhel-openssl-3.0.x</td><td>Build en Ubuntu, deploy en RHEL</td></tr>
@@ -6994,13 +6994,13 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 │          ┌───────────┘      │  └──────────────┐                     │
 │          ▼                  ▼                  ▼                     │
 │  /var/www/sitrep/      /api/ proxy        /var/www/sitrep/app/      │
-│  Frontend SPA          localhost:3002      PWA Mobile App           │
+│  Frontend SPA          localhost:3010      PWA Mobile App           │
 │  try_files → /index.html                  try_files → /app/app.html│
 │                            │                                         │
 │                   ┌────────▼────────┐                               │
 │                   │   PM2 Cluster   │  process: sitrep-backend      │
 │                   │  2x Node.js 20  │  512MB/instancia              │
-│                   │  Express ^4.18  │  port: 3002                   │
+│                   │  Express ^4.18  │  port: 3010                   │
 │                   └────────┬────────┘                               │
 │                   ┌────────▼────────┐                               │
 │                   │  Prisma ^5.6.0  │  pool: 20/inst (40 total)     │
@@ -7707,7 +7707,7 @@ server {
 
     # API proxy a PM2 backend
     location /api/ {
-        proxy_pass http://127.0.0.1:3002;
+        proxy_pass http://127.0.0.1:3010;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -7843,7 +7843,7 @@ npx prisma generate
 <pre>
 # ---- Core ----
 NODE_ENV=production
-PORT=3002
+PORT=3010
 
 # ---- Base de Datos ----
 # Reemplazar PASSWORD con el password generado en Paso 3
@@ -7891,7 +7891,7 @@ pm2 save
 </pre>
 
 <div class="info-box">
-<strong>Verificacion:</strong> <code>curl http://localhost:3002/api/health</code> debe retornar <code>{"status":"ok","db":"connected"}</code>. Tambien verificar <code>pm2 list</code> muestra 2 instancias online.
+<strong>Verificacion:</strong> <code>curl http://localhost:3010/api/health</code> debe retornar <code>{"status":"ok","db":"connected"}</code>. Tambien verificar <code>pm2 list</code> muestra 2 instancias online.
 </div>
 
 <!-- 15.12.8 PASO 7: SEED DE DATOS -->
@@ -8118,7 +8118,7 @@ chmod +x /opt/scripts-cicd/backup_sitrep.sh
 <pre>
 #!/bin/bash
 RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
-  --max-time 10 http://localhost:3002/api/health)
+  --max-time 10 http://localhost:3010/api/health)
 if [ "$RESPONSE" != "200" ]; then
   echo "[$(date)] ALERT: Health check failed (HTTP $RESPONSE)" \
     >> /var/log/sitrep-health.log
