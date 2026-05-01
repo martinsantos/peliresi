@@ -6,6 +6,7 @@ on:
     paths:
       - 'frontend/**'
       - 'backend/**'
+      - 'blockchain/**'
       - 'docs/manual/**'
       - 'docs/screenshots/**'
   workflow_dispatch:
@@ -25,6 +26,7 @@ env:
 
 jobs:
   deploy-frontend:
+    needs: validate-frontend
     if: github.event_name == 'push' || github.event.inputs.deploy_target != 'backend-only'
     runs-on: ubuntu-latest
     steps:
@@ -74,11 +76,58 @@ jobs:
       - name: TypeScript type-check
         run: cd backend && npx tsc --noEmit
 
+      - name: Run backend tests
+        run: cd backend && npm test
+
       - name: Build backend
         run: cd backend && npm run build
 
+  validate-frontend:
+    if: github.event_name == 'push' || github.event.inputs.deploy_target != 'backend-only'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci
+
+      - name: Lint frontend
+        run: cd frontend && npm run lint
+
+      - name: Run frontend tests
+        run: cd frontend && npm test
+
+      - name: Build frontend
+        run: cd frontend && npm run build
+
+  validate-blockchain:
+    if: github.event_name == 'push' || github.event.inputs.deploy_target != 'frontend-only'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: blockchain/package-lock.json
+
+      - name: Install blockchain dependencies
+        run: cd blockchain && npm ci
+
+      - name: Compile smart contracts
+        run: cd blockchain && npm run compile
+
   deploy-backend:
-    needs: validate-backend
+    needs: [validate-backend, validate-blockchain]
     if: github.event_name == 'push' || github.event.inputs.deploy_target != 'frontend-only'
     runs-on: ubuntu-latest
     steps:

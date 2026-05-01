@@ -4,12 +4,13 @@
 
 | Suite | Framework | Location | Count | Runtime |
 |-------|-----------|----------|-------|---------|
-| Backend Unit | Vitest | `backend/src/__tests__/` | 61 | ~400ms |
+| Backend Unit | Vitest | `backend/src/__tests__/` | 70 | ~500ms |
 | Frontend Unit | Vitest | `frontend/src-v6/__tests__/` | 63 | ~2.5s |
 | E2E | Playwright | `frontend/e2e/` | 13 | ~30s |
 | API Smoke | Bash/curl | `backend/tests/` | 124+ | ~60s |
+| Blockchain Compile | Hardhat | `blockchain/` | 1 contract | ~2s |
 
-**Total: 261+ automated tests**
+**Total: 270+ automated tests/checks**
 
 ## Running Tests
 
@@ -19,6 +20,13 @@ cd backend && npm test
 
 # Frontend unit tests
 cd frontend && npm test
+
+# Frontend lint + production build
+cd frontend && npm run lint
+cd frontend && npm run build
+
+# Blockchain compile
+cd blockchain && npm run compile
 
 # Frontend E2E (requires production or local server)
 cd frontend && npm run test:e2e
@@ -44,12 +52,13 @@ backend/src/__tests__/
   mocks/prisma.ts                   # PrismaClient deep mock
   middlewares/
     auth.middleware.test.ts          # JWT validation, role checks
+    push.controller.test.ts          # Push feature flag response
     errorHandler.test.ts            # AppError, Prisma errors, 500s
   utils/
     asyncHandler.test.ts            # Express async wrapper
     manifiestoNumber.test.ts        # Numero generation algorithm
     pagination.test.ts              # parsePagination utility
-    roleFilter.test.ts              # Role-based query filtering
+    roleFilter.test.ts              # Role-based query filtering + manifiesto ownership guard
 ```
 
 ### Prisma Mocking
@@ -109,6 +118,16 @@ npx playwright test --project=chromium # Desktop only
 PLAYWRIGHT_BASE_URL=http://localhost:5173 npx playwright test  # Local
 ```
 
+## Lint Baseline
+
+Frontend lint is now part of CI, but existing React/type debt is treated as warnings so it can be reduced incrementally without blocking deployments.
+
+Current expected state:
+
+- `npm run lint`: exits 0.
+- Existing debt remains visible as warnings, mainly `any`, unused symbols, React Compiler memoization warnings, and hook-effect cleanup candidates.
+- New hard errors such as conditional hook calls should still fail lint.
+
 ## Bash Smoke Tests
 
 The original test suite (124+ tests) using curl against the live API. These remain the production verification standard.
@@ -133,4 +152,10 @@ Initial thresholds (ratchet up over time):
 
 ## CI Integration
 
-`scripts/test-all.sh` orchestrates all test suites. Set `SKIP_E2E=1` to skip Playwright in environments without a browser.
+The production workflow validates backend, frontend, and blockchain before deploy:
+
+- Backend: `npm ci`, audit high-level report, typecheck, tests, build.
+- Frontend: `npm ci`, lint, tests, build.
+- Blockchain: `npm ci`, Hardhat compile.
+
+Playwright and bash smoke tests remain environment-dependent and should run manually, nightly, or post-deploy against a known seeded target.

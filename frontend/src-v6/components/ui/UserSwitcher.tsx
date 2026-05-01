@@ -88,6 +88,7 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
   const { currentUser, users, switchUser, getUsersByRole } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<UserRole | 'all'>('all');
+  const [isSwitching, setIsSwitching] = useState(false);
 
   if (!currentUser) return null;
 
@@ -97,8 +98,6 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
   const filteredUsers = selectedRole === 'all' 
     ? users 
     : getUsersByRole(selectedRole);
-
-  const [isSwitching, setIsSwitching] = useState(false);
 
   const handleSwitch = async (userId: number | string) => {
     if (userId === currentUser.id) {

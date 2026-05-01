@@ -75,6 +75,46 @@ export const MainLayout: React.FC = () => {
   const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isAdminTransportista, isAdminGenerador, isAdminOperador, canAccess, isLoading } = useAuth();
   const { impersonationData, exitImpersonation } = useImpersonation();
 
+  // Items de administración según rol. Hooks must stay before loading/null guards.
+  const adminItems = useMemo(() => {
+    const items = [];
+
+    if (isAdmin) {
+      items.push({ path: '/admin/actores',                icon: Building2,    label: 'Actores' });
+      items.push({ path: '/admin/actores/generadores',    icon: Factory,      label: 'Admin Generadores' });
+      items.push({ path: '/admin/actores/operadores',     icon: FlaskConical, label: 'Admin Operadores' });
+      items.push({ path: '/admin/actores/transportistas', icon: Truck,        label: 'Admin Transporte' });
+      items.push({ path: '/admin/solicitudes',            icon: FileCheck,    label: 'Solicitudes' });
+      items.push({ path: '/admin/residuos',               icon: FlaskConical, label: 'Catálogo Residuos' });
+      items.push({ path: '/admin/tratamientos',           icon: BarChart3,    label: 'Tratamientos' });
+      items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
+      items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
+      items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
+    } else if (isAdminGenerador) {
+      items.push({ path: '/admin/actores/generadores',    icon: Factory,      label: 'Mis Generadores' });
+      items.push({ path: '/admin/residuos',               icon: FlaskConical, label: 'Catálogo Residuos' });
+      items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
+      items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
+      items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
+    } else if (isAdminTransportista) {
+      items.push({ path: '/admin/actores/transportistas', icon: Truck,        label: 'Mis Transportistas' });
+      items.push({ path: '/admin/vehiculos',              icon: Truck,        label: 'Vehículos' });
+      items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
+      items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
+      items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
+    } else if (isAdminOperador) {
+      items.push({ path: '/admin/actores/operadores',     icon: FlaskConical, label: 'Mis Operadores' });
+      items.push({ path: '/admin/tratamientos',           icon: BarChart3,    label: 'Tratamientos' });
+      items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
+      items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
+      items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
+    } else if (isTransportista) {
+      items.push({ path: '/admin/vehiculos',              icon: Truck,        label: 'Mis Vehículos' });
+    }
+
+    return items;
+  }, [isAdmin, isAdminGenerador, isAdminTransportista, isAdminOperador, isTransportista]);
+
   // Guard: show loading or redirect if no user
   if (isLoading) {
     return (
@@ -137,46 +177,6 @@ export const MainLayout: React.FC = () => {
     
     return items;
   })();
-
-  // Items de administración según rol
-  const adminItems = useMemo(() => {
-    const items = [];
-
-    if (isAdmin) {
-      items.push({ path: '/admin/actores',                icon: Building2,    label: 'Actores' });
-      items.push({ path: '/admin/actores/generadores',    icon: Factory,      label: 'Admin Generadores' });
-      items.push({ path: '/admin/actores/operadores',     icon: FlaskConical, label: 'Admin Operadores' });
-      items.push({ path: '/admin/actores/transportistas', icon: Truck,        label: 'Admin Transporte' });
-      items.push({ path: '/admin/solicitudes',            icon: FileCheck,    label: 'Solicitudes' });
-      items.push({ path: '/admin/residuos',               icon: FlaskConical, label: 'Catálogo Residuos' });
-      items.push({ path: '/admin/tratamientos',           icon: BarChart3,    label: 'Tratamientos' });
-      items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
-      items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
-      items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
-    } else if (isAdminGenerador) {
-      items.push({ path: '/admin/actores/generadores',    icon: Factory,      label: 'Mis Generadores' });
-      items.push({ path: '/admin/residuos',               icon: FlaskConical, label: 'Catálogo Residuos' });
-      items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
-      items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
-      items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
-    } else if (isAdminTransportista) {
-      items.push({ path: '/admin/actores/transportistas', icon: Truck,        label: 'Mis Transportistas' });
-      items.push({ path: '/admin/vehiculos',              icon: Truck,        label: 'Vehículos' });
-      items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
-      items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
-      items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
-    } else if (isAdminOperador) {
-      items.push({ path: '/admin/actores/operadores',     icon: FlaskConical, label: 'Mis Operadores' });
-      items.push({ path: '/admin/tratamientos',           icon: BarChart3,    label: 'Tratamientos' });
-      items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
-      items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
-      items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
-    } else if (isTransportista) {
-      items.push({ path: '/admin/vehiculos',              icon: Truck,        label: 'Mis Vehículos' });
-    }
-
-    return items;
-  }, [isAdmin, isAdminGenerador, isAdminTransportista, isAdminOperador, isTransportista]);
 
   // Get current page title
   const currentPage = navItems.find(item => item.path === location.pathname)?.label || 

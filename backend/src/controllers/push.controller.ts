@@ -5,8 +5,11 @@ import { enviarPushAlUsuario } from '../services/push.service';
 
 export async function getVapidPublicKey(_req: Request, res: Response) {
   const key = process.env.VAPID_PUBLIC_KEY;
-  if (!key) throw new AppError('Push no configurado', 503);
-  res.json({ success: true, data: { publicKey: key } });
+  if (!key) {
+    res.json({ success: true, data: { enabled: false, publicKey: null } });
+    return;
+  }
+  res.json({ success: true, data: { enabled: true, publicKey: key } });
 }
 
 export async function subscribe(req: Request, res: Response) {

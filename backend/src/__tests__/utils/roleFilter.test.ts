@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { isFullAccess, applyRoleFilter, canAccessManifiesto } from '../../utils/roleFilter';
+import {
+  isFullAccess,
+  applyRoleFilter,
+  canAccessManifiesto,
+  assertCanAccessManifiesto,
+} from '../../utils/roleFilter';
 
 describe('isFullAccess', () => {
   it('returns true for ADMIN', () => {
@@ -103,6 +108,60 @@ describe('canAccessManifiesto', () => {
       transportista: null,
       operador: null,
     }, manifiesto)).toBe(false);
+  });
+});
+
+describe('assertCanAccessManifiesto', () => {
+  function createPrismaMock(manifiesto: {
+    generadorId: string;
+    transportistaId: string;
+    operadorId: string;
+  } | null) {
+    return {
+      manifiesto: {
+        findUnique: async () => manifiesto,
+      },
+    };
+  }
+
+  it('resolves for the owning actor', async () => {
+    await expect(assertCanAccessManifiesto(
+      createPrismaMock({ generadorId: 'gen-1', transportistaId: 'trans-1', operadorId: 'oper-1' }),
+      {
+        rol: 'GENERADOR',
+        generador: { id: 'gen-1' },
+        transportista: null,
+        operador: null,
+      },
+      'man-1',
+    )).resolves.toBeUndefined();
+  });
+
+  it('throws 404 for non-owner actors', async () => {
+    await expect(assertCanAccessManifiesto(
+      createPrismaMock({ generadorId: 'gen-1', transportistaId: 'trans-1', operadorId: 'oper-1' }),
+      {
+        rol: 'OPERADOR',
+        generador: null,
+        transportista: null,
+        operador: { id: 'oper-2' },
+      },
+      'man-1',
+    )).rejects.toMatchObject({
+      message: 'Manifiesto no encontrado',
+      statusCode: 404,
+    });
+  });
+
+  it('throws 404 for missing manifests', async () => {
+    await expect(assertCanAccessManifiesto(
+      createPrismaMock(null),
+      { rol: 'ADMIN' },
+      'missing',
+    )).rejects.toMatchObject({
+      message: 'Manifiesto no encontrado',
+      statusCode: 404,
+    });
   });
 });
 
