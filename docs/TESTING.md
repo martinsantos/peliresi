@@ -192,9 +192,9 @@ Profiles:
 | Profile | Purpose | Destructive |
 |---------|---------|-------------|
 | `quick` | Local/CI fast validation: dependencies, typecheck, unit, coverage, build, audits, blockchain compile. | No |
-| `post-deploy` | Remote validation after deploy: API regression plus Playwright chromium. | No |
-| `production-smoke` | Minimal no-destructive production/VPN validation. | No |
-| `certification` | Full staging/test VPS matrix: static, config, API, workflow, security, integrity, frontend/PWA, accessibility, compatibility, ops/recovery, stress. | Only if explicitly enabled |
+| `post-deploy` | Remote validation after deploy: API regression, API contract, PWA/offline surface, Playwright chromium, ops readiness. | No |
+| `production-smoke` | Minimal no-destructive production/VPN validation plus API contract and PWA/offline surface. | No |
+| `certification` | Full staging/test VPS matrix: static, config, API contract, workflow, authenticated security, forensic integrity, frontend/PWA/offline, compatibility, ops/recovery, documentation evidence, stress. | Only if explicitly enabled |
 
 Example staging run:
 
@@ -206,6 +206,7 @@ ALLOW_AUTOFIX=true \
 ALLOW_DESTRUCTIVE_STAGING=true \
 STAGING_SNAPSHOT_COMMAND='ssh root@23.105.176.45 /opt/scripts-cicd/backup_sitrep.sh' \
 STAGING_RESTORE_COMMAND='echo restore-command-not-configured' \
+ALLOW_RESTORE_DRILL=false \
 bash scripts/certification/run-certification-suite.sh
 ```
 
@@ -215,13 +216,14 @@ Evidence generated per run:
 - `summary.json`: machine-readable report for CI or audit storage.
 - one `.log` file per step with command output.
 - each result includes a category: `APP_CHECK`, `APP_FAILURE`, `SECURITY_FAILURE`, `DEPENDENCY_CHECK`, `DEPENDENCY_RISK`, `ENVIRONMENT_CHECK`, `ENVIRONMENT_FAILURE`, `KNOWN_EXCEPTION`, or `SKIPPED_BY_POLICY`.
-- non-stress certification coverage includes configuration, health/live/ready, security headers, rate-limit headers, PWA/manual surface, mobile viewport, and dependency-free accessibility heuristics.
+- non-stress certification coverage includes configuration, health/live/ready, security headers, rate-limit headers, API contract, PWA/offline surface, authenticated role checks, forensic integrity, mobile viewport, and requirement-to-test evidence.
+- accessibility is intentionally out of the certification gate for now; `check-accessibility-static.py` remains available as a manual backlog tool.
 
 Severity policy:
 
 - `BLOCKER` and `HIGH` failures return non-zero and block certification.
 - `MEDIUM`, `LOW`, and `WARN` failures are recorded but do not hide known exceptions, such as backend dependency advisories that require breaking upgrades.
-- Destructive stress or restore drills are skipped unless `ALLOW_DESTRUCTIVE_STAGING=true`.
+- Destructive stress is skipped unless `ALLOW_DESTRUCTIVE_STAGING=true`; restore drills are skipped unless `ALLOW_RESTORE_DRILL=true` and a temporary restore target is configured.
 - DNS/registry failures are classified as `ENVIRONMENT_FAILURE`; they are warnings for local `quick` runs and blocking in `post-deploy`, `production-smoke`, `certification`, and GitHub Actions.
 - `npm audit` results are classified separately from functional failures. The known backend advisories for `nodemailer`, `uuid`, and `xlsx` are recorded as `KNOWN_EXCEPTION` until the dependency migration backlog is executed.
 

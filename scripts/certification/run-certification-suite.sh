@@ -33,6 +33,12 @@ ALLOW_AUTOFIX="${ALLOW_AUTOFIX:-false}"
 ALLOW_DESTRUCTIVE_STAGING="${ALLOW_DESTRUCTIVE_STAGING:-false}"
 STAGING_SNAPSHOT_COMMAND="${STAGING_SNAPSHOT_COMMAND:-}"
 STAGING_RESTORE_COMMAND="${STAGING_RESTORE_COMMAND:-}"
+ALLOW_RESTORE_DRILL="${ALLOW_RESTORE_DRILL:-false}"
+RESTORE_TEST_DATABASE_URL="${RESTORE_TEST_DATABASE_URL:-}"
+RESTORE_VERIFY_COMMAND="${RESTORE_VERIFY_COMMAND:-}"
+OPENAPI_CONTRACT_MODE="${OPENAPI_CONTRACT_MODE:-baseline}"
+CERT_REQUIREMENTS_MATRIX="${CERT_REQUIREMENTS_MATRIX:-docs/certification/requirements-matrix.json}"
+PWA_OFFLINE_TESTS="${PWA_OFFLINE_TESTS:-true}"
 PLAYWRIGHT_PROJECT="${PLAYWRIGHT_PROJECT:-chromium}"
 SOAK_SECONDS="${SOAK_SECONDS:-1800}"
 NETWORK_RETRIES="${NETWORK_RETRIES:-2}"
@@ -364,6 +370,7 @@ security_suite() {
   run_step "security" "production mode" "HIGH" "bash backend/tests/production-mode-test.sh '$TARGET_URL'"
   run_step "security" "edge cases" "HIGH" "bash backend/tests/edge-cases-test.sh '$API_URL'"
   run_step "security" "actor ownership data" "HIGH" "python3 backend/tests/verify-actor-data.py --api '$TARGET_URL'"
+  run_step "security" "authenticated security matrix" "HIGH" "bash scripts/certification/check-authenticated-security.sh '$TARGET_URL'"
 }
 
 data_integrity_suite() {
@@ -380,6 +387,14 @@ frontend_e2e_suite() {
 
 frontend_surface_suite() {
   run_step "frontend-surface" "pwa manual and app shell" "HIGH" "bash scripts/certification/check-frontend-surface.sh '$TARGET_URL'"
+}
+
+pwa_offline_suite() {
+  if is_true "$PWA_OFFLINE_TESTS"; then
+    run_step "pwa-offline" "offline shell and service workers" "HIGH" "bash scripts/certification/check-pwa-offline.sh '$TARGET_URL'"
+  else
+    run_skip "pwa-offline" "offline shell and service workers" "MEDIUM" "PWA_OFFLINE_TESTS=false"
+  fi
 }
 
 accessibility_suite() {
@@ -400,6 +415,26 @@ ops_recovery_suite() {
   else
     run_skip "ops-recovery" "restore drill" "HIGH" "restore drill requires ALLOW_DESTRUCTIVE_STAGING=true"
   fi
+}
+
+backup_restore_suite() {
+  if is_true "$ALLOW_RESTORE_DRILL"; then
+    run_step "backup-restore" "temporary restore drill" "HIGH" "bash scripts/certification/check-backup-restore-drill.sh"
+  else
+    run_skip "backup-restore" "temporary restore drill" "HIGH" "ALLOW_RESTORE_DRILL=false"
+  fi
+}
+
+api_contract_suite() {
+  run_step "api-contract" "openapi and critical responses" "HIGH" "OPENAPI_CONTRACT_MODE='$OPENAPI_CONTRACT_MODE' python3 scripts/certification/check-api-contract.py '$TARGET_URL'"
+}
+
+forensic_integrity_suite() {
+  run_step "forensic-integrity" "manifest evidence consistency" "HIGH" "bash scripts/certification/check-forensic-integrity.sh '$TARGET_URL'"
+}
+
+documentation_evidence_suite() {
+  run_step "documentation-evidence" "requirements matrix" "HIGH" "CERT_REQUIREMENTS_MATRIX='$CERT_REQUIREMENTS_MATRIX' python3 scripts/certification/check-documentation-evidence.py"
 }
 
 stress_suite() {
@@ -424,7 +459,9 @@ production_smoke_suite() {
   run_step "production-smoke" "smoke" "BLOCKER" "bash backend/tests/smoke-test.sh '$TARGET_URL'"
   run_step "production-smoke" "role enforcement" "BLOCKER" "bash backend/tests/role-enforcement-test.sh '$TARGET_URL'"
   run_step "production-smoke" "search safety" "HIGH" "bash backend/tests/search-safety-test.sh '$TARGET_URL'"
+  api_contract_suite
   frontend_surface_suite
+  pwa_offline_suite
   run_step "ops-recovery" "operational readiness" "HIGH" "bash scripts/certification/check-operational-readiness.sh '$TARGET_URL'"
 }
 
@@ -472,7 +509,9 @@ main() {
       ;;
     post-deploy)
       api_regression_suite
+      api_contract_suite
       frontend_surface_suite
+      pwa_offline_suite
       frontend_e2e_suite
       ops_recovery_suite
       ;;
@@ -486,11 +525,15 @@ main() {
       workflow_suite
       security_suite
       data_integrity_suite
+      api_contract_suite
+      forensic_integrity_suite
       frontend_surface_suite
+      pwa_offline_suite
       frontend_e2e_suite
-      accessibility_suite
       compatibility_suite
       ops_recovery_suite
+      backup_restore_suite
+      documentation_evidence_suite
       stress_suite
       ;;
     *)

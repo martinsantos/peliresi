@@ -22,7 +22,7 @@ SITREP esta en estado MVP avanzado / beta operativa. Backend, frontend web, PWA 
 - Evidencia de certificacion estandarizada en Markdown y JSON bajo `reports/test-runs/`.
 - Workflow manual `SITREP Certification Tests` agregado para ejecutar la matriz desde GitHub Actions.
 - El runner clasifica fallos por categoria para separar errores de aplicacion, red/ambiente, riesgos de dependencias y excepciones conocidas.
-- La matriz de certificacion ahora incluye checks no destructivos de configuracion, readiness operativa, superficie frontend/PWA/manual, compatibilidad mobile y accesibilidad estatica.
+- La matriz de certificacion ahora incluye checks no destructivos de configuracion, contrato API, seguridad autenticada, integridad forense, readiness operativa, superficie frontend/PWA/offline, compatibilidad mobile y evidencia documental.
 
 ## Backlog recomendado
 
@@ -62,8 +62,8 @@ SITREP esta en estado MVP avanzado / beta operativa. Backend, frontend web, PWA 
    - Convertir las excepciones `KNOWN_EXCEPTION` en fallos bloqueantes cuando cada migracion este planificada y testeada.
 
 7. Certificacion
-   - Configurar comandos reales de snapshot/restore para staging en `STAGING_SNAPSHOT_COMMAND` y `STAGING_RESTORE_COMMAND`.
+   - Configurar comandos reales de snapshot/restore para staging en `STAGING_SNAPSHOT_COMMAND`, `STAGING_RESTORE_COMMAND` y `RESTORE_TEST_DATABASE_URL`.
    - Definir retencion de artefactos `reports/test-runs/` en CI.
    - Agregar soak extendido de 6-12 horas como corrida manual previa a certificacion final.
    - Agregar pruebas de backup/restore contra base temporal para evitar depender de restore destructivo sobre staging compartido.
-   - Complementar las heuristicas estaticas de accesibilidad con auditoria axe/manual formal antes de certificacion externa.
+   - Accesibilidad queda fuera del gate por el momento por decision de producto; mantenerla como backlog manual.

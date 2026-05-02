@@ -1,0 +1,47 @@
+{
+  "version": "2026-05-02",
+  "requirements": [
+    {
+      "id": "REQ-AUTH-001",
+      "title": "Autenticacion y rechazo de tokens invalidos",
+      "test": "security-authenticated",
+      "command": "bash scripts/certification/check-authenticated-security.sh"
+    },
+    {
+      "id": "REQ-ROLE-001",
+      "title": "Matriz de permisos por rol sin bypass",
+      "test": "role-enforcement",
+      "command": "bash backend/tests/role-enforcement-test.sh"
+    },
+    {
+      "id": "REQ-API-001",
+      "title": "Contrato OpenAPI y endpoints criticos",
+      "test": "api-contract",
+      "command": "python3 scripts/certification/check-api-contract.py"
+    },
+    {
+      "id": "REQ-PWA-001",
+      "title": "PWA y modo offline basico disponibles",
+      "test": "pwa-offline",
+      "command": "bash scripts/certification/check-pwa-offline.sh"
+    },
+    {
+      "id": "REQ-OPS-001",
+      "title": "Readiness operativa y health checks",
+      "test": "operational-readiness",
+      "command": "bash scripts/certification/check-operational-readiness.sh"
+    },
+    {
+      "id": "REQ-FORENSIC-001",
+      "title": "Trazabilidad forense basica manifiesto/PDF/blockchain/auditoria",
+      "test": "forensic-integrity",
+      "command": "bash scripts/certification/check-forensic-integrity.sh"
+    },
+    {
+      "id": "REQ-BACKUP-001",
+      "title": "Backup y restore sobre base temporal",
+      "test": "backup-restore-drill",
+      "command": "bash scripts/certification/check-backup-restore-drill.sh"
+    }
+  ]
+}
