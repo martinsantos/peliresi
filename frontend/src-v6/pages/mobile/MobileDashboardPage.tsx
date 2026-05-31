@@ -199,7 +199,7 @@ export const MobileDashboardPage: React.FC = () => {
           <h3 className="text-sm font-semibold text-neutral-900">Actividad Reciente</h3>
           <button 
             onClick={() => navigate(mp('/manifiestos'))}
-            className="text-xs text-primary-600 font-medium flex items-center gap-0.5"
+            className="flex min-h-11 items-center gap-0.5 rounded-lg px-2 text-xs font-medium text-primary-600"
           >
             Ver todo
             <ChevronRight size={14} />
@@ -244,13 +244,13 @@ export const MobileDashboardPage: React.FC = () => {
           <div className="mt-4 flex gap-2">
             <button 
               onClick={() => navigate(mp('/manifiestos'))}
-              className="flex-1 py-2 bg-white text-primary-600 font-medium rounded-lg text-sm"
+              className="min-h-11 flex-1 rounded-lg bg-white px-3 py-2 text-sm font-medium text-primary-600"
             >
               Ver manifiestos
             </button>
             <button 
               onClick={() => navigate(mp('/centro-control'))}
-              className="flex-1 py-2 bg-primary-400/50 text-white font-medium rounded-lg text-sm"
+              className="min-h-11 flex-1 rounded-lg bg-primary-400/50 px-3 py-2 text-sm font-medium text-white"
             >
               Ver tracking
             </button>

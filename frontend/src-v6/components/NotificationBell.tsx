@@ -178,7 +178,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
       <button
         ref={buttonRef}
         onClick={handleBellClick}
-        className="relative p-2 rounded-xl hover:bg-neutral-100 transition-colors"
+        className="relative flex min-h-11 min-w-11 items-center justify-center rounded-xl hover:bg-neutral-100 transition-colors"
         aria-label={`Notificaciones${unreadCount > 0 ? ` (${unreadCount} sin leer)` : ''}`}
       >
         <Bell size={20} className="text-neutral-600" />
