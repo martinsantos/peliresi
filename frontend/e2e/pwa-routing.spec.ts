@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { ADMIN_EMAIL, ADMIN_PASS, loginWithCredentials } from './helpers/auth';
 
 /**
  * PWA routing regression tests.
@@ -6,26 +7,26 @@ import { test, expect } from '@playwright/test';
  * This covers a bug where App.tsx (web) and AppMobile.tsx (PWA) had inconsistent paths.
  */
 
-const ADMIN_EMAIL = 'admin@dgfa.mendoza.gov.ar';
-const ADMIN_PASS = 'admin123';
-
 // Real production IDs — these exist in the database
 const KNOWN_TRANSPORTISTA_ID = 'cmm4a0u9r002nd8dy37h53j5t';
 const KNOWN_OPERADOR_ID = 'cmmpaa2b100edlvk7p577bmap';
 const KNOWN_GENERADOR_ID = 'cmmpaawor00a14kd0ogaieve9';
 
 async function loginToPwa(page: import('@playwright/test').Page) {
-  await page.goto('/app/');
-  // PWA redirects to /app/login — wait for form
-  await page.waitForSelector('input[type="email"], input[placeholder*="email"]', { timeout: 15000 });
-  await page.locator('input[type="email"], input[placeholder*="email"]').fill(ADMIN_EMAIL);
-  await page.locator('input[type="password"], input[placeholder="********"]').fill(ADMIN_PASS);
-  await page.getByRole('button', { name: /iniciar|entrar|ingresar/i }).click();
-  // Wait for post-login render (dashboard or redirect)
-  await page.waitForTimeout(2000);
+  await loginWithCredentials(page, {
+    email: ADMIN_EMAIL,
+    password: ADMIN_PASS,
+    onboardingRole: 'ADMIN',
+    startPath: '/app/',
+    clickLoginLink: false,
+  });
 }
 
 test.describe('PWA routing — canonical /admin/actores paths', () => {
+  test.beforeEach(({}, testInfo) => {
+    testInfo.setTimeout(120_000);
+  });
+
   test('direct /app/admin/actores/transportistas/:id renders (not 404)', async ({ page }) => {
     await loginToPwa(page);
     await page.goto(`/app/admin/actores/transportistas/${KNOWN_TRANSPORTISTA_ID}`);

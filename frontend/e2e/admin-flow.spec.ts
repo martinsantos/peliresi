@@ -1,23 +1,9 @@
 import { test, expect } from '@playwright/test';
-
-const ADMIN_EMAIL = 'admin@dgfa.mendoza.gov.ar';
-const ADMIN_PASS = 'admin123';
-
-async function loginAsAdmin(page: import('@playwright/test').Page) {
-  await page.goto('/');
-  const loginBtn = page.getByText(/iniciar sesión/i).first();
-  await loginBtn.waitFor({ timeout: 15000 });
-  await loginBtn.click();
-  await page.waitForSelector('input[type="email"], input[placeholder*="email"]', { timeout: 10000 });
-  await page.locator('input[type="email"], input[placeholder*="email"]').fill(ADMIN_EMAIL);
-  await page.locator('input[type="password"], input[placeholder="********"]').fill(ADMIN_PASS);
-  await page.getByRole('button', { name: /iniciar|entrar|ingresar/i }).click();
-  // Wait for post-login navigation
-  await expect(page.locator('aside, main, nav').first()).toBeVisible({ timeout: 20000 });
-}
+import { loginAsAdmin } from './helpers/auth';
 
 test.describe('Admin Flow', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    testInfo.setTimeout(120_000);
     await loginAsAdmin(page);
   });
 

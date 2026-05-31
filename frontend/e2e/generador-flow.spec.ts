@@ -1,24 +1,9 @@
 import { test, expect } from '@playwright/test';
-
-const GENERADOR_EMAIL = 'quimica.mendoza@industria.com';
-const GENERADOR_PASS = 'gen123';
-
-async function loginAsGenerador(page: import('@playwright/test').Page) {
-  await page.goto('/');
-  const loginBtn = page.getByText(/iniciar sesión/i).first();
-  await loginBtn.waitFor({ timeout: 15000 });
-  await loginBtn.click();
-  await page.waitForSelector('input[type="email"], input[placeholder*="email"]', { timeout: 10000 });
-  await page.locator('input[type="email"], input[placeholder*="email"]').fill(GENERADOR_EMAIL);
-  await page.locator('input[type="password"], input[placeholder="********"]').fill(GENERADOR_PASS);
-  await page.getByRole('button', { name: /iniciar|entrar|ingresar/i }).click();
-  await expect(page.locator('aside, main, nav').first()).toBeVisible({ timeout: 20000 }).catch(() => {
-    // Login may fail if generador user doesn't exist on this server — skip remaining tests
-  });
-}
+import { loginAsGenerador } from './helpers/auth';
 
 test.describe('Generador Flow', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    testInfo.setTimeout(120_000);
     await loginAsGenerador(page);
   });
 

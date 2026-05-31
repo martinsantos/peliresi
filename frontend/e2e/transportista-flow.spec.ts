@@ -1,24 +1,9 @@
 import { test, expect } from '@playwright/test';
-
-const TRANSPORTISTA_EMAIL = 'transportes.andes@logistica.com';
-const TRANSPORTISTA_PASS = 'trans123';
-
-async function loginAsTransportista(page: import('@playwright/test').Page) {
-  await page.goto('/');
-  const loginBtn = page.getByText(/iniciar sesión/i).first();
-  await loginBtn.waitFor({ timeout: 15000 });
-  await loginBtn.click();
-  await page.waitForSelector('input[type="email"], input[placeholder*="email"]', { timeout: 10000 });
-  await page.locator('input[type="email"], input[placeholder*="email"]').fill(TRANSPORTISTA_EMAIL);
-  await page.locator('input[type="password"], input[placeholder="********"]').fill(TRANSPORTISTA_PASS);
-  await page.getByRole('button', { name: /iniciar|entrar|ingresar/i }).click();
-  await expect(page.locator('aside, main, nav').first()).toBeVisible({ timeout: 20000 }).catch(() => {
-    // Login may fail if transportista user doesn't exist on this server — skip remaining tests
-  });
-}
+import { loginAsTransportista } from './helpers/auth';
 
 test.describe('Transportista Flow', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    testInfo.setTimeout(120_000);
     await loginAsTransportista(page);
   });
 

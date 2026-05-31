@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { loginAsAdmin } from './helpers/auth';
 
 /**
  * Visual UI audit — visits key pages at multiple viewports and detects:
@@ -6,9 +7,6 @@ import { test, expect } from '@playwright/test';
  * - Pages that show 404
  * - Tables with column widths summing > 100%
  */
-
-const ADMIN_EMAIL = 'admin@dgfa.mendoza.gov.ar';
-const ADMIN_PASS = 'admin123';
 
 const VIEWPORTS = [
   { name: 'mobile-375', width: 375, height: 812 },
@@ -36,15 +34,7 @@ const PAGES_WEB = [
 ];
 
 async function loginWeb(page: import('@playwright/test').Page) {
-  await page.goto('/');
-  const loginBtn = page.getByText(/iniciar sesión/i).first();
-  await loginBtn.waitFor({ timeout: 15000 });
-  await loginBtn.click();
-  await page.waitForSelector('input[type="email"], input[placeholder*="email"]', { timeout: 10000 });
-  await page.locator('input[type="email"], input[placeholder*="email"]').fill(ADMIN_EMAIL);
-  await page.locator('input[type="password"], input[placeholder="********"]').fill(ADMIN_PASS);
-  await page.getByRole('button', { name: /iniciar|entrar|ingresar/i }).click();
-  await page.waitForTimeout(2500);
+  await loginAsAdmin(page);
 }
 
 interface VisualIssue {
