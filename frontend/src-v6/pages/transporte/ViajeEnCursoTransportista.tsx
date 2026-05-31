@@ -16,13 +16,14 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, Truck, MapPin, Clock, Navigation, Package,
-  Play, Pause, CheckCircle2, AlertTriangle, Radio, Map as MapIcon, List,
+  CheckCircle2, AlertTriangle, Radio, Map as MapIcon, List,
   Loader2, Crosshair, WifiOff
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { toast } from '../../components/ui/Toast';
 import { GpsStatusPanel } from '../../components/mobile/GpsStatusPanel';
+import { TripActionBar } from '../../components/mobile/TripActionBar';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -411,15 +412,16 @@ const ViajeEnCursoTransportista: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
-            <Button
-              fullWidth
-              size="lg"
-              onClick={handleConfirmarRetiro}
-              disabled={isActionPending}
-              leftIcon={confirmarRetiro.isPending ? <Loader2 size={20} className="animate-spin" /> : <CheckCircle2 size={20} />}
-            >
-              Confirmar Retiro
-            </Button>
+            <TripActionBar
+              estado={m.estado}
+              viajeStatus={viajeStatus}
+              isPending={isActionPending}
+              hasPendingSync={gps.hasPending}
+              onConfirmPickup={handleConfirmarRetiro}
+              onTogglePause={handlePausar}
+              onReportIncident={() => setShowIncidenteModal(true)}
+              onConfirmDelivery={() => setShowFinalizarModal(true)}
+            />
           </>
         )}
 
@@ -464,25 +466,16 @@ const ViajeEnCursoTransportista: React.FC = () => {
               </div>
             </div>
 
-            {/* Action buttons */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3">
-              <button
-                onClick={handlePausar}
-                disabled={registrarIncidente.isPending}
-                className={`flex items-center justify-center gap-2 py-4 rounded-xl font-semibold border-2 transition-all disabled:opacity-50 ${viajeStatus === 'ACTIVO' ? 'bg-warning-50 text-warning-700 border-warning-200' : 'bg-success-50 text-success-700 border-success-200'}`}
-              >
-                {registrarIncidente.isPending ? <Loader2 size={20} className="animate-spin" /> : viajeStatus === 'ACTIVO' ? <Pause size={20} /> : <Play size={20} />}
-                {viajeStatus === 'ACTIVO' ? 'Pausar' : 'Reanudar'}
-              </button>
-              <button onClick={() => setShowIncidenteModal(true)} className="flex items-center justify-center gap-2 py-4 rounded-xl font-semibold bg-error-50 text-error-700 border-2 border-error-200 hover:bg-error-100">
-                <AlertTriangle size={20} /> Incidente
-              </button>
-            </div>
-
-            <Button fullWidth onClick={() => setShowFinalizarModal(true)} disabled={isActionPending}>
-              <CheckCircle2 size={20} className="mr-2 flex-shrink-0" />
-              <span>Confirmar Entrega</span>
-            </Button>
+            <TripActionBar
+              estado={m.estado}
+              viajeStatus={viajeStatus}
+              isPending={isActionPending}
+              hasPendingSync={gps.hasPending}
+              onConfirmPickup={handleConfirmarRetiro}
+              onTogglePause={handlePausar}
+              onReportIncident={() => setShowIncidenteModal(true)}
+              onConfirmDelivery={() => setShowFinalizarModal(true)}
+            />
 
             {/* Toggle map/events */}
             <div className="flex bg-neutral-100 rounded-xl p-1">
