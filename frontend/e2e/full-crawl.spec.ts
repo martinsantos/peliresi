@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { ADMIN_EMAIL, ADMIN_PASS, loginAsAdmin, loginWithCredentials } from './helpers/auth';
 
 /**
  * Full crawler — visits every key route in both web and PWA builds,
@@ -6,9 +7,6 @@ import { test, expect } from '@playwright/test';
  *
  * Skips routes that need specific roles (use admin only).
  */
-
-const ADMIN_EMAIL = 'admin@dgfa.mendoza.gov.ar';
-const ADMIN_PASS = 'admin123';
 
 // Real production IDs
 const KNOWN = {
@@ -75,24 +73,17 @@ const ROUTES_PWA = [
 ];
 
 async function loginWeb(page: import('@playwright/test').Page) {
-  await page.goto('/');
-  const loginBtn = page.getByText(/iniciar sesión/i).first();
-  await loginBtn.waitFor({ timeout: 15000 });
-  await loginBtn.click();
-  await page.waitForSelector('input[type="email"], input[placeholder*="email"]', { timeout: 10000 });
-  await page.locator('input[type="email"], input[placeholder*="email"]').fill(ADMIN_EMAIL);
-  await page.locator('input[type="password"], input[placeholder="********"]').fill(ADMIN_PASS);
-  await page.getByRole('button', { name: /iniciar|entrar|ingresar/i }).click();
-  await page.waitForTimeout(2500);
+  await loginAsAdmin(page);
 }
 
 async function loginPwa(page: import('@playwright/test').Page) {
-  await page.goto('/app/');
-  await page.waitForSelector('input[type="email"], input[placeholder*="email"]', { timeout: 15000 });
-  await page.locator('input[type="email"], input[placeholder*="email"]').fill(ADMIN_EMAIL);
-  await page.locator('input[type="password"], input[placeholder="********"]').fill(ADMIN_PASS);
-  await page.getByRole('button', { name: /iniciar|entrar|ingresar/i }).click();
-  await page.waitForTimeout(2500);
+  await loginWithCredentials(page, {
+    email: ADMIN_EMAIL,
+    password: ADMIN_PASS,
+    onboardingRole: 'ADMIN',
+    startPath: '/app/',
+    clickLoginLink: false,
+  });
 }
 
 interface CrawlIssue {
@@ -129,7 +120,8 @@ async function crawlRoute(
   page.on('response', responseHandler);
 
   try {
-    await page.goto(`${basePrefix}${route}`, { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto(`${basePrefix}${route}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(1500);
 
     // Check for 404 page

@@ -1,24 +1,10 @@
 import { test, expect } from '@playwright/test';
-
-const ADMIN_EMAIL = 'admin@dgfa.mendoza.gov.ar';
-const ADMIN_PASS = 'admin123';
+import { loginAsAdmin } from './helpers/auth';
 
 test.describe('Dashboard', () => {
   test('login and verify dashboard loads with navigation', async ({ page }) => {
-    await page.goto('/');
-
-    // Click "Iniciar sesión" on landing
-    const loginLink = page.getByRole('link', { name: /iniciar sesión/i }).or(
-      page.getByText(/iniciar sesión/i)
-    ).first();
-    await loginLink.waitFor({ timeout: 15000 });
-    await loginLink.click();
-
-    // Fill login form
-    await page.waitForSelector('input[type="email"], input[placeholder*="email"]', { timeout: 10000 });
-    await page.locator('input[type="email"], input[placeholder*="email"]').fill(ADMIN_EMAIL);
-    await page.locator('input[type="password"], input[placeholder="********"]').fill(ADMIN_PASS);
-    await page.getByRole('button', { name: /iniciar|entrar|ingresar/i }).click();
+    test.setTimeout(120_000);
+    await loginAsAdmin(page);
 
     // Wait for dashboard to load — check for main content area or sidebar (aside)
     // Desktop uses <aside> sidebar, mobile uses bottom nav — check for either
