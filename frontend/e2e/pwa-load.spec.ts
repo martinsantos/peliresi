@@ -1,13 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { ADMIN_EMAIL, ADMIN_PASS, loginWithCredentials } from './helpers/auth';
 
 /**
  * PWA load test — visits all canonical /app/admin/actores/* routes
  * in rapid succession to detect any routing, console or network errors
  * under load-ish conditions (not true stress, but broader coverage).
  */
-
-const ADMIN_EMAIL = 'admin@dgfa.mendoza.gov.ar';
-const ADMIN_PASS = 'admin123';
 
 const KNOWN = {
   transportistaId: 'cmm4a0u9r002nd8dy37h53j5t',
@@ -42,12 +40,13 @@ const PWA_ROUTES = [
 ];
 
 async function loginPwa(page: import('@playwright/test').Page) {
-  await page.goto('/app/');
-  await page.waitForSelector('input[type="email"], input[placeholder*="email"]', { timeout: 15000 });
-  await page.locator('input[type="email"], input[placeholder*="email"]').fill(ADMIN_EMAIL);
-  await page.locator('input[type="password"], input[placeholder="********"]').fill(ADMIN_PASS);
-  await page.getByRole('button', { name: /iniciar|entrar|ingresar/i }).click();
-  await page.waitForTimeout(2500);
+  await loginWithCredentials(page, {
+    email: ADMIN_EMAIL,
+    password: ADMIN_PASS,
+    onboardingRole: 'ADMIN',
+    startPath: '/app/',
+    clickLoginLink: false,
+  });
 }
 
 interface Issue {
