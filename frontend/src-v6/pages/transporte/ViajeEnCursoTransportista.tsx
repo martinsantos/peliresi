@@ -433,7 +433,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
               position={currentPosition}
               details={gpsDetails}
               pendingCount={gps.pendingCount}
-              lastSyncAt={null}
+              lastSyncAt={gps.lastSyncAt}
             />
 
             {/* Timer */}

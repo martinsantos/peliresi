@@ -44,6 +44,8 @@ interface UseGPSTrackingReturn {
   details: GpsDetails;
   sendStatus: 'ok' | 'error' | 'idle';
   pendingCount: number;
+  hasPending: boolean;
+  lastSyncAt: Date | null;
   cleanupGps: () => void;
 }
 
@@ -55,6 +57,8 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
     accuracy: null, speed: null, heading: null, altitude: null, lastUpdate: null,
   });
   const [gpsSendStatus, setGpsSendStatus] = useState<'ok' | 'error' | 'idle'>('idle');
+  const [pendingCount, setPendingCount] = useState(0);
+  const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
 
   const watchIdRef = useRef<number | null>(null);
   const sendIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -69,6 +73,18 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
   useEffect(() => { gpsDetailsRef.current = gpsDetails; }, [gpsDetails]);
 
   const id = manifiestoId;
+
+  const setPendingUpdates = useCallback((points: PendingGpsPoint[]) => {
+    pendingUpdatesRef.current = points;
+    setPendingCount(points.length);
+    if (!id) return;
+
+    if (points.length > 0) {
+      localStorage.setItem(`gps_pending_${id}`, JSON.stringify(points));
+    } else {
+      localStorage.removeItem(`gps_pending_${id}`);
+    }
+  }, [id]);
 
   // Robust cleanup function — clears watcher + flushes pending to localStorage
   const cleanupGps = useCallback(() => {
@@ -110,28 +126,37 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
   // Restore pending GPS updates from localStorage on mount and flush in order
   useEffect(() => {
     if (!id) return;
+    let isMounted = true;
     const savedPending = localStorage.getItem(`gps_pending_${id}`);
     if (savedPending) {
       try {
         const parsed = JSON.parse(savedPending);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          pendingUpdatesRef.current = parsed;
+          if (isMounted) setPendingUpdates(parsed);
           (async () => {
             let flushed = 0;
             for (const p of parsed) {
               try {
                 await manifiestoService.actualizarUbicacion(id, p.lat, p.lng, p.speed, p.heading);
                 flushed++;
+                if (isMounted) setLastSyncAt(new Date());
               } catch {
                 break;
               }
             }
+            if (!isMounted) {
+              const remaining = parsed.slice(flushed);
+              if (remaining.length > 0) {
+                localStorage.setItem(`gps_pending_${id}`, JSON.stringify(remaining));
+              } else {
+                localStorage.removeItem(`gps_pending_${id}`);
+              }
+              return;
+            }
             if (flushed === parsed.length) {
-              pendingUpdatesRef.current = [];
-              localStorage.removeItem(`gps_pending_${id}`);
+              setPendingUpdates([]);
             } else {
-              pendingUpdatesRef.current = parsed.slice(flushed);
-              localStorage.setItem(`gps_pending_${id}`, JSON.stringify(pendingUpdatesRef.current));
+              setPendingUpdates(parsed.slice(flushed));
             }
           })();
         }
@@ -139,7 +164,10 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
         localStorage.removeItem(`gps_pending_${id}`);
       }
     }
-  }, [id]);
+    return () => {
+      isMounted = false;
+    };
+  }, [id, setPendingUpdates]);
 
   // Default center (Mendoza, Argentina)
   const defaultCenter: [number, number] = [-32.9287, -68.8535];
@@ -192,36 +220,32 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
       try {
         // First flush any accumulated pending points in order
         if (pendingUpdatesRef.current.length > 0) {
-          const remaining: PendingGpsPoint[] = [];
-          for (const p of pendingUpdatesRef.current) {
+          const pendingSnapshot = pendingUpdatesRef.current;
+          let flushed = 0;
+          for (const p of pendingSnapshot) {
             try {
               await manifiestoService.actualizarUbicacion(id, p.lat, p.lng, p.speed, p.heading);
+              flushed++;
+              setLastSyncAt(new Date());
             } catch {
-              remaining.push(p);
               break;
             }
           }
-          const flushed = pendingUpdatesRef.current.length - remaining.length;
-          if (remaining.length > 0) {
-            pendingUpdatesRef.current = [...remaining, ...pendingUpdatesRef.current.slice(flushed + 1)];
-          } else {
-            pendingUpdatesRef.current = [];
-          }
+          const remaining = pendingSnapshot.slice(flushed);
+          setPendingUpdates(remaining);
+          if (remaining.length > 0) throw new Error('Unable to flush pending GPS points');
         }
 
         // Now send current position
         await manifiestoService.actualizarUbicacion(id, point.lat, point.lng, point.speed, point.heading);
-        pendingUpdatesRef.current = [];
-        localStorage.removeItem(`gps_pending_${id}`);
+        setPendingUpdates([]);
+        setLastSyncAt(new Date());
         setGpsSendStatus('ok');
       } catch {
-        pendingUpdatesRef.current.push(point);
-        if (pendingUpdatesRef.current.length > 500) {
-          pendingUpdatesRef.current = pendingUpdatesRef.current.slice(-500);
-        }
-        localStorage.setItem(`gps_pending_${id}`, JSON.stringify(pendingUpdatesRef.current));
+        const nextPending = [...pendingUpdatesRef.current, point].slice(-500);
+        setPendingUpdates(nextPending);
         setGpsSendStatus('error');
-        if (pendingUpdatesRef.current.length === 1) {
+        if (nextPending.length === 1) {
           toast.warning('Sin conexión GPS. Los puntos se guardan localmente.');
         }
       }
@@ -235,7 +259,7 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
       cleanupGps();
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [estado, viajeStatus, id, gpsStatus, cleanupGps]);
+  }, [estado, viajeStatus, id, gpsStatus, cleanupGps, setPendingUpdates]);
 
   return {
     position: currentPosition,
@@ -243,7 +267,9 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
     status: gpsStatus,
     details: gpsDetails,
     sendStatus: gpsSendStatus,
-    pendingCount: pendingUpdatesRef.current.length,
+    pendingCount,
+    hasPending: pendingCount > 0,
+    lastSyncAt,
     cleanupGps,
   };
 }
