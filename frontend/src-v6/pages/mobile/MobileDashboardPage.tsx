@@ -14,34 +14,15 @@ import {
   ChevronRight,
   Package,
   CheckCircle2,
-  Truck,
-  Radio,
-  Navigation
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
-import { Badge } from '../../components/ui/BadgeV2';
-import { Button } from '../../components/ui/ButtonV2';
+import { MobileRoleHero } from '../../components/mobile/MobileRoleHero';
+import { TransportistaTripQueue } from '../../components/mobile/TransportistaTripQueue';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDashboardStats } from '../../hooks/useDashboard';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { useManifiestos } from '../../hooks/useManifiestos';
 import { EstadoManifiesto } from '../../types/models';
-
-const roleLabelMap: Record<string, string> = {
-  ADMIN: 'Admin',
-  GENERADOR: 'Generador',
-  TRANSPORTISTA: 'Transportista',
-  OPERADOR: 'Operador',
-  AUDITOR: 'Auditor',
-};
-
-const roleBadgeColor: Record<string, 'primary' | 'info' | 'warning' | 'success'> = {
-  ADMIN: 'primary',
-  GENERADOR: 'info',
-  TRANSPORTISTA: 'warning',
-  OPERADOR: 'success',
-  AUDITOR: 'info',
-};
 
 export const MobileDashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -52,10 +33,12 @@ export const MobileDashboardPage: React.FC = () => {
 
   // FIX 2: Fetch assigned/active trips for TRANSPORTISTA
   const { data: tripsEnTransito } = useManifiestos(
-    isTransportista ? { estado: EstadoManifiesto.EN_TRANSITO, limit: 5 } : undefined
+    isTransportista ? { estado: EstadoManifiesto.EN_TRANSITO, limit: 5 } : undefined,
+    { enabled: isTransportista },
   );
   const { data: tripsAprobados } = useManifiestos(
-    isTransportista ? { estado: EstadoManifiesto.APROBADO, limit: 5 } : undefined
+    isTransportista ? { estado: EstadoManifiesto.APROBADO, limit: 5 } : undefined,
+    { enabled: isTransportista },
   );
 
   const activeTrips = tripsEnTransito?.items || [];
@@ -70,6 +53,19 @@ export const MobileDashboardPage: React.FC = () => {
       return s ? JSON.parse(s) : null;
     } catch { return null; }
   }, [savedTripId]);
+
+  const activeQueueTrips = useMemo(() => (
+    activeTrips.length > 0
+      ? activeTrips
+      : savedTripSnapshot && savedTripId
+        ? [{
+            id: savedTripId,
+            numero: savedTripSnapshot.numero,
+            operador: { razonSocial: savedTripSnapshot.operador },
+            generador: { razonSocial: savedTripSnapshot.generador },
+          }]
+        : []
+  ), [activeTrips, savedTripId, savedTripSnapshot]);
 
   const accesosRapidos = useMemo(() => [
     { id: 1, label: 'Nuevo Manifiesto', icon: FileText, path: mp('/manifiestos/nuevo'), color: 'primary' },
@@ -87,123 +83,21 @@ export const MobileDashboardPage: React.FC = () => {
     { id: 4, label: 'Completados', value: String(dashStats?.manifiestos?.completados ?? 0), change: undefined, icon: CheckCircle2, color: 'success', href: '/manifiestos?estado=TRATADO' },
   ];
 
-  const greeting = () => {
-    const h = new Date().getHours();
-    if (h < 12) return 'Buenos días';
-    if (h < 18) return 'Buenas tardes';
-    return 'Buenas noches';
-  };
-
   return (
     <div className="space-y-4 animate-fade-in">
-      {/* Welcome Section */}
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-neutral-500">{greeting()},</p>
-          <h2 className="text-xl font-bold text-neutral-900">{currentUser?.nombre || 'Usuario'}</h2>
-        </div>
-        <Badge variant="soft" color={roleBadgeColor[currentUser?.rol || 'ADMIN'] || 'primary'}>
-          {roleLabelMap[currentUser?.rol || 'ADMIN'] || currentUser?.rol || 'ADMIN'}
-        </Badge>
-      </div>
+      <MobileRoleHero
+        role={currentUser?.rol || 'ADMIN'}
+        userName={currentUser?.nombre || 'Usuario'}
+        activeCount={isTransportista ? activeQueueTrips.length : 0}
+        pendingCount={isTransportista ? pendingTrips.length : 0}
+      />
 
-      {/* FIX 2: TRANSPORTISTA Trip Assignment Banner */}
-      {isTransportista && activeTrips.length === 0 && savedTripSnapshot && (
-        <Card className="border-2 border-success-200 bg-success-50">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-success-100 flex items-center justify-center">
-                  <Radio size={16} className="text-success-600 animate-pulse" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-success-800">Viaje en Curso</p>
-                  <p className="text-xs text-success-600">#{savedTripSnapshot.numero || savedTripId?.slice(0, 8)}</p>
-                </div>
-              </div>
-              <Badge variant="soft" color="warning">Datos guardados</Badge>
-            </div>
-            <p className="text-xs text-success-700 mb-3">
-              Destino: {savedTripSnapshot.operador || '-'}
-            </p>
-            <Button
-              fullWidth
-              size="sm"
-              onClick={() => navigate(mp(`/transporte/viaje/${savedTripId}`))}
-            >
-              <Navigation size={14} className="mr-1.5" />
-              Ir al viaje
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-      {isTransportista && (activeTrips.length > 0 || pendingTrips.length > 0) && (
-        <div className="space-y-2">
-          {/* Active trips (EN_TRANSITO) */}
-          {activeTrips.map((trip: any) => (
-            <Card key={trip.id} className="border-2 border-success-200 bg-success-50">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-success-100 flex items-center justify-center">
-                      <Radio size={16} className="text-success-600 animate-pulse" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-success-800">Viaje en Curso</p>
-                      <p className="text-xs text-success-600">#{trip.numero || trip.id?.slice(0, 8)}</p>
-                    </div>
-                  </div>
-                  <Badge variant="soft" color="success">EN TRANSITO</Badge>
-                </div>
-                <p className="text-xs text-success-700 mb-3">
-                  Destino: {trip.operador?.razonSocial || '-'}
-                </p>
-                <Button
-                  fullWidth
-                  size="sm"
-                  onClick={() => navigate(mp(`/transporte/viaje/${trip.id}`))}
-                >
-                  <Navigation size={14} className="mr-1.5" />
-                  Ir al viaje
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-
-          {/* Pending trips (APROBADO) */}
-          {pendingTrips.length > 0 && (
-            <Card className="border-2 border-warning-200 bg-warning-50">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-8 h-8 rounded-full bg-warning-100 flex items-center justify-center">
-                    <Truck size={16} className="text-warning-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-warning-800">
-                      {pendingTrips.length} viaje{pendingTrips.length > 1 ? 's' : ''} asignado{pendingTrips.length > 1 ? 's' : ''}
-                    </p>
-                    <p className="text-xs text-warning-600">Pendientes de retiro</p>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  {pendingTrips.slice(0, 3).map((trip: any) => (
-                    <button
-                      key={trip.id}
-                      onClick={() => navigate(mp(`/transporte/viaje/${trip.id}`))}
-                      className="w-full flex items-center justify-between p-2.5 bg-white rounded-lg border border-warning-200 hover:bg-warning-50 transition-colors"
-                    >
-                      <div className="text-left">
-                        <p className="text-xs font-semibold text-neutral-800">#{trip.numero || trip.id?.slice(0, 8)}</p>
-                        <p className="text-xs text-neutral-500">{trip.generador?.razonSocial || '-'}</p>
-                      </div>
-                      <ChevronRight size={16} className="text-warning-400" />
-                    </button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+      {isTransportista && (
+        <TransportistaTripQueue
+          activeTrips={activeQueueTrips}
+          pendingTrips={pendingTrips}
+          onOpenTrip={(tripId) => navigate(mp(`/transporte/viaje/${tripId}`))}
+        />
       )}
 
       {/* Stats Grid */}
