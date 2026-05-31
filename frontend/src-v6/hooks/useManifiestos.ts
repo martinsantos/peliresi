@@ -12,10 +12,12 @@ import { useAuth } from '../contexts/AuthContext';
 import type { ManifiestoFilters } from '../types/api';
 import type { Manifiesto } from '../types/models';
 
+type UserId = string | number;
+
 const KEYS = {
   all: ['manifiestos'] as const,
   lists: () => [...KEYS.all, 'list'] as const,
-  list: (filters?: ManifiestoFilters) => [...KEYS.lists(), filters] as const,
+  list: (filters?: ManifiestoFilters, userScope?: { userId: UserId; rol: string; actorId: string | null } | null) => [...KEYS.lists(), userScope, filters] as const,
   detail: (id: string) => [...KEYS.all, 'detail', id] as const,
   dashboard: () => [...KEYS.all, 'dashboard'] as const,
 };
@@ -42,8 +44,12 @@ function applyClientFilters(items: Manifiesto[], filters?: ManifiestoFilters): M
 
 export function useManifiestos(filters?: ManifiestoFilters, options?: { enabled?: boolean }) {
   const { currentUser } = useAuth();
+  const userScope = currentUser
+    ? { userId: currentUser.id, rol: currentUser.rol, actorId: currentUser.actorId ?? null }
+    : null;
+
   return useQuery({
-    queryKey: KEYS.list(filters),
+    queryKey: KEYS.list(filters, userScope),
     enabled: options?.enabled ?? true,
     staleTime: 60_000, // 1 min — avoids refetch on every focus/mount
     queryFn: async () => {

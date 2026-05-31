@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
 import { MobileRoleHero } from '../../components/mobile/MobileRoleHero';
+import { OperatorActionQueue } from '../../components/mobile/OperatorActionQueue';
 import { TransportistaTripQueue } from '../../components/mobile/TransportistaTripQueue';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDashboardStats } from '../../hooks/useDashboard';
@@ -30,6 +31,7 @@ export const MobileDashboardPage: React.FC = () => {
   const { data: dashData, isLoading: dashLoading } = useDashboardStats();
   const mp = useMobilePrefix();
   const isTransportista = currentUser?.rol === 'TRANSPORTISTA';
+  const isOperador = currentUser?.rol === 'OPERADOR';
 
   // FIX 2: Fetch assigned/active trips for TRANSPORTISTA
   const { data: tripsEnTransito } = useManifiestos(
@@ -40,9 +42,26 @@ export const MobileDashboardPage: React.FC = () => {
     isTransportista ? { estado: EstadoManifiesto.APROBADO, limit: 5 } : undefined,
     { enabled: isTransportista },
   );
+  const { data: entregadosOperador } = useManifiestos(
+    isOperador ? { estado: EstadoManifiesto.ENTREGADO, limit: 5 } : undefined,
+    { enabled: isOperador },
+  );
+  const { data: recibidosOperador } = useManifiestos(
+    isOperador ? { estado: EstadoManifiesto.RECIBIDO, limit: 5 } : undefined,
+    { enabled: isOperador },
+  );
+  const { data: enTratamientoOperador } = useManifiestos(
+    isOperador ? { estado: EstadoManifiesto.EN_TRATAMIENTO, limit: 5 } : undefined,
+    { enabled: isOperador },
+  );
 
   const activeTrips = tripsEnTransito?.items || [];
   const pendingTrips = tripsAprobados?.items || [];
+  const operatorQueue = [
+    ...(isOperador ? entregadosOperador?.items || [] : []),
+    ...(isOperador ? recibidosOperador?.items || [] : []),
+    ...(isOperador ? enTratamientoOperador?.items || [] : []),
+  ];
 
   // Fallback: read active trip from localStorage when API hasn't responded yet
   const savedTripId = useMemo(() => localStorage.getItem('sitrep_active_trip_id'), []);
@@ -89,7 +108,7 @@ export const MobileDashboardPage: React.FC = () => {
         role={currentUser?.rol || 'ADMIN'}
         userName={currentUser?.nombre || 'Usuario'}
         activeCount={isTransportista ? activeQueueTrips.length : 0}
-        pendingCount={isTransportista ? pendingTrips.length : 0}
+        pendingCount={isTransportista ? pendingTrips.length : isOperador ? operatorQueue.length : 0}
       />
 
       {isTransportista && (
@@ -97,6 +116,13 @@ export const MobileDashboardPage: React.FC = () => {
           activeTrips={activeQueueTrips}
           pendingTrips={pendingTrips}
           onOpenTrip={(tripId) => navigate(mp(`/transporte/viaje/${tripId}`))}
+        />
+      )}
+
+      {isOperador && (
+        <OperatorActionQueue
+          manifiestos={operatorQueue}
+          onOpenManifiesto={(manifiestoId) => navigate(mp(`/manifiestos/${manifiestoId}`))}
         />
       )}
 
