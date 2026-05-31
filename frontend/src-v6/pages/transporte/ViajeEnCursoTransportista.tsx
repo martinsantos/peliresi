@@ -17,11 +17,12 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, Truck, MapPin, Clock, Navigation, Package,
   Play, Pause, CheckCircle2, AlertTriangle, Radio, Map as MapIcon, List,
-  Loader2, Compass, Gauge, Crosshair, WifiOff, LocateFixed
+  Loader2, Crosshair, WifiOff
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { toast } from '../../components/ui/Toast';
+import { GpsStatusPanel } from '../../components/mobile/GpsStatusPanel';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -36,8 +37,7 @@ import { manifiestoService } from '../../services/manifiesto.service';
 import { EstadoManifiesto } from '../../types/models';
 import { formatDateTime, formatWeight } from '../../utils/formatters';
 import { offlineSafeMutation } from '../../utils/offline-mutation';
-import { useGPSTracking, headingToCompass } from '../../hooks/useGPSTracking';
-import type { GpsStatus } from '../../hooks/useGPSTracking';
+import { useGPSTracking } from '../../hooks/useGPSTracking';
 
 // Recenter map when position changes (respects user pan/zoom)
 function RecenterMap({ position, onUserInteract, followUser }: {
@@ -368,90 +368,6 @@ const ViajeEnCursoTransportista: React.FC = () => {
   const totalPeso = Array.isArray(m.residuos) ? m.residuos.reduce((sum: number, r: any) => sum + (r.cantidad || 0), 0) : 0;
   const eventos = Array.isArray(m.eventos) ? m.eventos : [];
 
-  // GPS Status Panel component
-  const GpsStatusPanel = () => {
-    if (m.estado !== EstadoManifiesto.EN_TRANSITO) return null;
-
-    const statusConfig: Record<GpsStatus, { color: string; bgColor: string; label: string; icon: React.ReactNode }> = {
-      checking: { color: 'text-neutral-500', bgColor: 'bg-neutral-100', label: 'Verificando GPS...', icon: <Loader2 size={14} className="animate-spin" /> },
-      acquiring: { color: 'text-warning-600', bgColor: 'bg-warning-50', label: 'Adquiriendo señal GPS...', icon: <LocateFixed size={14} className="animate-pulse" /> },
-      active: { color: 'text-success-600', bgColor: 'bg-success-50', label: 'GPS Activo', icon: <div className="w-2.5 h-2.5 rounded-full bg-success-500 animate-pulse" /> },
-      denied: { color: 'text-error-600', bgColor: 'bg-error-50', label: 'Permiso GPS Denegado', icon: <WifiOff size={14} /> },
-      unavailable: { color: 'text-error-600', bgColor: 'bg-error-50', label: 'GPS No Disponible', icon: <WifiOff size={14} /> },
-      error: { color: 'text-error-600', bgColor: 'bg-error-50', label: 'Error GPS', icon: <AlertTriangle size={14} /> },
-    };
-
-    const cfg = statusConfig[gpsStatus];
-
-    return (
-      <Card className={`${cfg.bgColor} border-none`}>
-        <CardContent className="p-3">
-          {/* Status row */}
-          <div className="flex items-center justify-between mb-2">
-            <div className={`flex items-center gap-2 ${cfg.color}`}>
-              {cfg.icon}
-              <span className="text-sm font-semibold">{cfg.label}</span>
-            </div>
-            {gpsSendStatus === 'error' && gpsStatus === 'active' && (
-              <span className="text-xs text-error-500 flex items-center gap-1">
-                <WifiOff size={12} /> Sin conexión
-              </span>
-            )}
-          </div>
-
-          {/* GPS denied help */}
-          {gpsStatus === 'denied' && (
-            <p className="text-xs text-error-500 mt-1">
-              Ve a Ajustes &gt; Privacidad &gt; Ubicación y permite el acceso para esta app. Luego recarga la página.
-            </p>
-          )}
-
-          {/* GPS data when active */}
-          {gpsStatus === 'active' && currentPosition && (
-            <div className="grid grid-cols-2 gap-2 mt-1">
-              <div className="flex items-center gap-1.5">
-                <Crosshair size={13} className="text-neutral-400" />
-                <span className="text-xs text-neutral-600">
-                  {currentPosition[0].toFixed(5)}, {currentPosition[1].toFixed(5)}
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <MapPin size={13} className="text-neutral-400" />
-                <span className="text-xs text-neutral-600">
-                  ±{gpsDetails.accuracy != null ? Math.round(gpsDetails.accuracy) : '-'}m
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Gauge size={13} className="text-neutral-400" />
-                <span className="text-xs text-neutral-600">
-                  {gpsDetails.speed != null ? `${Math.round(gpsDetails.speed * 3.6)} km/h` : '- km/h'}
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Compass size={13} className="text-neutral-400" />
-                <span className="text-xs text-neutral-600">
-                  {headingToCompass(gpsDetails.heading)} {gpsDetails.heading != null ? `(${Math.round(gpsDetails.heading)}°)` : ''}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Acquiring animation */}
-          {gpsStatus === 'acquiring' && (
-            <div className="flex items-center gap-2 mt-1">
-              <div className="flex gap-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-warning-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-1.5 h-1.5 rounded-full bg-warning-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                <div className="w-1.5 h-1.5 rounded-full bg-warning-400 animate-bounce" style={{ animationDelay: '300ms' }} />
-              </div>
-              <span className="text-xs text-warning-500">Buscando satélites...</span>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    );
-  };
-
   return (
     <div className="min-h-screen bg-neutral-50 pb-24">
       <header className="sticky top-0 z-40 bg-white border-b border-neutral-200">
@@ -511,7 +427,14 @@ const ViajeEnCursoTransportista: React.FC = () => {
         {m.estado === EstadoManifiesto.EN_TRANSITO && (
           <>
             {/* GPS Status Panel */}
-            <GpsStatusPanel />
+            <GpsStatusPanel
+              status={gpsStatus}
+              sendStatus={gpsSendStatus}
+              position={currentPosition}
+              details={gpsDetails}
+              pendingCount={gps.pendingCount}
+              lastSyncAt={null}
+            />
 
             {/* Timer */}
             <Card variant="elevated" className="bg-gradient-to-br from-primary-600 to-primary-700 text-white border-none shadow-lg">
