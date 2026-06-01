@@ -240,6 +240,11 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
       { enableHighAccuracy: true, maximumAge: 30000, timeout: 60000 }
     );
 
+    requestCoarseFallback();
+    const acquisitionRetryInterval = setInterval(() => {
+      if (!currentPositionRef.current) requestCoarseFallback();
+    }, 15000);
+
     // GPS send interval: every 30s
     sendIntervalRef.current = setInterval(async () => {
       const pos = currentPositionRef.current;
@@ -292,6 +297,7 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
+      clearInterval(acquisitionRetryInterval);
       cleanupGps();
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
