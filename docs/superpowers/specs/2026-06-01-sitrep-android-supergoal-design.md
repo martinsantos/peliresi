@@ -44,11 +44,22 @@ Add an `AndroidFieldReadinessPanel` to the mobile dashboard. It summarizes:
 
 This increment is intentionally small and production-safe. It does not change backend contracts, workflow states, authentication, or data ownership rules.
 
+## Second Increment
+
+Make the installed Android/PWA entry points behave more like a field app by adding manifest shortcuts for the highest-frequency actions:
+
+- Panel de campo: opens `/app/dashboard`.
+- Escanear QR: opens `/app/escaner-qr`.
+- Centro de control: opens `/app/centro-control`.
+
+This keeps the source of truth in the deployed PWA manifest and gives Chrome-installed Android users direct launcher actions. The APK/TWA wrapper will pick up equivalent behavior when rebuilt from the updated web manifest/TWA config.
+
 ## Acceptance Criteria
 
 - Mobile dashboard shows an Android operational readiness panel.
 - Transportista and operador users see role-aware queue readiness.
 - Offline/API degraded state is visible.
+- Android web manifest exposes launcher shortcuts for field dashboard, QR scanning, and control center.
 - Unit tests cover ready and degraded states.
 - Existing Android UX E2E remains green.
 - `npm test`, `npm run build`, PWA build, static Android gate, and `git diff --check` pass before merge.

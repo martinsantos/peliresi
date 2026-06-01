@@ -1,47 +1,88 @@
 {
-    "name": "SITREP - Trazabilidad RRPP",
-    "short_name": "SITREP",
-    "description": "Sistema de Trazabilidad de Residuos Peligrosos - App Mobile",
-    "start_url": "/app/",
-    "scope": "/app/",
-    "display": "standalone",
-    "background_color": "#0f172a",
-    "theme_color": "#0D8A4F",
-    "orientation": "portrait-primary",
-    "icons": [
-        {
-            "src": "/app/icon-192.png",
-            "sizes": "192x192",
-            "type": "image/png",
-            "purpose": "any"
-        },
-        {
-            "src": "/app/icon-192.png",
-            "sizes": "192x192",
-            "type": "image/png",
-            "purpose": "maskable"
-        },
-        {
-            "src": "/app/icon-512.png",
-            "sizes": "512x512",
-            "type": "image/png",
-            "purpose": "any"
-        },
-        {
-            "src": "/app/icon-512.png",
-            "sizes": "512x512",
-            "type": "image/png",
-            "purpose": "maskable"
-        }
-    ],
-    "categories": [
-        "productivity",
-        "business",
-        "government"
-    ],
-    "prefer_related_applications": false,
-    "id": "sitrep-mobile-app",
-    "launch_handler": {
-        "client_mode": "navigate-existing"
+  "name": "SITREP - Trazabilidad RRPP",
+  "short_name": "SITREP",
+  "description": "Sistema de Trazabilidad de Residuos Peligrosos - App Mobile",
+  "start_url": "/app/",
+  "scope": "/app/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0D8A4F",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/app/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/app/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/app/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/app/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
+  ],
+  "categories": [
+    "productivity",
+    "business",
+    "government"
+  ],
+  "prefer_related_applications": false,
+  "id": "sitrep-mobile-app",
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
+  "shortcuts": [
+    {
+      "name": "Panel de campo",
+      "short_name": "Campo",
+      "description": "Abrir el tablero operativo de campo",
+      "url": "/app/dashboard?source=shortcut-field",
+      "icons": [
+        {
+          "src": "/app/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Escanear QR",
+      "short_name": "QR",
+      "description": "Abrir el escaner QR de manifiestos",
+      "url": "/app/escaner-qr?source=shortcut-qr",
+      "icons": [
+        {
+          "src": "/app/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Centro de control",
+      "short_name": "Control",
+      "description": "Abrir monitoreo de viajes y alertas",
+      "url": "/app/centro-control?source=shortcut-control",
+      "icons": [
+        {
+          "src": "/app/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
 }

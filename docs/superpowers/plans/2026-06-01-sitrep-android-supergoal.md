@@ -189,3 +189,46 @@ git diff --check
 ```
 
 Expected: exits 0.
+
+## Task 5: Android Field App Manifest Shortcuts
+
+- [x] **Step 1: Write manifest shortcut static test**
+
+Create `backend/tests/android-field-app-manifest-static-test.sh` to validate the Android/PWA manifest has app-grade properties and field launcher shortcuts.
+
+Expected RED result before implementation:
+
+```bash
+bash backend/tests/android-field-app-manifest-static-test.sh
+```
+
+Fails with `field app must expose at least three Android shortcuts`.
+
+- [x] **Step 2: Add field shortcuts to `manifest-app.json`**
+
+Add shortcuts for:
+
+- `Panel de campo` -> `/app/dashboard?source=shortcut-field`
+- `Escanear QR` -> `/app/escaner-qr?source=shortcut-qr`
+- `Centro de control` -> `/app/centro-control?source=shortcut-control`
+
+- [x] **Step 3: Verify manifest shortcut gate**
+
+```bash
+bash backend/tests/android-field-app-manifest-static-test.sh
+```
+
+Expected: prints `Android field app manifest shortcuts present`.
+
+- [x] **Step 4: Run final verification**
+
+```bash
+cd frontend && npm test
+cd frontend && npm run build
+cd frontend && npx vite build --config vite.config.app.ts
+bash backend/tests/android-ux-readiness-static-test.sh
+bash backend/tests/android-field-app-manifest-static-test.sh
+git diff --check
+```
+
+Expected: all pass before merge/deploy.
