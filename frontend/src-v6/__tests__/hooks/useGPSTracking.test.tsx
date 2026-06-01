@@ -65,20 +65,24 @@ describe('useGPSTracking', () => {
       errorCallback = error ?? null;
       return 8;
     });
-    vi.mocked(navigator.geolocation.getCurrentPosition).mockImplementation((success) => {
-      success({
-        coords: {
-          latitude: -32.8891,
-          longitude: -68.8458,
-          accuracy: 65,
-          speed: null,
-          heading: null,
-          altitude: null,
-          altitudeAccuracy: null,
-        },
-        timestamp: Date.now(),
-      } as GeolocationPosition);
-    });
+    vi.mocked(navigator.geolocation.getCurrentPosition)
+      .mockImplementationOnce((_success, error) => {
+        error?.({ code: 3, message: 'initial timeout' } as GeolocationPositionError);
+      })
+      .mockImplementationOnce((success) => {
+        success({
+          coords: {
+            latitude: -32.8891,
+            longitude: -68.8458,
+            accuracy: 65,
+            speed: null,
+            heading: null,
+            altitude: null,
+            altitudeAccuracy: null,
+          },
+          timestamp: Date.now(),
+        } as GeolocationPosition);
+      });
 
     const { result, unmount } = renderHook(() =>
       useGPSTracking({
@@ -100,12 +104,49 @@ describe('useGPSTracking', () => {
     unmount();
   });
 
+  it('requests an initial coarse Android fix when watchPosition stays silent', async () => {
+    vi.mocked(navigator.geolocation.watchPosition).mockImplementation(() => 10);
+    vi.mocked(navigator.geolocation.getCurrentPosition).mockImplementation((success) => {
+      success({
+        coords: {
+          latitude: -32.8895,
+          longitude: -68.846,
+          accuracy: 90,
+          speed: null,
+          heading: null,
+          altitude: null,
+          altitudeAccuracy: null,
+        },
+        timestamp: Date.now(),
+      } as GeolocationPosition);
+    });
+
+    const { result, unmount } = renderHook(() =>
+      useGPSTracking({
+        manifiestoId: 'trip-5',
+        estado: EstadoManifiesto.EN_TRANSITO,
+        viajeStatus: 'ACTIVO',
+      }),
+    );
+
+    await waitFor(() => expect(result.current.status).toBe('active'));
+    expect(result.current.position).toEqual([-32.8895, -68.846]);
+    expect(navigator.geolocation.getCurrentPosition).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.any(Function),
+      expect.objectContaining({ enableHighAccuracy: false }),
+    );
+
+    unmount();
+  });
+
   it('keeps GPS active after the first Android location fix', async () => {
     let successCallback: PositionCallback | null = null;
     vi.mocked(navigator.geolocation.watchPosition).mockImplementation((success) => {
       successCallback = success;
       return 9;
     });
+    vi.mocked(navigator.geolocation.getCurrentPosition).mockImplementation(() => undefined);
 
     const { result, unmount } = renderHook(() =>
       useGPSTracking({
