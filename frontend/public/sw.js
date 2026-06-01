@@ -1,7 +1,7 @@
 // Service Worker para modo Offline-First (CU-T09)
 // Scope: / (main site)
-const CACHE_NAME = 'trazabilidad-rrpp-v30';
-const RUNTIME_CACHE = 'runtime-cache-v30';
+const CACHE_NAME = 'trazabilidad-rrpp-v31';
+const RUNTIME_CACHE = 'runtime-cache-v31';
 
 // Recursos críticos para cachear en instalación
 const PRECACHE_URLS = [
@@ -11,7 +11,7 @@ const PRECACHE_URLS = [
 
 // Instalación del Service Worker
 self.addEventListener('install', (event) => {
-    console.log('[SW] Installing Service Worker v30...');
+    console.log('[SW] Installing Service Worker v31...');
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then((cache) => {
@@ -30,7 +30,7 @@ self.addEventListener('install', (event) => {
 
 // Activación del Service Worker
 self.addEventListener('activate', (event) => {
-    console.log('[SW] Activando Service Worker v30...');
+    console.log('[SW] Activando Service Worker v31...');
     event.waitUntil(
         caches.keys().then((cacheNames) => {
             const currentCaches = [CACHE_NAME, RUNTIME_CACHE];
@@ -143,7 +143,7 @@ self.addEventListener('push', (event) => {
     event.waitUntil(self.registration.showNotification(data.title || 'SITREP', options));
 });
 
-console.log('[SW] Service Worker v30 cargado');
+console.log('[SW] Service Worker v31 cargado');
 
 // ========================================
 // NOTIFICATION CLICK — abrir/enfocar la web
