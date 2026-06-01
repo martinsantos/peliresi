@@ -63,6 +63,7 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
   const watchIdRef = useRef<number | null>(null);
   const sendIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pendingUpdatesRef = useRef<PendingGpsPoint[]>([]);
+  const lastGpsSearchToastAtRef = useRef(0);
   // Use refs for current position/details inside the interval callback
   // to avoid stale closures
   const currentPositionRef = useRef<[number, number] | null>(null);
@@ -193,13 +194,17 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
           setGpsStatus('denied');
           toast.error('Permiso de ubicación denegado. Activa GPS en Ajustes.');
         } else if (err.code === 2) {
-          setGpsStatus('unavailable');
-          toast.error('No se pudo obtener ubicación. Verifica que el GPS esté activo.');
+          setGpsStatus('acquiring');
+          const now = Date.now();
+          if (now - lastGpsSearchToastAtRef.current > 30000) {
+            toast.warning('GPS activo. Esperando señal de ubicación del dispositivo.');
+            lastGpsSearchToastAtRef.current = now;
+          }
         } else {
           setGpsStatus('error');
           toast.error('Tiempo de espera GPS agotado. Reintentando...');
         }
-        if (!currentPositionRef.current) setCurrentPosition(defaultCenter);
+        if (err.code !== 2 && !currentPositionRef.current) setCurrentPosition(defaultCenter);
       },
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
     );
