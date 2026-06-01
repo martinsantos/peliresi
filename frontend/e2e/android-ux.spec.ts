@@ -63,6 +63,11 @@ async function setupMockedPwa(page: Page) {
       return;
     }
 
+    if (path === '/health') {
+      await route.fulfill(json({ status: 'ok', db: 'connected' }));
+      return;
+    }
+
     if (path === '/manifiestos/dashboard') {
       await route.fulfill(json({
         success: true,

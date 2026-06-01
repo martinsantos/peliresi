@@ -39,6 +39,14 @@ vi.mock('../../../hooks/useDashboard', () => ({
   }),
 }));
 
+vi.mock('../../../hooks/useConnectivity', () => ({
+  useConnectivity: () => ({
+    isOnline: true,
+    isApiReachable: true,
+    lastOnline: new Date('2026-06-01T00:00:00Z'),
+  }),
+}));
+
 vi.mock('../../../hooks/useManifiestos', () => ({
   useManifiestos: (filters?: { estado?: string }) => ({
     data: { items: filters?.estado ? manifiestosByEstado.get(filters.estado) || [] : [] },
@@ -67,6 +75,7 @@ describe('MobileDashboardPage operator queue', () => {
       </MemoryRouter>
     );
 
+    expect(screen.getByText('Score operativo Android')).toBeInTheDocument();
     expect(screen.getByText('Cerrar tratamiento')).toBeInTheDocument();
     expect(screen.getByText('1 pendientes')).toBeInTheDocument();
     expect(screen.queryByText('Sin acciones de operador')).not.toBeInTheDocument();
