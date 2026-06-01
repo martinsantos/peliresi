@@ -64,6 +64,7 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
   const sendIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pendingUpdatesRef = useRef<PendingGpsPoint[]>([]);
   const lastGpsSearchToastAtRef = useRef(0);
+  const fallbackPositionInFlightRef = useRef(false);
   // Use refs for current position/details inside the interval callback
   // to avoid stale closures
   const currentPositionRef = useRef<[number, number] | null>(null);
@@ -176,37 +177,67 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
   // Start GPS tracking when EN_TRANSITO and ACTIVO
   useEffect(() => {
     if (estado !== EstadoManifiesto.EN_TRANSITO || viajeStatus === 'PAUSADO') return;
-    if (gpsStatus === 'denied' || gpsStatus === 'unavailable') return;
+    if (!('geolocation' in navigator)) {
+      setGpsStatus('unavailable');
+      return;
+    }
 
     setGpsStatus('acquiring');
 
+    const applyPosition = (pos: GeolocationPosition) => {
+      const { latitude, longitude, accuracy, speed, heading, altitude } = pos.coords;
+      const point: [number, number] = [latitude, longitude];
+      setCurrentPosition(point);
+      setTrackPoints(prev => [...prev, point]);
+      setGpsDetails({ accuracy, speed, heading, altitude, lastUpdate: new Date() });
+      setGpsStatus('active');
+    };
+
+    const requestCoarseFallback = () => {
+      if (fallbackPositionInFlightRef.current) return;
+      fallbackPositionInFlightRef.current = true;
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          fallbackPositionInFlightRef.current = false;
+          applyPosition(pos);
+        },
+        () => {
+          fallbackPositionInFlightRef.current = false;
+          setGpsStatus('acquiring');
+        },
+        { enableHighAccuracy: false, maximumAge: 300000, timeout: 10000 },
+      );
+    };
+
+    const notifyGpsSearching = (message: string) => {
+      const now = Date.now();
+      if (now - lastGpsSearchToastAtRef.current > 30000) {
+        toast.warning(message);
+        lastGpsSearchToastAtRef.current = now;
+      }
+    };
+
     watchIdRef.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        const { latitude, longitude, accuracy, speed, heading, altitude } = pos.coords;
-        const point: [number, number] = [latitude, longitude];
-        setCurrentPosition(point);
-        setTrackPoints(prev => [...prev, point]);
-        setGpsDetails({ accuracy, speed, heading, altitude, lastUpdate: new Date() });
-        setGpsStatus('active');
-      },
+      applyPosition,
       (err) => {
         if (err.code === 1) {
           setGpsStatus('denied');
           toast.error('Permiso de ubicación denegado. Activa GPS en Ajustes.');
         } else if (err.code === 2) {
           setGpsStatus('acquiring');
-          const now = Date.now();
-          if (now - lastGpsSearchToastAtRef.current > 30000) {
-            toast.warning('GPS activo. Esperando señal de ubicación del dispositivo.');
-            lastGpsSearchToastAtRef.current = now;
-          }
+          notifyGpsSearching('GPS activo. Esperando señal de ubicación del dispositivo.');
+          requestCoarseFallback();
+        } else if (err.code === 3) {
+          setGpsStatus('acquiring');
+          notifyGpsSearching('GPS activo. Reintentando con ubicación aproximada.');
+          requestCoarseFallback();
         } else {
           setGpsStatus('error');
           toast.error('Tiempo de espera GPS agotado. Reintentando...');
         }
-        if (err.code !== 2 && !currentPositionRef.current) setCurrentPosition(defaultCenter);
+        if (err.code !== 2 && err.code !== 3 && !currentPositionRef.current) setCurrentPosition(defaultCenter);
       },
-      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+      { enableHighAccuracy: true, maximumAge: 30000, timeout: 60000 }
     );
 
     // GPS send interval: every 30s
@@ -264,7 +295,7 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
       cleanupGps();
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [estado, viajeStatus, id, gpsStatus, cleanupGps, setPendingUpdates]);
+  }, [estado, viajeStatus, id, cleanupGps, setPendingUpdates]);
 
   return {
     position: currentPosition,
