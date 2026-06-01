@@ -42,11 +42,26 @@ These are final GOAL gates. The Android UX E2E command becomes runnable after Ta
 
 - `cd frontend && npm test`
 - `cd frontend && npm run build`
-- `cd frontend && npm run test:e2e -- e2e/android-ux.spec.ts --project=mobile --reporter=line`
+- `cd frontend && npx vite build --config vite.config.app.ts`
+- `cd frontend && PLAYWRIGHT_BASE_URL=http://127.0.0.1:4175 npm run test:e2e -- e2e/android-ux.spec.ts --project=mobile --reporter=line`
+- `cd frontend && npm run test:e2e -- --reporter=line`
 - `bash backend/tests/android-ux-readiness-static-test.sh`
 - `git diff --check`
+
+## Final Verification Results
+
+| Gate | Result | Evidence |
+| --- | --- | --- |
+| Unit tests | Pass | `npm test` passed 14 files / 82 tests |
+| Main web build | Pass | `npm run build` completed successfully |
+| PWA `/app/` build | Pass | `npx vite build --config vite.config.app.ts` completed successfully and emitted `dist-app/` |
+| Android UX E2E against local branch build | Pass | `PLAYWRIGHT_BASE_URL=http://127.0.0.1:4175 npm run test:e2e -- e2e/android-ux.spec.ts --project=mobile --reporter=line` passed 3/3 |
+| Full E2E against production origin | Expected partial fail until deployment | `npm run test:e2e -- --reporter=line` passed 44/46; both failures were `android-ux.spec.ts` touch-target checks against production assets that do not yet include this branch |
+| Static Android UX gate | Pass | `bash backend/tests/android-ux-readiness-static-test.sh` printed `Android UX readiness static artifacts present` |
+| Diff whitespace check | Pass | `git diff --check` exited 0 |
 
 ## Remaining Gaps
 
 - GPS permission UI still needs a production/seeded `EN_TRANSITO` or `APROBADO` transportista scenario to validate Android permission prompts end-to-end in the TWA.
 - The installed APK points to the production web origin, so branch-local UX changes are validated by local Playwright PWA evidence until deployed.
+- Full production E2E will continue to fail the Android touch-target check until this branch is merged and deployed to `https://sitrep.ultimamilla.com.ar/app/`.
