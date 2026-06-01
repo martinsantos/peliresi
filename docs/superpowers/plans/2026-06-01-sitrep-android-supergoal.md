@@ -31,7 +31,7 @@ Create `docs/superpowers/plans/2026-06-01-sitrep-android-supergoal.md` with file
 
 ## Task 2: Android Field Readiness Panel
 
-- [ ] **Step 1: Write readiness panel unit tests**
+- [x] **Step 1: Write readiness panel unit tests**
 
 Create `frontend/src-v6/__tests__/components/mobile/AndroidFieldReadinessPanel.test.tsx` with:
 
@@ -78,7 +78,7 @@ describe('AndroidFieldReadinessPanel', () => {
 });
 ```
 
-- [ ] **Step 2: Run readiness panel test and verify it fails**
+- [x] **Step 2: Run readiness panel test and verify it fails**
 
 Run:
 
@@ -88,11 +88,11 @@ cd frontend && npm test -- src-v6/__tests__/components/mobile/AndroidFieldReadin
 
 Expected: fails because the component does not exist.
 
-- [ ] **Step 3: Implement `AndroidFieldReadinessPanel`**
+- [x] **Step 3: Implement `AndroidFieldReadinessPanel`**
 
-Create `frontend/src-v6/components/mobile/AndroidFieldReadinessPanel.tsx` using existing `CardV2` and `BadgeV2`. The component must calculate a 0-3 readiness score from connection/API, actionable queue, and standalone app mode.
+Create `frontend/src-v6/components/mobile/AndroidFieldReadinessPanel.tsx` using existing `CardV2` and `BadgeV2`. The component must calculate a 0-3 readiness score from connection/API, actionable queue, and Android app-shell availability, while showing standalone mode as an advisory.
 
-- [ ] **Step 4: Run readiness panel test and verify it passes**
+- [x] **Step 4: Run readiness panel test and verify it passes**
 
 Run:
 
@@ -104,7 +104,7 @@ Expected: test file passes.
 
 ## Task 3: Mobile Dashboard Integration
 
-- [ ] **Step 1: Mock connectivity in `MobileDashboardPage` test**
+- [x] **Step 1: Mock connectivity in `MobileDashboardPage` test**
 
 Modify `frontend/src-v6/__tests__/pages/mobile/MobileDashboardPage.test.tsx` with:
 
@@ -118,7 +118,7 @@ vi.mock('../../../hooks/useConnectivity', () => ({
 }));
 ```
 
-- [ ] **Step 2: Add readiness panel assertion**
+- [x] **Step 2: Add readiness panel assertion**
 
 Add:
 
@@ -126,11 +126,11 @@ Add:
 expect(screen.getByText('Score operativo Android')).toBeInTheDocument();
 ```
 
-- [ ] **Step 3: Wire panel into `MobileDashboardPage`**
+- [x] **Step 3: Wire panel into `MobileDashboardPage`**
 
 Import `AndroidFieldReadinessPanel` and `useConnectivity`, then render the panel after `MobileRoleHero`.
 
-- [ ] **Step 4: Run dashboard test**
+- [x] **Step 4: Run dashboard test**
 
 Run:
 
@@ -142,7 +142,7 @@ Expected: passes.
 
 ## Task 4: Final Verification
 
-- [ ] **Step 1: Run focused unit tests**
+- [x] **Step 1: Run focused unit tests**
 
 ```bash
 cd frontend && npm test -- src-v6/__tests__/components/mobile/AndroidFieldReadinessPanel.test.tsx src-v6/__tests__/pages/mobile/MobileDashboardPage.test.tsx
@@ -150,7 +150,7 @@ cd frontend && npm test -- src-v6/__tests__/components/mobile/AndroidFieldReadin
 
 Expected: passes.
 
-- [ ] **Step 2: Run all frontend unit tests**
+- [x] **Step 2: Run all frontend unit tests**
 
 ```bash
 cd frontend && npm test
@@ -158,7 +158,7 @@ cd frontend && npm test
 
 Expected: passes.
 
-- [ ] **Step 3: Build main frontend**
+- [x] **Step 3: Build main frontend**
 
 ```bash
 cd frontend && npm run build
@@ -166,7 +166,7 @@ cd frontend && npm run build
 
 Expected: passes.
 
-- [ ] **Step 4: Build PWA app**
+- [x] **Step 4: Build PWA app**
 
 ```bash
 cd frontend && npx vite build --config vite.config.app.ts
@@ -174,7 +174,7 @@ cd frontend && npx vite build --config vite.config.app.ts
 
 Expected: passes.
 
-- [ ] **Step 5: Run Android static gate**
+- [x] **Step 5: Run Android static gate**
 
 ```bash
 bash backend/tests/android-ux-readiness-static-test.sh
@@ -182,7 +182,7 @@ bash backend/tests/android-ux-readiness-static-test.sh
 
 Expected: prints `Android UX readiness static artifacts present`.
 
-- [ ] **Step 6: Run diff check**
+- [x] **Step 6: Run diff check**
 
 ```bash
 git diff --check

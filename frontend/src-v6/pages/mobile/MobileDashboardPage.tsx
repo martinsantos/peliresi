@@ -16,10 +16,12 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
+import { AndroidFieldReadinessPanel } from '../../components/mobile/AndroidFieldReadinessPanel';
 import { MobileRoleHero } from '../../components/mobile/MobileRoleHero';
 import { OperatorActionQueue } from '../../components/mobile/OperatorActionQueue';
 import { TransportistaTripQueue } from '../../components/mobile/TransportistaTripQueue';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConnectivity } from '../../hooks/useConnectivity';
 import { useDashboardStats } from '../../hooks/useDashboard';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { useManifiestos } from '../../hooks/useManifiestos';
@@ -29,6 +31,7 @@ export const MobileDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const { data: dashData, isLoading: dashLoading } = useDashboardStats();
+  const connectivity = useConnectivity({ pingInterval: 60_000 });
   const mp = useMobilePrefix();
   const isTransportista = currentUser?.rol === 'TRANSPORTISTA';
   const isOperador = currentUser?.rol === 'OPERADOR';
@@ -86,6 +89,15 @@ export const MobileDashboardPage: React.FC = () => {
         : []
   ), [activeTrips, savedTripId, savedTripSnapshot]);
 
+  const isStandalone = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    const displayModeStandalone = typeof window.matchMedia === 'function'
+      ? window.matchMedia('(display-mode: standalone)').matches
+      : false;
+    const navigatorStandalone = Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);
+    return displayModeStandalone || navigatorStandalone;
+  }, []);
+
   const accesosRapidos = useMemo(() => [
     { id: 1, label: 'Nuevo Manifiesto', icon: FileText, path: mp('/manifiestos/nuevo'), color: 'primary' },
     { id: 2, label: 'Escanear QR', icon: MapPin, path: mp('/escaner-qr'), color: 'success' },
@@ -109,6 +121,15 @@ export const MobileDashboardPage: React.FC = () => {
         userName={currentUser?.nombre || 'Usuario'}
         activeCount={isTransportista ? activeQueueTrips.length : 0}
         pendingCount={isTransportista ? pendingTrips.length : isOperador ? operatorQueue.length : 0}
+      />
+
+      <AndroidFieldReadinessPanel
+        role={currentUser?.rol || 'ADMIN'}
+        isOnline={connectivity.isOnline}
+        isApiReachable={connectivity.isApiReachable}
+        activeCount={isTransportista ? activeQueueTrips.length : Number(dashStats?.manifiestos?.enTransito ?? 0)}
+        pendingCount={isTransportista ? pendingTrips.length : isOperador ? operatorQueue.length : Number(dashStats?.manifiestos?.pendientes ?? 0)}
+        isStandalone={isStandalone}
       />
 
       {isTransportista && (
