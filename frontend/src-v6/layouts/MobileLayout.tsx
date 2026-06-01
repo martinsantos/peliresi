@@ -160,7 +160,7 @@ export const MobileLayout: React.FC = () => {
     items.push({
       to: isTransportista ? mp('/transporte/perfil') : mp('/manifiestos'),
       icon: isTransportista ? <Truck size={22} /> : <FileText size={22} />,
-      label: isTransportista ? 'Mis Viajes' : 'Manifiestos',
+      label: isTransportista ? 'Viajes' : 'Manifiestos',
     });
 
     if (isAdmin || isTransportista) {
@@ -273,6 +273,7 @@ export const MobileLayout: React.FC = () => {
 
   // Determinar si mostrar FAB
   const showFab = location.pathname.includes('/manifiestos') && !location.pathname.includes('/nuevo') && (isAdmin || isGenerador);
+  const isFieldTripRoute = location.pathname.includes('/transporte/viaje/');
 
   const handleSwitchUser = (userId: number | string) => {
     if (userId === currentUser.id) return;
@@ -323,7 +324,7 @@ export const MobileLayout: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto">
-        <div className="p-4 pb-28">
+        <div className={cn('p-4', isFieldTripRoute ? 'pb-6' : 'pb-28')}>
           <Outlet />
         </div>
       </main>
@@ -343,11 +344,14 @@ export const MobileLayout: React.FC = () => {
       {isTransportista && activeTripId && !location.pathname.includes('/transporte/viaje/') && (
         <button
           onClick={() => navigate(mp(`/transporte/viaje/${activeTripId}`))}
-          className="fixed left-2 right-2 bottom-[68px] z-40 flex items-center gap-3 px-4 py-3 bg-emerald-600 text-white rounded-xl shadow-lg animate-pulse-subtle"
+          className="fixed left-3 right-3 bottom-[76px] z-40 flex min-h-[56px] items-center gap-3 rounded-2xl bg-emerald-700 px-4 py-3 text-white shadow-xl active:scale-[0.99]"
+          aria-label="Volver al viaje en curso"
         >
-          <Navigation size={20} className="shrink-0" />
-          <span className="flex-1 text-sm font-semibold text-left">Viaje en Curso</span>
-          <ChevronRight size={18} className="shrink-0 opacity-70" />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15">
+            <Navigation size={20} />
+          </div>
+          <span className="flex-1 text-left text-sm font-black">Viaje en curso</span>
+          <ChevronRight size={18} className="shrink-0 opacity-80" />
         </button>
       )}
 

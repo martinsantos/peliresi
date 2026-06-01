@@ -34,6 +34,7 @@ const PWA_ROUTES = [
   '/dashboard',
   '/manifiestos',
   `/manifiestos/${KNOWN.manifiestoId}`,
+  `/transporte/viaje/${KNOWN.manifiestoId}`,
   '/reportes',
   '/alertas',
   '/centro-control',

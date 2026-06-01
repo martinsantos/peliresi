@@ -8,6 +8,19 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 
+const useQueryMock = vi.hoisted(() => vi.fn((options: any) => options));
+const authState = vi.hoisted(() => ({
+  currentUser: { id: '1', rol: 'ADMIN', actorId: 'actor-1', nombre: 'Test', email: 'test@test.com', sector: '', avatar: 'T', telefono: '', ubicacion: '', permisos: ['*'] },
+}));
+
+vi.mock('@tanstack/react-query', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@tanstack/react-query')>();
+  return {
+    ...actual,
+    useQuery: useQueryMock,
+  };
+});
+
 // Mock the dependencies that the hooks import
 vi.mock('../../services/manifiesto.service', () => ({
   manifiestoService: {
@@ -23,7 +36,7 @@ vi.mock('../../services/offline-sync', () => ({
 
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({
-    currentUser: { id: '1', rol: 'ADMIN', nombre: 'Test', email: 'test@test.com', sector: '', avatar: 'T', telefono: '', ubicacion: '', permisos: ['*'] },
+    currentUser: authState.currentUser,
   }),
 }));
 
@@ -52,5 +65,19 @@ describe('useManifiestos module exports', () => {
     expect(typeof mod.useConfirmarEntrega).toBe('function');
     expect(typeof mod.useCerrarManifiesto).toBe('function');
     expect(typeof mod.useCancelarManifiesto).toBe('function');
+  });
+
+  it('scopes list query keys by current user identity', async () => {
+    const mod = await import('../../hooks/useManifiestos');
+
+    authState.currentUser = { ...authState.currentUser, id: 'operator-1', rol: 'OPERADOR', actorId: 'op-1' };
+    const operatorQuery = mod.useManifiestos({ estado: 'ENTREGADO' as any, limit: 5 }) as any;
+
+    authState.currentUser = { ...authState.currentUser, id: 'operator-2', rol: 'OPERADOR', actorId: 'op-2' };
+    const otherOperatorQuery = mod.useManifiestos({ estado: 'ENTREGADO' as any, limit: 5 }) as any;
+
+    expect(operatorQuery.queryKey).not.toEqual(otherOperatorQuery.queryKey);
+    expect(operatorQuery.queryKey).toContainEqual({ userId: 'operator-1', rol: 'OPERADOR', actorId: 'op-1' });
+    expect(otherOperatorQuery.queryKey).toContainEqual({ userId: 'operator-2', rol: 'OPERADOR', actorId: 'op-2' });
   });
 });
