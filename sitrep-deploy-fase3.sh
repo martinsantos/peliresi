@@ -175,10 +175,11 @@ ok "SPA desplegado"
 scp /tmp/sitrep-app-${TIMESTAMP}.tar.gz "$SSH_HOST":/tmp/
 ssh "$SSH_HOST" "
   mkdir -p ${VM_FRONTEND_DIR}/app
-  rm -rf ${VM_FRONTEND_DIR}/app/*
+  find ${VM_FRONTEND_DIR}/app -mindepth 1 -maxdepth 1 ! -name assets -exec rm -rf {} + 2>/dev/null || true
   tar xzf /tmp/sitrep-app-${TIMESTAMP}.tar.gz -C ${VM_FRONTEND_DIR}/app
+  chmod -R 755 ${VM_FRONTEND_DIR}/app
 "
-ok "PWA desplegada"
+ok "PWA desplegada preservando assets versionados anteriores"
 
 # ---- 7/10  Deploy Backend --------------------------------------------------
 

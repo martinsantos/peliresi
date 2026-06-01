@@ -113,7 +113,7 @@ scp /tmp/sitrep-frontend.tar.gz /tmp/sitrep-app.tar.gz root@23.105.176.45:/tmp/
 
 # 5. Deploy on server
 ssh root@23.105.176.45 "cd /var/www/sitrep && find . -maxdepth 1 ! -name app ! -name . -exec rm -rf {} + && tar xzf /tmp/sitrep-frontend.tar.gz && chmod -R 755 ."
-ssh root@23.105.176.45 "cd /var/www/sitrep/app && rm -rf * && tar xzf /tmp/sitrep-app.tar.gz && chmod -R 755 ."
+ssh root@23.105.176.45 "cd /var/www/sitrep/app && find . -mindepth 1 -maxdepth 1 ! -name assets -exec rm -rf {} + && tar xzf /tmp/sitrep-app.tar.gz && chmod -R 755 ."
 ```
 
 ## Deployment - Backend
@@ -143,7 +143,7 @@ scp /tmp/sitrep-frontend.tar.gz /tmp/sitrep-app.tar.gz /tmp/sitrep-backend.tar.g
 
 # Deploy frontend
 ssh root@23.105.176.45 "cd /var/www/sitrep && find . -maxdepth 1 ! -name app ! -name . -exec rm -rf {} + && tar xzf /tmp/sitrep-frontend.tar.gz && chmod -R 755 ."
-ssh root@23.105.176.45 "cd /var/www/sitrep/app && rm -rf * && tar xzf /tmp/sitrep-app.tar.gz && chmod -R 755 ."
+ssh root@23.105.176.45 "cd /var/www/sitrep/app && find . -mindepth 1 -maxdepth 1 ! -name assets -exec rm -rf {} + && tar xzf /tmp/sitrep-app.tar.gz && chmod -R 755 ."
 
 # Deploy backend
 ssh root@23.105.176.45 "cd /var/www/sitrep-backend && tar xzf /tmp/sitrep-backend.tar.gz && npm ci --production && npx prisma generate && pm2 restart sitrep-backend"
