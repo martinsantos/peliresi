@@ -35,4 +35,21 @@ describe('GpsStatusPanel', () => {
     expect(screen.getByText('Permiso GPS denegado')).toBeInTheDocument();
     expect(screen.getByText('Permiso de ubicacion bloqueado')).toBeInTheDocument();
   });
+
+  it('reports Android GPS as searching instead of off while waiting for a fix', () => {
+    render(
+      <GpsStatusPanel
+        status="acquiring"
+        sendStatus="idle"
+        position={null}
+        details={{ accuracy: null, speed: null, heading: null, altitude: null, lastUpdate: null }}
+        pendingCount={0}
+        lastSyncAt={null}
+      />,
+    );
+
+    expect(screen.getByText('Buscando senal GPS')).toBeInTheDocument();
+    expect(screen.getByText('Ubicacion activa. Esperando primer punto GPS del dispositivo.')).toBeInTheDocument();
+    expect(screen.queryByText('GPS no disponible')).not.toBeInTheDocument();
+  });
 });

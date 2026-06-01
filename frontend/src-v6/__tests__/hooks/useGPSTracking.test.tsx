@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { headingToCompass, useGPSTracking } from '../../hooks/useGPSTracking';
 import { EstadoManifiesto } from '../../types/models';
@@ -30,6 +30,33 @@ describe('useGPSTracking', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
+  });
+
+  it('keeps tracking while Android has GPS enabled but no location fix yet', async () => {
+    let errorCallback: PositionErrorCallback | null = null;
+    vi.mocked(navigator.geolocation.watchPosition).mockImplementation((_success, error) => {
+      errorCallback = error ?? null;
+      return 7;
+    });
+
+    const { result, unmount } = renderHook(() =>
+      useGPSTracking({
+        manifiestoId: 'trip-2',
+        estado: EstadoManifiesto.EN_TRANSITO,
+        viajeStatus: 'ACTIVO',
+      }),
+    );
+
+    await waitFor(() => expect(result.current.status).toBe('acquiring'));
+    vi.mocked(navigator.geolocation.clearWatch).mockClear();
+    act(() => {
+      errorCallback?.({ code: 2, message: 'location provider temporarily unavailable' } as GeolocationPositionError);
+    });
+
+    await waitFor(() => expect(result.current.status).toBe('acquiring'));
+    expect(navigator.geolocation.clearWatch).not.toHaveBeenCalledWith(7);
+
+    unmount();
   });
 
   it('exposes restored pending GPS metadata before sync completes', async () => {

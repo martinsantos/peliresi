@@ -16,7 +16,7 @@ interface GpsStatusPanelProps {
 
 const STATUS_COPY: Record<GpsStatus, { label: string; tone: string; icon: React.ReactNode }> = {
   checking: { label: 'Verificando GPS', tone: 'bg-neutral-100 text-neutral-700', icon: <Loader2 size={14} className="animate-spin" /> },
-  acquiring: { label: 'Adquiriendo senal GPS', tone: 'bg-warning-50 text-warning-700', icon: <LocateFixed size={14} className="animate-pulse" /> },
+  acquiring: { label: 'Buscando senal GPS', tone: 'bg-warning-50 text-warning-700', icon: <LocateFixed size={14} className="animate-pulse" /> },
   active: { label: 'GPS activo', tone: 'bg-success-50 text-success-700', icon: <span className="h-2.5 w-2.5 rounded-full bg-success-500 animate-pulse" /> },
   denied: { label: 'Permiso GPS denegado', tone: 'bg-error-50 text-error-700', icon: <WifiOff size={14} /> },
   unavailable: { label: 'GPS no disponible', tone: 'bg-error-50 text-error-700', icon: <WifiOff size={14} /> },
@@ -76,7 +76,7 @@ export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
           )}
 
           {status === 'acquiring' && (
-            <p className="mt-2 text-xs text-warning-700">Manten la app abierta hasta fijar posicion.</p>
+            <p className="mt-2 text-xs text-warning-700">Ubicacion activa. Esperando primer punto GPS del dispositivo.</p>
           )}
         </CardContent>
       </Card>
