@@ -8,6 +8,7 @@ SOURCE_TARBALL=/tmp/sitrep-frontend-source.tar.gz
 BUILD_DIR=/tmp/sitrep-build-$RELEASE_NAME
 FRONTEND_URL=${SITREP_FRONTEND_URL:-https://sitrep.ultimamilla.com.ar/}
 PWA_URL=${SITREP_PWA_URL:-https://sitrep.ultimamilla.com.ar/app/app.html}
+PWA_ASSET_CHECK_URL=${SITREP_PWA_ASSET_CHECK_URL:-https://sitrep.ultimamilla.com.ar}
 
 echo "Deploy SITREP Frontend + PWA App (with build on VPS): $RELEASE_NAME"
 
@@ -19,6 +20,7 @@ if [ "${DRY_RUN:-false}" = "true" ]; then
   echo "[DRY-RUN] Would deploy to: $RELEASE_DIR"
   echo "[DRY-RUN] Would deploy PWA app to: $RELEASE_DIR/app/"
   echo "[DRY-RUN] Would create symlink: $CURRENT_LINK -> $RELEASE_DIR"
+  echo "[DRY-RUN] Would run PWA asset check against: $PWA_ASSET_CHECK_URL"
   echo "[DRY-RUN] No changes made"
   exit 0
 fi
@@ -63,10 +65,6 @@ fi
 echo "Switching symlink..."
 ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"
 
-echo "Cleaning build directory..."
-cd /
-rm -rf "$BUILD_DIR"
-
 echo "Health check (main frontend): $FRONTEND_URL"
 sleep 2
 if curl -f "$FRONTEND_URL" >/dev/null 2>&1; then
@@ -78,13 +76,34 @@ else
     ln -sfn "/var/www/sitrep-releases/$PREV_RELEASE" "$CURRENT_LINK"
     echo "Rollback successful to: $PREV_RELEASE"
   fi
+  cd /
+  rm -rf "$BUILD_DIR"
   exit 1
 fi
 
 echo "Health check (PWA app): $PWA_URL"
 if curl -f "$PWA_URL" >/dev/null 2>&1; then
   echo "PWA app OK"
-  echo "Deploy successful - health checks passed"
+
+  echo "PWA asset integrity check: $PWA_ASSET_CHECK_URL"
+  if bash "$BUILD_DIR/scripts/ops/check-pwa-assets.sh" "$PWA_ASSET_CHECK_URL"; then
+    echo "PWA asset integrity OK"
+    echo "Deploy successful - health checks passed"
+  else
+    echo "PWA asset integrity check failed - rolling back"
+    PREV_RELEASE=$(ls -t /var/www/sitrep-releases | sed -n 2p)
+    if [ -n "$PREV_RELEASE" ]; then
+      ln -sfn "/var/www/sitrep-releases/$PREV_RELEASE" "$CURRENT_LINK"
+      echo "Rollback successful to: $PREV_RELEASE"
+    fi
+    cd /
+    rm -rf "$BUILD_DIR"
+    exit 1
+  fi
+
+  echo "Cleaning build directory..."
+  cd /
+  rm -rf "$BUILD_DIR"
 
   cd /var/www/sitrep-releases
   ls -t | tail -n +6 | xargs -r rm -rf
@@ -99,4 +118,6 @@ if [ -n "$PREV_RELEASE" ]; then
   ln -sfn "/var/www/sitrep-releases/$PREV_RELEASE" "$CURRENT_LINK"
   echo "Rollback successful to: $PREV_RELEASE"
 fi
+cd /
+rm -rf "$BUILD_DIR"
 exit 1

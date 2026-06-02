@@ -201,6 +201,7 @@ ssh root@<HOST> "
 sleep 3
 curl https://sitrep.ultimamilla.com.ar/api/health
 bash backend/tests/smoke-test.sh https://sitrep.ultimamilla.com.ar
+scripts/ops/check-pwa-assets.sh https://sitrep.ultimamilla.com.ar
 ```
 
 ### Deploy solo backend
@@ -473,6 +474,12 @@ bash scripts/migration/migration-rollback.sh
 
 ```bash
 bash backend/tests/smoke-test.sh https://sitrep.ultimamilla.com.ar
+```
+
+### PWA asset integrity
+
+```bash
+scripts/ops/check-pwa-assets.sh https://sitrep.ultimamilla.com.ar
 ```
 
 ### Cross-platform workflow (5 min, 59 tests)
