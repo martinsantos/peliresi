@@ -41,7 +41,7 @@ cd dist && tar czf /tmp/sitrep-frontend.tar.gz . && cd ..
 cd dist-app && tar czf /tmp/sitrep-app.tar.gz . && cd ..
 scp /tmp/sitrep-frontend.tar.gz /tmp/sitrep-app.tar.gz root@23.105.176.45:/tmp/
 ssh root@23.105.176.45 "cd /var/www/sitrep && find . -maxdepth 1 ! -name app ! -name manual ! -name . -exec rm -rf {} + && tar xzf /tmp/sitrep-frontend.tar.gz && chmod -R 755 ."
-ssh root@23.105.176.45 "cd /var/www/sitrep/app && rm -rf * && tar xzf /tmp/sitrep-app.tar.gz && chmod -R 755 ."
+ssh root@23.105.176.45 "cd /var/www/sitrep/app && find . -mindepth 1 -maxdepth 1 ! -name assets -exec rm -rf {} + && tar xzf /tmp/sitrep-app.tar.gz && chmod -R 755 ."
 ```
 
 ### Backend

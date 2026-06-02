@@ -825,7 +825,7 @@ chmod -R 755 .
 
 # PWA App
 cd /var/www/sitrep/app
-rm -rf *
+find . -mindepth 1 -maxdepth 1 ! -name assets -exec rm -rf {} +
 tar xzf /tmp/sitrep-app.tar.gz
 chmod -R 755 .
 ```
