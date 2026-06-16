@@ -78,6 +78,22 @@ function pwaPrecachePlugin(): Plugin {
   }
 }
 
+const manualChunkGroups: Array<[string, string[]]> = [
+  ['vendor', ['react', 'react-dom', 'react-router-dom']],
+  ['ui', ['lucide-react']],
+]
+
+function manualChunks(id: string) {
+  if (!id.includes('node_modules')) return undefined
+
+  const normalizedId = id.split('\\').join('/')
+  const group = manualChunkGroups.find(([, packages]) =>
+    packages.some((pkg) => normalizedId.includes(`/node_modules/${pkg}/`)),
+  )
+
+  return group?.[0]
+}
+
 export default defineConfig({
   plugins: [react(), renameAppHtml(), pwaPrecachePlugin()],
 
@@ -94,10 +110,7 @@ export default defineConfig({
         main: path.resolve(__dirname, 'app.html'),
       },
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          ui: ['lucide-react'],
-        }
+        manualChunks,
       }
     }
   },

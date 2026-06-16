@@ -2,6 +2,22 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+const manualChunkGroups: Array<[string, string[]]> = [
+  ['vendor', ['react', 'react-dom', 'react-router-dom']],
+  ['ui', ['lucide-react']],
+]
+
+function manualChunks(id: string) {
+  if (!id.includes('node_modules')) return undefined
+
+  const normalizedId = id.split('\\').join('/')
+  const group = manualChunkGroups.find(([, packages]) =>
+    packages.some((pkg) => normalizedId.includes(`/node_modules/${pkg}/`)),
+  )
+
+  return group?.[0]
+}
+
 /**
  * Vite Config para UI/UX v6 Revolution
  * 
@@ -52,10 +68,7 @@ export default defineConfig({
         main: path.resolve(__dirname, 'index.html'),
       },
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          ui: ['lucide-react'],
-        }
+        manualChunks,
       }
     }
   },
