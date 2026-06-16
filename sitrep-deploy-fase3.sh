@@ -106,13 +106,13 @@ cd "${SCRIPT_DIR}"
 
 say "4/10 — Empaquetando Frontend + Backend"
 cd "${SCRIPT_DIR}/frontend"
-(cd dist     && tar czf /tmp/sitrep-frontend-${TIMESTAMP}.tar.gz .)
-(cd dist-app && tar czf /tmp/sitrep-app-${TIMESTAMP}.tar.gz .)
+(cd dist     && COPYFILE_DISABLE=1 tar --exclude='._*' --exclude='.DS_Store' --exclude='*/._*' --exclude='*/.DS_Store' -czf /tmp/sitrep-frontend-${TIMESTAMP}.tar.gz .)
+(cd dist-app && COPYFILE_DISABLE=1 tar --exclude='._*' --exclude='.DS_Store' --exclude='*/._*' --exclude='*/.DS_Store' -czf /tmp/sitrep-app-${TIMESTAMP}.tar.gz .)
 ok "Frontend empaquetado"
 
 cd "${SCRIPT_DIR}/backend"
 # Incluir node_modules para deploy sin acceso a npm registry en VM
-tar czf /tmp/sitrep-backend-${TIMESTAMP}.tar.gz \
+COPYFILE_DISABLE=1 tar --exclude='._*' --exclude='.DS_Store' --exclude='*/._*' --exclude='*/.DS_Store' -czf /tmp/sitrep-backend-${TIMESTAMP}.tar.gz \
   dist \
   node_modules \
   data \
