@@ -2,10 +2,23 @@ import { Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
 import { enviarPushAlUsuario } from '../services/push.service';
+import logger from '../utils/logger';
 
-export async function getVapidPublicKey(_req: Request, res: Response) {
+interface WelcomePushFailureContext {
+  usuarioId: string;
+  endpoint: string;
+}
+
+export function logWelcomePushFailure(err: unknown, context: WelcomePushFailureContext): void {
+  logger.error({ ...context, err }, 'Error enviando push de bienvenida');
+}
+
+export function getVapidPublicKey(_req: Request, res: Response) {
   const key = process.env.VAPID_PUBLIC_KEY;
-  if (!key) throw new AppError('Push no configurado', 503);
+  if (!key) {
+    res.status(503).json({ success: false, status: 503, message: 'Push no configurado' });
+    return;
+  }
   res.json({ success: true, data: { publicKey: key } });
 }
 
@@ -31,7 +44,7 @@ export async function subscribe(req: Request, res: Response) {
       body: 'Las notificaciones push están activas. Te avisaremos cuando haya novedades en tus manifiestos.',
       url: '/dashboard',
       tag: 'bienvenida',
-    }).catch(() => {});
+    }).catch((err) => logWelcomePushFailure(err, { usuarioId, endpoint }));
   }
 
   res.json({ success: true });
