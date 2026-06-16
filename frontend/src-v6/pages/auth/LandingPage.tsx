@@ -58,10 +58,8 @@ const LandingPage: React.FC = () => {
           <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <Leaf size={32} className="text-white" />
           </div>
-          <h1 className="text-3xl sm:text-4xl font-bold mb-4" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
-            SITREP
-          </h1>
-          <p className="text-lg text-green-100 mb-2">
+          <h1 className="sr-only">SITREP</h1>
+          <p className="text-2xl sm:text-3xl font-bold text-white leading-tight mb-4" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             Sistema de Trazabilidad de Residuos Peligrosos
           </p>
           <p className="text-green-200 text-sm mb-8">
