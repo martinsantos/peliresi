@@ -110,7 +110,7 @@ Nota tecnica: `pm get-app-links ar.gob.mendoza.rptrazar` sigue mostrando estado 
 
 Host SSH usado:
 
-- `ubuntu@192.168.205.197`.
+- `ubuntu@<ip-interna-gobierno>`.
 - Hostname: `sitrepprd1.mendoza.gov.ar`.
 
 Servicios:

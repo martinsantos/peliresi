@@ -67,7 +67,7 @@ Se separan perfiles:
 - 2026-06-30: se regenero el proyecto Android TWA para `rptrazar.mendoza.gov.ar` en `android-twa/build-rptrazar/`.
 - 2026-06-30: `assembleDebug`, `assembleRelease` y `bundleRelease` pasan con JDK/SDK local de Bubblewrap.
 - 2026-06-30: el APK release unsigned confirma `package='ar.com.ultimamilla.sitrep'`, `versionCode='3'`, `versionName='1.0.1'`, `hostName='rptrazar.mendoza.gov.ar'`, `launchUrl='https://rptrazar.mendoza.gov.ar/app/'` y `assetStatements` hacia `https://rptrazar.mendoza.gov.ar`.
-- 2026-06-30: busqueda adicional de keystore en ruta esperada, carpetas locales, CloudStorage y Google Drive/conector: sin resultados. Solo existe `~/.android/debug.keystore`, no apta para release.
+- 2026-06-30: busqueda adicional de keystore en ruta esperada, carpetas locales, CloudStorage y Google Drive/conector: sin resultados. Solo existe `~/.android/debug<keystore>`, no apta para release.
 - 2026-06-30: ADB sobre emulador `sitrep_pixel7_api35`:
   - `adb shell pm get-app-links ar.com.ultimamilla.sitrep` confirma firma esperada y solo `sitrep.ultimamilla.com.ar: verified`.
   - `adb shell monkey -p ar.com.ultimamilla.sitrep -c android.intent.category.LAUNCHER 1` devuelve codigo 251 por `SYS_KEYS` del emulador headless.
@@ -94,8 +94,8 @@ Se dejo de perseguir la keystore original y se preparo el camino alternativo:
 
 Bloqueo externo actual:
 
-- `rptrazar.mendoza.gov.ar` no esta servido por el VPS `23.105.176.45`; resuelve a `diclb.mendoza.gov.ar` / `192.168.192.135`.
-- `192.168.192.135` responde SSH y HTTPS, pero rechaza autenticacion para `ubuntu` y `root`, incluso con `~/.ssh/ambiente.pem`.
+- `rptrazar.mendoza.gov.ar` no esta servido por el VPS `23.105.176.45`; resuelve a `diclb.mendoza.gov.ar` / `<host-balanceador-gobierno>`.
+- `<host-balanceador-gobierno>` responde SSH y HTTPS, pero rechaza autenticacion para `ubuntu` y `root`, incluso con `~/.ssh/<clave-autorizada>`.
 - El `assetlinks.json` publico sigue devolviendo solo `ar.com.ultimamilla.sitrep`, por eso la app nueva abre como Chrome Custom Tab con toolbar hasta que infraestructura publique el archivo actualizado.
 
 Informe detallado: `docs/qa/2026-06-30-rptrazar-pwa-android-new-package.md`.

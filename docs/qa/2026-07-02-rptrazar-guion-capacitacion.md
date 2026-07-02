@@ -88,21 +88,21 @@ TARGET_URL=https://rptrazar.mendoza.gov.ar \
 API_URL=https://rptrazar.mendoza.gov.ar/api \
 ALLOW_PRODUCTION_TRAINING_E2E=true \
 CERT_AUTH_COOLDOWN_SECONDS=65 \
-PRODUCTION_TRAINING_RESET_COMMAND="ssh -i ~/.ssh/ambiente.pem ubuntu@192.168.205.197 'cd /home/ubuntu/sitrep-backend && node -r dotenv/config prisma/seed-production-training.js'" \
+PRODUCTION_TRAINING_RESET_COMMAND="ssh -i ~/.ssh/<clave-autorizada> ubuntu@<ip-interna-gobierno> 'cd /home/ubuntu/sitrep-backend && node -r dotenv/config prisma/seed-production-training.js'" \
 bash scripts/certification/run-certification-suite.sh produccion-capacitacion
 ```
 
 Reset manual del dataset:
 
 ```bash
-ssh -i ~/.ssh/ambiente.pem ubuntu@192.168.205.197 \
+ssh -i ~/.ssh/<clave-autorizada> ubuntu@<ip-interna-gobierno> \
   "cd /home/ubuntu/sitrep-backend && node -r dotenv/config prisma/seed-production-training.js"
 ```
 
 Verificacion SQL post-sesion:
 
 ```bash
-ssh -i ~/.ssh/ambiente.pem ubuntu@192.168.205.197 \
+ssh -i ~/.ssh/<clave-autorizada> ubuntu@<ip-interna-gobierno> \
   "sudo -u postgres psql -d sitrep_prod -F '|' -Atc \"SELECT numero, estado, \\\"isDemoData\\\" FROM manifiestos WHERE numero LIKE 'CAP-20260702-%' ORDER BY numero; SELECT 'email_cap_rows', count(*) FROM email_queue WHERE subject LIKE '%CAP-20260702%'; SELECT 'notificaciones_cap_rows', count(*) FROM notificaciones n JOIN manifiestos m ON m.id=n.\\\"manifiestoId\\\" WHERE m.numero LIKE 'CAP-20260702-%';\""
 ```
 

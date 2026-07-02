@@ -6,10 +6,15 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('Iniciando seed de datos...');
 
+  const adminSeedPassword = process.env.SEED_ADMIN_PASSWORD || (process.env.NODE_ENV === 'production' ? '' : 'admin123');
+  if (!adminSeedPassword) {
+    throw new Error('SEED_ADMIN_PASSWORD es obligatorio cuando NODE_ENV=production');
+  }
+
   // ========================================
   // ADMIN
   // ========================================
-  const adminPassword = await bcrypt.hash('admin123', 10);
+  const adminPassword = await bcrypt.hash(adminSeedPassword, 10);
   const admin = await prisma.usuario.upsert({
     where: { email: 'admin@dgfa.mendoza.gov.ar' },
     update: {},

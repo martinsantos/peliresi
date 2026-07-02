@@ -28,7 +28,7 @@
 | Campo | Valor |
 |-------|-------|
 | **Email** | `admin@dgfa.mendoza.gov.ar` |
-| **Password** | `admin123` |
+| **Password** | `<password-inicial-seguro>` |
 | **Rol** | `ADMIN` |
 
 > ⚠️ **Cambiar la contraseña inmediatamente** tras el primer login: Perfil → Cambiar contraseña.
@@ -63,7 +63,7 @@ Nginx 1.28.3 (443 SSL)
 | **OS** | Ubuntu 25.04 (Resolute) |
 | **User** | `ubuntu` |
 | **SSH** | `ssh sitrepprd1` (alias en `~/.ssh/config`) |
-| **SSH key** | `~/.ssh/ambiente.pem` |
+| **SSH key** | `~/.ssh/<clave-autorizada>` |
 | **Disco /data** | 64 GB (LVM), 5 GB usados, 59 GB libres |
 | **Swap** | 4 GB en `/data/swap`, swappiness=10 |
 

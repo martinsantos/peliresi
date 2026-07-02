@@ -4,7 +4,7 @@
 
 Publicado en el servidor Gobierno correcto:
 
-- SSH: `ubuntu@192.168.205.197`.
+- SSH: `ubuntu@<ip-interna-gobierno>`.
 - Hostname: `sitrepprd1.mendoza.gov.ar`.
 - Servicio web: `rptrazar.mendoza.gov.ar`.
 - Root Nginx: `/var/www/sitrep`.
@@ -40,7 +40,7 @@ PASS assetlinks-fingerprint
 PASS api-health
 ```
 
-Validacion del servicio `rptrazar.mendoza.gov.ar` contra `192.168.192.135`:
+Validacion del servicio `rptrazar.mendoza.gov.ar` contra `<host-balanceador-gobierno>`:
 
 ```text
 PASS web-title contains=RP Trazar - Residuos Peligrosos
@@ -86,7 +86,7 @@ El `assetlinks.json` debe quedar disponible con `Content-Type: application/json`
 
 ## Estado verificado
 
-- Host real HTTPS: `192.168.192.135`.
+- Host real HTTPS: `<host-balanceador-gobierno>`.
 - Servidor: `nginx/1.28.3 (Ubuntu)`.
 - `https://rptrazar.mendoza.gov.ar/.well-known/assetlinks.json` sirve el archivo viejo.
 - `https://rptrazar.mendoza.gov.ar/` sirve HTML viejo con titulo `SITREP v6 - Nueva Generacion`.
@@ -96,31 +96,31 @@ El `assetlinks.json` debe quedar disponible con `Content-Type: application/json`
 - El archivo local correcto contiene:
   - `ar.com.ultimamilla.sitrep`
   - `ar.gob.mendoza.rptrazar`
-- SSH probado con `ubuntu@192.168.192.135` y `root@192.168.192.135` usando `~/.ssh/ambiente.pem`: rechazado por autenticacion.
+- SSH probado con `ubuntu@<host-balanceador-gobierno>` y `root@<host-balanceador-gobierno>` usando `~/.ssh/<clave-autorizada>`: rechazado por autenticacion.
 - Publicacion por HTTP no habilitada: `OPTIONS` devuelve 405.
 
 ## Intentos de acceso SSH realizados
 
 Datos operativos usados:
 
-- Host Gobierno: `192.168.192.135`.
+- Host Gobierno: `<host-balanceador-gobierno>`.
 - Alias documentado: `sitrepprd1`.
 - Usuario documentado: `ubuntu`.
-- Clave documentada: `~/.ssh/ambiente.pem`.
+- Clave documentada: `~/.ssh/<clave-autorizada>`.
 - Usuarios probados: `ubuntu`, `root`, `deploy`, `sitrep`, `santosma`.
-- Claves locales probadas: `ambiente.pem`, `id_rsa`, `id_ed25519`, `cicd-deploy`.
+- Claves locales probadas: `<clave-autorizada>`, `id_rsa`, `id_ed25519`, `cicd-deploy`.
 
 Resultado:
 
 ```text
-ubuntu@192.168.192.135: Permission denied
-root@192.168.192.135: Permission denied
-deploy@192.168.192.135: Permission denied / connection closed
-sitrep@192.168.192.135: Permission denied / connection closed
-santosma@192.168.192.135: Permission denied / connection closed
+ubuntu@<host-balanceador-gobierno>: Permission denied
+root@<host-balanceador-gobierno>: Permission denied
+deploy@<host-balanceador-gobierno>: Permission denied / connection closed
+sitrep@<host-balanceador-gobierno>: Permission denied / connection closed
+santosma@<host-balanceador-gobierno>: Permission denied / connection closed
 ```
 
-Tambien se probo el VPS historico `root@23.105.176.45` como posible salto SSH hacia `192.168.192.135`; no obtuvo banner SSH del host Gobierno.
+Tambien se probo el VPS historico `root@23.105.176.45` como posible salto SSH hacia `<host-balanceador-gobierno>`; no obtuvo banner SSH del host Gobierno.
 
 Conclusion: el host es alcanzable, pero no hay credencial SSH valida disponible en esta maquina para publicar los paquetes.
 
@@ -165,7 +165,7 @@ Copiar primero los paquetes al servidor:
 - `/tmp/rptrazar-app-20260630.tar.gz`
 - `/tmp/rptrazar-well-known-20260630.tar.gz`
 
-Luego ejecutar en `192.168.192.135`:
+Luego ejecutar en `<host-balanceador-gobierno>`:
 
 ```bash
 sudo install -d -m 755 /var/www/sitrep

@@ -27,7 +27,7 @@ El `assetlinks.json` local ya contiene ambos packages:
 - `ar.com.ultimamilla.sitrep` con la firma historica.
 - `ar.gob.mendoza.rptrazar` con la firma nueva.
 
-Bloqueo externo pendiente: publicar ese archivo en el host real de `rptrazar.mendoza.gov.ar`. El dominio resuelve a `diclb.mendoza.gov.ar` / `192.168.192.135`; SSH responde, pero rechaza autenticacion para `ubuntu` y `root`, incluso usando la clave documentada `~/.ssh/ambiente.pem`.
+Bloqueo externo pendiente: publicar ese archivo en el host real de `rptrazar.mendoza.gov.ar`. El dominio resuelve a `diclb.mendoza.gov.ar` / `<host-balanceador-gobierno>`; SSH responde, pero rechaza autenticacion para `ubuntu` y `root`, incluso usando la clave documentada `~/.ssh/<clave-autorizada>`.
 
 ## Estado actual 2026-06-30
 
@@ -58,9 +58,9 @@ El proyecto Android/Gradle ya fue regenerado y compila. Sigue pendiente recupera
 ## Evidencia 2026-06-30
 
 - Busqueda local y remota de keystore/proyecto original:
-  - Local: no se encontro `.jks`, `.keystore`, `keystore.properties`, proyecto Gradle ni Bubblewrap original compatible. Solo existe `~/.android/debug.keystore`, no valida para release.
-  - Google Drive/conector: sin resultados para `sitrep keystore`, `.jks`, `.keystore`, `keystore`, `upload`, `release` ni `SITREP Android` asociados a una clave.
-  - Servidor accesible por `ubuntu@192.168.205.197`: sin artefactos Android en `/home/ubuntu`, `/var/www`, `/opt`, `/srv`, `/tmp`.
+  - Local: no se encontro `<jks>`, `<keystore>`, `keystore.properties`, proyecto Gradle ni Bubblewrap original compatible. Solo existe `~/.android/debug<keystore>`, no valida para release.
+  - Google Drive/conector: sin resultados para `sitrep keystore`, `<jks>`, `<keystore>`, `keystore`, `upload`, `release` ni `SITREP Android` asociados a una clave.
+  - Servidor accesible por `ubuntu@<ip-interna-gobierno>`: sin artefactos Android en `/home/ubuntu`, `/var/www`, `/opt`, `/srv`, `/tmp`.
   - Servidor `root@23.105.176.45`: sin artefactos Android en rutas buscadas.
 - Proyecto TWA regenerado en `android-twa/build-rptrazar/` con Bubblewrap 1.24.1.
 - `assembleDebug`: PASS. APK debug generado en `android-twa/build-rptrazar/app/build/outputs/apk/debug/app-debug.apk`.
@@ -95,7 +95,7 @@ node android-twa/scripts/generate-rptrazar-twa.cjs
 Si cambia la IP publicada por DNS interno, sobreescribirla asi:
 
 ```bash
-RPTRAZAR_RESOLVE_IP='192.168.192.135' \
+RPTRAZAR_RESOLVE_IP='<host-balanceador-gobierno>' \
 JAVA_HOME=/Users/santosma/.bubblewrap/jdk/jdk-17.0.11+9/Contents/Home \
 node android-twa/scripts/generate-rptrazar-twa.cjs
 ```
@@ -126,7 +126,7 @@ GRADLE_USER_HOME=/Users/santosma/peliresi/android-twa/.gradle \
 La configuracion espera la keystore en:
 
 ```text
-android-twa/secrets/sitrep-release.keystore
+android-twa/secrets/<release-keystore>
 ```
 
 Alias inferido por el APK anterior: `SITREP`. Se puede sobreescribir al regenerar:
@@ -139,7 +139,7 @@ Antes de firmar, validar que la keystore recuperada emite el fingerprint requeri
 
 ```bash
 keytool -list -v \
-  -keystore android-twa/secrets/sitrep-release.keystore \
+  -keystore android-twa/secrets/<release-keystore> \
   -alias SITREP
 ```
 
@@ -161,7 +161,7 @@ cd android-twa/build-rptrazar
 
 SITREP_TWA_KEYSTORE_PASSWORD='REEMPLAZAR' \
 /Users/santosma/.bubblewrap/android_sdk/build-tools/35.0.0/apksigner sign \
-  --ks ../secrets/sitrep-release.keystore \
+  --ks ../secrets/sitrep-release<keystore> \
   --ks-key-alias SITREP \
   --ks-pass env:SITREP_TWA_KEYSTORE_PASSWORD \
   --out app/build/outputs/apk/release/app-release-signed.apk \

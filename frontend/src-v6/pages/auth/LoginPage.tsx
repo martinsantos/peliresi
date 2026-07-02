@@ -9,13 +9,17 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Leaf, AlertCircle, Factory, Truck, FlaskConical, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
-// Accesos rápidos — siempre visibles para facilitar el testing
-const QUICK_LOGINS = [
-  { label: 'Administrador', sublabel: 'DGFA',               color: 'bg-primary-500', email: 'admin@dgfa.mendoza.gov.ar',          password: 'admin123'  },
-  { label: 'Generador',     sublabel: 'Química Mendoza',    color: 'bg-purple-500',  email: 'quimica.mendoza@industria.com',       password: 'gen123'    },
-  { label: 'Transportista', sublabel: 'Transportes Andes',  color: 'bg-orange-500',  email: 'transportes.andes@logistica.com',     password: 'trans123'  },
-  { label: 'Operador',      sublabel: 'Tratamiento Residuos',color: 'bg-blue-500',   email: 'tratamiento.residuos@planta.com',     password: 'op123'     },
-];
+const ENABLE_QUICK_LOGINS = import.meta.env.VITE_DEMO_MODE === 'true';
+
+// Accesos rapidos solo para entornos demo/locales.
+const QUICK_LOGINS = ENABLE_QUICK_LOGINS
+  ? [
+      { label: 'Administrador', sublabel: 'DGFA',                color: 'bg-primary-500', email: 'admin@dgfa.mendoza.gov.ar',       password: 'admin123' },
+      { label: 'Generador',     sublabel: 'Quimica Mendoza',     color: 'bg-purple-500',  email: 'quimica.mendoza@industria.com',   password: 'gen123' },
+      { label: 'Transportista', sublabel: 'Transportes Andes',   color: 'bg-orange-500',  email: 'transportes.andes@logistica.com', password: 'trans123' },
+      { label: 'Operador',      sublabel: 'Tratamiento Residuos', color: 'bg-blue-500',    email: 'tratamiento.residuos@planta.com', password: 'op123' },
+    ]
+  : [];
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -85,42 +89,46 @@ const LoginPage: React.FC = () => {
         </div>
       )}
 
-      {/* Demo users - PRINCIPAL */}
-      <div className="mb-6 md:mb-8">
-        <p className="text-xs md:text-sm text-neutral-500 text-center mb-3 md:mb-4 font-medium">
-          Selecciona un perfil para ingresar
-        </p>
-        <div className="grid grid-cols-2 gap-2 md:gap-3 stagger-children">
-          {QUICK_LOGINS.map((q, idx) => {
-            const isSelected = selectedUserId === idx;
-            return (
-              <button
-                key={idx}
-                onClick={() => handleQuickLogin(q, idx)}
-                disabled={loading}
-                className={`p-3 md:p-4 text-left rounded-xl border-2 transition-all active:scale-[0.97] disabled:opacity-50 ${
-                  isSelected
-                    ? 'border-[#1B5E3C] bg-emerald-50 shadow-md'
-                    : 'border-neutral-200 bg-white hover:border-primary-500 hover:bg-primary-50'
-                }`}
-              >
-                <div className={`w-7 h-7 md:w-8 md:h-8 ${q.color} rounded-lg flex items-center justify-center text-white text-xs font-bold mb-1.5 md:mb-2`}>
-                  {q.label[0]}
-                </div>
-                <p className="font-semibold text-sm text-neutral-900">{q.label}</p>
-                <p className="text-xs text-neutral-500">{q.sublabel}</p>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      {ENABLE_QUICK_LOGINS && (
+        <>
+          {/* Demo users - PRINCIPAL */}
+          <div className="mb-6 md:mb-8">
+            <p className="text-xs md:text-sm text-neutral-500 text-center mb-3 md:mb-4 font-medium">
+              Selecciona un perfil para ingresar
+            </p>
+            <div className="grid grid-cols-2 gap-2 md:gap-3 stagger-children">
+              {QUICK_LOGINS.map((q, idx) => {
+                const isSelected = selectedUserId === idx;
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => handleQuickLogin(q, idx)}
+                    disabled={loading}
+                    className={`p-3 md:p-4 text-left rounded-xl border-2 transition-all active:scale-[0.97] disabled:opacity-50 ${
+                      isSelected
+                        ? 'border-[#1B5E3C] bg-emerald-50 shadow-md'
+                        : 'border-neutral-200 bg-white hover:border-primary-500 hover:bg-primary-50'
+                    }`}
+                  >
+                    <div className={`w-7 h-7 md:w-8 md:h-8 ${q.color} rounded-lg flex items-center justify-center text-white text-xs font-bold mb-1.5 md:mb-2`}>
+                      {q.label[0]}
+                    </div>
+                    <p className="font-semibold text-sm text-neutral-900">{q.label}</p>
+                    <p className="text-xs text-neutral-500">{q.sublabel}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-      {/* Divider */}
-      <div className="flex items-center gap-3 md:gap-4 mb-4 md:mb-6">
-        <div className="flex-1 h-px bg-neutral-200" />
-        <span className="text-[10px] md:text-xs text-neutral-400 font-medium whitespace-nowrap">o ingresa con credenciales</span>
-        <div className="flex-1 h-px bg-neutral-200" />
-      </div>
+          {/* Divider */}
+          <div className="flex items-center gap-3 md:gap-4 mb-4 md:mb-6">
+            <div className="flex-1 h-px bg-neutral-200" />
+            <span className="text-[10px] md:text-xs text-neutral-400 font-medium whitespace-nowrap">o ingresa con credenciales</span>
+            <div className="flex-1 h-px bg-neutral-200" />
+          </div>
+        </>
+      )}
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-3 md:space-y-4 bg-white rounded-2xl p-4 md:p-0 md:bg-transparent border border-neutral-100 md:border-0 shadow-sm md:shadow-none">

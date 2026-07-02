@@ -11,7 +11,6 @@ const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const TARGET_DIR = path.resolve(process.argv[2] || path.join(REPO_ROOT, 'android-twa', 'build-rptrazar'));
 const WEB_MANIFEST_URL = 'https://rptrazar.mendoza.gov.ar/manifest-app.json';
 const WEB_MANIFEST_HOST = new URL(WEB_MANIFEST_URL).hostname;
-const DEFAULT_RPTRAZAR_IP = '192.168.192.135';
 const RELEASE_KEYSTORE = path.resolve(
   process.env.RPTRAZAR_TWA_KEYSTORE ||
     path.join(REPO_ROOT, 'android-twa', 'secrets', 'sitrep-release.keystore'),
@@ -44,9 +43,9 @@ function resolveOverrideIp(hostname) {
     const output = childProcess.execFileSync('dig', ['+short', hostname], { encoding: 'utf8' });
     return output
       .split(/\s+/)
-      .find((entry) => /^(?:\d{1,3}\.){3}\d{1,3}$/.test(entry)) || DEFAULT_RPTRAZAR_IP;
+      .find((entry) => /^(?:\d{1,3}\.){3}\d{1,3}$/.test(entry)) || null;
   } catch {
-    return DEFAULT_RPTRAZAR_IP;
+    return null;
   }
 }
 

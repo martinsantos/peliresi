@@ -560,7 +560,7 @@ bash backend/tests/smoke-test.sh http://localhost:3002
 
 - **Script**: `backend/tests/smoke-test.sh`
 - **Coverage**: 44 endpoints across all route groups (Health, Auth, Manifiestos, Catalogos, Actores, Admin, Reportes, PDF, Analytics, Centro de Control, Notificaciones, QR Verification)
-- **Auth**: Logs in as admin (`juan.perez@dgfa.gob.ar` / `admin123`), uses JWT token for authenticated endpoints
+- **Auth**: Logs in as admin (`juan.perez@dgfa.gob.ar` / `<password-inicial-seguro>`), uses JWT token for authenticated endpoints
 - **Dynamic IDs**: Fetches real IDs for detail/sub-resource tests (manifiestoId, transportistaId, operadorId)
 - **Exit code**: 0 on all pass, 1 on any failure
 
