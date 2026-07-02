@@ -8,16 +8,16 @@
 
   var logo = document.createElement('div');
   logo.className = 'auth-logo';
-  logo.textContent = 'SITREP ';
+  logo.textContent = 'RP Trazar ';
   var logoSpan = document.createElement('span');
   logoSpan.textContent = 'Mendoza';
   logo.appendChild(logoSpan);
 
   var p1 = document.createElement('p');
-  p1.textContent = 'Este manual es exclusivo para usuarios registrados del sistema SITREP.';
+  p1.textContent = 'Este manual es exclusivo para usuarios registrados de RP Trazar.';
 
   var p2 = document.createElement('p');
-  p2.textContent = 'Inicia sesion para acceder a la documentacion completa.';
+  p2.textContent = 'Inicia sesion en la app para acceder a la documentacion completa y al guion de capacitacion.';
 
   var btn = document.createElement('button');
   btn.className = 'auth-btn';
@@ -44,8 +44,8 @@
 // ── v2026.6: Share manual ──
 function shareManual() {
   var shareData = {
-    title: 'SITREP - Manual del Sistema',
-    text: 'Manual de Trazabilidad de Residuos Peligrosos - Provincia de Mendoza',
+    title: 'RP Trazar - Manual del Sistema',
+    text: 'Manual y guia de capacitacion de Trazabilidad de Residuos Peligrosos - Provincia de Mendoza',
     url: window.location.href
   };
 

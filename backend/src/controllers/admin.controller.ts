@@ -20,6 +20,8 @@ const createUsuarioSchema = z.object({
   empresa: z.string().optional(),
   telefono: z.string().optional(),
   cuit: z.string().optional(),
+  activo: z.boolean().optional(),
+  emailVerified: z.boolean().optional(),
 });
 
 const updateUsuarioSchema = z.object({
@@ -143,7 +145,7 @@ export const createUsuario = async (req: AuthRequest, res: Response, next: NextF
       throw new AppError(parsed.error.issues[0].message, 400);
     }
 
-    const { email, password, nombre, apellido, rol, empresa, telefono, cuit } = parsed.data;
+    const { email, password, nombre, apellido, rol, empresa, telefono, cuit, activo, emailVerified } = parsed.data;
 
     // Multi-rol: si el CUIT ya existe con el mismo email, reusar el usuario
     const existingByCuit = cuit ? await prisma.usuario.findUnique({ where: { cuit } }) : null;
@@ -172,6 +174,8 @@ export const createUsuario = async (req: AuthRequest, res: Response, next: NextF
           empresa,
           telefono,
           cuit,
+          activo: activo ?? true,
+          emailVerified: emailVerified ?? true,
         },
       });
     }
@@ -187,6 +191,7 @@ export const createUsuario = async (req: AuthRequest, res: Response, next: NextF
         empresa: true,
         telefono: true,
         activo: true,
+        emailVerified: true,
         createdAt: true,
       },
     });

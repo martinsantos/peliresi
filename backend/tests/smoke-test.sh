@@ -6,11 +6,15 @@
 # ============================================================
 
 BASE_URL="${1:-https://sitrep.ultimamilla.com.ar}"
+BASE_URL="${BASE_URL%/}"
 API="$BASE_URL/api"
 PASS=0
 FAIL=0
 SKIP=0
 ERRORS=""
+TRAINING_PREFIX="${TRAINING_PREFIX:-CAP-20260702}"
+CERT_ADMIN_EMAIL="${CERT_ADMIN_EMAIL:-admin@dgfa.mendoza.gov.ar}"
+CERT_ADMIN_PASSWORD="${CERT_ADMIN_PASSWORD:-admin123}"
 
 # Colors
 GREEN='\033[0;32m'
@@ -19,6 +23,93 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 CURL=$(which curl)
+
+json_get() {
+  local path="$1"
+  python3 -c '
+import json
+import sys
+
+path = sys.argv[1].split(".")
+try:
+    value = json.load(sys.stdin)
+    for key in path:
+        if isinstance(value, list):
+            value = value[int(key)]
+        else:
+            value = value[key]
+    if isinstance(value, bool):
+        print("true" if value else "false")
+    elif value is not None:
+        print(value)
+except Exception:
+    print("")
+' "$path"
+}
+
+host_from_url() {
+  python3 - "$1" <<'PY'
+import sys
+from urllib.parse import urlparse
+print(urlparse(sys.argv[1]).hostname or sys.argv[1])
+PY
+}
+
+is_real_production_target() {
+  case "$(host_from_url "$BASE_URL")" in
+    rptrazar.mendoza.gov.ar|sitrepprd1.mendoza.gov.ar) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+first_id_from_collection() {
+  local collection="$1"
+  python3 -c '
+import json
+import sys
+
+collection = sys.argv[1]
+try:
+    data = json.load(sys.stdin).get("data", {})
+    items = data.get(collection) or data.get("items") or []
+    print(items[0].get("id", "") if items else "")
+except Exception:
+    print("")
+' "$collection"
+}
+
+manifest_id_by_number() {
+  local number="$1"
+  $CURL -sS --max-time 20 -G \
+    -H "Authorization: Bearer $TOKEN" \
+    --data-urlencode "search=$number" \
+    --data-urlencode "limit=20" \
+    "${API}/manifiestos" | NUMBER="$number" python3 -c '
+import json
+import os
+import sys
+
+target = os.environ["NUMBER"]
+try:
+    data = json.load(sys.stdin).get("data", {})
+    items = data.get("manifiestos") or data.get("items") or []
+    for item in items:
+        if item.get("numero") == target:
+            print(item.get("id", ""))
+            break
+except Exception:
+    pass
+'
+}
+
+actor_id_by_search() {
+  local path="$1" collection="$2" query="$3"
+  $CURL -sS --max-time 20 -G \
+    -H "Authorization: Bearer $TOKEN" \
+    --data-urlencode "search=$query" \
+    --data-urlencode "limit=5" \
+    "${API}${path}" | first_id_from_collection "$collection"
+}
 
 # Login and get token
 echo "============================================"
@@ -30,9 +121,9 @@ echo "--- Authenticating ---"
 
 LOGIN_RESP=$($CURL -s -X POST "$API/auth/login" \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@dgfa.mendoza.gov.ar","password":"admin123"}')
+  -d "{\"email\":\"$CERT_ADMIN_EMAIL\",\"password\":\"$CERT_ADMIN_PASSWORD\"}")
 
-TOKEN=$(echo "$LOGIN_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data']['tokens']['accessToken'])" 2>/dev/null)
+TOKEN=$(echo "$LOGIN_RESP" | json_get "data.tokens.accessToken")
 
 if [ -z "$TOKEN" ]; then
   echo -e "${RED}FATAL: Cannot authenticate. Aborting.${NC}"
@@ -104,7 +195,7 @@ test_public "GET" "/health/ready" "200"
 echo ""
 echo "--- Auth ---"
 test_public "GET" "/auth/test" "200"
-test_public "POST" "/auth/login" "200" '{"email":"admin@dgfa.mendoza.gov.ar","password":"admin123"}'
+test_public "POST" "/auth/login" "200" "{\"email\":\"$CERT_ADMIN_EMAIL\",\"password\":\"$CERT_ADMIN_PASSWORD\"}"
 test_public "POST" "/auth/login" "401" '{"email":"fake@test.com","password":"wrong"}'
 test_endpoint "GET" "/auth/profile" "200"
 test_endpoint "POST" "/auth/change-password" "400" '{"currentPassword":"wrong","newPassword":"NewPass123"}'
@@ -117,8 +208,13 @@ test_endpoint "GET" "/manifiestos/sync-inicial" "200"
 test_endpoint "GET" "/manifiestos" "200"
 test_endpoint "GET" "/manifiestos?estado=APROBADO&limit=1" "200"
 
-# Get a real manifiesto ID
-MANIFIESTO_ID=$($CURL -s "${API}/manifiestos?limit=1" -H "Authorization: Bearer $TOKEN" | python3 -c "import sys,json; d=json.load(sys.stdin); ms=d['data']['manifiestos']; print(ms[0]['id'] if ms else '')" 2>/dev/null)
+# Get a manifiesto ID. On real production, pin this to the CAP demo dataset.
+if is_real_production_target; then
+  MANIFIESTO_ID=$(manifest_id_by_number "${TRAINING_PREFIX}-0003")
+  [ -n "$MANIFIESTO_ID" ] && echo -e "  ${GREEN}INFO${NC} Using demo manifiesto ${TRAINING_PREFIX}-0003 for detail/PDF/QR checks"
+else
+  MANIFIESTO_ID=$($CURL -s "${API}/manifiestos?limit=1" -H "Authorization: Bearer $TOKEN" | first_id_from_collection "manifiestos")
+fi
 
 if [ -n "$MANIFIESTO_ID" ]; then
   test_endpoint "GET" "/manifiestos/$MANIFIESTO_ID" "200"
@@ -140,7 +236,11 @@ test_endpoint "GET" "/catalogos/vehiculos" "200"
 test_endpoint "GET" "/catalogos/choferes" "200"
 
 # Get transportista ID
-TRANSP_ID=$($CURL -s "${API}/catalogos/transportistas" -H "Authorization: Bearer $TOKEN" | python3 -c "import sys,json; d=json.load(sys.stdin); ts=d['data']['transportistas']; print(ts[0]['id'] if ts else '')" 2>/dev/null)
+if is_real_production_target; then
+  TRANSP_ID=$(actor_id_by_search "/actores/transportistas" "transportistas" "CAPACITACION RP - Transporte Escuela")
+else
+  TRANSP_ID=$($CURL -s "${API}/catalogos/transportistas" -H "Authorization: Bearer $TOKEN" | first_id_from_collection "transportistas")
+fi
 
 if [ -n "$TRANSP_ID" ]; then
   test_endpoint "GET" "/catalogos/transportistas/$TRANSP_ID/vehiculos" "200"
@@ -151,7 +251,11 @@ else
 fi
 
 # Get operador ID
-OPERADOR_ID=$($CURL -s "${API}/catalogos/operadores" -H "Authorization: Bearer $TOKEN" | python3 -c "import sys,json; d=json.load(sys.stdin); os=d['data']['operadores']; print(os[0]['id'] if os else '')" 2>/dev/null)
+if is_real_production_target; then
+  OPERADOR_ID=$(actor_id_by_search "/actores/operadores" "operadores" "CAPACITACION RP - Operador Escuela")
+else
+  OPERADOR_ID=$($CURL -s "${API}/catalogos/operadores" -H "Authorization: Bearer $TOKEN" | first_id_from_collection "operadores")
+fi
 
 if [ -n "$OPERADOR_ID" ]; then
   test_endpoint "GET" "/catalogos/operadores/$OPERADOR_ID/tratamientos" "200"
@@ -167,9 +271,15 @@ test_endpoint "GET" "/actores/transportistas" "200"
 test_endpoint "GET" "/actores/operadores" "200"
 
 # Get IDs for detail tests
-GEN_ID=$($CURL -s "${API}/actores/generadores?limit=1" -H "Authorization: Bearer $TOKEN" | python3 -c "import sys,json; d=json.load(sys.stdin); gs=d['data']['generadores']; print(gs[0]['id'] if gs else '')" 2>/dev/null)
-TRANSP_ACTOR_ID=$($CURL -s "${API}/actores/transportistas?limit=1" -H "Authorization: Bearer $TOKEN" | python3 -c "import sys,json; d=json.load(sys.stdin); ts=d['data']['transportistas']; print(ts[0]['id'] if ts else '')" 2>/dev/null)
-OPER_ACTOR_ID=$($CURL -s "${API}/actores/operadores?limit=1" -H "Authorization: Bearer $TOKEN" | python3 -c "import sys,json; d=json.load(sys.stdin); os=d['data']['operadores']; print(os[0]['id'] if os else '')" 2>/dev/null)
+if is_real_production_target; then
+  GEN_ID=$(actor_id_by_search "/actores/generadores" "generadores" "CAPACITACION RP - Generador Escuela")
+  TRANSP_ACTOR_ID="$TRANSP_ID"
+  OPER_ACTOR_ID="$OPERADOR_ID"
+else
+  GEN_ID=$($CURL -s "${API}/actores/generadores?limit=1" -H "Authorization: Bearer $TOKEN" | first_id_from_collection "generadores")
+  TRANSP_ACTOR_ID=$($CURL -s "${API}/actores/transportistas?limit=1" -H "Authorization: Bearer $TOKEN" | first_id_from_collection "transportistas")
+  OPER_ACTOR_ID=$($CURL -s "${API}/actores/operadores?limit=1" -H "Authorization: Bearer $TOKEN" | first_id_from_collection "operadores")
+fi
 
 if [ -n "$GEN_ID" ]; then
   test_endpoint "GET" "/actores/generadores/$GEN_ID" "200"
@@ -221,7 +331,7 @@ echo ""
 echo "--- QR Verification (public) ---"
 # Get a real manifiesto number
 if [ -n "$MANIFIESTO_ID" ]; then
-  MAN_NUMERO=$($CURL -s "${API}/manifiestos/$MANIFIESTO_ID" -H "Authorization: Bearer $TOKEN" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data']['manifiesto']['numero'])" 2>/dev/null)
+  MAN_NUMERO=$($CURL -s "${API}/manifiestos/$MANIFIESTO_ID" -H "Authorization: Bearer $TOKEN" | json_get "data.manifiesto.numero")
   if [ -n "$MAN_NUMERO" ]; then
     test_public "GET" "/manifiestos/verificar/$MAN_NUMERO" "200"
   fi

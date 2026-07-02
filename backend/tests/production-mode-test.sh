@@ -5,7 +5,8 @@
 # Usage: bash backend/tests/production-mode-test.sh [BASE_URL]
 # ============================================================
 
-BASE_URL="${1:-https://sitrep.ultimamilla.com.ar/api}"
+BASE_URL="${1:-https://rptrazar.mendoza.gov.ar/api}"
+AUTH_RETRY_SLEEP="${SITREP_AUTH_RETRY_SLEEP:-65}"
 PASS=0
 FAIL=0
 
@@ -55,6 +56,19 @@ http_post_anon_status() {
     "$BASE_URL$endpoint"
 }
 
+http_post_anon_status_retry_429() {
+  local endpoint="$1" body="$2" status sleep_seconds
+  status=$(http_post_anon_status "$endpoint" "$body")
+  if [ "$status" = "429" ]; then
+    sleep_seconds="$(echo "$AUTH_RETRY_SLEEP" | tr -cd '0-9' | head -c 6)"
+    sleep_seconds="${sleep_seconds:-65}"
+    echo "  ⚠️  Rate limit en $endpoint; reintentando en ${sleep_seconds}s" >&2
+    sleep "$sleep_seconds"
+    status=$(http_post_anon_status "$endpoint" "$body")
+  fi
+  echo "$status"
+}
+
 # ────────────────────────────────────────────────
 # 1. AUTH — login con credenciales reales
 # ────────────────────────────────────────────────
@@ -83,7 +97,7 @@ check "Login inválido → 401" "401" "$STATUS"
 # ────────────────────────────────────────────────
 section "[AUTH] Validación de password en registro"
 
-STATUS=$(http_post_anon_status '/auth/register' '{"email":"nuevo@test.com","password":"abc","rol":"GENERADOR","nombre":"Test"}')
+STATUS=$(http_post_anon_status_retry_429 '/auth/register' '{"email":"nuevo@test.com","password":"abc","rol":"GENERADOR","nombre":"Test"}')
 check "Password débil en registro → 400" "400" "$STATUS"
 
 # ────────────────────────────────────────────────

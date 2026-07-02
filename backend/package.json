@@ -13,6 +13,8 @@
     "db:migrate": "npx prisma migrate dev",
     "db:generate": "npx prisma generate",
     "db:seed": "ts-node prisma/seed.ts",
+    "training:seed": "ts-node prisma/seed-production-training.ts",
+    "demo:repair": "ts-node prisma/repair-demo-certification.ts",
     "seed:transportistas": "ts-node prisma/seed-transportistas-reales.ts",
     "seed:generadores": "ts-node prisma/seed-generadores-reales.ts",
     "seed:operadores": "ts-node prisma/seed-operadores-reales.ts"

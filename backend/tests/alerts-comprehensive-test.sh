@@ -147,21 +147,30 @@ fi
 section "Preparar manifiesto de prueba"
 
 # Obtener IDs de actores
-R=$(curl_json -H "$AUTH" "$BASE_URL/api/catalogos/generadores")
-GEN_ID=$(echo "$R" | sed '$d' | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+R=$(curl_json -H "Authorization: Bearer $GEN_TOKEN" "$BASE_URL/api/auth/profile")
+GEN_ID=$(echo "$R" | sed '$d' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('user',{}).get('generador',{}).get('id',''))" 2>/dev/null)
 [ -n "$GEN_ID" ] && pass "Generador obtenido: $GEN_ID" || { fail "No se pudo obtener generador"; exit 1; }
 
-R=$(curl_json -H "$AUTH" "$BASE_URL/api/catalogos/transportistas")
-TRANS_ID=$(echo "$R" | sed '$d' | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+R=$(curl_json -H "Authorization: Bearer $TRANS_TOKEN" "$BASE_URL/api/auth/profile")
+TRANS_ID=$(echo "$R" | sed '$d' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('user',{}).get('transportista',{}).get('id',''))" 2>/dev/null)
 [ -n "$TRANS_ID" ] && pass "Transportista obtenido: $TRANS_ID" || { fail "No se pudo obtener transportista"; exit 1; }
 
-R=$(curl_json -H "$AUTH" "$BASE_URL/api/catalogos/operadores")
-OPER_ID=$(echo "$R" | sed '$d' | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+R=$(curl_json -H "Authorization: Bearer $OPER_TOKEN" "$BASE_URL/api/auth/profile")
+OPER_ID=$(echo "$R" | sed '$d' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('user',{}).get('operador',{}).get('id',''))" 2>/dev/null)
 [ -n "$OPER_ID" ] && pass "Operador obtenido: $OPER_ID" || { fail "No se pudo obtener operador"; exit 1; }
 
-R=$(curl_json -H "$AUTH" "$BASE_URL/api/catalogos/tipos-residuos")
-TIPO_ID=$(echo "$R" | sed '$d' | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
-[ -n "$TIPO_ID" ] && pass "Tipo residuo obtenido: $TIPO_ID" || { fail "No se pudo obtener tipo residuo"; exit 1; }
+R=$(curl_json -H "$AUTH" "$BASE_URL/api/catalogos/operadores")
+TIPO_ID=$(echo "$R" | sed '$d' | python3 -c "
+import sys,json
+try:
+    ops=json.load(sys.stdin).get('data',{}).get('operadores',[])
+    op=next((o for o in ops if o.get('id') == '$OPER_ID'), None)
+    if op and op.get('tratamientos'):
+        print(op['tratamientos'][0].get('tipoResiduoId',''))
+except Exception:
+    pass
+" 2>/dev/null)
+[ -n "$TIPO_ID" ] && pass "Tipo residuo compatible obtenido: $TIPO_ID" || { fail "Operador demo sin tratamiento autorizado"; exit 1; }
 
 R=$(curl_json -H "$AUTH" "$BASE_URL/api/catalogos/vehiculos")
 VEH_ID=$(echo "$R" | sed '$d' | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)

@@ -5,7 +5,9 @@
 # Profiles:
 #   quick             Local/CI fast validation.
 #   post-deploy       Remote smoke validation after deploy.
-#   production-smoke  Non-destructive production/VPN validation.
+#   production-smoke  Non-destructive production/VPN validation with auth checks.
+#   produccion-seguro Production-safe idempotent validation for live domains.
+#   produccion-capacitacion Demo-only mutating E2E on CAP/isDemoData training records.
 #   certification     Full staging certification matrix.
 #
 # The runner is non-destructive by default. Autocorrections and staging
@@ -18,7 +20,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 RUN_PROFILE="${RUN_PROFILE:-${1:-quick}}"
-TARGET_URL="${TARGET_URL:-https://sitrep.ultimamilla.com.ar}"
+TARGET_URL="${TARGET_URL:-https://rptrazar.mendoza.gov.ar}"
 TARGET_URL="${TARGET_URL%/}"
 API_URL="${API_URL:-$TARGET_URL/api}"
 API_URL="${API_URL%/}"
@@ -31,6 +33,9 @@ SUMMARY_JSON="$RUN_DIR/summary.json"
 
 ALLOW_AUTOFIX="${ALLOW_AUTOFIX:-false}"
 ALLOW_DESTRUCTIVE_STAGING="${ALLOW_DESTRUCTIVE_STAGING:-false}"
+ALLOW_PRODUCTION_DESTRUCTIVE_E2E="${ALLOW_PRODUCTION_DESTRUCTIVE_E2E:-false}"
+ALLOW_PRODUCTION_TRAINING_E2E="${ALLOW_PRODUCTION_TRAINING_E2E:-false}"
+PRODUCTION_TRAINING_RESET_COMMAND="${PRODUCTION_TRAINING_RESET_COMMAND:-}"
 STAGING_SNAPSHOT_COMMAND="${STAGING_SNAPSHOT_COMMAND:-}"
 STAGING_RESTORE_COMMAND="${STAGING_RESTORE_COMMAND:-}"
 ALLOW_RESTORE_DRILL="${ALLOW_RESTORE_DRILL:-false}"
@@ -44,6 +49,7 @@ SOAK_SECONDS="${SOAK_SECONDS:-1800}"
 NETWORK_RETRIES="${NETWORK_RETRIES:-2}"
 NETWORK_TIMEOUT="${NETWORK_TIMEOUT:-10}"
 OFFLINE_SKIP_AUDIT="${OFFLINE_SKIP_AUDIT:-false}"
+AUTH_COOLDOWN_SECONDS="${CERT_AUTH_COOLDOWN_SECONDS:-65}"
 
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -69,7 +75,13 @@ json_escape() {
 }
 
 strict_network_required() {
-  [ "$RUN_PROFILE" = "certification" ] || [ "$RUN_PROFILE" = "post-deploy" ] || [ "$RUN_PROFILE" = "production-smoke" ] || is_true "${GITHUB_ACTIONS:-false}"
+  [ "$RUN_PROFILE" = "certification" ] \
+    || [ "$RUN_PROFILE" = "post-deploy" ] \
+    || [ "$RUN_PROFILE" = "production-smoke" ] \
+    || [ "$RUN_PROFILE" = "production-safe" ] \
+    || [ "$RUN_PROFILE" = "produccion-seguro" ] \
+    || [ "$RUN_PROFILE" = "produccion-capacitacion" ] \
+    || is_true "${GITHUB_ACTIONS:-false}"
 }
 
 host_from_url() {
@@ -78,6 +90,49 @@ import sys
 from urllib.parse import urlparse
 print(urlparse(sys.argv[1]).hostname or sys.argv[1])
 PY
+}
+
+is_real_production_target() {
+  local host
+  host="$(host_from_url "$TARGET_URL")"
+  case "$host" in
+    rptrazar.mendoza.gov.ar|sitrepprd1.mendoza.gov.ar)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+require_production_destructive_opt_in() {
+  local suite="$1"
+  if ! is_real_production_target; then
+    return 0
+  fi
+
+  if is_true "$ALLOW_PRODUCTION_DESTRUCTIVE_E2E"; then
+    return 0
+  fi
+
+  run_step "$suite" "blocked on real production target" "BLOCKER" \
+    "echo 'Destructive E2E is blocked for $TARGET_URL. Set ALLOW_PRODUCTION_DESTRUCTIVE_E2E=true only after using isolated isDemoData=true training records and an approved rollback plan.' >&2; exit 1"
+  return 1
+}
+
+require_production_training_opt_in() {
+  local suite="$1"
+  if ! is_real_production_target; then
+    return 0
+  fi
+
+  if is_true "$ALLOW_PRODUCTION_TRAINING_E2E"; then
+    return 0
+  fi
+
+  run_step "$suite" "blocked without training opt-in" "BLOCKER" \
+    "echo 'Training E2E mutates CAP demo records on $TARGET_URL. Set ALLOW_PRODUCTION_TRAINING_E2E=true after confirming the training dataset and reset command.' >&2; exit 1"
+  return 1
 }
 
 network_check() {
@@ -179,6 +234,18 @@ run_skip() {
   echo "[$suite] $name"
   echo "  SKIP - $reason"
   record_result "$suite" "$name" "$severity" "SKIP" "0" "$log" "$reason" "SKIPPED_BY_POLICY"
+}
+
+auth_cooldown() {
+  local reason="${1:-auth rate-limit cooldown}"
+  local seconds
+  seconds="$(printf "%s" "$AUTH_COOLDOWN_SECONDS" | tr -cd '0-9' | head -c 6)"
+  seconds="${seconds:-0}"
+  if [ "$seconds" -le 0 ]; then
+    return 0
+  fi
+  echo "[cooldown] $reason (${seconds}s)"
+  sleep "$seconds"
 }
 
 run_autofix_step() {
@@ -352,14 +419,19 @@ static_suite() {
 api_regression_suite() {
   run_step "api-regression" "health" "BLOCKER" "curl -fsS '$TARGET_URL/api/health' | grep -q '\"status\":\"ok\"'"
   run_step "api-regression" "smoke" "BLOCKER" "bash backend/tests/smoke-test.sh '$TARGET_URL'"
+  auth_cooldown "after api smoke login burst"
   run_step "api-regression" "role enforcement" "BLOCKER" "bash backend/tests/role-enforcement-test.sh '$TARGET_URL'"
+  auth_cooldown "after role enforcement login burst"
   run_step "api-regression" "search safety" "HIGH" "bash backend/tests/search-safety-test.sh '$TARGET_URL'"
   run_step "api-regression" "pagination stress" "HIGH" "bash backend/tests/pagination-stress-test.sh '$TARGET_URL'"
+  auth_cooldown "after pagination stress login burst"
   run_step "api-regression" "sort stress" "HIGH" "bash backend/tests/sort-stress-test.sh '$TARGET_URL'"
+  auth_cooldown "after sort stress login burst"
   run_step "api-regression" "date validation stress" "HIGH" "bash backend/tests/date-validation-stress-test.sh '$TARGET_URL'"
 }
 
 workflow_suite() {
+  require_production_destructive_opt_in "workflow-e2e" || return 1
   run_step "workflow-e2e" "cross platform workflow" "BLOCKER" "bash backend/tests/cross-platform-workflow-test.sh '$TARGET_URL'"
   run_step "workflow-e2e" "extended workflow" "HIGH" "bash backend/tests/workflow-extended-test.sh '$TARGET_URL'"
   run_step "workflow-e2e" "multirol integral" "HIGH" "bash backend/tests/integral-multirol-test.sh '$TARGET_URL'"
@@ -367,13 +439,14 @@ workflow_suite() {
 }
 
 security_suite() {
-  run_step "security" "production mode" "HIGH" "bash backend/tests/production-mode-test.sh '$TARGET_URL'"
+  run_step "security" "production mode" "HIGH" "bash backend/tests/production-mode-test.sh '$API_URL'"
   run_step "security" "edge cases" "HIGH" "bash backend/tests/edge-cases-test.sh '$API_URL'"
   run_step "security" "actor ownership data" "HIGH" "python3 backend/tests/verify-actor-data.py --api '$TARGET_URL'"
   run_step "security" "authenticated security matrix" "HIGH" "bash scripts/certification/check-authenticated-security.sh '$TARGET_URL'"
 }
 
 data_integrity_suite() {
+  require_production_destructive_opt_in "data-integrity" || return 1
   run_step "data-integrity" "actores crud" "HIGH" "bash backend/tests/actores-crud-test.sh '$TARGET_URL'"
   run_step "data-integrity" "admin advanced" "HIGH" "bash backend/tests/admin-advanced-test.sh '$TARGET_URL'"
   run_step "data-integrity" "notifications" "MEDIUM" "bash backend/tests/notification-test.sh '$TARGET_URL'"
@@ -438,6 +511,7 @@ documentation_evidence_suite() {
 }
 
 stress_suite() {
+  require_production_destructive_opt_in "stress" || return 1
   run_step "stress" "multiuser concurrent" "HIGH" "bash backend/tests/multiuser-concurrent-test.sh '$API_URL'"
   run_step "stress" "pagination deep" "HIGH" "bash backend/tests/pagination-stress-test.sh '$TARGET_URL'"
   run_step "stress" "sort concurrent" "HIGH" "bash backend/tests/sort-stress-test.sh '$TARGET_URL'"
@@ -457,12 +531,44 @@ stress_suite() {
 production_smoke_suite() {
   run_step "production-smoke" "health" "BLOCKER" "curl -fsS '$TARGET_URL/api/health' | grep -q '\"status\":\"ok\"'"
   run_step "production-smoke" "smoke" "BLOCKER" "bash backend/tests/smoke-test.sh '$TARGET_URL'"
+  auth_cooldown "after smoke login burst"
   run_step "production-smoke" "role enforcement" "BLOCKER" "bash backend/tests/role-enforcement-test.sh '$TARGET_URL'"
+  auth_cooldown "after role enforcement login burst"
   run_step "production-smoke" "search safety" "HIGH" "bash backend/tests/search-safety-test.sh '$TARGET_URL'"
   api_contract_suite
   frontend_surface_suite
   pwa_offline_suite
   run_step "ops-recovery" "operational readiness" "HIGH" "bash scripts/certification/check-operational-readiness.sh '$TARGET_URL'"
+}
+
+production_safe_suite() {
+  run_step "produccion-seguro" "health" "BLOCKER" "curl -fsS '$TARGET_URL/api/health' | grep -q '\"status\":\"ok\"'"
+  frontend_surface_suite
+  pwa_offline_suite
+  api_contract_suite
+  run_step "ops-recovery" "operational readiness" "HIGH" "bash scripts/certification/check-operational-readiness.sh '$TARGET_URL'"
+}
+
+production_training_suite() {
+  require_production_training_opt_in "produccion-capacitacion" || return 1
+
+  if [ -n "$PRODUCTION_TRAINING_RESET_COMMAND" ]; then
+    run_step "produccion-capacitacion" "reset dataset before e2e" "BLOCKER" "$PRODUCTION_TRAINING_RESET_COMMAND"
+  else
+    run_skip "produccion-capacitacion" "reset dataset before e2e" "HIGH" "PRODUCTION_TRAINING_RESET_COMMAND not configured"
+  fi
+
+  auth_cooldown "before production training auth burst"
+  run_step "produccion-capacitacion" "demo-only e2e" "BLOCKER" \
+    "ALLOW_PRODUCTION_TRAINING_E2E='$ALLOW_PRODUCTION_TRAINING_E2E' bash backend/tests/production-training-e2e-test.sh '$TARGET_URL'"
+
+  if [ -n "$PRODUCTION_TRAINING_RESET_COMMAND" ]; then
+    run_step "produccion-capacitacion" "reset dataset after e2e" "BLOCKER" "$PRODUCTION_TRAINING_RESET_COMMAND"
+  else
+    run_skip "produccion-capacitacion" "reset dataset after e2e" "HIGH" "PRODUCTION_TRAINING_RESET_COMMAND not configured"
+  fi
+
+  production_safe_suite
 }
 
 preflight_suite() {
@@ -517,6 +623,12 @@ main() {
       ;;
     production-smoke)
       production_smoke_suite
+      ;;
+    production-safe|produccion-seguro)
+      production_safe_suite
+      ;;
+    produccion-capacitacion|production-training)
+      production_training_suite
       ;;
     certification)
       snapshot_staging

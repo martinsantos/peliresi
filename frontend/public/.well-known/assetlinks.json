@@ -11,5 +11,17 @@
         "B1:BD:AF:21:56:77:2A:06:BC:D7:0A:8D:50:E6:B2:30:D2:C4:23:D5:FF:07:E9:CF:FF:DD:6D:33:7C:D3:B4:B4"
       ]
     }
+  },
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "ar.gob.mendoza.rptrazar",
+      "sha256_cert_fingerprints": [
+        "81:20:6C:4C:4D:39:CB:05:79:DF:33:84:6C:EF:E9:86:F7:DA:8E:DC:A9:9C:E0:07:32:5C:B8:28:A6:42:9F:CE"
+      ]
+    }
   }
 ]

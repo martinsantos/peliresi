@@ -145,7 +145,16 @@ if [ -z "$OPER_ACTOR_ID" ]; then
   OPER_ACTOR_ID=$(api_get "/catalogos/operadores" "$ADMIN_TOKEN" | grep -o '"id":"[^"]*"' | cut -d'"' -f4 | head -1)
 fi
 
-TIPO_ID=$(curl -s --compressed "$BASE_URL/catalogos/tipos-residuos" | grep -o '"id":"[^"]*"' | cut -d'"' -f4 | head -1)
+TIPO_ID=$(api_get "/catalogos/operadores" "$ADMIN_TOKEN" | python3 -c "
+import sys, json
+try:
+    ops = json.load(sys.stdin).get('data',{}).get('operadores',[])
+    op = next((o for o in ops if o.get('id') == '$OPER_ACTOR_ID'), None)
+    if op and op.get('tratamientos'):
+        print(op['tratamientos'][0].get('tipoResiduoId',''))
+except Exception:
+    pass
+" 2>/dev/null)
 
 echo "  GEN_ACTOR_ID=$GEN_ACTOR_ID"
 echo "  TRANS_ACTOR_ID=$TRANS_ACTOR_ID"
@@ -161,7 +170,7 @@ fi
 # ── Bloque C: Crear + Firmar manifiesto ─────────────
 section "Bloque C — BORRADOR → APROBADO (genera notificaciones)"
 
-CREATE_PAYLOAD="{\"generadorId\":\"$GEN_ACTOR_ID\",\"transportistaId\":\"$TRANS_ACTOR_ID\",\"operadorId\":\"$OPER_ACTOR_ID\",\"residuos\":[{\"tipoResiduoId\":\"$TIPO_ID\",\"cantidad\":1,\"unidad\":\"kg\"}],\"descripcion\":\"Manifiesto de prueba notificaciones\"}"
+CREATE_PAYLOAD="{\"generadorId\":\"$GEN_ACTOR_ID\",\"transportistaId\":\"$TRANS_ACTOR_ID\",\"operadorId\":\"$OPER_ACTOR_ID\",\"residuos\":[{\"tipoResiduoId\":\"$TIPO_ID\",\"cantidad\":1,\"unidad\":\"kg\"}],\"observaciones\":\"TEST_AUTOMATION notification-test\"}"
 
 CREATE_RESP=$(curl -s --compressed -o /dev/null -w "%{http_code}" \
   -X POST "$BASE_URL/manifiestos" \

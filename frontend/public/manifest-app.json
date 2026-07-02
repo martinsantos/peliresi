@@ -1,6 +1,6 @@
 {
-  "name": "SITREP - Trazabilidad RRPP",
-  "short_name": "SITREP",
+  "name": "RP Trazar - Residuos Peligrosos",
+  "short_name": "RP Trazar",
   "description": "Sistema de Trazabilidad de Residuos Peligrosos - App Mobile",
   "start_url": "/app/",
   "scope": "/app/",
@@ -40,7 +40,7 @@
     "government"
   ],
   "prefer_related_applications": false,
-  "id": "sitrep-mobile-app",
+  "id": "rptrazar-mobile-app",
   "launch_handler": {
     "client_mode": "navigate-existing"
   },

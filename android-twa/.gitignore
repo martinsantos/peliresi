@@ -1,0 +1,16 @@
+.gradle/
+secrets/
+
+build-rptrazar/
+build-rptrazar-new/
+
+build-rptrazar/.gradle/
+build-rptrazar/build/
+build-rptrazar/app/build/
+build-rptrazar/local.properties
+build-rptrazar/*.iml
+build-rptrazar/.idea/
+
+*.apk
+*.aab
+*.apks

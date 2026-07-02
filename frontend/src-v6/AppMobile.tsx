@@ -77,7 +77,7 @@ const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
 
   // Public routes that don't need auth
-  const publicPaths = ['/login', '/reclamar', '/manifiestos/verificar', '/inscripcion', '/registro', '/recuperar', '/reset-password'];
+  const publicPaths = ['/l', '/login', '/reclamar', '/manifiestos/verificar', '/inscripcion', '/registro', '/recuperar', '/reset-password'];
   const isPublic = publicPaths.some(p => location.pathname.startsWith(p));
 
   // While auth state is loading, show loader (even for public routes,
@@ -105,6 +105,8 @@ function AppMobile() {
         <AuthGate>
         <Routes>
           {/* Auth — public, sin layout */}
+          <Route path="/l" element={<Navigate to="/login" replace />} />
+          <Route path="/l/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/reclamar" element={<ReclamarCuentaPage />} />
           <Route path="/registro" element={<RegistroPage />} />

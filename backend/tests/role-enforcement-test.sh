@@ -10,6 +10,10 @@ _INPUT="${1:-https://sitrep.ultimamilla.com.ar}"
 BASE="${_INPUT%/}"
 # Ensure /api suffix
 [[ "$BASE" != */api ]] && BASE="$BASE/api"
+
+TRAINING_PREFIX="${TRAINING_PREFIX:-CAP-20260702}"
+TRAINING_PASSWORD="${TRAINING_PASSWORD:-CapacitacionRP2026!}"
+
 PASS=0
 FAIL=0
 
@@ -22,6 +26,44 @@ echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━�
 echo -e "${YELLOW}   SITREP — Role Enforcement Test${NC}"
 echo -e "${YELLOW}   Target: $BASE${NC}"
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+json_get() {
+  local path="$1"
+  python3 -c '
+import json
+import sys
+
+path = sys.argv[1].split(".")
+try:
+    value = json.load(sys.stdin)
+    for key in path:
+        if isinstance(value, list):
+            value = value[int(key)]
+        else:
+            value = value[key]
+    if isinstance(value, bool):
+        print("true" if value else "false")
+    elif value is not None:
+        print(value)
+except Exception:
+    print("")
+' "$path"
+}
+
+host_from_url() {
+  python3 - "$1" <<'PY'
+import sys
+from urllib.parse import urlparse
+print(urlparse(sys.argv[1]).hostname or sys.argv[1])
+PY
+}
+
+is_real_production_target() {
+  case "$(host_from_url "$BASE")" in
+    rptrazar.mendoza.gov.ar|sitrepprd1.mendoza.gov.ar) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 
 # ── Helper: assert HTTP status ────────────────────────────────────
 assert_status() {
@@ -38,22 +80,115 @@ assert_status() {
 # ── Helper: login → token ─────────────────────────────────────────
 login() {
   local email="$1" password="$2"
-  curl -s -X POST "$BASE/auth/login" \
+  curl -sS --max-time 15 -X POST "$BASE/auth/login" \
     -H "Content-Type: application/json" \
-    -d "{\"email\":\"$email\",\"password\":\"$2\"}" | \
-    python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('tokens',{}).get('accessToken',''))" 2>/dev/null
+    -d "{\"email\":\"$email\",\"password\":\"$password\"}" | json_get "data.tokens.accessToken"
+}
+
+api_get() {
+  local path="$1" token="$2"
+  curl -sS --max-time 20 -H "Authorization: Bearer $token" "$BASE$path"
+}
+
+manifest_id_by_number() {
+  local number="$1"
+  curl -sS --max-time 20 -G \
+    -H "Authorization: Bearer $TOKEN_ADMIN" \
+    --data-urlencode "search=$number" \
+    --data-urlencode "limit=20" \
+    "$BASE/manifiestos" | NUMBER="$number" python3 -c '
+import json
+import os
+import sys
+
+target = os.environ["NUMBER"]
+try:
+    data = json.load(sys.stdin).get("data", {})
+    items = data.get("manifiestos") or data.get("items") or []
+    for item in items:
+        if item.get("numero") == target:
+            print(item.get("id", ""))
+            break
+except Exception:
+    pass
+'
+}
+
+ASSERTED_MANIFEST_ID=""
+assert_demo_manifest() {
+  local number="$1" expected_state="$2"
+  local id detail actual_number is_demo state
+
+  ASSERTED_MANIFEST_ID=""
+  id="$(manifest_id_by_number "$number")"
+  if [ -z "$id" ]; then
+    echo -e "  ${RED}FAIL${NC} No se encontro manifiesto demo $number"
+    FAIL=$((FAIL + 1))
+    return 1
+  fi
+
+  detail="$(api_get "/manifiestos/$id" "$TOKEN_ADMIN")"
+  actual_number="$(printf "%s" "$detail" | json_get "data.manifiesto.numero")"
+  is_demo="$(printf "%s" "$detail" | json_get "data.manifiesto.isDemoData")"
+  state="$(printf "%s" "$detail" | json_get "data.manifiesto.estado")"
+
+  if [ "$actual_number" != "$number" ]; then
+    echo -e "  ${RED}FAIL${NC} $number detalle inconsistente: numero=$actual_number"
+    FAIL=$((FAIL + 1))
+    return 1
+  fi
+  if [ "$is_demo" != "true" ]; then
+    echo -e "  ${RED}FAIL${NC} $number no tiene isDemoData=true"
+    FAIL=$((FAIL + 1))
+    return 1
+  fi
+  if [[ "$number" != "$TRAINING_PREFIX"-* ]]; then
+    echo -e "  ${RED}FAIL${NC} $number no usa prefijo $TRAINING_PREFIX"
+    FAIL=$((FAIL + 1))
+    return 1
+  fi
+  if [ "$state" != "$expected_state" ]; then
+    echo -e "  ${RED}FAIL${NC} $number estado esperado $expected_state, actual $state"
+    FAIL=$((FAIL + 1))
+    return 1
+  fi
+
+  ASSERTED_MANIFEST_ID="$id"
+  echo -e "  ${GREEN}OK${NC} $number guard demo (estado=$state, id=${id:0:8})"
+  return 0
 }
 
 # ── Obtener tokens ────────────────────────────────────────────────
 echo ""
 echo "Autenticando 4 roles..."
-TOKEN_ADMIN=$(login "admin@dgfa.mendoza.gov.ar" "admin123")
+if is_real_production_target; then
+  echo "Produccion Gobierno detectada: usando usuarios de capacitacion para roles no ADMIN."
+  ADMIN_EMAIL="${CERT_ADMIN_EMAIL:-admin@dgfa.mendoza.gov.ar}"
+  ADMIN_PASSWORD="${CERT_ADMIN_PASSWORD:-admin123}"
+  GEN_EMAIL="${TRAINING_GEN_EMAIL:-capacitacion.generador@rptrazar.mendoza.gov.ar}"
+  GEN_PASSWORD="$TRAINING_PASSWORD"
+  TRANS_EMAIL="${TRAINING_TRANS_EMAIL:-capacitacion.transportista@rptrazar.mendoza.gov.ar}"
+  TRANS_PASSWORD="$TRAINING_PASSWORD"
+  OPER_EMAIL="${TRAINING_OPER_EMAIL:-capacitacion.operador@rptrazar.mendoza.gov.ar}"
+  OPER_PASSWORD="$TRAINING_PASSWORD"
+else
+  ADMIN_EMAIL="${CERT_ADMIN_EMAIL:-admin@dgfa.mendoza.gov.ar}"
+  ADMIN_PASSWORD="${CERT_ADMIN_PASSWORD:-admin123}"
+  GEN_EMAIL="${GEN_EMAIL:-quimica.mendoza@industria.com}"
+  GEN_PASSWORD="${GEN_PASSWORD:-gen123}"
+  TRANS_EMAIL="${TRANS_EMAIL:-transportes.andes@logistica.com}"
+  TRANS_PASSWORD="${TRANS_PASSWORD:-trans123}"
+  OPER_EMAIL="${OPER_EMAIL:-tratamiento.residuos@planta.com}"
+  OPER_PASSWORD="${OPER_PASSWORD:-op123}"
+fi
+
+TOKEN_ADMIN=$(login "$ADMIN_EMAIL" "$ADMIN_PASSWORD")
 sleep 1
-TOKEN_GEN=$(login "quimica.mendoza@industria.com" "gen123")
+TOKEN_GEN=$(login "$GEN_EMAIL" "$GEN_PASSWORD")
 sleep 1
-TOKEN_TRANS=$(login "transportes.andes@logistica.com" "trans123")
+TOKEN_TRANS=$(login "$TRANS_EMAIL" "$TRANS_PASSWORD")
 sleep 1
-TOKEN_OPER=$(login "tratamiento.residuos@planta.com" "op123")
+TOKEN_OPER=$(login "$OPER_EMAIL" "$OPER_PASSWORD")
 
 [ -n "$TOKEN_ADMIN" ] && echo -e "  ${GREEN}OK${NC} ADMIN token" || echo -e "  ${RED}ERROR${NC} No se pudo autenticar ADMIN"
 [ -n "$TOKEN_GEN" ]   && echo -e "  ${GREEN}OK${NC} GENERADOR token" || echo -e "  ${RED}ERROR${NC} No se pudo autenticar GENERADOR"
@@ -69,17 +204,44 @@ fi
 echo ""
 echo "Obteniendo IDs de manifiestos para tests de workflow..."
 
-MAN_BORRADOR=$(curl -s -H "Authorization: Bearer $TOKEN_ADMIN" \
-  "$BASE/manifiestos?estado=BORRADOR&limit=1" | \
-  python3 -c "import sys,json; d=json.load(sys.stdin); dd=d.get('data',{}); items=dd.get('manifiestos',dd.get('items',[])); print(items[0]['id'] if items else '')" 2>/dev/null)
+if is_real_production_target; then
+  echo "Guardando seleccion de manifiestos: solo $TRAINING_PREFIX con isDemoData=true."
 
-MAN_TRANSITO=$(curl -s -H "Authorization: Bearer $TOKEN_ADMIN" \
-  "$BASE/manifiestos?estado=EN_TRANSITO&limit=1" | \
-  python3 -c "import sys,json; d=json.load(sys.stdin); dd=d.get('data',{}); items=dd.get('manifiestos',dd.get('items',[])); print(items[0]['id'] if items else '')" 2>/dev/null)
+  if assert_demo_manifest "${TRAINING_PREFIX}-0001" "BORRADOR"; then
+    MAN_BORRADOR="$ASSERTED_MANIFEST_ID"
+  else
+    MAN_BORRADOR=""
+  fi
 
-MAN_APROBADO=$(curl -s -H "Authorization: Bearer $TOKEN_ADMIN" \
-  "$BASE/manifiestos?estado=APROBADO&limit=1" | \
-  python3 -c "import sys,json; d=json.load(sys.stdin); dd=d.get('data',{}); items=dd.get('manifiestos',dd.get('items',[])); print(items[0]['id'] if items else '')" 2>/dev/null)
+  if assert_demo_manifest "${TRAINING_PREFIX}-0003" "EN_TRANSITO"; then
+    MAN_TRANSITO="$ASSERTED_MANIFEST_ID"
+  else
+    MAN_TRANSITO=""
+  fi
+
+  if assert_demo_manifest "${TRAINING_PREFIX}-0002" "APROBADO"; then
+    MAN_APROBADO="$ASSERTED_MANIFEST_ID"
+  else
+    MAN_APROBADO=""
+  fi
+
+  if [ -z "$MAN_BORRADOR" ] || [ -z "$MAN_TRANSITO" ] || [ -z "$MAN_APROBADO" ]; then
+    echo -e "${RED}ERROR CRÍTICO: dataset de capacitacion no esta listo. Ejecutar seed/reset antes de production-smoke.${NC}"
+    exit 1
+  fi
+else
+  MAN_BORRADOR=$(curl -sS --max-time 20 -H "Authorization: Bearer $TOKEN_ADMIN" \
+    "$BASE/manifiestos?estado=BORRADOR&limit=1" | \
+    python3 -c "import sys,json; d=json.load(sys.stdin); dd=d.get('data',{}); items=dd.get('manifiestos',dd.get('items',[])); print(items[0]['id'] if items else '')" 2>/dev/null)
+
+  MAN_TRANSITO=$(curl -sS --max-time 20 -H "Authorization: Bearer $TOKEN_ADMIN" \
+    "$BASE/manifiestos?estado=EN_TRANSITO&limit=1" | \
+    python3 -c "import sys,json; d=json.load(sys.stdin); dd=d.get('data',{}); items=dd.get('manifiestos',dd.get('items',[])); print(items[0]['id'] if items else '')" 2>/dev/null)
+
+  MAN_APROBADO=$(curl -sS --max-time 20 -H "Authorization: Bearer $TOKEN_ADMIN" \
+    "$BASE/manifiestos?estado=APROBADO&limit=1" | \
+    python3 -c "import sys,json; d=json.load(sys.stdin); dd=d.get('data',{}); items=dd.get('manifiestos',dd.get('items',[])); print(items[0]['id'] if items else '')" 2>/dev/null)
+fi
 
 [ -n "$MAN_BORRADOR" ] && echo -e "  BORRADOR: $MAN_BORRADOR" || echo -e "  ${YELLOW}WARN${NC} No hay manifiestos BORRADOR"
 [ -n "$MAN_TRANSITO" ] && echo -e "  EN_TRANSITO: $MAN_TRANSITO" || echo -e "  ${YELLOW}WARN${NC} No hay manifiestos EN_TRANSITO"

@@ -7,14 +7,46 @@
 
 set -uo pipefail
 
-BASE="${1:-https://sitrep.ultimamilla.com.ar}"
+BASE="${1:-https://rptrazar.mendoza.gov.ar}"
 API="$BASE/api"
-CONCURRENT=50
+CONCURRENT="${SITREP_PAGINATION_CONCURRENT:-50}"
+REQUEST_DIVISOR="${SITREP_PAGINATION_REQUEST_DIVISOR:-1}"
+ALLOW_429="${SITREP_PAGINATION_ALLOW_429:-false}"
+
+positive_int_or_default() {
+  local value="$1" fallback="$2"
+  value="$(echo "$value" | tr -cd '0-9' | head -c 8)"
+  if [ -n "$value" ] && [ "$value" -gt 0 ] 2>/dev/null; then
+    echo "$value"
+  else
+    echo "$fallback"
+  fi
+}
+
+is_true() {
+  case "${1:-}" in
+    true|TRUE|1|yes|YES|si|SI) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+scale_total() {
+  local total="$1"
+  if [ "$REQUEST_DIVISOR" -le 1 ]; then
+    echo "$total"
+  else
+    echo $(( (total + REQUEST_DIVISOR - 1) / REQUEST_DIVISOR ))
+  fi
+}
+
+CONCURRENT="$(positive_int_or_default "$CONCURRENT" 50)"
+REQUEST_DIVISOR="$(positive_int_or_default "$REQUEST_DIVISOR" 1)"
 
 echo "=================================================="
 echo "  SITREP Pagination Stress Test"
 echo "  Base: $BASE"
 echo "  Concurrent: $CONCURRENT"
+echo "  Request divisor: $REQUEST_DIVISOR"
 echo "=================================================="
 echo ""
 
@@ -31,7 +63,8 @@ fi
 # Test scenarios: (endpoint, total_requests, label)
 run_scenario() {
   local endpoint="$1"
-  local total="$2"
+  local total
+  total="$(scale_total "$2")"
   local label="$3"
   local temp_file
   temp_file=$(mktemp)
@@ -58,14 +91,16 @@ run_scenario() {
   local end=$(date +%s)
   local duration=$((end - start))
 
-  local count_200 count_500 count_other avg max p50 p95 p99
+  local count_200 count_429 count_500 count_other avg max p50 p95 p99
   count_200=$(grep -c '^200 ' "$temp_file" 2>/dev/null | head -1)
+  count_429=$(grep -c '^429 ' "$temp_file" 2>/dev/null | head -1)
   count_500=$(grep -c '^500 ' "$temp_file" 2>/dev/null | head -1)
   [ -z "$count_200" ] && count_200=0
+  [ -z "$count_429" ] && count_429=0
   [ -z "$count_500" ] && count_500=0
   local total_lines
   total_lines=$(wc -l < "$temp_file" | tr -d ' ')
-  count_other=$((total_lines - count_200 - count_500))
+  count_other=$((total_lines - count_200 - count_429 - count_500))
 
   # Latency stats (ms)
   if [ "$count_200" -gt 0 ]; then
@@ -86,7 +121,7 @@ run_scenario() {
     p50=0; p95=0; p99=0; max=0; avg=0
   fi
 
-  echo "    Duration: ${duration}s, 200: $count_200, 500: $count_500, other: $count_other"
+  echo "    Duration: ${duration}s, 200: $count_200, 429: $count_429, 500: $count_500, other: $count_other"
   echo "    Latency (ms): avg=$avg p50=$p50 p95=$p95 p99=$p99 max=$max"
 
   rm -f "$temp_file"
@@ -94,7 +129,10 @@ run_scenario() {
   if [ "$count_500" -gt 0 ]; then
     echo "    FAIL — $count_500 internal errors"
     return 1
-  elif [ "$count_200" -eq 0 ] && [ "$count_other" -gt 0 ]; then
+  elif [ "$count_429" -gt 0 ] && ! is_true "$ALLOW_429"; then
+    echo "    FAIL — $count_429 rate-limited responses"
+    return 1
+  elif [ "$count_200" -eq 0 ] && [ "$total_lines" -gt 0 ]; then
     echo "    FAIL — no successful responses"
     return 1
   fi

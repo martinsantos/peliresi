@@ -468,6 +468,28 @@ async function main() {
     });
   }
 
+  // Demo/local users must be able to login immediately.
+  await prisma.usuario.updateMany({
+    where: {
+      email: {
+        in: [
+          'admin@dgfa.mendoza.gov.ar',
+          'quimica.mendoza@industria.com',
+          'petroquimica.andes@industria.com',
+          'laboratorio.central@medicina.com',
+          'transportes.andes@logistica.com',
+          'logistica.cuyo@transporte.com',
+          'tratamiento.residuos@planta.com',
+          'reciclaje.ecologico@planta.com',
+        ],
+      },
+    },
+    data: {
+      activo: true,
+      emailVerified: true,
+    },
+  });
+
   console.log('Seed completado exitosamente!');
   console.log('  - 1 Admin');
   console.log('  - 15 Tipos de residuos');

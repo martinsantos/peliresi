@@ -60,6 +60,12 @@ except Exception:
 " 2>/dev/null
 }
 
+actor_id_from_profile() {
+  local token="$1"
+  local actor="$2"
+  api_call "GET" "/auth/profile" "$token" | json_extract "data.user.$actor.id"
+}
+
 # Test authenticated endpoint — returns HTTP body
 api_call() {
   local METHOD=$1
@@ -226,10 +232,12 @@ test_status "GET" "/manifiestos?estado=ENTREGADO&limit=5" "$OPER_TOKEN" "200" "O
 
 subsection "Phase 3: Catalog data availability"
 
-# Get IDs needed for manifest creation
-GENERADOR_ACTOR_ID=$(api_call "GET" "/catalogos/generadores" "$ADMIN_TOKEN" | json_extract "data.generadores.0.id")
-TRANSPORTISTA_ACTOR_ID=$(api_call "GET" "/catalogos/transportistas" "$ADMIN_TOKEN" | json_extract "data.transportistas.0.id")
-OPERADOR_ACTOR_ID=$(api_call "GET" "/catalogos/operadores" "$ADMIN_TOKEN" | json_extract "data.operadores.0.id")
+# Get IDs associated with the demo users that will execute workflow actions.
+# Falling back to the first catalog item creates false 404s because role filters
+# correctly hide manifests assigned to another actor.
+GENERADOR_ACTOR_ID=$(actor_id_from_profile "$GEN_TOKEN" "generador")
+TRANSPORTISTA_ACTOR_ID=$(actor_id_from_profile "$TRANS_TOKEN" "transportista")
+OPERADOR_ACTOR_ID=$(actor_id_from_profile "$OPER_TOKEN" "operador")
 # Get a residuo type that the selected operador is authorized to treat
 OPER_CATALOG_RESP=$(api_call "GET" "/catalogos/operadores" "$ADMIN_TOKEN")
 TIPO_RESIDUO_ID=$(echo "$OPER_CATALOG_RESP" | python3 -c "
@@ -246,10 +254,6 @@ try:
 except Exception:
     pass
 " 2>/dev/null)
-# Fallback if operator lookup failed
-if [ -z "$TIPO_RESIDUO_ID" ]; then
-  TIPO_RESIDUO_ID=$(api_call "GET" "/catalogos/tipos-residuos" "$ADMIN_TOKEN" | json_extract "data.tiposResiduos.0.id")
-fi
 
 echo -n "  Generador actor: "
 if [ -n "$GENERADOR_ACTOR_ID" ]; then echo -e "${GREEN}${GENERADOR_ACTOR_ID:0:8}...${NC}"; else echo -e "${RED}NOT FOUND${NC}"; fi

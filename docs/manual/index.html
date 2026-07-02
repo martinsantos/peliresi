@@ -3,11 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SITREP — Manual del Sistema | v2026.11</title>
-<meta name="description" content="Manual completo del Sistema de Trazabilidad de Residuos Peligrosos - Provincia de Mendoza">
+<title>RP Trazar — Manual del Sistema | v2026.12</title>
+<meta name="description" content="Manual completo de RP Trazar - Sistema de Trazabilidad de Residuos Peligrosos de Mendoza">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="icon" href="screenshots/escudo-mendoza-color.webp" type="image/webp">
 <link rel="stylesheet" href="manual.css">
 </head>
 <body>
@@ -18,8 +19,8 @@
     <span></span><span></span><span></span>
   </button>
   <img src="screenshots/escudo-mendoza-blanco.webp" alt="Gobierno de Mendoza" style="height:32px;width:auto;margin-right:6px;">
-  <div class="logo">SITREP <span>Mendoza</span></div>
-  <span class="version">v2026.11</span>
+  <div class="logo">RP Trazar <span>Mendoza</span></div>
+  <span class="version">v2026.12</span>
   <span class="doc-title">Manual del Sistema de Trazabilidad de Residuos Peligrosos</span>
   <div class="header-actions">
     <button class="header-action-btn" id="btnShare" onclick="shareManual()" aria-label="Compartir" title="Compartir">
@@ -257,16 +258,25 @@
     <a href="#changelog-v2026-10" class="nav-link level-2" data-nav-role="all">16.11 PWA Routing</a>
     <a href="#changelog-v2026-10" class="nav-link level-2" data-nav-role="all">16.12 Operaciones</a>
   </div>
+
+  <div class="nav-section-title" onclick="toggleNavGroup(this)">17. Capacitacion y QA</div>
+  <div class="nav-group-items">
+    <a href="#capacitacion-qa" class="nav-link" data-nav-role="all">17.1 Guion operativo</a>
+    <a href="#cap-dataset" class="nav-link level-2" data-nav-role="all">Dataset CAP</a>
+    <a href="#cap-recorrido" class="nav-link level-2" data-nav-role="all">Recorrido guiado</a>
+    <a href="#cap-comandos" class="nav-link level-2" data-nav-role="admin">Comandos seguros</a>
+    <a href="#cap-cierre" class="nav-link level-2" data-nav-role="admin">Cierre de sesion</a>
+  </div>
 </nav>
 
 <!-- Main Content -->
 <main class="main-content" id="mainContent">
 
 <div class="print-cover">
-  <div class="print-logo">SITREP</div>
+  <div class="print-logo">RP Trazar</div>
   <h1>Manual del Sistema de Trazabilidad<br>de Residuos Peligrosos</h1>
   <p class="print-subtitle">Provincia de Mendoza &mdash; Direccion General de Fiscalizacion Ambiental</p>
-  <p class="print-date">Version 2026.9 &mdash; Marzo 2026</p>
+  <p class="print-date">Version 2026.12 &mdash; Julio 2026</p>
   <div style="margin-top:2rem;text-align:center;">
     <img src="screenshots/escudo-mendoza-color.webp" alt="Gobierno de Mendoza" style="height:72px;width:auto;">
   </div>
@@ -278,15 +288,15 @@
   <div class="hero-content">
     <div class="hero-text">
       <h1 class="hero-title">
-        <span class="hero-logo">SITREP</span>
+        <span class="hero-logo">RP Trazar</span>
         <span class="hero-accent">Mendoza</span>
       </h1>
       <p class="hero-subtitle">Sistema de Trazabilidad de Residuos Peligrosos</p>
-      <p class="hero-tagline">Trazabilidad completa. Control en tiempo real. Cumplimiento normativo.</p>
+      <p class="hero-tagline">Capacitacion guiada. Trazabilidad completa. Control en tiempo real.</p>
       <div class="hero-badges">
+        <span class="hero-badge">Dataset CAP</span>
         <span class="hero-badge">Ley 24.051</span>
         <span class="hero-badge">GPS en Vivo</span>
-        <span class="hero-badge">110+ API Endpoints</span>
         <span class="hero-badge">PWA Mobile</span>
       </div>
     </div>
@@ -420,7 +430,7 @@ timedatectl set-timezone America/Argentina/Mendoza
   <div class="wm-body">
     <h4>Paso 1: Servidor Web <span class="wm-badge pass">Completado</span></h4>
     <p>Si estas viendo esta pagina, Nginx esta funcionando correctamente.</p>
-    <table class="wm-tbl"><tr><td><strong>Dominio</strong></td><td>sitrep.ultimamilla.com.ar</td></tr><tr><td><strong>Protocolo</strong></td><td>https: <span class="wm-badge pass">SSL Activo</span></td></tr></table>
+    <table class="wm-tbl"><tr><td><strong>Dominio</strong></td><td>rptrazar.mendoza.gov.ar</td></tr><tr><td><strong>Protocolo</strong></td><td>https: <span class="wm-badge pass">SSL Activo</span></td></tr></table>
   </div>
 </div>
 
@@ -728,10 +738,10 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <table>
 <thead><tr><th>Servicio</th><th>URL</th></tr></thead>
 <tbody>
-<tr><td>Aplicacion Web</td><td><code>https://sitrep.ultimamilla.com.ar/</code></td></tr>
-<tr><td>App Movil (PWA)</td><td><code>https://sitrep.ultimamilla.com.ar/app/</code></td></tr>
-<tr><td>API REST</td><td><code>https://sitrep.ultimamilla.com.ar/api/</code></td></tr>
-<tr><td>Manual</td><td><code>https://sitrep.ultimamilla.com.ar/manual/</code></td></tr>
+<tr><td>Aplicacion Web</td><td><code>https://rptrazar.mendoza.gov.ar/</code></td></tr>
+<tr><td>App Movil (PWA)</td><td><code>https://rptrazar.mendoza.gov.ar/app/</code></td></tr>
+<tr><td>API REST</td><td><code>https://rptrazar.mendoza.gov.ar/api/</code></td></tr>
+<tr><td>Manual</td><td><code>https://rptrazar.mendoza.gov.ar/manual/</code></td></tr>
 </tbody>
 </table>
 <h4>Credenciales de Demostracion</h4>
@@ -757,7 +767,7 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <p><strong>Rol:</strong> Administrador DGFA &mdash; Acceso completo a todos los modulos del sistema.</p>
 </div>
 <ol>
-<li>Ingresar a <code>sitrep.ultimamilla.com.ar</code> con credenciales de administrador.</li>
+<li>Ingresar a <code>rptrazar.mendoza.gov.ar</code> con credenciales de administrador.</li>
 <li>El <strong>Dashboard</strong> muestra KPIs principales: manifiestos activos, en transito, completados, alertas pendientes.</li>
 <li>Navegar a <strong>Centro de Control</strong> para ver el mapa de transportes activos en tiempo real.</li>
 <li>Consultar <strong>Reportes</strong> con 8 pestanas de analisis (manifiestos, residuos, transporte, generadores, operadores, tratamientos, departamentos, mapa de actores).</li>
@@ -825,7 +835,7 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <h4>Consejos para el Transportista</h4>
 <div class="info-card role-card-transportista">
 <ul>
-<li><strong>Instalar la PWA:</strong> Para la mejor experiencia en campo, instalar SITREP como aplicacion en el telefono desde <code>https://sitrep.ultimamilla.com.ar/app/</code>. Esto habilita el modo offline y acceso rapido desde la pantalla de inicio.</li>
+<li><strong>Instalar la PWA:</strong> Para la mejor experiencia en campo, instalar SITREP como aplicacion en el telefono desde <code>https://rptrazar.mendoza.gov.ar/app/</code>. Esto habilita el modo offline y acceso rapido desde la pantalla de inicio.</li>
 <li><strong>Permisos GPS:</strong> Al confirmar el retiro, el navegador solicitara permisos de ubicacion. Es imprescindible aceptar para que el tracking funcione correctamente. Si se deniegan por error, ir a configuracion del navegador para habilitarlos manualmente.</li>
 <li><strong>Mantener la aplicacion abierta:</strong> El GPS se envia cada 30 segundos mientras la aplicacion esta activa. Si se cierra o se pone en segundo plano, los puntos pendientes se guardan localmente y se envian al reabrir la app.</li>
 <li><strong>Usar pausa en paradas:</strong> Si se realizan paradas intermedias (combustible, descanso), usar el boton de Pausa para registrar el incidente. Reanudar al continuar el viaje.</li>
@@ -2648,7 +2658,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 
 <h4>Instalacion en Android (Chrome)</h4>
 <ol>
-<li>Abrir <code>https://sitrep.ultimamilla.com.ar/app/</code> en Google Chrome.</li>
+<li>Abrir <code>https://rptrazar.mendoza.gov.ar/app/</code> en Google Chrome.</li>
 <li>El navegador mostrara automaticamente un banner de instalacion despues de 45 segundos de uso (puede descartarse por 7 dias).</li>
 <li>Alternativamente, tocar el menu de tres puntos y seleccionar <strong>&quot;Agregar a pantalla de inicio&quot;</strong>.</li>
 <li>La aplicacion se instala como icono independiente en el launcher.</li>
@@ -2656,7 +2666,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 
 <h4>Instalacion en iOS (Safari)</h4>
 <ol>
-<li>Abrir <code>https://sitrep.ultimamilla.com.ar/app/</code> en Safari.</li>
+<li>Abrir <code>https://rptrazar.mendoza.gov.ar/app/</code> en Safari.</li>
 <li>Tocar el boton <strong>Compartir</strong> (icono de flecha hacia arriba).</li>
 <li>Seleccionar <strong>&quot;Agregar a la pantalla de inicio&quot;</strong>.</li>
 <li>Confirmar el nombre y tocar <strong>Agregar</strong>.</li>
@@ -3467,7 +3477,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <thead><tr><th>Componente</th><th>Configuracion</th></tr></thead>
 <tbody>
 <tr><td>Servidor</td><td>VPS en 23.105.176.45</td></tr>
-<tr><td>Dominio</td><td><code>sitrep.ultimamilla.com.ar</code></td></tr>
+<tr><td>Dominio</td><td><code>rptrazar.mendoza.gov.ar</code></td></tr>
 <tr><td>PM2</td><td>Modo cluster, 2 instancias, puerto 3010, 512MB por instancia</td></tr>
 <tr><td>Nginx</td><td>Reverse proxy <code>/api/</code> hacia <code>localhost:3010</code>, SPA fallback para frontend</td></tr>
 <tr><td>SSL</td><td>Let's Encrypt (renovacion automatica)</td></tr>
@@ -3483,7 +3493,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <tr><td>PWA App mobile</td><td><code>/var/www/sitrep/app/</code></td></tr>
 <tr><td>Backend (codigo compilado)</td><td><code>/var/www/sitrep-backend/</code></td></tr>
 <tr><td>Backend .env</td><td><code>/var/www/sitrep-backend/.env</code> (symlink)</td></tr>
-<tr><td>Configuracion Nginx</td><td><code>/etc/nginx/sites-available/sitrep.ultimamilla.com.ar</code></td></tr>
+<tr><td>Configuracion Nginx</td><td><code>/etc/nginx/sites-available/rptrazar.mendoza.gov.ar</code></td></tr>
 <tr><td>Logs PM2</td><td><code>/root/.pm2/logs/sitrep-backend-*.log</code></td></tr>
 </tbody>
 </table>
@@ -3696,7 +3706,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <section id="arq-api" data-role="all">
 <h3>5.3 Esquema de Servicios API</h3>
 
-<a href="https://sitrep.ultimamilla.com.ar/api/docs" target="_blank" class="api-docs-card">
+<a href="https://rptrazar.mendoza.gov.ar/api/docs" target="_blank" class="api-docs-card">
   <span class="api-icon">&#128218;</span>
   <div class="api-info">
     <h4>Documentacion Interactiva de la API (OpenAPI/Swagger)</h4>
@@ -3794,7 +3804,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <tbody>
 <tr><td><strong>Helmet</strong></td><td>Headers de seguridad HTTP</td><td>CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy</td></tr>
 <tr><td><strong>Compression</strong></td><td>Compresion gzip</td><td>~7x reduccion de payload. Aplicado a todas las respuestas JSON y HTML.</td></tr>
-<tr><td><strong>CORS</strong></td><td>Control de origen cruzado</td><td>Configurado exclusivamente para el dominio de produccion (<code>sitrep.ultimamilla.com.ar</code>).</td></tr>
+<tr><td><strong>CORS</strong></td><td>Control de origen cruzado</td><td>Configurado exclusivamente para el dominio de produccion (<code>rptrazar.mendoza.gov.ar</code>).</td></tr>
 <tr><td><strong>Rate Limiting</strong></td><td>Proteccion contra abuso</td><td>600 solicitudes por minuto por direccion IP. Soporta CGNAT (multiples usuarios detras de misma IP).</td></tr>
 <tr><td><strong>Auth JWT</strong></td><td>Autenticacion y autorizacion</td><td>Verificacion de token Bearer en rutas protegidas. Roles verificados por endpoint.</td></tr>
 <tr><td><strong>Analytics</strong></td><td>Registro de metricas</td><td>Registra endpoint, metodo, status, tiempo de respuesta, userId. Excluye rutas GPS (<code>/ubicacion</code>, <code>/gps</code>) para evitar volumen excesivo.</td></tr>
@@ -5520,7 +5530,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">Como accedo al sistema por primera vez?</div>
 <div class="collapsible-body">
-<p>El administrador del sistema (DGFA) debe crear su cuenta de usuario y asignarle el rol correspondiente (Generador, Transportista u Operador). Una vez creada la cuenta, acceda a <code>https://sitrep.ultimamilla.com.ar/</code> con el email y contrasena proporcionados. Para la version mobile, acceda a <code>https://sitrep.ultimamilla.com.ar/app/</code> desde el navegador de su telefono.</p>
+<p>El administrador del sistema (DGFA) debe crear su cuenta de usuario y asignarle el rol correspondiente (Generador, Transportista u Operador). Una vez creada la cuenta, acceda a <code>https://rptrazar.mendoza.gov.ar/</code> con el email y contrasena proporcionados. Para la version mobile, acceda a <code>https://rptrazar.mendoza.gov.ar/app/</code> desde el navegador de su telefono.</p>
 </div>
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">Que navegadores son compatibles?</div>
@@ -5539,7 +5549,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <div class="collapsible-body">
 <p>El tracking GPS requiere que se concedan permisos de ubicacion al navegador. Si el GPS no funciona:</p>
 <ol>
-<li><strong>Verificar permisos:</strong> En la configuracion del navegador, asegurarse de que <code>sitrep.ultimamilla.com.ar</code> tenga permiso de ubicacion &quot;Permitir&quot;.</li>
+<li><strong>Verificar permisos:</strong> En la configuracion del navegador, asegurarse de que <code>rptrazar.mendoza.gov.ar</code> tenga permiso de ubicacion &quot;Permitir&quot;.</li>
 <li><strong>Verificar GPS del dispositivo:</strong> Asegurarse de que el GPS del telefono este activado (Configuracion &gt; Ubicacion).</li>
 <li><strong>Modo de alta precision:</strong> Activar el modo de ubicacion de alta precision que combina GPS, WiFi y datos moviles.</li>
 <li><strong>Reiniciar el navegador:</strong> Cerrar completamente el navegador y volver a abrir la aplicacion.</li>
@@ -5563,13 +5573,13 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <div class="collapsible-body">
 <p><strong>Android (Chrome):</strong></p>
 <ol>
-<li>Abrir <code>https://sitrep.ultimamilla.com.ar/app/</code> en Google Chrome.</li>
+<li>Abrir <code>https://rptrazar.mendoza.gov.ar/app/</code> en Google Chrome.</li>
 <li>Esperar 45 segundos hasta que aparezca el banner de instalacion, o abrir el menu (tres puntos) y seleccionar &quot;Agregar a pantalla de inicio&quot;.</li>
 <li>Confirmar la instalacion. La app aparecera como icono en el launcher.</li>
 </ol>
 <p><strong>iOS (Safari):</strong></p>
 <ol>
-<li>Abrir <code>https://sitrep.ultimamilla.com.ar/app/</code> en Safari (no Chrome).</li>
+<li>Abrir <code>https://rptrazar.mendoza.gov.ar/app/</code> en Safari (no Chrome).</li>
 <li>Tocar el boton Compartir (cuadrado con flecha hacia arriba).</li>
 <li>Seleccionar &quot;Agregar a la pantalla de inicio&quot;.</li>
 <li>Confirmar el nombre y tocar Agregar.</li>
@@ -5687,7 +5697,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <table>
 <thead><tr><th>Caracteristica</th><th>Version Web</th><th>Version Mobile (PWA)</th></tr></thead>
 <tbody>
-<tr><td><strong>URL</strong></td><td><code>sitrep.ultimamilla.com.ar/</code></td><td><code>sitrep.ultimamilla.com.ar/app/</code></td></tr>
+<tr><td><strong>URL</strong></td><td><code>rptrazar.mendoza.gov.ar/</code></td><td><code>rptrazar.mendoza.gov.ar/app/</code></td></tr>
 <tr><td><strong>Orientacion</strong></td><td>Desktop (horizontal)</td><td>Portrait (vertical)</td></tr>
 <tr><td><strong>Navegacion</strong></td><td>Sidebar lateral + header</td><td>Bottom nav bar + drawer lateral</td></tr>
 <tr><td><strong>Instalable</strong></td><td>No</td><td>Si (PWA con icono en home screen)</td></tr>
@@ -5912,7 +5922,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <table>
 <thead><tr><th>Problema</th><th>Causa Probable</th><th>Solucion</th></tr></thead>
 <tbody>
-<tr><td>GPS no se activa al confirmar retiro</td><td>Permisos de ubicacion denegados</td><td>Ir a Configuracion del navegador &gt; Permisos &gt; Ubicacion &gt; Permitir para sitrep.ultimamilla.com.ar</td></tr>
+<tr><td>GPS no se activa al confirmar retiro</td><td>Permisos de ubicacion denegados</td><td>Ir a Configuracion del navegador &gt; Permisos &gt; Ubicacion &gt; Permitir para rptrazar.mendoza.gov.ar</td></tr>
 <tr><td>Estado &quot;acquiring&quot; indefinido</td><td>GPS del dispositivo desactivado</td><td>Activar GPS en Configuracion &gt; Ubicacion del telefono. Usar modo alta precision.</td></tr>
 <tr><td>Puntos GPS no se envian</td><td>Sin conexion a internet</td><td>Los puntos se almacenan localmente (max 5). Se enviaran automaticamente al reconectar.</td></tr>
 <tr><td>GPS muestra ubicacion incorrecta</td><td>Baja precision de senial</td><td>Moverse a un area abierta. Verificar que el modo de alta precision este activado.</td></tr>
@@ -6015,9 +6025,9 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <tbody>
 <tr><td><strong>Administrador del Sistema</strong></td><td><code>admin@dgfa.mendoza.gov.ar</code></td></tr>
 <tr><td><strong>Soporte Tecnico</strong></td><td>Contactar a la Direccion General de Fiscalizacion Ambiental (DGFA)</td></tr>
-<tr><td><strong>Aplicacion Web</strong></td><td><code>https://sitrep.ultimamilla.com.ar/</code></td></tr>
-<tr><td><strong>Aplicacion Movil</strong></td><td><code>https://sitrep.ultimamilla.com.ar/app/</code></td></tr>
-<tr><td><strong>Manual en linea</strong></td><td><code>https://sitrep.ultimamilla.com.ar/manual/</code></td></tr>
+<tr><td><strong>Aplicacion Web</strong></td><td><code>https://rptrazar.mendoza.gov.ar/</code></td></tr>
+<tr><td><strong>Aplicacion Movil</strong></td><td><code>https://rptrazar.mendoza.gov.ar/app/</code></td></tr>
+<tr><td><strong>Manual en linea</strong></td><td><code>https://rptrazar.mendoza.gov.ar/manual/</code></td></tr>
 </tbody>
 </table>
 
@@ -6063,11 +6073,11 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <table>
 <thead><tr><th>Recurso</th><th>URL</th></tr></thead>
 <tbody>
-<tr><td>Aplicacion Web (Desktop)</td><td><code>https://sitrep.ultimamilla.com.ar/</code></td></tr>
-<tr><td>Aplicacion Mobile (PWA)</td><td><code>https://sitrep.ultimamilla.com.ar/app/</code></td></tr>
-<tr><td>API REST</td><td><code>https://sitrep.ultimamilla.com.ar/api/</code></td></tr>
-<tr><td>Health Check</td><td><code>https://sitrep.ultimamilla.com.ar/api/health</code></td></tr>
-<tr><td>Manual en linea</td><td><code>https://sitrep.ultimamilla.com.ar/manual/</code></td></tr>
+<tr><td>Aplicacion Web (Desktop)</td><td><code>https://rptrazar.mendoza.gov.ar/</code></td></tr>
+<tr><td>Aplicacion Mobile (PWA)</td><td><code>https://rptrazar.mendoza.gov.ar/app/</code></td></tr>
+<tr><td>API REST</td><td><code>https://rptrazar.mendoza.gov.ar/api/</code></td></tr>
+<tr><td>Health Check</td><td><code>https://rptrazar.mendoza.gov.ar/api/health</code></td></tr>
+<tr><td>Manual en linea</td><td><code>https://rptrazar.mendoza.gov.ar/manual/</code></td></tr>
 </tbody>
 </table>
 </section>
@@ -7024,7 +7034,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <tr><td>Backend (codigo)</td><td><code>/var/www/sitrep-backend/</code> (symlink a release activo)</td></tr>
 <tr><td>Backend .env</td><td><code>/home/demoambiente/.env</code> (symlink desde cada release)</td></tr>
 <tr><td>Releases</td><td><code>/var/www/sitrep-backend-releases/YYYYMMDD-HHMMSS/</code></td></tr>
-<tr><td>Nginx config</td><td><code>/etc/nginx/sites-available/sitrep.ultimamilla.com.ar</code></td></tr>
+<tr><td>Nginx config</td><td><code>/etc/nginx/sites-available/rptrazar.mendoza.gov.ar</code></td></tr>
 <tr><td>PM2 logs</td><td><code>/root/.pm2/logs/sitrep-backend-*.log</code></td></tr>
 <tr><td>Deploy scripts</td><td><code>/opt/scripts-cicd/deploy_sitrep_backend.sh</code></td></tr>
 </tbody>
@@ -7034,12 +7044,12 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <table>
 <thead><tr><th>Recurso</th><th>URL</th></tr></thead>
 <tbody>
-<tr><td>Frontend</td><td><code>https://sitrep.ultimamilla.com.ar/</code></td></tr>
-<tr><td>PWA App</td><td><code>https://sitrep.ultimamilla.com.ar/app/</code></td></tr>
-<tr><td>API REST</td><td><code>https://sitrep.ultimamilla.com.ar/api/</code></td></tr>
-<tr><td>API Docs (Swagger)</td><td><code>https://sitrep.ultimamilla.com.ar/api/docs</code></td></tr>
-<tr><td>Health Check</td><td><code>https://sitrep.ultimamilla.com.ar/api/health</code></td></tr>
-<tr><td>Manual</td><td><code>https://sitrep.ultimamilla.com.ar/manual/</code></td></tr>
+<tr><td>Frontend</td><td><code>https://rptrazar.mendoza.gov.ar/</code></td></tr>
+<tr><td>PWA App</td><td><code>https://rptrazar.mendoza.gov.ar/app/</code></td></tr>
+<tr><td>API REST</td><td><code>https://rptrazar.mendoza.gov.ar/api/</code></td></tr>
+<tr><td>API Docs (Swagger)</td><td><code>https://rptrazar.mendoza.gov.ar/api/docs</code></td></tr>
+<tr><td>Health Check</td><td><code>https://rptrazar.mendoza.gov.ar/api/health</code></td></tr>
+<tr><td>Manual</td><td><code>https://rptrazar.mendoza.gov.ar/manual/</code></td></tr>
 </tbody>
 </table>
 </section>
@@ -7303,7 +7313,7 @@ checking → acquiring → active
     <li><code>pm2 restart sitrep-backend</code></li>
   </ul>
 </li>
-<li><strong>Health check:</strong> <code>curl https://sitrep.ultimamilla.com.ar/api/health</code>
+<li><strong>Health check:</strong> <code>curl https://rptrazar.mendoza.gov.ar/api/health</code>
   <ul>
     <li>Espera respuesta <code>{"status":"ok","db":"connected"}</code></li>
     <li>Si falla → <strong>ROLLBACK automatico</strong> al release anterior (2 segundos)</li>
@@ -7372,7 +7382,7 @@ ssh root@23.105.176.45 "pm2 logs sitrep-backend --lines 100"
 ssh root@23.105.176.45 "pm2 show sitrep-backend"
 
 # Health check
-curl -s https://sitrep.ultimamilla.com.ar/api/health | jq .
+curl -s https://rptrazar.mendoza.gov.ar/api/health | jq .
 
 # Estado de PostgreSQL
 ssh root@23.105.176.45 "docker exec directus-admin-database-1 \
@@ -7436,7 +7446,7 @@ find $BACKUP_DIR -name "env-*.bak" -mtime +30 -delete
 <li><strong>Restaurar .env:</strong> <code>cp env-backup.bak /home/demoambiente/.env</code></li>
 <li><strong>Re-deploy backend:</strong> Usar ultimo release en <code>/var/www/sitrep-backend-releases/</code> o CI/CD</li>
 <li><strong>Re-deploy frontend:</strong> Build local + scp + tar</li>
-<li><strong>Verificar:</strong> <code>curl https://sitrep.ultimamilla.com.ar/api/health</code></li>
+<li><strong>Verificar:</strong> <code>curl https://rptrazar.mendoza.gov.ar/api/health</code></li>
 </ol>
 </section>
 
@@ -7685,7 +7695,7 @@ cd /opt/sitrep-db && docker compose up -d
 <!-- 15.12.5 PASO 4: NGINX + SSL -->
 <h4 id="inst-paso4">15.12.5 Paso 4 — Configurar Nginx y SSL</h4>
 
-<p><strong>Prerequisito:</strong> El dominio (ej: <code>sitrep.ultimamilla.com.ar</code>) debe apuntar al IP del servidor via DNS A record.</p>
+<p><strong>Prerequisito:</strong> El dominio (ej: <code>rptrazar.mendoza.gov.ar</code>) debe apuntar al IP del servidor via DNS A record.</p>
 
 <pre>
 # Instalar Nginx y Certbot
@@ -7703,7 +7713,7 @@ mkdir -p /opt/scripts-cicd
 <pre>
 server {
     listen 80;
-    server_name sitrep.ultimamilla.com.ar;
+    server_name rptrazar.mendoza.gov.ar;
 
     # API proxy a PM2 backend
     location /api/ {
@@ -7757,12 +7767,12 @@ nginx -t
 systemctl reload nginx
 
 # Obtener certificado SSL (requiere DNS apuntando al servidor)
-certbot --nginx -d sitrep.ultimamilla.com.ar \
+certbot --nginx -d rptrazar.mendoza.gov.ar \
   --non-interactive --agree-tos -m admin@dgfa.mendoza.gov.ar
 </pre>
 
 <div class="info-box">
-<strong>Verificacion:</strong> Abrir <code>https://sitrep.ultimamilla.com.ar</code> en el navegador. Debe mostrar el candado SSL verde (aunque aun no hay contenido frontend, no debe dar error de certificado).
+<strong>Verificacion:</strong> Abrir <code>https://rptrazar.mendoza.gov.ar</code> en el navegador. Debe mostrar el candado SSL verde (aunque aun no hay contenido frontend, no debe dar error de certificado).
 </div>
 
 <!-- 15.12.6 PASO 5: DNS Y CORREOS -->
@@ -7856,8 +7866,8 @@ JWT_REFRESH_SECRET=GENERAR_OTRO_DISTINTO
 JWT_REFRESH_EXPIRES_IN=7d
 
 # ---- URLs ----
-FRONTEND_URL=https://sitrep.ultimamilla.com.ar
-CORS_ORIGIN=https://sitrep.ultimamilla.com.ar
+FRONTEND_URL=https://rptrazar.mendoza.gov.ar
+CORS_ORIGIN=https://rptrazar.mendoza.gov.ar
 
 # ---- Admin ----
 SUPER_ADMIN_EMAIL=admin@dgfa.mendoza.gov.ar
@@ -7870,7 +7880,7 @@ SMTP_HOST=smtp-relay.brevo.com
 SMTP_PORT=587
 SMTP_USER=apikey
 SMTP_PASS=xkeysib-TU-API-KEY-AQUI
-SMTP_FROM="SITREP <no-reply@sitrep.ultimamilla.com.ar>"
+SMTP_FROM="SITREP <no-reply@rptrazar.mendoza.gov.ar>"
 DISABLE_EMAILS=false
 EMAIL_DAILY_LIMIT_TRANSACCIONAL=10
 EMAIL_DAILY_LIMIT_ALERTA=6
@@ -7997,7 +8007,7 @@ SQL
 cd peliresi/frontend
 
 # Configurar URL de produccion
-echo 'VITE_API_URL=https://sitrep.ultimamilla.com.ar/api' > .env.production
+echo 'VITE_API_URL=https://rptrazar.mendoza.gov.ar/api' > .env.production
 
 # Build principal
 npm ci
@@ -8066,7 +8076,7 @@ chmod -R 755 /var/www/sitrep/manual
 </pre>
 
 <div class="info-box">
-<strong>Verificacion:</strong> Abrir <code>https://sitrep.ultimamilla.com.ar/manual/</code> en el navegador. Debe mostrar el manual con todas las capturas visibles y el carousel de la portada animando.
+<strong>Verificacion:</strong> Abrir <code>https://rptrazar.mendoza.gov.ar/manual/</code> en el navegador. Debe mostrar el manual con todas las capturas visibles y el carousel de la portada animando.
 </div>
 
 <!-- 15.12.11 PASO 10: BACKUPS -->
@@ -8143,11 +8153,11 @@ chmod +x /opt/scripts-cicd/healthcheck.sh
 <table>
 <thead><tr><th>#</th><th>Verificacion</th><th>Comando / URL</th><th>Resultado esperado</th></tr></thead>
 <tbody>
-<tr><td>1</td><td>API Health</td><td><code>curl https://sitrep.ultimamilla.com.ar/api/health</code></td><td><code>{"status":"ok","db":"connected"}</code></td></tr>
-<tr><td>2</td><td>Frontend carga</td><td>Abrir <code>https://sitrep.ultimamilla.com.ar/</code></td><td>Pagina de login visible</td></tr>
+<tr><td>1</td><td>API Health</td><td><code>curl https://rptrazar.mendoza.gov.ar/api/health</code></td><td><code>{"status":"ok","db":"connected"}</code></td></tr>
+<tr><td>2</td><td>Frontend carga</td><td>Abrir <code>https://rptrazar.mendoza.gov.ar/</code></td><td>Pagina de login visible</td></tr>
 <tr><td>3</td><td>Login admin</td><td>Email: <code>admin@dgfa.mendoza.gov.ar</code> / Password: <code>admin123</code></td><td>Dashboard con KPIs</td></tr>
-<tr><td>4</td><td>PWA App</td><td>Abrir <code>https://sitrep.ultimamilla.com.ar/app/</code></td><td>Version mobile funcional</td></tr>
-<tr><td>5</td><td>Manual</td><td>Abrir <code>https://sitrep.ultimamilla.com.ar/manual/</code></td><td>Manual con capturas visibles</td></tr>
+<tr><td>4</td><td>PWA App</td><td>Abrir <code>https://rptrazar.mendoza.gov.ar/app/</code></td><td>Version mobile funcional</td></tr>
+<tr><td>5</td><td>Manual</td><td>Abrir <code>https://rptrazar.mendoza.gov.ar/manual/</code></td><td>Manual con capturas visibles</td></tr>
 <tr><td>6</td><td>SSL valido</td><td>Verificar candado verde en el navegador</td><td>Certificado Let's Encrypt valido</td></tr>
 <tr><td>7</td><td>PM2 cluster</td><td><code>pm2 list</code></td><td>2 instancias online, 0 restarts</td></tr>
 <tr><td>8</td><td>Backup funciona</td><td><code>ls /opt/sitrep-backups/*.sql.gz</code></td><td>Al menos 1 archivo de backup</td></tr>
@@ -8165,7 +8175,7 @@ chmod +x /opt/scripts-cicd/healthcheck.sh
 <tbody>
 <tr><td>API retorna 502 Bad Gateway</td><td>PM2 no esta corriendo</td><td><code>pm2 restart sitrep-backend</code> y verificar <code>pm2 logs</code></td></tr>
 <tr><td><code>PrismaClientInitializationError</code></td><td>Binarios Prisma incorrectos para el OS</td><td><code>npx prisma generate</code> en el servidor (genera binarios nativos)</td></tr>
-<tr><td>Certificado SSL invalido</td><td>DNS no apunta al servidor</td><td>Verificar <code>dig sitrep.ultimamilla.com.ar</code> retorna el IP correcto</td></tr>
+<tr><td>Certificado SSL invalido</td><td>DNS no apunta al servidor</td><td>Verificar <code>dig rptrazar.mendoza.gov.ar</code> retorna el IP correcto</td></tr>
 <tr><td>Emails van a spam</td><td>Faltan registros SPF/DKIM</td><td>Verificar DNS con <a href="https://mxtoolbox.com" target="_blank" rel="noopener">mxtoolbox.com</a></td></tr>
 <tr><td>Base de datos no conecta</td><td>Container Docker parado</td><td><code>docker compose -f /opt/sitrep-db/docker-compose.yml up -d</code></td></tr>
 <tr><td>Frontend muestra pagina en blanco</td><td><code>VITE_API_URL</code> incorrecto</td><td>Verificar <code>frontend/.env.production</code> y rebuildar</td></tr>
@@ -8194,7 +8204,7 @@ gunzip -c /opt/sitrep-backups/ARCHIVO.sql.gz | \
 pm2 restart sitrep-backend
 
 # 5. Verificar
-curl https://sitrep.ultimamilla.com.ar/api/health
+curl https://rptrazar.mendoza.gov.ar/api/health
 </pre>
 
 <div class="info-box">
@@ -8352,7 +8362,7 @@ npm run test:coverage          # con cobertura</pre>
 </li>
 <li><strong>Como correr contra produccion:</strong>
 <pre>cd frontend
-PLAYWRIGHT_BASE_URL=https://sitrep.ultimamilla.com.ar \
+PLAYWRIGHT_BASE_URL=https://rptrazar.mendoza.gov.ar \
   npx playwright test --project=chromium</pre>
 </li>
 </ul>
@@ -8555,7 +8565,7 @@ if (dateFilter) where.createdAt = dateFilter;</pre>
 <pre># puertos abiertos pero apps no responden
 nc -zv 23.105.176.45 80   # OK
 nc -zv 23.105.176.45 443  # OK
-curl https://sitrep.ultimamilla.com.ar/api/health  # timeout
+curl https://rptrazar.mendoza.gov.ar/api/health  # timeout
 ssh root@23.105.176.45 "systemctl status nginx"
 # nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
 
@@ -8572,7 +8582,7 @@ ssh root@23.105.176.45 "ss -tlnp | grep -E ':80|:443'"
   systemctl disable lshttpd
 "</pre>
 
-<p>Verificacion: <code>curl https://sitrep.ultimamilla.com.ar/api/health</code> &rarr; <code>{"status":"ok","db":"connected"}</code>. Smoke test 48/48 PASS.</p>
+<p>Verificacion: <code>curl https://rptrazar.mendoza.gov.ar/api/health</code> &rarr; <code>{"status":"ok","db":"connected"}</code>. Smoke test 48/48 PASS.</p>
 
 <h4>Runbook — Recuperacion rapida</h4>
 <table>
@@ -8599,7 +8609,7 @@ docker exec directus-admin-database-1 pg_isready -U directus -d trazabilidad_rrp
 ls -lt /opt/sitrep-backups/sitrep-db-*.sql.gz | head -3
 
 # Smoke test produccion
-bash backend/tests/smoke-test.sh https://sitrep.ultimamilla.com.ar</pre>
+bash backend/tests/smoke-test.sh https://rptrazar.mendoza.gov.ar</pre>
 
 <div class="warn-box">
 <strong>Atencion:</strong> el disco esta al 91% (7.2GB libres). Los backups crecen ~120MB/dia. Monitorear con cron, considerar limpieza agresiva o cross-server rsync.
@@ -8624,6 +8634,138 @@ bash backend/tests/smoke-test.sh https://sitrep.ultimamilla.com.ar</pre>
 
 <p>Runbook operacional en <code>docs/RUNBOOK.md</code> — comandos de uso diario, deploy, logs, backups, recuperacion.</p>
 
+</section>
+
+<!-- ============================================================ -->
+<!-- SECTION 17: CAPACITACION Y QA CONTROLADA                     -->
+<!-- ============================================================ -->
+<section id="capacitacion-qa" data-role="all">
+<h2>17. Capacitacion y QA Controlada</h2>
+
+<div class="training-hero">
+  <div>
+    <span class="training-eyebrow">Produccion Gobierno</span>
+    <h3>Guion operativo para entrenar sin tocar datos reales</h3>
+    <p>Esta seccion complementa la capacitacion presencial y las corridas E2E sobre <code>https://rptrazar.mendoza.gov.ar/app/</code>. El objetivo es practicar el ciclo completo de manifiestos usando exclusivamente datos de capacitacion, identificados con el prefijo <code>CAP-20260702</code> y marcados en base como <code>isDemoData=true</code>.</p>
+  </div>
+  <div class="training-status">
+    <strong>Estado recomendado</strong>
+    <span>GO para piloto/capacitacion controlada</span>
+    <small>No usar suites destructivas sobre datos reales.</small>
+  </div>
+</div>
+
+<div class="callout callout-info">
+<strong>Regla principal:</strong> todos los ejercicios deben hacerse con usuarios de capacitacion y manifiestos <code>CAP-20260702-*</code>. Al finalizar cada bloque, resetear el dataset para volver a la matriz base.
+</div>
+
+<h3 id="cap-dataset">17.1 Dataset CAP</h3>
+<p>Los siguientes manifiestos estan preparados para mostrar cada estado del workflow sin depender de usuarios finales ni registros reales:</p>
+
+<table class="training-table">
+<thead><tr><th>Manifiesto</th><th>Estado base</th><th>Uso recomendado</th></tr></thead>
+<tbody>
+<tr><td><code>CAP-20260702-0001</code></td><td><span class="workflow-state ws-borrador">BORRADOR</span></td><td>Ejercicio completo guiado: firma, retiro, GPS, entrega, recepcion, tratamiento y cierre.</td></tr>
+<tr><td><code>CAP-20260702-0002</code></td><td><span class="workflow-state ws-aprobado">APROBADO</span></td><td>Practica de transportista: tomar viaje y confirmar retiro.</td></tr>
+<tr><td><code>CAP-20260702-0003</code></td><td><span class="workflow-state ws-transito">EN_TRANSITO</span></td><td>Centro de Control, GPS, viaje activo, PDF, QR y smoke seguro.</td></tr>
+<tr><td><code>CAP-20260702-0004</code></td><td><span class="workflow-state ws-entregado">ENTREGADO</span></td><td>Practica operador: recepcion o rechazo controlado.</td></tr>
+<tr><td><code>CAP-20260702-0005</code></td><td><span class="workflow-state ws-recibido">RECIBIDO</span></td><td>Pesaje y registro de tratamiento.</td></tr>
+<tr><td><code>CAP-20260702-0006</code></td><td><span class="workflow-state ws-tratamiento">EN_TRATAMIENTO</span></td><td>Cierre y emision de certificado.</td></tr>
+<tr><td><code>CAP-20260702-0007</code></td><td><span class="workflow-state ws-tratado">TRATADO</span></td><td>Descarga de certificado y consulta historica.</td></tr>
+<tr><td><code>CAP-20260702-0008</code></td><td><span class="workflow-state ws-rechazado">RECHAZADO</span></td><td>Revision de casos rechazados.</td></tr>
+<tr><td><code>CAP-20260702-0009</code></td><td><span class="workflow-state ws-cancelado">CANCELADO</span></td><td>Revision de casos cancelados.</td></tr>
+</tbody>
+</table>
+
+<div class="summary-grid training-summary">
+  <div class="summary-card"><div class="number">3</div><div class="label">Usuarios escuela</div></div>
+  <div class="summary-card"><div class="number">9</div><div class="label">Manifiestos demo</div></div>
+  <div class="summary-card"><div class="number">0</div><div class="label">Emails CAP al cierre</div></div>
+  <div class="summary-card"><div class="number">0</div><div class="label">Notificaciones CAP al cierre</div></div>
+</div>
+
+<h3 id="cap-recorrido">17.2 Recorrido guiado por rol</h3>
+
+<div class="training-flow">
+  <div class="training-step">
+    <div class="training-step-num">1</div>
+    <div>
+      <h4>Administrador</h4>
+      <p>Ingresar a la web, abrir Dashboard, Centro de Control, Reportes y Busqueda. Usar el filtro <code>CAP-20260702</code> para no mezclar datos reales con datos escuela.</p>
+    </div>
+  </div>
+  <div class="training-step">
+    <div class="training-step-num">2</div>
+    <div>
+      <h4>Generador</h4>
+      <p>Entrar por <code>/app/</code>, revisar sus manifiestos y firmar <code>CAP-20260702-0001</code> solo durante el ejercicio guiado.</p>
+    </div>
+  </div>
+  <div class="training-step">
+    <div class="training-step-num">3</div>
+    <div>
+      <h4>Transportista</h4>
+      <p>Tomar el viaje aprobado, confirmar retiro, revisar viaje activo, registrar ubicacion GPS e incidente simulado. Luego confirmar entrega.</p>
+    </div>
+  </div>
+  <div class="training-step">
+    <div class="training-step-num">4</div>
+    <div>
+      <h4>Operador</h4>
+      <p>Confirmar recepcion, registrar tratamiento, cerrar manifiesto y descargar certificado. Para rechazo, usar <code>CAP-20260702-0004</code> y resetear al finalizar.</p>
+    </div>
+  </div>
+  <div class="training-step">
+    <div class="training-step-num">5</div>
+    <div>
+      <h4>Cierre de instructor</h4>
+      <p>Ejecutar reset del dataset, verificar estados base, confirmar que no queden emails ni notificaciones CAP, y registrar el reporte de test-run.</p>
+    </div>
+  </div>
+</div>
+
+<h3 id="cap-comandos">17.3 Comandos seguros</h3>
+<p>Estos comandos estan pensados para ejecutarse desde la estacion tecnica con VPN activa.</p>
+
+<h4>Perfil seguro idempotente</h4>
+<pre><code>RUN_PROFILE=produccion-seguro \
+TARGET_URL=https://rptrazar.mendoza.gov.ar \
+API_URL=https://rptrazar.mendoza.gov.ar/api \
+bash scripts/certification/run-certification-suite.sh produccion-seguro</code></pre>
+
+<h4>Smoke productivo con auth y cooldown</h4>
+<pre><code>RUN_PROFILE=production-smoke \
+TARGET_URL=https://rptrazar.mendoza.gov.ar \
+API_URL=https://rptrazar.mendoza.gov.ar/api \
+NETWORK_TIMEOUT=12 \
+NETWORK_RETRIES=1 \
+CERT_AUTH_COOLDOWN_SECONDS=65 \
+bash scripts/certification/run-certification-suite.sh production-smoke</code></pre>
+
+<h4>E2E demo-only con reset antes y despues</h4>
+<pre><code>RUN_PROFILE=produccion-capacitacion \
+TARGET_URL=https://rptrazar.mendoza.gov.ar \
+API_URL=https://rptrazar.mendoza.gov.ar/api \
+ALLOW_PRODUCTION_TRAINING_E2E=true \
+CERT_AUTH_COOLDOWN_SECONDS=65 \
+PRODUCTION_TRAINING_RESET_COMMAND="ssh -i ~/.ssh/ambiente.pem ubuntu@192.168.205.197 'cd /home/ubuntu/sitrep-backend &amp;&amp; node -r dotenv/config prisma/seed-production-training.js'" \
+bash scripts/certification/run-certification-suite.sh produccion-capacitacion</code></pre>
+
+<h3 id="cap-cierre">17.4 Cierre de sesion</h3>
+<ol>
+<li>Resetear dataset CAP en el servidor.</li>
+<li>Confirmar que los nueve manifiestos vuelvan a sus estados base.</li>
+<li>Confirmar <code>email_cap_rows|0</code>.</li>
+<li>Confirmar <code>notificaciones_cap_rows|0</code>.</li>
+<li>Guardar el enlace al reporte generado en <code>reports/test-runs/</code>.</li>
+</ol>
+
+<pre><code>ssh -i ~/.ssh/ambiente.pem ubuntu@192.168.205.197 \
+  "cd /home/ubuntu/sitrep-backend &amp;&amp; node -r dotenv/config prisma/seed-production-training.js"</code></pre>
+
+<div class="callout callout-warning">
+<strong>No ejecutar en produccion real:</strong> <code>certification</code>, <code>workflow-e2e</code>, <code>data-integrity</code>, <code>stress</code> ni pruebas que creen, aprueben, transporten, reciban, traten, rechacen, cancelen, borren o editen registros fuera de <code>CAP-20260702</code>.
+</div>
 </section>
 
 </main>

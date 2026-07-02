@@ -178,6 +178,12 @@ UID_B=$(extract_id "$CREATE_B")
 if [ -n "$UID_B" ]; then
   pass "[201/200] POST /admin/usuarios — test user B created: ${UID_B:0:8}..."
 
+  # Keep this test focused on activo. Older deployments create admin users with
+  # emailVerified=false, which blocks login independently of toggle-activo.
+  VERIFY_B=$(status_only "PUT" "/admin/usuarios/$UID_B" "$ADMIN_TOKEN" \
+    "{\"emailVerified\":true}")
+  check_status "PUT /admin/usuarios/:id emailVerified=true" "200" "$VERIFY_B"
+
   # Toggle OFF (desactivar)
   TOGGLE_OFF=$(status_only "PATCH" "/admin/usuarios/$UID_B/toggle-activo" "$ADMIN_TOKEN")
   check_status "PATCH /admin/usuarios/:id/toggle-activo (disable)" "200" "$TOGGLE_OFF"

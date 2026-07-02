@@ -37,11 +37,12 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SSH_HOST="sitrepprd1"
-DOMAIN="sitrepprd1.mendoza.gov.ar"
-PORT=3002
-VM_BACKEND_DIR="/home/ubuntu/sitrep-backend"
-VM_FRONTEND_DIR="/var/www/sitrep"
+SSH_HOST="${SSH_HOST:-ubuntu@rptrazar.mendoza.gov.ar}"
+DOMAIN="${DOMAIN:-rptrazar.mendoza.gov.ar}"
+PORT="${PORT:-3002}"
+VM_BACKEND_DIR="${VM_BACKEND_DIR:-/home/ubuntu/sitrep-backend}"
+VM_FRONTEND_DIR="${VM_FRONTEND_DIR:-/var/www/sitrep}"
+SSH_KEY="${SSH_KEY:-$HOME/.ssh/ambiente.pem}"
 TIMESTAMP=$(date +'%Y%m%d-%H%M%S')
 LOCAL_LOG="/tmp/sitrep-deploy-fase3-${TIMESTAMP}.log"
 
@@ -52,16 +53,29 @@ ok()  { printf '    [OK] %s\n' "$*"; }
 warn(){ printf '    [WARN] %s\n' "$*"; }
 die() { printf '\n[ERROR] %s\n' "$*"; exit 1; }
 
+SSH_OPTS=(-o ConnectTimeout=8)
+if [[ -n "${SSH_KEY}" && -f "${SSH_KEY}" ]]; then
+  SSH_OPTS+=(-i "${SSH_KEY}" -o IdentitiesOnly=yes)
+fi
+
+ssh_vm() {
+  ssh "${SSH_OPTS[@]}" "$SSH_HOST" "$@"
+}
+
+scp_vm() {
+  scp "${SSH_OPTS[@]}" "$@"
+}
+
 # ---- Sanity checks ---------------------------------------------------------
 
 say "Verificando entorno"
 command -v node >/dev/null || die "node no encontrado en la Mac"
 command -v npm >/dev/null  || die "npm no encontrado en la Mac"
-ssh -o ConnectTimeout=8 "$SSH_HOST" "echo pong" >/dev/null 2>&1 || die "No se puede conectar a $SSH_HOST (¿VPN activa?)"
+ssh_vm "echo pong" >/dev/null 2>&1 || die "No se puede conectar a $SSH_HOST (¿VPN activa / usuario-key correctos?)"
 ok "SSH OK: $SSH_HOST"
-ssh "$SSH_HOST" "systemctl is-active postgresql >/dev/null 2>&1" || die "PostgreSQL no activo en VM. Correr Fase 2 primero."
+ssh_vm "systemctl is-active postgresql >/dev/null 2>&1" || die "PostgreSQL no activo en VM. Correr Fase 2 primero."
 ok "PostgreSQL activo"
-ssh "$SSH_HOST" "test -f /data/postgres/DATABASE_URL.txt" || die "DATABASE_URL no encontrada. Correr Fase 2 primero."
+ssh_vm "test -f /data/postgres/DATABASE_URL.txt" || die "DATABASE_URL no encontrada. Correr Fase 2 primero."
 ok "DATABASE_URL disponible"
 
 # ---- 1/10  Build Frontend --------------------------------------------------
@@ -100,6 +114,33 @@ say "3/10 — Prisma generate con binarios Mac + Ubuntu"
 npx prisma generate 2>&1 | tail -5
 ok "Prisma client generado (native + rhel-openssl-3.0.x + debian-openssl-3.0.x)"
 
+say "3b/10 — Prisma engines Linux para migraciones offline"
+PRISMA_ENGINE_TARGET="debian-openssl-3.0.x"
+PRISMA_ENGINE_COMMIT="$(node -e "console.log(require('@prisma/engines-version').enginesVersion)")"
+PRISMA_ENGINES_DIR="node_modules/@prisma/engines"
+PRISMA_SCHEMA_ENGINE="${PRISMA_ENGINES_DIR}/schema-engine-${PRISMA_ENGINE_TARGET}"
+PRISMA_QUERY_ENGINE_SRC="node_modules/prisma/libquery_engine-${PRISMA_ENGINE_TARGET}.so.node"
+PRISMA_QUERY_ENGINE_DST="${PRISMA_ENGINES_DIR}/libquery_engine-${PRISMA_ENGINE_TARGET}.so.node"
+
+mkdir -p "$PRISMA_ENGINES_DIR"
+
+if [[ ! -x "$PRISMA_SCHEMA_ENGINE" ]]; then
+  command -v curl >/dev/null || die "curl no encontrado en la Mac"
+  command -v gunzip >/dev/null || die "gunzip no encontrado en la Mac"
+  curl -fsSL \
+    "https://binaries.prisma.sh/all_commits/${PRISMA_ENGINE_COMMIT}/${PRISMA_ENGINE_TARGET}/schema-engine.gz" \
+    | gunzip -c > "$PRISMA_SCHEMA_ENGINE"
+  chmod +x "$PRISMA_SCHEMA_ENGINE"
+fi
+
+if [[ -f "$PRISMA_QUERY_ENGINE_SRC" ]]; then
+  cp "$PRISMA_QUERY_ENGINE_SRC" "$PRISMA_QUERY_ENGINE_DST"
+else
+  warn "Query engine Linux no encontrado en $PRISMA_QUERY_ENGINE_SRC"
+fi
+
+ok "Prisma engines offline listos (${PRISMA_ENGINE_TARGET})"
+
 cd "${SCRIPT_DIR}"
 
 # ---- 4/10  Empaquetar ------------------------------------------------------
@@ -109,6 +150,10 @@ cd "${SCRIPT_DIR}/frontend"
 (cd dist     && tar czf /tmp/sitrep-frontend-${TIMESTAMP}.tar.gz .)
 (cd dist-app && tar czf /tmp/sitrep-app-${TIMESTAMP}.tar.gz .)
 ok "Frontend empaquetado"
+
+cd "${SCRIPT_DIR}/docs/manual"
+tar czf /tmp/sitrep-manual-${TIMESTAMP}.tar.gz .
+ok "Manual empaquetado"
 
 cd "${SCRIPT_DIR}/backend"
 # Incluir node_modules para deploy sin acceso a npm registry en VM
@@ -126,17 +171,17 @@ cd "${SCRIPT_DIR}"
 # ---- 5/10  .env en VM (solo si no existe) ----------------------------------
 
 say "5/10 — .env en VM"
-ENV_EXISTS=$(ssh "$SSH_HOST" "test -f ${VM_BACKEND_DIR}/.env && echo yes || echo no")
+ENV_EXISTS=$(ssh_vm "test -f ${VM_BACKEND_DIR}/.env && echo yes || echo no")
 
 if [[ "$ENV_EXISTS" == "no" ]]; then
-  DB_URL=$(ssh "$SSH_HOST" "cat /data/postgres/DATABASE_URL.txt" | tr -d '[:space:]')
+  DB_URL=$(ssh_vm "cat /data/postgres/DATABASE_URL.txt" | tr -d '[:space:]')
   [[ -z "$DB_URL" ]] && die "DATABASE_URL vacía"
 
   JWT_SECRET=$(openssl rand -base64 64 | tr -d '\n')
   JWT_REFRESH_SECRET=$(openssl rand -base64 64 | tr -d '\n')
 
-  ssh "$SSH_HOST" "mkdir -p ${VM_BACKEND_DIR}"
-  ssh "$SSH_HOST" "cat > ${VM_BACKEND_DIR}/.env" <<EOF
+  ssh_vm "mkdir -p ${VM_BACKEND_DIR}"
+  ssh_vm "cat > ${VM_BACKEND_DIR}/.env" <<EOF
 NODE_ENV=production
 PORT=${PORT}
 DATABASE_URL=${DB_URL}
@@ -152,7 +197,7 @@ EMAIL_DAILY_LIMIT_ALERTA=200
 LOG_LEVEL=info
 BLOCKCHAIN_ENABLED=false
 EOF
-  ssh "$SSH_HOST" "chmod 600 ${VM_BACKEND_DIR}/.env"
+  ssh_vm "chmod 600 ${VM_BACKEND_DIR}/.env"
   ok ".env creado"
   warn "Editar ${VM_BACKEND_DIR}/.env si se necesita SMTP u otros params"
 else
@@ -162,18 +207,18 @@ fi
 # ---- 6/10  Deploy Frontend -------------------------------------------------
 
 say "6/10 — Deploy Frontend"
-ssh "$SSH_HOST" "sudo mkdir -p ${VM_FRONTEND_DIR}/app ${VM_FRONTEND_DIR}/manual && sudo chown -R ubuntu:ubuntu ${VM_FRONTEND_DIR}"
+ssh_vm "sudo mkdir -p ${VM_FRONTEND_DIR}/app ${VM_FRONTEND_DIR}/manual && sudo chown -R ubuntu:ubuntu ${VM_FRONTEND_DIR}"
 
-scp /tmp/sitrep-frontend-${TIMESTAMP}.tar.gz "$SSH_HOST":/tmp/
-ssh "$SSH_HOST" "
+scp_vm /tmp/sitrep-frontend-${TIMESTAMP}.tar.gz "$SSH_HOST":/tmp/
+ssh_vm "
   find ${VM_FRONTEND_DIR} -maxdepth 1 ! -name app ! -name manual ! -name . -exec rm -rf {} + 2>/dev/null || true
   tar xzf /tmp/sitrep-frontend-${TIMESTAMP}.tar.gz -C ${VM_FRONTEND_DIR}
   chmod -R 755 ${VM_FRONTEND_DIR}
 "
 ok "SPA desplegado"
 
-scp /tmp/sitrep-app-${TIMESTAMP}.tar.gz "$SSH_HOST":/tmp/
-ssh "$SSH_HOST" "
+scp_vm /tmp/sitrep-app-${TIMESTAMP}.tar.gz "$SSH_HOST":/tmp/
+ssh_vm "
   mkdir -p ${VM_FRONTEND_DIR}/app
   find ${VM_FRONTEND_DIR}/app -mindepth 1 -maxdepth 1 ! -name assets -exec rm -rf {} + 2>/dev/null || true
   tar xzf /tmp/sitrep-app-${TIMESTAMP}.tar.gz -C ${VM_FRONTEND_DIR}/app
@@ -181,11 +226,20 @@ ssh "$SSH_HOST" "
 "
 ok "PWA desplegada preservando assets versionados anteriores"
 
+scp_vm /tmp/sitrep-manual-${TIMESTAMP}.tar.gz "$SSH_HOST":/tmp/
+ssh_vm "
+  mkdir -p ${VM_FRONTEND_DIR}/manual
+  rm -rf ${VM_FRONTEND_DIR}/manual/*
+  tar xzf /tmp/sitrep-manual-${TIMESTAMP}.tar.gz -C ${VM_FRONTEND_DIR}/manual
+  chmod -R 755 ${VM_FRONTEND_DIR}/manual
+"
+ok "Manual desplegado"
+
 # ---- 7/10  Deploy Backend --------------------------------------------------
 
 say "7/10 — Deploy Backend"
-scp /tmp/sitrep-backend-${TIMESTAMP}.tar.gz "$SSH_HOST":/tmp/
-ssh "$SSH_HOST" "
+scp_vm /tmp/sitrep-backend-${TIMESTAMP}.tar.gz "$SSH_HOST":/tmp/
+ssh_vm "
   mkdir -p ${VM_BACKEND_DIR}
   # No borrar .env si existe
   find ${VM_BACKEND_DIR} -mindepth 1 -maxdepth 1 ! -name .env -exec rm -rf {} + 2>/dev/null || true
@@ -194,7 +248,7 @@ ssh "$SSH_HOST" "
 ok "Backend extraído en ${VM_BACKEND_DIR}"
 
 # Prisma migrate deploy (usa el cliente pre-generado, sin internet)
-ssh "$SSH_HOST" "
+ssh_vm "
   cd ${VM_BACKEND_DIR}
   export DATABASE_URL=\$(grep '^DATABASE_URL=' .env | cut -d= -f2-)
   node_modules/.bin/prisma migrate deploy
@@ -204,15 +258,16 @@ ok "Migraciones Prisma aplicadas"
 # ---- 8/10  Servicio systemd ------------------------------------------------
 
 say "8/10 — Servicio systemd sitrep-backend"
-ssh "$SSH_HOST" "sudo bash -s -- '${VM_BACKEND_DIR}' '${PORT}'" << 'SSHEOF'
+ssh_vm "sudo bash -s -- '${VM_BACKEND_DIR}' '${PORT}' '${DOMAIN}'" << 'SSHEOF'
 set -euo pipefail
 VM_BACKEND_DIR="$1"
 PORT="$2"
+DOMAIN="$3"
 
 cat > /etc/systemd/system/sitrep-backend.service <<UNIT
 [Unit]
 Description=SITREP Backend
-Documentation=https://sitrepprd1.mendoza.gov.ar/api/docs
+Documentation=https://${DOMAIN}/api/docs
 After=network.target postgresql.service
 Requires=postgresql.service
 
@@ -250,7 +305,7 @@ SSHEOF
 
 # Health check
 sleep 2
-HTTP_CODE=$(ssh "$SSH_HOST" "curl -s -o /dev/null -w '%{http_code}' http://localhost:${PORT}/api/health/live" || echo "000")
+HTTP_CODE=$(ssh_vm "curl -s -o /dev/null -w '%{http_code}' http://localhost:${PORT}/api/health/live" || echo "000")
 [[ "$HTTP_CODE" == "200" ]] && ok "Backend health OK (HTTP 200)" || warn "Backend health HTTP $HTTP_CODE"
 
 # ---- 9/10  Nginx + SSL self-signed -----------------------------------------
@@ -327,8 +382,8 @@ server {
 NGINXEOF
 
 # Self-signed cert + instalar config
-scp "$NGINX_CONF_TMP" "$SSH_HOST":/tmp/sitrep-nginx.conf
-ssh "$SSH_HOST" "sudo bash -s" <<'SSHEOF2'
+scp_vm "$NGINX_CONF_TMP" "$SSH_HOST":/tmp/sitrep-nginx.conf
+ssh_vm "sudo bash -s" <<'SSHEOF2'
 set -euo pipefail
 SSL_CERT="/etc/ssl/sitrep/sitrep.crt"
 SSL_KEY="/etc/ssl/sitrep/sitrep.key"
@@ -360,11 +415,11 @@ SSHEOF2
 say "10/10 — Health check final"
 sleep 2
 
-HEALTH=$(ssh "$SSH_HOST" "curl -sk https://localhost/api/health/ready" 2>/dev/null || echo '{}')
+HEALTH=$(ssh_vm "curl -sk https://localhost/api/health/ready" 2>/dev/null || echo '{}')
 STATUS=$(echo "$HEALTH" | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "?")
 ok "Backend /api/health/ready → status: $STATUS"
 
-FRONTEND=$(ssh "$SSH_HOST" "curl -sk -o /dev/null -w '%{http_code}' https://localhost/" 2>/dev/null || echo "000")
+FRONTEND=$(ssh_vm "curl -sk -o /dev/null -w '%{http_code}' https://localhost/" 2>/dev/null || echo "000")
 ok "Frontend HTTPS → HTTP $FRONTEND"
 
 # ---- Resumen ---------------------------------------------------------------

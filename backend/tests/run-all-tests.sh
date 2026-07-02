@@ -2,12 +2,20 @@
 # ============================================================
 # SITREP Master Test Runner
 # Executes all test scripts and aggregates results.
-# Usage: bash backend/tests/run-all-tests.sh [BASE_URL]
-# Default: https://sitrep.ultimamilla.com.ar
+# Usage: bash backend/tests/run-all-tests.sh [BASE_URL] [full|safe|effectful]
+# Default: https://rptrazar.mendoza.gov.ar full
 # ============================================================
 
-BASE_URL="${1:-https://sitrep.ultimamilla.com.ar}"
+BASE_URL="${1:-https://rptrazar.mendoza.gov.ar}"
+if [[ "${BASE_URL%/}" == */api ]]; then
+  API_URL="${BASE_URL%/}"
+  BASE_URL="${BASE_URL%/api}"
+else
+  API_URL="${BASE_URL%/}/api"
+fi
+RUN_PROFILE="${SITREP_TEST_PROFILE:-${2:-full}}"
 SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)"
+SUITE_PAUSE_SECONDS="${SITREP_SUITE_PAUSE_SECONDS:-65}"
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -20,11 +28,15 @@ TOTAL_PASS=0
 TOTAL_FAIL=0
 SUITE_RESULTS=()
 
-SCRIPTS=(
+SAFE_SCRIPTS=(
   "smoke-test.sh"
   "production-mode-test.sh"
-  "cross-platform-workflow-test.sh"
   "role-enforcement-test.sh"
+  "search-safety-test.sh"
+)
+
+EFFECTFUL_SCRIPTS=(
+  "cross-platform-workflow-test.sh"
   "edge-cases-test.sh"
   "gps-validation-test.sh"
   "multiuser-concurrent-test.sh"
@@ -35,6 +47,56 @@ SCRIPTS=(
   "workflow-extended-test.sh"
 )
 
+FULL_SCRIPTS=(
+  "smoke-test.sh"
+  "production-mode-test.sh"
+  "cross-platform-workflow-test.sh"
+  "role-enforcement-test.sh"
+  "search-safety-test.sh"
+  "edge-cases-test.sh"
+  "gps-validation-test.sh"
+  "multiuser-concurrent-test.sh"
+  "notification-test.sh"
+  "alerts-comprehensive-test.sh"
+  "actores-crud-test.sh"
+  "admin-advanced-test.sh"
+  "workflow-extended-test.sh"
+)
+
+case "$RUN_PROFILE" in
+  full|all)
+    SCRIPTS=("${FULL_SCRIPTS[@]}")
+    ;;
+  safe|production-safe|produccion-seguro)
+    SCRIPTS=("${SAFE_SCRIPTS[@]}")
+    ;;
+  effectful|destructive|destructivo)
+    SCRIPTS=("${EFFECTFUL_SCRIPTS[@]}")
+    ;;
+  *)
+    echo "Unknown test profile: $RUN_PROFILE" >&2
+    echo "Allowed profiles: full, safe, effectful" >&2
+    exit 2
+    ;;
+esac
+
+api_base_for_script() {
+  case "$1" in
+    production-mode-test.sh|multiuser-concurrent-test.sh|notification-test.sh)
+      echo "$API_URL"
+      ;;
+    *)
+      echo "$BASE_URL"
+      ;;
+  esac
+}
+
+integer_or_zero() {
+  local value="$1"
+  value=$(echo "$value" | tr -cd '0-9' | head -c 12)
+  if [ -n "$value" ]; then echo "$value"; else echo "0"; fi
+}
+
 echo -e "${BOLD}${CYAN}╔══════════════════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}${CYAN}║     SITREP — MASTER TEST RUNNER                      ║${NC}"
 echo -e "${BOLD}${CYAN}║     Target: $BASE_URL${NC}"
@@ -42,6 +104,8 @@ echo -e "${BOLD}${CYAN}╚══════════════════
 echo ""
 echo "Date: $(date '+%Y-%m-%d %H:%M:%S')"
 echo "Scripts dir: $SCRIPTS_DIR"
+echo "Profile: $RUN_PROFILE"
+echo "Inter-suite pause: ${SUITE_PAUSE_SECONDS}s"
 echo ""
 
 for SCRIPT in "${SCRIPTS[@]}"; do
@@ -55,22 +119,26 @@ for SCRIPT in "${SCRIPTS[@]}"; do
 
   echo -e "${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
   echo -e "${BOLD}Running: $SCRIPT${NC}"
+  SCRIPT_BASE="$(api_base_for_script "$SCRIPT")"
+  echo -e "Base: $SCRIPT_BASE"
   echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
   # Run the script and capture output + exit code
-  OUTPUT=$(bash "$SCRIPT_PATH" "$BASE_URL" 2>&1)
+  OUTPUT=$(bash "$SCRIPT_PATH" "$SCRIPT_BASE" 2>&1)
   EXIT_CODE=$?
 
   echo "$OUTPUT"
 
   # Extract PASS/FAIL counts from output
-  PASS_COUNT=$(echo "$OUTPUT" | grep -oE 'PASS[: ]+[0-9]+' | tail -1 | grep -oE '[0-9]+' || echo "0")
-  FAIL_COUNT=$(echo "$OUTPUT" | grep -oE 'FAIL[: ]+[0-9]+' | tail -1 | grep -oE '[0-9]+' || echo "0")
+  PASS_COUNT=$(echo "$OUTPUT" | grep -oE 'PASS[: ]+[0-9]+' | tail -1 | grep -oE '[0-9]+' | head -1 || echo "0")
+  FAIL_COUNT=$(echo "$OUTPUT" | grep -oE 'FAIL[: ]+[0-9]+' | tail -1 | grep -oE '[0-9]+' | head -1 || echo "0")
 
   # Fallback: count individual PASS/FAIL lines
   if [ -z "$PASS_COUNT" ] || [ "$PASS_COUNT" = "0" ]; then
-    PASS_COUNT=$(echo "$OUTPUT" | grep -c '✓\|PASS\b' 2>/dev/null || echo "0")
+    PASS_COUNT=$(echo "$OUTPUT" | grep -c '✓\|PASS\b' 2>/dev/null || true)
   fi
+  PASS_COUNT=$(integer_or_zero "$PASS_COUNT")
+  FAIL_COUNT=$(integer_or_zero "$FAIL_COUNT")
 
   TOTAL_PASS=$((TOTAL_PASS + PASS_COUNT))
   TOTAL_FAIL=$((TOTAL_FAIL + FAIL_COUNT))
@@ -83,6 +151,12 @@ for SCRIPT in "${SCRIPTS[@]}"; do
     echo -e "\n${RED}✗ $SCRIPT: FAILED ($PASS_COUNT pass, $FAIL_COUNT fail)${NC}"
   fi
   echo ""
+
+  if [ "$SCRIPT" != "${SCRIPTS[${#SCRIPTS[@]}-1]}" ] && [ "$SUITE_PAUSE_SECONDS" -gt 0 ]; then
+    echo -e "${YELLOW}Waiting ${SUITE_PAUSE_SECONDS}s to avoid auth rate limiting...${NC}"
+    sleep "$SUITE_PAUSE_SECONDS"
+    echo ""
+  fi
 done
 
 # ── FINAL SUMMARY ────────────────────────────────────────────

@@ -142,7 +142,7 @@ export const verificarBlockchainPublico = async (req: Request, res: Response, ne
   try {
     const { hash } = req.params;
 
-    if (!hash || hash.length !== 64) {
+    if (!hash || !/^[0-9a-fA-F]{64}$/.test(hash)) {
       throw new AppError('Hash SHA-256 invalido (debe ser 64 caracteres hex)', 400);
     }
 
@@ -154,7 +154,25 @@ export const verificarBlockchainPublico = async (req: Request, res: Response, ne
       return;
     }
 
-    const result = await verificarEnBlockchain(hash);
+    let result;
+    try {
+      result = await verificarEnBlockchain(hash);
+    } catch (error: any) {
+      logger.warn({ hash, err: error?.message }, 'Blockchain public verification unavailable');
+      res.json({
+        success: true,
+        data: {
+          enabled: true,
+          exists: false,
+          timestamp: 0,
+          verificationAvailable: false,
+          network: 'Ethereum Sepolia',
+          contractAddress: config.BLOCKCHAIN_CONTRACT_ADDRESS,
+        },
+      });
+      return;
+    }
+
     res.json({
       success: true,
       data: {

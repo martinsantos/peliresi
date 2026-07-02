@@ -102,44 +102,29 @@ except: pass
 " 2>/dev/null
 }
 
-# Get a catalog generador ID
-get_generador_id() {
-  curl -s "$API/catalogos/generadores" -H "Authorization: Bearer $1" \
+actor_id_from_profile() {
+  local token="$1" actor="$2"
+  curl -s "$API/auth/profile" -H "Authorization: Bearer $token" \
     | python3 -c "
 import sys, json
 try:
     d = json.load(sys.stdin)
-    items = d.get('data', [])
-    if not isinstance(items, list): items = items.get('generadores', [])
-    if items: print(items[0]['id'])
+    print(d.get('data',{}).get('user',{}).get('$actor',{}).get('id',''))
 except: pass
 " 2>/dev/null
+}
+
+# Get the actor ID associated with the authenticated demo user.
+get_generador_id() {
+  actor_id_from_profile "$1" "generador"
 }
 
 get_transportista_id() {
-  curl -s "$API/catalogos/transportistas" -H "Authorization: Bearer $1" \
-    | python3 -c "
-import sys, json
-try:
-    d = json.load(sys.stdin)
-    items = d.get('data', [])
-    if not isinstance(items, list): items = items.get('transportistas', [])
-    if items: print(items[0]['id'])
-except: pass
-" 2>/dev/null
+  actor_id_from_profile "$1" "transportista"
 }
 
 get_operador_id() {
-  curl -s "$API/catalogos/operadores" -H "Authorization: Bearer $1" \
-    | python3 -c "
-import sys, json
-try:
-    d = json.load(sys.stdin)
-    items = d.get('data', [])
-    if not isinstance(items, list): items = items.get('operadores', [])
-    if items: print(items[0]['id'])
-except: pass
-" 2>/dev/null
+  actor_id_from_profile "$1" "operador"
 }
 
 get_tipo_residuo_id() {
@@ -155,19 +140,6 @@ try:
     op = next((o for o in ops if o['id'] == '$oper_id'), None)
     if op and op.get('tratamientos'):
         print(op['tratamientos'][0]['tipoResiduoId'])
-except: pass
-" 2>/dev/null)
-  fi
-  # Fallback to first from global catalog
-  if [ -z "$result" ]; then
-    result=$(curl -s "$API/catalogos/tipos-residuos" \
-      | python3 -c "
-import sys, json
-try:
-    d = json.load(sys.stdin)
-    data = d.get('data', [])
-    items = data if isinstance(data, list) else data.get('tiposResiduos', data.get('tipos', data.get('items', [])))
-    if items: print(items[0]['id'])
 except: pass
 " 2>/dev/null)
   fi
@@ -253,9 +225,9 @@ OPER_TOKEN=$(get_token "tratamiento.residuos@planta.com" "op123")
 
 section "Fetching catalog IDs"
 
-GEN_CAT_ID=$(get_generador_id "$ADMIN_TOKEN")
-TRANS_CAT_ID=$(get_transportista_id "$ADMIN_TOKEN")
-OPER_CAT_ID=$(get_operador_id "$ADMIN_TOKEN")
+GEN_CAT_ID=$(get_generador_id "$GEN_TOKEN")
+TRANS_CAT_ID=$(get_transportista_id "$TRANS_TOKEN")
+OPER_CAT_ID=$(get_operador_id "$OPER_TOKEN")
 TIPO_ID=$(get_tipo_residuo_id "$OPER_CAT_ID" "$ADMIN_TOKEN")
 
 [ -n "$GEN_CAT_ID" ]   && pass "Generador catalog id: ${GEN_CAT_ID:0:8}..."   || fail "No generadores in catalog"

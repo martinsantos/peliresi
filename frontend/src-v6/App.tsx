@@ -88,6 +88,8 @@ function App() {
       <Routes>
         {/* Public Routes */}
         <Route element={<AuthLayout />}>
+          <Route path="/l" element={<Navigate to="/login" replace />} />
+          <Route path="/l/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/registro" element={<RegistroPage />} />
           <Route path="/verificar-email" element={<VerificarEmailPage />} />

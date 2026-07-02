@@ -140,7 +140,7 @@ self.addEventListener('push', (event) => {
         data,
     };
 
-    event.waitUntil(self.registration.showNotification(data.title || 'SITREP', options));
+    event.waitUntil(self.registration.showNotification(data.title || 'RP Trazar', options));
 });
 
 console.log('[SW] Service Worker v32 cargado');
