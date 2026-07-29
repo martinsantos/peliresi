@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { isAuthenticated } from '../middlewares/auth.middleware';
+import { isAuthenticated, requireFullAccess } from '../middlewares/auth.middleware';
 import {
     getRenovaciones,
     getRenovacionById,
@@ -10,6 +10,7 @@ import {
 
 const router = Router();
 router.use(isAuthenticated);
+router.use(requireFullAccess);
 
 router.get('/', getRenovaciones);
 router.get('/:id', getRenovacionById);

@@ -25,11 +25,22 @@ function normalizeCuit(raw: string): string | null {
 const uploadDir = path.join(process.cwd(), 'uploads', 'solicitudes');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
+function safeUploadName(originalName: string): string {
+  return path.basename(originalName).replace(/[\r\n"/\\]/g, '_').slice(0, 180) || 'documento';
+}
+
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
+  filename: (_req, file, cb) => cb(null, `${Date.now()}-${safeUploadName(file.originalname)}`),
 });
-export const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB
+export const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (['application/pdf', 'image/jpeg', 'image/png'].includes(file.mimetype)) cb(null, true);
+    else cb(new AppError('Tipo de archivo no permitido. Solo PDF, JPG, PNG.', 400));
+  },
+}); // 10MB
 
 // Helper: check if user is an admin role
 const ADMIN_ROLES = ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA'];
@@ -489,6 +500,9 @@ export const listarSolicitudes = async (req: AuthRequest, res: Response, next: N
     const where: any = {};
     if (estado) where.estado = estado;
     if (tipoActor) where.tipoActor = tipoActor;
+    if (req.user!.rol === 'ADMIN_GENERADOR') where.tipoActor = 'GENERADOR';
+    if (req.user!.rol === 'ADMIN_TRANSPORTISTA') where.tipoActor = 'TRANSPORTISTA';
+    if (req.user!.rol === 'ADMIN_OPERADOR') where.tipoActor = 'OPERADOR';
     if (search && typeof search === 'string') {
       where.OR = [
         { usuario: { nombre: { contains: search, mode: 'insensitive' } } },

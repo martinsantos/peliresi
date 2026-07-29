@@ -1,11 +1,13 @@
 import { Router } from 'express';
-import { isAuthenticated } from '../middlewares/auth.middleware';
+import { hasRole, isAuthenticated, requireFullAccess } from '../middlewares/auth.middleware';
 import { getActividadCentroControl } from '../controllers/tracking.controller';
 import { getTimeline, getMonitorLive, getForecast, getActiveDays } from '../controllers/monitor.controller';
 
 const router = Router();
 
 router.use(isAuthenticated);
+router.use(requireFullAccess);
+router.use(hasRole('ADMIN'));
 
 /**
  * @openapi

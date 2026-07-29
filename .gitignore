@@ -47,8 +47,7 @@ Thumbs.db
 *.sqlite
 *.sqlite3
 
-# Prisma
-backend/prisma/migrations/
+# Prisma migrations are deployment history and must remain versioned.
 
 # Test coverage
 coverage/

@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import prisma from '../lib/prisma';
 import { Prisma } from '@prisma/client';
+import { buildActorWhere, buildManifestAccessWhere } from '../utils/authorization';
 
 export const globalSearch = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -16,6 +17,7 @@ export const globalSearch = async (req: AuthRequest, res: Response, next: NextFu
 
     // Role-based filter for manifiestos (mirrors getManifiestos lines 152-158)
     const manifiestoWhere: any = {
+      ...buildManifestAccessWhere(req.user),
       OR: [
         { numero: { contains: query, mode: Prisma.QueryMode.insensitive } },
         { generador: { razonSocial: { contains: query, mode: Prisma.QueryMode.insensitive } } },
@@ -31,15 +33,8 @@ export const globalSearch = async (req: AuthRequest, res: Response, next: NextFu
       manifiestoWhere.estado = estado;
     }
 
-    if (req.user.rol === 'GENERADOR' && req.user.generador) {
-      manifiestoWhere.generadorId = req.user.generador.id;
-    } else if (req.user.rol === 'TRANSPORTISTA' && req.user.transportista) {
-      manifiestoWhere.transportistaId = req.user.transportista.id;
-    } else if (req.user.rol === 'OPERADOR' && req.user.operador) {
-      manifiestoWhere.operadorId = req.user.operador.id;
-    }
-
     const generadorWhere = {
+      ...buildActorWhere(req.user, 'generador'),
       OR: [
         { razonSocial: { contains: query, mode: Prisma.QueryMode.insensitive } },
         { cuit: { contains: query, mode: Prisma.QueryMode.insensitive } },
@@ -48,6 +43,7 @@ export const globalSearch = async (req: AuthRequest, res: Response, next: NextFu
     };
 
     const transportistaWhere = {
+      ...buildActorWhere(req.user, 'transportista'),
       OR: [
         { razonSocial: { contains: query, mode: Prisma.QueryMode.insensitive } },
         { cuit: { contains: query, mode: Prisma.QueryMode.insensitive } },
@@ -56,6 +52,7 @@ export const globalSearch = async (req: AuthRequest, res: Response, next: NextFu
     };
 
     const operadorWhere = {
+      ...buildActorWhere(req.user, 'operador'),
       OR: [
         { razonSocial: { contains: query, mode: Prisma.QueryMode.insensitive } },
         { cuit: { contains: query, mode: Prisma.QueryMode.insensitive } },

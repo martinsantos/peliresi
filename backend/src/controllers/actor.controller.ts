@@ -1,10 +1,12 @@
 import { Response, NextFunction } from 'express';
 import prisma from '../lib/prisma';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { auditarActor } from '../utils/auditoria';
 import { parsePagination } from '../utils/pagination';
+import { buildActorWhere } from '../utils/authorization';
 
 // ============== GENERADORES (CU-A06) ==============
 
@@ -23,7 +25,7 @@ export const getGeneradores = async (req: AuthRequest, res: Response, next: Next
         };
         const orderBy = GEN_SORT[sortBy as string] ?? { razonSocial: 'asc' };
 
-        const where: any = {};
+        const where: any = { ...buildActorWhere(req.user, 'generador') };
         if (search) {
             where.OR = [
                 { razonSocial: { contains: search as string, mode: 'insensitive' } },
@@ -133,8 +135,7 @@ export const createGenerador = async (req: AuthRequest, res: Response, next: Nex
             throw new AppError('Ya existe un usuario con ese email', 400);
         }
 
-        // Password: usar el proporcionado por el admin, o CUIT como fallback
-        const rawPassword = password || cuit;
+        const rawPassword = password || crypto.randomBytes(18).toString('base64url');
         const passwordHash = await bcrypt.hash(rawPassword, 10);
 
         // Crear usuario asociado (admin-created → emailVerified + activo)
@@ -147,6 +148,7 @@ export const createGenerador = async (req: AuthRequest, res: Response, next: Nex
                 rol: 'GENERADOR',
                 activo: true,
                 emailVerified: true,
+                forcePasswordChange: true,
             }
         });
 
@@ -176,7 +178,9 @@ export const createGenerador = async (req: AuthRequest, res: Response, next: Nex
         res.status(201).json({
             success: true,
             data: { generador },
-            message: `Generador creado. ${password ? 'Password: el definido en el formulario' : 'Password inicial: ' + cuit}`
+            message: password
+                ? 'Generador creado. Debe cambiar la contraseña en el primer acceso.'
+                : 'Generador creado. Se generó una contraseña temporal privada; enviar invitación o reset de contraseña.'
         });
     } catch (error) {
         next(error);
@@ -267,7 +271,7 @@ export const getTransportistas = async (req: AuthRequest, res: Response, next: N
         };
         const orderBy = TRANS_SORT[sortBy as string] ?? { razonSocial: 'asc' };
 
-        const where: any = {};
+        const where: any = { ...buildActorWhere(req.user, 'transportista') };
         if (search) {
             where.OR = [
                 { razonSocial: { contains: search as string, mode: 'insensitive' } },
@@ -360,14 +364,18 @@ export const createTransportista = async (req: AuthRequest, res: Response, next:
             throw new AppError('Ya existe un transportista con ese CUIT', 400);
         }
 
-        const passwordHash = await bcrypt.hash(cuit, 10);
+        const rawPassword = crypto.randomBytes(18).toString('base64url');
+        const passwordHash = await bcrypt.hash(rawPassword, 10);
         const usuario = await prisma.usuario.create({
             data: {
                 email,
                 password: passwordHash,
                 nombre: razonSocial,
                 apellido: '',
-                rol: 'TRANSPORTISTA'
+                rol: 'TRANSPORTISTA',
+                activo: true,
+                emailVerified: true,
+                forcePasswordChange: true,
             }
         });
 
@@ -420,7 +428,7 @@ export const createTransportista = async (req: AuthRequest, res: Response, next:
         res.status(201).json({
             success: true,
             data: { transportista },
-            message: 'Transportista creado. Contraseña inicial: ' + cuit
+            message: 'Transportista creado. Se generó una contraseña temporal privada; enviar invitación o reset de contraseña.'
         });
     } catch (error) {
         next(error);
@@ -682,7 +690,7 @@ export const getOperadores = async (req: AuthRequest, res: Response, next: NextF
         };
         const orderBy = OPER_SORT[sortBy as string] ?? { razonSocial: 'asc' };
 
-        const where: any = {};
+        const where: any = { ...buildActorWhere(req.user, 'operador') };
         if (search) {
             where.OR = [
                 { razonSocial: { contains: search as string, mode: 'insensitive' } },
@@ -878,7 +886,7 @@ export const createOperador = async (req: AuthRequest, res: Response, next: Next
             throw new AppError('Ya existe un usuario con ese email', 400);
         }
 
-        const rawPassword = password || cuit;
+        const rawPassword = password || crypto.randomBytes(18).toString('base64url');
         const passwordHash = await bcrypt.hash(rawPassword, 10);
         const usuario = await prisma.usuario.create({
             data: {
@@ -889,6 +897,7 @@ export const createOperador = async (req: AuthRequest, res: Response, next: Next
                 rol: 'OPERADOR',
                 activo: true,
                 emailVerified: true,
+                forcePasswordChange: true,
             }
         });
 
@@ -915,7 +924,9 @@ export const createOperador = async (req: AuthRequest, res: Response, next: Next
         res.status(201).json({
             success: true,
             data: { operador },
-            message: `Operador creado. ${password ? 'Password: el definido en el formulario' : 'Password inicial: ' + cuit}`
+            message: password
+                ? 'Operador creado. Debe cambiar la contraseña en el primer acceso.'
+                : 'Operador creado. Se generó una contraseña temporal privada; enviar invitación o reset de contraseña.'
         });
     } catch (error) {
         next(error);

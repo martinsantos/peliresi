@@ -47,6 +47,63 @@ export const generateTokens = (userId: string, restricted = false) => {
   return { accessToken, refreshToken };
 };
 
+function getTokenExpiry(token: string): Date {
+  const decoded = jwt.decode(token) as { exp?: number } | null;
+  return decoded?.exp ? new Date(decoded.exp * 1000) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+}
+
+async function storeRefreshToken(token: string, usuarioId: string) {
+  await prisma.refreshToken.create({
+    data: {
+      token,
+      usuarioId,
+      revocado: false,
+      expiresAt: getTokenExpiry(token),
+    },
+  });
+}
+
+async function revokeToken(token: string, usuarioId: string) {
+  await prisma.refreshToken.upsert({
+    where: { token },
+    update: { revocado: true },
+    create: {
+      token,
+      usuarioId,
+      revocado: true,
+      expiresAt: getTokenExpiry(token),
+    },
+  });
+}
+
+function normalizeIp(ip: string): string {
+  return ip.replace(/^::ffff:/, '').trim();
+}
+
+function requestIps(req: Request): string[] {
+  const forwarded = req.headers['x-forwarded-for']?.toString().split(',').map((ip) => normalizeIp(ip)) ?? [];
+  return [...forwarded, normalizeIp(req.ip || '')].filter(Boolean);
+}
+
+function assertDemoLoginAllowed(user: any, req: Request) {
+  if (!user.esDemo) return;
+
+  if (!config.DEMO_LOGIN_ENABLED) {
+    throw new AppError('Login demo no habilitado en este entorno', 403);
+  }
+
+  const userExpiry = user.demoExpiresAt ? new Date(user.demoExpiresAt) : null;
+  const globalExpiry = config.DEMO_LOGIN_EXPIRES_AT ? new Date(config.DEMO_LOGIN_EXPIRES_AT) : null;
+  if ((userExpiry && userExpiry <= new Date()) || (globalExpiry && globalExpiry <= new Date())) {
+    throw new AppError('Login demo vencido', 403);
+  }
+
+  const allowed = config.DEMO_LOGIN_ALLOWED_IPS;
+  if (allowed.length > 0 && !requestIps(req).some((ip) => allowed.includes(ip) || allowed.includes('*'))) {
+    throw new AppError('Login demo no autorizado desde esta red', 403);
+  }
+}
+
 // ── REGISTER (público) ─────────────────────────────────────────────
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -250,6 +307,8 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       throw new AppError('Credenciales inválidas', 401);
     }
 
+    assertDemoLoginAllowed(user, req);
+
     // Reset lockout on successful login
     if (user.intentosFallidos > 0 || user.bloqueadoHasta) {
       await prisma.usuario.update({
@@ -274,12 +333,14 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       if (solicitudPendiente) {
         // Issue restricted token
         const { accessToken, refreshToken } = generateTokens(user.id, true);
+        await storeRefreshToken(refreshToken, user.id);
 
         const userData = {
           id: user.id, email: user.email, rol: user.rol, nombre: user.nombre,
           apellido: user.apellido, empresa: user.empresa, telefono: user.telefono,
           activo: user.activo, esInspector: user.esInspector, generador: user.generador,
           transportista: user.transportista, operador: user.operador, createdAt: user.createdAt,
+          forcePasswordChange: (user as any).forcePasswordChange,
         };
 
         // Audit restricted login
@@ -314,16 +375,17 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     }
 
     const { accessToken, refreshToken } = generateTokens(user.id);
+    await storeRefreshToken(refreshToken, user.id);
 
     try {
       await prisma.auditoria.create({
         data: {
           usuarioId: user.id,
-          accion: 'LOGIN',
+          accion: (user as any).esDemo ? 'LOGIN_DEMO' : 'LOGIN',
           modulo: 'AUTH',
           ip: req.ip || req.headers['x-forwarded-for']?.toString() || 'unknown',
           userAgent: req.headers['user-agent'] || 'unknown',
-          datosDespues: JSON.stringify({ email: user.email, rol: user.rol, timestamp: new Date().toISOString() }),
+          datosDespues: JSON.stringify({ email: user.email, rol: user.rol, esDemo: (user as any).esDemo, timestamp: new Date().toISOString() }),
         },
       });
     } catch { /* ignore audit errors */ }
@@ -333,6 +395,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       apellido: user.apellido, empresa: user.empresa, telefono: user.telefono,
       activo: user.activo, esInspector: user.esInspector, generador: user.generador,
       transportista: user.transportista, operador: user.operador, createdAt: user.createdAt,
+      forcePasswordChange: (user as any).forcePasswordChange,
     };
 
     res.json({ success: true, data: { user: userData, tokens: { accessToken, refreshToken } } });
@@ -418,6 +481,7 @@ export const getProfile = async (req: Request & { user?: any }, res: Response, n
         empresa: true, telefono: true, activo: true, esInspector: true,
         createdAt: true, generador: true, transportista: true, operador: true,
         notifNuevoRegistro: true, notifEmail: true,
+        forcePasswordChange: true,
       },
     });
     if (!user) throw new AppError('Usuario no encontrado', 404);
@@ -430,26 +494,16 @@ export const getProfile = async (req: Request & { user?: any }, res: Response, n
 // ── LOGOUT ────────────────────────────────────────────────────────
 export const logout = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // Blacklist the access token so it can't be used again
     const authHeader = req.headers.authorization;
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
-    if (token && (req as any).user?.id) {
-      try {
-        const decoded = jwt.decode(token) as { exp?: number } | null;
-        if (decoded?.exp) {
-          await prisma.refreshToken.create({
-            data: {
-              token,
-              usuarioId: (req as any).user.id,
-              revocado: true,
-              expiresAt: new Date(decoded.exp * 1000),
-            },
-          });
-        }
-      } catch {
-        // If token decode fails, skip blacklisting — still return success
-      }
+    const accessToken = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+    const refreshToken = req.body?.refreshToken;
+    const userId = (req as any).user?.id;
+
+    if (userId) {
+      if (accessToken) await revokeToken(accessToken, userId);
+      if (refreshToken) await revokeToken(refreshToken, userId);
     }
+
     res.json({ success: true, message: 'Sesión cerrada correctamente' });
   } catch (error) {
     next(error);
@@ -474,7 +528,10 @@ export const changePassword = async (req: Request & { user?: any }, res: Respons
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-    await prisma.usuario.update({ where: { id: req.user.id }, data: { password: hashedPassword } });
+    await prisma.usuario.update({
+      where: { id: req.user.id },
+      data: { password: hashedPassword, forcePasswordChange: false },
+    });
     res.json({ success: true, message: 'Contraseña actualizada correctamente' });
   } catch (error) {
     next(error);
@@ -495,15 +552,16 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
     }
 
     // Check token revocation (blacklist)
-    const blacklisted = await prisma.refreshToken.findFirst({
-      where: { token, revocado: true },
+    const storedToken = await prisma.refreshToken.findUnique({
+      where: { token },
     });
-    if (blacklisted) {
+    if (!storedToken || storedToken.revocado || storedToken.expiresAt <= new Date()) {
       throw new AppError('Refresh token revocado', 401);
     }
 
     const user = await prisma.usuario.findUnique({ where: { id: decoded.id } });
     if (!user) throw new AppError('Usuario no encontrado o inactivo', 401);
+    assertDemoLoginAllowed(user, req);
 
     // Allow refresh for restricted tokens (inactive users with pending solicitudes)
     if (!user.activo && !decoded.restricted) {
@@ -511,10 +569,34 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
     }
 
     if (decoded.restricted) {
-      return res.json({ success: true, data: generateTokens(user.id, true) });
+      const nextTokens = generateTokens(user.id, true);
+      await prisma.$transaction([
+        prisma.refreshToken.update({ where: { token }, data: { revocado: true } }),
+        prisma.refreshToken.create({
+          data: {
+            token: nextTokens.refreshToken,
+            usuarioId: user.id,
+            revocado: false,
+            expiresAt: getTokenExpiry(nextTokens.refreshToken),
+          },
+        }),
+      ]);
+      return res.json({ success: true, data: nextTokens });
     }
 
-    res.json({ success: true, data: generateTokens(user.id) });
+    const nextTokens = generateTokens(user.id);
+    await prisma.$transaction([
+      prisma.refreshToken.update({ where: { token }, data: { revocado: true } }),
+      prisma.refreshToken.create({
+        data: {
+          token: nextTokens.refreshToken,
+          usuarioId: user.id,
+          revocado: false,
+          expiresAt: getTokenExpiry(nextTokens.refreshToken),
+        },
+      }),
+    ]);
+    res.json({ success: true, data: nextTokens });
   } catch (error) {
     next(error);
   }

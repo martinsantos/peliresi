@@ -64,7 +64,7 @@ export interface AuthContextType {
 // Must match actual seeded users in backend/prisma/seed.ts
 // ========================================
 export const DEMO_CREDENTIALS: Record<number, { email: string; password: string; nombre: string; rol: UserRole; sector: string }> =
-  import.meta.env.VITE_DEMO_MODE === 'true'
+  import.meta.env.VITE_DEMO_LOGIN_ENABLED === 'true' || import.meta.env.VITE_DEMO_MODE === 'true'
     ? {
         1:  { email: 'admin@dgfa.mendoza.gov.ar',          password: 'admin123', nombre: 'Administrador DGFA',          rol: 'ADMIN',         sector: 'DGFA' },
         5:  { email: 'quimica.mendoza@industria.com',       password: 'gen123',   nombre: 'Roberto Gómez',               rol: 'GENERADOR',     sector: 'Química Mendoza S.A.' },

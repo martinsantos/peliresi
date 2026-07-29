@@ -1,11 +1,17 @@
 import { Request, Response, NextFunction } from 'express';
 import { EventoAlerta, EstadoAlerta, TipoAnomalia, SeveridadAnomalia } from '@prisma/client';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import prisma from '../lib/prisma';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { domainEvents } from '../services/domainEvent.service';
 
 // Re-export notificationService so existing imports continue to work
 export { notificationService } from '../services/notification-dispatcher.service';
+
+async function createPrivateTempPasswordHash() {
+    return bcrypt.hash(crypto.randomBytes(18).toString('base64url'), 10);
+}
 
 // ============ CONTROLADOR DE NOTIFICACIONES ============
 
@@ -524,7 +530,7 @@ export const cargaMasivaGeneradores = async (req: Request, res: Response, next: 
                     });
                 } else {
                     // Crear usuario y generador
-                    const password = await require('bcryptjs').hash('temporal123', 10);
+                    const password = await createPrivateTempPasswordHash();
                     const usuario = await prisma.usuario.create({
                         data: {
                             email: registro.email,
@@ -532,7 +538,9 @@ export const cargaMasivaGeneradores = async (req: Request, res: Response, next: 
                             rol: 'GENERADOR',
                             nombre: registro.razonsocial || registro.razon_social,
                             cuit: registro.cuit,
-                            activo: true
+                            activo: true,
+                            emailVerified: true,
+                            forcePasswordChange: true,
                         }
                     });
 
@@ -605,7 +613,7 @@ export const cargaMasivaTransportistas = async (req: Request, res: Response, nex
                         }
                     });
                 } else {
-                    const password = await require('bcryptjs').hash('temporal123', 10);
+                    const password = await createPrivateTempPasswordHash();
                     const usuario = await prisma.usuario.create({
                         data: {
                             email: registro.email,
@@ -613,7 +621,9 @@ export const cargaMasivaTransportistas = async (req: Request, res: Response, nex
                             rol: 'TRANSPORTISTA',
                             nombre: registro.razonsocial || registro.razon_social,
                             cuit: registro.cuit,
-                            activo: true
+                            activo: true,
+                            emailVerified: true,
+                            forcePasswordChange: true,
                         }
                     });
 
@@ -686,7 +696,7 @@ export const cargaMasivaOperadores = async (req: Request, res: Response, next: N
                         }
                     });
                 } else {
-                    const password = await require('bcryptjs').hash('temporal123', 10);
+                    const password = await createPrivateTempPasswordHash();
                     const usuario = await prisma.usuario.create({
                         data: {
                             email: registro.email,
@@ -694,7 +704,9 @@ export const cargaMasivaOperadores = async (req: Request, res: Response, next: N
                             rol: 'OPERADOR',
                             nombre: registro.razonsocial || registro.razon_social,
                             cuit: registro.cuit,
-                            activo: true
+                            activo: true,
+                            emailVerified: true,
+                            forcePasswordChange: true,
                         }
                     });
 

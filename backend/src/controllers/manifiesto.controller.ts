@@ -4,6 +4,7 @@ import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import prisma from '../lib/prisma';
 import { generarNumeroManifiesto } from '../utils/manifiestoNumber';
+import { canAccessManifestRecord } from '../utils/authorization';
 
 // Re-export split modules so existing imports (e.g. routes) continue to work
 export { getManifiestos, getManifiestoById, getDashboardStats, getSyncInicial, getManifiestosEsperados } from './manifiesto-query.controller';
@@ -346,6 +347,10 @@ export const validarQR = async (req: AuthRequest, res: Response, next: NextFunct
         message: 'Manifiesto no encontrado'
       });
       return;
+    }
+
+    if (!canAccessManifestRecord(req.user, manifiesto, 'read')) {
+      throw new AppError('No tiene permisos sobre este manifiesto', 403);
     }
 
     // Verificar que el QR corresponde al manifiesto

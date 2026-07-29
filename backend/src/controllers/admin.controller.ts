@@ -343,6 +343,9 @@ export const updatePreferenciasNotificacion = async (req: AuthRequest, res: Resp
 export const impersonateUsuario = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { userId } = req.params;
+    if (req.user?.rol !== 'ADMIN') {
+      throw new AppError('Solo ADMIN raíz puede impersonar usuarios', 403);
+    }
 
     const target = await prisma.usuario.findUnique({
       where: { id: userId },

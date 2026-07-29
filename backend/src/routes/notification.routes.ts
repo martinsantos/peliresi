@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { isAuthenticated, hasRole } from '../middlewares/auth.middleware';
+import { isAuthenticated, hasRole, requireFullAccess } from '../middlewares/auth.middleware';
 import { getVapidPublicKey, subscribe, unsubscribe } from '../controllers/push.controller';
+import { requireManifestAccess } from '../utils/authorization';
 import {
     getNotificaciones,
     marcarLeida,
@@ -43,11 +44,12 @@ const upload = multer({
 
 // Push — clave pública es pública (sin auth), subscribe/unsubscribe requieren auth
 router.get('/push/vapid-key', getVapidPublicKey);
-router.post('/push/subscribe',   isAuthenticated, subscribe);
-router.post('/push/unsubscribe', isAuthenticated, unsubscribe);
+router.post('/push/subscribe',   isAuthenticated, requireFullAccess, subscribe);
+router.post('/push/unsubscribe', isAuthenticated, requireFullAccess, unsubscribe);
 
 // Todas las rutas requieren autenticacion
 router.use(isAuthenticated);
+router.use(requireFullAccess);
 
 // ============ NOTIFICACIONES ============
 
@@ -277,7 +279,7 @@ router.put('/alertas/:id/resolver', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_T
  *       403:
  *         description: Solo ADMIN
  */
-router.post('/anomalias/detectar/:manifiestoId', hasRole('ADMIN'), detectarAnomalias);
+router.post('/anomalias/detectar/:manifiestoId', hasRole('ADMIN'), requireManifestAccess('read', 'manifiestoId'), detectarAnomalias);
 
 /**
  * @openapi
@@ -295,7 +297,7 @@ router.post('/anomalias/detectar/:manifiestoId', hasRole('ADMIN'), detectarAnoma
  *       200:
  *         description: Lista de anomalias
  */
-router.get('/anomalias/:manifiestoId', getAnomalias);
+router.get('/anomalias/:manifiestoId', requireManifestAccess('read', 'manifiestoId'), getAnomalias);
 
 /**
  * @openapi
@@ -351,7 +353,7 @@ router.put('/anomalias/:id/resolver', hasRole('ADMIN'), resolverAnomalia);
  *       403:
  *         description: Solo ADMIN
  */
-router.post('/carga-masiva/generadores', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'), upload.single('archivo'), cargaMasivaGeneradores);
+router.post('/carga-masiva/generadores', hasRole('ADMIN', 'ADMIN_GENERADOR'), upload.single('archivo'), cargaMasivaGeneradores);
 
 /**
  * @openapi
@@ -377,7 +379,7 @@ router.post('/carga-masiva/generadores', hasRole('ADMIN', 'ADMIN_GENERADOR', 'AD
  *       403:
  *         description: Solo ADMIN
  */
-router.post('/carga-masiva/transportistas', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'), upload.single('archivo'), cargaMasivaTransportistas);
+router.post('/carga-masiva/transportistas', hasRole('ADMIN', 'ADMIN_TRANSPORTISTA'), upload.single('archivo'), cargaMasivaTransportistas);
 
 /**
  * @openapi
@@ -403,7 +405,7 @@ router.post('/carga-masiva/transportistas', hasRole('ADMIN', 'ADMIN_GENERADOR', 
  *       403:
  *         description: Solo ADMIN
  */
-router.post('/carga-masiva/operadores', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'), upload.single('archivo'), cargaMasivaOperadores);
+router.post('/carga-masiva/operadores', hasRole('ADMIN', 'ADMIN_OPERADOR'), upload.single('archivo'), cargaMasivaOperadores);
 
 /**
  * @openapi

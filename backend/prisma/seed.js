@@ -8,18 +8,26 @@ const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const prisma = new client_1.PrismaClient();
 async function main() {
     console.log('Iniciando seed de datos...');
+    const demoExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const demoUserControls = {
+        activo: true,
+        emailVerified: true,
+        esDemo: true,
+        demoExpiresAt,
+        forcePasswordChange: false,
+    };
     // Crear usuario administrador
     const adminPassword = await bcryptjs_1.default.hash('admin123', 10);
     const admin = await prisma.usuario.upsert({
         where: { email: 'admin@dgfa.mendoza.gov.ar' },
-        update: {},
+        update: demoUserControls,
         create: {
             email: 'admin@dgfa.mendoza.gov.ar',
             password: adminPassword,
             rol: 'ADMIN',
             nombre: 'Administrador',
             apellido: 'DGFA',
-            activo: true,
+            ...demoUserControls,
         },
     });
     // Crear tipos de residuos según Ley 24.051
@@ -110,8 +118,8 @@ async function main() {
     for (const gen of generadores) {
         const usuario = await prisma.usuario.upsert({
             where: { email: gen.usuario.email },
-            update: {},
-            create: gen.usuario,
+            update: demoUserControls,
+            create: { ...gen.usuario, ...demoUserControls },
         });
         await prisma.generador.upsert({
             where: { usuarioId: usuario.id },
@@ -164,8 +172,8 @@ async function main() {
     for (const trans of transportistas) {
         const usuario = await prisma.usuario.upsert({
             where: { email: trans.usuario.email },
-            update: {},
-            create: trans.usuario,
+            update: demoUserControls,
+            create: { ...trans.usuario, ...demoUserControls },
         });
         const transportista = await prisma.transportista.upsert({
             where: { usuarioId: usuario.id },
@@ -277,8 +285,8 @@ async function main() {
     for (const op of operadores) {
         const usuario = await prisma.usuario.upsert({
             where: { email: op.usuario.email },
-            update: {},
-            create: op.usuario,
+            update: demoUserControls,
+            create: { ...op.usuario, ...demoUserControls },
         });
         const operador = await prisma.operador.upsert({
             where: { usuarioId: usuario.id },

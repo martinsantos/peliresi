@@ -1,6 +1,7 @@
 import { Router } from 'express';
-import { isAuthenticated } from '../middlewares/auth.middleware';
+import { isAuthenticated, requireFullAccess } from '../middlewares/auth.middleware';
 import { hasRole } from '../middlewares/auth.middleware';
+import { requireManifestAccess } from '../utils/authorization';
 import {
   getBlockchainStatus,
   registrarBlockchain,
@@ -16,18 +17,18 @@ const router = Router();
 router.get('/verificar/:hash', verificarBlockchainPublico);
 
 // Authenticated: get blockchain status for a manifest
-router.get('/manifiesto/:id', isAuthenticated, getBlockchainStatus);
+router.get('/manifiesto/:id', isAuthenticated, requireFullAccess, requireManifestAccess('read'), getBlockchainStatus);
 
 // Authenticated: register a manifest on blockchain on-demand
-router.post('/registrar/:id', isAuthenticated, registrarBlockchain);
+router.post('/registrar/:id', isAuthenticated, requireFullAccess, requireManifestAccess('read'), registrarBlockchain);
 
 // Admin + sectorial: list all blockchain registrations
-router.get('/registro', isAuthenticated, hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'), getRegistroBlockchain);
+router.get('/registro', isAuthenticated, requireFullAccess, hasRole('ADMIN'), getRegistroBlockchain);
 
 // Admin + sectorial: verify integrity of a single manifest
-router.get('/verificar-integridad/:id', isAuthenticated, hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'), getVerificarIntegridad);
+router.get('/verificar-integridad/:id', isAuthenticated, requireFullAccess, hasRole('ADMIN'), requireManifestAccess('read'), getVerificarIntegridad);
 
 // Admin + sectorial: batch integrity verification
-router.get('/verificar-lote', isAuthenticated, hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'), getVerificarLote);
+router.get('/verificar-lote', isAuthenticated, requireFullAccess, hasRole('ADMIN'), getVerificarLote);
 
 export default router;

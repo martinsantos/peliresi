@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { isAuthenticated, requireAdminOrTransportista, requireAdminOrGenerador, requireAdminOrOperador } from '../middlewares/auth.middleware';
+import { isAuthenticated, requireAdminOrTransportista, requireAdminOrGenerador, requireAdminOrOperador, requireFullAccess } from '../middlewares/auth.middleware';
+import { requireActorAccess, requireDocumentoAccess, rejectUnsafePathParams } from '../utils/authorization';
 import {
     getGeneradores, getGeneradorById, createGenerador, updateGenerador, deleteGenerador,
     getTransportistas, getTransportistaById, createTransportista, updateTransportista, deleteTransportista,
@@ -14,6 +15,7 @@ import { upload, uploadDocumento, getDocumentos, downloadDocumento, revisarDocum
 
 const router = Router();
 router.use(isAuthenticated);
+router.use(requireFullAccess);
 
 // ===== GENERADORES =====
 
@@ -60,7 +62,7 @@ router.get('/generadores', getGeneradores);
  *       404:
  *         description: Generador no encontrado
  */
-router.get('/generadores/:id', getGeneradorById);
+router.get('/generadores/:id', requireActorAccess('generador', 'id', 'read'), getGeneradorById);
 
 /**
  * @openapi
@@ -120,7 +122,7 @@ router.post('/generadores',      requireAdminOrGenerador, createGenerador);
  *       404:
  *         description: No encontrado
  */
-router.put('/generadores/:id',   requireAdminOrGenerador, updateGenerador);
+router.put('/generadores/:id',   requireAdminOrGenerador, requireActorAccess('generador', 'id', 'write'), updateGenerador);
 
 /**
  * @openapi
@@ -140,26 +142,26 @@ router.put('/generadores/:id',   requireAdminOrGenerador, updateGenerador);
  *       400:
  *         description: No se puede eliminar (tiene manifiestos asociados)
  */
-router.delete('/generadores/:id', requireAdminOrGenerador, deleteGenerador);
+router.delete('/generadores/:id', requireAdminOrGenerador, requireActorAccess('generador', 'id', 'write'), deleteGenerador);
 
 // ===== GENERADORES — PAGOS TEF =====
-router.get('/generadores/:id/pagos',                          getPagosTEF);
-router.post('/generadores/:id/pagos',    requireAdminOrGenerador, createPagoTEF);
-router.put('/generadores/:genId/pagos/:pagoId',  requireAdminOrGenerador, updatePagoTEF);
-router.delete('/generadores/:genId/pagos/:pagoId', requireAdminOrGenerador, deletePagoTEF);
+router.get('/generadores/:id/pagos', requireActorAccess('generador', 'id', 'read'), getPagosTEF);
+router.post('/generadores/:id/pagos', requireAdminOrGenerador, requireActorAccess('generador', 'id', 'write'), createPagoTEF);
+router.put('/generadores/:genId/pagos/:pagoId', requireAdminOrGenerador, requireActorAccess('generador', 'genId', 'write'), rejectUnsafePathParams('pagoId'), updatePagoTEF);
+router.delete('/generadores/:genId/pagos/:pagoId', requireAdminOrGenerador, requireActorAccess('generador', 'genId', 'write'), rejectUnsafePathParams('pagoId'), deletePagoTEF);
 
 // ===== GENERADORES — DDJJ =====
-router.get('/generadores/:id/ddjj',                           getDDJJ);
-router.post('/generadores/:id/ddjj',     requireAdminOrGenerador, createDDJJ);
-router.put('/generadores/:genId/ddjj/:ddjjId',   requireAdminOrGenerador, updateDDJJ);
-router.delete('/generadores/:genId/ddjj/:ddjjId',  requireAdminOrGenerador, deleteDDJJ);
+router.get('/generadores/:id/ddjj', requireActorAccess('generador', 'id', 'read'), getDDJJ);
+router.post('/generadores/:id/ddjj', requireAdminOrGenerador, requireActorAccess('generador', 'id', 'write'), createDDJJ);
+router.put('/generadores/:genId/ddjj/:ddjjId', requireAdminOrGenerador, requireActorAccess('generador', 'genId', 'write'), rejectUnsafePathParams('ddjjId'), updateDDJJ);
+router.delete('/generadores/:genId/ddjj/:ddjjId', requireAdminOrGenerador, requireActorAccess('generador', 'genId', 'write'), rejectUnsafePathParams('ddjjId'), deleteDDJJ);
 
 // ===== GENERADORES — DOCUMENTOS =====
-router.get('/generadores/:id/documentos',                     getDocumentos);
-router.post('/generadores/:id/documentos', requireAdminOrGenerador, upload.single('archivo'), uploadDocumento);
-router.get('/documentos/:docId/download',                     downloadDocumento);
-router.patch('/documentos/:docId/revisar', requireAdminOrGenerador, revisarDocumento);
-router.delete('/documentos/:docId',        requireAdminOrGenerador, deleteDocumento);
+router.get('/generadores/:id/documentos', requireActorAccess('generador', 'id', 'read'), getDocumentos);
+router.post('/generadores/:id/documentos', requireAdminOrGenerador, requireActorAccess('generador', 'id', 'write'), upload.single('archivo'), uploadDocumento);
+router.get('/documentos/:docId/download', requireDocumentoAccess('read'), downloadDocumento);
+router.patch('/documentos/:docId/revisar', requireAdminOrGenerador, requireDocumentoAccess('review'), revisarDocumento);
+router.delete('/documentos/:docId', requireAdminOrGenerador, requireDocumentoAccess('delete'), deleteDocumento);
 
 // ===== TRANSPORTISTAS =====
 
@@ -194,7 +196,7 @@ router.get('/transportistas', getTransportistas);
  *       404:
  *         description: Transportista no encontrado
  */
-router.get('/transportistas/:id', getTransportistaById);
+router.get('/transportistas/:id', requireActorAccess('transportista', 'id', 'read'), getTransportistaById);
 
 /**
  * @openapi
@@ -250,7 +252,7 @@ router.post('/transportistas',           requireAdminOrTransportista, createTran
  *       200:
  *         description: Transportista actualizado
  */
-router.put('/transportistas/:id',        requireAdminOrTransportista, updateTransportista);
+router.put('/transportistas/:id',        requireAdminOrTransportista, requireActorAccess('transportista', 'id', 'write'), updateTransportista);
 
 /**
  * @openapi
@@ -270,7 +272,7 @@ router.put('/transportistas/:id',        requireAdminOrTransportista, updateTran
  *       400:
  *         description: No se puede eliminar (tiene manifiestos asociados)
  */
-router.delete('/transportistas/:id',     requireAdminOrTransportista, deleteTransportista);
+router.delete('/transportistas/:id',     requireAdminOrTransportista, requireActorAccess('transportista', 'id', 'write'), deleteTransportista);
 
 /**
  * @openapi
@@ -302,7 +304,7 @@ router.delete('/transportistas/:id',     requireAdminOrTransportista, deleteTran
  *       201:
  *         description: Vehiculo agregado
  */
-router.post('/transportistas/:id/vehiculos',           requireAdminOrTransportista, addVehiculo);
+router.post('/transportistas/:id/vehiculos',           requireAdminOrTransportista, requireActorAccess('transportista', 'id', 'write'), addVehiculo);
 
 /**
  * @openapi
@@ -336,7 +338,7 @@ router.post('/transportistas/:id/vehiculos',           requireAdminOrTransportis
  *       200:
  *         description: Vehiculo actualizado
  */
-router.put('/transportistas/:id/vehiculos/:vehiculoId', requireAdminOrTransportista, updateVehiculo);
+router.put('/transportistas/:id/vehiculos/:vehiculoId', requireAdminOrTransportista, requireActorAccess('transportista', 'id', 'write'), rejectUnsafePathParams('vehiculoId'), updateVehiculo);
 
 /**
  * @openapi
@@ -359,7 +361,7 @@ router.put('/transportistas/:id/vehiculos/:vehiculoId', requireAdminOrTransporti
  *       200:
  *         description: Vehiculo eliminado
  */
-router.delete('/transportistas/:id/vehiculos/:vehiculoId', requireAdminOrTransportista, deleteVehiculo);
+router.delete('/transportistas/:id/vehiculos/:vehiculoId', requireAdminOrTransportista, requireActorAccess('transportista', 'id', 'write'), rejectUnsafePathParams('vehiculoId'), deleteVehiculo);
 
 /**
  * @openapi
@@ -389,7 +391,7 @@ router.delete('/transportistas/:id/vehiculos/:vehiculoId', requireAdminOrTranspo
  *       201:
  *         description: Chofer agregado
  */
-router.post('/transportistas/:id/choferes',          requireAdminOrTransportista, addChofer);
+router.post('/transportistas/:id/choferes',          requireAdminOrTransportista, requireActorAccess('transportista', 'id', 'write'), addChofer);
 
 /**
  * @openapi
@@ -422,7 +424,7 @@ router.post('/transportistas/:id/choferes',          requireAdminOrTransportista
  *       200:
  *         description: Chofer actualizado
  */
-router.put('/transportistas/:id/choferes/:choferId', requireAdminOrTransportista, updateChofer);
+router.put('/transportistas/:id/choferes/:choferId', requireAdminOrTransportista, requireActorAccess('transportista', 'id', 'write'), rejectUnsafePathParams('choferId'), updateChofer);
 
 /**
  * @openapi
@@ -445,7 +447,7 @@ router.put('/transportistas/:id/choferes/:choferId', requireAdminOrTransportista
  *       200:
  *         description: Chofer eliminado
  */
-router.delete('/transportistas/:id/choferes/:choferId', requireAdminOrTransportista, deleteChofer);
+router.delete('/transportistas/:id/choferes/:choferId', requireAdminOrTransportista, requireActorAccess('transportista', 'id', 'write'), rejectUnsafePathParams('choferId'), deleteChofer);
 
 // ===== OPERADORES =====
 
@@ -480,7 +482,7 @@ router.get('/operadores', getOperadores);
  *       404:
  *         description: Operador no encontrado
  */
-router.get('/operadores/:id', getOperadorById);
+router.get('/operadores/:id', requireActorAccess('operador', 'id', 'read'), getOperadorById);
 
 /**
  * @openapi
@@ -536,7 +538,7 @@ router.post('/operadores',       requireAdminOrOperador, createOperador);
  *       200:
  *         description: Operador actualizado
  */
-router.put('/operadores/:id',    requireAdminOrOperador, updateOperador);
+router.put('/operadores/:id',    requireAdminOrOperador, requireActorAccess('operador', 'id', 'write'), updateOperador);
 
 /**
  * @openapi
@@ -556,27 +558,27 @@ router.put('/operadores/:id',    requireAdminOrOperador, updateOperador);
  *       400:
  *         description: No se puede eliminar (tiene manifiestos asociados)
  */
-router.delete('/operadores/:id', requireAdminOrOperador, deleteOperador);
+router.delete('/operadores/:id', requireAdminOrOperador, requireActorAccess('operador', 'id', 'write'), deleteOperador);
 
 // ===== OPERADORES — PAGOS TEF =====
-router.get('/operadores/:id/pagos',                              getPagosTEFOperador);
-router.post('/operadores/:id/pagos',        requireAdminOrOperador, createPagoTEFOperador);
-router.put('/operadores/:opId/pagos/:pagoId',  requireAdminOrOperador, updatePagoTEFOperador);
-router.delete('/operadores/:opId/pagos/:pagoId', requireAdminOrOperador, deletePagoTEFOperador);
+router.get('/operadores/:id/pagos', requireActorAccess('operador', 'id', 'read'), getPagosTEFOperador);
+router.post('/operadores/:id/pagos', requireAdminOrOperador, requireActorAccess('operador', 'id', 'write'), createPagoTEFOperador);
+router.put('/operadores/:opId/pagos/:pagoId', requireAdminOrOperador, requireActorAccess('operador', 'opId', 'write'), rejectUnsafePathParams('pagoId'), updatePagoTEFOperador);
+router.delete('/operadores/:opId/pagos/:pagoId', requireAdminOrOperador, requireActorAccess('operador', 'opId', 'write'), rejectUnsafePathParams('pagoId'), deletePagoTEFOperador);
 
 // ===== OPERADORES — DDJJ =====
-router.get('/operadores/:id/ddjj',                               getDDJJOperador);
-router.post('/operadores/:id/ddjj',         requireAdminOrOperador, createDDJJOperador);
-router.put('/operadores/:opId/ddjj/:ddjjId',   requireAdminOrOperador, updateDDJJOperador);
-router.delete('/operadores/:opId/ddjj/:ddjjId',  requireAdminOrOperador, deleteDDJJOperador);
+router.get('/operadores/:id/ddjj', requireActorAccess('operador', 'id', 'read'), getDDJJOperador);
+router.post('/operadores/:id/ddjj', requireAdminOrOperador, requireActorAccess('operador', 'id', 'write'), createDDJJOperador);
+router.put('/operadores/:opId/ddjj/:ddjjId', requireAdminOrOperador, requireActorAccess('operador', 'opId', 'write'), rejectUnsafePathParams('ddjjId'), updateDDJJOperador);
+router.delete('/operadores/:opId/ddjj/:ddjjId', requireAdminOrOperador, requireActorAccess('operador', 'opId', 'write'), rejectUnsafePathParams('ddjjId'), deleteDDJJOperador);
 
 // ===== OPERADORES — DOCUMENTOS =====
-router.get('/operadores/:id/documentos',                         getDocumentos);
-router.post('/operadores/:id/documentos', requireAdminOrOperador, upload.single('archivo'), uploadDocumento);
+router.get('/operadores/:id/documentos', requireActorAccess('operador', 'id', 'read'), getDocumentos);
+router.post('/operadores/:id/documentos', requireAdminOrOperador, requireActorAccess('operador', 'id', 'write'), upload.single('archivo'), uploadDocumento);
 
 // ===== HISTORIAL DE CAMBIOS =====
-router.get('/generadores/:id/historial', getHistorialActor);
-router.get('/operadores/:id/historial', getHistorialActor);
-router.get('/transportistas/:id/historial', getHistorialActor);
+router.get('/generadores/:id/historial', requireActorAccess('generador', 'id', 'read'), getHistorialActor);
+router.get('/operadores/:id/historial', requireActorAccess('operador', 'id', 'read'), getHistorialActor);
+router.get('/transportistas/:id/historial', requireActorAccess('transportista', 'id', 'read'), getHistorialActor);
 
 export default router;

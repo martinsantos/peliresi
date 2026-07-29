@@ -2,7 +2,7 @@
  * SITREP v6 - Auth Service
  */
 
-import api, { setTokens, clearTokens } from './api';
+import api, { setTokens, clearTokens, getRefreshToken } from './api';
 import type { LoginRequest, LoginResponse, ChangePasswordRequest } from '../types/api';
 import type { Usuario } from '../types/models';
 
@@ -16,7 +16,7 @@ export const authService = {
 
   async logout(): Promise<void> {
     try {
-      await api.post('/auth/logout');
+      await api.post('/auth/logout', { refreshToken: getRefreshToken() });
     } finally {
       clearTokens();
     }

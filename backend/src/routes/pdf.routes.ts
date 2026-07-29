@@ -1,10 +1,12 @@
 import { Router } from 'express';
-import { isAuthenticated } from '../middlewares/auth.middleware';
+import { isAuthenticated, requireFullAccess } from '../middlewares/auth.middleware';
+import { requireManifestAccess } from '../utils/authorization';
 import { generarPDFManifiesto, generarCertificado } from '../controllers/pdf.controller';
 
 const router = Router();
 
 router.use(isAuthenticated);
+router.use(requireFullAccess);
 
 /**
  * @openapi
@@ -29,7 +31,7 @@ router.use(isAuthenticated);
  *         description: Manifiesto no encontrado
  */
 // PDF de manifiesto - disponible para todos los roles
-router.get('/manifiesto/:id', generarPDFManifiesto);
+router.get('/manifiesto/:id', requireManifestAccess('read'), generarPDFManifiesto);
 
 /**
  * @openapi
@@ -56,6 +58,6 @@ router.get('/manifiesto/:id', generarPDFManifiesto);
  *         description: Manifiesto no encontrado
  */
 // Certificado de disposicion - disponible para operadores y admin
-router.get('/certificado/:id', generarCertificado);
+router.get('/certificado/:id', requireManifestAccess('read'), generarCertificado);
 
 export default router;

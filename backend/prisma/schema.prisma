@@ -37,6 +37,9 @@ model Usuario {
   passwordResetExpires    DateTime?
   intentosFallidos        Int       @default(0)
   bloqueadoHasta          DateTime?
+  esDemo          Boolean   @default(false)
+  demoExpiresAt   DateTime?
+  forcePasswordChange Boolean @default(false)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -404,6 +407,8 @@ model RefreshToken {
   // Relaciones
   usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
+  @@index([usuarioId])
+  @@index([expiresAt])
   @@map("refresh_tokens")
 }
 

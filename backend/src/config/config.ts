@@ -33,7 +33,20 @@ export const config = {
   // Blockchain
   BLOCKCHAIN_ENABLED: process.env.BLOCKCHAIN_ENABLED === 'true',
   BLOCKCHAIN_RPC_URL: process.env.BLOCKCHAIN_RPC_URL || '',
-  BLOCKCHAIN_CONTRACT_ADDRESS: process.env.BLOCKCHAIN_CONTRACT_ADDRESS || ''
+  BLOCKCHAIN_CONTRACT_ADDRESS: process.env.BLOCKCHAIN_CONTRACT_ADDRESS || '',
+
+  // Demo login controls. In production this may only be enabled with
+  // explicit IP allowlist and expiration.
+  DEMO_LOGIN_ENABLED: process.env.DEMO_LOGIN_ENABLED === 'true',
+  DEMO_LOGIN_ALLOWED_IPS: (process.env.DEMO_LOGIN_ALLOWED_IPS || '')
+    .split(',')
+    .map((ip) => ip.trim())
+    .filter(Boolean),
+  DEMO_LOGIN_EXPIRES_AT: process.env.DEMO_LOGIN_EXPIRES_AT || '',
+
+  // File scanning policy for uploads
+  FILE_SCAN_MODE: process.env.FILE_SCAN_MODE || (process.env.NODE_ENV === 'production' ? 'required' : 'disabled'),
+  CLAMAV_SCAN_CMD: process.env.CLAMAV_SCAN_CMD || 'clamscan --no-summary'
 };
 
 // Validar configuraciones requeridas
@@ -54,6 +67,17 @@ if (config.NODE_ENV === 'production') {
   }
   if (config.JWT_SECRET === config.JWT_REFRESH_SECRET) {
     logger.error('FATAL: JWT_SECRET and JWT_REFRESH_SECRET must be different in production.');
+    process.exit(1);
+  }
+  if (config.DEMO_LOGIN_ENABLED) {
+    const expiresAt = config.DEMO_LOGIN_EXPIRES_AT ? new Date(config.DEMO_LOGIN_EXPIRES_AT) : null;
+    if (config.DEMO_LOGIN_ALLOWED_IPS.length === 0 || !expiresAt || Number.isNaN(expiresAt.getTime()) || expiresAt <= new Date()) {
+      logger.error('FATAL: DEMO_LOGIN_ENABLED requires DEMO_LOGIN_ALLOWED_IPS and a future DEMO_LOGIN_EXPIRES_AT in production.');
+      process.exit(1);
+    }
+  }
+  if (config.FILE_SCAN_MODE === 'required' && !config.CLAMAV_SCAN_CMD) {
+    logger.error('FATAL: FILE_SCAN_MODE=required requires CLAMAV_SCAN_CMD.');
     process.exit(1);
   }
 }

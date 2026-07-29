@@ -123,8 +123,11 @@ async function crawlRoute(
     await page.goto(`${basePrefix}${route}`, { waitUntil: 'networkidle', timeout: 30000 });
     await page.waitForTimeout(1500);
 
-    // Check for 404 page
-    const has404 = await page.getByText(/página no encontrada|404/i).first().isVisible().catch(() => false);
+    // Check for the actual NotFound page. Operational pages can legitimately
+    // render "404" inside alert/error content, so do not match any 404 text.
+    const has404Code = await page.getByRole('heading', { name: /^404$/ }).isVisible().catch(() => false);
+    const has404Title = await page.getByRole('heading', { name: /página no encontrada/i }).isVisible().catch(() => false);
+    const has404 = has404Code && has404Title;
     if (has404) issues.push({ route, type: '404', detail: 'Page shows 404 message' });
   } catch (e: any) {
     issues.push({ route, type: 'navigation-error', detail: e.message?.slice(0, 100) || 'unknown' });

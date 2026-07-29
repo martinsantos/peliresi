@@ -2,6 +2,46 @@ import { Response, NextFunction } from 'express';
 import prisma from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { canAccessActor, isActorTypeAdmin, isReadAllUser, isRootAdmin } from '../utils/authorization';
+
+const GENERADOR_RENOVACION_FIELDS = [
+    'razonSocial', 'domicilio', 'telefono', 'email', 'numeroInscripcion', 'categoria',
+    'actividad', 'rubro', 'corrientesControl', 'domicilioLegalCalle', 'domicilioLegalLocalidad',
+    'domicilioLegalDepto', 'domicilioRealCalle', 'domicilioRealLocalidad', 'domicilioRealDepto',
+    'certificacionISO', 'resolucionInscripcion', 'factorR', 'montoMxR', 'categoriaIndividual',
+    'libroOperatoria', 'tefInputs', 'latitud', 'longitud',
+];
+
+const OPERADOR_RENOVACION_FIELDS = [
+    'razonSocial', 'domicilio', 'telefono', 'email', 'numeroHabilitacion', 'categoria',
+    'tipoOperador', 'tecnologia', 'corrientesY', 'modalidades', 'expedienteInscripcion',
+    'certificadoNumero', 'domicilioLegalCalle', 'domicilioLegalLocalidad', 'domicilioLegalDepto',
+    'domicilioRealCalle', 'domicilioRealLocalidad', 'domicilioRealDepto',
+    'representanteLegalNombre', 'representanteLegalDNI', 'representanteLegalTelefono',
+    'representanteTecnicoNombre', 'representanteTecnicoMatricula', 'representanteTecnicoTelefono',
+    'vencimientoHabilitacion', 'resolucionDPA', 'tefInputs', 'latitud', 'longitud',
+];
+
+function pickAllowed(input: any, allowed: string[]) {
+    return Object.fromEntries(Object.entries(input || {}).filter(([key]) => allowed.includes(key)));
+}
+
+function assertRenovacionAccess(req: AuthRequest, renovacion: any, mode: 'read' | 'admin' = 'read') {
+    const actorType = renovacion.tipoActor === 'GENERADOR' ? 'generador' : renovacion.tipoActor === 'OPERADOR' ? 'operador' : null;
+    const actorId = renovacion.generadorId || renovacion.operadorId;
+    if (!actorType || !actorId) throw new AppError('Renovacion sin actor valido', 403);
+
+    if (mode === 'admin') {
+        if (!isRootAdmin(req.user) && !isActorTypeAdmin(req.user, actorType)) {
+            throw new AppError('No tiene permisos para revisar esta renovacion', 403);
+        }
+        return;
+    }
+
+    if (!canAccessActor(req.user, actorType, actorId, 'read')) {
+        throw new AppError('No tiene permisos sobre esta renovacion', 403);
+    }
+}
 
 export const getRenovaciones = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -13,6 +53,13 @@ export const getRenovaciones = async (req: AuthRequest, res: Response, next: Nex
         if (anio) where.anio = Number(anio);
         if (tipoActor) where.tipoActor = tipoActor;
         if (estado) where.estado = estado;
+        if (!isReadAllUser(req.user)) {
+            if (req.user!.rol === 'ADMIN_GENERADOR') where.tipoActor = 'GENERADOR';
+            else if (req.user!.rol === 'ADMIN_OPERADOR') where.tipoActor = 'OPERADOR';
+            else if (req.user!.generador?.id) where.generadorId = req.user!.generador.id;
+            else if (req.user!.operador?.id) where.operadorId = req.user!.operador.id;
+            else where.id = '__NO_ACCESS__';
+        }
 
         const [renovaciones, total] = await Promise.all([
             prisma.renovacion.findMany({
@@ -51,6 +98,7 @@ export const getRenovacionById = async (req: AuthRequest, res: Response, next: N
             },
         });
         if (!renovacion) throw new AppError('Renovacion no encontrada', 404);
+        assertRenovacionAccess(req, renovacion, 'read');
         res.json({ success: true, data: { renovacion } });
     } catch (error) {
         next(error);
@@ -68,10 +116,12 @@ export const createRenovacion = async (req: AuthRequest, res: Response, next: Ne
         // Snapshot current data
         let datosActuales: any = null;
         if (tipoActor === 'GENERADOR' && generadorId) {
+            if (!canAccessActor(req.user, 'generador', generadorId, 'write')) throw new AppError('No tiene permisos sobre este generador', 403);
             const gen = await prisma.generador.findUnique({ where: { id: generadorId } });
             if (!gen) throw new AppError('Generador no encontrado', 404);
             datosActuales = gen;
         } else if (tipoActor === 'OPERADOR' && operadorId) {
+            if (!canAccessActor(req.user, 'operador', operadorId, 'write')) throw new AppError('No tiene permisos sobre este operador', 403);
             const op = await prisma.operador.findUnique({ where: { id: operadorId } });
             if (!op) throw new AppError('Operador no encontrado', 404);
             datosActuales = op;
@@ -112,6 +162,7 @@ export const aprobarRenovacion = async (req: AuthRequest, res: Response, next: N
 
         const renovacion = await prisma.renovacion.findUnique({ where: { id } });
         if (!renovacion) throw new AppError('Renovacion no encontrada', 404);
+        assertRenovacionAccess(req, renovacion, 'admin');
         if (renovacion.estado !== 'PENDIENTE') throw new AppError('Solo se pueden aprobar renovaciones pendientes', 400);
 
         const updated = await prisma.renovacion.update({
@@ -128,9 +179,9 @@ export const aprobarRenovacion = async (req: AuthRequest, res: Response, next: N
         if (renovacion.modalidad === 'CON_CAMBIOS' && renovacion.datosNuevos) {
             const parsed = JSON.parse(renovacion.datosNuevos);
             if (renovacion.tipoActor === 'GENERADOR' && renovacion.generadorId) {
-                await prisma.generador.update({ where: { id: renovacion.generadorId }, data: parsed });
+                await prisma.generador.update({ where: { id: renovacion.generadorId }, data: pickAllowed(parsed, GENERADOR_RENOVACION_FIELDS) });
             } else if (renovacion.tipoActor === 'OPERADOR' && renovacion.operadorId) {
-                await prisma.operador.update({ where: { id: renovacion.operadorId }, data: parsed });
+                await prisma.operador.update({ where: { id: renovacion.operadorId }, data: pickAllowed(parsed, OPERADOR_RENOVACION_FIELDS) });
             }
         }
 
@@ -147,6 +198,7 @@ export const rechazarRenovacion = async (req: AuthRequest, res: Response, next: 
 
         const renovacion = await prisma.renovacion.findUnique({ where: { id } });
         if (!renovacion) throw new AppError('Renovacion no encontrada', 404);
+        assertRenovacionAccess(req, renovacion, 'admin');
         if (renovacion.estado !== 'PENDIENTE') throw new AppError('Solo se pueden rechazar renovaciones pendientes', 400);
 
         const updated = await prisma.renovacion.update({

@@ -6,16 +6,16 @@ describe('isFullAccess', () => {
     expect(isFullAccess({ rol: 'ADMIN' })).toBe(true);
   });
 
-  it('returns true for ADMIN_GENERADOR', () => {
-    expect(isFullAccess({ rol: 'ADMIN_GENERADOR' })).toBe(true);
+  it('returns false for ADMIN_GENERADOR without root admin privileges', () => {
+    expect(isFullAccess({ rol: 'ADMIN_GENERADOR' })).toBe(false);
   });
 
-  it('returns true for ADMIN_TRANSPORTISTA', () => {
-    expect(isFullAccess({ rol: 'ADMIN_TRANSPORTISTA' })).toBe(true);
+  it('returns false for ADMIN_TRANSPORTISTA without root admin privileges', () => {
+    expect(isFullAccess({ rol: 'ADMIN_TRANSPORTISTA' })).toBe(false);
   });
 
-  it('returns true for ADMIN_OPERADOR', () => {
-    expect(isFullAccess({ rol: 'ADMIN_OPERADOR' })).toBe(true);
+  it('returns false for ADMIN_OPERADOR without root admin privileges', () => {
+    expect(isFullAccess({ rol: 'ADMIN_OPERADOR' })).toBe(false);
   });
 
   it('returns true for inspector regardless of role', () => {
@@ -98,7 +98,7 @@ describe('applyRoleFilter', () => {
     expect(where).toEqual({ operadorId: 'oper-1' });
   });
 
-  it('does not add filter when GENERADOR has no associated generador', () => {
+  it('denies by default when GENERADOR has no associated generador', () => {
     const where: Record<string, unknown> = {};
     applyRoleFilter(where, {
       rol: 'GENERADOR',
@@ -106,7 +106,7 @@ describe('applyRoleFilter', () => {
       transportista: null,
       operador: null,
     });
-    expect(where).toEqual({});
+    expect(where).toEqual({ id: '__NO_ACCESS__' });
   });
 
   it('preserves existing where conditions', () => {
@@ -120,14 +120,14 @@ describe('applyRoleFilter', () => {
     expect(where).toEqual({ estado: 'APROBADO', transportistaId: 'trans-1' });
   });
 
-  it('does not modify where for ADMIN_GENERADOR sub-admin', () => {
+  it('filters ADMIN_GENERADOR by associated actor instead of granting full access', () => {
     const where: Record<string, unknown> = {};
     applyRoleFilter(where, {
       rol: 'ADMIN_GENERADOR',
-      generador: null,
+      generador: { id: 'gen-admin-1' },
       transportista: null,
       operador: null,
     });
-    expect(where).toEqual({});
+    expect(where).toEqual({ generadorId: 'gen-admin-1' });
   });
 });

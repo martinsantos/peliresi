@@ -17,6 +17,9 @@ export interface AuthUser {
   transportista: { id: string; [key: string]: unknown } | null;
   operador: { id: string; [key: string]: unknown } | null;
   restricted: boolean;
+  esDemo?: boolean;
+  demoExpiresAt?: Date | null;
+  forcePasswordChange?: boolean;
 }
 
 export interface AuthRequest extends Request {
@@ -63,6 +66,9 @@ export const isAuthenticated = async (
         generador: true,
         transportista: true,
         operador: true,
+        esDemo: true,
+        demoExpiresAt: true,
+        forcePasswordChange: true,
       },
     });
 
@@ -92,6 +98,10 @@ export const hasRole = (...roles: string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       return next(new AppError('No autorizado', 401));
+    }
+
+    if (req.user.restricted) {
+      return next(new AppError('Acceso restringido - Tu solicitud esta siendo procesada', 403));
     }
 
     if (!roles.includes(req.user.rol)) {

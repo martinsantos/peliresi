@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { isAuthenticated, requireAdminOrGenerador, requireAdminOrOperador } from '../middlewares/auth.middleware';
+import { isAuthenticated, requireAdminOrGenerador, requireAdminOrOperador, requireFullAccess } from '../middlewares/auth.middleware';
 import {
     getTiposResiduos,
     createTipoResiduo,
@@ -55,6 +55,7 @@ router.get('/enrichment/operadores', getOperadoresEnrichment);
 
 // Rutas protegidas
 router.use(isAuthenticated);
+router.use(requireFullAccess);
 
 /**
  * @openapi

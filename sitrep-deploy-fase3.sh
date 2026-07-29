@@ -39,6 +39,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SSH_HOST="sitrepprd1"
 DOMAIN="sitrepprd1.mendoza.gov.ar"
+PUBLIC_DOMAIN="${PUBLIC_DOMAIN:-rptrazar.mendoza.gov.ar}"
+EXTRA_SERVER_NAMES="${EXTRA_SERVER_NAMES:-${PUBLIC_DOMAIN}}"
+SERVER_NAMES="${DOMAIN} ${EXTRA_SERVER_NAMES}"
+APP_FRONTEND_URL="${APP_FRONTEND_URL:-https://${PUBLIC_DOMAIN}}"
+APP_CORS_ORIGIN="${APP_CORS_ORIGIN:-https://${DOMAIN},https://${PUBLIC_DOMAIN}}"
 PORT=3002
 VM_BACKEND_DIR="/home/ubuntu/sitrep-backend"
 VM_FRONTEND_DIR="/var/www/sitrep"
@@ -69,10 +74,10 @@ ok "DATABASE_URL disponible"
 say "1/10 — Build Frontend (SPA + PWA)"
 cd "${SCRIPT_DIR}/frontend"
 
-VITE_API_URL="https://${DOMAIN}/api" npm run build 2>&1 | tail -3
+VITE_API_URL="/api" npm run build 2>&1 | tail -3
 ok "SPA (dist/) compilado"
 
-VITE_API_URL="https://${DOMAIN}/api" npx vite build --config vite.config.app.ts 2>&1 | tail -3
+VITE_API_URL="/api" npx vite build --config vite.config.app.ts 2>&1 | tail -3
 ok "PWA (dist-app/) compilado"
 
 cd "${SCRIPT_DIR}"
@@ -142,8 +147,8 @@ PORT=${PORT}
 DATABASE_URL=${DB_URL}
 JWT_SECRET=${JWT_SECRET}
 JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
-FRONTEND_URL=https://${DOMAIN}
-CORS_ORIGIN=https://${DOMAIN}
+FRONTEND_URL=${APP_FRONTEND_URL}
+CORS_ORIGIN=${APP_CORS_ORIGIN}
 SUPER_ADMIN_EMAIL=santosma@gmail.com
 ENABLE_ANALYTICS=true
 DISABLE_EMAILS=true
@@ -203,15 +208,16 @@ ok "Migraciones Prisma aplicadas"
 # ---- 8/10  Servicio systemd ------------------------------------------------
 
 say "8/10 — Servicio systemd sitrep-backend"
-ssh "$SSH_HOST" "sudo bash -s -- '${VM_BACKEND_DIR}' '${PORT}'" << 'SSHEOF'
+ssh "$SSH_HOST" "sudo bash -s -- '${VM_BACKEND_DIR}' '${PORT}' '${APP_FRONTEND_URL}'" << 'SSHEOF'
 set -euo pipefail
 VM_BACKEND_DIR="$1"
 PORT="$2"
+APP_FRONTEND_URL="$3"
 
 cat > /etc/systemd/system/sitrep-backend.service <<UNIT
 [Unit]
 Description=SITREP Backend
-Documentation=https://sitrepprd1.mendoza.gov.ar/api/docs
+Documentation=${APP_FRONTEND_URL}/api/docs
 After=network.target postgresql.service
 Requires=postgresql.service
 
@@ -261,14 +267,9 @@ NGINX_CONF_TMP="/tmp/sitrep-nginx-${TIMESTAMP}.conf"
 cat > "$NGINX_CONF_TMP" <<NGINXEOF
 server {
     listen 80;
-    server_name ${DOMAIN};
-    return 301 https://\$host\$request_uri;
-}
-
-server {
     listen 443 ssl;
     http2 on;
-    server_name ${DOMAIN};
+    server_name ${SERVER_NAMES};
 
     ssl_certificate     /etc/ssl/sitrep/sitrep.crt;
     ssl_certificate_key /etc/ssl/sitrep/sitrep.key;
@@ -285,13 +286,22 @@ server {
     add_header X-Content-Type-Options "nosniff"     always;
     add_header X-Robots-Tag  "noindex, nofollow"    always;
 
+    # HAProxy terminates TLS and reaches this backend over HTTP.
+    # Redirect only direct HTTP requests; do not redirect proxied HTTPS traffic.
+    set \$redirect_to_https 0;
+    set \$forwarded_proto \$scheme;
+    if (\$scheme = http) { set \$redirect_to_https 1; }
+    if (\$http_x_forwarded_proto = https) { set \$redirect_to_https 0; }
+    if (\$http_x_forwarded_proto != "") { set \$forwarded_proto \$http_x_forwarded_proto; }
+    if (\$redirect_to_https = 1) { return 301 https://\$host\$request_uri; }
+
     location /api/ {
         proxy_pass         http://127.0.0.1:${PORT};
         proxy_http_version 1.1;
         proxy_set_header   Host              \$host;
         proxy_set_header   X-Real-IP         \$remote_addr;
         proxy_set_header   X-Forwarded-For   \$proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto \$scheme;
+        proxy_set_header   X-Forwarded-Proto \$forwarded_proto;
         proxy_set_header   Upgrade           \$http_upgrade;
         proxy_set_header   Connection        "upgrade";
         proxy_cache_bypass \$http_upgrade;

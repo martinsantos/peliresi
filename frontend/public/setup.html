@@ -212,11 +212,10 @@ function renderStep4(box) {
 
 function renderStep5(box) {
   box.appendChild(el('h2',{},['Paso 5: Crear Admin Inicial ',statusBadge(status[5])]));
-  box.appendChild(el('p',{},'El seed crea el usuario administrador y el catalogo de tipos de residuo.'));
+  box.appendChild(el('p',{},'Crear el usuario administrador mediante seed controlado o invitacion segura. No publicar passwords fijos en este archivo.'));
   box.appendChild(codeBlock('cd /var/www/sitrep-backend\nnpx prisma db seed'));
-  box.appendChild(infoBox('Credenciales del admin: admin@dgfa.mendoza.gov.ar / admin123'));
-  box.appendChild(infoBox('Cambiar el password del admin inmediatamente despues del primer login.','warn'));
-  var row=el('div',{className:'btn-row'}); row.appendChild(verifyBtn('Verificar Login Admin',checkStep5)); box.appendChild(row);
+  box.appendChild(infoBox('Para continuar, iniciar sesion manualmente como admin y pegar un access token temporal cuando se solicite.','warn'));
+  var row=el('div',{className:'btn-row'}); row.appendChild(verifyBtn('Cargar Token Admin',checkStep5)); box.appendChild(row);
   box.appendChild(resultBox('r5'));
 }
 
@@ -354,22 +353,14 @@ function checkStep4(){
 }
 
 function checkStep5(){
-  status[5]='checking'; render();
-  fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({email:'admin@dgfa.mendoza.gov.ar',password:'admin123'}),
-    signal:AbortSignal.timeout(5000)
-  }).then(function(r){return r.json();}).then(function(d){
-    if(d.success&&d.data&&d.data.tokens){
-      token=d.data.tokens.accessToken; save();
-      status[5]='pass';showResult('r5','info','Login admin exitoso. Token guardado para pasos siguientes.');
-    } else {
-      status[5]='fail';showResult('r5','error','Login fallo: '+(d.message||'respuesta inesperada')+'. Ejecutar seed.');
-    }
-    renderStepper();save();
-  }).catch(function(){
-    status[5]='fail';showResult('r5','error','Backend no responde. Completar pasos 2-3 primero.');
-    renderStepper();save();
-  });
+  var pasted=prompt('Pegar access token admin temporal');
+  if(!pasted||!pasted.trim()){
+    status[5]='warn';showResult('r5','warn','No se cargo token. Iniciar sesion manualmente y repetir este paso.');
+  } else {
+    token=pasted.trim(); save();
+    status[5]='pass';showResult('r5','info','Token admin cargado localmente para verificaciones siguientes.');
+  }
+  renderStepper();save();
 }
 
 function checkStep6(){
@@ -415,10 +406,6 @@ fetch('/api/health',{signal:AbortSignal.timeout(3000)}).then(function(r){return 
   }
 }).then(function(r){if(r)return r.text();}).then(function(html){
   if(html&&html.indexOf('id="root"')>-1&&html.indexOf('Setup Wizard')===-1) status[4]='pass';
-  return fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({email:'admin@dgfa.mendoza.gov.ar',password:'admin123'}),signal:AbortSignal.timeout(3000)});
-}).then(function(r){if(r)return r.json();}).then(function(d){
-  if(d&&d.success&&d.data&&d.data.tokens){status[5]='pass';token=d.data.tokens.accessToken;save();}
   render();
 }).catch(function(){render();});
 </script>

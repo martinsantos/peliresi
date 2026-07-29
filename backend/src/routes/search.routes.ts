@@ -1,10 +1,11 @@
 import { Router } from 'express';
-import { isAuthenticated } from '../middlewares/auth.middleware';
+import { isAuthenticated, requireFullAccess } from '../middlewares/auth.middleware';
 import { globalSearch } from '../controllers/search.controller';
 
 const router = Router();
 
 router.use(isAuthenticated);
+router.use(requireFullAccess);
 
 /**
  * @openapi

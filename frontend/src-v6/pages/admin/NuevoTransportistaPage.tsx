@@ -140,7 +140,6 @@ const NuevoTransportistaPage: React.FC = () => {
     };
 
     if (!isEdit) {
-      payload.password = form.password || form.cuit.replace(/\D/g, '');
       payload.nombre = form.nombre || form.razonSocial;
       // Include vehiculos and choferes on create
       if (vehiculos.length > 0) {
@@ -168,7 +167,7 @@ const NuevoTransportistaPage: React.FC = () => {
         toast.success('Actualizado', `Transportista ${form.razonSocial} actualizado`);
       } else {
         await createMutation.mutateAsync(payload);
-        toast.success('Creado', `Transportista ${form.razonSocial} creado. Password inicial: ${payload.password}`);
+        toast.success('Creado', `Transportista ${form.razonSocial} creado. Se deberá enviar invitación o reset de contraseña.`);
       }
       const backPath = '/admin/actores/transportistas';
       navigate(backPath);
@@ -245,10 +244,7 @@ const NuevoTransportistaPage: React.FC = () => {
             </div>
             <Input label="Coordenadas" value={form.coordenadas} onChange={e => up('coordenadas', e.target.value)} placeholder="-32.89, -68.83" />
             {!isEdit && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input label="Nombre Responsable" value={form.nombre} onChange={e => up('nombre', e.target.value)} placeholder="Juan Perez" />
-                <Input label="Password inicial" type="password" value={form.password} onChange={e => up('password', e.target.value)} placeholder="Default: CUIT" />
-              </div>
+              <Input label="Nombre Responsable" value={form.nombre} onChange={e => up('nombre', e.target.value)} placeholder="Juan Perez" />
             )}
           </div>
         )}

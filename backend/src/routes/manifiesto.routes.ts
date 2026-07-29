@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { isAuthenticated, hasRole } from '../middlewares/auth.middleware';
+import { isAuthenticated, hasRole, requireFullAccess } from '../middlewares/auth.middleware';
+import { requireManifestAccess } from '../utils/authorization';
 import {
     verificarManifiesto,
     getManifiestos,
@@ -65,6 +66,7 @@ router.get('/verificar/:numero', verificarManifiesto);
 
 // Todas las rutas siguientes requieren autenticacion
 router.use(isAuthenticated);
+router.use(requireFullAccess);
 
 /**
  * @openapi
@@ -225,7 +227,7 @@ router.get('/', getManifiestos);
  *       404:
  *         description: Manifiesto no encontrado
  */
-router.get('/:id', getManifiestoById);
+router.get('/:id', requireManifestAccess('read'), getManifiestoById);
 
 /**
  * @openapi
@@ -300,7 +302,7 @@ router.post('/', hasRole('GENERADOR', 'ADMIN'), createManifiesto);
  *       404:
  *         description: Manifiesto no encontrado
  */
-router.put('/:id', hasRole('GENERADOR', 'ADMIN'), updateManifiesto);
+router.put('/:id', hasRole('GENERADOR', 'ADMIN'), requireManifestAccess('generador'), updateManifiesto);
 
 /**
  * @openapi
@@ -322,7 +324,7 @@ router.put('/:id', hasRole('GENERADOR', 'ADMIN'), updateManifiesto);
  *       404:
  *         description: Manifiesto no encontrado
  */
-router.delete('/:id', hasRole('GENERADOR', 'ADMIN'), deleteManifiesto);
+router.delete('/:id', hasRole('GENERADOR', 'ADMIN'), requireManifestAccess('generador'), deleteManifiesto);
 
 /**
  * @openapi
@@ -353,7 +355,7 @@ router.delete('/:id', hasRole('GENERADOR', 'ADMIN'), deleteManifiesto);
  *                   timestamp: { type: string, format: date-time }
  */
 // Tracking del viaje actual
-router.get('/:id/viaje-actual', getViajeActual);
+router.get('/:id/viaje-actual', requireManifestAccess('read'), getViajeActual);
 
 /**
  * @openapi
@@ -376,7 +378,7 @@ router.get('/:id/viaje-actual', getViajeActual);
  *         description: Rol no autorizado
  */
 // Flujo de manifiesto - Generador (ADMIN puede ejecutar todas las acciones)
-router.post('/:id/firmar', hasRole('GENERADOR', 'ADMIN'), firmarManifiesto);
+router.post('/:id/firmar', hasRole('GENERADOR', 'ADMIN'), requireManifestAccess('generador'), firmarManifiesto);
 
 /**
  * @openapi
@@ -399,7 +401,7 @@ router.post('/:id/firmar', hasRole('GENERADOR', 'ADMIN'), firmarManifiesto);
  *         description: Rol no autorizado
  */
 // Flujo de manifiesto - Transportista
-router.post('/:id/confirmar-retiro', hasRole('TRANSPORTISTA', 'ADMIN'), confirmarRetiro);
+router.post('/:id/confirmar-retiro', hasRole('TRANSPORTISTA', 'ADMIN'), requireManifestAccess('transportista'), confirmarRetiro);
 
 /**
  * @openapi
@@ -433,7 +435,7 @@ router.post('/:id/confirmar-retiro', hasRole('TRANSPORTISTA', 'ADMIN'), confirma
  *       403:
  *         description: Rol no autorizado
  */
-router.post('/:id/ubicacion', hasRole('TRANSPORTISTA', 'ADMIN'), actualizarUbicacion);
+router.post('/:id/ubicacion', hasRole('TRANSPORTISTA', 'ADMIN'), requireManifestAccess('transportista'), actualizarUbicacion);
 
 /**
  * @openapi
@@ -455,7 +457,7 @@ router.post('/:id/ubicacion', hasRole('TRANSPORTISTA', 'ADMIN'), actualizarUbica
  *       403:
  *         description: Rol no autorizado
  */
-router.post('/:id/confirmar-entrega', hasRole('TRANSPORTISTA', 'ADMIN'), confirmarEntrega);
+router.post('/:id/confirmar-entrega', hasRole('TRANSPORTISTA', 'ADMIN'), requireManifestAccess('transportista'), confirmarEntrega);
 
 /**
  * @openapi
@@ -489,7 +491,7 @@ router.post('/:id/confirmar-entrega', hasRole('TRANSPORTISTA', 'ADMIN'), confirm
  *       403:
  *         description: Rol no autorizado
  */
-router.post('/:id/incidente', hasRole('TRANSPORTISTA', 'ADMIN'), registrarIncidente);
+router.post('/:id/incidente', hasRole('TRANSPORTISTA', 'ADMIN'), requireManifestAccess('transportista'), registrarIncidente);
 
 /**
  * @openapi
@@ -512,7 +514,7 @@ router.post('/:id/incidente', hasRole('TRANSPORTISTA', 'ADMIN'), registrarIncide
  *         description: Rol no autorizado
  */
 // Flujo de manifiesto - Operador
-router.post('/:id/confirmar-recepcion', hasRole('OPERADOR', 'ADMIN'), confirmarRecepcion);
+router.post('/:id/confirmar-recepcion', hasRole('OPERADOR', 'ADMIN'), requireManifestAccess('operador'), confirmarRecepcion);
 
 /**
  * @openapi
@@ -541,7 +543,7 @@ router.post('/:id/confirmar-recepcion', hasRole('OPERADOR', 'ADMIN'), confirmarR
  *       403:
  *         description: Rol no autorizado
  */
-router.post('/:id/recepcion-insitu', hasRole('OPERADOR', 'ADMIN'), confirmarRecepcionInSitu);
+router.post('/:id/recepcion-insitu', hasRole('OPERADOR', 'ADMIN'), requireManifestAccess('operador'), confirmarRecepcionInSitu);
 
 /**
  * @openapi
@@ -575,7 +577,7 @@ router.post('/:id/recepcion-insitu', hasRole('OPERADOR', 'ADMIN'), confirmarRece
  *       403:
  *         description: Rol no autorizado
  */
-router.post('/:id/pesaje', hasRole('OPERADOR', 'ADMIN'), registrarPesaje);
+router.post('/:id/pesaje', hasRole('OPERADOR', 'ADMIN'), requireManifestAccess('operador'), registrarPesaje);
 
 /**
  * @openapi
@@ -604,7 +606,7 @@ router.post('/:id/pesaje', hasRole('OPERADOR', 'ADMIN'), registrarPesaje);
  *       403:
  *         description: Rol no autorizado
  */
-router.post('/:id/rechazar', hasRole('OPERADOR', 'ADMIN'), rechazarCarga);
+router.post('/:id/rechazar', hasRole('OPERADOR', 'ADMIN'), requireManifestAccess('operador'), rechazarCarga);
 
 /**
  * @openapi
@@ -626,7 +628,7 @@ router.post('/:id/rechazar', hasRole('OPERADOR', 'ADMIN'), rechazarCarga);
  *       403:
  *         description: Rol no autorizado
  */
-router.post('/:id/tratamiento', hasRole('OPERADOR', 'ADMIN'), registrarTratamiento);
+router.post('/:id/tratamiento', hasRole('OPERADOR', 'ADMIN'), requireManifestAccess('operador'), registrarTratamiento);
 
 /**
  * @openapi
@@ -648,7 +650,7 @@ router.post('/:id/tratamiento', hasRole('OPERADOR', 'ADMIN'), registrarTratamien
  *       403:
  *         description: Rol no autorizado
  */
-router.post('/:id/cerrar', hasRole('OPERADOR', 'ADMIN'), cerrarManifiesto);
+router.post('/:id/cerrar', hasRole('OPERADOR', 'ADMIN'), requireManifestAccess('operador'), cerrarManifiesto);
 
 /**
  * @openapi
@@ -671,9 +673,9 @@ router.post('/:id/cerrar', hasRole('OPERADOR', 'ADMIN'), cerrarManifiesto);
  *         description: Solo ADMIN
  */
 // Cancelar manifiesto (Generador o Admin)
-router.post('/:id/cancelar', hasRole('GENERADOR', 'ADMIN'), cancelarManifiesto);
+router.post('/:id/cancelar', hasRole('GENERADOR', 'ADMIN'), requireManifestAccess('generador'), cancelarManifiesto);
 
 // Reversion de estado (solo ADMIN)
-router.post('/:id/revertir-estado', hasRole('ADMIN'), revertirEstado);
+router.post('/:id/revertir-estado', hasRole('ADMIN'), requireManifestAccess('read'), revertirEstado);
 
 export default router;
