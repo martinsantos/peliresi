@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { ADMIN_EMAIL, ADMIN_PASS } from './helpers/auth';
 
 test.describe('API Health', () => {
   test('health endpoint returns ok', async ({ request }) => {
@@ -25,10 +26,11 @@ test.describe('API Health', () => {
   });
 
   test('login returns tokens on valid credentials', async ({ request }) => {
+    expect(ADMIN_PASS, 'E2E_ADMIN_PASSWORD is required').toBeTruthy();
     const response = await request.post('/api/auth/login', {
       data: {
-        email: 'admin@dgfa.mendoza.gov.ar',
-        password: 'admin123',
+        email: ADMIN_EMAIL,
+        password: ADMIN_PASS,
       },
     });
     expect(response.ok()).toBeTruthy();

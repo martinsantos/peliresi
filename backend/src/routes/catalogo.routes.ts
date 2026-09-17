@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { isAuthenticated, requireAdminOrGenerador, requireAdminOrOperador, requireFullAccess } from '../middlewares/auth.middleware';
+import { hasRole, isAuthenticated, requireAdminOrGenerador, requireAdminOrOperador, requireFullAccess } from '../middlewares/auth.middleware';
 import {
     getTiposResiduos,
     createTipoResiduo,
@@ -20,6 +20,7 @@ import {
     getGeneradoresEnrichment,
     getOperadoresEnrichment,
 } from '../controllers/catalogo.controller';
+import { createEntidadExterior, getEntidadesExteriores, updateEntidadExterior } from '../controllers/entidad-exterior.controller';
 
 const router = Router();
 
@@ -56,6 +57,10 @@ router.get('/enrichment/operadores', getOperadoresEnrichment);
 // Rutas protegidas
 router.use(isAuthenticated);
 router.use(requireFullAccess);
+
+router.get('/entidades-exteriores', getEntidadesExteriores);
+router.post('/entidades-exteriores', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'), createEntidadExterior);
+router.put('/entidades-exteriores/:id', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'), updateEntidadExterior);
 
 /**
  * @openapi

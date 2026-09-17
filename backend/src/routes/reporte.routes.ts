@@ -150,7 +150,7 @@ router.get('/transporte', reporteTransporte);
  *         description: Solo ADMIN
  */
 // Log de auditoria (solo admin)
-router.get('/auditoria', hasRole('ADMIN'), getLogAuditoria);
+router.get('/auditoria', hasRole('ADMIN', 'AUDITOR'), getLogAuditoria);
 
 /**
  * @openapi
@@ -175,6 +175,6 @@ router.get('/auditoria', hasRole('ADMIN'), getLogAuditoria);
  *         description: Solo ADMIN
  */
 // Exportacion CSV (solo admin)
-router.get('/exportar/:tipo', hasRole('ADMIN'), exportarCSV);
+router.get('/exportar/:tipo', hasRole('ADMIN', 'AUDITOR'), exportarCSV);
 
 export default router;

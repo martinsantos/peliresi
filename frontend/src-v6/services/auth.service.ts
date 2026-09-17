@@ -8,10 +8,17 @@ import type { Usuario } from '../types/models';
 
 export const authService = {
   async login(credentials: LoginRequest): Promise<LoginResponse> {
-    const { data } = await api.post<{ success: true; data: { user: any; tokens: { accessToken: string; refreshToken: string } } }>('/auth/login', credentials);
-    const { tokens, user } = data.data;
+    const { data } = await api.post<{ success: true; data: { user: any; tokens: { accessToken: string; refreshToken: string }; restricted?: boolean; solicitudId?: string | null } }>('/auth/login', credentials);
+    const { tokens, user, restricted, solicitudId } = data.data;
     setTokens(tokens.accessToken, tokens.refreshToken);
-    return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, user };
+    if (restricted) {
+      localStorage.setItem('sitrep_restricted_session', '1');
+      if (solicitudId) localStorage.setItem('sitrep_solicitud_id', solicitudId);
+    } else {
+      localStorage.removeItem('sitrep_restricted_session');
+      localStorage.removeItem('sitrep_solicitud_id');
+    }
+    return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, user, restricted, solicitudId };
   },
 
   async logout(): Promise<void> {
@@ -19,6 +26,8 @@ export const authService = {
       await api.post('/auth/logout', { refreshToken: getRefreshToken() });
     } finally {
       clearTokens();
+      localStorage.removeItem('sitrep_restricted_session');
+      localStorage.removeItem('sitrep_solicitud_id');
     }
   },
 

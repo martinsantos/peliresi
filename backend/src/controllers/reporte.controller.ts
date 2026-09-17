@@ -6,6 +6,37 @@ import { parsePagination } from '../utils/pagination';
 import { applyRoleFilter, isFullAccess as checkFullAccess } from '../utils/roleFilter';
 import { MANIFIESTO_LIST_INCLUDE } from '../utils/manifiestoIncludes';
 import { parseDateRange } from '../utils/dateRange';
+import { summarizeQuantities, summaryByUnit, type QuantityLike } from '../utils/quantities';
+
+type ResidueAggregateInput = QuantityLike & {
+  tipoResiduo?: { nombre?: string | null; codigo?: string | null } | null;
+};
+
+function aggregateResiduesBy(
+  residues: ResidueAggregateInput[],
+  keyOf: (residue: ResidueAggregateInput) => string,
+): Record<string, { cantidad: number | null; unidad: string; cantidadesPorUnidad: Record<string, number> }> {
+  const grouped = new Map<string, ResidueAggregateInput[]>();
+  for (const residue of residues) {
+    const key = keyOf(residue);
+    grouped.set(key, [...(grouped.get(key) ?? []), residue]);
+  }
+
+  const result: Record<string, { cantidad: number | null; unidad: string; cantidadesPorUnidad: Record<string, number> }> = {};
+  for (const [key, items] of grouped) {
+    const summary = summarizeQuantities(items);
+    const quantities = summaryByUnit(summary);
+    const dimensions = Object.keys(quantities).filter(unit => quantities[unit] !== 0);
+    const compatible = dimensions.length === 1;
+    const unit = compatible ? dimensions[0] : 'mixta';
+    result[key] = {
+      cantidad: compatible ? quantities[unit] : null,
+      unidad: unit,
+      cantidadesPorUnidad: quantities,
+    };
+  }
+  return result;
+}
 
 // Sanitize CSV cell to prevent CSV injection (formula injection via =, +, -, @, \t, \r)
 function sanitizeCsvCell(value: any): string {
@@ -44,7 +75,7 @@ export const reporteManifiestosPorPeriodo = async (req: AuthRequest, res: Respon
         applyRoleFilter(where, req.user);
 
         // Run paginated query + count + aggregations in parallel
-        const [manifiestos, totalCount, porEstadoRaw, totalResiduosAgg] = await Promise.all([
+        const [manifiestos, totalCount, porEstadoRaw, aggregateManifiestos] = await Promise.all([
             prisma.manifiesto.findMany({
                 where,
                 include: MANIFIESTO_LIST_INCLUDE,
@@ -58,9 +89,17 @@ export const reporteManifiestosPorPeriodo = async (req: AuthRequest, res: Respon
                 where,
                 _count: true,
             }),
-            prisma.manifiestoResiduo.aggregate({
-                where: { manifiesto: where },
-                _sum: { cantidad: true },
+            prisma.manifiesto.findMany({
+                where,
+                select: {
+                    residuos: {
+                        select: {
+                            cantidad: true,
+                            unidad: true,
+                            tipoResiduo: { select: { nombre: true } },
+                        },
+                    },
+                },
             }),
         ]);
 
@@ -70,24 +109,20 @@ export const reporteManifiestosPorPeriodo = async (req: AuthRequest, res: Respon
             porEstado[row.estado] = row._count;
         }
 
-        // Agrupar por tipo de residuo (from the paginated set — lightweight)
-        const porTipoResiduo: Record<string, { cantidad: number; unidad: string }> = {};
-        manifiestos.forEach(m => {
-            m.residuos.forEach(r => {
-                const key = r.tipoResiduo.nombre;
-                if (!porTipoResiduo[key]) {
-                    porTipoResiduo[key] = { cantidad: 0, unidad: r.unidad };
-                }
-                porTipoResiduo[key].cantidad += r.cantidad;
-            });
-        });
+        const aggregateResidues = aggregateManifiestos.flatMap(m => m.residuos);
+        const quantitySummary = summarizeQuantities(aggregateResidues);
+        const porTipoResiduo = aggregateResiduesBy(
+            aggregateResidues,
+            residue => residue.tipoResiduo?.nombre ?? 'DESCONOCIDO',
+        );
 
         res.json({
             success: true,
             data: {
                 resumen: {
                     totalManifiestos: totalCount,
-                    totalResiduos: totalResiduosAgg._sum.cantidad || 0,
+                    totalResiduos: quantitySummary.massKg,
+                    totalResiduosPorUnidad: summaryByUnit(quantitySummary),
                     periodo: {
                         desde: fechaInicio || 'Sin límite',
                         hasta: fechaFin || 'Sin límite'
@@ -102,7 +137,7 @@ export const reporteManifiestosPorPeriodo = async (req: AuthRequest, res: Respon
                     createdAt: m.createdAt,
                     generador: m.generador.razonSocial,
                     transportista: m.transportista?.razonSocial ?? null,
-                    operador: m.operador.razonSocial,
+                    operador: m.operador?.razonSocial || null,
                     residuos: m.residuos.map(r => ({
                         tipo: r.tipoResiduo.nombre,
                         cantidad: r.cantidad,
@@ -143,7 +178,7 @@ export const reporteResiduosTratados = async (req: AuthRequest, res: Response, n
         // Filtrar por rol (ADMIN, ADMIN_*, esInspector → sin filtro)
         applyRoleFilter(where, req.user);
 
-        const [manifiestos, totalCount] = await Promise.all([
+        const [manifiestos, totalCount, aggregateManifiestos] = await Promise.all([
             prisma.manifiesto.findMany({
                 where,
                 include: {
@@ -161,31 +196,41 @@ export const reporteResiduosTratados = async (req: AuthRequest, res: Response, n
                 take: limitNum,
             }),
             prisma.manifiesto.count({ where }),
+            prisma.manifiesto.findMany({
+                where,
+                select: {
+                    generador: { select: { razonSocial: true } },
+                    residuos: {
+                        select: {
+                            cantidad: true,
+                            unidad: true,
+                            tipoResiduo: { select: { codigo: true } },
+                        },
+                    },
+                },
+            }),
         ]);
 
         // Agrupar por generador
         const porGenerador: Record<string, number> = {};
-        manifiestos.forEach(m => {
+        aggregateManifiestos.forEach(m => {
             porGenerador[m.generador.razonSocial] = (porGenerador[m.generador.razonSocial] || 0) + 1;
         });
 
-        // Total de residuos tratados
-        const totalPorTipo: Record<string, number> = {};
-        manifiestos.forEach(m => {
-            m.residuos.forEach(r => {
-                const key = r.tipoResiduo?.codigo ?? 'DESCONOCIDO';
-                totalPorTipo[key] = (totalPorTipo[key] || 0) + r.cantidad;
-            });
-        });
+        const aggregateResidues = aggregateManifiestos.flatMap(m => m.residuos);
+        const quantitySummary = summarizeQuantities(aggregateResidues);
+        const totalPorTipo = aggregateResiduesBy(
+            aggregateResidues,
+            residue => residue.tipoResiduo?.codigo ?? 'DESCONOCIDO',
+        );
 
         res.json({
             success: true,
             data: {
                 resumen: {
                     totalManifiestosTratados: totalCount,
-                    totalResiduosTratados: manifiestos.reduce((acc, m) =>
-                        acc + m.residuos.reduce((sum, r) => sum + r.cantidad, 0), 0
-                    ),
+                    totalResiduosTratados: quantitySummary.massKg,
+                    totalResiduosTratadosPorUnidad: summaryByUnit(quantitySummary),
                     periodo: {
                         desde: fechaInicio || 'Sin límite',
                         hasta: fechaFin || 'Sin límite'
@@ -262,7 +307,7 @@ export const reporteTransporte = async (req: AuthRequest, res: Response, next: N
         }
 
         // Get total count + paginated transportistas with _count instead of full manifiestos
-        const [totalTransportistas, transportistas] = await Promise.all([
+        const [totalTransportistas, transportistas, globalManifestStates] = await Promise.all([
             prisma.transportista.count({ where: transportistaWhere }),
             prisma.transportista.findMany({
                 where: transportistaWhere,
@@ -286,11 +331,15 @@ export const reporteTransporte = async (req: AuthRequest, res: Response, next: N
                     },
                 },
             }),
+            prisma.manifiesto.findMany({
+                where: manifiestoWhere,
+                select: { estado: true, transportistaId: true },
+            }),
         ]);
 
         const reporteTransportistas = transportistas.map(t => {
             const totalViajes = t.manifiestos.length;
-            const completados = t.manifiestos.filter(m => m.estado === 'TRATADO' || m.estado === 'RECIBIDO').length;
+            const completados = t.manifiestos.filter(m => ['ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO', 'TRATADO'].includes(m.estado)).length;
             const enTransito = t.manifiestos.filter(m => m.estado === 'EN_TRANSITO').length;
             const pendientes = t.manifiestos.filter(m => m.estado === 'APROBADO').length;
 
@@ -304,17 +353,24 @@ export const reporteTransporte = async (req: AuthRequest, res: Response, next: N
                 pendientes,
                 vehiculosRegistrados: t._count.vehiculos,
                 choferesRegistrados: t._count.choferes,
-                tasaCompletitud: totalViajes > 0 ? ((completados / totalViajes) * 100).toFixed(1) + '%' : '0%'
+                tasaCompletitud: totalViajes > 0 ? Math.round((completados / totalViajes) * 1000) / 10 : 0,
             };
         });
+
+        const globalStates = globalManifestStates.filter(m => Boolean(m.transportistaId));
+        const globalCompleted = globalStates.filter(m => ['ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO', 'TRATADO'].includes(m.estado)).length;
+        const globalInTransit = globalStates.filter(m => m.estado === 'EN_TRANSITO').length;
 
         res.json({
             success: true,
             data: {
                 resumen: {
                     totalTransportistas,
-                    totalViajes: reporteTransportistas.reduce((acc, t) => acc + t.totalViajes, 0),
-                    viajesActivos: reporteTransportistas.reduce((acc, t) => acc + t.enTransito, 0)
+                    totalViajes: globalStates.length,
+                    viajesActivos: globalInTransit,
+                    tasaCompletitud: globalStates.length > 0
+                        ? Math.round((globalCompleted / globalStates.length) * 1000) / 10
+                        : 0,
                 },
                 transportistas: reporteTransportistas.sort((a, b) => b.totalViajes - a.totalViajes),
                 pagination: {
@@ -333,8 +389,8 @@ export const reporteTransporte = async (req: AuthRequest, res: Response, next: N
 // Log de Auditoría (CU-A10)
 export const getLogAuditoria = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        // Solo admin puede ver el log completo
-        if (req.user.rol !== 'ADMIN') {
+        // Root ADMIN and the formal read-only AUDITOR role can inspect the log.
+        if (!['ADMIN', 'AUDITOR'].includes(req.user.rol)) {
             throw new AppError('Acceso no autorizado', 403);
         }
 
@@ -451,7 +507,7 @@ export const exportarCSV = async (req: AuthRequest, res: Response, next: NextFun
 
                 manifiestos.forEach(m => {
                     m.residuos.forEach(r => {
-                        csvContent += `"${sanitizeCsvCell(m.numero)}","${sanitizeCsvCell(m.estado)}","${sanitizeCsvCell(m.generador.razonSocial)}","${sanitizeCsvCell(m.transportista?.razonSocial ?? 'IN SITU')}","${sanitizeCsvCell(m.operador.razonSocial)}","${m.createdAt.toISOString()}","${m.fechaFirma?.toISOString() || ''}","${m.fechaRetiro?.toISOString() || ''}","${m.fechaEntrega?.toISOString() || ''}","${m.fechaRecepcion?.toISOString() || ''}","${m.fechaCierre?.toISOString() || ''}","${sanitizeCsvCell(r.tipoResiduo.nombre)}","${r.cantidad}","${r.unidad}"\n`;
+                        csvContent += `"${sanitizeCsvCell(m.numero)}","${sanitizeCsvCell(m.estado)}","${sanitizeCsvCell(m.generador.razonSocial)}","${sanitizeCsvCell(m.transportista?.razonSocial ?? 'IN SITU')}","${sanitizeCsvCell(m.operador?.razonSocial ?? 'EXTERIOR')}","${m.createdAt.toISOString()}","${m.fechaFirma?.toISOString() || ''}","${m.fechaRetiro?.toISOString() || ''}","${m.fechaEntrega?.toISOString() || ''}","${m.fechaRecepcion?.toISOString() || ''}","${m.fechaCierre?.toISOString() || ''}","${sanitizeCsvCell(r.tipoResiduo.nombre)}","${r.cantidad}","${r.unidad}"\n`;
                     });
                 });
 

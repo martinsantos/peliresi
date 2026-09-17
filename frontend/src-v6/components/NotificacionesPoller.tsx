@@ -49,10 +49,10 @@ export function NotificacionesPoller() {
     nuevas.forEach((n) => {
       seen.current.add(n.id);
       toast.add({
-        type:    n.prioridad === 'ALTA' || n.prioridad === 'CRITICA' ? 'warning' : 'info',
+        type:    n.prioridad === 'ALTA' || n.prioridad === 'URGENTE' || n.prioridad === 'CRITICA' ? 'warning' : 'info',
         title:   n.titulo,
         message: n.mensaje,
-        duration: n.prioridad === 'CRITICA' ? 12_000 : 6_000,
+        duration: n.prioridad === 'URGENTE' || n.prioridad === 'CRITICA' ? 12_000 : 6_000,
       });
     });
   }, [data]);

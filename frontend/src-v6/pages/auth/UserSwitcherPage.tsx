@@ -12,13 +12,14 @@ import { ArrowLeft, Shield, Factory, Truck, FlaskConical, User, ChevronRight, Lo
 import { api } from '../../services/api';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { actorForEffectiveRole } from '../../utils/userContext';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 type UserRole = 'ADMIN' | 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR' | 'AUDITOR' | 'ADMIN_TRANSPORTISTA' | 'ADMIN_GENERADOR' | 'ADMIN_OPERADOR';
 
 interface ApiUsuario {
-  id: number;
+  id: string;
   nombre: string;
   apellido?: string;
   email: string;
@@ -48,7 +49,7 @@ const ROL_ORDER: UserRole[] = ['ADMIN', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR'
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getSector(u: ApiUsuario): string {
-  return u.generador?.razonSocial || u.transportista?.razonSocial || u.operador?.razonSocial || u.empresa || u.email;
+  return actorForEffectiveRole(u)?.razonSocial || u.empresa || u.email;
 }
 
 function getInitials(u: ApiUsuario): string {
@@ -60,14 +61,19 @@ function getInitials(u: ApiUsuario): string {
 
 export const UserSwitcherPage: React.FC = () => {
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { currentUser, canImpersonate } = useAuth();
   const { impersonateUser, impersonationData } = useImpersonation();
-  const [loadingId, setLoadingId] = useState<number | null>(null);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const { data, isLoading, isError } = useQuery<ApiUsuario[]>({
-    queryKey: ['admin-usuarios-switcher'],
+    // Scope the cache to the authenticated principal. Besides preventing data
+    // reuse across sessions, the key transition reliably starts the query once
+    // the async profile hydration identifies the allowlisted administrator.
+    queryKey: ['admin-usuarios-switcher', currentUser?.id ?? 'anonymous'],
     queryFn: () => api.get('/admin/usuarios', { params: { limit: 200 } }).then(r => r.data?.data?.usuarios || []),
     staleTime: 2 * 60_000,
+    enabled: canImpersonate && !!currentUser?.id,
   });
 
   const usuarios: ApiUsuario[] = useMemo(() => {
@@ -86,15 +92,33 @@ export const UserSwitcherPage: React.FC = () => {
   }, [usuarios]);
 
   const handleImpersonate = async (u: ApiUsuario) => {
-    setLoadingId(u.id);
+    setErrorMessage(null);
+    setLoadingId(String(u.id));
     try {
       await impersonateUser(String(u.id));
       // impersonateUser does window.location.href = '/dashboard', so this won't run
     } catch (err) {
       console.error('Impersonation failed:', err);
+      const responseMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setErrorMessage(responseMessage || (err instanceof Error ? err.message : 'No se pudo cambiar de usuario'));
       setLoadingId(null);
     }
   };
+
+  if (!canImpersonate) {
+    return (
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-6">
+        <div className="max-w-md rounded-2xl border border-red-200 bg-white p-6 text-center shadow-sm">
+          <Shield size={36} className="mx-auto mb-3 text-red-500" />
+          <h1 className="text-lg font-bold text-neutral-900">Impersonación no autorizada</h1>
+          <p className="mt-2 text-sm text-neutral-600">Esta cuenta no está habilitada para cambiar de usuario.</p>
+          <button onClick={() => navigate('/dashboard')} className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white">
+            Volver al dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Loading overlay
   if (loadingId !== null) {
@@ -109,7 +133,7 @@ export const UserSwitcherPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 py-8 px-4">
+    <div className="min-h-screen bg-neutral-50 py-8 px-4" data-testid="user-switcher-page">
       <div className="max-w-3xl mx-auto space-y-6">
 
         {/* Header */}
@@ -129,7 +153,7 @@ export const UserSwitcherPage: React.FC = () => {
 
         {/* Banner informativo */}
         <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 rounded-xl p-4 text-white">
-          <p className="font-semibold">Acceso Comodín — Impersonación de Usuarios</p>
+          <p className="font-semibold text-white">Acceso Comodín — Impersonación de Usuarios</p>
           <p className="text-emerald-100 text-sm mt-1">
             Tomarás el control total de la sesión del usuario seleccionado. Aparecerá
             una barra naranja para recordarte que estás en modo impersonación.
@@ -149,6 +173,12 @@ export const UserSwitcherPage: React.FC = () => {
         {isError && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">
             Error al cargar usuarios. Verificá que tenés rol ADMIN.
+          </div>
+        )}
+
+        {errorMessage && (
+          <div role="alert" className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">
+            {errorMessage}
           </div>
         )}
 
@@ -176,6 +206,7 @@ export const UserSwitcherPage: React.FC = () => {
                   <button
                     key={u.id}
                     onClick={() => handleImpersonate(u)}
+                    data-testid={`impersonate-user-${u.id}`}
                     className="w-full flex items-center gap-3 px-4 py-3 hover:bg-neutral-50 transition-colors text-left"
                   >
                     {/* Avatar */}

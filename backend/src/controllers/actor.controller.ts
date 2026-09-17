@@ -1,5 +1,6 @@
 import { Response, NextFunction } from 'express';
 import prisma from '../lib/prisma';
+import { summarizeQuantities, summaryByUnit } from '../utils/quantities';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { AppError } from '../middlewares/errorHandler';
@@ -7,6 +8,9 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 import { auditarActor } from '../utils/auditoria';
 import { parsePagination } from '../utils/pagination';
 import { buildActorWhere } from '../utils/authorization';
+import { normalizeDni, normalizePlate } from '../utils/documentNormalization';
+import { calculateFinalTef, sanitizeTefInputs } from '../utils/tef';
+import { assertActorDocumentationReady } from './certificate.controller';
 
 // ============== GENERADORES (CU-A06) ==============
 
@@ -115,12 +119,16 @@ export const createGenerador = async (req: AuthRequest, res: Response, next: Nex
             razonSocial, cuit, domicilio, telefono, email, password, nombre, numeroInscripcion, categoria, actividad, rubro, corrientesControl,
             expedienteInscripcion, domicilioLegalCalle, domicilioLegalLocalidad, domicilioLegalDepto,
             domicilioRealCalle, domicilioRealLocalidad, domicilioRealDepto,
-            certificacionISO, resolucionInscripcion, factorR, montoMxR, categoriaIndividual, libroOperatoria,
-            latitud, longitud, tefInputs,
+            certificacionISO, resolucionInscripcion, categoriaIndividual, libroOperatoria,
+            latitud, longitud, tefInputs, alcanceTratamiento,
         } = req.body;
 
-        if (!razonSocial || !cuit || !email) {
-            throw new AppError('Razón social, CUIT y email son obligatorios', 400);
+        if (alcanceTratamiento !== undefined && !['NACIONAL', 'INTERNACIONAL'].includes(alcanceTratamiento)) {
+            throw new AppError('Alcance de tratamiento inválido', 400);
+        }
+
+        if (!razonSocial || !cuit || !email || !domicilio || !telefono || !numeroInscripcion || !categoria) {
+            throw new AppError('Complete razon social, CUIT, email, domicilio, telefono, inscripcion y categoria', 400);
         }
 
         // Verificar CUIT único en generadores
@@ -138,35 +146,38 @@ export const createGenerador = async (req: AuthRequest, res: Response, next: Nex
         const rawPassword = password || crypto.randomBytes(18).toString('base64url');
         const passwordHash = await bcrypt.hash(rawPassword, 10);
 
-        // Crear usuario asociado (admin-created → emailVerified + activo)
-        const usuario = await prisma.usuario.create({
-            data: {
+        // Nested creation makes user + actor atomic (including fleet below).
+        // Never reserve an email if the actor insert fails.
+        const usuarioData = {
                 email,
                 password: passwordHash,
                 nombre: nombre || razonSocial,
                 cuit,
-                rol: 'GENERADOR',
+                rol: 'GENERADOR' as const,
                 activo: true,
                 emailVerified: true,
                 forcePasswordChange: true,
-            }
-        });
+        };
 
         // Crear generador
+        const authoritativeTefInputs = sanitizeTefInputs(tefInputs);
+        const authoritativeTef = authoritativeTefInputs ? calculateFinalTef(authoritativeTefInputs, corrientesControl) : null;
         const generador = await prisma.generador.create({
             data: {
-                usuarioId: usuario.id,
+                activo: false,
+                usuario: { create: usuarioData },
                 razonSocial, cuit, domicilio, telefono, email, numeroInscripcion, categoria, actividad, rubro, corrientesControl,
                 expedienteInscripcion, domicilioLegalCalle, domicilioLegalLocalidad, domicilioLegalDepto,
                 domicilioRealCalle, domicilioRealLocalidad, domicilioRealDepto,
                 certificacionISO: certificacionISO ? new Date(certificacionISO) : undefined,
                 resolucionInscripcion,
-                factorR: factorR !== undefined ? Number(factorR) : undefined,
-                montoMxR: montoMxR !== undefined ? Number(montoMxR) : undefined,
+                factorR: authoritativeTef?.R,
+                montoMxR: authoritativeTef?.MxR,
                 categoriaIndividual, libroOperatoria,
+                ...(alcanceTratamiento && { alcanceTratamiento }),
                 ...(latitud !== undefined && { latitud: Number(latitud) }),
                 ...(longitud !== undefined && { longitud: Number(longitud) }),
-                ...(tefInputs !== undefined && { tefInputs }),
+                ...(authoritativeTefInputs && { tefInputs: authoritativeTefInputs as any }),
             },
             include: {
                 usuario: { select: { email: true, nombre: true } }
@@ -194,11 +205,21 @@ export const updateGenerador = async (req: AuthRequest, res: Response, next: Nex
             razonSocial, domicilio, telefono, email, numeroInscripcion, categoria, activo, actividad, rubro, corrientesControl,
             expedienteInscripcion, domicilioLegalCalle, domicilioLegalLocalidad, domicilioLegalDepto,
             domicilioRealCalle, domicilioRealLocalidad, domicilioRealDepto,
-            certificacionISO, resolucionInscripcion, factorR, montoMxR, categoriaIndividual, libroOperatoria,
-            latitud, longitud, tefInputs,
+            certificacionISO, resolucionInscripcion, categoriaIndividual, libroOperatoria,
+            latitud, longitud, tefInputs, alcanceTratamiento,
         } = req.body;
 
+        if (alcanceTratamiento !== undefined && !['NACIONAL', 'INTERNACIONAL'].includes(alcanceTratamiento)) {
+            throw new AppError('Alcance de tratamiento inválido', 400);
+        }
+
         const antes = await prisma.generador.findUnique({ where: { id } });
+        if (!antes) throw new AppError('Generador no encontrado', 404);
+        if (activo === true && !antes.activo) await assertActorDocumentationReady('generador', id);
+        const authoritativeTefInputs = tefInputs === undefined ? sanitizeTefInputs(antes.tefInputs) : sanitizeTefInputs(tefInputs);
+        const authoritativeTef = authoritativeTefInputs
+            ? calculateFinalTef(authoritativeTefInputs, corrientesControl === undefined ? antes.corrientesControl : corrientesControl)
+            : null;
 
         const generador = await prisma.generador.update({
             where: { id },
@@ -208,12 +229,12 @@ export const updateGenerador = async (req: AuthRequest, res: Response, next: Nex
                 domicilioRealCalle, domicilioRealLocalidad, domicilioRealDepto,
                 certificacionISO: certificacionISO ? new Date(certificacionISO) : certificacionISO,
                 resolucionInscripcion,
-                factorR: factorR !== undefined ? Number(factorR) : undefined,
-                montoMxR: montoMxR !== undefined ? Number(montoMxR) : undefined,
+                ...(authoritativeTef ? { factorR: authoritativeTef.R, montoMxR: authoritativeTef.MxR } : {}),
                 categoriaIndividual, libroOperatoria,
+                ...(alcanceTratamiento && { alcanceTratamiento }),
                 ...(latitud !== undefined && { latitud: Number(latitud) }),
                 ...(longitud !== undefined && { longitud: Number(longitud) }),
-                ...(tefInputs !== undefined && { tefInputs }),
+                ...(tefInputs !== undefined && { tefInputs: authoritativeTefInputs as any }),
             }
         });
 
@@ -359,6 +380,9 @@ export const createTransportista = async (req: AuthRequest, res: Response, next:
             latitud, longitud,
         } = req.body;
 
+        if (!razonSocial || !cuit || !email || !domicilio || !telefono || !numeroHabilitacion) {
+            throw new AppError('Complete razon social, CUIT, email, domicilio, telefono y habilitacion', 400);
+        }
         const existente = await prisma.transportista.findFirst({ where: { cuit } });
         if (existente) {
             throw new AppError('Ya existe un transportista con ese CUIT', 400);
@@ -366,22 +390,21 @@ export const createTransportista = async (req: AuthRequest, res: Response, next:
 
         const rawPassword = crypto.randomBytes(18).toString('base64url');
         const passwordHash = await bcrypt.hash(rawPassword, 10);
-        const usuario = await prisma.usuario.create({
-            data: {
+        const usuarioData = {
                 email,
                 password: passwordHash,
                 nombre: razonSocial,
                 apellido: '',
-                rol: 'TRANSPORTISTA',
+                rol: 'TRANSPORTISTA' as const,
                 activo: true,
                 emailVerified: true,
                 forcePasswordChange: true,
-            }
-        });
+        };
 
         const transportista = await prisma.transportista.create({
             data: {
-                usuarioId: usuario.id,
+                activo: false,
+                usuario: { create: usuarioData },
                 razonSocial,
                 cuit,
                 domicilio,
@@ -447,6 +470,8 @@ export const updateTransportista = async (req: AuthRequest, res: Response, next:
         } = req.body;
 
         const antes = await prisma.transportista.findUnique({ where: { id } });
+        if (!antes) throw new AppError('Transportista no encontrado', 404);
+        if (activo === true && !antes.activo) await assertActorDocumentationReady('transportista', id);
 
         const transportista = await prisma.transportista.update({
             where: { id },
@@ -508,16 +533,19 @@ export const addVehiculo = async (req: AuthRequest, res: Response, next: NextFun
     try {
         const { id } = req.params;
         const { patente, marca, modelo, anio, capacidad, numeroHabilitacion, vencimiento } = req.body;
+        const normalizedPlate = normalizePlate(patente);
+        if (!normalizedPlate || !String(marca || '').trim() || !String(modelo || '').trim() || !vencimiento) throw new AppError('Patente, marca, modelo y vencimiento son obligatorios', 400);
+        if (Number.isNaN(new Date(vencimiento).getTime())) throw new AppError('Vencimiento invalido', 400);
 
         const vehiculo = await prisma.vehiculo.create({
             data: {
                 transportistaId: id,
-                patente,
-                marca,
-                modelo,
-                anio,
-                capacidad,
-                numeroHabilitacion,
+                patente: normalizedPlate,
+                marca: String(marca).trim(),
+                modelo: String(modelo).trim(),
+                anio: Number(anio),
+                capacidad: Number(capacidad),
+                numeroHabilitacion: String(numeroHabilitacion || ''),
                 vencimiento: new Date(vencimiento)
             }
         });
@@ -547,12 +575,12 @@ export const updateVehiculo = async (req: AuthRequest, res: Response, next: Next
         const updated = await prisma.vehiculo.update({
             where: { id: vehiculoId },
             data: {
-                ...(patente !== undefined && { patente }),
-                ...(marca !== undefined && { marca }),
-                ...(modelo !== undefined && { modelo }),
-                ...(anio !== undefined && { anio }),
-                ...(capacidad !== undefined && { capacidad }),
-                ...(numeroHabilitacion !== undefined && { numeroHabilitacion }),
+                ...(patente !== undefined && { patente: normalizePlate(patente) }),
+                ...(marca !== undefined && { marca: String(marca).trim() }),
+                ...(modelo !== undefined && { modelo: String(modelo).trim() }),
+                ...(anio !== undefined && { anio: Number(anio) }),
+                ...(capacidad !== undefined && { capacidad: Number(capacidad) }),
+                ...(numeroHabilitacion !== undefined && { numeroHabilitacion: String(numeroHabilitacion) }),
                 ...(vencimiento !== undefined && { vencimiento: new Date(vencimiento) }),
                 ...(activo !== undefined && { activo }),
             }
@@ -594,14 +622,17 @@ export const addChofer = async (req: AuthRequest, res: Response, next: NextFunct
     try {
         const { id } = req.params;
         const { nombre, apellido, dni, licencia, vencimiento, telefono } = req.body;
+        const normalizedDni = normalizeDni(dni);
+        if (!String(nombre || '').trim() || normalizedDni.length < 7 || !String(licencia || '').trim() || !vencimiento) throw new AppError('Nombre, DNI, licencia y vencimiento son obligatorios', 400);
+        if (Number.isNaN(new Date(vencimiento).getTime())) throw new AppError('Vencimiento invalido', 400);
 
         const chofer = await prisma.chofer.create({
             data: {
                 transportistaId: id,
-                nombre,
-                apellido: apellido || '',
-                dni,
-                licencia,
+                nombre: String(nombre).trim(),
+                apellido: String(apellido || '').trim(),
+                dni: normalizedDni,
+                licencia: String(licencia).trim(),
                 vencimiento: new Date(vencimiento),
                 telefono: telefono || ''
             }
@@ -632,10 +663,10 @@ export const updateChofer = async (req: AuthRequest, res: Response, next: NextFu
         const updated = await prisma.chofer.update({
             where: { id: choferId },
             data: {
-                ...(nombre !== undefined && { nombre }),
-                ...(apellido !== undefined && { apellido }),
-                ...(dni !== undefined && { dni }),
-                ...(licencia !== undefined && { licencia }),
+                ...(nombre !== undefined && { nombre: String(nombre).trim() }),
+                ...(apellido !== undefined && { apellido: String(apellido).trim() }),
+                ...(dni !== undefined && { dni: normalizeDni(dni) }),
+                ...(licencia !== undefined && { licencia: String(licencia).trim() }),
                 ...(vencimiento !== undefined && { vencimiento: new Date(vencimiento) }),
                 ...(telefono !== undefined && { telefono }),
                 ...(activo !== undefined && { activo }),
@@ -812,24 +843,36 @@ export const getOperadorById = async (req: AuthRequest, res: Response, next: Nex
         };
 
         // Mapear últimos manifiestos para UI
-        const ultimosManifiestosUI = ultimosManifiestos.map(m => ({
-            id: m.id,
-            numero: m.numero,
-            fecha: m.createdAt,
-            estado: m.estado,
-            peso: m.residuos.reduce((sum, r) => sum + (r.cantidad || 0), 0),
-            generador: m.generador?.razonSocial || '-'
-        }));
+        const ultimosManifiestosUI = ultimosManifiestos.map(m => {
+            const summary = summarizeQuantities(m.residuos);
+            return {
+                id: m.id,
+                numero: m.numero,
+                fecha: m.createdAt,
+                estado: m.estado,
+                peso: summary.massKg,
+                cantidadesPorUnidad: summaryByUnit(summary),
+                generador: m.generador?.razonSocial || '-'
+            };
+        });
 
         // Mapear historial de tratamientos (manifiestos procesados)
-        const tratamientos = historialTratados.map(m => ({
-            id: m.id,
-            fecha: m.fechaCierre || m.fechaRecepcion || m.updatedAt,
-            manifiesto: m.numero,
-            metodo: metodosAutorizados[0] || 'Tratamiento estándar',
-            peso: m.residuos.reduce((sum, r) => sum + (r.cantidadRecibida || r.cantidad || 0), 0),
-            certificado: operador.numeroHabilitacion || '-'
-        }));
+        const tratamientos = historialTratados.map(m => {
+            const quantities = m.residuos.map(r => ({
+                cantidad: r.cantidadRecibida ?? r.cantidad,
+                unidad: r.unidad,
+            }));
+            const summary = summarizeQuantities(quantities);
+            return {
+                id: m.id,
+                fecha: m.fechaCierre || m.fechaRecepcion || m.updatedAt,
+                manifiesto: m.numero,
+                metodo: metodosAutorizados[0] || 'Tratamiento estándar',
+                peso: summary.massKg,
+                cantidadesPorUnidad: summaryByUnit(summary),
+                certificado: operador.numeroHabilitacion || '-'
+            };
+        });
 
         // Mapear tratamientos autorizados para UI
         const tratamientosAutorizados = operador.tratamientos.map(t => ({
@@ -872,8 +915,8 @@ export const createOperador = async (req: AuthRequest, res: Response, next: Next
             vencimientoHabilitacion, resolucionDPA, latitud, longitud, tefInputs,
         } = req.body;
 
-        if (!razonSocial || !cuit || !email) {
-            throw new AppError('Razon social, CUIT y email son obligatorios', 400);
+        if (!razonSocial || !cuit || !email || !domicilio || !telefono || !numeroHabilitacion || !categoria) {
+            throw new AppError('Complete razon social, CUIT, email, domicilio, telefono, habilitacion y categoria', 400);
         }
 
         const existente = await prisma.operador.findFirst({ where: { cuit } });
@@ -888,22 +931,21 @@ export const createOperador = async (req: AuthRequest, res: Response, next: Next
 
         const rawPassword = password || crypto.randomBytes(18).toString('base64url');
         const passwordHash = await bcrypt.hash(rawPassword, 10);
-        const usuario = await prisma.usuario.create({
-            data: {
+        const usuarioData = {
                 email,
                 password: passwordHash,
                 nombre: nombre || razonSocial,
                 cuit,
-                rol: 'OPERADOR',
+                rol: 'OPERADOR' as const,
                 activo: true,
                 emailVerified: true,
                 forcePasswordChange: true,
-            }
-        });
+        };
 
         const operador = await prisma.operador.create({
             data: {
-                usuarioId: usuario.id,
+                activo: false,
+                usuario: { create: usuarioData },
                 razonSocial, cuit, numeroHabilitacion, domicilio, telefono, email, categoria, tipoOperador, tecnologia, corrientesY,
                 expedienteInscripcion, certificadoNumero,
                 domicilioLegalCalle, domicilioLegalLocalidad, domicilioLegalDepto,
@@ -947,6 +989,8 @@ export const updateOperador = async (req: AuthRequest, res: Response, next: Next
         } = req.body;
 
         const antes = await prisma.operador.findUnique({ where: { id } });
+        if (!antes) throw new AppError('Operador no encontrado', 404);
+        if (activo === true && !antes.activo) await assertActorDocumentationReady('operador', id);
 
         const operador = await prisma.operador.update({
             where: { id },

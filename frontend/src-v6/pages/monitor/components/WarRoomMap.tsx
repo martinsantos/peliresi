@@ -4,7 +4,7 @@
  * PLAYBACK mode: HIDES static actors, shows only event action (trips, flashes, camera follows)
  */
 
-import React, { useMemo, useEffect, useRef, memo } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
@@ -16,10 +16,8 @@ import {
   createOperadorIcon,
 } from '../utils/war-room-icons';
 import { EVENT_COLORS } from '../utils/war-room-icons';
+import { BASE_MAP_ATTRIBUTION, BASE_MAP_MAX_ZOOM, BASE_MAP_TILE_URL } from '../../../utils/map-tiles';
 
-const VOYAGER_TILES = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-const ATTRIBUTION = '&copy; OpenStreetMap &copy; CARTO';
 const MENDOZA_CENTER: [number, number] = [-32.9287, -68.8535];
 const MAX_GENERADORES = 50;
 
@@ -268,9 +266,7 @@ interface Props {
   playbackEvents?: Array<{ id: string; tipo: string; lat: number; lng: number; numero?: string }>;
 }
 
-export const WarRoomMap: React.FC<Props> = ({ cinemaMode, actores, enTransito, mode, currentHour, playbackTrips, currentEvent, playbackEvents }) => {
-  const tiles = cinemaMode ? DARK_TILES : VOYAGER_TILES;
-
+export const WarRoomMap: React.FC<Props> = ({ actores, enTransito, mode, currentHour, playbackTrips, currentEvent, playbackEvents }) => {
   // Overlay día/noche — sutil, máx opacity 0.12
   const dayOverlayColor = useMemo(() => {
     if (currentHour === undefined || mode !== 'PLAYBACK') return null;
@@ -300,8 +296,8 @@ export const WarRoomMap: React.FC<Props> = ({ cinemaMode, actores, enTransito, m
 
   return (
     <div className="relative w-full h-full">
-    <MapContainer center={MENDOZA_CENTER} zoom={10} className="w-full h-full" zoomControl={false} attributionControl={false}>
-      <TileLayer url={tiles} attribution={ATTRIBUTION} />
+    <MapContainer center={MENDOZA_CENTER} zoom={10} className="w-full h-full" zoomControl={false} attributionControl>
+      <TileLayer url={BASE_MAP_TILE_URL} attribution={BASE_MAP_ATTRIBUTION} maxZoom={BASE_MAP_MAX_ZOOM} />
 
       {/* PLAYBACK: camera + imperative trucks + event flashes */}
       {mode === 'PLAYBACK' && (

@@ -59,7 +59,7 @@ router.use(hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPE
  *     parameters:
  *       - in: query
  *         name: rol
- *         schema: { type: string, enum: [ADMIN, GENERADOR, TRANSPORTISTA, OPERADOR] }
+ *         schema: { type: string, enum: [ADMIN, AUDITOR, GENERADOR, TRANSPORTISTA, OPERADOR, ADMIN_TRANSPORTISTA, ADMIN_GENERADOR, ADMIN_OPERADOR] }
  *       - in: query
  *         name: search
  *         schema: { type: string }
@@ -119,7 +119,7 @@ router.get('/usuarios/:id', hasRole('ADMIN'), getUsuarioById);
  *               email: { type: string, format: email }
  *               password: { type: string, minLength: 6 }
  *               nombre: { type: string }
- *               rol: { type: string, enum: [ADMIN, GENERADOR, TRANSPORTISTA, OPERADOR] }
+ *               rol: { type: string, enum: [ADMIN, AUDITOR, GENERADOR, TRANSPORTISTA, OPERADOR, ADMIN_TRANSPORTISTA, ADMIN_GENERADOR, ADMIN_OPERADOR] }
  *               sector: { type: string }
  *     responses:
  *       201:

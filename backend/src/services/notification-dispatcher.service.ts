@@ -73,8 +73,9 @@ class NotificationService {
                     title:     data.titulo,
                     body:      data.mensaje,
                     url:       data.manifiestoId ? `/manifiestos/${data.manifiestoId}` : '/',
+                    appUrl:    data.manifiestoId ? `/app/manifiestos/${data.manifiestoId}` : '/app/',
                     tag:       data.manifiestoId ?? data.tipo,
-                    prioridad: (data.prioridad ?? 'NORMAL') as any,
+                    prioridad: data.prioridad ?? 'NORMAL',
                 }).catch(() => {});
             } catch (err) {
                 logger.error({ err }, 'Error sending notification via channels');
@@ -119,8 +120,9 @@ class NotificationService {
                     title:     data.titulo,
                     body:      data.mensaje,
                     url:       data.manifiestoId ? `/manifiestos/${data.manifiestoId}` : '/',
+                    appUrl:    data.manifiestoId ? `/app/manifiestos/${data.manifiestoId}` : '/app/',
                     tag:       data.manifiestoId ?? data.tipo,
-                    prioridad: prioridad as any,
+                    prioridad,
                 }).catch(() => {})
             ));
         });
@@ -143,6 +145,10 @@ class NotificationService {
         const trans = manifiesto.transportista;
         const oper = manifiesto.operador;
         const num = manifiesto.numero;
+
+        // International manifests remain in the dedicated pending workflow
+        // until the cross-border operational transitions are enabled.
+        if (!oper) return;
 
         // Build maps URL from generador coordinates (pickup location)
         const mapsUrl = gen.latitud && gen.longitud

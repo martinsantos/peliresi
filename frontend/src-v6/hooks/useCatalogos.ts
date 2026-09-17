@@ -5,7 +5,8 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { catalogoService } from '../services/catalogo.service';
-import { saveOffline, getOffline } from '../services/indexeddb';
+import { OFFLINE_CATALOG_KEYS, getOfflineCatalogKey, saveOffline, getOffline } from '../services/indexeddb';
+import { useAuth } from '../contexts/AuthContext';
 import type { TipoResiduo } from '../types/models';
 
 const STALE_TIME = 10 * 60 * 1000; // 10 min cache for catalogos
@@ -15,26 +16,34 @@ const STALE_TIME = 10 * 60 * 1000; // 10 min cache for catalogos
  * Falls back to IndexedDB when offline/API fails.
  */
 async function fetchWithOfflineFallback<T>(
-  key: string,
+  key: typeof OFFLINE_CATALOG_KEYS[number],
+  userId: string | number | undefined,
   fetcher: () => Promise<T>,
 ): Promise<T> {
+  const scopedKey = userId == null ? null : getOfflineCatalogKey(userId, key);
   try {
     const data = await fetcher();
-    // Cache to IndexedDB for offline use
-    saveOffline('catalogos', { id: key, data, updatedAt: new Date().toISOString() }).catch(() => {});
+    // Cache only under the authenticated principal's key. Catalog responses
+    // include actor and fleet data and must not survive into another account.
+    if (scopedKey) {
+      saveOffline('catalogos', { id: scopedKey, data, updatedAt: new Date().toISOString() }).catch(() => {});
+    }
     return data;
   } catch (err) {
-    // Try IndexedDB fallback
-    const cached = await getOffline('catalogos', key).catch(() => null);
+    // Without a principal, do not serve a persisted fallback from another
+    // account after an authentication or connectivity failure.
+    if (!scopedKey) throw err;
+    const cached = await getOffline<{ data: T }>('catalogos', scopedKey).catch(() => null);
     if (cached?.data) return cached.data as T;
     throw err; // No cache available — propagate original error
   }
 }
 
 export function useTiposResiduo() {
+  const { currentUser } = useAuth();
   return useQuery({
-    queryKey: ['catalogos', 'tipos-residuo'],
-    queryFn: () => fetchWithOfflineFallback('tipos-residuo', () => catalogoService.tiposResiduo()),
+    queryKey: ['catalogos', currentUser?.id, 'tipos-residuo'],
+    queryFn: () => fetchWithOfflineFallback('tipos-residuo', currentUser?.id, () => catalogoService.tiposResiduo()),
     staleTime: STALE_TIME,
     select: (data) => data.tiposResiduos,
   });
@@ -42,49 +51,64 @@ export function useTiposResiduo() {
 
 /** Returns tiposResiduos + server-side counts (manifiestosPorResiduo, operadoresPorResiduo) */
 export function useTiposResiduoEnriched() {
+  const { currentUser } = useAuth();
   return useQuery({
-    queryKey: ['catalogos', 'tipos-residuo'],
-    queryFn: () => fetchWithOfflineFallback('tipos-residuo', () => catalogoService.tiposResiduo()),
+    queryKey: ['catalogos', currentUser?.id, 'tipos-residuo'],
+    queryFn: () => fetchWithOfflineFallback('tipos-residuo', currentUser?.id, () => catalogoService.tiposResiduo()),
     staleTime: STALE_TIME,
   });
 }
 
 export function useCatalogoGeneradores() {
+  const { currentUser } = useAuth();
   return useQuery({
-    queryKey: ['catalogos', 'generadores'],
-    queryFn: () => fetchWithOfflineFallback('generadores', () => catalogoService.generadores()),
+    queryKey: ['catalogos', currentUser?.id, 'generadores'],
+    queryFn: () => fetchWithOfflineFallback('generadores', currentUser?.id, () => catalogoService.generadores()),
     staleTime: STALE_TIME,
   });
 }
 
 export function useCatalogoTransportistas() {
+  const { currentUser } = useAuth();
   return useQuery({
-    queryKey: ['catalogos', 'transportistas'],
-    queryFn: () => fetchWithOfflineFallback('transportistas', () => catalogoService.transportistas()),
+    queryKey: ['catalogos', currentUser?.id, 'transportistas'],
+    queryFn: () => fetchWithOfflineFallback('transportistas', currentUser?.id, () => catalogoService.transportistas()),
     staleTime: STALE_TIME,
   });
 }
 
 export function useCatalogoOperadores() {
+  const { currentUser } = useAuth();
   return useQuery({
-    queryKey: ['catalogos', 'operadores'],
-    queryFn: () => fetchWithOfflineFallback('operadores', () => catalogoService.operadores()),
+    queryKey: ['catalogos', currentUser?.id, 'operadores'],
+    queryFn: () => fetchWithOfflineFallback('operadores', currentUser?.id, () => catalogoService.operadores()),
+    staleTime: STALE_TIME,
+  });
+}
+
+export function useCatalogoEntidadesExteriores(tipo?: 'TRANSPORTISTA' | 'OPERADOR') {
+  const { currentUser } = useAuth();
+  return useQuery({
+    queryKey: ['catalogos', currentUser?.id, 'entidades-exteriores', tipo],
+    queryFn: () => catalogoService.entidadesExteriores(tipo),
     staleTime: STALE_TIME,
   });
 }
 
 export function useCatalogoVehiculos() {
+  const { currentUser } = useAuth();
   return useQuery({
-    queryKey: ['catalogos', 'vehiculos'],
-    queryFn: () => fetchWithOfflineFallback('vehiculos', () => catalogoService.vehiculos()),
+    queryKey: ['catalogos', currentUser?.id, 'vehiculos'],
+    queryFn: () => fetchWithOfflineFallback('vehiculos', currentUser?.id, () => catalogoService.vehiculos()),
     staleTime: STALE_TIME,
   });
 }
 
 export function useCatalogoChoferes() {
+  const { currentUser } = useAuth();
   return useQuery({
-    queryKey: ['catalogos', 'choferes'],
-    queryFn: () => fetchWithOfflineFallback('choferes', () => catalogoService.choferes()),
+    queryKey: ['catalogos', currentUser?.id, 'choferes'],
+    queryFn: () => fetchWithOfflineFallback('choferes', currentUser?.id, () => catalogoService.choferes()),
     staleTime: STALE_TIME,
   });
 }
@@ -117,8 +141,9 @@ export function useDeleteTipoResiduo() {
 
 // List all tratamientos autorizados (admin)
 export function useAllTratamientos() {
+  const { currentUser } = useAuth();
   return useQuery({
-    queryKey: ['catalogos', 'tratamientos'],
+    queryKey: ['catalogos', currentUser?.id, 'tratamientos'],
     queryFn: () => catalogoService.allTratamientos(),
   });
 }

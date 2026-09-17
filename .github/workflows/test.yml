@@ -27,12 +27,18 @@ jobs:
         run: cd ${{ matrix.project }} && npm ci
 
       - name: Run unit tests
-        run: |
-          if [ "${{ matrix.project }}" = "backend" ]; then
-            cd backend && npx vitest run --config src/__tests__/vitest.config.services.ts
-          else
-            cd frontend && npx vitest run --config vitest.config.src.ts
-          fi
+        run: cd ${{ matrix.project }} && npm test
+
+      - name: Lint critical frontend paths
+        if: matrix.project == 'frontend'
+        run: cd frontend && npm run lint:critical
+
+      - name: Verify critical frontend coverage
+        if: matrix.project == 'frontend'
+        run: cd frontend && npm run test:coverage:critical
+
+      - name: Verify production build
+        run: cd ${{ matrix.project }} && npm run build
 
       - name: Upload test report
         if: always()
@@ -41,7 +47,105 @@ jobs:
           name: test-report-${{ matrix.project }}
           path: test-reports/
 
+  safe-ui:
+    # Deterministic browser gate. Every API request is intercepted locally;
+    # this job cannot authenticate against QA/production or mutate a database.
+    runs-on: ubuntu-latest
+    needs: [unit]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: cd frontend && npm ci
+
+      - name: Build web and PWA
+        run: cd frontend && npm run build && npx vite build --config vite.config.app.ts
+
+      - name: Install browser engines
+        run: cd frontend && npx playwright install --with-deps chromium firefox webkit
+
+      - name: Run credential-free UI quality gates
+        working-directory: frontend
+        run: |
+          set -euo pipefail
+          npx vite preview --host 127.0.0.1 --port 4173 >/tmp/sitrep-web-preview.log 2>&1 &
+          web_pid=$!
+          npx vite preview --config vite.config.app.ts --host 127.0.0.1 --port 4174 >/tmp/sitrep-pwa-preview.log 2>&1 &
+          pwa_pid=$!
+          trap 'kill "$web_pid" "$pwa_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            curl --fail --silent http://127.0.0.1:4173/ >/dev/null && \
+            curl --fail --silent http://127.0.0.1:4174/app/ >/dev/null && break
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:4173/ >/dev/null
+          curl --fail --silent http://127.0.0.1:4174/app/ >/dev/null
+          PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 npm run test:e2e:safe -- --project=chromium --project=mobile
+          PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 npm run test:e2e:safe:cross-browser -- --project=firefox --project=webkit
+          E2E_APP_PREFIX=/app PLAYWRIGHT_BASE_URL=http://127.0.0.1:4174 npm run test:e2e:safe -- --project=mobile
+          E2E_APP_PREFIX=/app PLAYWRIGHT_BASE_URL=http://127.0.0.1:4174 npm run test:e2e:safe:cross-browser -- --project=webkit
+
+      - name: Upload safe UI report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: safe-ui-playwright-report
+          path: frontend/playwright-report/
+
+  migration-transaction:
+    # Destructive fixture is confined to this disposable PostgreSQL service.
+    # The test itself refuses non-local hosts or database names without "test".
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: sitrep_migration_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d sitrep_migration_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/sitrep_migration_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: cd backend && npm ci
+
+      - name: Apply schema to disposable database
+        # The repository currently lacks the historical baseline migration;
+        # db push is intentional for this throwaway rollback harness.
+        run: cd backend && npx prisma db push --skip-generate
+
+      - name: Prove roster migration rollback
+        run: cd backend && npm run test:migration:rollback:e2e
+
   e2e:
+    # The suite creates workflow data. It only runs against a private, isolated
+    # QA URL configured by the repository; it must never target the public mirror.
+    # Explicit opt-in protects training and shared accounts from accidental
+    # logins or workflow mutations.
+    if: vars.SITREP_QA_E2E_URL != '' && vars.SITREP_QA_E2E_CONFIRM == 'YES'
     runs-on: ubuntu-latest
     needs: [unit]
     steps:
@@ -63,7 +167,7 @@ jobs:
       - name: Run E2E tests
         run: cd frontend && npx playwright test
         env:
-          BASE_URL: https://sitrep.ultimamilla.com.ar
+          PLAYWRIGHT_BASE_URL: ${{ vars.SITREP_QA_E2E_URL }}
 
       - name: Upload Playwright report
         if: always()

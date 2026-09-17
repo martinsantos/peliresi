@@ -29,12 +29,11 @@ import { Card } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Input } from '../../components/ui/Input';
-import { Modal, ConfirmModal } from '../../components/ui/Modal';
+import { ConfirmModal } from '../../components/ui/Modal';
 import { toast } from '../../components/ui/Toast';
 import { Select } from '../../components/ui/Select';
 import {
   useOperadores,
-  useCreateOperador,
   useDeleteOperador,
 } from '../../hooks/useActores';
 
@@ -44,18 +43,6 @@ const estadoConfig: Record<string, { label: string; color: any; icon: React.Reac
   INACTIVO: { label: 'Fuera de servicio', color: 'error', icon: <AlertCircle size={14} /> },
 };
 
-const INITIAL_FORM = {
-  razonSocial: '',
-  cuit: '',
-  domicilio: '',
-  telefono: '',
-  email: '',
-  password: '',
-  nombre: '',
-  numeroHabilitacion: '',
-  categoria: '',
-};
-
 const OperadoresPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
@@ -63,14 +50,11 @@ const OperadoresPage: React.FC = () => {
   const [vista, setVista] = useState<'grid' | 'lista'>('lista');
   const [sortBy, setSortBy] = useState<string | undefined>(undefined);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [modalCrear, setModalCrear] = useState(false);
   const [modalEliminar, setModalEliminar] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; razonSocial: string } | null>(null);
-  const [form, setForm] = useState(INITIAL_FORM);
 
   // API hooks
   const { data: apiData, isLoading } = useOperadores({ search: searchTerm || undefined, sortBy, sortOrder });
-  const createMutation = useCreateOperador();
   const deleteMutation = useDeleteOperador();
 
   const operadoresData = Array.isArray(apiData?.items) ? apiData.items : [];
@@ -110,28 +94,6 @@ const OperadoresPage: React.FC = () => {
 
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
-  const updateField = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }));
-
-  const handleCrear = async () => {
-    try {
-      await createMutation.mutateAsync({
-        email: form.email,
-        password: form.password || 'TempPass123!',
-        nombre: form.nombre || form.razonSocial,
-        razonSocial: form.razonSocial,
-        cuit: form.cuit,
-        domicilio: form.domicilio,
-        telefono: form.telefono,
-        numeroHabilitacion: form.numeroHabilitacion,
-        categoria: form.categoria,
-      });
-      setModalCrear(false);
-      setForm(INITIAL_FORM);
-    } catch (err: any) {
-      toast.error('Error', err?.response?.data?.message || 'No se pudo crear el operador');
-    }
-  };
-
   const openEditar = (op: any) => {
     navigate(`/admin/actores/operadores/${op.id}/editar`);
   };
@@ -146,28 +108,6 @@ const OperadoresPage: React.FC = () => {
       toast.error('Error', err?.response?.data?.message || 'No se pudo eliminar el operador');
     }
   };
-
-  const renderForm = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-        <Input label="Razon Social" value={form.razonSocial} onChange={(e) => updateField('razonSocial', e.target.value)} placeholder="Empresa S.A." />
-        <Input label="CUIT" value={form.cuit} onChange={(e) => updateField('cuit', e.target.value)} placeholder="30-12345678-9" />
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-        <Input label="Email" type="email" value={form.email} onChange={(e) => updateField('email', e.target.value)} placeholder="contacto@empresa.com" />
-        <Input label="Telefono" value={form.telefono} onChange={(e) => updateField('telefono', e.target.value)} placeholder="+54 261 ..." />
-      </div>
-      <Input label="Domicilio" value={form.domicilio} onChange={(e) => updateField('domicilio', e.target.value)} placeholder="Ruta 40 Km 1234, Guaymallen" />
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-        <Input label="N. Habilitacion" value={form.numeroHabilitacion} onChange={(e) => updateField('numeroHabilitacion', e.target.value)} placeholder="HAB-OP-2024-XXXX" />
-        <Input label="Categoria" value={form.categoria} onChange={(e) => updateField('categoria', e.target.value)} placeholder="Incineracion" />
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-        <Input label="Nombre Responsable" value={form.nombre} onChange={(e) => updateField('nombre', e.target.value)} placeholder="Juan Perez" />
-        <Input label="Password inicial" type="password" value={form.password} onChange={(e) => updateField('password', e.target.value)} placeholder="Min. 8 caracteres" />
-      </div>
-    </div>
-  );
 
   const activosCount = operadoresData.filter((op: any) => op.activo !== false).length;
 
@@ -194,7 +134,7 @@ const OperadoresPage: React.FC = () => {
             </p>
           </div>
         </div>
-        <Button leftIcon={<Plus size={18} />} onClick={() => { setForm(INITIAL_FORM); setModalCrear(true); }}>
+        <Button leftIcon={<Plus size={18} />} onClick={() => navigate('/admin/actores/operadores/nuevo')}>
           Nuevo Operador
         </Button>
       </div>
@@ -500,24 +440,6 @@ const OperadoresPage: React.FC = () => {
           </div>
         </Card>
       )}
-
-      {/* Modal crear */}
-      <Modal
-        isOpen={modalCrear}
-        onClose={() => { setModalCrear(false); setForm(INITIAL_FORM); }}
-        title="Nuevo Operador"
-        size="lg"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => { setModalCrear(false); setForm(INITIAL_FORM); }}>Cancelar</Button>
-            <Button onClick={handleCrear} disabled={createMutation.isPending}>
-              {createMutation.isPending ? 'Guardando...' : 'Crear Operador'}
-            </Button>
-          </>
-        }
-      >
-        {renderForm()}
-      </Modal>
 
       {/* Modal eliminar */}
       <ConfirmModal

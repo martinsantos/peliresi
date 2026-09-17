@@ -4,7 +4,10 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import prisma from '../lib/prisma';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { AppError } from '../middlewares/errorHandler';
 import { domainEvents } from '../services/domainEvent.service';
+import { buildManifestAccessWhere, canAccessManifestRecord } from '../utils/authorization';
+import { distanciaHaversine } from '../utils/geo';
 
 // Re-export notificationService so existing imports continue to work
 export { notificationService } from '../services/notification-dispatcher.service';
@@ -205,7 +208,10 @@ export const getAlertasGeneradas = async (req: Request, res: Response, next: Nex
         const { estado, limit = 50, offset = 0 } = req.query;
         const alertasLimit = Math.min(500, Math.max(1, parseInt(limit as string)));
 
+        const user = (req as AuthRequest).user;
         const where: any = {};
+        const manifestWhere = buildManifestAccessWhere(user);
+        if (Object.keys(manifestWhere).length > 0) where.manifiesto = manifestWhere;
         if (estado) where.estado = estado;
 
         const [alertas, total] = await Promise.all([
@@ -243,6 +249,15 @@ export const resolverAlerta = async (req: Request, res: Response, next: NextFunc
         const { estado, notas } = req.body;
         const usuarioId = (req as AuthRequest).user!.id;
 
+        const existing = await prisma.alertaGenerada.findUnique({
+            where: { id },
+            select: { manifiesto: { select: { generadorId: true, transportistaId: true, operadorId: true } } },
+        });
+        if (!existing) throw new AppError('Alerta no encontrada', 404);
+        if (!existing.manifiesto || !canAccessManifestRecord((req as AuthRequest).user, existing.manifiesto, 'read')) {
+            throw new AppError('No tiene permisos sobre esta alerta', 403);
+        }
+
         const alerta = await prisma.alertaGenerada.update({
             where: { id },
             data: {
@@ -269,33 +284,20 @@ interface PuntoGPS {
 }
 
 class AnomaliaDetector {
-    // Calcular distancia entre dos puntos en km (Haversine)
-    private calcularDistancia(lat1: number, lon1: number, lat2: number, lon2: number): number {
-        const R = 6371; // Radio de la Tierra en km
-        const dLat = this.toRad(lat2 - lat1);
-        const dLon = this.toRad(lon2 - lon1);
-        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(this.toRad(lat1)) * Math.cos(this.toRad(lat2)) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
-    }
-
-    private toRad(deg: number): number {
-        return deg * (Math.PI / 180);
-    }
-
     // Detectar anomalias en la ruta
     async detectarAnomalias(manifiestoId: string, userId?: string): Promise<any[]> {
         const anomaliasDetectadas: any[] = [];
 
-        // Obtener tracking del manifiesto
+        // Analizar solo el ultimo segmento. El detector se invoca de forma
+        // incremental y no debe reinsertar anomalias de todo el historial.
         const tracking = await prisma.trackingGPS.findMany({
             where: { manifiestoId },
-            orderBy: { timestamp: 'asc' }
+            orderBy: { timestamp: 'desc' },
+            take: 2,
         });
 
         if (tracking.length < 2) return anomaliasDetectadas;
+        tracking.reverse();
 
         // Obtener info del manifiesto
         const manifiesto = await prisma.manifiesto.findUnique({
@@ -314,22 +316,23 @@ class AnomaliaDetector {
             const puntoActual = tracking[i];
 
             // Calcular distancia y tiempo
-            const distancia = this.calcularDistancia(
+            const distancia = distanciaHaversine(
                 puntoAnterior.latitud, puntoAnterior.longitud,
                 puntoActual.latitud, puntoActual.longitud
             );
             const tiempoHoras = (puntoActual.timestamp.getTime() - puntoAnterior.timestamp.getTime()) / (1000 * 60 * 60);
             const velocidadCalculada = tiempoHoras > 0 ? distancia / tiempoHoras : 0;
 
+            const limiteVelocidadKmh = 120;
             // 1. Detectar velocidad anormal (> 120 km/h)
-            if (velocidadCalculada > 120) {
+            if (velocidadCalculada > limiteVelocidadKmh) {
                 anomaliasDetectadas.push({
                     tipo: 'VELOCIDAD_ANORMAL' as TipoAnomalia,
                     descripcion: `Velocidad anormalmente alta detectada: ${velocidadCalculada.toFixed(1)} km/h`,
                     latitud: puntoActual.latitud,
                     longitud: puntoActual.longitud,
                     valorDetectado: velocidadCalculada,
-                    valorEsperado: 100,
+                    valorEsperado: limiteVelocidadKmh,
                     severidad: 'ALTA' as SeveridadAnomalia
                 });
             }
@@ -531,22 +534,21 @@ export const cargaMasivaGeneradores = async (req: Request, res: Response, next: 
                 } else {
                     // Crear usuario y generador
                     const password = await createPrivateTempPasswordHash();
-                    const usuario = await prisma.usuario.create({
-                        data: {
+                    const usuarioData = {
                             email: registro.email,
                             password,
-                            rol: 'GENERADOR',
+                            rol: 'GENERADOR' as const,
                             nombre: registro.razonsocial || registro.razon_social,
                             cuit: registro.cuit,
                             activo: true,
                             emailVerified: true,
                             forcePasswordChange: true,
-                        }
-                    });
+                    };
 
                     await prisma.generador.create({
                         data: {
-                            usuarioId: usuario.id,
+                            usuario: { create: usuarioData },
+                            activo: false,
                             razonSocial: registro.razonsocial || registro.razon_social,
                             cuit: registro.cuit,
                             domicilio: registro.domicilio,
@@ -614,22 +616,21 @@ export const cargaMasivaTransportistas = async (req: Request, res: Response, nex
                     });
                 } else {
                     const password = await createPrivateTempPasswordHash();
-                    const usuario = await prisma.usuario.create({
-                        data: {
+                    const usuarioData = {
                             email: registro.email,
                             password,
-                            rol: 'TRANSPORTISTA',
+                            rol: 'TRANSPORTISTA' as const,
                             nombre: registro.razonsocial || registro.razon_social,
                             cuit: registro.cuit,
                             activo: true,
                             emailVerified: true,
                             forcePasswordChange: true,
-                        }
-                    });
+                    };
 
                     await prisma.transportista.create({
                         data: {
-                            usuarioId: usuario.id,
+                            usuario: { create: usuarioData },
+                            activo: false,
                             razonSocial: registro.razonsocial || registro.razon_social,
                             cuit: registro.cuit,
                             domicilio: registro.domicilio,
@@ -697,22 +698,21 @@ export const cargaMasivaOperadores = async (req: Request, res: Response, next: N
                     });
                 } else {
                     const password = await createPrivateTempPasswordHash();
-                    const usuario = await prisma.usuario.create({
-                        data: {
+                    const usuarioData = {
                             email: registro.email,
                             password,
-                            rol: 'OPERADOR',
+                            rol: 'OPERADOR' as const,
                             nombre: registro.razonsocial || registro.razon_social,
                             cuit: registro.cuit,
                             activo: true,
                             emailVerified: true,
                             forcePasswordChange: true,
-                        }
-                    });
+                    };
 
                     await prisma.operador.create({
                         data: {
-                            usuarioId: usuario.id,
+                            usuario: { create: usuarioData },
+                            activo: false,
                             razonSocial: registro.razonsocial || registro.razon_social,
                             cuit: registro.cuit,
                             domicilio: registro.domicilio,
@@ -745,9 +745,9 @@ export const descargarPlantilla = async (req: Request, res: Response, next: Next
         const { tipo } = req.params;
 
         const plantillas: Record<string, string> = {
-            generadores: 'cuit,razon_social,domicilio,telefono,email,numero_inscripcion,categoria\n30-12345678-9,Empresa Demo SA,Av. Ejemplo 1234,261-4567890,contacto@empresa.com,MDZ-001-2024,Industrial',
-            transportistas: 'cuit,razon_social,domicilio,telefono,email,numero_habilitacion\n30-98765432-1,Transporte Demo SRL,Ruta 40 Km 5,261-9876543,info@transporte.com,HAB-T-001',
-            operadores: 'cuit,razon_social,domicilio,telefono,email,numero_habilitacion,categoria\n30-55555555-5,Operador Demo SA,Parque Industrial 100,261-5555555,operador@demo.com,HAB-O-001,Disposicion Final'
+            generadores: 'cuit,razon_social,domicilio,telefono,email,numero_inscripcion,categoria\n30-12345678-9,Industria Ejemplo SA,Av. Ejemplo 1234,261-4567890,contacto@empresa-ejemplo.invalid,MDZ-001-2024,Industrial',
+            transportistas: 'cuit,razon_social,domicilio,telefono,email,numero_habilitacion\n30-98765432-1,Transporte Ejemplo SRL,Ruta 40 Km 5,261-9876543,info@transporte-ejemplo.invalid,HAB-T-001',
+            operadores: 'cuit,razon_social,domicilio,telefono,email,numero_habilitacion,categoria\n30-55555555-5,Operador Ejemplo SA,Parque Industrial 100,261-5555555,contacto@operador-ejemplo.invalid,HAB-O-001,Disposicion Final'
         };
 
         if (!plantillas[tipo]) {

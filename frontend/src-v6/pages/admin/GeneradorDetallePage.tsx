@@ -1,16 +1,16 @@
 /**
  * SITREP v6 - Generador Detail Page (5 tabs)
  * ============================================
- * Info General | Residuos | Situacion Fiscal | DDJJ y Documentos | Historial
+ * Info General | Residuos | Situacion Fiscal | DDJJ | Historial
  */
 
 import React, { useState } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Factory, MapPin, Phone, Mail, Calendar, Download,
   CheckCircle, AlertTriangle, Biohazard, Shield, FileText,
   DollarSign, ClipboardList, Plus, Pencil, Trash2, X,
-  Building2, Award, BookOpen, Route,
+    Building2, Award, BookOpen, Route, ClipboardCheck,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -19,15 +19,13 @@ import { Tabs, TabList, Tab, TabPanel } from '../../components/ui/Tabs';
 import { Input } from '../../components/ui/Input';
 import { toast } from '../../components/ui/Toast';
 import { useGenerador } from '../../hooks/useActores';
-import { usePagosTEF, useCreatePago, useUpdatePago, useDeletePago, useDDJJ, useCreateDDJJ, useUpdateDDJJ, useDeleteDDJJ, useDocumentos, useUploadDocumento, useRevisarDocumento, useDeleteDocumento } from '../../hooks/useGeneradorFiscal';
+import { usePagosTEF, useCreatePago, useUpdatePago, useDeletePago, useDDJJ, useCreateDDJJ, useUpdateDDJJ, useDeleteDDJJ } from '../../hooks/useGeneradorFiscal';
 import { downloadCsv } from '../../utils/exportCsv';
 import { useGeneradoresEnrichment } from '../../hooks/useEnrichment';
 import { CORRIENTES_Y, parseCorrientes } from '../../data/corrientes-y';
-import DocumentUpload from '../../components/DocumentUpload';
-import CalculadoraTEF from '../../components/CalculadoraTEF';
 import type { PagoTEF, DeclaracionJurada } from '../../services/generador-fiscal.service';
-import api from '../../services/api';
 import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
+import { ActorInspectionsPanel } from '../inspecciones/ActorInspectionsPanel';
 
 // ===== Inline CRUD Modal =====
 function CrudModal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
@@ -134,7 +132,6 @@ function DDJJForm({ initial, onSave, onCancel, isPending }: {
 const GeneradorDetallePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
   // Removed isMobile — React Router handles basename
 
   const [pagoModal, setPagoModal] = useState<{ open: boolean; editing?: PagoTEF }>({ open: false });
@@ -146,7 +143,6 @@ const GeneradorDetallePage: React.FC = () => {
   const { data: apiGenerador, isLoading } = useGenerador(id || '');
   const { data: pagos = [] } = usePagosTEF(id || '');
   const { data: ddjjList = [] } = useDDJJ(id || '');
-  const { data: documentos = [] } = useDocumentos(id || '');
 
   const createPago = useCreatePago();
   const updatePago = useUpdatePago();
@@ -154,9 +150,6 @@ const GeneradorDetallePage: React.FC = () => {
   const createDDJJ = useCreateDDJJ();
   const updateDDJJ = useUpdateDDJJ();
   const deleteDDJJ = useDeleteDDJJ();
-  const uploadDoc = useUploadDocumento();
-  const revisarDoc = useRevisarDocumento();
-  const deleteDoc = useDeleteDocumento();
 
   const generador = apiGenerador ? {
     ...apiGenerador,
@@ -195,7 +188,6 @@ const GeneradorDetallePage: React.FC = () => {
   const currentYear = new Date().getFullYear();
   const lastPago = pagos.find(p => p.anio === currentYear - 1) || pagos.find(p => p.anio === currentYear);
   const tefAlDia = lastPago?.fechaPago != null;
-  const ddjjRecent = ddjjList.filter(d => d.anio >= currentYear - 1 && d.presentada);
   const habilitado = lastPago?.habilitado ?? false;
 
   // Pago handlers
@@ -246,37 +238,12 @@ const GeneradorDetallePage: React.FC = () => {
     } catch { toast.error('Error al eliminar'); }
   };
 
-  // Doc handlers
-  const handleUploadDoc = async (file: File, tipo: string, anio?: number) => {
-    try {
-      await uploadDoc.mutateAsync({ generadorId: id!, file, tipo, anio });
-      toast.success('Documento subido');
-    } catch (err: any) {
-      toast.error('Error', err?.response?.data?.message || 'No se pudo subir');
-    }
-  };
-
-  const handleDownloadDoc = (doc: any) => {
-    window.open(`${api.defaults.baseURL}/actores/documentos/${doc.id}/download`, '_blank');
-  };
-
-  const handleRevisarDoc = async (docId: string, estado: 'APROBADO' | 'RECHAZADO') => {
-    try {
-      await revisarDoc.mutateAsync({ docId, estado, generadorId: id! });
-      toast.success(estado === 'APROBADO' ? 'Documento aprobado' : 'Documento rechazado');
-    } catch { toast.error('Error al revisar'); }
-  };
-
-  const handleDeleteDoc = async (docId: string) => {
-    if (!confirm('Eliminar documento?')) return;
-    try {
-      await deleteDoc.mutateAsync({ docId, generadorId: id! });
-      toast.success('Documento eliminado');
-    } catch { toast.error('Error al eliminar'); }
-  };
-
   const fmtMoney = (v: number | null) => v != null ? `$ ${v.toLocaleString('es-AR', { minimumFractionDigits: 0 })}` : '-';
-  const fmtDate = (v: string | null) => v ? new Date(v).toLocaleDateString('es-AR') : '-';
+  // These are administrative calendar dates, not instants in local time.
+  // Formatting in UTC prevents midnight values from appearing as the previous day in Mendoza.
+  const fmtDate = (v: string | null) => v
+    ? new Date(v).toLocaleDateString('es-AR', { timeZone: 'UTC' })
+    : '-';
 
   return (
     <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
@@ -344,7 +311,8 @@ const GeneradorDetallePage: React.FC = () => {
           <Tab id="info" icon={<Factory size={16} />}>Info General</Tab>
           <Tab id="residuos" icon={<Biohazard size={16} />}>Residuos</Tab>
           <Tab id="fiscal" icon={<DollarSign size={16} />}>Situacion Fiscal</Tab>
-          <Tab id="ddjj" icon={<ClipboardList size={16} />}>DDJJ y Documentos</Tab>
+          <Tab id="ddjj" icon={<ClipboardList size={16} />}>DDJJ</Tab>
+          <Tab id="inspecciones" icon={<ClipboardCheck size={16} />}>Inspecciones</Tab>
           <Tab id="historial" icon={<Route size={16} />}>Trazabilidad</Tab>
         </TabList>
 
@@ -450,20 +418,20 @@ const GeneradorDetallePage: React.FC = () => {
           )}
         </TabPanel>
 
-        {/* ===== Tab 3: Situacion Fiscal (Pagos TEF) ===== */}
+        {/* ===== Tab 3: Situación Fiscal (Pagos TEF) ===== */}
         <TabPanel id="fiscal">
           <div className="space-y-6">
             {/* KPI mini-cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Card className="p-4 text-center">
-                <p className="text-xs text-neutral-500">Ultimo TEF</p>
+                <p className="text-xs text-neutral-500">Último TEF</p>
                 <p className="text-lg font-bold text-neutral-900 mt-1">
                   {pagos.length > 0 ? fmtMoney(pagos[0].montoTEF) : '-'}
                 </p>
                 {pagos.length > 0 && <p className="text-xs text-neutral-400">{pagos[0].anio}</p>}
               </Card>
               <Card className="p-4 text-center">
-                <p className="text-xs text-neutral-500">Anos al dia</p>
+                <p className="text-xs text-neutral-500">Años al día</p>
                 <p className="text-2xl font-bold text-success-600 mt-1">{pagos.filter(p => p.fechaPago).length}</p>
               </Card>
               <Card className="p-4 text-center">
@@ -474,7 +442,7 @@ const GeneradorDetallePage: React.FC = () => {
 
             {/* CRUD Table */}
             <Card>
-              <CardHeader title="Registro de Pagos TEF" icon={<DollarSign size={20} />}>
+              <CardHeader title="Registro de pagos TEF" icon={<DollarSign size={20} />}>
                 <Button size="sm" leftIcon={<Plus size={14} />} onClick={() => setPagoModal({ open: true })}>
                   Registrar Pago
                 </Button>
@@ -485,9 +453,9 @@ const GeneradorDetallePage: React.FC = () => {
                     <table className="w-full text-sm">
                       <thead className="bg-neutral-50">
                         <tr>
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600">Ano</th>
+                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600">Año</th>
                           <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600">TEF</th>
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 hidden md:table-cell">Resolucion</th>
+                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 hidden md:table-cell">Resolución</th>
                           <th className="px-3 py-2.5 text-center text-xs font-semibold text-neutral-600">Notif.</th>
                           <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 hidden md:table-cell">F. Pago</th>
                           <th className="px-3 py-2.5 text-center text-xs font-semibold text-neutral-600">Hab.</th>
@@ -507,7 +475,7 @@ const GeneradorDetallePage: React.FC = () => {
                             <td className="px-3 py-2.5 text-center">
                               {p.habilitado != null && (
                                 <Badge variant="soft" color={p.habilitado ? 'success' : 'error'} className="text-[10px] px-1.5">
-                                  {p.habilitado ? 'SI' : 'NO'}
+                                  {p.habilitado ? 'SÍ' : 'NO'}
                                 </Badge>
                               )}
                             </td>
@@ -526,28 +494,96 @@ const GeneradorDetallePage: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* Calculadora TEF */}
-            <CalculadoraTEF
-              corrientesY={categorias}
-              tieneISO={!!(g.certificacionISO)}
-            />
-
-            {/* Habilitaciones timeline */}
+            {/* Historial anual de habilitaciones asociado al registro TEF */}
             {pagos.length > 0 && (
-              <Card>
-                <CardHeader title="Timeline Habilitaciones" icon={<Shield size={20} />} />
+              <Card data-testid="tef-authorization-history">
+                <CardHeader title="Habilitaciones TEF por año" icon={<Shield size={20} />} />
                 <CardContent>
-                  <div className="flex gap-2 flex-wrap">
-                    {pagos.slice().reverse().map(p => (
-                      <div key={p.id} className="flex flex-col items-center gap-1">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${
-                          p.habilitado ? 'bg-success-500' : p.fechaPago ? 'bg-warning-500' : 'bg-neutral-300'
-                        }`}>
-                          {String(p.anio).slice(-2)}
-                        </div>
-                        <span className="text-[10px] text-neutral-400">{p.anio}</span>
-                      </div>
-                    ))}
+                  <div className="space-y-5">
+                    <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-4">
+                      <p className="text-sm font-semibold text-blue-950">¿Qué muestra este historial?</p>
+                      <p className="mt-1 text-sm leading-relaxed text-blue-900/80">
+                        Resume, año por año, el estado administrativo registrado junto al pago de la Tasa de Evaluación y Fiscalización (TEF).
+                        La habilitación se toma del campo <strong>Habilitado</strong> de cada registro: no se deduce automáticamente del importe ni de la fecha de pago.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-neutral-600" aria-label="Referencias de estados de habilitación">
+                      <span className="inline-flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 rounded-full bg-success-500" aria-hidden="true" />
+                        Habilitado
+                      </span>
+                      <span className="inline-flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 rounded-full bg-warning-500" aria-hidden="true" />
+                        Pago registrado; habilitación pendiente
+                      </span>
+                      <span className="inline-flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 rounded-full bg-neutral-300" aria-hidden="true" />
+                        Sin pago registrado
+                      </span>
+                    </div>
+
+                    <ol className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3" aria-label="Habilitaciones por año">
+                      {pagos.slice().sort((a, b) => a.anio - b.anio).map(p => {
+                        const status = p.habilitado
+                          ? {
+                              label: 'Habilitado',
+                              description: 'La habilitación anual figura confirmada.',
+                              dot: 'bg-success-500',
+                              border: 'border-l-success-500',
+                              badge: 'bg-success-50 text-success-700 ring-success-200',
+                            }
+                          : p.fechaPago
+                            ? {
+                                label: 'Habilitación pendiente',
+                                description: 'Hay fecha de pago, pero la habilitación no está confirmada.',
+                                dot: 'bg-warning-500',
+                                border: 'border-l-warning-500',
+                                badge: 'bg-warning-50 text-warning-700 ring-warning-200',
+                              }
+                            : {
+                                label: 'Sin pago registrado',
+                                description: 'No hay fecha de pago ni habilitación confirmada.',
+                                dot: 'bg-neutral-300',
+                                border: 'border-l-neutral-300',
+                                badge: 'bg-neutral-100 text-neutral-600 ring-neutral-200',
+                              };
+
+                        return (
+                          <li key={p.id} className={`rounded-xl border border-neutral-200 border-l-4 ${status.border} bg-white p-4 shadow-sm`}>
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-2.5">
+                                <span className={`h-3 w-3 shrink-0 rounded-full ${status.dot}`} aria-hidden="true" />
+                                <span className="text-lg font-bold text-neutral-900">{p.anio}</span>
+                              </div>
+                              <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${status.badge}`}>
+                                {status.label}
+                              </span>
+                            </div>
+                            <p className="mt-2 text-xs leading-relaxed text-neutral-500">{status.description}</p>
+                            <dl className="mt-4 grid grid-cols-1 gap-2 border-t border-neutral-100 pt-3 text-xs sm:grid-cols-3 md:grid-cols-1 2xl:grid-cols-3">
+                              <div>
+                                <dt className="text-neutral-400">Importe TEF</dt>
+                                <dd className="mt-0.5 font-semibold text-neutral-700">{p.montoTEF != null ? fmtMoney(p.montoTEF) : 'Sin importe'}</dd>
+                              </div>
+                              <div>
+                                <dt className="text-neutral-400">Fecha de pago</dt>
+                                <dd className="mt-0.5 font-semibold text-neutral-700">{p.fechaPago ? fmtDate(p.fechaPago) : 'Sin fecha'}</dd>
+                              </div>
+                              <div>
+                                <dt className="text-neutral-400">Resolución</dt>
+                                <dd className="mt-0.5 break-words font-semibold text-neutral-700">{p.resolucion || 'Sin referencia'}</dd>
+                              </div>
+                            </dl>
+                          </li>
+                        );
+                      })}
+                    </ol>
+
+                    <p className="text-xs leading-relaxed text-neutral-500">
+                      <strong>Referencia:</strong> este historial reproduce los datos del “Registro de pagos TEF” de esta misma pantalla.
+                      Para corregir un año, use la acción de edición de ese registro. El estado general Activo/Inactivo del generador se administra por separado.
+                    </p>
                   </div>
                 </CardContent>
               </Card>
@@ -555,7 +591,7 @@ const GeneradorDetallePage: React.FC = () => {
           </div>
         </TabPanel>
 
-        {/* ===== Tab 4: DDJJ y Documentos ===== */}
+        {/* ===== Tab 4: DDJJ ===== */}
         <TabPanel id="ddjj">
           <div className="space-y-8">
             {/* DDJJ Table */}
@@ -605,26 +641,14 @@ const GeneradorDetallePage: React.FC = () => {
                 )}
               </CardContent>
             </Card>
-
-            {/* Documentos */}
-            <Card>
-              <CardHeader title="Documentos" icon={<FileText size={20} />} />
-              <CardContent>
-                <DocumentUpload
-                  documentos={documentos}
-                  onUpload={handleUploadDoc}
-                  onDownload={handleDownloadDoc}
-                  onRevisar={handleRevisarDoc}
-                  onDelete={handleDeleteDoc}
-                  isAdmin={true}
-                  isPending={uploadDoc.isPending}
-                />
-              </CardContent>
-            </Card>
           </div>
         </TabPanel>
 
-        {/* ===== Tab 5: Trazabilidad ===== */}
+        <TabPanel id="inspecciones">
+          <ActorInspectionsPanel actorType="GENERADOR" actorId={id || ''} actorName={generador.razonSocial} />
+        </TabPanel>
+
+        {/* ===== Tab: Trazabilidad ===== */}
         <TabPanel id="historial">
           <TrazabilidadTimeline
             actorType="generador"

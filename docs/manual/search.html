@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1B5E3C">
+  <title>Buscar ayuda — SITREP Mendoza</title>
+  <meta name="description" content="Buscar tutoriales y respuestas del Centro de Ayuda SITREP Mendoza.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0,0&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="manual.css?v=2026.15.5">
+</head>
+<body data-page="search">
+  <a class="skip-link" href="#searchMain">Saltar a los resultados</a>
+  <header class="help-header tutorial-header">
+    <a class="brand" href="./" aria-label="SITREP Mendoza, Centro de Ayuda">
+      <img src="screenshots/escudo-mendoza-blanco.webp" width="42" height="42" alt="">
+      <span class="brand-name">SITREP <strong>Mendoza</strong></span>
+      <span class="brand-divider" aria-hidden="true"></span>
+      <span class="brand-product">Centro de Ayuda</span>
+    </a>
+    <form class="header-search search-page-form" id="searchPageForm" role="search">
+      <label class="sr-only" for="searchQuery">Buscar en el Centro de Ayuda</label>
+      <span class="material-symbols-rounded" aria-hidden="true">search</span>
+      <input id="searchQuery" name="q" type="search" placeholder="Buscar una tarea o problema">
+      <button type="submit">Buscar</button>
+    </form>
+    <a href="/app/" class="header-link header-link-primary"><span class="material-symbols-rounded" aria-hidden="true">arrow_back</span><span>Volver a SITREP</span></a>
+  </header>
+
+  <main class="search-layout" id="searchMain">
+    <aside class="search-categories" aria-label="Filtrar por perfil">
+      <h2>Explorar</h2>
+      <button class="category-filter active" type="button" data-profile="all"><span class="material-symbols-rounded" aria-hidden="true">apps</span>Todos</button>
+      <div id="searchProfileFilters"></div>
+      <a href="directorio.html#faq" class="category-filter"><span class="material-symbols-rounded" aria-hidden="true">help</span>Resolver problemas</a>
+    </aside>
+
+    <section class="search-results-panel" aria-labelledby="searchResultsTitle">
+      <div class="search-results-heading">
+        <p class="eyebrow">Resultados ordenados</p>
+        <h1 id="searchResultsTitle">Todas las guías</h1>
+        <p id="searchResultCount"></p>
+      </div>
+      <div class="filter-row" role="group" aria-label="Tipo de contenido">
+        <button type="button" class="filter-chip active" data-type="all">Todos</button>
+        <button type="button" class="filter-chip" data-type="tutorial">Tutoriales</button>
+        <span class="result-order"><span class="material-symbols-rounded" aria-hidden="true">sort</span>Más relevante</span>
+      </div>
+      <div class="search-results" id="searchResults"></div>
+      <div class="empty-state" id="searchEmpty" hidden>
+        <span class="material-symbols-rounded" aria-hidden="true">search_off</span>
+        <h2>No encontramos una guía con esas palabras</h2>
+        <p>Probá con una acción, un perfil o un estado del manifiesto.</p>
+        <a class="button button-secondary" href="directorio.html#faq">Consultar preguntas frecuentes</a>
+      </div>
+    </section>
+
+    <aside class="search-preview" id="searchPreview" aria-live="polite">
+      <div class="preview-placeholder"><span class="material-symbols-rounded" aria-hidden="true">touch_app</span><p>Elegí una guía para ver sus pasos.</p></div>
+    </aside>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="help-data.js?v=2026.15.2"></script>
+  <script src="manual.js?v=2026.15.5"></script>
+</body>
+</html>

@@ -16,6 +16,7 @@ import type { MonitorLiveResponse, ForecastResponse, TimelineResponse, EnTransit
 import { formatNumber, formatTimeShort } from '../utils/formatters';
 import { EventFeed } from './EventFeed';
 import { EVENT_COLORS } from '../utils/war-room-icons';
+import { normalizeUnit } from '../../../utils/formatters';
 
 // ─── AnimatedCounter ─────────────────────────────────────────────────────────
 
@@ -327,8 +328,10 @@ export const DashboardPanels: React.FC<Props> = ({
     const counts: Record<string, { nombre: string; total: number; categoria: string | null }> = {};
     timelineData.eventos.forEach(ev => {
       ev.residuos?.forEach(r => {
+        const unit = normalizeUnit(r.unidad);
+        if (unit !== 'kg' && unit !== 'tn') return;
         if (!counts[r.nombre]) counts[r.nombre] = { nombre: r.nombre, total: 0, categoria: null };
-        counts[r.nombre].total += r.cantidad;
+        counts[r.nombre].total += unit === 'tn' ? r.cantidad * 1000 : r.cantidad;
       });
     });
     return Object.values(counts).sort((a, b) => b.total - a.total).slice(0, 5);
@@ -519,7 +522,7 @@ export const DashboardPanels: React.FC<Props> = ({
                       style={{ width: `${(r.total / maxTotal) * 100}%`, backgroundColor: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length] + '18' }} />
                     <div className="relative flex items-center justify-between px-1 py-0.5">
                       <span className="text-[11px] text-neutral-700 truncate">{r.nombre}</span>
-                      <span className="text-[11px] font-bold text-neutral-900 tabular-nums font-mono ml-1">{formatNumber(r.total)}</span>
+                      <span className="text-[11px] font-bold text-neutral-900 tabular-nums font-mono ml-1">{formatNumber(r.total)} kg</span>
                     </div>
                   </div>
                 </div>

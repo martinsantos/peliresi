@@ -2,6 +2,8 @@
 import { Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import logger from '../utils/logger';
+import { calculateAverageStageTimes } from '../utils/workflowMetrics';
+import { summarizeQuantities, summaryByUnit } from '../utils/quantities';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { parseDateParam } from '../utils/dateRange';
 
@@ -260,7 +262,7 @@ export const getManifiestosPorMes = async (req: Request, res: Response) => {
 export const getResiduosPorTipo = async (req: Request, res: Response) => {
     try {
         const datos = await prisma.manifiestoResiduo.groupBy({
-            by: ['tipoResiduoId'],
+            by: ['tipoResiduoId', 'unidad'],
             _sum: { cantidad: true },
             _count: true,
         });
@@ -272,13 +274,25 @@ export const getResiduosPorTipo = async (req: Request, res: Response) => {
 
         const tipoMap = new Map(tiposResiduo.map(t => [t.id, t]));
 
+        const grouped = new Map<string, typeof datos>();
+        for (const row of datos) {
+            grouped.set(row.tipoResiduoId, [...(grouped.get(row.tipoResiduoId) ?? []), row]);
+        }
+
         res.json({
             success: true,
-            data: datos.map(d => ({
-                name: tipoMap.get(d.tipoResiduoId)?.nombre || d.tipoResiduoId,
-                value: d._sum.cantidad || 0,
-                count: d._count,
-            })),
+            data: [...grouped.entries()].map(([tipoResiduoId, rows]) => {
+                const summary = summarizeQuantities(rows.map(row => ({
+                    cantidad: row._sum.cantidad,
+                    unidad: row.unidad,
+                })));
+                return {
+                    name: tipoMap.get(tipoResiduoId)?.nombre || tipoResiduoId,
+                    value: summary.massKg,
+                    cantidadesPorUnidad: summaryByUnit(summary),
+                    count: rows.reduce((sum, row) => sum + row._count, 0),
+                };
+            }),
         });
     } catch (error) {
         logger.error({ err: error }, 'Error getting residuos por tipo');
@@ -325,28 +339,7 @@ export const getTiempoPromedioPorEtapa = async (req: Request, res: Response) => 
             orderBy: { createdAt: 'desc' },
         });
 
-        type DateKey = keyof typeof manifiestos[number];
-        const etapas: Array<{ name: string; from: DateKey; to: DateKey }> = [
-            { name: 'Creación → Firma', from: 'createdAt', to: 'fechaFirma' },
-            { name: 'Firma → Retiro', from: 'fechaFirma', to: 'fechaRetiro' },
-            { name: 'Retiro → Entrega', from: 'fechaRetiro', to: 'fechaEntrega' },
-            { name: 'Entrega → Recepción', from: 'fechaRecepcion', to: 'fechaRecepcion' },
-            { name: 'Recepción → Cierre', from: 'fechaRecepcion', to: 'fechaCierre' },
-        ];
-
-        const result = etapas.map(etapa => {
-            const tiempos: number[] = [];
-            for (const m of manifiestos) {
-                const fromDate = m[etapa.from];
-                const toDate = m[etapa.to];
-                if (fromDate && toDate) {
-                    const diffHours = (new Date(toDate).getTime() - new Date(fromDate).getTime()) / (1000 * 60 * 60);
-                    if (diffHours > 0) tiempos.push(diffHours);
-                }
-            }
-            const avg = tiempos.length > 0 ? tiempos.reduce((a, b) => a + b, 0) / tiempos.length : 0;
-            return { name: etapa.name, value: Math.round(avg * 10) / 10 };
-        });
+        const result = calculateAverageStageTimes(manifiestos);
 
         res.json({ success: true, data: result });
     } catch (error) {

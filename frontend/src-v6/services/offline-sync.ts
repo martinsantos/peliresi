@@ -5,7 +5,13 @@
  * Data is scoped per user (key: `user_{userId}`) for multi-user isolation.
  */
 
-import { saveOffline, getOffline, removeOffline } from './indexeddb';
+import {
+  OFFLINE_CATALOG_KEYS,
+  getOfflineCatalogKey,
+  saveOffline,
+  getOffline,
+  removeOffline,
+} from './indexeddb';
 import { manifiestoService } from './manifiesto.service';
 import type { Manifiesto } from '../types/models';
 
@@ -59,5 +65,11 @@ export async function getLastSyncTime(userId: string | number): Promise<number |
  */
 export async function clearUserOfflineData(userId: string | number): Promise<void> {
   await removeOffline('manifiestos', `user_${userId}`).catch(() => {});
-  await removeOffline('catalogos', `user_${userId}`).catch(() => {});
+  await Promise.all(OFFLINE_CATALOG_KEYS.flatMap((key) => [
+    // Current, principal-scoped cache entry.
+    removeOffline('catalogos', getOfflineCatalogKey(userId, key)).catch(() => {}),
+    // Legacy origin-wide entry. This keeps logout private even before the
+    // IndexedDB v3 upgrade has completed on a device.
+    removeOffline('catalogos', key).catch(() => {}),
+  ]));
 }

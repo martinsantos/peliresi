@@ -120,7 +120,7 @@ describe('applyRoleFilter', () => {
     expect(where).toEqual({ estado: 'APROBADO', transportistaId: 'trans-1' });
   });
 
-  it('filters ADMIN_GENERADOR by associated actor instead of granting full access', () => {
+  it('scopes ADMIN_GENERADOR to manifests that have a generator', () => {
     const where: Record<string, unknown> = {};
     applyRoleFilter(where, {
       rol: 'ADMIN_GENERADOR',
@@ -128,6 +128,6 @@ describe('applyRoleFilter', () => {
       transportista: null,
       operador: null,
     });
-    expect(where).toEqual({ generadorId: 'gen-admin-1' });
+    expect(where).toEqual({ generadorId: { not: '' } });
   });
 });

@@ -1,0 +1,74 @@
+/* Sampled from the supplied 2023–2027 palette; scoped to the public entrance. */
+.institutional {
+  --brand-blue: #0811a0;
+  --brand-cyan: #36b5e6;
+  --brand-sand: #c9a877;
+  --brand-paper: #f7f5f1;
+  color: #20243d;
+  background: var(--brand-paper);
+}
+.institutional a:focus-visible, .institutional button:focus-visible {
+  outline: 3px solid var(--brand-blue);
+  outline-offset: 4px;
+}
+.mendoza-brand { display: block; width: auto; height: 57px; object-fit: contain; flex-shrink: 0; background: transparent; }
+.institutional-stripe { height: 5px; background: linear-gradient(to right, #0811a0 0 55%, #36b5e6 55% 80%, #c9a877 80%); }
+.institutional .brand-action { background: var(--brand-blue); color: white; }
+.institutional .brand-action:hover { background: #060c78; }
+.institutional .brand-link { color: var(--brand-blue); }
+.institutional .brand-icon { background: var(--brand-blue); color: white; }
+.institutional-hero { border-bottom: 1px solid #dedbd5; }
+.institutional-hero-inner { max-width: 1120px; margin: auto; padding: 64px 24px; display: grid; grid-template-columns: 1.5fr 1fr; gap: 64px; align-items: center; }
+.institutional-eyebrow { color: #575962; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.institutional-title { color: var(--brand-blue); font-size: clamp(2rem, 4vw, 3.5rem); line-height: 1.1; letter-spacing: -.035em; font-weight: 750; margin: 20px 0; text-wrap: balance; }
+.institutional-hero-brand { display: flex; justify-content: center; padding: 24px 0; }
+.institutional-hero-brand .mendoza-brand { height: 57px; max-width: 100%; }
+.institutional .brand-secondary { color: var(--brand-blue); border: 1px solid #0811a040; background: transparent; }
+.institutional .brand-secondary:hover { background: #0811a008; }
+.institutional-footer { background: #08115d; color: #d8def1; }
+.institutional-footer p { color: inherit; }
+.institutional .text-neutral-500 { color: #626b7c; }
+.auth-shell { min-height: 100dvh; display: grid; grid-template-columns: minmax(340px, .85fr) minmax(0, 1.4fr); }
+.auth-brand-panel { background: var(--brand-blue); color: white; padding: clamp(28px, 4vw, 64px); display: flex; flex-direction: column; justify-content: space-between; gap: 48px; }
+.auth-brand-panel h1 { color: white; font-size: clamp(30px, 3vw, 44px); line-height: 1.15; font-weight: 700; letter-spacing: -.03em; margin: 32px 0 20px; }
+.auth-brand-panel .mendoza-brand { height: 126px; }
+.auth-brand-panel .institutional-stripe { width: 72px; margin-top: 32px; }
+.auth-brand-panel p { color: #e2e5ff; }
+.auth-brand-features { display: flex; flex-wrap: wrap; gap: 20px; font-size: 12px; }
+.auth-brand-features > div { display: flex; align-items: center; gap: 8px; }
+.auth-form-panel { padding: 40px 24px; display: flex; align-items: center; justify-content: center; min-width: 0; }
+.auth-form-panel > div { width: 100%; max-width: 460px; }
+.auth-shell--wizard { grid-template-columns: minmax(320px, .72fr) minmax(0, 1.6fr); }
+.auth-shell--wizard .auth-form-panel { align-items: flex-start; padding: clamp(20px, 3vw, 40px); }
+.auth-shell--wizard .auth-form-panel > div { max-width: 1080px; }
+.institutional-login { padding: 0; width: 100%; }
+.institutional-login.is-pwa { min-height: 100dvh; padding: 28px 20px; display: flex; justify-content: center; align-items: center; }
+.login-brand-lockup { display: flex; align-items: center; justify-content: center; gap: 24px; margin-bottom: 20px; }
+.login-brand-lockup .mendoza-brand { height: 48px; }
+.login-brand-lockup .sitrep-wordmark { border-left: 1px solid #d2d3dc; padding-left: 24px; display: flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 800; color: var(--brand-blue); }
+.institutional-login input { min-height: 48px; font-size: 16px; background: white; }
+.institutional-login input:focus { border-color: var(--brand-blue); box-shadow: 0 0 0 3px #0811a018; }
+.institutional-login button[type=submit] { min-height: 48px; }
+.institutional-registration { background: white; border: 1px solid #dedbd5; border-top: 3px solid var(--brand-sand); }
+.institutional-registration h3 { color: var(--brand-blue); }
+.institutional-registration p { color: #565965; }
+.institutional-registration a { border-color: #e2e3ea; }
+.login-institutional-footer { margin-top: 24px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.login-institutional-footer .mendoza-brand { height: 32px; }
+@media (max-width: 900px) {
+  .auth-shell { display: block; }
+  .auth-brand-panel { display: none; }
+  .auth-form-panel { min-height: 100dvh; padding: 28px 20px; }
+  .auth-shell--wizard .auth-form-panel { padding: 20px; }
+  .institutional-hero-inner { gap: 28px; padding: 40px 20px; grid-template-columns: 1fr 230px; }
+  .institutional-hero-brand { padding: 20px 0; }
+}
+@media (max-width: 600px) {
+  .institutional-hero-inner { display: flex; flex-direction: column-reverse; align-items: stretch; gap: 24px; padding: 28px 20px 36px; }
+  .institutional-hero-brand { align-self: center; padding: 12px 0; }
+  .institutional-title { font-size: 32px; margin: 14px 0; }
+  .login-brand-lockup { gap: 16px; }
+  .login-brand-lockup .sitrep-wordmark { padding-left: 16px; font-size: 20px; }
+  .login-brand-lockup .mendoza-brand { height: 40px; }
+  .auth-shell--wizard .auth-form-panel { padding: 0; }
+}

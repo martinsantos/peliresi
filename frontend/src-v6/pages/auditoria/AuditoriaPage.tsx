@@ -20,6 +20,7 @@ import { useQuery } from '@tanstack/react-query';
 import { reporteService } from '../../services/reporte.service';
 import { downloadCsv } from '../reportes/tabs/shared';
 import { useUsuarios } from '../../hooks/useUsuarios';
+import { useAuth } from '../../contexts/AuthContext';
 
 type LogEntry = {
   id: number;
@@ -69,6 +70,7 @@ const ACCION_OPTIONS = [
 ];
 
 const AuditoriaPage: React.FC = () => {
+  const { isAuditor } = useAuth();
   // Filters state
   const [busqueda, setBusqueda] = useState('');
   const [filtroAccion, setFiltroAccion] = useState('');
@@ -81,7 +83,7 @@ const AuditoriaPage: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Fetch users for user filter dropdown
-  const { data: usuariosData } = useUsuarios();
+  const { data: usuariosData } = useUsuarios(undefined, { enabled: !isAuditor });
   const usuarioOptions = useMemo(() => {
     const users = (usuariosData as any)?.items || usuariosData || [];
     if (!Array.isArray(users)) return [{ value: '', label: 'Todos los usuarios' }];

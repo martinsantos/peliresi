@@ -167,7 +167,7 @@ const NuevoTransportistaPage: React.FC = () => {
         toast.success('Actualizado', `Transportista ${form.razonSocial} actualizado`);
       } else {
         await createMutation.mutateAsync(payload);
-        toast.success('Creado', `Transportista ${form.razonSocial} creado. Se deberá enviar invitación o reset de contraseña.`);
+        toast.success('Registro creado', `${form.razonSocial} quedó inactivo hasta validar su documentación. Las credenciales se gestionan por separado; no se envió una invitación.`);
       }
       const backPath = '/admin/actores/transportistas';
       navigate(backPath);

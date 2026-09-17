@@ -8,9 +8,10 @@ import type { ApiErrorResponse, RefreshTokenResponse } from '../types/api';
 
 const TOKEN_KEY = 'sitrep_access_token';
 const REFRESH_TOKEN_KEY = 'sitrep_refresh_token';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
   timeout: 30000,
 });
@@ -74,8 +75,8 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // In demo mode (no tokens), just let 401s propagate so React Query
-    // can fallback to mock data gracefully
+    // Without an authenticated session, propagate 401 responses so the
+    // route guard can present the login flow without attempting a refresh.
     const hasToken = !!getAccessToken();
 
     if (error.response?.status === 401 && !originalRequest._retry && hasToken) {
@@ -99,7 +100,7 @@ api.interceptors.response.use(
         if (!refreshToken) throw new Error('No refresh token');
 
         const { data } = await axios.post<{ success: true; data: RefreshTokenResponse }>(
-          '/api/auth/refresh-token',
+          `${API_BASE_URL}/auth/refresh-token`,
           { refreshToken }
         );
 

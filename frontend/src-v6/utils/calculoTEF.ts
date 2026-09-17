@@ -2,7 +2,7 @@
  * Calculo TEF - Tasa de Evaluacion y Fiscalizacion
  * Decreto 2625/99 - Ley 5917 (Mendoza)
  *
- * Formula: TEF = M x R x ISO_factor
+ * Formula base: MxR = M x R
  * Donde:   R = Z x A x D x C
  */
 
@@ -127,7 +127,7 @@ export function calcularA(coefs: CoeficientesA): number {
 // C: Maximo coeficiente de las corrientes Y del generador
 export function calcularC(corrientesY: string[]): number {
   if (corrientesY.length === 0) return 0;
-  return Math.max(...corrientesY.map(y => C_CORRIENTES[y.trim()] || 0));
+  return Math.max(...corrientesY.map(y => C_CORRIENTES[y.trim().toUpperCase()] || 0));
 }
 
 // R: Indice de riesgo
@@ -135,9 +135,10 @@ export function calcularR(Z: number, A: number, D: number, C: number): number {
   return Z * A * D * C;
 }
 
-// ISO factor
-export function isoFactor(tieneISO: boolean): number {
-  return tieneISO ? 2 : 1;
+// La certificacion se registra, pero su efecto monetario no se aplica hasta
+// contar con una regla oficial versionada por DGFA.
+export function isoFactor(_tieneISO: boolean): number {
+  return 1;
 }
 
 // TEF final
@@ -160,6 +161,8 @@ export interface TEFResult {
   C: number;
   R: number;
   ISO: number;
+  MxR: number;
+  /** @deprecated alias transitorio de MxR; no representa un importe oficial. */
   TEF: number;
 }
 
@@ -172,9 +175,10 @@ export function calcularTEF(input: TEFInput): TEFResult {
   const C = calcularC(input.corrientesY);
   const R = calcularR(Z, A, D, C);
   const ISO = isoFactor(input.tieneISO);
-  const TEF = M * R * ISO;
+  const MxR = M * R;
+  const TEF = MxR;
 
-  return { M, Z, A, D, C, R, ISO, TEF };
+  return { M, Z, A, D, C, R, ISO, MxR, TEF };
 }
 
 export const DEFAULT_A: CoeficientesA = {

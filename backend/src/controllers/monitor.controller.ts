@@ -305,7 +305,14 @@ export async function getMonitorLive(req: Request, res: Response) {
 
     // Toneladas total (sum de residuos)
     const toneladasRaw = await prisma.$queryRawUnsafe<{ total: number }[]>(`
-      SELECT COALESCE(SUM(cantidad), 0) as total FROM manifiestos_residuos
+      SELECT COALESCE(SUM(
+        CASE
+          WHEN LOWER(TRIM(unidad)) IN ('kg', 'kgs', 'kilogramo', 'kilogramos') THEN cantidad / 1000
+          WHEN LOWER(TRIM(unidad)) IN ('tn', 'ton', 't', 'tonelada', 'toneladas') THEN cantidad
+          ELSE 0
+        END
+      ), 0)::float8 as total
+      FROM manifiestos_residuos
     `);
     const toneladas = Number(toneladasRaw[0]?.total || 0);
 
@@ -344,12 +351,20 @@ export async function getMonitorLive(req: Request, res: Response) {
       ORDER BY fecha ASC
     `, hace7d);
 
-    // Top residuos por cantidad total
+    // Top residuos por masa total normalizada a kg. Litros/unidades no se
+    // comparan contra masa en este ranking.
     const topResiduosRaw = await prisma.$queryRawUnsafe<any[]>(`
-      SELECT tr.nombre, SUM(mr.cantidad) as total, tr.categoria
+      SELECT tr.nombre,
+        SUM(CASE
+          WHEN LOWER(TRIM(mr.unidad)) IN ('kg', 'kgs', 'kilogramo', 'kilogramos') THEN mr.cantidad
+          WHEN LOWER(TRIM(mr.unidad)) IN ('tn', 'ton', 't', 'tonelada', 'toneladas') THEN mr.cantidad * 1000
+          ELSE 0
+        END)::float8 as total,
+        tr.categoria
       FROM manifiestos_residuos mr
       JOIN tipos_residuos tr ON tr.id = mr."tipoResiduoId"
       GROUP BY tr.nombre, tr.categoria
+      HAVING SUM(CASE WHEN LOWER(TRIM(mr.unidad)) IN ('kg', 'kgs', 'kilogramo', 'kilogramos', 'tn', 'ton', 't', 'tonelada', 'toneladas') THEN 1 ELSE 0 END) > 0
       ORDER BY total DESC
       LIMIT 8
     `);
@@ -384,9 +399,9 @@ export async function getMonitorLive(req: Request, res: Response) {
             lng: m.generador.longitud,
           },
           destino: {
-            razonSocial: m.operador.razonSocial,
-            lat: m.operador.latitud,
-            lng: m.operador.longitud,
+            razonSocial: m.operador?.razonSocial || 'Exterior',
+            lat: m.operador?.latitud,
+            lng: m.operador?.longitud,
           },
           residuos: (m.residuos || []).map(r => ({
             codigo: r.tipoResiduo?.codigo || '',
@@ -517,20 +532,20 @@ export async function getForecast(req: Request, res: Response) {
           manifiestoId: m.id,
           numero: m.numero,
           generador: m.generador.razonSocial,
-          operador: m.operador.razonSocial,
+          operador: m.operador?.razonSocial || 'Exterior',
           transportista: m.transportista?.razonSocial || 'Sin asignar',
           fechaEstimadaRetiro: m.fechaEstimadaRetiro,
           diasEspera: Math.ceil((now.getTime() - m.createdAt.getTime()) / 86400000),
           origenLatLng: m.generador.latitud ? [m.generador.latitud, m.generador.longitud] : null,
-          destinoLatLng: m.operador.latitud ? [m.operador.latitud, m.operador.longitud] : null,
+          destinoLatLng: m.operador?.latitud ? [m.operador.latitud, m.operador.longitud] : null,
         })),
         pendienteTratamiento: pendienteTratamiento.map(m => ({
           manifiestoId: m.id,
           numero: m.numero,
-          operador: m.operador.razonSocial,
+          operador: m.operador?.razonSocial || 'Exterior',
           estado: m.estado,
           diasEnEspera: m.fechaRecepcion ? Math.ceil((now.getTime() - m.fechaRecepcion.getTime()) / 86400000) : 0,
-          operadorLatLng: m.operador.latitud ? [m.operador.latitud, m.operador.longitud] : null,
+          operadorLatLng: m.operador?.latitud ? [m.operador.latitud, m.operador.longitud] : null,
         })),
         vencimientosProximos: vencimientos.sort((a, b) => a.diasRestantes - b.diasRestantes),
       },

@@ -34,8 +34,9 @@ interface ManifiestoParaHash {
   generador: { cuit: string };
   transportistaId: string | null;
   transportista: { cuit: string } | null;
-  operadorId: string;
-  operador: { cuit: string };
+  operadorId: string | null;
+  operador: { cuit: string } | null;
+  operadorExterior?: { identificacionFiscal: string | null } | null;
   residuos: Array<{ tipoResiduoId: string; cantidad: number; unidad: string }>;
   fechaFirma: Date | null;
 }
@@ -60,7 +61,7 @@ export function hashManifiesto(manifiesto: ManifiestoParaHash): string {
     transportistaId: manifiesto.transportistaId ?? null,
     transportistaCuit: manifiesto.transportista?.cuit ?? '',
     operadorId: manifiesto.operadorId,
-    operadorCuit: manifiesto.operador.cuit,
+    operadorCuit: manifiesto.operador?.cuit ?? manifiesto.operadorExterior?.identificacionFiscal ?? '',
     residuos: residuosSorted,
     fechaFirma: manifiesto.fechaFirma?.toISOString() ?? null,
   });
@@ -240,6 +241,7 @@ export async function registrarEnBlockchain(manifiestoId: string): Promise<void>
       generador: { select: { cuit: true } },
       transportista: { select: { cuit: true } },
       operador: { select: { cuit: true } },
+      operadorExterior: { select: { identificacionFiscal: true } },
       residuos: { select: { tipoResiduoId: true, cantidad: true, unidad: true } },
     },
   });
@@ -282,6 +284,7 @@ export async function verificarIntegridad(manifiestoId: string) {
       generador: { select: { cuit: true } },
       transportista: { select: { cuit: true } },
       operador: { select: { cuit: true } },
+      operadorExterior: { select: { identificacionFiscal: true } },
       residuos: { select: { tipoResiduoId: true, cantidad: true, unidad: true } },
       eventos: { orderBy: { createdAt: 'asc' } },
       sellosBlockchain: true,
@@ -342,7 +345,7 @@ export async function verificarIntegridad(manifiestoId: string) {
         numero: manifiesto.numero,
         generadorCuit: manifiesto.generador.cuit,
         transportistaCuit: manifiesto.transportista?.cuit ?? '',
-        operadorCuit: manifiesto.operador.cuit,
+        operadorCuit: manifiesto.operador?.cuit ?? manifiesto.operadorExterior?.identificacionFiscal ?? '',
         residuos: manifiesto.residuos,
         fechaFirma: manifiesto.fechaFirma?.toISOString() ?? '',
         fechaRetiro: manifiesto.fechaRetiro?.toISOString() ?? null,

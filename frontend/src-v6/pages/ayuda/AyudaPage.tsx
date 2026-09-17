@@ -16,7 +16,6 @@ import {
   Mail,
   ChevronRight,
   ArrowLeft,
-  Play,
   ExternalLink,
   HelpCircle,
   GitBranch
@@ -128,14 +127,14 @@ const faqs = [
 
 // Videos data
 const videos = [
-  { title: 'Login y Dashboard', animation: '/manual/screenshots/animations/login_dashboard.webp', duration: 'Demo' },
-  { title: 'Navegacion del Admin', animation: '/manual/screenshots/animations/admin_menu_navegacion.webp', duration: 'Demo' },
-  { title: 'Viaje del Transportista', animation: '/manual/screenshots/animations/transportista_viaje.webp', duration: 'Demo' },
-  { title: 'Tracking GPS en Mapa', animation: '/manual/screenshots/animations/tracking_gps_mapa.webp', duration: 'Demo' },
-  { title: 'Recepcion del Operador', animation: '/manual/screenshots/animations/operador_recepcion.webp', duration: 'Demo' },
-  { title: 'Reportes y Exportacion', animation: '/manual/screenshots/animations/reportes_exportacion.webp', duration: 'Demo' },
-  { title: 'Cambio de Perfil', animation: '/manual/screenshots/animations/cambio_perfil_menu.webp', duration: 'Demo' },
-  { title: 'Onboarding de la App', animation: '/manual/screenshots/animations/demoapp_selector_onboarding.webp', duration: 'Demo' },
+  { title: 'Login y Dashboard', animation: '/manual/screenshots/animations/login_dashboard.webp', duration: 'Recorrido' },
+  { title: 'Navegación del Admin', animation: '/manual/screenshots/animations/admin_menu_navegacion.webp', duration: 'Recorrido' },
+  { title: 'Viaje del Transportista', animation: '/manual/screenshots/animations/transportista_viaje.webp', duration: 'Recorrido' },
+  { title: 'Tracking GPS en Mapa', animation: '/manual/screenshots/animations/tracking_gps_mapa.webp', duration: 'Recorrido' },
+  { title: 'Recepción del Operador', animation: '/manual/screenshots/animations/operador_recepcion.webp', duration: 'Recorrido' },
+  { title: 'Reportes y Exportación', animation: '/manual/screenshots/animations/reportes_exportacion.webp', duration: 'Recorrido' },
+  { title: 'Cambio de Perfil', animation: '/manual/screenshots/animations/cambio_perfil_menu.webp', duration: 'Recorrido' },
+  { title: 'Bienvenida de la App', animation: '/manual/screenshots/animations/demoapp_selector_onboarding.webp', duration: 'Recorrido' },
 ];
 
 const AyudaPage: React.FC = () => {

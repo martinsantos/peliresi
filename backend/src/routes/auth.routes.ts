@@ -74,7 +74,7 @@ router.post('/register', verifyCaptcha, register);
  *             required: [email, password]
  *             properties:
  *               email: { type: string, format: email, example: juan.perez@dgfa.gob.ar }
- *               password: { type: string, example: password-demo-local }
+ *               password: { type: string, example: una-contrasena-segura }
  *     responses:
  *       200:
  *         description: Login exitoso

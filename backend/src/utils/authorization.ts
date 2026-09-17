@@ -3,6 +3,7 @@ import { Rol } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { AuthRequest, AuthUser } from '../middlewares/auth.middleware';
 import { AppError } from '../middlewares/errorHandler';
+import { isPrivilegedEmail } from './privilegedAccess';
 
 export type ActorType = 'generador' | 'transportista' | 'operador';
 export type ManifestAction = 'read' | 'generador' | 'transportista' | 'operador';
@@ -27,16 +28,16 @@ const actorAdminRole: Record<ActorType, Rol> = {
 
 export const NO_ACCESS_WHERE = { id: '__NO_ACCESS__' };
 
-export function isRootAdmin(user?: Pick<AuthUser, 'rol'> | null): boolean {
-  return user?.rol === 'ADMIN';
+export function isRootAdmin(user?: Pick<AuthUser, 'rol' | 'email'> | null): boolean {
+  return user?.rol === 'ADMIN' && isPrivilegedEmail(user.email);
 }
 
-export function isReadAllUser(user?: Pick<AuthUser, 'rol' | 'esInspector'> | null): boolean {
-  return isRootAdmin(user) || !!user?.esInspector;
+export function isReadAllUser(user?: Pick<AuthUser, 'rol' | 'email' | 'esInspector'> | null): boolean {
+  return isPrivilegedEmail(user?.email) && (isRootAdmin(user) || user?.rol === 'AUDITOR' || !!user?.esInspector);
 }
 
-export function isActorTypeAdmin(user: Pick<AuthUser, 'rol'> | undefined, actorType: ActorType): boolean {
-  return !!user && user.rol === actorAdminRole[actorType];
+export function isActorTypeAdmin(user: Pick<AuthUser, 'rol' | 'email'> | undefined, actorType: ActorType): boolean {
+  return !!user && user.rol === actorAdminRole[actorType] && isPrivilegedEmail(user.email);
 }
 
 export function userActorId(user: AuthUser | undefined, actorType: ActorType): string | null {
@@ -51,7 +52,7 @@ export function canAccessActor(
 ): boolean {
   if (!user) return false;
   if (isRootAdmin(user)) return true;
-  if (mode === 'read' && user.esInspector) return true;
+  if (mode === 'read' && isReadAllUser(user)) return true;
   if (isActorTypeAdmin(user, actorType)) return true;
   return userActorId(user, actorType) === actorId;
 }
@@ -66,6 +67,16 @@ export function buildActorWhere(user: AuthUser | undefined, actorType: ActorType
 export function buildManifestAccessWhere(user: AuthUser | undefined): Record<string, unknown> {
   if (!user) return NO_ACCESS_WHERE;
   if (isReadAllUser(user)) return {};
+
+  // Sector administrators supervise the complete workflow for their domain.
+  // They intentionally do not need a synthetic actor association: the role
+  // itself is the scope. This keeps the database model (one primary role) and
+  // the operational permissions aligned.
+  // IDs are non-empty CUIDs in persisted manifests. Using an empty-string
+  // exclusion keeps this valid for both required and nullable Prisma fields.
+  if (isActorTypeAdmin(user, 'generador')) return { generadorId: { not: '' } };
+  if (isActorTypeAdmin(user, 'transportista')) return { transportistaId: { not: '' } };
+  if (isActorTypeAdmin(user, 'operador')) return { operadorId: { not: '' } };
 
   if ((user.rol === 'GENERADOR' || user.rol === 'ADMIN_GENERADOR') && user.generador?.id) {
     return { generadorId: user.generador.id };
@@ -82,12 +93,12 @@ export function buildManifestAccessWhere(user: AuthUser | undefined): Record<str
 
 export function canAccessManifestRecord(
   user: AuthUser | undefined,
-  manifiesto: { generadorId: string; transportistaId: string | null; operadorId: string },
+  manifiesto: { generadorId: string; transportistaId: string | null; operadorId: string | null },
   action: ManifestAction = 'read'
 ): boolean {
   if (!user) return false;
   if (isRootAdmin(user)) return true;
-  if (action === 'read' && user.esInspector) return true;
+  if (action === 'read' && isReadAllUser(user)) return true;
 
   const checks: ActorType[] =
     action === 'read'
@@ -95,6 +106,7 @@ export function canAccessManifestRecord(
       : [action];
 
   return checks.some((actorType) => {
+    if (isActorTypeAdmin(user, actorType)) return true;
     const expected = manifiesto[actorIdField[actorType]];
     return !!expected && userActorId(user, actorType) === expected;
   });

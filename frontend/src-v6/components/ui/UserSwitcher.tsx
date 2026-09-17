@@ -1,7 +1,7 @@
 /**
  * SITREP v6 - User Switcher Component
  * ====================================
- * Componente para cambiar entre usuarios de demo
+ * Componente para cambiar entre usuarios autorizados
  */
 
 import React, { useState } from 'react';

@@ -127,8 +127,7 @@ export const StepResumen: React.FC<StepResumenProps> = ({
   // TEF
   if (!isTransportista) {
     const tefFields: { label: string; value: string }[] = [
-      { label: 'Factor R', value: form.factorR || '' },
-      { label: 'Monto MxR', value: form.montoMxR ? `$ ${form.montoMxR}` : '' },
+      { label: 'Liquidación', value: 'Pendiente de cálculo final por DGFA' },
       { label: 'Personal', value: form.tefPersonal || '' },
       { label: 'Superficie (m2)', value: form.tefSuperficie || '' },
       { label: 'Zona', value: form.tefZona || '' },

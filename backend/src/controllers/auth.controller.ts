@@ -9,6 +9,7 @@ import { AppError } from '../middlewares/errorHandler';
 import prisma from '../lib/prisma';
 import { emailService } from '../services/email.service';
 import { validatePasswordStrength } from '../utils/passwordStrength';
+import { ipMatchesAllowlist } from '../utils/ipAllowlist';
 
 // CUIT normalization: accepts "30711235961" or "30-71123596-1" → "30-71123596-1"
 function normalizeCuit(raw: string): string | null {
@@ -38,7 +39,10 @@ const registerSchema = z.object({
 
 // Generar tokens JWT
 export const generateTokens = (userId: string, restricted = false) => {
-  const payload: Record<string, unknown> = { id: userId };
+  // `iat` has one-second precision. A login followed immediately by an
+  // impersonation/refresh could otherwise generate the same JWT twice and
+  // collide with the unique refreshToken column in PostgreSQL.
+  const payload: Record<string, unknown> = { id: userId, jti: crypto.randomUUID() };
   if (restricted) payload.restricted = true;
   const options: SignOptions = { expiresIn: config.JWT_EXPIRES_IN as StringValue };
   const accessToken = jwt.sign(payload, config.JWT_SECRET as string, options);
@@ -52,7 +56,8 @@ function getTokenExpiry(token: string): Date {
   return decoded?.exp ? new Date(decoded.exp * 1000) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 }
 
-async function storeRefreshToken(token: string, usuarioId: string) {
+/** Persist a refresh token so it can be rotated/revoked through the auth API. */
+export async function storeRefreshToken(token: string, usuarioId: string) {
   await prisma.refreshToken.create({
     data: {
       token,
@@ -76,31 +81,42 @@ async function revokeToken(token: string, usuarioId: string) {
   });
 }
 
+async function revokeAllUserSessions(usuarioId: string): Promise<void> {
+  await prisma.refreshToken.updateMany({
+    where: { usuarioId, revocado: false },
+    data: { revocado: true },
+  });
+}
+
 function normalizeIp(ip: string): string {
   return ip.replace(/^::ffff:/, '').trim();
 }
 
 function requestIps(req: Request): string[] {
-  const forwarded = req.headers['x-forwarded-for']?.toString().split(',').map((ip) => normalizeIp(ip)) ?? [];
-  return [...forwarded, normalizeIp(req.ip || '')].filter(Boolean);
+  // Express has already resolved the client IP using the configured trusted
+  // proxy count. Never iterate every X-Forwarded-For value: a caller can
+  // prepend arbitrary entries and bypass a demo allowlist that way.
+  const resolved = normalizeIp(req.ip || '');
+  const socketPeer = normalizeIp(req.socket?.remoteAddress || '');
+  return [...new Set([resolved, socketPeer].filter(Boolean))];
 }
 
 function assertDemoLoginAllowed(user: any, req: Request) {
   if (!user.esDemo) return;
 
   if (!config.DEMO_LOGIN_ENABLED) {
-    throw new AppError('Login demo no habilitado en este entorno', 403);
+    throw new AppError('Esta cuenta no está habilitada en este entorno', 403);
   }
 
   const userExpiry = user.demoExpiresAt ? new Date(user.demoExpiresAt) : null;
   const globalExpiry = config.DEMO_LOGIN_EXPIRES_AT ? new Date(config.DEMO_LOGIN_EXPIRES_AT) : null;
   if ((userExpiry && userExpiry <= new Date()) || (globalExpiry && globalExpiry <= new Date())) {
-    throw new AppError('Login demo vencido', 403);
+    throw new AppError('La autorización de acceso de esta cuenta está vencida', 403);
   }
 
   const allowed = config.DEMO_LOGIN_ALLOWED_IPS;
-  if (allowed.length > 0 && !requestIps(req).some((ip) => allowed.includes(ip) || allowed.includes('*'))) {
-    throw new AppError('Login demo no autorizado desde esta red', 403);
+  if (allowed.length > 0 && !requestIps(req).some((ip) => ipMatchesAllowlist(ip, allowed))) {
+    throw new AppError('El acceso de esta cuenta no está autorizado desde la red actual', 403);
   }
 }
 
@@ -154,6 +170,7 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
           activo: false,
           emailVerified: false,
           emailVerificationToken: hashedToken,
+          emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
         },
         select: { id: true, email: true, rol: true, nombre: true },
       });
@@ -202,15 +219,13 @@ export const verifyEmail = async (req: Request, res: Response, next: NextFunctio
 
     if (!user) throw new AppError('Token inválido o expirado', 400);
 
-    // Verificar expiración (24h desde creación — usamos updatedAt como proxy)
-    const hoursElapsed = (Date.now() - user.createdAt.getTime()) / (1000 * 60 * 60);
-    if (hoursElapsed > 24) {
+    if (!user.emailVerificationExpires || user.emailVerificationExpires <= new Date()) {
       throw new AppError('El enlace de verificación expiró. Contactá al administrador.', 400);
     }
 
     await prisma.usuario.update({
       where: { id: user.id },
-      data: { emailVerified: true, emailVerificationToken: null },
+      data: { emailVerified: true, emailVerificationToken: null, emailVerificationExpires: null },
     });
 
     // Notificar al usuario que falta aprobación admin
@@ -340,6 +355,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
           apellido: user.apellido, empresa: user.empresa, telefono: user.telefono,
           activo: user.activo, esInspector: user.esInspector, generador: user.generador,
           transportista: user.transportista, operador: user.operador, createdAt: user.createdAt,
+          esDemo: (user as any).esDemo,
           forcePasswordChange: (user as any).forcePasswordChange,
         };
 
@@ -395,6 +411,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       apellido: user.apellido, empresa: user.empresa, telefono: user.telefono,
       activo: user.activo, esInspector: user.esInspector, generador: user.generador,
       transportista: user.transportista, operador: user.operador, createdAt: user.createdAt,
+      esDemo: (user as any).esDemo,
       forcePasswordChange: (user as any).forcePasswordChange,
     };
 
@@ -462,8 +479,15 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
 
     await prisma.usuario.update({
       where: { id: user.id },
-      data: { password: hashedPassword, passwordResetToken: null, passwordResetExpires: null },
+      data: {
+        password: hashedPassword,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+        forcePasswordChange: false,
+        passwordChangedAt: new Date(),
+      },
     });
+    await revokeAllUserSessions(user.id);
 
     res.json({ success: true, message: 'Contraseña restablecida correctamente.' });
   } catch (error) {
@@ -530,8 +554,9 @@ export const changePassword = async (req: Request & { user?: any }, res: Respons
 
     await prisma.usuario.update({
       where: { id: req.user.id },
-      data: { password: hashedPassword, forcePasswordChange: false },
+      data: { password: hashedPassword, forcePasswordChange: false, passwordChangedAt: new Date() },
     });
+    await revokeAllUserSessions(req.user.id);
     res.json({ success: true, message: 'Contraseña actualizada correctamente' });
   } catch (error) {
     next(error);
@@ -644,6 +669,13 @@ export const claimAccount = async (req: Request, res: Response, next: NextFuncti
       return res.json({ success: true, message: genericMsg });
     }
 
+    // Account claiming is only for imported, inactive, unverified records.
+    // Never let public CUIT/razón-social knowledge replace credentials on an
+    // already active or verified account (including demo users).
+    if (user.activo || user.emailVerified) {
+      return res.json({ success: true, message: genericMsg });
+    }
+
     // Verify nuevoEmail is not used by another user
     const existingEmail = await prisma.usuario.findUnique({ where: { email: nuevoEmail } });
     if (existingEmail && existingEmail.id !== user.id) {
@@ -664,6 +696,7 @@ export const claimAccount = async (req: Request, res: Response, next: NextFuncti
         emailVerified: false,
         activo: false,
         emailVerificationToken: hashedToken,
+        emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
       },
     });
 

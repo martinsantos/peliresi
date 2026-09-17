@@ -37,7 +37,7 @@ import { formatRelativeTime } from '../../utils/formatters';
 // ========================================
 // ADMIN DASHBOARD
 // ========================================
-const AdminDashboard: React.FC = () => {
+const AdminDashboard: React.FC<{ readOnly?: boolean }> = ({ readOnly = false }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const route = (path: string) => path;
@@ -119,9 +119,11 @@ const AdminDashboard: React.FC = () => {
           <h2 className="text-2xl font-bold text-neutral-900">Panel de Control</h2>
           <p className="text-neutral-600">Vista general del sistema de trazabilidad</p>
         </div>
-        <Button leftIcon={<Plus size={18} />} onClick={() => navigate(route('/manifiestos/nuevo'))} className="hover-glow">
-          Nuevo Manifiesto
-        </Button>
+        {!readOnly && (
+          <Button leftIcon={<Plus size={18} />} onClick={() => navigate(route('/manifiestos/nuevo'))} className="hover-glow">
+            Nuevo Manifiesto
+          </Button>
+        )}
       </div>
 
       {/* Stats Grid */}
@@ -212,9 +214,9 @@ const AdminDashboard: React.FC = () => {
           title="Acciones Rápidas"
           actions={[
             { icon: FileText, label: 'Ver Manifiestos', onClick: () => navigate(route('/manifiestos')) },
-            { icon: MapPin, label: 'Tracking', onClick: () => navigate(route('/tracking')) },
+            ...(readOnly ? [] : [{ icon: MapPin, label: 'Tracking', onClick: () => navigate(route('/tracking')) }]),
             { icon: BarChart3, label: 'Reportes', onClick: () => navigate(route('/reportes')) },
-            { icon: Users, label: 'Usuarios', onClick: () => navigate(route('/admin/usuarios')) },
+            ...(readOnly ? [] : [{ icon: Users, label: 'Usuarios', onClick: () => navigate(route('/admin/usuarios')) }]),
           ]}
         />
       </div>
@@ -634,9 +636,10 @@ const OperadorDashboard: React.FC = () => {
 // MAIN DASHBOARD PAGE
 // ========================================
 export const DashboardPage: React.FC = () => {
-  const { isAdmin, isGenerador, isTransportista, isOperador } = useAuth();
+  const { isAdmin, isAuditor, isGenerador, isTransportista, isOperador } = useAuth();
 
   if (isAdmin) return <AdminDashboard />;
+  if (isAuditor) return <AdminDashboard readOnly />;
   if (isGenerador) return <GeneradorDashboard />;
   if (isTransportista) return <TransportistaDashboard />;
   if (isOperador) return <OperadorDashboard />;

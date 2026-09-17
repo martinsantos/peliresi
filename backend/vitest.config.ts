@@ -5,7 +5,8 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['src/**/*.test.ts'],
-    exclude: ['node_modules', 'dist'],
+    // Ignore macOS AppleDouble metadata files that can appear on shared volumes.
+    exclude: ['node_modules', 'dist', '**/._*'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'text-summary'],

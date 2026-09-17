@@ -88,7 +88,7 @@ async function loginPwa(page: import('@playwright/test').Page) {
 
 interface CrawlIssue {
   route: string;
-  type: '404' | 'console-error' | 'network-500' | 'navigation-error';
+  type: '404' | 'console-error' | 'network-error' | 'navigation-error';
   detail: string;
 }
 
@@ -99,7 +99,7 @@ async function crawlRoute(
   issues: CrawlIssue[],
 ) {
   const consoleErrors: string[] = [];
-  const network500s: string[] = [];
+  const networkErrors: string[] = [];
 
   const consoleHandler = (msg: any) => {
     if (msg.type() === 'error') {
@@ -111,13 +111,18 @@ async function crawlRoute(
     }
   };
   const responseHandler = (resp: any) => {
-    if (resp.status() >= 500) {
-      network500s.push(`${resp.status()} ${resp.url().slice(0, 80)}`);
+    if (resp.status() >= 500 || resp.status() === 408) {
+      networkErrors.push(`${resp.status()} ${resp.url().slice(0, 180)}`);
     }
+  };
+  const requestFailedHandler = (request: any) => {
+    const failure = request.failure();
+    networkErrors.push(`${failure?.errorText || 'request failed'} ${request.url().slice(0, 180)}`);
   };
 
   page.on('console', consoleHandler);
   page.on('response', responseHandler);
+  page.on('requestfailed', requestFailedHandler);
 
   try {
     await page.goto(`${basePrefix}${route}`, { waitUntil: 'networkidle', timeout: 30000 });
@@ -134,13 +139,33 @@ async function crawlRoute(
   } finally {
     page.off('console', consoleHandler);
     page.off('response', responseHandler);
+    page.off('requestfailed', requestFailedHandler);
   }
 
   for (const err of consoleErrors.slice(0, 3)) {
     issues.push({ route, type: 'console-error', detail: err.slice(0, 150) });
   }
-  for (const n5 of network500s) {
-    issues.push({ route, type: 'network-500', detail: n5 });
+  for (const failure of networkErrors.slice(0, 5)) {
+    issues.push({ route, type: 'network-error', detail: failure });
+  }
+}
+
+async function crawlRoutesWithFreshPages(
+  authenticatedPage: import('@playwright/test').Page,
+  basePrefix: string,
+  routes: string[],
+  issues: CrawlIssue[],
+) {
+  const context = authenticatedPage.context();
+  await authenticatedPage.close();
+
+  for (const route of routes) {
+    const routePage = await context.newPage();
+    try {
+      await crawlRoute(routePage, basePrefix, route, issues);
+    } finally {
+      if (!routePage.isClosed()) await routePage.close();
+    }
   }
 }
 
@@ -149,9 +174,7 @@ test.describe('Full crawl — Web build', () => {
     test.setTimeout(15 * 60 * 1000); // 15 minutes
     await loginWeb(page);
     const issues: CrawlIssue[] = [];
-    for (const route of ROUTES_WEB) {
-      await crawlRoute(page, '', route, issues);
-    }
+    await crawlRoutesWithFreshPages(page, '', ROUTES_WEB, issues);
     if (issues.length > 0) {
       console.log('\n=== WEB CRAWL ISSUES ===');
       for (const i of issues) console.log(`  [${i.type}] ${i.route} → ${i.detail}`);
@@ -165,9 +188,7 @@ test.describe('Full crawl — PWA build', () => {
     test.setTimeout(15 * 60 * 1000);
     await loginPwa(page);
     const issues: CrawlIssue[] = [];
-    for (const route of ROUTES_PWA) {
-      await crawlRoute(page, '/app', route, issues);
-    }
+    await crawlRoutesWithFreshPages(page, '/app', ROUTES_PWA, issues);
     if (issues.length > 0) {
       console.log('\n=== PWA CRAWL ISSUES ===');
       for (const i of issues) console.log(`  [${i.type}] ${i.route} → ${i.detail}`);

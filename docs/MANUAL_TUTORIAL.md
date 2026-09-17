@@ -454,4 +454,133 @@ Endpoints asociados:
 
 ---
 
-*Documento generado automáticamente - Marzo 2026*
+## 6. ACTUALIZACION 2026-08-25 - ALTAS, OCR Y TRATAMIENTO INTERNACIONAL
+
+Esta actualización aplica al código espejado de **SITREP** y **RPTRAZAR Mendoza**.
+
+### 6.1 Estado funcional
+
+- Las altas nacionales e internacionales están implementadas.
+- El generador puede quedar habilitado con alcance `NACIONAL` o `INTERNACIONAL`.
+- Los manifiestos internacionales pueden prepararse y editarse en estado `BORRADOR`.
+- El manifiesto internacional incorpora transportista exterior, operador exterior y una declaración abierta de tratamiento internacional.
+- La firma y las transiciones operativas internacionales están bloqueadas intencionalmente hasta definir el circuito de frontera, recepción, tratamiento y certificado. No se debe interpretar esta versión como un flujo transfronterizo completo.
+
+### 6.2 Formulario modelo de altas para QA y capacitación
+
+Se recuperó una ruta accesible para revisar los formularios sin crear cuentas ni modificar datos:
+
+```text
+/inscripcion/generador?modo=revision
+/inscripcion/transportista?modo=revision
+/inscripcion/operador?modo=revision
+```
+
+En modo revisión se pueden recorrer los pasos, adjuntar archivos de prueba y ejecutar OCR local. El aviso de la pantalla confirma que no se crea una cuenta, no se envían documentos y no se modifica ninguna solicitud.
+
+> **Límite funcional:** los documentos generales de inscripción se cargan en el alta y se controlan desde **Administración > Solicitudes**. El botón **Nuevo actor** sólo permite elegir el tipo y abre el asistente completo correspondiente; no existe un alta rápida paralela. Los detalles operativos de Generadores, Transportistas y Operadores son de consulta y gestión específica; no vuelven a abrir el expediente general ni permiten emitir credenciales desde una pestaña no relacionada.
+
+![Formulario modelo de generador en modo revisión con alcance internacional](screenshots/desktop/85_alta_generador_revision_internacional.png)
+
+![Selector de alcance internacional en alta de generador](screenshots/desktop/86_alta_generador_alcance_internacional.png)
+
+La captura anterior corresponde a una revisión local/QA del código actualizado. Después del despliegue deben renovarse las capturas en `https://sitrep.ultimamilla.com.ar/` y en RPTRAZAR Mendoza.
+
+El análisis de dominio ampliado está documentado en [Análisis funcional de tratamiento internacional](ANALISIS-TRATAMIENTO-INTERNACIONAL-2026-08-24.md).
+
+### 6.3 Capacidades nuevas de las altas
+
+| Capacidad | Descripción |
+|-----------|-------------|
+| Alcance de tratamiento | Selector nacional/internacional en alta y edición de generadores; la aprobación pública copia el alcance al actor. |
+| OCR asistivo | El OCR local propone campos, confianza y diferencias para que un responsable revise. Nunca aprueba, firma ni certifica por sí solo. |
+| Documentos | Se mantienen tipos, vigencia, estado de revisión y trazabilidad de quién aprobó o rechazó. |
+| ATM | Una referencia duplicada por el mismo actor se resuelve idempotentemente; otra identidad recibe conflicto. |
+| Fixtures QA | Las referencias ATM y los números regulatorios de prueba se aíslan por corrida. |
+| Revisión humana | La pantalla modelo permite validar contratos de UI, documentos y OCR sin efectos en base de datos. |
+| Login e impersonación | Los E2E usan selectores estables para shell, errores de autenticación y navegación posterior a impersonar. |
+
+Los wizards existentes de generador, operador y transportista siguen disponibles con sus representantes, corrientes Y, TEF, vehículos, choferes y adjuntos. Las capturas de referencia de los wizards se encuentran en `screenshots/desktop/W17_adm_gen_paso1.png`, `W24_adm_oper_paso1.png`, `W08_pub_oper_paso1.png` y `W15_pub_trans_paso3.png`.
+
+#### OCR visible y documentos de flota
+
+En el alta de transportista se ofrecen como documentos opcionales de soporte la **licencia de conducir** y la **cédula azul / identificación del vehículo**. En el modo revisión se puede ejecutar la demostración `Probar OCR de licencia` o `Probar OCR de cédula azul`; el ejemplo se genera en memoria y no se envía.
+
+**Cómo cargar las caras y formatos:**
+
+- Licencia de conducir y cédula azul requieren **frente y dorso**. Se pueden cargar como dos fotos separadas o como un único PDF completo; la pantalla identifica cada casilla como **Frente** y **Dorso**.
+- Constancia AFIP, habilitación y seguro requieren una copia legible; si tienen varias páginas conviene usar el PDF completo.
+- Se aceptan PDF, JPG/JPEG y PNG de hasta 10 MB. El botón **Tomar foto** usa la cámara trasera del teléfono cuando el navegador/dispositivo lo permite; si no, se utiliza el selector de archivos.
+- El OCR local procesa imágenes JPG/JPEG/PNG. Un PDF se conserva y se remite para revisión; para reconocimiento inmediato conviene cargar fotos nítidas de cada cara.
+- El OCR muestra propuestas para revisar: no aprueba ni modifica datos automáticamente. Si no termina en 30 segundos, informa el problema, libera el formulario y conserva el archivo para revisión manual; un OCR sin resultado no significa documento inválido ni aprobado.
+
+El reconocimiento usa Tesseract local para proponer, según el documento:
+
+- licencia: apellido, nombre, DNI, número de licencia, clase y vencimiento;
+- cédula azul: dominio/patente, titular, DNI/CUIT, marca, modelo y vencimiento;
+- otros documentos: identificador y vencimiento cuando las etiquetas son legibles.
+
+Cada valor lleva confianza y queda marcado como **propuesta para revisar**. El OCR nunca aprueba, firma ni habilita automáticamente. En expedientes persistidos, el OCR backend guarda texto, motor, confianza y campos; el responsable debe confirmar los valores antes de aprobar. La asociación exacta a un chofer o vehículo se completa desde **Flota y Conductores > Documentación** sobre la fila correspondiente; no se usa un expediente general del transportista, evitando atribuir un documento a la unidad o persona equivocada.
+
+![OCR de licencia y cédula azul en modo revisión](screenshots/desktop/87_ocr_licencia_cedula_transportista.png)
+
+#### TEF diferido
+
+El alta ya no muestra un importe MxR que se recalcule al tocar variables. El usuario sólo declara zona, personal, potencia, superficie, criterios A1–A10, corrientes Y e ISO. La pantalla muestra **Importe pendiente de cálculo final**.
+
+La liquidación final es autoritativa en backend: usa la versión fija de la regla vigente, descarta `factorR`, `montoMxR`, `TEF` o `MxR` enviados desde el navegador y calcula al aprobar/guardar administrativamente. Esto evita que una cifra presentada por el cliente se tome como importe fiscal. La pantalla de cierre indica que el importe queda pendiente de liquidación.
+
+![TEF con variables declaradas y liquidación diferida](screenshots/desktop/88_tef_liquidacion_diferida.png)
+
+### 6.4 Tratamiento internacional y entidades exteriores
+
+Las entidades exteriores no se mezclan con los actores locales. Cada registro debe indicar:
+
+- tipo: transportista u operador;
+- razón social y país;
+- identificador fiscal de la jurisdicción correspondiente;
+- contacto operativo;
+- licencia/habilitación y evidencia asociada;
+- estado, que debe ser `APROBADA` para poder seleccionarse.
+
+Para preparar un manifiesto internacional:
+
+1. Habilitar al generador con alcance `INTERNACIONAL`.
+2. Registrar y aprobar el transportista exterior.
+3. Registrar y aprobar el operador exterior.
+4. Crear el manifiesto y seleccionar `INTERNACIONAL`.
+5. Seleccionar transportista exterior y operador exterior.
+6. Completar la declaración de tratamiento internacional (texto libre, hasta 4.000 caracteres).
+7. Guardar como borrador y realizar revisión administrativa/regulatoria.
+
+El PDF del manifiesto incorpora el alcance, la declaración y la identificación de las entidades exteriores. No se debe combinar un actor local con una entidad exterior en el mismo rol. Los manifiestos nacionales conservan el flujo local: aprobación, retiro, entrega, recepción, tratamiento y certificado.
+
+![Referencia del detalle de manifiesto](screenshots/desktop/57_manifiesto_tratado_detalle.png)
+
+La captura es una referencia del detalle y documentación final. La variante internacional agrega sus campos propios y no puede firmarse hasta que exista un workflow internacional aprobado.
+
+### 6.5 Límites y decisiones que faltan
+
+Antes de habilitar la operación internacional completa se deben definir:
+
+- estados y firmas de despacho, frontera/aduana, recepción exterior, tratamiento y cierre;
+- autoridades, países, permisos, seguros, convenios y normativa aplicable;
+- documentos por jurisdicción, vencimiento, idioma, traducción, apostilla y legalización;
+- husos horarios, moneda, unidades, contactos 24x7, GPS fuera del país y contingencia offline;
+- reglas de certificados, QR, verificación pública, reportes y KPIs nacionales/internacionales;
+- snapshot histórico del alcance y de los actores usados en cada manifiesto;
+- pantalla administrativa para mantenimiento del catálogo de entidades exteriores, si se requiere operar sin API o carga técnica;
+- migración, backup, smoke test y rollback en ambos entornos, sin reiniciar el VPS de Gobierno.
+
+### 6.6 Evidencia de pruebas
+
+| Suite | Resultado | Alcance |
+|-------|-----------|---------|
+| SITREP backend | 294/294 PASS | Unitarias/integración, documentos, OCR estructurado, TEF autoritativo, actores, manifiestos y concurrencia ATM. |
+| SITREP frontend | 82/82 PASS | Componentes, formularios, revisión de altas, permisos y flujos de UI. |
+| Builds SITREP y RPTRAZAR | PASS | Backend, frontend, PWA y Prisma. |
+| E2E remoto en VPS | Pendiente | La VPN/VPS no quedó visible desde este entorno; falta aplicar migración y correr el test integral en ambos servidores. |
+
+---
+
+*Documento actualizado - 25 de agosto de 2026*

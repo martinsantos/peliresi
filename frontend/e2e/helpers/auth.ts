@@ -1,13 +1,13 @@
 import { expect, type Page } from '@playwright/test';
 
-export const ADMIN_EMAIL = 'admin@dgfa.mendoza.gov.ar';
-export const ADMIN_PASS = 'admin123';
-export const GENERADOR_EMAIL = 'quimica.mendoza@industria.com';
-export const GENERADOR_PASS = 'gen123';
-export const TRANSPORTISTA_EMAIL = 'transportes.andes@logistica.com';
-export const TRANSPORTISTA_PASS = 'trans123';
-export const OPERADOR_EMAIL = 'tratamiento.residuos@planta.com';
-export const OPERADOR_PASS = 'op123';
+export const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || 'admin@dgfa.mendoza.gov.ar';
+export const ADMIN_PASS = process.env.E2E_ADMIN_PASSWORD || '';
+export const GENERADOR_EMAIL = process.env.E2E_GENERADOR_EMAIL || 'quimica.mendoza@industria.com';
+export const GENERADOR_PASS = process.env.E2E_GENERADOR_PASSWORD || 'gen123';
+export const TRANSPORTISTA_EMAIL = process.env.E2E_TRANSPORTISTA_EMAIL || 'transportes.andes@logistica.com';
+export const TRANSPORTISTA_PASS = process.env.E2E_TRANSPORTISTA_PASSWORD || 'trans123';
+export const OPERADOR_EMAIL = process.env.E2E_OPERADOR_EMAIL || 'tratamiento.residuos@planta.com';
+export const OPERADOR_PASS = process.env.E2E_OPERADOR_PASSWORD || 'op123';
 
 const RATE_LIMIT_TEXT = /Demasiados intentos de autenticaci.n/i;
 
@@ -62,8 +62,7 @@ export async function loginWithCredentials(page: Page, options: LoginOptions) {
         const bodyText = document.body?.innerText || '';
         return (
           new RegExp(rateLimitPattern, 'i').test(bodyText) ||
-          !!document.querySelector('aside, main, nav') ||
-          /Inicio|Buenos d.as|Accesos R.pidos/i.test(bodyText)
+          !!document.querySelector('[data-testid="app-shell"]')
         );
       },
       RATE_LIMIT_TEXT.source,
@@ -78,7 +77,7 @@ export async function loginWithCredentials(page: Page, options: LoginOptions) {
 
     const rateLimited = await page.getByText(RATE_LIMIT_TEXT).first().isVisible().catch(() => false);
     if (!rateLimited) {
-      await expect(page.locator('aside, main, nav').first()).toBeVisible({ timeout: 20000 });
+      await expect(page.locator('[data-testid="app-shell"]')).toBeVisible({ timeout: 20000 });
       await dismissBlockingOnboarding(page);
       return;
     }
@@ -91,6 +90,7 @@ export async function loginWithCredentials(page: Page, options: LoginOptions) {
 }
 
 export async function loginAsAdmin(page: Page) {
+  if (!ADMIN_PASS) throw new Error('E2E_ADMIN_PASSWORD is required for authenticated E2E tests');
   await loginWithCredentials(page, { email: ADMIN_EMAIL, password: ADMIN_PASS, onboardingRole: 'ADMIN' });
 }
 

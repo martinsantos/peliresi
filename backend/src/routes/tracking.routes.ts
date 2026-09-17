@@ -7,7 +7,9 @@ const router = Router();
 
 router.use(isAuthenticated);
 router.use(requireFullAccess);
-router.use(hasRole('ADMIN'));
+// Sector administrators supervise the operational flow in the control room;
+// keep root-only user administration separate from this read/monitor surface.
+router.use(hasRole('ADMIN', 'AUDITOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR'));
 
 /**
  * @openapi

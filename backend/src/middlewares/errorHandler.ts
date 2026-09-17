@@ -24,13 +24,15 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ) => {
-  // Log error with structured context
+  // Prisma errors can embed full queries, passwords and document metadata.
+  // Record only safe diagnostic identifiers, never the raw exception/body.
   logger.error({
-    err,
+    errorName: err.name,
+    code: err.code,
     method: req.method,
-    path: req.path,
+    path: req.route?.path || 'unmatched',
     statusCode: err.statusCode || 500,
-  }, err.message);
+  }, 'Request failed');
 
   let statusCode = err.statusCode || 500;
   let message = err.message || 'Error interno del servidor';
@@ -54,7 +56,7 @@ export const errorHandler = (
   }
 
   // In production, don't expose internal error details for 500 errors
-  if (process.env.NODE_ENV === 'production' && statusCode === 500) {
+  if (process.env.NODE_ENV !== 'development' && statusCode >= 500) {
     message = 'Error interno del servidor';
     details = undefined;
   }

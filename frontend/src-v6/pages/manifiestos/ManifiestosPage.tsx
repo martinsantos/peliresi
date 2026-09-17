@@ -23,9 +23,11 @@ import { useOperadores } from '../../hooks/useOperadores';
 import { manifiestoService } from '../../services/manifiesto.service';
 import { EstadoManifiesto } from '../../types/models';
 import { ESTADO_LABELS } from '../../utils/constants';
-import { formatDate, formatDateTime } from '../../utils/formatters';
+import { formatDate, formatDateTime, formatQuantitySummary, summarizeQuantities } from '../../utils/formatters';
 import { downloadCsv } from '../reportes/tabs/shared';
 import { exportReportePDF } from '../../utils/exportPdf';
+import { useAuth } from '../../contexts/AuthContext';
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,8 +40,9 @@ interface MRow {
   fecha: string;
   actividad: string;
   peso: number;
-  unidad: string;
+  cantidadResumen: string;
   blockchainStatus: string | null;
+  isDemo: boolean;
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -98,9 +101,10 @@ function mapRow(m: any): MRow {
     estado: m.estado,
     fecha: m.createdAt,
     actividad: m.updatedAt || m.createdAt,
-    peso: Array.isArray(m.residuos) ? m.residuos.reduce((acc: number, r: any) => acc + (typeof r.cantidad === 'number' ? r.cantidad : 0), 0) : 0,
-    unidad: Array.isArray(m.residuos) && m.residuos.length > 0 ? m.residuos[0]?.unidad || 'kg' : 'kg',
+    peso: Array.isArray(m.residuos) ? summarizeQuantities(m.residuos).massKg : 0,
+    cantidadResumen: Array.isArray(m.residuos) ? formatQuantitySummary(m.residuos) : '0 kg',
     blockchainStatus: m.blockchainStatus || null,
+    isDemo: m.isDemoData === true || String(m.numero).startsWith('DEMO-'),
   };
 }
 
@@ -108,6 +112,8 @@ function mapRow(m: any): MRow {
 
 const ManifiestosPage: React.FC = () => {
   const navigate = useNavigate();
+  const mp = useMobilePrefix();
+  const { isAuditor } = useAuth();
   const [searchParams] = useSearchParams();
 
   // Filters
@@ -280,18 +286,18 @@ const ManifiestosPage: React.FC = () => {
           <button
             onClick={() => {
               const headers = ['Numero', 'Generador', 'Operador', 'Estado', 'Actividad', 'Peso', 'Unidad'];
-              const rows = allRows.map(m => [m.numero, m.generadorNombre, m.operadorNombre, ESTADO_LABELS[m.estado as EstadoManifiesto] || m.estado, formatDateTime(m.actividad), typeof m.peso === 'number' ? m.peso : 0, m.unidad]);
+              const rows = allRows.map(m => [m.numero, m.generadorNombre, m.operadorNombre, ESTADO_LABELS[m.estado as EstadoManifiesto] || m.estado, formatDateTime(m.actividad), m.cantidadResumen]);
               downloadCsv(`manifiestos-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows, { titulo: 'Listado de Manifiestos', periodo: fechaDesde || fechaHasta ? `${fechaDesde || '...'} a ${fechaHasta || '...'}` : 'Todos', filtros: estadoFilter ? `Estado: ${ESTADO_LABELS[estadoFilter as EstadoManifiesto] || estadoFilter}` : 'Todos', total: totalCount });
             }}
             className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg border border-primary-200 transition-colors" title="CSV"
           ><Download size={13} /> CSV</button>
           <button
             onClick={() => {
-              exportReportePDF({ titulo: 'Listado de Manifiestos', subtitulo: estadoFilter ? `Estado: ${ESTADO_LABELS[estadoFilter as EstadoManifiesto] || estadoFilter}` : 'Todos', periodo: fechaDesde || fechaHasta ? `${fechaDesde || '...'} a ${fechaHasta || '...'}` : 'Todos', kpis: [{ label: 'Cargados', value: allRows.length }, { label: 'Total', value: totalCount }], tabla: { headers: ['Numero', 'Generador', 'Estado', 'Actividad', 'Peso'], rows: allRows.map(m => [m.numero, m.generadorNombre, ESTADO_LABELS[m.estado as EstadoManifiesto] || m.estado, formatDateTime(m.actividad), `${typeof m.peso === 'number' ? m.peso.toLocaleString('es-AR') : '0'} ${m.unidad}`]) } });
+              exportReportePDF({ titulo: 'Listado de Manifiestos', subtitulo: estadoFilter ? `Estado: ${ESTADO_LABELS[estadoFilter as EstadoManifiesto] || estadoFilter}` : 'Todos', periodo: fechaDesde || fechaHasta ? `${fechaDesde || '...'} a ${fechaHasta || '...'}` : 'Todos', kpis: [{ label: 'Cargados', value: allRows.length }, { label: 'Total', value: totalCount }], tabla: { headers: ['Numero', 'Generador', 'Estado', 'Actividad', 'Cantidad'], rows: allRows.map(m => [m.numero, m.generadorNombre, ESTADO_LABELS[m.estado as EstadoManifiesto] || m.estado, formatDateTime(m.actividad), m.cantidadResumen]) } });
             }}
             className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-error-600 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="PDF"
           ><FileDown size={13} /> PDF</button>
-          <Button size="sm" leftIcon={<Plus size={16} />} onClick={() => navigate('/manifiestos/nuevo')}>Nuevo Manifiesto</Button>
+          {!isAuditor && <Button size="sm" leftIcon={<Plus size={16} />} onClick={() => navigate(mp('/manifiestos/nuevo'))}>Nuevo Manifiesto</Button>}
         </div>
       </div>
 
@@ -403,11 +409,12 @@ const ManifiestosPage: React.FC = () => {
                     </div>
                   </div>
                 )}
-                <Card className="active:scale-[0.98] transition-transform cursor-pointer" onClick={() => navigate(`/manifiestos/${m.id}`)}>
+                <Card className="active:scale-[0.98] transition-transform cursor-pointer" onClick={() => navigate(mp(`/manifiestos/${m.id}`))}>
                   <div className="p-3">
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="font-mono font-semibold text-sm text-neutral-900">{m.numero}</span>
+                        {m.isDemo && <Badge variant="soft" color="warning" className="text-[9px]">DEMO</Badge>}
                         <BcBadge status={m.blockchainStatus} />
                       </div>
                       <Badge variant="soft" color={estadoBadgeColor[m.estado] || 'neutral'} className="text-[10px] shrink-0">
@@ -418,7 +425,7 @@ const ManifiestosPage: React.FC = () => {
                     <div className="flex items-center justify-between mt-1.5">
                       <span className="text-[11px] text-neutral-400">{formatDateTime(m.actividad)}</span>
                       <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="sm" className="p-1" onClick={() => navigate(`/manifiestos/${m.id}`)}><Eye size={14} /></Button>
+                        <Button variant="ghost" size="sm" className="p-1" onClick={() => navigate(mp(`/manifiestos/${m.id}`))}><Eye size={14} /></Button>
                         <Button variant="ghost" size="sm" className="p-1 text-error-500" onClick={() => setDeleteTarget({ id: m.id, numero: m.numero })}><Trash2 size={14} /></Button>
                       </div>
                     </div>
@@ -467,10 +474,11 @@ const ManifiestosPage: React.FC = () => {
                   )}
                   <div
                     className="grid grid-cols-[minmax(140px,1.2fr)_1.5fr_100px_100px] lg:grid-cols-[minmax(140px,1.2fr)_1.5fr_100px_160px_70px_100px] xl:grid-cols-[minmax(140px,1.2fr)_1.3fr_1.3fr_100px_160px_70px_100px] items-center px-1 border-b border-neutral-50 hover:bg-neutral-50/60 cursor-pointer transition-colors"
-                    onClick={() => navigate(`/manifiestos/${m.id}`)}
+                    onClick={() => navigate(mp(`/manifiestos/${m.id}`))}
                   >
                     <div className="px-3 py-2 flex items-center gap-2 min-w-0">
                       <span className="font-mono text-sm font-semibold text-neutral-900 whitespace-nowrap">{m.numero}</span>
+                      {m.isDemo && <Badge variant="soft" color="warning" className="text-[9px]">DEMO</Badge>}
                       <BcBadge status={m.blockchainStatus} />
                     </div>
                     <div className="px-3 py-2 text-sm text-neutral-700 truncate" title={m.generadorNombre}>{m.generadorNombre}</div>
@@ -479,11 +487,11 @@ const ManifiestosPage: React.FC = () => {
                       <Badge variant="soft" color={estadoBadgeColor[m.estado] || 'neutral'} className="text-[10px]">{ESTADO_LABELS[m.estado as EstadoManifiesto] || m.estado}</Badge>
                     </div>
                     <div className="px-3 py-2 text-xs text-neutral-500 whitespace-nowrap hidden lg:block">{formatDateTime(m.actividad)}</div>
-                    <div className="px-3 py-2 text-sm text-neutral-700 whitespace-nowrap hidden lg:block">{typeof m.peso === 'number' ? m.peso.toLocaleString('es-AR') : '0'} {m.unidad}</div>
+                    <div className="px-3 py-2 text-sm text-neutral-700 whitespace-nowrap hidden lg:block">{m.cantidadResumen}</div>
                     <div className="px-3 py-2 flex items-center justify-end gap-0.5">
-                      <button className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-primary-600 transition-colors" onClick={(e) => { e.stopPropagation(); navigate(`/manifiestos/${m.id}`); }}><Eye size={15} /></button>
-                      <button className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-primary-600 transition-colors" onClick={(e) => { e.stopPropagation(); navigate(`/manifiestos/${m.id}/editar`); }}><Edit size={15} /></button>
-                      <button className="p-1.5 rounded-lg hover:bg-error-50 text-neutral-400 hover:text-error-500 transition-colors" onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: m.id, numero: m.numero }); }}><Trash2 size={15} /></button>
+                      <button className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-primary-600 transition-colors" onClick={(e) => { e.stopPropagation(); navigate(mp(`/manifiestos/${m.id}`)); }}><Eye size={15} /></button>
+                      {!isAuditor && <button className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-primary-600 transition-colors" onClick={(e) => { e.stopPropagation(); navigate(mp(`/manifiestos/${m.id}/editar`)); }}><Edit size={15} /></button>}
+                      {!isAuditor && <button className="p-1.5 rounded-lg hover:bg-error-50 text-neutral-400 hover:text-error-500 transition-colors" onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: m.id, numero: m.numero }); }}><Trash2 size={15} /></button>}
                     </div>
                   </div>
                 </React.Fragment>

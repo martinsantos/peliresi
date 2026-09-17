@@ -14,6 +14,7 @@ import { useSessionTimeout } from '../hooks/useSessionTimeout';
 import { getAccessToken, clearTokens } from '../services/api';
 import { ImpersonationProvider } from './ImpersonationContext';
 import type { Usuario } from '../types/models';
+import { actorForEffectiveRole, actorIdForEffectiveRole, clearUserScopedStorage } from '../utils/userContext';
 
 // ========================================
 // TYPES
@@ -31,6 +32,8 @@ export interface User {
   ubicacion: string;
   permisos: string[];
   actorId?: string;
+  esDemo?: boolean;
+  forcePasswordChange?: boolean;
   esInspector?: boolean;
 }
 
@@ -40,6 +43,7 @@ export interface AuthContextType {
   switchUser: (userId: number) => Promise<void>;
   getUsersByRole: (role: UserRole) => User[];
   isAdmin: boolean;
+  isAuditor: boolean;
   isGenerador: boolean;
   isTransportista: boolean;
   isOperador: boolean;
@@ -47,6 +51,7 @@ export interface AuthContextType {
   isAdminGenerador: boolean;
   isAdminOperador: boolean;
   isAnyAdmin: boolean;
+  canImpersonate: boolean;
   canAccess: (permission: string) => boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -59,19 +64,15 @@ export interface AuthContextType {
   dismissOnboarding: () => void;
 }
 
-// ========================================
-// DEMO CREDENTIALS - for quick-switch buttons
-// Must match actual seeded users in backend/prisma/seed.ts
-// ========================================
-export const DEMO_CREDENTIALS: Record<number, { email: string; password: string; nombre: string; rol: UserRole; sector: string }> =
-  import.meta.env.VITE_DEMO_LOGIN_ENABLED === 'true' || import.meta.env.VITE_DEMO_MODE === 'true'
-    ? {
-        1:  { email: 'admin@dgfa.mendoza.gov.ar',          password: 'admin123', nombre: 'Administrador DGFA',          rol: 'ADMIN',         sector: 'DGFA' },
-        5:  { email: 'quimica.mendoza@industria.com',       password: 'gen123',   nombre: 'Roberto Gómez',               rol: 'GENERADOR',     sector: 'Química Mendoza S.A.' },
-        13: { email: 'transportes.andes@logistica.com',     password: 'trans123', nombre: 'Pedro Martínez',              rol: 'TRANSPORTISTA', sector: 'Transportes Andes S.R.L.' },
-        19: { email: 'tratamiento.residuos@planta.com',     password: 'op123',    nombre: 'Miguel Fernández',            rol: 'OPERADOR',      sector: 'Tratamiento de Residuos Mendoza S.A.' },
-      }
-    : {};
+// Legacy compatibility for old components. The public login has no demo
+// credentials or click-to-login shortcuts.
+export const DEMO_CREDENTIALS: Record<number, { email: string; password: string; nombre: string; rol: UserRole; sector: string }> = {};
+
+// UI hint only; the backend allowlist is authoritative.
+export const IMPERSONATION_EMAILS = new Set([
+  'santosma@gmail.com',
+  'admin@dgfa.mendoza.gov.ar',
+]);
 
 // ========================================
 // HELPERS
@@ -85,6 +86,7 @@ function apiUserToUser(u: Usuario): User {
 
   const rolPermisos: Record<string, string[]> = {
     ADMIN: ['*'],
+    AUDITOR: ['dashboard.read', 'manifiestos.read', 'reportes.read', 'alertas.read', 'auditoria.read'],
     GENERADOR: ['manifiestos.read', 'manifiestos.create', 'manifiestos.edit', 'reportes.read'],
     TRANSPORTISTA: ['manifiestos.read', 'manifiestos.transport', 'tracking.update', 'vehiculos.read'],
     OPERADOR: ['manifiestos.read', 'manifiestos.receive', 'manifiestos.treat', 'reportes.read', 'reportes.create'],
@@ -92,18 +94,21 @@ function apiUserToUser(u: Usuario): User {
     ADMIN_GENERADOR: ['actores.generadores', 'catalogo.residuos', 'manifiestos.read', 'reportes.read'],
     ADMIN_OPERADOR: ['actores.operadores', 'catalogo.tratamientos', 'manifiestos.read', 'reportes.read'],
   };
+  const effectiveActor = actorForEffectiveRole(u);
 
   return {
     id: u.id,
     nombre: [u.nombre, u.apellido].filter(Boolean).join(' '),
     email: u.email,
     rol: u.rol as UserRole,
-    sector: u.empresa || u.generador?.razonSocial || u.transportista?.razonSocial || u.operador?.razonSocial || '',
-    actorId: u.generador?.id || u.transportista?.id || u.operador?.id,
+    sector: u.empresa || effectiveActor?.razonSocial || '',
+    actorId: actorIdForEffectiveRole(u),
     avatar: initials,
     telefono: u.telefono || '',
     ubicacion: '',
     permisos: rolPermisos[u.rol] || [],
+    esDemo: u.esDemo ?? false,
+    forcePasswordChange: u.forcePasswordChange ?? false,
     esInspector: u.esInspector ?? false,
   };
 }
@@ -161,6 +166,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const apiUser = await authService.getMe();
           const mapped = apiUserToUser(apiUser);
           setCurrentUser(mapped);
+          const restricted = localStorage.getItem('sitrep_restricted_session') === '1';
+          setIsRestricted(restricted);
+          setSolicitudId(restricted ? localStorage.getItem('sitrep_solicitud_id') : null);
           setIsLoading(false);
           return;
         } catch {
@@ -169,6 +177,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           localStorage.removeItem('sitrep_impersonation');
         }
       }
+      setIsRestricted(false);
+      setSolicitudId(null);
       setIsLoading(false);
     };
 
@@ -186,18 +196,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ? { cuit: identifier.trim(), password }
         : { email: identifier.trim(), password };
       const response = await authService.login(credentials);
-      if (response.restricted) {
-        setIsRestricted(true);
-        setSolicitudId(response.solicitudId || null);
-      }
+      setIsRestricted(response.restricted === true);
+      setSolicitudId(response.restricted ? response.solicitudId || null : null);
       const user = apiUserToUser(response.user);
       setCurrentUser(user);
       const isFirstSession = !localStorage.getItem(`sitrep_onboarding_${user.id}`);
       const isPostReset = localStorage.getItem('sitrep_post_reset') === '1';
       if (isFirstSession || isPostReset) setShowOnboarding(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       clearTokens();
-      const message = err.response?.data?.message || 'Credenciales incorrectas o API no disponible.';
+      const responseMessage = (err as { response?: { data?: { message?: string } } })
+        ?.response?.data?.message;
+      const message = responseMessage || 'Credenciales incorrectas o API no disponible.';
       setAuthError(message);
       throw err;
     } finally {
@@ -213,6 +223,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // ignore logout errors
     } finally {
       clearTokens();
+      localStorage.removeItem('sitrep_restricted_session');
+      localStorage.removeItem('sitrep_solicitud_id');
       setIsRestricted(false);
       setSolicitudId(null);
       // Clean up impersonation and trip-related localStorage
@@ -228,6 +240,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       keysToClean.forEach(k => localStorage.removeItem(k));
       // Clear IndexedDB offline data and sync queue for this user
       if (currentUser) {
+        clearUserScopedStorage(currentUser.id);
         clearUserOfflineData(currentUser.id).catch(() => {});
       }
       clearSyncQueue().catch(() => {});
@@ -275,6 +288,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return currentUser.permisos.includes(permission);
   }, [currentUser]);
 
+  const canImpersonate = !!currentUser &&
+    currentUser.rol === 'ADMIN' &&
+    IMPERSONATION_EMAILS.has(currentUser.email.trim().toLowerCase());
+
   // Build users list from DEMO_CREDENTIALS for UserSwitcher (stable reference)
   const users = useMemo<User[]>(() => Object.entries(DEMO_CREDENTIALS).map(([id, c]) => ({
     id: Number(id),
@@ -294,6 +311,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     switchUser,
     getUsersByRole,
     isAdmin: currentUser?.rol === 'ADMIN',
+    isAuditor: currentUser?.rol === 'AUDITOR',
     isGenerador: currentUser?.rol === 'GENERADOR',
     isTransportista: currentUser?.rol === 'TRANSPORTISTA',
     isOperador: currentUser?.rol === 'OPERADOR',
@@ -301,17 +319,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isAdminGenerador: currentUser?.rol === 'ADMIN_GENERADOR',
     isAdminOperador: currentUser?.rol === 'ADMIN_OPERADOR',
     isAnyAdmin: ['ADMIN', 'ADMIN_TRANSPORTISTA', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR'].includes(currentUser?.rol ?? ''),
+    canImpersonate,
     canAccess,
     login,
     logout,
     isRestricted,
     solicitudId,
-    isDemo: false,
+    isDemo: currentUser?.esDemo === true,
     isLoading,
     authError,
     showOnboarding,
     dismissOnboarding,
-  }), [currentUser, users, switchUser, getUsersByRole, canAccess, login, logout, isRestricted, solicitudId, isLoading, authError, showOnboarding, dismissOnboarding]);
+  }), [currentUser, users, switchUser, getUsersByRole, canAccess, canImpersonate, login, logout, isRestricted, solicitudId, isLoading, authError, showOnboarding, dismissOnboarding]);
 
   return (
     <AuthContext.Provider value={value}>

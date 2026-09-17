@@ -1,11 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Response } from 'express';
 
-const { mockFindUnique, mockUpsert, mockDeleteMany, mockEnviarPushAlUsuario, mockLoggerError } = vi.hoisted(() => ({
+const {
+  mockFindUnique,
+  mockUpsert,
+  mockDeleteMany,
+  mockEnviarPushAlUsuario,
+  mockEnviarPushAlDispositivo,
+  mockLoggerError,
+} = vi.hoisted(() => ({
   mockFindUnique: vi.fn(),
   mockUpsert: vi.fn(),
   mockDeleteMany: vi.fn(),
   mockEnviarPushAlUsuario: vi.fn(),
+  mockEnviarPushAlDispositivo: vi.fn(),
   mockLoggerError: vi.fn(),
 }));
 
@@ -22,6 +30,7 @@ vi.mock('../../lib/prisma', () => ({
 
 vi.mock('../../services/push.service', () => ({
   enviarPushAlUsuario: mockEnviarPushAlUsuario,
+  enviarPushAlDispositivo: mockEnviarPushAlDispositivo,
 }));
 
 vi.mock('../../utils/logger', () => ({
@@ -30,7 +39,7 @@ vi.mock('../../utils/logger', () => ({
   logger: { error: mockLoggerError, warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
-import { getVapidPublicKey, logWelcomePushFailure, subscribe } from '../../controllers/push.controller';
+import { getVapidPublicKey, logWelcomePushFailure, subscribe, testPush } from '../../controllers/push.controller';
 
 const flushPromises = () => Promise.resolve();
 
@@ -49,6 +58,7 @@ describe('PushController', () => {
     mockUpsert.mockResolvedValue({ id: 'sub-1' });
     mockDeleteMany.mockResolvedValue({ count: 1 });
     mockEnviarPushAlUsuario.mockResolvedValue(undefined);
+    mockEnviarPushAlDispositivo.mockResolvedValue(true);
   });
 
   it('returns the configured VAPID public key', () => {
@@ -78,13 +88,13 @@ describe('PushController', () => {
 
     logWelcomePushFailure(err, {
       usuarioId: 'user-1',
-      endpoint: 'https://push.example/sub-1',
+      subscriptionId: 'sub-1',
     });
 
     expect(mockLoggerError).toHaveBeenCalledWith(
       {
         usuarioId: 'user-1',
-        endpoint: 'https://push.example/sub-1',
+        subscriptionId: 'sub-1',
         err,
       },
       'Error enviando push de bienvenida'
@@ -109,7 +119,7 @@ describe('PushController', () => {
 
     expect(mockUpsert).toHaveBeenCalledWith({
       where: { endpoint: 'https://push.example/sub-1' },
-      update: { p256dh: 'p256dh-key', auth: 'auth-key', userAgent: 'Vitest' },
+      update: { usuarioId: 'user-1', p256dh: 'p256dh-key', auth: 'auth-key', userAgent: 'Vitest' },
       create: {
         usuarioId: 'user-1',
         endpoint: 'https://push.example/sub-1',
@@ -122,10 +132,43 @@ describe('PushController', () => {
     expect(mockLoggerError).toHaveBeenCalledWith(
       {
         usuarioId: 'user-1',
-        endpoint: 'https://push.example/sub-1',
+        subscriptionId: 'sub-1',
         err,
       },
       'Error enviando push de bienvenida'
     );
+  });
+
+  it('sends a test push only to the authenticated user device', async () => {
+    const req = {
+      body: { endpoint: 'https://push.example/device-1' },
+      user: { id: 'user-1' },
+    };
+    const res = createResponse();
+
+    await testPush(req as any, res);
+
+    expect(mockEnviarPushAlDispositivo).toHaveBeenCalledWith(
+      'user-1',
+      'https://push.example/device-1',
+      expect.objectContaining({
+        prioridad: 'ALTA',
+        url: '/configuracion?tab=notificaciones',
+        appUrl: '/app/configuracion?tab=notificaciones',
+      }),
+    );
+    expect(res.json).toHaveBeenCalledWith({ success: true, data: { delivered: true } });
+  });
+
+  it('rejects a test endpoint that is not bound to the authenticated user', async () => {
+    mockEnviarPushAlDispositivo.mockResolvedValueOnce(false);
+    const res = createResponse();
+
+    await expect(testPush({
+      body: { endpoint: 'https://push.example/foreign-device' },
+      user: { id: 'user-1' },
+    } as any, res)).rejects.toThrow('La suscripción no existe o venció');
+
+    expect(res.json).not.toHaveBeenCalled();
   });
 });

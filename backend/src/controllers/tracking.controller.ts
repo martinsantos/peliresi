@@ -286,14 +286,19 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
         )
         GROUP BY estado
       `,
-      // Toneladas en el período (sum of cantidades in kg, convert)
-      prisma.manifiestoResiduo.aggregate({
-        _sum: { cantidad: true },
-        where: {
-          manifiesto: { createdAt: dateFilter },
-          unidad: { in: ['kg', 'toneladas'] },
-        },
-      }),
+      // Masa en el periodo normalizada a kg. Las magnitudes no masicas se excluyen.
+      prisma.$queryRaw<Array<{ kg: number }>>`
+        SELECT COALESCE(SUM(
+          CASE
+            WHEN LOWER(TRIM(mr.unidad)) IN ('kg', 'kgs', 'kilogramo', 'kilogramos') THEN mr.cantidad
+            WHEN LOWER(TRIM(mr.unidad)) IN ('tn', 'ton', 't', 'tonelada', 'toneladas') THEN mr.cantidad * 1000
+            ELSE 0
+          END
+        ), 0)::float8 AS kg
+        FROM manifiestos_residuos mr
+        JOIN manifiestos m ON m.id = mr."manifiestoId"
+        WHERE m."createdAt" >= ${desde} AND m."createdAt" <= ${hasta}
+      `,
       // Manifiestos por día
       prisma.$queryRawUnsafe<Array<{ fecha: string; cantidad: bigint }>>(
         `SELECT DATE("createdAt") as fecha, COUNT(*)::bigint as cantidad
@@ -328,7 +333,7 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
       enTransitoActivos,
       generadoresActivos,
       operadoresActivos,
-      toneladasPeriodo: Math.round((residuosAgg._sum.cantidad || 0) / 1000),
+      toneladasPeriodo: Math.round(((residuosAgg[0]?.kg ?? 0) / 1000) * 100) / 100,
       porEstado: {
         BORRADOR: borradores,
         APROBADO: aprobados,

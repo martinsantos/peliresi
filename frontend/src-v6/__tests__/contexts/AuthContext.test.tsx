@@ -78,6 +78,10 @@ vi.mock('../../components/OnboardingWizard', () => ({
 
 // Import AFTER mocks are declared
 import { AuthProvider, useAuth } from '../../contexts/AuthContext';
+import { clearUserOfflineData } from '../../services/offline-sync';
+import { clearSyncQueue } from '../../services/indexeddb';
+import { authService } from '../../services/auth.service';
+import { clearTokens, getAccessToken } from '../../services/api';
 
 // ========================================
 // Test helpers
@@ -97,6 +101,7 @@ function AuthConsumer() {
     <div>
       <span data-testid="user">{auth.currentUser ? auth.currentUser.nombre : 'null'}</span>
       <span data-testid="rol">{auth.currentUser?.rol ?? 'none'}</span>
+      <span data-testid="actorId">{auth.currentUser?.actorId ?? 'none'}</span>
       <span data-testid="isAdmin">{String(auth.isAdmin)}</span>
       <span data-testid="isGenerador">{String(auth.isGenerador)}</span>
       <span data-testid="isTransportista">{String(auth.isTransportista)}</span>
@@ -175,6 +180,38 @@ describe('AuthContext', () => {
     expect(screen.getByTestId('isGenerador').textContent).toBe('false');
   });
 
+  it('rehydrates a multi-role user with the actor matching the effective role', async () => {
+    vi.mocked(getAccessToken).mockReturnValueOnce('persisted-access-token');
+    vi.mocked(authService.getMe).mockResolvedValueOnce({
+      id: 'multi-1', email: 'multi@sitrep.local', rol: 'OPERADOR', cuit: '30-00000000-0',
+      nombre: 'Usuario', apellido: 'Multirol', empresa: null, telefono: null, activo: true,
+      dosFaVerificado: false, createdAt: '', updatedAt: '',
+      generador: { id: 'generator-1', razonSocial: 'Empresa G' },
+      transportista: { id: 'transporter-1', razonSocial: 'Empresa T' },
+      operador: { id: 'operator-1', razonSocial: 'Empresa O' },
+    } as any);
+
+    renderWithProviders();
+
+    await waitFor(() => expect(screen.getByTestId('isLoading').textContent).toBe('false'));
+    expect(screen.getByTestId('user').textContent).toBe('Usuario Multirol');
+    expect(screen.getByTestId('rol').textContent).toBe('OPERADOR');
+    expect(screen.getByTestId('actorId').textContent).toBe('operator-1');
+  });
+
+  it('clears an invalid persisted session and stale impersonation state', async () => {
+    vi.mocked(getAccessToken).mockReturnValueOnce('expired-access-token');
+    vi.mocked(authService.getMe).mockRejectedValueOnce(new Error('expired'));
+    localStorage.setItem('sitrep_impersonation', '{"stale":true}');
+
+    renderWithProviders();
+
+    await waitFor(() => expect(screen.getByTestId('isLoading').textContent).toBe('false'));
+    expect(screen.getByTestId('user').textContent).toBe('null');
+    expect(clearTokens).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem('sitrep_impersonation')).toBeNull();
+  });
+
   it('logout clears the current user', async () => {
     const user = userEvent.setup();
     renderWithProviders();
@@ -195,6 +232,33 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('user').textContent).toBe('null');
     });
     expect(screen.getByTestId('isAdmin').textContent).toBe('false');
+    expect(clearUserOfflineData).toHaveBeenCalledWith('42');
+    expect(clearSyncQueue).toHaveBeenCalledTimes(1);
+  });
+
+  it('logout removes current-principal and legacy trip state without erasing another principal', async () => {
+    const user = userEvent.setup();
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('isLoading').textContent).toBe('false'));
+    await user.click(screen.getByTestId('login-btn'));
+    await waitFor(() => expect(screen.getByTestId('user').textContent).toBe('Admin User'));
+
+    localStorage.setItem('sitrep_user_42_recent_searches', '["current"]');
+    localStorage.setItem('sitrep_user_other_recent_searches', '["other"]');
+    localStorage.setItem('sitrep_active_trip_id', 'legacy-trip');
+    localStorage.setItem('viaje_snapshot_legacy-trip', '{"estado":"EN_TRANSITO"}');
+    localStorage.setItem('viaje_status_legacy-trip', 'ACTIVO');
+    localStorage.setItem('gps_pending_legacy-trip', '[{"latitud":-32.8}]');
+
+    await user.click(screen.getByTestId('logout-btn'));
+    await waitFor(() => expect(screen.getByTestId('user').textContent).toBe('null'));
+
+    expect(localStorage.getItem('sitrep_user_42_recent_searches')).toBeNull();
+    expect(localStorage.getItem('sitrep_user_other_recent_searches')).toBe('["other"]');
+    expect(localStorage.getItem('sitrep_active_trip_id')).toBeNull();
+    expect(localStorage.getItem('viaje_snapshot_legacy-trip')).toBeNull();
+    expect(localStorage.getItem('viaje_status_legacy-trip')).toBeNull();
+    expect(localStorage.getItem('gps_pending_legacy-trip')).toBeNull();
   });
 
   it('useAuth throws when used outside AuthProvider', () => {

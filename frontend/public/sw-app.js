@@ -68,6 +68,10 @@ self.addEventListener('fetch', (event) => {
   // Only handle http/https schemes (filter chrome-extension://, etc.)
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
 
+  // Do not proxy or cache cross-origin resources. A blocked map/font provider
+  // must not be rewritten as a SITREP 408 response by the PWA service worker.
+  if (url.origin !== self.location.origin) return;
+
   // Never cache API calls — let the app handle offline via IndexedDB
   if (url.pathname.startsWith('/api/')) return;
 
@@ -110,6 +114,9 @@ self.addEventListener('fetch', (event) => {
             caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, clone));
           }
           return response;
+        }).catch(async () => {
+          const cached = await caches.match(request);
+          return cached || (await caches.match('/app/offline.html')) || new Response('', { status: 408, statusText: 'Offline' });
         });
       })
     );
@@ -140,7 +147,7 @@ self.addEventListener('sync', (event) => {
     event.waitUntil(
       self.clients.matchAll().then((clients) => {
         clients.forEach((client) => {
-          client.postMessage({ type: 'SYNC_COMPLETE', timestamp: new Date().toISOString() });
+          client.postMessage({ type: 'SYNC_REQUEST', timestamp: new Date().toISOString() });
         });
       })
     );
@@ -153,7 +160,7 @@ self.addEventListener('sync', (event) => {
 self.addEventListener('push', (event) => {
   const data = event.data ? event.data.json() : {};
   const prioridad = data.prioridad || 'NORMAL';
-  const esCritica = prioridad === 'CRITICA';
+  const esCritica = prioridad === 'CRITICA' || prioridad === 'URGENTE';
   const esAlta    = prioridad === 'ALTA' || esCritica;
 
   const options = {
@@ -183,12 +190,22 @@ self.addEventListener('message', (event) => {
 
 console.log(`[SW-App] Service Worker ${SW_VERSION} loaded`);
 
+function notificationTarget(rawTarget, fallback) {
+  try {
+    const target = new URL(typeof rawTarget === 'string' ? rawTarget : fallback, self.location.origin);
+    if (target.origin !== self.location.origin) return fallback;
+    return `${target.pathname}${target.search}${target.hash}`;
+  } catch {
+    return fallback;
+  }
+}
+
 // ========================================
 // NOTIFICATION CLICK — abrir/enfocar la app
 // ========================================
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || '/app/';
+  const url = notificationTarget(event.notification.data?.appUrl || event.notification.data?.url, '/app/');
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
@@ -198,6 +215,14 @@ self.addEventListener('notificationclick', (event) => {
         }
       }
       return clients.openWindow(url);
+    })
+  );
+});
+
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      clientList.forEach((client) => client.postMessage({ type: 'PUSH_SUBSCRIPTION_CHANGED' }));
     })
   );
 });

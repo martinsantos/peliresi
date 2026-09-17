@@ -189,14 +189,19 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
 
   // ── Handlers ──
   const handlePesaje = () => {
-    const residuosData = Object.entries(pesajeData).map(([resId, cant]) => ({
-      id: resId,
-      cantidadRecibida: cant,
-    }));
-    if (residuosData.length === 0) {
-      toast.warning('Datos incompletos', 'Ingresa al menos un peso');
+    const residuosManifiesto = m.residuos || [];
+    const incompletos = residuosManifiesto.some((r: any) => {
+      const value = pesajeData[r.id];
+      return value === undefined || !Number.isFinite(value) || value < 0;
+    });
+    if (incompletos) {
+      toast.warning('Datos incompletos', 'Ingresa una cantidad valida para cada residuo');
       return;
     }
+    const residuosData = residuosManifiesto.map((r: any) => ({
+      id: r.id,
+      cantidadRecibida: pesajeData[r.id],
+    }));
     onPesaje(residuosData, pesajeObs || undefined);
     onClosePesaje();
   };
@@ -273,9 +278,16 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
                   <div className="w-32">
                     <Input
                       type="number"
-                      placeholder="Peso real"
-                      value={pesajeData[r.id] || ''}
-                      onChange={(e) => setPesajeData({ ...pesajeData, [r.id]: Number(e.target.value) })}
+                      min="0"
+                      step="any"
+                      placeholder={`Cantidad real (${r.unidad})`}
+                      value={pesajeData[r.id] ?? ''}
+                      onChange={(e) => {
+                        const next = { ...pesajeData };
+                        if (e.target.value === '') delete next[r.id];
+                        else next[r.id] = Number(e.target.value);
+                        setPesajeData(next);
+                      }}
                     />
                   </div>
                 </div>

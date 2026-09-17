@@ -54,11 +54,12 @@ export const manifiestoService = {
     return data.data;
   },
 
-  async actualizarUbicacion(id: string, latitud: number, longitud: number, velocidad?: number | null, direccion?: number | null): Promise<void> {
+  async actualizarUbicacion(id: string, latitud: number, longitud: number, velocidad?: number | null, direccion?: number | null, sampledAt?: string): Promise<void> {
     await api.post(`/manifiestos/${id}/ubicacion`, {
       latitud, longitud,
       ...(velocidad != null && { velocidad }),
       ...(direccion != null && { direccion }),
+      ...(sampledAt && { timestamp: sampledAt }),
     });
   },
 
@@ -123,8 +124,8 @@ export const manifiestoService = {
     return Array.isArray(raw) ? raw : raw.manifiestos || [];
   },
 
-  async validarQR(code: string): Promise<Manifiesto> {
-    const { data } = await api.post('/manifiestos/validar-qr', { code });
+  async validarQR(qrData: string): Promise<Manifiesto> {
+    const { data } = await api.post('/manifiestos/validar-qr', { qrData });
     return data.data;
   },
 

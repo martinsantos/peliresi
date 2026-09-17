@@ -13,7 +13,7 @@ const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 export function useOfflineSync(): void {
   const { currentUser } = useAuth();
-  const { isOnline } = useConnectivity({ enablePing: false });
+  const { isOnline } = useConnectivity({ enablePing: false, currentUserId: currentUser?.id });
   const syncingRef = useRef(false);
 
   useEffect(() => {

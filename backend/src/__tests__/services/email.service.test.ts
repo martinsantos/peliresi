@@ -118,6 +118,12 @@ describe('EmailService', () => {
     expect(typeof emailService.sendModificacionRechazadaEmail).toBe('function');
   });
 
+  it('exposes workflow, ABM and report templates', () => {
+    expect(typeof emailService.sendWorkflowActionEmail).toBe('function');
+    expect(typeof emailService.sendCrudEmail).toBe('function');
+    expect(typeof emailService.sendReportEmail).toBe('function');
+  });
+
   describe('sendAlertEmail', () => {
     it('returns early when emails array is empty', async () => {
       await emailService.sendAlertEmail([], { nombre: 'Test' }, null, {});
@@ -131,7 +137,7 @@ describe('EmailService', () => {
         ['user@test.com'],
         { nombre: 'Regla de Alerta', descripcion: 'Alerta activada' },
         null,
-        { mensaje: 'Test alert' }
+        { mensaje: 'Test alert', lat: -32.889, lng: -68.845, mapsUrl: 'https://maps.google.com/?q=-32.889,-68.845' }
       );
 
       expect(mockCreate).toHaveBeenCalledWith(
@@ -144,6 +150,7 @@ describe('EmailService', () => {
           }),
         })
       );
+      expect(mockCreate.mock.calls[0][0].data.html).toContain('Abrir mapa');
     });
   });
 

@@ -3,22 +3,24 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { searchService } from '../services/search.service';
 import type { SearchResult } from '../services/search.service';
+import { useAuth } from '../contexts/AuthContext';
+import { recentSearchesStorageKey } from '../utils/userContext';
 
-const RECENT_KEY = 'sitrep_recent_searches';
 const MAX_RECENT = 5;
 
-export function loadRecent(): string[] {
+export function loadRecent(userId?: string | number): string[] {
+  if (userId == null) return [];
   try {
-    return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
+    return JSON.parse(localStorage.getItem(recentSearchesStorageKey(userId)) || '[]');
   } catch {
     return [];
   }
 }
 
-function persistRecent(q: string) {
-  const prev = loadRecent();
+function persistRecent(userId: string | number, q: string) {
+  const prev = loadRecent(userId);
   const next = [q, ...prev.filter((s) => s !== q)].slice(0, MAX_RECENT);
-  localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+  localStorage.setItem(recentSearchesStorageKey(userId), JSON.stringify(next));
 }
 
 export interface FlatResult {
@@ -53,12 +55,17 @@ interface UseGlobalSearchOptions {
 }
 
 export function useGlobalSearch({ onClose }: UseGlobalSearchOptions) {
+  const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [activeEstado, setActiveEstado] = useState('');
-  const [recentSearches, setRecentSearches] = useState<string[]>(loadRecent);
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => loadRecent(currentUser?.id));
+
+  useEffect(() => {
+    setRecentSearches(loadRecent(currentUser?.id));
+  }, [currentUser?.id]);
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -78,13 +85,13 @@ export function useGlobalSearch({ onClose }: UseGlobalSearchOptions) {
   const flatResults = flatten(data);
 
   const navigateTo = useCallback((href: string) => {
-    if (query.trim().length >= 2) {
-      persistRecent(query.trim());
-      setRecentSearches(loadRecent());
+    if (query.trim().length >= 2 && currentUser?.id != null) {
+      persistRecent(currentUser.id, query.trim());
+      setRecentSearches(loadRecent(currentUser.id));
     }
     onClose();
     navigate(href);
-  }, [query, onClose, navigate]);
+  }, [query, onClose, navigate, currentUser?.id]);
 
   // Keyboard handler — always active while panel is mounted
   useEffect(() => {

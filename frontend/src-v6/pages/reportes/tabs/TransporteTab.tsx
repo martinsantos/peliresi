@@ -16,6 +16,7 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const resumen = data.resumen || {};
   const transportistas = data.transportistas || [];
+  const toRate = (value: unknown) => Number.parseFloat(String(value ?? 0)) || 0;
 
   const toggleSort = (key: string) => setSortConfig(prev =>
     prev?.key === key ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' }
@@ -36,7 +37,7 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
         case 'enTransito': return dir * ((a.enTransito || 0) - (b.enTransito || 0));
         case 'vehiculos': return dir * ((a.vehiculosRegistrados || 0) - (b.vehiculosRegistrados || 0));
         case 'choferes': return dir * ((a.choferesRegistrados || 0) - (b.choferesRegistrados || 0));
-        case 'tasa': return dir * (parseFloat(a.tasaCompletitud || '0') - parseFloat(b.tasaCompletitud || '0'));
+        case 'tasa': return dir * (toRate(a.tasaCompletitud) - toRate(b.tasaCompletitud));
         default: return 0;
       }
     });
@@ -54,9 +55,7 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
       .slice(0, 8),
   [transportistas]);
 
-  const avgTasa = transportistas.length > 0
-    ? transportistas.reduce((s: number, t: any) => s + parseFloat(t.tasaCompletitud || '0'), 0) / transportistas.length
-    : 0;
+  const avgTasa = toRate(resumen.tasaCompletitud);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -155,7 +154,7 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
                   {sortedTransportistas.map((t: any, i: number) => {
-                    const tasa = parseFloat(t.tasaCompletitud || '0');
+                    const tasa = toRate(t.tasaCompletitud);
                     return (
                       <tr
                         key={i}
@@ -177,7 +176,7 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
                               }} />
                             </div>
                             <span className="text-xs font-semibold" style={{ color: tasa >= 80 ? '#0D8A4F' : tasa >= 50 ? '#F59E0B' : '#EF4444' }}>
-                              {t.tasaCompletitud}
+                              {tasa.toFixed(1)}%
                             </span>
                           </div>
                         </td>

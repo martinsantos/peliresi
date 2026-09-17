@@ -13,6 +13,8 @@ const actualizarUbicacionSchema = z.object({
   longitud: z.number({ error: 'longitud es requerida y debe ser un numero' }).min(-180, 'longitud debe ser >= -180').max(180, 'longitud debe ser <= 180'),
   velocidad: z.number().min(0, 'velocidad no puede ser negativa').optional(),
   direccion: z.number().optional(),
+  // Preserve the capture time when a phone replays points after reconnecting.
+  timestamp: z.string().datetime().optional(),
 });
 
 // GPS in-memory cache — optimized for high-frequency calls (30 clients x every 30s)
@@ -47,7 +49,11 @@ export const actualizarUbicacion = async (req: AuthRequest, res: Response, next:
     if (!parsed.success) {
       throw new AppError(parsed.error.issues[0].message, 400);
     }
-    const { latitud, longitud, velocidad, direccion } = parsed.data;
+    const { latitud, longitud, velocidad, direccion, timestamp } = parsed.data;
+    const sampledAt = timestamp ? new Date(timestamp) : new Date();
+    if (sampledAt.getTime() > Date.now() + 5 * 60 * 1000) {
+      throw new AppError('La marca temporal GPS no puede estar en el futuro', 400);
+    }
 
     // Check cache — skip DB lookup if we verified EN_TRANSITO recently
     let cacheEntry = _enTransitoCache.get(id);
@@ -82,8 +88,20 @@ export const actualizarUbicacion = async (req: AuthRequest, res: Response, next:
       _enTransitoCache.set(id, cacheEntry);
     }
 
+    // Offline replay is at-least-once. Treat an identical capture timestamp
+    // as idempotent so retries cannot duplicate the route or its anomalies.
+    const existingTracking = timestamp
+      ? await prisma.trackingGPS.findFirst({
+          where: { manifiestoId: id, timestamp: sampledAt },
+        })
+      : null;
+    if (existingTracking) {
+      res.json({ success: true, data: { tracking: existingTracking, replayed: true } });
+      return;
+    }
+
     const tracking = await prisma.trackingGPS.create({
-      data: { manifiestoId: id, latitud, longitud, velocidad, direccion },
+      data: { manifiestoId: id, latitud, longitud, velocidad, direccion, timestamp: sampledAt },
     });
 
     res.json({ success: true, data: { tracking } });

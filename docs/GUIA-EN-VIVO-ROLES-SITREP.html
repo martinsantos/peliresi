@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Guía de capacitación y monitoreo en vivo por perfil de SITREP.">
+  <title>SITREP · Guía en vivo por perfil</title>
+  <style>
+    :root {
+      --green: #17663f;
+      --green-dark: #0e4d2e;
+      --mint: #eef9f3;
+      --ink: #172033;
+      --muted: #61708a;
+      --line: #d9e4df;
+      --surface: #ffffff;
+      --warning: #9a6517;
+      --warning-bg: #fff8e9;
+      --danger: #b42318;
+      --danger-bg: #fff3f1;
+      --shadow: 0 12px 32px rgba(20, 55, 39, .08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: linear-gradient(180deg, #f0faf4 0, #f8fbf9 330px, #fff 330px);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+    a { color: var(--green-dark); font-weight: 700; }
+    a:hover { color: #0b3d24; }
+    .container { width: min(1120px, calc(100% - 32px)); margin: 0 auto; }
+    header { padding: 48px 0 32px; }
+    .brand { display: flex; align-items: center; gap: 12px; color: var(--green-dark); font-weight: 800; letter-spacing: -.02em; }
+    .brand-mark { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; background: var(--green); color: white; font-size: 22px; }
+    h1 { margin: 20px 0 10px; max-width: 760px; font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1.05; letter-spacing: -.055em; }
+    .lead { max-width: 780px; margin: 0; color: var(--muted); font-size: 1.1rem; }
+    .notice { margin: 24px 0; padding: 16px 18px; border: 1px solid #f0d49c; border-radius: 14px; background: var(--warning-bg); color: #744b0d; }
+    .notice strong { color: #643e06; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+    .card, .role, .monitor { border: 1px solid var(--line); background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); }
+    .card { padding: 20px; }
+    .card h2, .monitor h2 { margin: 0 0 8px; font-size: 1.12rem; letter-spacing: -.025em; }
+    .card p { margin: 0; color: var(--muted); font-size: .93rem; }
+    main { padding-bottom: 54px; }
+    section { margin-top: 28px; }
+    .section-title { margin: 0 0 6px; font-size: 1.45rem; letter-spacing: -.035em; }
+    .section-copy { margin: 0 0 16px; color: var(--muted); }
+    .workflow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 16px 0 0; }
+    .state { padding: 6px 10px; border-radius: 999px; background: #e9f6ee; color: var(--green-dark); font-size: .78rem; font-weight: 800; }
+    .arrow { color: #91a59a; font-weight: 800; }
+    .roles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    .role { overflow: hidden; }
+    .role-head { padding: 18px 20px; background: linear-gradient(135deg, #f4fbf6, #fff); border-bottom: 1px solid var(--line); }
+    .role-head h3 { margin: 0; font-size: 1.12rem; letter-spacing: -.025em; }
+    .role-head p { margin: 4px 0 0; color: var(--muted); font-size: .87rem; }
+    .role-body { padding: 18px 20px 20px; }
+    .step { display: grid; grid-template-columns: 28px 1fr; gap: 10px; padding: 10px 0; border-bottom: 1px solid #eef3f0; }
+    .step:last-child { border-bottom: 0; padding-bottom: 0; }
+    .step-number { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: var(--green); color: white; font-size: .77rem; font-weight: 800; }
+    .step p { margin: 0; font-size: .92rem; }
+    .step small { display: block; margin-top: 3px; color: var(--muted); }
+    .tag { display: inline-block; margin: 0 0 9px; padding: 3px 8px; border-radius: 999px; background: #edf4f0; color: #416252; font-size: .72rem; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; }
+    .monitor { padding: 22px; }
+    .monitor-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+    .monitor p { margin: 4px 0 0; color: var(--muted); }
+    .progress { margin: 20px 0 14px; height: 9px; border-radius: 99px; overflow: hidden; background: #e9efeb; }
+    .progress > span { display: block; width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--green), #39a76e); transition: width .2s ease; }
+    .checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 18px; }
+    label.check { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; font-size: .92rem; cursor: pointer; }
+    input[type="checkbox"] { margin-top: 3px; width: 17px; height: 17px; accent-color: var(--green); }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+    button, .button-link { appearance: none; border: 0; border-radius: 10px; padding: 10px 14px; font: inherit; font-weight: 800; cursor: pointer; text-decoration: none; }
+    button { background: var(--green); color: white; }
+    button:hover { background: var(--green-dark); }
+    .button-link { border: 1px solid var(--line); background: white; color: var(--green-dark); }
+    .danger-note { margin-top: 18px; padding: 14px 16px; border-left: 4px solid var(--danger); border-radius: 8px; background: var(--danger-bg); color: #803126; font-size: .9rem; }
+    footer { padding: 26px 0 42px; color: var(--muted); font-size: .84rem; }
+    @media (max-width: 760px) {
+      header { padding-top: 30px; }
+      .grid, .roles, .checks { grid-template-columns: 1fr; }
+      .monitor-top { flex-direction: column; }
+      .card, .role-body, .role-head, .monitor { padding-left: 16px; padding-right: 16px; }
+    }
+    @media print {
+      body { background: white; font-size: 10pt; }
+      header { padding: 0 0 12px; }
+      .roles { gap: 10px; }
+      .role, .card, .monitor { box-shadow: none; break-inside: avoid; }
+      .actions { display: none; }
+      a { color: var(--ink); text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="container">
+    <div class="brand"><span class="brand-mark">⌁</span> SITREP · Gobierno de Mendoza</div>
+    <h1>Guía en vivo por perfil</h1>
+    <p class="lead">Recorrido guiado para acompañar la capacitación, comprobar que cada perfil visualiza lo que le corresponde y registrar el resultado sin compartir contraseñas ni alterar manifiestos reales.</p>
+    <div class="notice"><strong>Regla de la sesión:</strong> usar registros existentes filtrados por estado sólo para lectura. No confirmar retiro, entrega, recepción, tratamiento, rechazo o cancelación durante el curso salvo que exista un sandbox autorizado. No existen manifiestos <code>CAP-*</code> en el padrón vigente.</div>
+  </header>
+
+  <main class="container">
+    <section class="grid" aria-label="Enlaces de inicio">
+      <article class="card"><h2>Portal web</h2><p><a href="https://sitrep.ultimamilla.com.ar/login">https://sitrep.ultimamilla.com.ar/login</a><br>Para administración, reportes y detalle operativo.</p></article>
+      <article class="card"><h2>Aplicación móvil</h2><p><a href="https://sitrep.ultimamilla.com.ar/app/login">https://sitrep.ultimamilla.com.ar/app/login</a><br>Para la experiencia de campo y transporte.</p></article>
+      <article class="card"><h2>Manual completo</h2><p><a href="https://sitrep.ultimamilla.com.ar/manual/">https://sitrep.ultimamilla.com.ar/manual/</a><br>Referencia funcional durante la capacitación.</p></article>
+    </section>
+
+    <section>
+      <h2 class="section-title">Formularios modelo de alta · no guardan datos</h2>
+      <p class="section-copy">Estas rutas abren el wizard completo con información sintética. No crean cuentas, no envían archivos ni modifican solicitudes.</p>
+      <div class="grid">
+        <article class="card"><h2>Generador internacional</h2><p><a href="https://sitrep.ultimamilla.com.ar/inscripcion/generador?modo=revision">https://sitrep.ultimamilla.com.ar/inscripcion/generador?modo=revision</a><br>Incluye el selector Nacional / Internacional.</p></article>
+        <article class="card"><h2>Transporte y licencia</h2><p><a href="https://sitrep.ultimamilla.com.ar/inscripcion/transportista?modo=revision">https://sitrep.ultimamilla.com.ar/inscripcion/transportista?modo=revision</a><br>Vehículo, chofer, licencia, frente/dorso y OCR local.</p></article>
+        <article class="card"><h2>Operador</h2><p><a href="https://sitrep.ultimamilla.com.ar/inscripcion/operador?modo=revision">https://sitrep.ultimamilla.com.ar/inscripcion/operador?modo=revision</a><br>Datos regulatorios, TEF, documentos y resumen.</p></article>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="section-title">Flujo que vamos a narrar</h2>
+      <p class="section-copy">Cada persona observa su etapa, su evidencia y qué perfil toma el control siguiente.</p>
+      <div class="workflow" aria-label="Flujo de estados del manifiesto">
+        <span class="state">BORRADOR</span><span class="arrow">→</span><span class="state">APROBADO</span><span class="arrow">→</span><span class="state">EN TRANSITO</span><span class="arrow">→</span><span class="state">ENTREGADO</span><span class="arrow">→</span><span class="state">RECIBIDO</span><span class="arrow">→</span><span class="state">EN TRATAMIENTO</span><span class="arrow">→</span><span class="state">TRATADO</span>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="section-title">Recorridos por perfil</h2>
+      <p class="section-copy">Abrir los enlaces en una nueva pestaña, completar cada paso y marcarlo en el monitor de la parte inferior.</p>
+      <div class="roles">
+        <article class="role">
+          <div class="role-head"><span class="tag">Ivana · ADMIN_GENERADOR</span><h3>Administración de generadores</h3><p>Controla el alta y la información de generadores; inicia el flujo documental.</p></div>
+          <div class="role-body">
+            <div class="step"><span class="step-number">1</span><p>Ingresar al <a href="https://sitrep.ultimamilla.com.ar/dashboard">Dashboard</a> y confirmar que se muestra el resumen del perfil.</p></div>
+            <div class="step"><span class="step-number">2</span><p>Abrir <a href="https://sitrep.ultimamilla.com.ar/manifiestos">Manifiestos</a>, filtrar un registro existente por estado y abrir su detalle.<small>Revisar actores, residuo, estado y timeline.</small></p></div>
+            <div class="step"><span class="step-number">3</span><p>Mostrar <a href="https://sitrep.ultimamilla.com.ar/manifiestos/nuevo">Nuevo manifiesto</a> sin confirmar una creación.<small>Explicar generador, transportista, operador, residuo y borrador.</small></p></div>
+            <div class="step"><span class="step-number">4</span><p>Consultar <a href="https://sitrep.ultimamilla.com.ar/admin/actores/generadores">Generadores</a>, <a href="https://sitrep.ultimamilla.com.ar/reportes">Reportes</a> y <a href="https://sitrep.ultimamilla.com.ar/alertas">Alertas</a>.</p></div>
+          </div>
+        </article>
+
+        <article class="role">
+          <div class="role-head"><span class="tag">Santiago · ADMIN</span><h3>Administración raíz y transporte</h3><p>Supervisa el sistema completo y compara perfiles mediante impersonación autorizada.</p></div>
+          <div class="role-body">
+            <div class="step"><span class="step-number">1</span><p>Abrir <a href="https://sitrep.ultimamilla.com.ar/admin/usuarios">Administración de usuarios</a> y verificar que el usuario ADMIN puede acceder.</p></div>
+            <div class="step"><span class="step-number">2</span><p>Usar <a href="https://sitrep.ultimamilla.com.ar/switch-user">Cambiar usuario</a> sólo para comparar vistas de capacitación.<small>Salir de la impersonación al terminar cada comparación.</small></p></div>
+            <div class="step"><span class="step-number">3</span><p>Abrir un registro existente <strong>APROBADO</strong> en <a href="https://sitrep.ultimamilla.com.ar/manifiestos">Manifiestos</a> y explicar retiro, viaje y entrega sin ejecutarlos.</p></div>
+            <div class="step"><span class="step-number">4</span><p>Mostrar el mapa en <a href="https://sitrep.ultimamilla.com.ar/centro-control">Centro de control</a> y la PWA de campo en <a href="https://sitrep.ultimamilla.com.ar/app/transporte/perfil">Perfil de transporte</a>.</p></div>
+          </div>
+        </article>
+
+        <article class="role">
+          <div class="role-head"><span class="tag">Marcia · ADMIN_OPERADOR</span><h3>Administración de operadores</h3><p>Revisa recepción, pesaje, tratamiento, certificados y evidencias finales.</p></div>
+          <div class="role-body">
+            <div class="step"><span class="step-number">1</span><p>Abrir <a href="https://sitrep.ultimamilla.com.ar/dashboard">Dashboard</a> y luego <a href="https://sitrep.ultimamilla.com.ar/manifiestos">Manifiestos</a>.</p></div>
+            <div class="step"><span class="step-number">2</span><p>Elegir un registro existente en <strong>ENTREGADO</strong>, <strong>RECIBIDO</strong>, <strong>EN TRATAMIENTO</strong> o <strong>TRATADO</strong>.<small>Explicar recepción, pesaje, tratamiento, cierre y certificado.</small></p></div>
+            <div class="step"><span class="step-number">3</span><p>Abrir <a href="https://sitrep.ultimamilla.com.ar/admin/actores/operadores">Operadores</a> y mostrar la información habilitante del actor.</p></div>
+            <div class="step"><span class="step-number">4</span><p>Revisar <a href="https://sitrep.ultimamilla.com.ar/alertas">Alertas</a>, <a href="https://sitrep.ultimamilla.com.ar/reportes">Reportes</a> y la misma consulta en <a href="https://sitrep.ultimamilla.com.ar/app/manifiestos">PWA</a>.</p></div>
+          </div>
+        </article>
+
+        <article class="role">
+          <div class="role-head"><span class="tag">GENERADOR</span><h3>Operación del generador</h3><p>Consulta sus manifiestos, prepara borradores y sigue su trazabilidad.</p></div>
+          <div class="role-body">
+            <div class="step"><span class="step-number">1</span><p>Ingresar a <a href="https://sitrep.ultimamilla.com.ar/dashboard">Dashboard</a> y verificar indicadores propios.</p></div>
+            <div class="step"><span class="step-number">2</span><p>Abrir <a href="https://sitrep.ultimamilla.com.ar/manifiestos">Manifiestos</a> y revisar un caso propio.</p></div>
+            <div class="step"><span class="step-number">3</span><p>Mostrar <a href="https://sitrep.ultimamilla.com.ar/manifiestos/nuevo">Nuevo manifiesto</a> como preparación de un borrador; no enviarlo en clase.</p></div>
+            <div class="step"><span class="step-number">4</span><p>Consultar <a href="https://sitrep.ultimamilla.com.ar/reportes">Reportes</a> y descargar sólo documentos ya existentes.</p></div>
+          </div>
+        </article>
+
+        <article class="role">
+          <div class="role-head"><span class="tag">ADMIN_TRANSPORTISTA / TRANSPORTISTA</span><h3>Transporte y viaje en campo</h3><p>Ve los viajes asignados, el seguimiento y el escaneo de QR.</p></div>
+          <div class="role-body">
+            <div class="step"><span class="step-number">1</span><p>Abrir <a href="https://sitrep.ultimamilla.com.ar/manifiestos">Manifiestos</a> y ubicar un caso <strong>APROBADO</strong> o <strong>EN TRANSITO</strong>.</p></div>
+            <div class="step"><span class="step-number">2</span><p>Mostrar <a href="https://sitrep.ultimamilla.com.ar/centro-control">Centro de control</a>; no confirmar retiro ni entrega fuera de sandbox.</p></div>
+            <div class="step"><span class="step-number">3</span><p>En el teléfono, abrir <a href="https://sitrep.ultimamilla.com.ar/app/transporte/perfil">Perfil de transporte PWA</a> y comprobar que presenta viajes, información e historial.</p></div>
+            <div class="step"><span class="step-number">4</span><p>Abrir <a href="https://sitrep.ultimamilla.com.ar/app/escaner-qr">Escáner QR PWA</a>.<small>Permitir cámara sólo en el dispositivo que va a realizar la demostración.</small></p></div>
+          </div>
+        </article>
+
+        <article class="role">
+          <div class="role-head"><span class="tag">OPERADOR</span><h3>Operación de planta</h3><p>Consulta cargas entrantes y evidencia el tratamiento realizado.</p></div>
+          <div class="role-body">
+            <div class="step"><span class="step-number">1</span><p>Abrir <a href="https://sitrep.ultimamilla.com.ar/manifiestos">Manifiestos</a> y seleccionar un estado de recepción o tratamiento.</p></div>
+            <div class="step"><span class="step-number">2</span><p>Revisar el detalle y explicar recepción, pesaje, tratamiento, cierre y certificado, sin ejecutar acciones.</p></div>
+            <div class="step"><span class="step-number">3</span><p>Consultar <a href="https://sitrep.ultimamilla.com.ar/alertas">Alertas</a> y <a href="https://sitrep.ultimamilla.com.ar/reportes">Reportes</a> para vincular operación con control.</p></div>
+            <div class="step"><span class="step-number">4</span><p>Repetir la consulta en <a href="https://sitrep.ultimamilla.com.ar/app/manifiestos">PWA</a> para demostrar continuidad web/móvil.</p></div>
+          </div>
+        </article>
+
+        <article class="role">
+          <div class="role-head"><span class="tag">AUDITOR</span><h3>Auditoría y solo lectura</h3><p>Consulta evidencia y reportes sin modificar actores, manifiestos ni workflow.</p></div>
+          <div class="role-body">
+            <div class="step"><span class="step-number">1</span><p>Ingresar al <a href="https://sitrep.ultimamilla.com.ar/dashboard">Dashboard</a> y comprobar acceso de sólo lectura.</p></div>
+            <div class="step"><span class="step-number">2</span><p>Consultar <a href="https://sitrep.ultimamilla.com.ar/manifiestos">Manifiestos</a> y abrir un detalle para revisar timeline y documentos existentes.</p></div>
+            <div class="step"><span class="step-number">3</span><p>Abrir <a href="https://sitrep.ultimamilla.com.ar/reportes">Reportes</a>, <a href="https://sitrep.ultimamilla.com.ar/alertas">Alertas</a> y <a href="https://sitrep.ultimamilla.com.ar/admin/auditoria">Auditoría</a>.</p></div>
+            <div class="step"><span class="step-number">4</span><p>Confirmar que no aparecen botones de ABM, workflow o impersonación.</p></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="monitor" aria-labelledby="monitor-title">
+      <div class="monitor-top"><div><h2 id="monitor-title">Monitor de la sesión</h2><p>Marcá los controles realizados. El progreso queda sólo en este navegador; <strong>no transmite datos</strong>. Al finalizar, podés copiar un resumen para enviarlo al coordinador.</p></div><strong id="progress-label">0 de 8 verificados</strong></div>
+      <div class="progress" aria-hidden="true"><span id="progress-bar"></span></div>
+      <div class="checks">
+        <label class="check"><input type="checkbox" data-check="Login web correcto">Login web correcto</label>
+        <label class="check"><input type="checkbox" data-check="Login PWA correcto">Login PWA correcto</label>
+        <label class="check"><input type="checkbox" data-check="Dashboard visible por perfil">Dashboard visible por perfil</label>
+        <label class="check"><input type="checkbox" data-check="Registro existente encontrado">Registro existente encontrado</label>
+        <label class="check"><input type="checkbox" data-check="Timeline y estado coherentes">Timeline y estado coherentes</label>
+        <label class="check"><input type="checkbox" data-check="Alertas y reportes visibles">Alertas y reportes visibles</label>
+        <label class="check"><input type="checkbox" data-check="Mapa o perfil de transporte visible">Mapa o perfil de transporte visible</label>
+        <label class="check"><input type="checkbox" data-check="Permisos del rol respetados">Permisos del rol respetados</label>
+      </div>
+      <div class="actions"><button type="button" id="copy-summary">Copiar resumen</button><button type="button" id="reset-checks" class="button-link">Reiniciar marcas</button><a class="button-link" href="https://sitrep.ultimamilla.com.ar/api/health" target="_blank" rel="noreferrer">Consultar salud técnica</a></div>
+      <div class="danger-note"><strong>Detener y avisar al coordinador</strong> si el login falla, un perfil ve funciones ajenas, no aparece el manifiesto esperado, se muestra un error técnico o una acción intenta mutar un registro real. No pruebes contraseñas repetidamente ni habilites permisos de cámara/GPS en teléfonos que no usarán la demostración.</div>
+    </section>
+  </main>
+
+  <footer class="container">SITREP · Guía de capacitación en vivo · Versión 2026-09-16 · No contiene contraseñas, correos personales ni datos de manifiestos.</footer>
+  <script>
+    (() => {
+      const key = 'sitrep-guia-en-vivo-checks-v1';
+      const checks = [...document.querySelectorAll('[data-check]')];
+      const bar = document.querySelector('#progress-bar');
+      const label = document.querySelector('#progress-label');
+      const saved = JSON.parse(localStorage.getItem(key) || '{}');
+      checks.forEach(check => { check.checked = Boolean(saved[check.dataset.check]); });
+      const update = () => {
+        const done = checks.filter(check => check.checked).length;
+        const state = Object.fromEntries(checks.map(check => [check.dataset.check, check.checked]));
+        localStorage.setItem(key, JSON.stringify(state));
+        bar.style.width = `${(done / checks.length) * 100}%`;
+        label.textContent = `${done} de ${checks.length} verificados`;
+      };
+      checks.forEach(check => check.addEventListener('change', update));
+      document.querySelector('#reset-checks').addEventListener('click', () => {
+        checks.forEach(check => { check.checked = false; });
+        update();
+      });
+      document.querySelector('#copy-summary').addEventListener('click', async () => {
+        const done = checks.filter(check => check.checked).map(check => `✓ ${check.dataset.check}`);
+        const pending = checks.filter(check => !check.checked).map(check => `• Pendiente: ${check.dataset.check}`);
+        const text = ['SITREP · seguimiento de capacitación', ...done, ...pending].join('\n');
+        try { await navigator.clipboard.writeText(text); alert('Resumen copiado. Podés pegarlo en el canal de coordinación.'); }
+        catch { prompt('Copiá este resumen:', text); }
+      });
+      update();
+    })();
+  </script>
+</body>
+</html>

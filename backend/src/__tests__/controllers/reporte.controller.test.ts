@@ -139,6 +139,32 @@ describe('ReporteController', () => {
         expect.objectContaining({ success: true })
       );
     });
+
+    it('normalizes mass and keeps liters separate in global totals', async () => {
+      const { req, res, next } = createMocks();
+      const item = {
+        ...mockManifiestoItem,
+        residuos: [
+          { cantidad: 500, unidad: 'KG', tipoResiduo: { nombre: 'Aceite usado', codigo: 'Y8' } },
+          { cantidad: 1, unidad: 'tn', tipoResiduo: { nombre: 'Solido', codigo: 'Y12' } },
+          { cantidad: 10, unidad: 'lt', tipoResiduo: { nombre: 'Liquido', codigo: 'Y9' } },
+        ],
+      };
+      mockFindMany.mockResolvedValue([item]);
+      mockCount.mockResolvedValue(1);
+      mockGroupBy.mockResolvedValue([{ estado: 'APROBADO', _count: 1 }]);
+
+      await reporteManifiestosPorPeriodo(req, res, next);
+
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          resumen: expect.objectContaining({
+            totalResiduos: 1500,
+            totalResiduosPorUnidad: { kg: 1500, lt: 10 },
+          }),
+        }),
+      }));
+    });
   });
 
   describe('reporteResiduosTratados', () => {
@@ -176,6 +202,30 @@ describe('ReporteController', () => {
           }),
         })
       );
+    });
+
+    it('uses global trips and numeric completion rate', async () => {
+      const { req, res, next } = createMocks();
+      mockCount.mockResolvedValue(1);
+      mockFindMany
+        .mockResolvedValueOnce([{
+          id: 't-1', razonSocial: 'Transporte', cuit: '30',
+          _count: { vehiculos: 1, choferes: 1 },
+          manifiestos: [{ estado: 'ENTREGADO' }, { estado: 'EN_TRANSITO' }],
+        }])
+        .mockResolvedValueOnce([
+          { estado: 'ENTREGADO', transportistaId: 't-1' },
+          { estado: 'EN_TRANSITO', transportistaId: 't-1' },
+        ]);
+
+      await reporteTransporte(req, res, next);
+
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          resumen: expect.objectContaining({ totalViajes: 2, viajesActivos: 1, tasaCompletitud: 50 }),
+          transportistas: [expect.objectContaining({ tasaCompletitud: 50 })],
+        }),
+      }));
     });
   });
 

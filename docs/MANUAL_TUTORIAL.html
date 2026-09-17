@@ -3284,10 +3284,91 @@
 
         </section>
 
+        <section class="section" id="actualizacion-2026-08" style="margin-top:48px;padding-top:32px;border-top:3px solid #0D8A4F;">
+            <h2>Actualización 25 de agosto de 2026</h2>
+            <p>Esta sección agrega al manual de SITREP y RPTRAZAR Mendoza las nuevas capacidades de altas, revisión documental/OCR y preparación de tratamiento internacional.</p>
+
+            <div class="card" style="margin:16px 0;border-left:4px solid #f59e0b;background:#fffbeb;color:#1f2937;">
+                <h3 style="margin-top:0;color:#1f2937;">Estado funcional</h3>
+                <p>Las altas nacionales e internacionales y la preparación de manifiestos internacionales en <strong>BORRADOR</strong> están implementadas. La firma y las transiciones operativas internacionales permanecen bloqueadas hasta definir el circuito específico de frontera, transporte exterior, recepción, tratamiento y certificado.</p>
+            </div>
+
+            <h3>Formulario modelo para revisar las altas</h3>
+            <p>Las rutas de revisión no crean cuentas, no envían documentos y no modifican solicitudes:</p>
+            <pre>/inscripcion/generador?modo=revision
+/inscripcion/transportista?modo=revision
+/inscripcion/operador?modo=revision</pre>
+            <p>Permiten recorrer el wizard, cargar archivos de prueba y ejecutar OCR local con revisión humana.</p>
+            <figure style="margin:24px 0;text-align:center;">
+                <img src="screenshots/desktop/85_alta_generador_revision_internacional.png" alt="Formulario modelo de alta de generador con alcance internacional" style="max-width:100%;border-radius:10px;border:1px solid #dbe3ea;">
+                <figcaption>Modo revisión local/QA: alta de generador sin efectos persistentes.</figcaption>
+            </figure>
+            <figure style="margin:24px 0;text-align:center;">
+                <img src="screenshots/desktop/86_alta_generador_alcance_internacional.png" alt="Selector de alcance internacional en alta de generador" style="max-width:100%;border-radius:10px;border:1px solid #dbe3ea;">
+                <figcaption>Selector de alcance Internacional y aviso de entidades exteriores aprobadas.</figcaption>
+            </figure>
+
+            <h3>OCR de licencias y cédulas azules</h3>
+            <p>En el alta de transportista se pueden adjuntar como soporte la licencia de conducir y la cédula azul/identificación del vehículo. El OCR local y el OCR backend proponen campos, confianza y texto; la propuesta queda pendiente de confirmación humana y nunca aprueba, firma ni habilita por sí sola.</p>
+            <ul><li><strong>Licencia:</strong> apellido, nombre, DNI, número de licencia, clase y vencimiento.</li><li><strong>Cédula azul:</strong> dominio/patente, titular, DNI/CUIT, marca, modelo y vencimiento.</li><li><strong>Otros documentos:</strong> identificador y vencimiento cuando las etiquetas son legibles.</li></ul>
+            <figure style="margin:24px 0;text-align:center;"><img src="screenshots/desktop/87_ocr_licencia_cedula_transportista.png" alt="OCR local de licencia y cédula azul" style="max-width:100%;border-radius:10px;border:1px solid #dbe3ea;"><figcaption>Tesseract local: campos propuestos, confianza y revisión humana.</figcaption></figure>
+
+            <h3>TEF con liquidación diferida</h3>
+            <p>Durante el alta sólo se guardan las variables declaradas: zona, personal, potencia, superficie, criterios A1–A10, corrientes Y e ISO. No se muestra un MxR dinámico. El backend descarta importes o factores enviados por el navegador y calcula el importe al cierre administrativo con la regla vigente.</p>
+            <figure style="margin:24px 0;text-align:center;"><img src="screenshots/desktop/88_tef_liquidacion_diferida.png" alt="TEF con liquidación diferida" style="max-width:100%;border-radius:10px;border:1px solid #dbe3ea;"><figcaption>Alta TEF: variables declaradas y estado pendiente de liquidación final.</figcaption></figure>
+
+            <h3>Nuevas capacidades de las altas</h3>
+            <table>
+                <tr><th>Capacidad</th><th>Descripción</th></tr>
+                <tr><td>Alcance de tratamiento</td><td>Generadores nacionales o internacionales en alta y edición; la aprobación pública conserva el alcance.</td></tr>
+                <tr><td>OCR asistivo</td><td>Propone campos, confianza y diferencias. Nunca aprueba, firma ni certifica de forma automática.</td></tr>
+                <tr><td>Documentos y ATM</td><td>Revisión humana, vigencia, trazabilidad y deduplicación ATM idempotente por actor.</td></tr>
+                <tr><td>QA aislado</td><td>Las referencias ATM y documentos regulatorios de prueba se identifican por corrida.</td></tr>
+                <tr><td>Login e impersonación</td><td>Los E2E usan selectores estables para shell, errores de autenticación y navegación posterior a impersonar.</td></tr>
+            </table>
+
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin:24px 0;">
+                <figure style="margin:0;text-align:center;"><img src="screenshots/desktop/W17_adm_gen_paso1.png" alt="Alta administrativa de generador" style="max-width:100%;border-radius:8px;"><figcaption>Alta administrativa de generador.</figcaption></figure>
+                <figure style="margin:0;text-align:center;"><img src="screenshots/desktop/W24_adm_oper_paso1.png" alt="Alta administrativa de operador" style="max-width:100%;border-radius:8px;"><figcaption>Alta administrativa de operador.</figcaption></figure>
+            </div>
+
+            <h3>Tratamiento internacional</h3>
+            <p>Las entidades exteriores son registros separados de los actores locales y sólo se pueden seleccionar cuando están aprobadas. El manifiesto internacional exige:</p>
+            <ul>
+                <li>generador con habilitación internacional;</li>
+                <li>transportista exterior aprobado;</li>
+                <li>operador exterior aprobado;</li>
+                <li>declaración de tratamiento internacional de texto libre, hasta 4.000 caracteres.</li>
+            </ul>
+            <p>El PDF incorpora el alcance, la declaración y las entidades exteriores. No se deben mezclar roles locales y exteriores en un mismo manifiesto.</p>
+            <figure style="margin:24px 0;text-align:center;">
+                <img src="screenshots/desktop/57_manifiesto_tratado_detalle.png" alt="Detalle de manifiesto y certificado" style="max-width:100%;border-radius:10px;border:1px solid #dbe3ea;">
+                <figcaption>Referencia del detalle/PDF; la variante internacional agrega sus campos específicos.</figcaption>
+            </figure>
+
+            <h3>Qué falta definir antes de operar internacionalmente</h3>
+            <ul>
+                <li>Estados y firmas de despacho, frontera/aduana, recepción exterior, tratamiento y cierre.</li>
+                <li>Permisos, seguros, autoridades, países, convenios, idioma, traducción y legalización documental.</li>
+                <li>Husos horarios, monedas, unidades, GPS fuera del país, contactos 24x7 y contingencia offline.</li>
+                <li>Certificados, QR, verificación pública, reportes y KPIs separados por alcance.</li>
+                <li>Aplicación de migración, backup, smoke test y rollback en SITREP y RPTRAZAR, sin reiniciar el VPS de Gobierno.</li>
+            </ul>
+
+            <h3>Evidencia de pruebas</h3>
+            <table>
+                <tr><th>Suite</th><th>Resultado</th></tr>
+                <tr><td>SITREP backend</td><td><strong style="color:#16a34a;">290/290 PASS</strong></td></tr>
+                <tr><td>SITREP frontend</td><td><strong style="color:#16a34a;">82/82 PASS</strong></td></tr>
+                <tr><td>Build SITREP y RPTRAZAR</td><td><strong style="color:#16a34a;">PASS</strong></td></tr>
+                <tr><td>E2E remoto en VPS</td><td><strong style="color:#d97706;">Pendiente de visibilidad VPN, migración y ejecución en ambos entornos</strong></td></tr>
+            </table>
+        </section>
+
         <footer
             style="margin-top: 64px; padding-top: 32px; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted);">
             <p><strong>Dirección de Gestión y Fiscalización Ambiental</strong></p>
-            <p>Gobierno de Mendoza - Diciembre 2025</p>
+            <p>Gobierno de Mendoza - Actualizado 25 de agosto de 2026</p>
         </footer>
     </main>
 

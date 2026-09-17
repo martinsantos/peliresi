@@ -1,9 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
 import { Rol } from '@prisma/client';
 import prisma from '../lib/prisma';
 import logger from '../utils/logger';
@@ -11,6 +8,11 @@ import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { emailService } from '../services/email.service';
 import { validatePasswordStrength } from '../utils/passwordStrength';
+import { generateTokens, storeRefreshToken } from './auth.controller';
+import { getRequiredDocumentsFor } from './document-management.controller';
+import { normalizeDni, normalizeDocumentIdentifier, normalizePlate } from '../utils/documentNormalization';
+import { calculateFinalTef, sanitizeTefInputs } from '../utils/tef';
+import { satisfiesDocumentRequirement } from '../utils/documentEligibility';
 
 // ── CUIT normalization (same pattern as auth.controller) ────────────
 function normalizeCuit(raw: string): string | null {
@@ -21,31 +23,54 @@ function normalizeCuit(raw: string): string | null {
 
 // ── Password strength: imported from shared utility ──
 
-// ── Multer setup for document uploads ───────────────────────────────
-const uploadDir = path.join(process.cwd(), 'uploads', 'solicitudes');
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-
-function safeUploadName(originalName: string): string {
-  return path.basename(originalName).replace(/[\r\n"/\\]/g, '_').slice(0, 180) || 'documento';
-}
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (_req, file, cb) => cb(null, `${Date.now()}-${safeUploadName(file.originalname)}`),
-});
-export const upload = multer({
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    if (['application/pdf', 'image/jpeg', 'image/png'].includes(file.mimetype)) cb(null, true);
-    else cb(new AppError('Tipo de archivo no permitido. Solo PDF, JPG, PNG.', 400));
-  },
-}); // 10MB
-
 // Helper: check if user is an admin role
 const ADMIN_ROLES = ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA'];
 function isAdmin(rol: string): boolean {
   return ADMIN_ROLES.includes(rol);
+}
+
+function parseStructuredArray(value: unknown): Record<string, unknown>[] {
+  if (Array.isArray(value)) return value.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'));
+  if (typeof value !== 'string' || !value.trim()) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object')) : [];
+  } catch {
+    return [];
+  }
+}
+
+function parseDateOrDefault(value: unknown, fallbackYears = 1): Date {
+  if (value) {
+    const date = new Date(String(value));
+    if (!Number.isNaN(date.getTime())) return date;
+  }
+  const fallback = new Date();
+  fallback.setFullYear(fallback.getFullYear() + fallbackYears);
+  return fallback;
+}
+
+function parseJsonObject(value: unknown): Record<string, any> {
+  if (value && typeof value === 'object' && !Array.isArray(value)) return value as Record<string, any>;
+  if (typeof value !== 'string' || !value.trim()) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Client TEF values are inputs only. Amounts are intentionally discarded. */
+function sanitizeTefSection(value: unknown): string {
+  const section = parseJsonObject(value);
+  const tefInputs = sanitizeTefInputs(section.tefInputs);
+  const sanitized: Record<string, any> = { ...section, tefInputs, estadoCalculo: 'PENDIENTE_LIQUIDACION' };
+  delete sanitized.factorR;
+  delete sanitized.montoMxR;
+  delete sanitized.TEF;
+  delete sanitized.MxR;
+  return JSON.stringify(sanitized);
 }
 
 // =====================================================================
@@ -110,6 +135,11 @@ export const iniciarSolicitud = async (req: Request, res: Response, next: NextFu
           activo: false,
           emailVerified: false,
           emailVerificationToken: hashedToken,
+          // The verification link issued for a draft must have the same
+          // bounded lifetime as the regular registration flow.  Without an
+          // explicit expiry Prisma stores NULL and verify-email rejects every
+          // newly-created application immediately.
+          emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
         },
       });
 
@@ -125,14 +155,21 @@ export const iniciarSolicitud = async (req: Request, res: Response, next: NextFu
       return { usuario, solicitud };
     });
 
-    // Send email verification (fire-and-forget, don't block)
+    // A restricted session lets the candidate complete only this draft while
+    // email verification/administrative review remain pending. It is not a
+    // normal login and cannot reach actor/workflow routes.
+    const tokens = generateTokens(result.usuario.id, true);
+    await storeRefreshToken(tokens.refreshToken, result.usuario.id);
+
+    // Send email verification (fire-and-forget, don't block). SMTP can be
+    // disabled in the mirror without breaking the draft flow.
     emailService.sendEmailVerification(email, nombre, rawToken).catch((err) => {
       logger.error({ err }, 'Error enviando email de verificacion de solicitud');
     });
 
     res.status(201).json({
       success: true,
-      data: { solicitudId: result.solicitud.id },
+      data: { solicitudId: result.solicitud.id, tokens },
       message: 'Solicitud creada. Revisa tu email para verificar tu cuenta.',
     });
   } catch (error) {
@@ -176,7 +213,32 @@ export const getSolicitud = async (req: AuthRequest, res: Response, next: NextFu
       where: { id },
       include: {
         usuario: { select: { id: true, email: true, nombre: true, cuit: true } },
-        documentos: true,
+        // Never expose the persisted storage key/path. Downloads go through
+        // /api/documentos/:id/download after the authorization check.
+        documentos: {
+          orderBy: { createdAt: 'asc' },
+          select: {
+            id: true,
+            solicitudId: true,
+            tipo: true,
+            cara: true,
+            nombre: true,
+            mimeType: true,
+            size: true,
+            estado: true,
+            observaciones: true,
+            revisadoPor: true,
+            revisadoAt: true,
+            createdAt: true,
+            archivoId: true,
+            sha256: true,
+            estadoScan: true,
+            vigenteDesde: true,
+            vigenteHasta: true,
+            datosOcr: true,
+            confianzaOcr: true,
+          },
+        },
         mensajes: {
           orderBy: { createdAt: 'asc' },
         },
@@ -203,7 +265,7 @@ export const getSolicitud = async (req: AuthRequest, res: Response, next: NextFu
 export const updateSolicitud = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { datosActor, datosResiduos, datosTEF, datosRegulatorio } = req.body;
+    const { datosActor, datosResiduos, datosTEF, datosRegulatorio, datosFormulario } = req.body;
 
     const solicitud = await prisma.solicitudInscripcion.findUnique({ where: { id } });
     if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
@@ -216,11 +278,16 @@ export const updateSolicitud = async (req: AuthRequest, res: Response, next: Nex
       throw new AppError('Solo se pueden editar solicitudes en estado BORRADOR u OBSERVADA', 400);
     }
 
+    // Accept the historical datosFormulario payload while persisting the
+    // canonical typed sections. This keeps old clients resumable without
+    // creating a second untyped source of truth.
+    const canonicalActor = datosActor === undefined ? datosFormulario : datosActor;
+    const canonicalRegulatorio = datosRegulatorio === undefined ? datosFormulario : datosRegulatorio;
     const data: any = {};
-    if (datosActor !== undefined) data.datosActor = typeof datosActor === 'string' ? datosActor : JSON.stringify(datosActor);
+    if (canonicalActor !== undefined) data.datosActor = typeof canonicalActor === 'string' ? canonicalActor : JSON.stringify(canonicalActor);
     if (datosResiduos !== undefined) data.datosResiduos = typeof datosResiduos === 'string' ? datosResiduos : JSON.stringify(datosResiduos);
-    if (datosTEF !== undefined) data.datosTEF = typeof datosTEF === 'string' ? datosTEF : JSON.stringify(datosTEF);
-    if (datosRegulatorio !== undefined) data.datosRegulatorio = typeof datosRegulatorio === 'string' ? datosRegulatorio : JSON.stringify(datosRegulatorio);
+    if (datosTEF !== undefined) data.datosTEF = sanitizeTefSection(datosTEF);
+    if (canonicalRegulatorio !== undefined) data.datosRegulatorio = typeof canonicalRegulatorio === 'string' ? canonicalRegulatorio : JSON.stringify(canonicalRegulatorio);
 
     const updated = await prisma.solicitudInscripcion.update({
       where: { id },
@@ -243,7 +310,7 @@ export const enviarSolicitud = async (req: AuthRequest, res: Response, next: Nex
 
     const solicitud = await prisma.solicitudInscripcion.findUnique({
       where: { id },
-      include: { usuario: { select: { email: true, nombre: true } } },
+      include: { usuario: { select: { email: true, nombre: true } }, documentos: { select: { tipo: true, cara: true, estado: true, estadoScan: true, archivoId: true, vigenteDesde: true, vigenteHasta: true } } },
     });
     if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
 
@@ -269,6 +336,13 @@ export const enviarSolicitud = async (req: AuthRequest, res: Response, next: Nex
     }
     if (!datosActor.domicilio) {
       throw new AppError('El domicilio es obligatorio', 400);
+    }
+
+    const missingDocuments = (await getRequiredDocumentsFor(solicitud.tipoActor))
+      .filter((requirement) => !satisfiesDocumentRequirement(requirement, solicitud.documentos, new Date(), false))
+      .map((requirement) => requirement.nombre);
+    if (missingDocuments.length > 0) {
+      throw new AppError(`Faltan documentos obligatorios: ${missingDocuments.join(', ')}`, 400);
     }
 
     const updated = await prisma.solicitudInscripcion.update({
@@ -303,75 +377,6 @@ export const enviarSolicitud = async (req: AuthRequest, res: Response, next: Nex
     ));
 
     res.json({ success: true, data: { solicitud: updated } });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * POST /solicitudes/:id/documentos
- * Upload file (multer middleware applied in route)
- */
-export const uploadDocumento = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const { tipo } = req.body;
-
-    if (!req.file) throw new AppError('No se envio ningun archivo', 400);
-    if (!tipo) throw new AppError('El tipo de documento es obligatorio', 400);
-
-    const solicitud = await prisma.solicitudInscripcion.findUnique({ where: { id } });
-    if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
-
-    if (solicitud.usuarioId !== req.user!.id && !isAdmin(req.user!.rol)) {
-      throw new AppError('No tiene permisos para subir documentos a esta solicitud', 403);
-    }
-
-    const documento = await prisma.documentoSolicitud.create({
-      data: {
-        solicitudId: id,
-        tipo,
-        nombre: req.file.originalname,
-        path: req.file.path,
-        mimeType: req.file.mimetype,
-        size: req.file.size,
-        estado: 'PENDIENTE',
-      },
-    });
-
-    res.status(201).json({ success: true, data: { documento } });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * DELETE /solicitudes/:id/documentos/:docId
- * Delete own doc
- */
-export const deleteDocumento = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { id, docId } = req.params;
-
-    const solicitud = await prisma.solicitudInscripcion.findUnique({ where: { id } });
-    if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
-
-    if (solicitud.usuarioId !== req.user!.id && !isAdmin(req.user!.rol)) {
-      throw new AppError('No tiene permisos para eliminar documentos de esta solicitud', 403);
-    }
-
-    const documento = await prisma.documentoSolicitud.findUnique({ where: { id: docId } });
-    if (!documento) throw new AppError('Documento no encontrado', 404);
-    if (documento.solicitudId !== id) throw new AppError('El documento no pertenece a esta solicitud', 400);
-
-    // Delete file from disk
-    if (fs.existsSync(documento.path)) {
-      fs.unlinkSync(documento.path);
-    }
-
-    await prisma.documentoSolicitud.delete({ where: { id: docId } });
-
-    res.json({ success: true, message: 'Documento eliminado' });
   } catch (error) {
     next(error);
   }
@@ -640,12 +645,23 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
 
     const solicitud = await prisma.solicitudInscripcion.findUnique({
       where: { id },
-      include: { usuario: { select: { id: true, email: true, nombre: true, cuit: true } } },
+      include: {
+        usuario: { select: { id: true, email: true, nombre: true, cuit: true } },
+        documentos: { select: { id: true, tipo: true, cara: true, estado: true, estadoScan: true, archivoId: true, vigenteDesde: true, vigenteHasta: true } },
+      },
     });
     if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
 
     if (solicitud.estado !== 'EN_REVISION') {
       throw new AppError('Solo se pueden aprobar solicitudes en estado EN_REVISION', 400);
+    }
+
+    const now = new Date();
+    const invalidDocuments = (await getRequiredDocumentsFor(solicitud.tipoActor))
+      .filter((requirement) => !satisfiesDocumentRequirement(requirement, solicitud.documentos, now))
+      .map((requirement) => requirement.nombre);
+    if (invalidDocuments.length > 0) {
+      throw new AppError(`No se puede aprobar: documentos faltantes, no aprobados o vencidos: ${invalidDocuments.join(', ')}`, 400);
     }
 
     const datosActor = JSON.parse(solicitud.datosActor);
@@ -656,8 +672,12 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
       let transportistaId: string | undefined;
 
       if (solicitud.tipoActor === 'GENERADOR') {
+        const datosTEF = parseJsonObject(solicitud.datosTEF);
+        const authoritativeTefInputs = sanitizeTefInputs(datosTEF.tefInputs);
+        const authoritativeTef = authoritativeTefInputs ? calculateFinalTef(authoritativeTefInputs, datosActor.corrientesControl) : null;
         const generador = await tx.generador.create({
           data: {
+            activo: true,
             usuarioId: solicitud.usuarioId,
             razonSocial: datosActor.razonSocial || datosActor.nombre || solicitud.usuario.nombre,
             cuit: datosActor.cuit || solicitud.usuario.cuit || '',
@@ -668,6 +688,9 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
             categoria: datosActor.categoria || 'PENDIENTE',
             actividad: datosActor.actividad,
             rubro: datosActor.rubro,
+            ...(authoritativeTef && { factorR: authoritativeTef.R, montoMxR: authoritativeTef.MxR }),
+            ...(authoritativeTefInputs && { tefInputs: authoritativeTefInputs as any }),
+            ...(datosActor.alcanceTratamiento === 'INTERNACIONAL' && { alcanceTratamiento: 'INTERNACIONAL' }),
             latitud: datosActor.latitud ? parseFloat(datosActor.latitud) : undefined,
             longitud: datosActor.longitud ? parseFloat(datosActor.longitud) : undefined,
           },
@@ -676,6 +699,7 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
       } else if (solicitud.tipoActor === 'OPERADOR') {
         const operador = await tx.operador.create({
           data: {
+            activo: true,
             usuarioId: solicitud.usuarioId,
             razonSocial: datosActor.razonSocial || datosActor.nombre || solicitud.usuario.nombre,
             cuit: datosActor.cuit || solicitud.usuario.cuit || '',
@@ -694,6 +718,7 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
       } else if (solicitud.tipoActor === 'TRANSPORTISTA') {
         const transportista = await tx.transportista.create({
           data: {
+            activo: true,
             usuarioId: solicitud.usuarioId,
             razonSocial: datosActor.razonSocial || datosActor.nombre || solicitud.usuario.nombre,
             cuit: datosActor.cuit || solicitud.usuario.cuit || '',
@@ -714,6 +739,46 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
           },
         });
         transportistaId = transportista.id;
+
+        // Structured cards are the canonical input. The legacy text fields
+        // remain readable for old drafts but are not used to create ambiguous
+        // records. Each created row gets normalized identifiers and its own
+        // validity date; documents are attached later through the secure
+        // vehicle/driver document endpoints.
+        const vehicles = parseStructuredArray(datosActor.vehiculosJson);
+        for (const vehicle of vehicles) {
+          const patente = normalizePlate(String(vehicle.patente || ''));
+          if (!patente) continue;
+          await tx.vehiculo.create({
+            data: {
+              transportistaId: transportista.id,
+              patente,
+              marca: String(vehicle.marca || 'PENDIENTE'),
+              modelo: String(vehicle.modelo || 'PENDIENTE'),
+              anio: Number(vehicle.anio) || new Date().getFullYear(),
+              capacidad: Number(vehicle.capacidad) || 0,
+              numeroHabilitacion: String(vehicle.numeroHabilitacion || datosActor.numeroHabilitacion || 'PENDIENTE'),
+              vencimiento: parseDateOrDefault(vehicle.vencimiento || datosActor.vencimientoHabilitacion),
+            },
+          });
+        }
+        const drivers = parseStructuredArray(datosActor.choferesJson);
+        for (const driver of drivers) {
+          const dni = normalizeDni(String(driver.dni || ''));
+          if (!dni) continue;
+          const fullName = String(driver.nombre || '').trim();
+          await tx.chofer.create({
+            data: {
+              transportistaId: transportista.id,
+              nombre: fullName || 'PENDIENTE',
+              apellido: String(driver.apellido || '').trim(),
+              dni,
+              licencia: normalizeDocumentIdentifier(String(driver.licencia || 'PENDIENTE')),
+              vencimiento: parseDateOrDefault(driver.vencimiento),
+              telefono: String(driver.telefono || ''),
+            },
+          });
+        }
       }
 
       // Update solicitud
@@ -738,6 +803,39 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
           rol: solicitud.tipoActor as Rol,
         },
       });
+
+      // Promote the approved request files into the permanent regulatory
+      // expediente without deleting the historical request rows.
+      const approvedDocs = solicitud.documentos.filter((documento) => documento.estado === 'APROBADO' && documento.estadoScan === 'LIMPIO' && documento.archivoId);
+      const typeMap: Record<string, any> = {
+        CONSTANCIA_AFIP: 'CONSTANCIA_AFIP',
+        MEMORIA_TECNICA: 'MEMORIA_TECNICA',
+        CERTIFICADO_HABILITACION: 'CERTIFICADO_HABILITACION',
+        RESOLUCION_DPA: 'RESOLUCION_DPA',
+        SEGURO_AMBIENTAL: 'SEGURO_AMBIENTAL',
+        LICENCIA_CONDUCIR: 'LICENCIA_CONDUCIR',
+        TARJETA_IDENTIFICACION_VEHICULO: 'TARJETA_IDENTIFICACION_VEHICULO',
+      };
+      for (const documento of approvedDocs) {
+        const tipo = typeMap[documento.tipo];
+        if (!tipo || !documento.archivoId) continue;
+        await tx.documentoRegulatorio.create({
+          data: {
+            archivoId: documento.archivoId,
+            tipo,
+            estado: 'APROBADO',
+            generadorId,
+            operadorId,
+            transportistaId,
+            solicitudId: id,
+            revisadoPorId: req.user!.id,
+            revisadoAt: new Date(),
+            cara: documento.cara,
+            vigenteDesde: documento.vigenteDesde,
+            vigenteHasta: documento.vigenteHasta,
+          },
+        });
+      }
 
       return updated;
     });

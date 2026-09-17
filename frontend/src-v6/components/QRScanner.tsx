@@ -16,6 +16,7 @@ import {
   SwitchCamera,
   Flashlight,
   Camera,
+  Image as ImageIcon,
   AlertCircle,
   RefreshCw,
 } from 'lucide-react';
@@ -51,6 +52,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
   const streamRef = useRef<MediaStream | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // State
   const [status, setStatus] = useState<ScannerStatus>('initializing');
@@ -232,11 +234,53 @@ const QRScanner: React.FC<QRScannerProps> = ({
     startCamera(facing);
   };
 
+  const scanImageFile = async (file: File) => {
+    try {
+      const bitmap = await createImageBitmap(file);
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const maxSide = 1800;
+      const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      if (!context) throw new Error('No se pudo procesar la imagen');
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close();
+      const image = context.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(image.data, image.width, image.height, { inversionAttempts: 'attemptBoth' });
+      if (!code?.data) {
+        setStatus('error');
+        setErrorMessage('No se encontró un código QR legible en la imagen. Pruebe con una foto más nítida.');
+        return;
+      }
+      stopStream();
+      onScan(code.data);
+    } catch (error) {
+      setStatus('error');
+      setErrorMessage(error instanceof Error ? error.message : 'No se pudo leer la imagen seleccionada.');
+    }
+  };
+
+  const chooseQrImage = () => fileInputRef.current?.click();
+
   // -----------------------------------------------------------
   // Render
   // -----------------------------------------------------------
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-neutral-900">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        aria-label="Elegir imagen con código QR"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = '';
+          if (file) void scanImageFile(file);
+        }}
+      />
       {/* ---- Header ---- */}
       <header className="flex items-center justify-between px-4 py-3 bg-neutral-900/90 backdrop-blur-sm z-20">
         <button
@@ -344,6 +388,9 @@ const QRScanner: React.FC<QRScannerProps> = ({
             <Button variant="primary" onClick={handleRetry} leftIcon={<RefreshCw size={18} />}>
               Reintentar
             </Button>
+            <Button variant="outline" onClick={chooseQrImage} leftIcon={<ImageIcon size={18} />} className="border-white/20 text-white hover:bg-white/10">
+              Leer desde una foto
+            </Button>
           </div>
         )}
 
@@ -357,14 +404,13 @@ const QRScanner: React.FC<QRScannerProps> = ({
             <p className="text-white/60 text-sm max-w-xs">{errorMessage}</p>
             <Button
               variant="outline"
-              onClick={() => {
-                stopStream();
-                onClose();
-              }}
+              onClick={chooseQrImage}
+              leftIcon={<ImageIcon size={18} />}
               className="border-white/20 text-white hover:bg-white/10"
             >
-              Volver
+              Leer desde una foto
             </Button>
+            <Button variant="outline" onClick={() => { stopStream(); onClose(); }} className="border-white/20 text-white hover:bg-white/10">Volver</Button>
           </div>
         )}
 
@@ -376,9 +422,12 @@ const QRScanner: React.FC<QRScannerProps> = ({
             </div>
             <h2 className="text-white text-lg font-semibold">Error de camara</h2>
             <p className="text-white/60 text-sm max-w-xs">{errorMessage}</p>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap justify-center gap-3">
               <Button variant="primary" onClick={handleRetry} leftIcon={<RefreshCw size={18} />}>
                 Reintentar
+              </Button>
+              <Button variant="outline" onClick={chooseQrImage} leftIcon={<ImageIcon size={18} />} className="border-white/20 text-white hover:bg-white/10">
+                Elegir foto
               </Button>
               <Button
                 variant="outline"
@@ -429,6 +478,14 @@ const QRScanner: React.FC<QRScannerProps> = ({
               aria-label="Cambiar camara"
             >
               <SwitchCamera size={24} />
+            </button>
+
+            <button
+              onClick={chooseQrImage}
+              className="p-4 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+              aria-label="Leer QR desde una foto"
+            >
+              <ImageIcon size={24} />
             </button>
           </div>
         </div>

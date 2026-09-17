@@ -26,13 +26,13 @@ import { Select } from '../../components/ui/Select';
 import { toast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useManifiesto, useUpdateManifiesto } from '../../hooks/useManifiestos';
-import { useTiposResiduo, useCatalogoGeneradores, useCatalogoTransportistas, useCatalogoOperadores } from '../../hooks/useCatalogos';
+import { useTiposResiduo, useCatalogoGeneradores, useCatalogoTransportistas, useCatalogoOperadores, useCatalogoEntidadesExteriores } from '../../hooks/useCatalogos';
 import { EstadoManifiesto } from '../../types/models';
 
 export const EditarManifiestoPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isAdmin, isGenerador } = useAuth();
+  const { isAdmin, isGenerador, isAdminGenerador } = useAuth();
   // Removed isMobile — React Router handles basename
 
   // Load existing manifiesto
@@ -44,11 +44,15 @@ export const EditarManifiestoPage: React.FC = () => {
   const { data: apiGeneradores } = useCatalogoGeneradores();
   const { data: apiTransportistas } = useCatalogoTransportistas();
   const { data: apiOperadores } = useCatalogoOperadores();
+  const { data: apiTransportistasExteriores } = useCatalogoEntidadesExteriores('TRANSPORTISTA');
+  const { data: apiOperadoresExteriores } = useCatalogoEntidadesExteriores('OPERADOR');
 
   const tiposResiduo = apiTiposResiduo || [];
   const generadoresList = apiGeneradores || [];
   const transportistasList = apiTransportistas || [];
   const operadoresList = apiOperadores || [];
+  const transportistasExteriores = apiTransportistasExteriores || [];
+  const operadoresExteriores = apiOperadoresExteriores || [];
 
   const [step, setStep] = useState(1);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
@@ -58,8 +62,12 @@ export const EditarManifiestoPage: React.FC = () => {
   const [formData, setFormData] = useState({
     generadorId: '',
     generador: '',
+    alcanceTratamiento: 'NACIONAL' as 'NACIONAL' | 'INTERNACIONAL',
     transportista: '',
     operador: '',
+    transportistaExterior: '',
+    operadorExterior: '',
+    declaracionTratamientoInternacional: '',
     fechaRetiro: new Date().toISOString().split('T')[0],
     observaciones: '',
     residuos: [{ tipo: '', cantidad: '', unidad: 'kg' }] as { tipo: string; cantidad: string; unidad: string }[],
@@ -71,8 +79,12 @@ export const EditarManifiestoPage: React.FC = () => {
       setFormData({
         generadorId: manifiesto.generadorId || '',
         generador: manifiesto.generador?.razonSocial || '',
+        alcanceTratamiento: manifiesto.alcanceTratamiento || 'NACIONAL',
         transportista: manifiesto.transportistaId || '',
         operador: manifiesto.operadorId || '',
+        transportistaExterior: manifiesto.transportistaExteriorId || '',
+        operadorExterior: manifiesto.operadorExteriorId || '',
+        declaracionTratamientoInternacional: manifiesto.declaracionTratamientoInternacional || '',
         fechaRetiro: manifiesto.fechaRetiro
           ? new Date(manifiesto.fechaRetiro).toISOString().split('T')[0]
           : new Date().toISOString().split('T')[0],
@@ -93,6 +105,9 @@ export const EditarManifiestoPage: React.FC = () => {
   const selectedGenerador = generadoresList.find((g) => g.id === formData.generadorId);
   const selectedTransportista = transportistasList.find((t) => t.id === formData.transportista);
   const selectedOperador = operadoresList.find((o) => o.id === formData.operador);
+  const selectedTransportistaExterior = transportistasExteriores.find((t: any) => t.id === formData.transportistaExterior);
+  const selectedOperadorExterior = operadoresExteriores.find((o: any) => o.id === formData.operadorExterior);
+  const isInternational = formData.alcanceTratamiento === 'INTERNACIONAL';
 
   const handleAddResiduo = () => {
     setFormData({
@@ -118,11 +133,13 @@ export const EditarManifiestoPage: React.FC = () => {
     if (!formData.generadorId) {
       errors.generador = 'El generador es requerido';
     }
-    if (!formData.transportista) {
-      errors.transportista = 'El transportista es requerido';
-    }
-    if (!formData.operador) {
-      errors.operador = 'El operador es requerido';
+    if (isInternational) {
+      if (!formData.transportistaExterior) errors.transportistaExterior = 'El transportista exterior es requerido';
+      if (!formData.operadorExterior) errors.operadorExterior = 'El operador exterior es requerido';
+      if (!formData.declaracionTratamientoInternacional.trim()) errors.declaracionTratamientoInternacional = 'La declaración internacional es requerida';
+    } else {
+      if (!formData.transportista) errors.transportista = 'El transportista es requerido';
+      if (!formData.operador) errors.operador = 'El operador es requerido';
     }
 
     const hasInvalidResiduos = formData.residuos.some(
@@ -146,8 +163,20 @@ export const EditarManifiestoPage: React.FC = () => {
       await updateManifiesto.mutateAsync({
         id: id!,
         generadorId: formData.generadorId,
-        transportistaId: formData.transportista,
-        operadorId: formData.operador,
+        alcanceTratamiento: formData.alcanceTratamiento,
+        ...(isInternational ? {
+          transportistaId: null,
+          operadorId: null,
+          transportistaExteriorId: formData.transportistaExterior,
+          operadorExteriorId: formData.operadorExterior,
+          declaracionTratamientoInternacional: formData.declaracionTratamientoInternacional.trim(),
+        } : {
+          transportistaId: formData.transportista,
+          operadorId: formData.operador,
+          transportistaExteriorId: null,
+          operadorExteriorId: null,
+          declaracionTratamientoInternacional: null,
+        }),
         observaciones: formData.observaciones || undefined,
         residuos: formData.residuos.map((r) => ({
           tipoResiduoId: r.tipo,
@@ -212,7 +241,7 @@ export const EditarManifiestoPage: React.FC = () => {
   }
 
   // Permission guard
-  const canEdit = isAdmin || isGenerador;
+  const canEdit = isAdmin || isGenerador || isAdminGenerador;
   if (!canEdit) {
     return (
       <div className="min-h-screen bg-neutral-50 pb-20">
@@ -343,6 +372,10 @@ export const EditarManifiestoPage: React.FC = () => {
                       <p className="text-sm font-semibold text-neutral-900">{selectedGenerador.numeroInscripcion}</p>
                     </div>
                   )}
+                  <div className={`rounded-lg border px-3 py-2 ${isInternational ? 'border-purple-200 bg-purple-50' : 'border-neutral-200 bg-white'}`}>
+                    <label className="block text-xs font-medium text-neutral-500 mb-0.5">Alcance del tratamiento</label>
+                    <p className={`text-sm font-semibold ${isInternational ? 'text-purple-700' : 'text-neutral-900'}`}>{isInternational ? 'INTERNACIONAL' : 'NACIONAL'}</p>
+                  </div>
                 </div>
               )}
 
@@ -454,6 +487,45 @@ export const EditarManifiestoPage: React.FC = () => {
               subtitle="Información del transportista y destino final"
             />
             <CardContent className="space-y-4 animate-fade-in">
+              {isInternational && (
+                <div className="space-y-4 rounded-xl border border-purple-200 bg-purple-50 p-4">
+                  <p className="text-sm text-purple-800">Tratamiento internacional: las entidades exteriores deben estar aprobadas.</p>
+                  <Select
+                    label="Transportista en el exterior *"
+                    value={formData.transportistaExterior}
+                    onChange={(val) => setFormData({ ...formData, transportistaExterior: val })}
+                    options={transportistasExteriores.map((t: any) => ({ value: t.id, label: `${t.razonSocial} — ${t.pais}` }))}
+                    placeholder="Buscar transportista exterior..."
+                    searchable
+                    errorMessage={validationErrors.transportistaExterior}
+                  />
+                  {selectedTransportistaExterior && <p className="text-xs text-purple-700">{selectedTransportistaExterior.pais}</p>}
+                  <Select
+                    label="Operador en el exterior *"
+                    value={formData.operadorExterior}
+                    onChange={(val) => setFormData({ ...formData, operadorExterior: val })}
+                    options={operadoresExteriores.map((o: any) => ({ value: o.id, label: `${o.razonSocial} — ${o.pais}` }))}
+                    placeholder="Buscar operador exterior..."
+                    searchable
+                    errorMessage={validationErrors.operadorExterior}
+                  />
+                  {selectedOperadorExterior && <p className="text-xs text-purple-700">{selectedOperadorExterior.pais}</p>}
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Declaración de tratamiento internacional *</label>
+                    <textarea
+                      value={formData.declaracionTratamientoInternacional}
+                      onChange={(e) => setFormData({ ...formData, declaracionTratamientoInternacional: e.target.value })}
+                      rows={4}
+                      maxLength={4000}
+                      className="w-full px-3 py-2 rounded-lg border border-purple-200 bg-white focus:border-purple-500 focus:outline-none resize-none"
+                      placeholder="Describa el tratamiento, destino y condiciones internacionales..."
+                    />
+                    {validationErrors.declaracionTratamientoInternacional && <p className="text-xs text-error-500 mt-1">{validationErrors.declaracionTratamientoInternacional}</p>}
+                  </div>
+                </div>
+              )}
+
+              {!isInternational && <>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Transportista *
@@ -549,6 +621,7 @@ export const EditarManifiestoPage: React.FC = () => {
                   )}
                 </div>
               )}
+              </>}
 
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">

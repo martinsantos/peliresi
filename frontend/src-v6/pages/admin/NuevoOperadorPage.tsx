@@ -303,7 +303,7 @@ const NuevoOperadorPage: React.FC = () => {
         } as CreateOperadorRequest);
         const resultObj = result as Operador & { operador?: { id: string } };
         operadorId = resultObj?.operador?.id || resultObj?.id;
-        toast.success('Operador creado', `${form.razonSocial} registrado exitosamente`);
+        toast.success('Registro creado', `${form.razonSocial} quedó inactivo hasta validar su documentación y habilitarlo desde el expediente.`);
       }
 
       const filesToUpload = Object.entries(adjuntos);
@@ -637,7 +637,7 @@ const NuevoOperadorPage: React.FC = () => {
               </div>
             </CardHeader>
             <CardContent>
-              <CalculadoraTEF corrientesY={corrientesCodes} tieneISO={false} inline initialInputs={tefInputs} onInputsChange={setTefInputs} />
+              <CalculadoraTEF corrientesY={corrientesCodes} tieneISO={false} inline initialInputs={tefInputs} onInputsChange={setTefInputs} deferred />
             </CardContent>
           </Card>
         )}

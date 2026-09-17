@@ -25,6 +25,27 @@ function renameAppHtml(): Plugin {
   }
 }
 
+function cleanAppleDoubleFiles(): Plugin {
+  return {
+    name: 'clean-apple-double',
+    closeBundle() {
+      const outDir = path.resolve(__dirname, 'dist-app')
+      if (!fs.existsSync(outDir)) return
+      const walk = (directory: string) => {
+        for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+          const target = path.join(directory, entry.name)
+          if (entry.name.startsWith('._')) {
+            fs.rmSync(target, { recursive: true, force: true })
+          } else if (entry.isDirectory()) {
+            walk(target)
+          }
+        }
+      }
+      walk(outDir)
+    },
+  }
+}
+
 // Plugin para generar precache manifest y versionar el SW
 function pwaPrecachePlugin(): Plugin {
   return {
@@ -36,27 +57,37 @@ function pwaPrecachePlugin(): Plugin {
       // Build version from timestamp
       const version = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14)
 
-      // Collect app shell assets (NOT lazy-loaded page chunks)
+      // Precache every hashed chunk. The app is used in vehicles with hostile
+      // connectivity; QR/GPS pages must be available after a fresh install.
       const precacheUrls: string[] = []
 
       if (fs.existsSync(assetsDir)) {
         const files = fs.readdirSync(assetsDir)
         for (const file of files) {
-          // Precache: vendor, main, ui bundles + CSS (the app shell)
-          // Skip: page-specific chunks (lazy loaded on demand)
-          if (
-            file.match(/^(vendor|main|ui)-.*\.(js|css)$/) ||
-            file.match(/^index\..*\.css$/)
-          ) {
+          if (!file.startsWith('._') && (file.endsWith('.js') || file.endsWith('.css'))) {
             precacheUrls.push(`/app/assets/${file}`)
           }
         }
       }
 
-      // Add icon files if they exist
-      for (const icon of ['icon-192.png', 'icon-512.png']) {
+      // Keep the institutional artwork available with the installed app.
+      for (const icon of ['icon-192.png', 'icon-512.png', 'mendoza-marca-horizontal-transparente.png', 'mendoza-marca-secundaria-transparente.png']) {
         if (fs.existsSync(path.join(outDir, icon))) {
           precacheUrls.push(`/app/${icon}`)
+        }
+      }
+
+      // OCR is intentionally local and lazy in the UI, but once the user
+      // opens the document scanner the PWA must keep the worker, WASM and
+      // Spanish language model available during a connectivity outage.
+      for (const ocrAsset of [
+        'worker.min.js',
+        'tesseract-core.wasm.js',
+        'tesseract-core.wasm',
+        'spa.traineddata',
+      ]) {
+        if (fs.existsSync(path.join(outDir, 'ocr', ocrAsset))) {
+          precacheUrls.push(`/app/ocr/${ocrAsset}`)
         }
       }
 
@@ -95,7 +126,11 @@ function manualChunks(id: string) {
 }
 
 export default defineConfig({
-  plugins: [react(), renameAppHtml(), pwaPrecachePlugin()],
+  plugins: [react(), renameAppHtml(), pwaPrecachePlugin(), cleanAppleDoubleFiles()],
+
+  define: {
+    'import.meta.env.VITE_SITREP_PWA': JSON.stringify('true'),
+  },
 
   base: '/app/',
 

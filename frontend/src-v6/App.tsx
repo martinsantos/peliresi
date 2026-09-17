@@ -5,12 +5,12 @@
  */
 
 import React, { Suspense } from 'react';
-import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet, useParams, useLocation } from 'react-router-dom';
 
 // ========================================
 // CONTEXTS & COMPONENTS
 // ========================================
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth, type UserRole } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -27,8 +27,8 @@ import { MobileLayout } from './layouts/MobileLayout';
 import {
   LoginPage, LandingPage, RegistroPage, VerificarEmailPage, ForgotPasswordPage,
   ResetPasswordPage, ReclamarCuentaPage, UserSwitcherPage,
-  DashboardPage, CentroControlPage, WarRoomPage,
-  ManifiestosPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
+  DashboardPage, CentroControlPage, WarRoomPage, InspeccionesPage, InspeccionDetallePage,
+  ManifiestosPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage, VerificarCertificadoPage,
   ViajeEnCursoPage, TransportePerfilPage, ViajeEnCursoTransportista,
   ActoresPage, OperadoresPage, OperadorDetallePage, TransportistasPage, TransportistaDetallePage,
   ReportesPage, AlertasPage, ConfiguracionPage,
@@ -52,6 +52,31 @@ const PageLoader: React.FC = () => (
     </div>
   </div>
 );
+
+const NON_AUDITOR_ROLES: UserRole[] = [
+  'ADMIN', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR',
+  'ADMIN_TRANSPORTISTA', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR',
+];
+
+/** UI boundary matching the API's AUDITOR read-only policy. */
+const AuditorReadOnlyBoundary: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
+  const { isAuditor } = useAuth();
+  const location = useLocation();
+  if (!isAuditor) return <Outlet />;
+
+  const prefix = mobile ? '/mobile' : '';
+  const path = location.pathname;
+  const exactAllowed = new Set([
+    `${prefix || ''}/dashboard`,
+    ...(mobile ? ['/mobile'] : []),
+    `${prefix}/manifiestos`, `${prefix}/reportes`, `${prefix}/alertas`, `${prefix}/ayuda`,
+  ]);
+  const manifestDetail = new RegExp(`^${prefix}/manifiestos/[^/]+$`).test(path) && !path.endsWith('/nuevo');
+  if (!exactAllowed.has(path) && !manifestDetail) {
+    return <Navigate to={`${prefix}/dashboard`} replace />;
+  }
+  return <Outlet />;
+};
 
 // ========================================
 // TRACKING REDIRECT (legacy routes → centro-control)
@@ -95,10 +120,12 @@ function App() {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/reclamar" element={<ReclamarCuentaPage />} />
           <Route path="/inscripcion/:tipo" element={<InscripcionWizardPage />} />
+          <Route path="/certificados/verificar/:token" element={<VerificarCertificadoPage />} />
         </Route>
 
         {/* Mobile Routes - Protected */}
         <Route element={<ProtectedRoute />}>
+          <Route element={<AuditorReadOnlyBoundary mobile />}>
           <Route element={<MobileLayout />}>
             <Route path="/mobile" element={<MobileDashboardPage />} />
             <Route path="/mobile/dashboard" element={<MobileDashboardPage />} />
@@ -108,20 +135,29 @@ function App() {
             <Route path="/mobile/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
             <Route path="/mobile/manifiestos/:id/editar" element={<EditarManifiestoPage />} />
             <Route path="/mobile/manifiestos/:id" element={<ManifiestoDetallePage />} />
+            <Route path="/mobile/inspecciones" element={<InspeccionesPage />} />
+            <Route path="/mobile/inspecciones/:id" element={<InspeccionDetallePage />} />
             <Route path="/mobile/transporte/perfil" element={<TransportePerfilPage />} />
             <Route path="/mobile/transporte/viaje/:id" element={<ViajeEnCursoTransportista />} />
-            <Route path="/mobile/admin/usuarios" element={<UsuariosPage />} />
             <Route path="/mobile/reportes" element={<ReportesPage />} />
             <Route path="/mobile/alertas" element={<AlertasPage />} />
             <Route path="/mobile/notificaciones" element={<NotificacionesPage />} />
             <Route path="/mobile/configuracion" element={<ConfiguracionPage />} />
             <Route path="/mobile/mi-perfil" element={<PerfilPage />} />
             <Route path="/mobile/ayuda" element={<AyudaPage />} />
-            <Route path="/mobile/switch-user" element={<UserSwitcherPage />} />
 
             {/* Mobile Special Routes */}
             <Route path="/mobile/escaner-qr" element={<EscanerQRPage />} />
             <Route path="/mobile/estadisticas" element={<EstadisticasPage />} />
+          </Route>
+          </Route>
+        </Route>
+
+        {/* Mobile user administration and impersonation — root ADMIN only */}
+        <Route element={<ProtectedRoute roles={['ADMIN']} />}>
+          <Route element={<MobileLayout />}>
+            <Route path="/mobile/admin/usuarios" element={<UsuariosPage />} />
+            <Route path="/mobile/switch-user" element={<UserSwitcherPage />} />
           </Route>
         </Route>
 
@@ -129,8 +165,13 @@ function App() {
         <Route element={<ProtectedRoute roles={['ADMIN']} />}>
           <Route element={<MobileLayout />}>
             <Route path="/mobile/admin/actores" element={<ActoresPage />} />
-            <Route path="/mobile/admin/auditoria" element={<AuditoriaPage />} />
             <Route path="/mobile/admin/carga-masiva" element={<CargaMasivaPage />} />
+          </Route>
+        </Route>
+
+        <Route element={<ProtectedRoute roles={['ADMIN', 'AUDITOR']} />}>
+          <Route element={<MobileLayout />}>
+            <Route path="/mobile/admin/auditoria" element={<AuditoriaPage />} />
           </Route>
         </Route>
 
@@ -180,12 +221,13 @@ function App() {
         </Route>
 
         {/* War Room Monitor — full-screen, outside MainLayout */}
-        <Route element={<ProtectedRoute />}>
+        <Route element={<ProtectedRoute roles={NON_AUDITOR_ROLES} />}>
           <Route path="/monitor" element={<WarRoomPage />} />
         </Route>
 
         {/* Main Routes - Protected */}
         <Route element={<ProtectedRoute />}>
+          <Route element={<AuditorReadOnlyBoundary />}>
           <Route element={<MainLayout />}>
             {/* Dashboard */}
             <Route path="/dashboard" element={<DashboardPage />} />
@@ -197,6 +239,8 @@ function App() {
             <Route path="/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
             <Route path="/manifiestos/:id/editar" element={<EditarManifiestoPage />} />
             <Route path="/manifiestos/:id" element={<ManifiestoDetallePage />} />
+            <Route path="/inspecciones" element={<InspeccionesPage />} />
+            <Route path="/inspecciones/:id" element={<InspeccionDetallePage />} />
 
             {/* Transporte */}
             <Route path="/transporte/perfil" element={<TransportePerfilPage />} />
@@ -207,6 +251,7 @@ function App() {
 
             {/* Alertas */}
             <Route path="/alertas" element={<AlertasPage />} />
+            <Route path="/notificaciones" element={<NotificacionesPage />} />
 
             {/* Configuración */}
             <Route path="/configuracion" element={<ConfiguracionPage />} />
@@ -222,10 +267,11 @@ function App() {
             <Route path="/mi-perfil/solicitar-cambios" element={<SolicitarCambiosPage />} />
 
           </Route>
+          </Route>
         </Route>
 
         {/* Admin Solicitudes - ADMIN + sub-admins */}
-        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR']} />}>
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR']} />}>
           <Route element={<MainLayout />}>
             <Route path="/admin/solicitudes" element={<AdminSolicitudesPage />} />
             <Route path="/admin/solicitudes/:id" element={<SolicitudDetallePage />} />
@@ -240,11 +286,17 @@ function App() {
           </Route>
         </Route>
 
-        {/* Blockchain + Carga Masiva + Auditoria - All admin roles */}
+        {/* Blockchain + Carga Masiva - All mutating admin roles */}
         <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR']} />}>
           <Route element={<MainLayout />}>
             <Route path="/admin/blockchain" element={<AdminBlockchainPage />} />
             <Route path="/admin/carga-masiva" element={<CargaMasivaPage />} />
+          </Route>
+        </Route>
+
+        {/* Audit log is read-only and available to root ADMIN and AUDITOR. */}
+        <Route element={<ProtectedRoute roles={['ADMIN', 'AUDITOR']} />}>
+          <Route element={<MainLayout />}>
             <Route path="/admin/auditoria" element={<AuditoriaPage />} />
           </Route>
         </Route>
@@ -301,8 +353,10 @@ function App() {
         {/* Legacy /v6/ QR redirect — QR codes ya impresos apuntan a /v6/manifiestos/verificar/... */}
         <Route path="/v6/manifiestos/verificar/:numero" element={<V6VerificarRedirect />} />
 
-        {/* User Switcher */}
-        <Route path="/switch-user" element={<UserSwitcherPage />} />
+        {/* User Switcher — root ADMIN only */}
+        <Route element={<ProtectedRoute roles={['ADMIN']} />}>
+          <Route path="/switch-user" element={<UserSwitcherPage />} />
+        </Route>
 
         {/* Redirects */}
         <Route path="/" element={<LandingPage />} />

@@ -6,8 +6,9 @@ import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { verificarVencimientos } from '../jobs/vencimiento.job';
 import { emailService } from '../services/email.service';
-import { generateTokens } from './auth.controller';
+import { generateTokens, storeRefreshToken } from './auth.controller';
 import { parseDateRange } from '../utils/dateRange';
+import { canImpersonateUser } from '../utils/privilegedAccess';
 
 // ============== USUARIOS CRUD (Admin) ==============
 
@@ -16,7 +17,7 @@ const createUsuarioSchema = z.object({
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
   nombre: z.string().min(1, 'El nombre es requerido'),
   apellido: z.string().optional(),
-  rol: z.enum(['ADMIN', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR']),
+  rol: z.enum(['ADMIN', 'AUDITOR', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR']),
   empresa: z.string().optional(),
   telefono: z.string().optional(),
   cuit: z.string().optional(),
@@ -32,7 +33,7 @@ const updateUsuarioSchema = z.object({
   activo: z.boolean().optional(),
   esInspector: z.boolean().optional(),
   emailVerified: z.boolean().optional(),
-  rol: z.enum(['ADMIN', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR']).optional(),
+  rol: z.enum(['ADMIN', 'AUDITOR', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR']).optional(),
 });
 
 export const getUsuarios = async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -343,8 +344,8 @@ export const updatePreferenciasNotificacion = async (req: AuthRequest, res: Resp
 export const impersonateUsuario = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { userId } = req.params;
-    if (req.user?.rol !== 'ADMIN') {
-      throw new AppError('Solo ADMIN raíz puede impersonar usuarios', 403);
+    if (!canImpersonateUser(req.user)) {
+      throw new AppError('Esta cuenta no está autorizada para impersonar usuarios', 403);
     }
 
     const target = await prisma.usuario.findUnique({
@@ -356,7 +357,25 @@ export const impersonateUsuario = async (req: AuthRequest, res: Response, next: 
     if (!target.activo) throw new AppError('Usuario inactivo', 400);
     if (target.id === req.user.id) throw new AppError('No podés impersonarte a vos mismo', 400);
 
+    // Root accounts in the explicit impersonation allowlist can inspect any
+    // active profile. Sector administrators remain constrained to their own
+    // actor domain even when they are allowed to use the switcher.
+    if (req.user.rol !== 'ADMIN') {
+      const relationByRole: Record<string, 'generador' | 'transportista' | 'operador'> = {
+        ADMIN_GENERADOR: 'generador',
+        ADMIN_TRANSPORTISTA: 'transportista',
+        ADMIN_OPERADOR: 'operador',
+      };
+      const relation = relationByRole[req.user.rol];
+      if (!relation || !target[relation]) {
+        throw new AppError('El perfil objetivo está fuera del alcance sectorial', 403);
+      }
+    }
+
     const { accessToken, refreshToken } = generateTokens(target.id);
+    // Impersonation is a real session: persist the refresh token just like a
+    // normal login so the session survives access-token rotation/expiry.
+    await storeRefreshToken(refreshToken, target.id);
 
     try {
       await prisma.auditoria.create({
@@ -384,6 +403,7 @@ export const impersonateUsuario = async (req: AuthRequest, res: Response, next: 
           id: target.id, email: target.email, rol: target.rol,
           nombre: target.nombre, apellido: target.apellido,
           empresa: target.empresa, activo: target.activo,
+          esDemo: target.esDemo,
           generador: target.generador, transportista: target.transportista, operador: target.operador,
         },
         tokens: { accessToken, refreshToken },

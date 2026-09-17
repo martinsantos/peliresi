@@ -8,6 +8,17 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { processSyncQueue } from '../services/indexeddb';
 
+let activeQueueRun: Promise<number> | null = null;
+
+function runSyncQueueOnce(currentUserId?: string | number): Promise<number> {
+  if (!activeQueueRun) {
+    activeQueueRun = processSyncQueue(currentUserId).finally(() => {
+      activeQueueRun = null;
+    });
+  }
+  return activeQueueRun;
+}
+
 export interface ConnectivityState {
   /** true si navigator.onLine reporta conectividad */
   isOnline: boolean;
@@ -26,6 +37,8 @@ interface UseConnectivityOptions {
   debounceMs?: number;
   /** Habilitar ping al API. Default: true */
   enablePing?: boolean;
+  /** Current principal used to scope queued mutations on reconnect. */
+  currentUserId?: string | number;
 }
 
 export function useConnectivity(options: UseConnectivityOptions = {}): ConnectivityState {
@@ -34,6 +47,7 @@ export function useConnectivity(options: UseConnectivityOptions = {}): Connectiv
     pingInterval = 30_000,
     debounceMs = 1_000,
     enablePing = true,
+    currentUserId,
   } = options;
 
   const [state, setState] = useState<ConnectivityState>({
@@ -77,10 +91,11 @@ export function useConnectivity(options: UseConnectivityOptions = {}): Connectiv
         signal: AbortSignal.timeout(5_000),
       });
       updateState({ isApiReachable: res.ok });
+      if (res.ok) void runSyncQueueOnce(currentUserId);
     } catch {
       updateState({ isApiReachable: false });
     }
-  }, [enablePing, healthEndpoint, updateState]);
+  }, [enablePing, healthEndpoint, updateState, currentUserId]);
 
   // Handle browser online/offline events
   useEffect(() => {
@@ -90,7 +105,7 @@ export function useConnectivity(options: UseConnectivityOptions = {}): Connectiv
       if (wasOffline.current) {
         wasOffline.current = false;
         checkApi();
-        processSyncQueue().then(() => {
+        runSyncQueueOnce(currentUserId).then(() => {
           // Sync queue processed on reconnect
         }).catch(() => {
           // Silently handle sync errors
@@ -111,7 +126,20 @@ export function useConnectivity(options: UseConnectivityOptions = {}): Connectiv
       window.removeEventListener('offline', handleOffline);
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
     };
-  }, [updateState, checkApi]);
+  }, [updateState, checkApi, currentUserId]);
+
+  // Background Sync wakes a controlled client; the authenticated page owns
+  // the actual replay so tokens never have to be copied into the worker.
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const handleWorkerMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'SYNC_REQUEST' || event.data?.type === 'SYNC_COMPLETE') {
+        void runSyncQueueOnce(currentUserId);
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', handleWorkerMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', handleWorkerMessage);
+  }, [currentUserId]);
 
   // Periodic API ping
   useEffect(() => {

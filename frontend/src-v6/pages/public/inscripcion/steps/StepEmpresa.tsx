@@ -17,6 +17,60 @@ import {
   labelCls,
 } from '../shared';
 
+type VehicleDraft = {
+  patente: string;
+  marca: string;
+  modelo: string;
+  anio: string;
+  capacidad: string;
+};
+
+type DriverDraft = {
+  nombre: string;
+  apellido: string;
+  dni: string;
+  licencia: string;
+  vencimiento: string;
+};
+
+const emptyVehicle = (): VehicleDraft => ({ patente: '', marca: '', modelo: '', anio: '', capacidad: '' });
+const emptyDriver = (): DriverDraft => ({ nombre: '', apellido: '', dni: '', licencia: '', vencimiento: '' });
+
+function parseDrafts<T>(value: string | undefined, fallback: T[]): T[] {
+  if (!value?.trim()) return fallback;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function parseLegacyVehicles(value: string | undefined): VehicleDraft[] {
+  const rows = value?.split(/\r?\n/).map(row => row.trim()).filter(Boolean) || [];
+  return rows.length > 0 ? rows.map(row => {
+    const [patente = '', marca = '', modelo = '', capacidad = ''] = row.split(',').map(part => part.trim());
+    return { ...emptyVehicle(), patente, marca, modelo, capacidad };
+  }) : [emptyVehicle()];
+}
+
+function parseLegacyDrivers(value: string | undefined): DriverDraft[] {
+  const rows = value?.split(/\r?\n/).map(row => row.trim()).filter(Boolean) || [];
+  return rows.length > 0 ? rows.map(row => {
+    const [nombreCompleto = '', dni = '', licencia = ''] = row.split(',').map(part => part.trim());
+    const parts = nombreCompleto.split(/\s+/).filter(Boolean);
+    return { ...emptyDriver(), nombre: parts.shift() || '', apellido: parts.join(' '), dni, licencia };
+  }) : [emptyDriver()];
+}
+
+function validVehicle(v: VehicleDraft): boolean {
+  return Boolean(v.patente.trim() && v.marca.trim() && v.modelo.trim());
+}
+
+function validDriver(v: DriverDraft): boolean {
+  return Boolean(v.nombre.trim() && v.apellido.trim() && v.dni.replace(/\D/g, '').length >= 7 && v.licencia.trim());
+}
+
 interface StepEmpresaProps {
   step: number;
   form: Record<string, string>;
@@ -90,6 +144,16 @@ function renderGeneradorStep(
               placeholder="Ej: Industria quimica" className={inputCls()} />
           </div>
         </div>
+        <div className="rounded-xl border border-purple-200 bg-purple-50 p-4">
+          <label className={labelCls}>Alcance habilitado para tratamiento</label>
+          <Select
+            value={form.alcanceTratamiento || 'NACIONAL'}
+            onChange={(val) => up('alcanceTratamiento', val)}
+            options={[{ value: 'NACIONAL', label: 'Nacional' }, { value: 'INTERNACIONAL', label: 'Internacional' }]}
+            size="base"
+          />
+          <p className="text-xs text-purple-700 mt-2">La habilitación internacional permitirá asociar transportista y operador exterior aprobados en futuros manifiestos.</p>
+        </div>
       </div>
     );
 
@@ -131,11 +195,15 @@ function renderGeneradorStep(
           <div>
             <label className={labelCls}>Corrientes de Control</label>
             <input value={form.corrientesControl || ''} onChange={e => up('corrientesControl', e.target.value)}
-              placeholder="Y1, Y2, Y3..." className={inputCls()} />
+              placeholder="Ej: Y8, Y12, Y48" className={inputCls()} />
           </div>
           <div>
             <label className={labelCls}>Categoria Individual</label>
-            <Select value={form.categoriaIndividual || ''} onChange={(val) => up('categoriaIndividual', val)} options={[{ value: '', label: 'Seleccionar...' }, { value: 'MINIMA', label: 'Minima' }, { value: 'INDIVIDUAL', label: 'Individual' }, { value: '2000-3000', label: '2000-3000' }]} size="base" />
+            <Select value={form.categoriaIndividual || ''} onChange={(val) => up('categoriaIndividual', val)} options={[
+              { value: '', label: 'Seleccionar...' },
+              ...['MINIMA', 'INDIVIDUAL', '600-1000', '1000-2000', '2000-3000', '3000-4000', '4000-6000', 'EXENTO']
+                .map(value => ({ value, label: value })),
+            ]} size="base" />
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -298,7 +366,7 @@ function renderOperadorStep(
           <textarea
             value={form.corrientesY || ''}
             onChange={e => up('corrientesY', e.target.value)}
-            placeholder="Y1, Y2, Y3... (separadas por coma)"
+            placeholder="Ej: Y8, Y12, Y48 (separadas por coma)"
             rows={4}
             className="w-full px-4 py-3 rounded-xl border border-neutral-200 focus:border-[#0D8A4F] focus:ring-2 focus:ring-[#0D8A4F]/20 focus:outline-none text-sm bg-white transition-colors resize-none"
           />
@@ -396,26 +464,49 @@ function renderTransportistaStep(
         </div>
       </div>
     );
-    case 3: return (
-      <div className="space-y-4">
-        <SectionTitle icon={Car} title="Vehiculos y Choferes" />
-        <p className="text-sm text-neutral-500">
-          Describa los vehiculos y choferes habilitados. Un dato por linea.
-        </p>
-        <div>
-          <label className={labelCls}>Vehiculos (patente, marca, modelo, capacidad — uno por linea)</label>
-          <textarea value={form.vehiculosDesc || ''} onChange={e => up('vehiculosDesc', e.target.value)}
-            placeholder={"AB123CD, Mercedes, Atego 1726, 10 tn\nXY456ZW, Iveco, Tector, 8 tn"} rows={5}
-            className="w-full px-4 py-3 rounded-xl border border-neutral-200 focus:border-[#0D8A4F] focus:ring-2 focus:ring-[#0D8A4F]/20 focus:outline-none text-sm bg-white transition-colors resize-none font-mono" />
+    case 3: {
+      const vehicles = parseDrafts<VehicleDraft>(form.vehiculosJson, parseLegacyVehicles(form.vehiculosDesc));
+      const drivers = parseDrafts<DriverDraft>(form.choferesJson, parseLegacyDrivers(form.choferesDesc));
+      const updateVehicles = (next: VehicleDraft[]) => up('vehiculosJson', JSON.stringify(next));
+      const updateDrivers = (next: DriverDraft[]) => up('choferesJson', JSON.stringify(next));
+      return (
+        <div className="space-y-5">
+          <SectionTitle icon={Car} title="Vehículos y choferes" />
+          <p className="text-sm text-neutral-500">
+            Cargue cada vehículo y cada chofer en su propia tarjeta. Las tarjetas verdes/azules y las licencias se adjuntan luego en Documentos.
+          </p>
+          <section className="space-y-3" aria-labelledby="vehiculos-heading">
+            <div className="flex items-center justify-between">
+              <h3 id="vehiculos-heading" className="text-sm font-semibold text-neutral-800">Vehículos</h3>
+              <button type="button" className="text-xs font-semibold text-[#0D8A4F]" onClick={() => updateVehicles([...vehicles, emptyVehicle()])}>+ Agregar vehículo</button>
+            </div>
+            {vehicles.map((vehicle, index) => (
+              <div key={`vehicle-${index}`} className={`rounded-xl border bg-neutral-50 p-4 space-y-3 ${validVehicle(vehicle) ? 'border-neutral-200' : 'border-amber-300'}`}>
+                <div className="flex items-center justify-between"><span className="text-xs font-semibold text-neutral-500">Vehículo {index + 1}</span>{vehicles.length > 1 && <button type="button" className="text-xs text-error-600" onClick={() => updateVehicles(vehicles.filter((_, i) => i !== index))}>Quitar</button>}</div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                  {([['patente', 'Patente *', 'AB123CD'], ['marca', 'Marca *', 'Mercedes'], ['modelo', 'Modelo *', 'Atego'], ['anio', 'Año', '2026'], ['capacidad', 'Capacidad (tn)', '10']] as const).map(([field, label, placeholder]) => (
+                    <div key={field}><label className={labelCls}>{label}</label><input type={field === 'anio' ? 'number' : field === 'capacidad' ? 'number' : 'text'} value={vehicle[field]} placeholder={placeholder} className={inputCls()} onChange={event => { const next = [...vehicles]; next[index] = { ...next[index], [field]: event.target.value }; updateVehicles(next); }} /></div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </section>
+          <section className="space-y-3" aria-labelledby="choferes-heading">
+            <div className="flex items-center justify-between"><h3 id="choferes-heading" className="text-sm font-semibold text-neutral-800">Choferes</h3><button type="button" className="text-xs font-semibold text-[#0D8A4F]" onClick={() => updateDrivers([...drivers, emptyDriver()])}>+ Agregar chofer</button></div>
+            {drivers.map((driver, index) => (
+              <div key={`driver-${index}`} className={`rounded-xl border bg-neutral-50 p-4 space-y-3 ${validDriver(driver) ? 'border-neutral-200' : 'border-amber-300'}`}>
+                <div className="flex items-center justify-between"><span className="text-xs font-semibold text-neutral-500">Chofer {index + 1}</span>{drivers.length > 1 && <button type="button" className="text-xs text-error-600" onClick={() => updateDrivers(drivers.filter((_, i) => i !== index))}>Quitar</button>}</div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                  {([['nombre', 'Nombre *', 'Juan'], ['apellido', 'Apellido *', 'Pérez'], ['dni', 'DNI *', '20123456'], ['licencia', 'Licencia *', 'LIC-001'], ['vencimiento', 'Vencimiento', '2027-12-31']] as const).map(([field, label, placeholder]) => (
+                    <div key={field}><label className={labelCls}>{label}</label><input type={field === 'vencimiento' ? 'date' : 'text'} value={driver[field]} placeholder={placeholder} className={inputCls()} onChange={event => { const next = [...drivers]; next[index] = { ...next[index], [field]: event.target.value }; updateDrivers(next); }} /></div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </section>
         </div>
-        <div>
-          <label className={labelCls}>Choferes (nombre, DNI, licencia — uno por linea)</label>
-          <textarea value={form.choferesDesc || ''} onChange={e => up('choferesDesc', e.target.value)}
-            placeholder={"Juan Perez, 12345678, LIC-001\nMaria Lopez, 87654321, LIC-002"} rows={4}
-            className="w-full px-4 py-3 rounded-xl border border-neutral-200 focus:border-[#0D8A4F] focus:ring-2 focus:ring-[#0D8A4F]/20 focus:outline-none text-sm bg-white transition-colors resize-none font-mono" />
-        </div>
-      </div>
-    );
+      );
+    }
     default: return null;
   }
 }

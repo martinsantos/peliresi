@@ -70,6 +70,20 @@ temp/
 # Local
 *.local
 
+# Local Codex/QA artifacts
+.codex/
+output/
+outputs/
+frontend/playwright-report/
+frontend/e2e/_live-smoke-temp.spec.ts
+
+# Local source data and training credentials (never commit)
+/PLANILLA OPERADORES SISTEMA TRAZABILIDAD.xlsx
+/Reg. Gen. RRPP v.26.xlsx
+/Reg. Pcial. TRP.xlsx
+docs/CREDENCIALES-CURSO-SITREP.md
+backend/spa.traineddata
+
 # Git worktrees
 .worktrees/
 

@@ -9,9 +9,13 @@
 
 export enum Rol {
   ADMIN = 'ADMIN',
+  AUDITOR = 'AUDITOR',
   GENERADOR = 'GENERADOR',
   TRANSPORTISTA = 'TRANSPORTISTA',
   OPERADOR = 'OPERADOR',
+  ADMIN_TRANSPORTISTA = 'ADMIN_TRANSPORTISTA',
+  ADMIN_GENERADOR = 'ADMIN_GENERADOR',
+  ADMIN_OPERADOR = 'ADMIN_OPERADOR',
 }
 
 export enum EstadoManifiesto {
@@ -26,6 +30,10 @@ export enum EstadoManifiesto {
   RECHAZADO = 'RECHAZADO',
   CANCELADO = 'CANCELADO',
 }
+
+export type AlcanceTratamiento = 'NACIONAL' | 'INTERNACIONAL';
+export type TipoEntidadExterior = 'TRANSPORTISTA' | 'OPERADOR';
+export type EstadoEntidadExterior = 'BORRADOR' | 'PENDIENTE' | 'APROBADO' | 'RECHAZADO' | 'INACTIVO';
 
 export enum TipoNotificacion {
   MANIFIESTO_FIRMADO = 'MANIFIESTO_FIRMADO',
@@ -102,6 +110,8 @@ export interface Usuario {
   empresa: string | null;
   telefono: string | null;
   activo: boolean;
+  esDemo?: boolean;
+  forcePasswordChange?: boolean;
   esInspector?: boolean;
   dosFaVerificado: boolean;
   createdAt: string;
@@ -124,6 +134,7 @@ export interface Generador {
   actividad?: string;
   rubro?: string;
   corrientesControl?: string;
+  alcanceTratamiento?: AlcanceTratamiento;
   latitud?: number;
   longitud?: number;
   activo: boolean;
@@ -259,7 +270,11 @@ export interface Manifiesto {
   numero: string;
   generadorId: string;
   transportistaId: string | null;
-  operadorId: string;
+  operadorId: string | null;
+  alcanceTratamiento?: AlcanceTratamiento;
+  transportistaExteriorId?: string | null;
+  operadorExteriorId?: string | null;
+  declaracionTratamientoInternacional?: string | null;
   modalidad?: 'FIJO' | 'IN_SITU';
   creadoPorId: string;
   estado: EstadoManifiesto;
@@ -282,10 +297,27 @@ export interface Manifiesto {
   generador?: Generador;
   transportista?: Transportista;
   operador?: Operador;
+  transportistaExterior?: EntidadExterior;
+  operadorExterior?: EntidadExterior;
   creadoPor?: Usuario;
   residuos?: ManifiestoResiduo[];
   eventos?: EventoManifiesto[];
   tracking?: TrackingGPS[];
+}
+
+export interface EntidadExterior {
+  id: string;
+  tipo: TipoEntidadExterior;
+  razonSocial: string;
+  pais: string;
+  identificacionFiscal?: string | null;
+  domicilio?: string | null;
+  telefono?: string | null;
+  email?: string | null;
+  numeroHabilitacion?: string | null;
+  estado: EstadoEntidadExterior;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ManifiestoResiduo {

@@ -31,10 +31,11 @@ import { Skeleton } from '../../components/ui/Skeleton';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { BASE_MAP_ATTRIBUTION, BASE_MAP_MAX_ZOOM, BASE_MAP_TILE_URL } from '../../utils/map-tiles';
 import { ACTOR_ICONS, ACTOR_COLORS } from '../../utils/map-icons';
 import { useManifiesto } from '../../hooks/useManifiestos';
 import { EstadoManifiesto } from '../../types/models';
-import { formatDateTime, formatEstado, formatWeight, formatNumber, formatCuit } from '../../utils/formatters';
+import { formatDateTime, formatEstado, formatNumber, formatCuit, formatQuantitySummary } from '../../utils/formatters';
 
 // Approximate geocoding for Mendoza demo locations
 // Ordered most-specific first so longer matches win over generic city names
@@ -202,7 +203,7 @@ const ViajeEnCursoPage: React.FC = () => {
     ? m.tracking.map((t: any) => [t.latitud, t.longitud] as [number, number])
     : [];
 
-  const totalPeso = Array.isArray(m.residuos) ? m.residuos.reduce((sum: number, r: any) => sum + (r.cantidad || 0), 0) : 0;
+  const totalCantidad = Array.isArray(m.residuos) ? formatQuantitySummary(m.residuos) : '0 kg';
   const eventos = Array.isArray(m.eventos) ? m.eventos : [];
 
   const handleActorClick = (actor: string, pos: [number, number]) => {
@@ -311,7 +312,7 @@ const ViajeEnCursoPage: React.FC = () => {
                 style={{ height: '100%', width: '100%', zIndex: 0 }}
                 className="z-0"
               >
-                <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                <TileLayer attribution={BASE_MAP_ATTRIBUTION} url={BASE_MAP_TILE_URL} maxZoom={BASE_MAP_MAX_ZOOM} />
 
                 {/* Fit all markers on mount and when fitKey changes */}
                 <FitBounds key={fitKey} points={allPoints} />
@@ -484,7 +485,7 @@ const ViajeEnCursoPage: React.FC = () => {
                   <Weight size={18} />
                   <span className="font-medium">Peso total:</span>
                 </div>
-                <span className="text-xl font-bold text-neutral-900">{formatWeight(totalPeso)}</span>
+                <span className="text-xl font-bold text-neutral-900">{totalCantidad}</span>
               </div>
             </CardContent>
           </Card>

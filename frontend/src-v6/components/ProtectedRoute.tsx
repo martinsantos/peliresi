@@ -5,8 +5,10 @@
  */
 
 import React from 'react';
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Link, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth, type UserRole } from '../contexts/AuthContext';
+import { canVisitRoute } from '../utils/routeAccess';
+import { hasStoredImpersonationSession } from '../utils/impersonationNavigation';
 
 interface ProtectedRouteProps {
   /** Optional list of roles allowed to access the route */
@@ -21,6 +23,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 }) => {
   const { currentUser, isLoading, isRestricted } = useAuth();
   const location = useLocation();
+  const mobilePrefix = location.pathname.startsWith('/mobile/') ? '/mobile' : '';
 
   // Show spinner while auth state is being determined
   if (isLoading) {
@@ -44,8 +47,14 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/mi-solicitud" replace />;
   }
 
+  // Keep the first-login credential policy for a real login, but do not trap
+  // an administrator who is only inspecting the account via impersonation.
+  if (currentUser.forcePasswordChange && !hasStoredImpersonationSession() && !location.pathname.startsWith(`${mobilePrefix}/configuracion`)) {
+    return <Navigate to={`${mobilePrefix}/configuracion?tab=seguridad`} replace />;
+  }
+
   // Authenticated but role not allowed -> access denied
-  if (roles && roles.length > 0 && !roles.includes(currentUser.rol)) {
+  if ((roles && roles.length > 0 && !roles.includes(currentUser.rol)) || !canVisitRoute(currentUser.rol, location.pathname)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-neutral-50">
         <div className="flex flex-col items-center gap-4 text-center max-w-md px-6">
@@ -59,12 +68,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
             No tienes permisos para acceder a esta seccion. Tu rol actual es{' '}
             <span className="font-medium">{currentUser.rol}</span>.
           </p>
-          <a
-            href="/dashboard"
+          <Link
+            to={`${mobilePrefix}/dashboard`}
             className="mt-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
           >
             Volver al Dashboard
-          </a>
+          </Link>
         </div>
       </div>
     );

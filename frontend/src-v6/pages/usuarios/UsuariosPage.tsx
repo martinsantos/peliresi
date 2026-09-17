@@ -1,15 +1,13 @@
 /**
  * SITREP v6 - Usuarios Admin Page
  * ================================
- * Gestion completa de usuarios del sistema - Real API + fallback mock
+ * Gestión completa de usuarios del sistema mediante la API real
  */
 
 import React, { useState, useMemo } from 'react';
 import {
-  Users,
   UserPlus,
   Search,
-  Filter,
   MoreHorizontal,
   Trash2,
   CheckCircle,
@@ -19,18 +17,12 @@ import {
   Truck,
   FlaskConical,
   Building2,
-  Mail,
-  Phone,
-  Calendar,
-  Lock,
   Grid3X3,
   List,
   User,
   Eye,
   Download,
   FileDown,
-  ChevronLeft,
-  ChevronRight,
   MapPin,
   Clock,
   Loader2,
@@ -39,7 +31,7 @@ import {
   ShieldCheck,
   Printer,
 } from 'lucide-react';
-import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
+import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/BadgeV2';
@@ -54,7 +46,8 @@ import { exportReportePDF } from '../../utils/exportPdf';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
 import api from '../../services/api';
-import type { Rol } from '../../types/models';
+import type { Rol, Usuario } from '../../types/models';
+import { getApiErrorMessage } from '../../utils/api-error';
 
 
 type UsuarioLocal = {
@@ -78,6 +71,7 @@ type UsuarioLocal = {
 // ========================================
 const rolConfig = {
   ADMIN:               { label: 'Super Administrador',    icon: Shield,       color: 'primary', bgColor: 'bg-primary-100',  textColor: 'text-primary-700',  borderColor: 'border-primary-200' },
+  AUDITOR:             { label: 'Auditor (solo lectura)', icon: Eye,          color: 'info',    bgColor: 'bg-sky-100',      textColor: 'text-sky-700',      borderColor: 'border-sky-200' },
   ADMIN_GENERADOR:     { label: 'Admin de Generadores',   icon: Factory,      color: 'purple',  bgColor: 'bg-purple-100',   textColor: 'text-purple-700',   borderColor: 'border-purple-200' },
   ADMIN_TRANSPORTISTA: { label: 'Admin de Transporte',    icon: Truck,        color: 'orange',  bgColor: 'bg-orange-100',   textColor: 'text-orange-700',   borderColor: 'border-orange-200' },
   ADMIN_OPERADOR:      { label: 'Admin de Operadores',    icon: FlaskConical, color: 'blue',    bgColor: 'bg-blue-100',     textColor: 'text-blue-700',     borderColor: 'border-blue-200' },
@@ -87,7 +81,7 @@ const rolConfig = {
 };
 
 /** Convert API Usuario to the local shape used in the UI */
-function apiUserToLocal(u: any): UsuarioLocal {
+function apiUserToLocal(u: Usuario & { emailVerified?: boolean }): UsuarioLocal {
   const initials = u.nombre && typeof u.nombre === 'string'
     ? u.nombre.split(' ').map((w: string) => w[0] || '').join('').slice(0, 2).toUpperCase()
     : String(u.email || '').slice(0, 2).toUpperCase();
@@ -260,8 +254,8 @@ const UsuariosPage: React.FC = () => {
       onSuccess: () => {
         toast.success('Estado actualizado', `El usuario ahora esta ${nuevoEstado}`);
       },
-      onError: () => {
-        toast.success('Estado actualizado', `El usuario ahora esta ${nuevoEstado} (demo)`);
+      onError: (error: unknown) => {
+        toast.error('No se pudo actualizar el estado', getApiErrorMessage(error, 'Reintentá cuando se restablezca la conexión'));
       },
     });
   };
@@ -273,9 +267,8 @@ const UsuariosPage: React.FC = () => {
           setModalEliminar(false);
           toast.success('Usuario eliminado', 'El usuario fue eliminado correctamente');
         },
-        onError: () => {
-          setModalEliminar(false);
-          toast.success('Usuario eliminado', 'El usuario fue eliminado correctamente (demo)');
+        onError: (error: unknown) => {
+          toast.error('No se pudo eliminar el usuario', getApiErrorMessage(error, 'El usuario no fue modificado'));
         },
       });
     }
@@ -304,12 +297,10 @@ const UsuariosPage: React.FC = () => {
         onSuccess: () => {
           setModalCrear(false);
           resetForm();
-          toast.success('Usuario creado', 'Se envio email de activacion');
+          toast.success('Usuario creado', 'La cuenta quedó registrada correctamente');
         },
-        onError: () => {
-          setModalCrear(false);
-          resetForm();
-          toast.success('Usuario creado', 'Se envio email de activacion (demo)');
+        onError: (error: unknown) => {
+          toast.error('No se pudo crear el usuario', getApiErrorMessage(error, 'Revisá los datos e intentá nuevamente'));
         },
       }
     );
@@ -354,8 +345,8 @@ const UsuariosPage: React.FC = () => {
           setModalEditar(false);
           toast.success('Usuario actualizado', 'Los datos se guardaron correctamente');
         },
-        onError: (err: any) => {
-          toast.error('Error', err?.response?.data?.message || 'No se pudo actualizar el usuario');
+        onError: (error: unknown) => {
+          toast.error('Error', getApiErrorMessage(error, 'No se pudo actualizar el usuario'));
         },
       }
     );
@@ -506,12 +497,12 @@ const UsuariosPage: React.FC = () => {
               variant="ghost"
               size="sm"
               className="p-2 text-amber-600 hover:bg-amber-50"
-              onClick={async (e: any) => {
-                e.stopPropagation();
+              onClick={async (event: React.MouseEvent) => {
+                event.stopPropagation();
                 try {
                   await impersonateUser(row.id);
-                } catch (err: any) {
-                  toast.error(err?.response?.data?.message || 'No se pudo acceder como este usuario');
+                } catch (error: unknown) {
+                  toast.error(getApiErrorMessage(error, 'No se pudo acceder como este usuario'));
                 }
               }}
               title="Acceso Comodín — ver como este usuario"
@@ -523,8 +514,8 @@ const UsuariosPage: React.FC = () => {
             variant="ghost"
             size="sm"
             className={`p-2 ${row.estado === 'activo' ? 'text-amber-500' : 'text-emerald-600'}`}
-            onClick={(e: any) => {
-              e.stopPropagation();
+            onClick={(event: React.MouseEvent) => {
+              event.stopPropagation();
               cambiarEstado(row.id, row.estado === 'activo' ? 'inactivo' : 'activo');
             }}
             title={row.estado === 'activo' ? 'Desactivar usuario' : 'Activar usuario'}
@@ -535,7 +526,7 @@ const UsuariosPage: React.FC = () => {
             variant="ghost"
             size="sm"
             className="p-2"
-            onClick={(e: any) => { e.stopPropagation(); verUsuario(row); }}
+            onClick={(event: React.MouseEvent) => { event.stopPropagation(); verUsuario(row); }}
             title="Ver detalle"
           >
             <MoreHorizontal size={16} />
@@ -544,7 +535,7 @@ const UsuariosPage: React.FC = () => {
             variant="ghost"
             size="sm"
             className="p-2 text-error-500"
-            onClick={(e: any) => { e.stopPropagation(); setUsuarioSeleccionado(row); setModalEliminar(true); }}
+            onClick={(event: React.MouseEvent) => { event.stopPropagation(); setUsuarioSeleccionado(row); setModalEliminar(true); }}
           >
             <Trash2 size={16} />
           </Button>
@@ -622,6 +613,7 @@ const UsuariosPage: React.FC = () => {
                 options={[
                   { value: 'todos', label: 'Todos los roles' },
                   { value: 'ADMIN', label: 'Administradores' },
+                  { value: 'AUDITOR', label: 'Auditores' },
                   { value: 'GENERADOR', label: 'Generadores' },
                   { value: 'TRANSPORTISTA', label: 'Transportistas' },
                   { value: 'OPERADOR', label: 'Operadores' },
@@ -1051,6 +1043,7 @@ const UsuariosPage: React.FC = () => {
                 { value: 'ADMIN_GENERADOR', label: 'Admin de Generadores' },
                 { value: 'ADMIN_TRANSPORTISTA', label: 'Admin de Transporte' },
                 { value: 'ADMIN_OPERADOR', label: 'Admin de Operadores' },
+                { value: 'AUDITOR', label: 'Auditor (solo lectura)' },
                 { value: 'GENERADOR', label: 'Generador' },
                 { value: 'TRANSPORTISTA', label: 'Transportista' },
                 { value: 'OPERADOR', label: 'Operador' },
@@ -1112,8 +1105,8 @@ const UsuariosPage: React.FC = () => {
                   toast.success('Rol actualizado', `${usuarioSeleccionado.nombre} ahora es ${label}`);
                   setModalPromover(false); setPromoverPassword(''); setPromoverTargetRol('');
                   window.location.reload();
-                } catch (err: any) {
-                  toast.error('Error', err?.response?.data?.message || 'Clave incorrecta o error de red');
+                } catch (error: unknown) {
+                  toast.error('Error', getApiErrorMessage(error, 'Clave incorrecta o error de red'));
                 } finally { setPromoverLoading(false); }
               }}
             >
@@ -1141,6 +1134,7 @@ const UsuariosPage: React.FC = () => {
                     { value: 'ADMIN_GENERADOR', label: 'Admin de Generadores' },
                     { value: 'ADMIN_TRANSPORTISTA', label: 'Admin de Transporte' },
                     { value: 'ADMIN_OPERADOR', label: 'Admin de Operadores' },
+                    { value: 'AUDITOR', label: 'Auditor (solo lectura)' },
                     { value: 'GENERADOR', label: 'Generador' },
                     { value: 'TRANSPORTISTA', label: 'Transportista' },
                     { value: 'OPERADOR', label: 'Operador' },

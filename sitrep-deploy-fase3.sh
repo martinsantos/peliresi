@@ -232,7 +232,16 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=sitrep-backend
 Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
 EnvironmentFile=${VM_BACKEND_DIR}/.env
+NoNewPrivileges=true
+PrivateTmp=true
+# The service reads its code/.env from /home/ubuntu; read-only protection
+# keeps that path available without allowing writes to user home data.
+ProtectHome=read-only
+ProtectSystem=full
+UMask=027
+LimitNOFILE=65536
 
 [Install]
 WantedBy=multi-user.target

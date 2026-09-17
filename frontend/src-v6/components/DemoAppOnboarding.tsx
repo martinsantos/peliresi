@@ -1,10 +1,10 @@
 /**
- * SITREP v6 - Demo App Onboarding
- * ================================
+ * SITREP v6 - Role Onboarding
+ * ===========================
  * Role-specific welcome carousel/modal shown on first login per role.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Shield,
   Factory,
@@ -184,7 +184,7 @@ const storageKey = (role: string) => `sitrep_onboarding_${role}`;
 // ========================================
 // COMPONENT
 // ========================================
-export const DemoAppOnboarding: React.FC = () => {
+export const RoleOnboarding: React.FC = () => {
   const { currentUser } = useAuth();
   const [visible, setVisible] = useState(false);
   const [slideIndex, setSlideIndex] = useState(0);
@@ -308,17 +308,4 @@ export const DemoAppOnboarding: React.FC = () => {
   );
 };
 
-/**
- * Utility: reset role onboarding so it shows again.
- */
-export const resetDemoOnboarding = (role?: string) => {
-  if (role) {
-    localStorage.removeItem(storageKey(role));
-  } else {
-    ['ADMIN', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'AUDITOR'].forEach((r) =>
-      localStorage.removeItem(storageKey(r))
-    );
-  }
-};
-
-export default DemoAppOnboarding;
+export default RoleOnboarding;

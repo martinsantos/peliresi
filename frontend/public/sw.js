@@ -1,17 +1,29 @@
 // Service Worker para modo Offline-First (CU-T09)
-// Scope: / (main site)
-const CACHE_NAME = 'trazabilidad-rrpp-v26';
-const RUNTIME_CACHE = 'runtime-cache-v26';
+const SCOPE_PATH = new URL(self.registration.scope).pathname;
+const IS_DEMO_SCOPE = SCOPE_PATH.startsWith('/demoambiente/');
+const CACHE_PREFIX = IS_DEMO_SCOPE ? 'trazabilidad-demo-' : 'trazabilidad-rrpp-';
+const RUNTIME_PREFIX = IS_DEMO_SCOPE ? 'runtime-demo-' : 'runtime-cache-';
+const CACHE_NAME = `${CACHE_PREFIX}v47`;
+const RUNTIME_CACHE = `${RUNTIME_PREFIX}v47`;
+const scoped = (path) => `${SCOPE_PATH}${path.replace(/^\//, '')}`;
 
 // Recursos críticos para cachear en instalación
 const PRECACHE_URLS = [
-    '/',
-    '/index.html'
+    scoped(''),
+    scoped('index.html'),
+    scoped('mendoza-marca-horizontal-transparente.png'),
+    scoped('mendoza-marca-secundaria-transparente.png'),
+    // Local OCR assets: no external domain is needed when the document
+    // scanner is opened after connectivity is lost.
+    scoped('ocr/worker.min.js'),
+    scoped('ocr/tesseract-core.wasm.js'),
+    scoped('ocr/tesseract-core.wasm'),
+    scoped('ocr/spa.traineddata')
 ];
 
 // Instalación del Service Worker
 self.addEventListener('install', (event) => {
-    console.log('[SW] Installing Service Worker v26...');
+    console.log('[SW] Installing Service Worker v45...');
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then((cache) => {
@@ -30,13 +42,19 @@ self.addEventListener('install', (event) => {
 
 // Activación del Service Worker
 self.addEventListener('activate', (event) => {
-    console.log('[SW] Activando Service Worker v26...');
+    console.log('[SW] Activando Service Worker v45...');
     event.waitUntil(
         caches.keys().then((cacheNames) => {
             const currentCaches = [CACHE_NAME, RUNTIME_CACHE];
             return Promise.all(
                 cacheNames
-                    .filter((name) => !currentCaches.includes(name))
+                    // Never delete the PWA's /app/ caches. This root worker
+                    // shares the origin with sw-app.js and must only rotate
+                    // caches that it owns.
+                    .filter((name) =>
+                        (name.startsWith(CACHE_PREFIX) || name.startsWith(RUNTIME_PREFIX)) &&
+                        !currentCaches.includes(name)
+                    )
                     .map((name) => {
                         console.log('[SW] Eliminando cache antigua:', name);
                         return caches.delete(name);
@@ -56,8 +74,15 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    // Cross-origin resources (map tiles, verification providers, etc.) must be
+    // handled by the browser. Intercepting them here turns a remote outage into
+    // a misleading same-origin 408 response and can pollute the runtime cache.
+    if (url.origin !== self.location.origin) {
+        return;
+    }
+
     // No cachear requests a la API (solo datos estáticos)
-    if (url.pathname.startsWith('/api/')) {
+    if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/demoambiente/api/')) {
         return;
     }
 
@@ -69,7 +94,7 @@ self.addEventListener('fetch', (event) => {
                 .catch(async () => {
                     const cached = await caches.match(request);
                     if (cached) return cached;
-                    const offline = await caches.match('/offline.html');
+                    const offline = await caches.match(scoped('offline.html'));
                     if (offline) return offline;
                     // Last resort: return a minimal HTML response to avoid SW error
                     return new Response('<html><body><h1>Offline</h1><p>Sin conexion. Intente de nuevo.</p></body></html>', {
@@ -115,7 +140,7 @@ async function syncManifiestos() {
     const clients = await self.clients.matchAll();
     clients.forEach((client) => {
         client.postMessage({
-            type: 'SYNC_COMPLETE',
+            type: 'SYNC_REQUEST',
             timestamp: new Date().toISOString()
         });
     });
@@ -124,7 +149,7 @@ async function syncManifiestos() {
 self.addEventListener('push', (event) => {
     const data = event.data ? event.data.json() : {};
     const prioridad = data.prioridad || 'NORMAL';
-    const esCritica = prioridad === 'CRITICA';
+    const esCritica = prioridad === 'CRITICA' || prioridad === 'URGENTE';
     const esAlta    = prioridad === 'ALTA' || esCritica;
 
     const options = {
@@ -143,14 +168,24 @@ self.addEventListener('push', (event) => {
     event.waitUntil(self.registration.showNotification(data.title || 'SITREP', options));
 });
 
-console.log('[SW] Service Worker v26 cargado');
+console.log('[SW] Service Worker v45 cargado');
+
+function notificationTarget(rawTarget, fallback) {
+  try {
+    const target = new URL(typeof rawTarget === 'string' ? rawTarget : fallback, self.location.origin);
+    if (target.origin !== self.location.origin) return fallback;
+    return `${target.pathname}${target.search}${target.hash}`;
+  } catch {
+    return fallback;
+  }
+}
 
 // ========================================
 // NOTIFICATION CLICK — abrir/enfocar la web
 // ========================================
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || '/';
+  const url = notificationTarget(event.notification.data?.url, '/');
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
@@ -160,6 +195,14 @@ self.addEventListener('notificationclick', (event) => {
         }
       }
       return clients.openWindow(url);
+    })
+  );
+});
+
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      clientList.forEach((client) => client.postMessage({ type: 'PUSH_SUBSCRIPTION_CHANGED' }));
     })
   );
 });

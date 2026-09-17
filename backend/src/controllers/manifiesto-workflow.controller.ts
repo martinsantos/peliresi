@@ -7,6 +7,7 @@ import prisma from '../lib/prisma';
 import { domainEvents } from '../services/domainEvent.service';
 import { computeRollingHash, computeClosureHash, hashManifiesto, registrarSello } from '../services/blockchain.service';
 import { invalidateGpsCache } from './manifiesto-gps.controller';
+import { finiteNonNegative, normalizeUnit, toMassKg } from '../utils/quantities';
 
 // Zod schemas
 const registrarIncidenteSchema = z.object({
@@ -73,7 +74,7 @@ export const firmarManifiesto = async (req: AuthRequest, res: Response, next: Ne
     // We need manifiesto.numero first — fetch outside tx to avoid holding tx open during QR generation
     const manifiestoPreview = await prisma.manifiesto.findUnique({
       where: { id },
-      select: { id: true, numero: true, estado: true },
+      select: { id: true, numero: true, estado: true, alcanceTratamiento: true, generador: { select: { activo: true } }, transportista: { select: { activo: true } }, operador: { select: { activo: true } } },
     });
 
     if (!manifiestoPreview) {
@@ -82,6 +83,12 @@ export const firmarManifiesto = async (req: AuthRequest, res: Response, next: Ne
 
     if (manifiestoPreview.estado !== 'BORRADOR') {
       throw new AppError('Solo se pueden firmar manifiestos en estado borrador', 400);
+    }
+    if (manifiestoPreview.alcanceTratamiento === 'INTERNACIONAL') {
+      throw new AppError('El flujo internacional requiere habilitación operativa específica antes de la firma', 409);
+    }
+    if ([manifiestoPreview.generador, manifiestoPreview.transportista, manifiestoPreview.operador].some(actor => actor?.activo === false)) {
+      throw new AppError('No se puede firmar: hay actores pendientes de habilitación o inactivos', 400);
     }
 
     const qrData = JSON.stringify({
@@ -168,7 +175,7 @@ export const confirmarRetiro = async (req: AuthRequest, res: Response, next: Nex
     const { latitud, longitud, observaciones } = req.body;
     const userId = req.user.id;
 
-    if (req.user.rol !== 'TRANSPORTISTA' && req.user.rol !== 'ADMIN') {
+    if (req.user.rol !== 'TRANSPORTISTA' && req.user.rol !== 'ADMIN' && req.user.rol !== 'ADMIN_TRANSPORTISTA') {
       throw new AppError('Solo los transportistas pueden confirmar retiros', 403);
     }
 
@@ -257,7 +264,7 @@ export const confirmarEntrega = async (req: AuthRequest, res: Response, next: Ne
     const { latitud, longitud, observaciones } = req.body;
     const userId = req.user.id;
 
-    if (req.user.rol !== 'TRANSPORTISTA' && req.user.rol !== 'ADMIN') {
+    if (req.user.rol !== 'TRANSPORTISTA' && req.user.rol !== 'ADMIN' && req.user.rol !== 'ADMIN_TRANSPORTISTA') {
       throw new AppError('Solo los transportistas pueden confirmar entregas', 403);
     }
 
@@ -334,7 +341,7 @@ export const confirmarRecepcion = async (req: AuthRequest, res: Response, next: 
     const { observaciones, pesoReal } = req.body;
     const userId = req.user.id;
 
-    if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') {
+    if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN' && req.user.rol !== 'ADMIN_OPERADOR') {
       throw new AppError('Solo los operadores pueden confirmar recepciones', 403);
     }
 
@@ -400,7 +407,7 @@ export const confirmarRecepcionInSitu = async (req: AuthRequest, res: Response, 
     const { observaciones } = req.body;
     const userId = req.user.id;
 
-    if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') {
+    if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN' && req.user.rol !== 'ADMIN_OPERADOR') {
       throw new AppError('Solo los operadores pueden confirmar recepciones in situ', 403);
     }
 
@@ -483,7 +490,7 @@ export const cerrarManifiesto = async (req: AuthRequest, res: Response, next: Ne
     const { metodoTratamiento, observaciones } = parsed.data;
     const userId = req.user.id;
 
-    if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') {
+    if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN' && req.user.rol !== 'ADMIN_OPERADOR') {
       throw new AppError('Solo los operadores pueden cerrar manifiestos', 403);
     }
 
@@ -559,6 +566,7 @@ export const cerrarManifiesto = async (req: AuthRequest, res: Response, next: Ne
             generador: { select: { cuit: true } },
             transportista: { select: { cuit: true } },
             operador: { select: { cuit: true } },
+            operadorExterior: { select: { identificacionFiscal: true } },
             residuos: { select: { tipoResiduoId: true, cantidad: true, unidad: true } },
             sellosBlockchain: { where: { tipo: 'GENESIS' } },
           },
@@ -574,7 +582,7 @@ export const cerrarManifiesto = async (req: AuthRequest, res: Response, next: Ne
           numero: fresh.numero,
           generadorCuit: fresh.generador.cuit,
           transportistaCuit: fresh.transportista?.cuit ?? '',
-          operadorCuit: fresh.operador.cuit,
+          operadorCuit: fresh.operador?.cuit ?? fresh.operadorExterior?.identificacionFiscal ?? '',
           residuos: fresh.residuos,
           fechaFirma: fresh.fechaFirma?.toISOString() ?? '',
           fechaRetiro: fresh.fechaRetiro?.toISOString() ?? null,
@@ -598,7 +606,7 @@ export const rechazarCarga = async (req: AuthRequest, res: Response, next: NextF
     const { motivo, descripcion, cantidadRechazada } = req.body;
     const userId = req.user.id;
 
-    if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') {
+    if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN' && req.user.rol !== 'ADMIN_OPERADOR') {
       throw new AppError('Solo los operadores pueden rechazar cargas', 403);
     }
 
@@ -668,7 +676,7 @@ export const registrarIncidente = async (req: AuthRequest, res: Response, next: 
     const tipoFinal = tipoIncidente || tipo; // Accept both field names
     const userId = req.user.id;
 
-    if (req.user.rol !== 'TRANSPORTISTA' && req.user.rol !== 'ADMIN') {
+    if (req.user.rol !== 'TRANSPORTISTA' && req.user.rol !== 'ADMIN' && req.user.rol !== 'ADMIN_TRANSPORTISTA') {
       throw new AppError('Solo los transportistas pueden registrar incidentes', 403);
     }
 
@@ -731,7 +739,7 @@ export const registrarTratamiento = async (req: AuthRequest, res: Response, next
     const metodoFinal = metodoTratamiento || metodo; // Accept both field names
     const userId = req.user.id;
 
-    if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') {
+    if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN' && req.user.rol !== 'ADMIN_OPERADOR') {
       throw new AppError('Solo los operadores pueden registrar tratamientos', 403);
     }
 
@@ -749,7 +757,7 @@ export const registrarTratamiento = async (req: AuthRequest, res: Response, next
 
     // Validate metodo against operador's authorized tratamientos
     const operadorTratamientos = await prisma.tratamientoAutorizado.findMany({
-      where: { operadorId: manifiestoCheck.operadorId, activo: true },
+      where: { operadorId: manifiestoCheck.operadorId || undefined, activo: true },
       select: { id: true, metodo: true },
     });
     const metodosUnicos = [...new Set(operadorTratamientos.map(t => t.metodo))];
@@ -884,7 +892,7 @@ export const registrarPesaje = async (req: AuthRequest, res: Response, next: Nex
     const { residuosPesados, residuos, observaciones } = req.body; // Accept both formats
     const userId = req.user.id;
 
-    if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') {
+    if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN' && req.user.rol !== 'ADMIN_OPERADOR') {
       throw new AppError('Solo los operadores pueden registrar pesajes', 403);
     }
 
@@ -906,31 +914,58 @@ export const registrarPesaje = async (req: AuthRequest, res: Response, next: Nex
 
     // Normalize input: accept both {residuosPesados: [{id, pesoReal}]} and {residuos: [{id, cantidadRecibida}]}
     const normalizedResiduos = residuosPesados || (residuos ? residuos.map((r: any) => ({ id: r.id, pesoReal: r.cantidadRecibida })) : null);
-    if (!normalizedResiduos || !Array.isArray(normalizedResiduos)) {
+    if (!normalizedResiduos || !Array.isArray(normalizedResiduos) || normalizedResiduos.length === 0) {
       throw new AppError('Formato de residuos incorrecto', 400);
     }
 
-    let pesoDeclaradoTotal = 0;
-    let pesoRealTotal = 0;
+    const ids = normalizedResiduos.map((item: any) => item?.id);
+    if (ids.some((itemId: unknown) => typeof itemId !== 'string' || !itemId)) {
+      throw new AppError('Cada residuo pesado debe incluir un ID valido', 400);
+    }
+    if (new Set(ids).size !== ids.length) {
+      throw new AppError('No se puede pesar dos veces el mismo residuo', 400);
+    }
+    if (normalizedResiduos.length !== manifiesto.residuos.length) {
+      throw new AppError('Debe registrar el pesaje de todos los residuos del manifiesto', 400);
+    }
+
+    const originalesPorId = new Map(manifiesto.residuos.map(residuo => [residuo.id, residuo]));
+    const prepared = normalizedResiduos.map((item: any) => {
+      const residuoOriginal = originalesPorId.get(item.id);
+      if (!residuoOriginal) {
+        throw new AppError(`Residuo con ID ${item.id} no encontrado en el manifiesto`, 400);
+      }
+
+      const cantidadReal = finiteNonNegative(item.pesoReal);
+      if (cantidadReal === null) {
+        throw new AppError('Las cantidades recibidas deben ser numeros finitos no negativos', 400);
+      }
+
+      const unidad = normalizeUnit(residuoOriginal.unidad);
+      const declaradoKg = toMassKg(residuoOriginal.cantidad, unidad);
+      const realKg = toMassKg(cantidadReal, unidad);
+      if (declaradoKg === null || realKg === null) {
+        throw new AppError('El pesaje solo admite residuos expresados en kg o tn', 400);
+      }
+
+      let tipoDiferencia: 'NINGUNA' | 'FALTANTE' | 'EXCEDENTE' = 'NINGUNA';
+      if (realKg > declaradoKg) tipoDiferencia = 'EXCEDENTE';
+      if (realKg < declaradoKg) tipoDiferencia = 'FALTANTE';
+
+      return { id: item.id as string, cantidadReal, declaradoKg, realKg, tipoDiferencia };
+    });
+
+    const pesoDeclaradoTotal = prepared.reduce((sum, item) => sum + item.declaradoKg, 0);
+    const pesoRealTotal = prepared.reduce((sum, item) => sum + item.realKg, 0);
 
     // Actualizar cada residuo en una transaccion
     await prisma.$transaction(
-      normalizedResiduos.map((item: any) => {
-        const residuoOriginal = manifiesto.residuos.find(r => r.id === item.id);
-        if (!residuoOriginal) throw new AppError(`Residuo con ID ${item.id} no encontrado en el manifiesto`, 400);
-
-        pesoDeclaradoTotal += residuoOriginal.cantidad;
-        pesoRealTotal += Number(item.pesoReal);
-
-        let tipoDiferencia: 'NINGUNA' | 'FALTANTE' | 'EXCEDENTE' = 'NINGUNA';
-        if (Number(item.pesoReal) > residuoOriginal.cantidad) tipoDiferencia = 'EXCEDENTE';
-        if (Number(item.pesoReal) < residuoOriginal.cantidad) tipoDiferencia = 'FALTANTE';
-
+      prepared.map(item => {
         return prisma.manifiestoResiduo.update({
           where: { id: item.id },
           data: {
-            cantidadRecibida: Number(item.pesoReal),
-            tipoDiferencia,
+            cantidadRecibida: item.cantidadReal,
+            tipoDiferencia: item.tipoDiferencia,
             estado: 'pesado'
           }
         });
@@ -945,7 +980,7 @@ export const registrarPesaje = async (req: AuthRequest, res: Response, next: Nex
       data: {
         manifiestoId: id,
         tipo: 'PESAJE',
-        descripcion: `Pesaje realizado. Declarado Total: ${pesoDeclaradoTotal}, Real Total: ${pesoRealTotal}. Diferencia: ${porcentajeDif}%. ${observaciones || ''}`,
+        descripcion: `Pesaje realizado. Declarado Total: ${pesoDeclaradoTotal} kg, Real Total: ${pesoRealTotal} kg. Diferencia: ${porcentajeDif}%. ${observaciones || ''}`,
         usuarioId: userId
       }
     });

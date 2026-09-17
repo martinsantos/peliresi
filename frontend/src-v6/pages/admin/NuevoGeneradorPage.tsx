@@ -51,7 +51,10 @@ const DOCUMENTOS_REQUERIDOS = [
 ];
 
 const CATEGORIAS = ['Grandes Generadores', 'Medianos Generadores', 'Pequenos Generadores'];
-const CATEGORIAS_INDIVIDUALES = ['MINIMA', 'INDIVIDUAL', '2000-3000'];
+const CATEGORIAS_INDIVIDUALES = [
+  'MINIMA', 'INDIVIDUAL', '600-1000', '1000-2000', '2000-3000',
+  '3000-4000', '4000-6000', 'EXENTO',
+];
 const DEPARTAMENTOS_MENDOZA = [
   'Capital', 'Godoy Cruz', 'Guaymallen', 'Las Heras', 'Lujan de Cuyo',
   'Maipu', 'San Rafael', 'General Alvear', 'Junin', 'La Paz',
@@ -62,6 +65,7 @@ const DEPARTAMENTOS_MENDOZA = [
 const INITIAL_FORM = {
   razonSocial: '', cuit: '', domicilio: '', telefono: '', email: '',
   password: '', nombre: '', numeroInscripcion: '', categoria: '',
+  alcanceTratamiento: 'NACIONAL' as 'NACIONAL' | 'INTERNACIONAL',
   actividad: '', rubro: '', corrientesControl: '',
   domicilioLegalCalle: '', domicilioLegalLocalidad: '', domicilioLegalDepto: '',
   domicilioRealCalle: '', domicilioRealLocalidad: '', domicilioRealDepto: '',
@@ -120,6 +124,7 @@ const NuevoGeneradorPage: React.FC = () => {
       email: g.email || g.usuario?.email || csv?.email || '', password: '',
       nombre: g.usuario?.nombre || '', numeroInscripcion: g.numeroInscripcion || csv?.certificado || '',
       categoria: g.categoria || '', actividad: g.actividad || csv?.actividad || '',
+      alcanceTratamiento: g.alcanceTratamiento || 'NACIONAL',
       rubro: g.rubro || csv?.rubro || '',
       corrientesControl: g.corrientesControl || (csv?.categoriasControl ? csv.categoriasControl.join(', ') : ''),
       domicilioLegalCalle: g.domicilioLegalCalle || parsedDom[0] || '',
@@ -233,8 +238,6 @@ const NuevoGeneradorPage: React.FC = () => {
       expedienteInscripcion: form.expedienteInscripcion || undefined,
       resolucionInscripcion: form.resolucionInscripcion || undefined,
       certificacionISO: form.certificacionISO || undefined,
-      factorR: form.factorR ? Number(form.factorR) : undefined,
-      montoMxR: form.montoMxR ? Number(form.montoMxR) : undefined,
       categoriaIndividual: form.categoriaIndividual || undefined,
       libroOperatoria: form.libroOperatoria,
       domicilioLegalCalle: form.domicilioLegalCalle || undefined,
@@ -257,6 +260,7 @@ const NuevoGeneradorPage: React.FC = () => {
             domicilio: form.domicilio || form.domicilioLegalCalle,
             telefono: form.telefono, email: form.email,
             numeroInscripcion: form.numeroInscripcion, categoria: form.categoria,
+            alcanceTratamiento: form.alcanceTratamiento,
             actividad: form.actividad, rubro: form.rubro,
             corrientesControl: corrientesCodes.join(', '),
             ...regulatory,
@@ -273,6 +277,7 @@ const NuevoGeneradorPage: React.FC = () => {
           razonSocial: form.razonSocial, cuit: form.cuit,
           domicilio: form.domicilio || form.domicilioLegalCalle,
           telefono: form.telefono, numeroInscripcion: form.numeroInscripcion,
+          alcanceTratamiento: form.alcanceTratamiento,
           categoria: form.categoria, actividad: form.actividad,
           rubro: form.rubro, corrientesControl: corrientesCodes.join(', '),
           ...regulatory,
@@ -282,7 +287,7 @@ const NuevoGeneradorPage: React.FC = () => {
         // result is data.data from service — could be Generador or { generador: { id, ... } }
         const resultObj = result as Generador & { generador?: { id: string } };
         generadorId = resultObj?.generador?.id || resultObj?.id;
-        toast.success('Generador creado', `${form.razonSocial} registrado exitosamente`);
+        toast.success('Registro creado', `${form.razonSocial} quedó inactivo hasta validar su documentación y habilitarlo desde el expediente.`);
       }
 
       // Upload attached files after generador is created
@@ -441,6 +446,19 @@ const NuevoGeneradorPage: React.FC = () => {
                     size="base"
                   />
                 </div>
+                <div className="rounded-xl border border-purple-200 bg-purple-50 p-4">
+                  <Select
+                    label="Alcance habilitado para tratamiento"
+                    value={form.alcanceTratamiento}
+                    onChange={(val) => up('alcanceTratamiento', val)}
+                    options={[
+                      { value: 'NACIONAL', label: 'Nacional' },
+                      { value: 'INTERNACIONAL', label: 'Internacional' },
+                    ]}
+                    size="base"
+                  />
+                  <p className="text-xs text-purple-700 mt-2">Al habilitar internacional, los manifiestos podrán vincular transportista y operador exterior aprobados y exigir una declaración específica.</p>
+                </div>
               </CardContent>
             </Card>
             <Card>
@@ -516,13 +534,12 @@ const NuevoGeneradorPage: React.FC = () => {
             <Card>
               <CardHeader><div className="flex items-center gap-2"><ClipboardList size={20} className="text-green-600" /><h3 className="text-lg font-bold text-neutral-900">Norma ISO 14000</h3></div></CardHeader>
               <CardContent>
-                <p className="text-xs text-neutral-500 mb-3">Si la empresa posee certificacion ISO 14000, ingrese la fecha. Esto duplica el factor ISO en el calculo TEF (x2 en vez de x1).</p>
+                <p className="text-xs text-neutral-500 mb-3">Si la empresa posee certificacion ISO 14000, ingrese la fecha. La certificacion se registra, pero su efecto sobre el importe final no se aplica hasta contar con una regla homologada por DGFA.</p>
                 <div className="max-w-xs">
                   <Input label="Fecha Certificacion ISO 14000" type="date" value={form.certificacionISO} onChange={e => up('certificacionISO', e.target.value)} />
                 </div>
                 <div className={`mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${form.certificacionISO ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-neutral-50 text-neutral-500 border border-neutral-200'}`}>
-                  Factor ISO: <span className="font-bold font-mono">{form.certificacionISO ? '2' : '1'}</span>
-                  <span className="text-xs">({form.certificacionISO ? 'Posee ISO — factor x2' : 'Sin ISO — factor x1'})</span>
+                  Certificacion ISO: <span className="font-bold">{form.certificacionISO ? 'registrada' : 'no informada'}</span>
                 </div>
               </CardContent>
             </Card>
@@ -538,7 +555,14 @@ const NuevoGeneradorPage: React.FC = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <CalculadoraTEF corrientesY={corrientesCodes} tieneISO={!!form.certificacionISO} inline initialInputs={tefInputs} onInputsChange={setTefInputs} />
+                  <CalculadoraTEF
+                  corrientesY={corrientesCodes}
+                  tieneISO={!!form.certificacionISO}
+                  inline
+                  initialInputs={tefInputs}
+                  onInputsChange={setTefInputs}
+                  deferred
+                />
               </CardContent>
             </Card>
           </div>
@@ -554,9 +578,8 @@ const NuevoGeneradorPage: React.FC = () => {
                   <Input label="Expediente Inscripcion" value={form.expedienteInscripcion} onChange={e => up('expedienteInscripcion', e.target.value)} placeholder="EX-2024-XXXXX" />
                   <Input label="Resolucion Inscripcion" value={form.resolucionInscripcion} onChange={e => up('resolucionInscripcion', e.target.value)} placeholder="0412/2024" />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input label="Factor R" type="number" value={form.factorR} onChange={e => up('factorR', e.target.value)} placeholder="0.00" />
-                  <Input label="Monto MxR ($)" type="number" value={form.montoMxR} onChange={e => up('montoMxR', e.target.value)} placeholder="0.00" />
+                <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                  El factor R y el importe TEF no se muestran ni se editan durante el alta. Se calcularán al cierre administrativo, en backend, con las variables declaradas y la regla vigente.
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Select

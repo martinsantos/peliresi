@@ -10,11 +10,9 @@ import { GlobalSearchPanel } from '../components/GlobalSearchPanel';
 import {
   LayoutDashboard,
   FileText,
-  MapPin,
   Settings,
   Search,
   Menu,
-  X,
   User,
   ChevronDown,
   LogOut,
@@ -31,24 +29,24 @@ import {
   Factory,
   Building2,
   SwitchCamera,
-  QrCode,
   HelpCircle,
   BookOpen,
   FileCheck,
   Radio,
+  ClipboardCheck,
 } from 'lucide-react';
 import { Button } from '../components/ui/ButtonV2';
 import { Badge } from '../components/ui/BadgeV2';
-import { UserSwitcher } from '../components/ui/UserSwitcher';
 import { NotificationBell } from '../components/NotificationBell';
 import { NotificacionesPoller } from '../components/NotificacionesPoller';
 import { ToastContainer } from '../components/ui/Toast';
 import { ConnectivityIndicator } from '../components/ConnectivityIndicator';
 import { OnboardingTour, resetOnboardingTour } from '../components/OnboardingTour';
-import { DemoAppOnboarding } from '../components/DemoAppOnboarding';
+import { RoleOnboarding } from '../components/DemoAppOnboarding';
 import { useAuth } from '../contexts/AuthContext';
 import { useImpersonation } from '../contexts/ImpersonationContext';
 import { ImpersonationBanner } from '../components/ImpersonationBanner';
+import { DemoEnvironmentBanner } from '../components/DemoEnvironmentBanner';
 
 // ========================================
 // COMPONENT
@@ -72,31 +70,16 @@ export const MainLayout: React.FC = () => {
   }, []);
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isAdminTransportista, isAdminGenerador, isAdminOperador, canAccess, isLoading } = useAuth();
+  const { currentUser, logout, isAdmin, isAuditor, isTransportista, isAdminTransportista, isAdminGenerador, isAdminOperador, canImpersonate, isLoading } = useAuth();
   const { impersonationData, exitImpersonation } = useImpersonation();
-
-  // Guard: show loading or redirect if no user
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-neutral-50">
-        <div className="text-center">
-          <div className="w-10 h-10 border-3 border-primary-200 border-t-primary-600 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-neutral-600">Cargando...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!currentUser) {
-    // Will be handled by router redirect, but guard against null access
-    return null;
-  }
 
   // Configuración de colores según rol (para header badges)
   const roleStyles = (() => {
-    switch (currentUser.rol) {
+    switch (currentUser?.rol) {
       case 'ADMIN':
         return { badge: 'primary' as const };
+      case 'AUDITOR':
+        return { badge: 'info' as const };
       case 'GENERADOR':
         return { badge: 'purple' as const };
       case 'TRANSPORTISTA':
@@ -123,6 +106,11 @@ export const MainLayout: React.FC = () => {
 
     // Manifiestos para todos
     items.push({ path: '/manifiestos', icon: FileText, label: 'Manifiestos' });
+
+    // Expedientes de inspeccion: inspectores y administradores gubernamentales.
+    if (currentUser?.esInspector || isAdmin || isAdminTransportista || isAdminOperador || isAdminGenerador) {
+      items.push({ path: '/inspecciones', icon: ClipboardCheck, label: 'Inspecciones' });
+    }
     
     // Usuarios del sistema solo para Admin
     if (isAdmin) {
@@ -155,6 +143,7 @@ export const MainLayout: React.FC = () => {
       items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
     } else if (isAdminGenerador) {
       items.push({ path: '/admin/actores/generadores',    icon: Factory,      label: 'Mis Generadores' });
+      items.push({ path: '/admin/solicitudes',            icon: FileCheck,    label: 'Solicitudes' });
       items.push({ path: '/admin/residuos',               icon: FlaskConical, label: 'Catálogo Residuos' });
       items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
       items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
@@ -162,28 +151,51 @@ export const MainLayout: React.FC = () => {
     } else if (isAdminTransportista) {
       items.push({ path: '/admin/actores/transportistas', icon: Truck,        label: 'Mis Transportistas' });
       items.push({ path: '/admin/vehiculos',              icon: Truck,        label: 'Vehículos' });
+      items.push({ path: '/admin/solicitudes',            icon: FileCheck,    label: 'Solicitudes' });
       items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
       items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
       items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
     } else if (isAdminOperador) {
       items.push({ path: '/admin/actores/operadores',     icon: FlaskConical, label: 'Mis Operadores' });
+      items.push({ path: '/admin/solicitudes',            icon: FileCheck,    label: 'Solicitudes' });
       items.push({ path: '/admin/tratamientos',           icon: BarChart3,    label: 'Tratamientos' });
       items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
       items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
       items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
+    } else if (isAuditor) {
+      items.push({ path: '/admin/auditoria', icon: Shield, label: 'Auditoría' });
     } else if (isTransportista) {
       items.push({ path: '/admin/vehiculos',              icon: Truck,        label: 'Mis Vehículos' });
     }
 
     return items;
-  }, [isAdmin, isAdminGenerador, isAdminTransportista, isAdminOperador, isTransportista]);
+  }, [isAdmin, isAuditor, isAdminGenerador, isAdminTransportista, isAdminOperador, isTransportista]);
+
+  // Keep every hook above conditional returns so login/logout transitions do
+  // not change hook ordering between renders.
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-neutral-50">
+        <div className="text-center">
+          <div className="w-10 h-10 border-3 border-primary-200 border-t-primary-600 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-neutral-600">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    // Will be handled by router redirect, but guard against null access.
+    return null;
+  }
 
   // Get current page title
   const currentPage = navItems.find(item => item.path === location.pathname)?.label || 
     adminItems.find(item => item.path === location.pathname)?.label || 'SITREP';
 
   return (
-    <div className={`h-screen bg-[#F8F8F6] flex flex-col overflow-hidden ${impersonationData ? 'pt-10' : ''}`}>
+    <div data-testid="app-shell" className={`h-screen bg-[#F8F8F6] flex flex-col overflow-hidden ${impersonationData ? 'pt-10' : ''}`}>
+      <DemoEnvironmentBanner />
       <NotificacionesPoller />
       <ToastContainer />
       {/* Impersonation banner — amber bar above everything */}
@@ -285,27 +297,29 @@ export const MainLayout: React.FC = () => {
             </div>
           )}
           
-          {/* User Switcher en Sidebar */}
-          <div className="mt-6 pt-6 border-t border-white/15">
-            <p className="px-3 text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">
-              Acceso Rápido
-            </p>
-            <NavLink
-              to="/switch-user"
-              onClick={() => setSidebarOpen(false)}
-              className={({ isActive }) => `
-                flex items-center gap-3 px-3 py-2.5 rounded-xl
-                font-medium text-sm transition-all duration-200
-                ${isActive
-                  ? 'bg-white/20 text-white'
-                  : 'text-white/70 hover:bg-white/10 hover:text-white'
-                }
-              `}
-            >
-              <SwitchCamera size={20} />
-              Cambiar Usuario
-            </NavLink>
-          </div>
+          {/* Impersonación: sólo las cuentas autorizadas por backend */}
+          {canImpersonate && (
+            <div className="mt-6 pt-6 border-t border-white/15">
+              <p className="px-3 text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">
+                Acceso administrativo
+              </p>
+              <NavLink
+                to="/switch-user"
+                onClick={() => setSidebarOpen(false)}
+                className={({ isActive }) => `
+                  flex items-center gap-3 px-3 py-2.5 rounded-xl
+                  font-medium text-sm transition-all duration-200
+                  ${isActive
+                    ? 'bg-white/20 text-white'
+                    : 'text-white/70 hover:bg-white/10 hover:text-white'
+                  }
+                `}
+              >
+                <SwitchCamera size={20} />
+                Impersonar usuario
+              </NavLink>
+            </div>
+          )}
           
           {/* Configuración y Ayuda al final */}
           <div className="mt-2">
@@ -389,10 +403,12 @@ export const MainLayout: React.FC = () => {
                   <User size={16} />
                   Mi Perfil
                 </NavLink>
-                <NavLink to="/switch-user" className="w-full flex items-center gap-2 px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50">
-                  <SwitchCamera size={16} />
-                  Cambiar Usuario
-                </NavLink>
+                {canImpersonate && (
+                  <NavLink to="/switch-user" className="w-full flex items-center gap-2 px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50">
+                    <SwitchCamera size={16} />
+                    Cambiar Usuario
+                  </NavLink>
+                )}
                 <button
                   onClick={() => { navigate('/configuracion'); setUserMenuOpen(false); }}
                   className="w-full flex items-center gap-2 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
@@ -424,6 +440,7 @@ export const MainLayout: React.FC = () => {
               size="sm"
               className="lg:hidden"
               onClick={() => setSidebarOpen(true)}
+              aria-label="Abrir menú de navegación"
             >
               <Menu size={20} />
             </Button>
@@ -470,8 +487,6 @@ export const MainLayout: React.FC = () => {
             {/* Notifications */}
             <NotificationBell />
 
-            {/* User Switcher Dropdown */}
-            <UserSwitcher variant="dropdown" onSwitch={() => navigate('/dashboard')} />
           </div>
         </header>
 
@@ -482,7 +497,7 @@ export const MainLayout: React.FC = () => {
 
         {/* Footer */}
         <footer className="border-t border-neutral-100 bg-white px-4 py-2.5 flex items-center justify-center gap-3 shrink-0">
-          <img src="/logo-mendoza.webp" alt="Gobierno de Mendoza" className="h-6 w-auto opacity-60" />
+          <img src={`${import.meta.env.BASE_URL}mendoza-marca-horizontal-transparente.png`} width={178} height={57} alt="Mendoza — Gobierno de la Provincia" className="h-6 w-auto" />
           <span className="text-xs text-neutral-400">Provincia de Mendoza — SITREP v6</span>
         </footer>
       </div>
@@ -495,7 +510,7 @@ export const MainLayout: React.FC = () => {
       />
 
       {/* Role-specific welcome modal */}
-      <DemoAppOnboarding />
+      <RoleOnboarding />
     </div>
   );
 };

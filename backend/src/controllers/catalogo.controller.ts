@@ -440,7 +440,7 @@ export const getAllTratamientos = async (req: AuthRequest, res: Response, next: 
         // Build operadorId -> manifiestos count map
         const countsByOperador: Record<string, number> = {};
         for (const row of manifiestosCounts) {
-            countsByOperador[row.operadorId] = row._count.id;
+            if (row.operadorId) countsByOperador[row.operadorId] = row._count.id;
         }
 
         res.json({

@@ -46,9 +46,6 @@ import {
   useGeneradores,
   useTransportistas,
   useOperadores,
-  useCreateGenerador,
-  useCreateTransportista,
-  useCreateOperador,
   useDeleteGenerador,
   useDeleteTransportista,
   useDeleteOperador,
@@ -58,20 +55,6 @@ const tipoConfig = {
   generador: { label: 'Generador', icon: Factory, color: 'purple' },
   transportista: { label: 'Transportista', icon: Truck, color: 'orange' },
   operador: { label: 'Operador', icon: FlaskConical, color: 'blue' },
-};
-
-const INITIAL_FORM = {
-  tipo: 'generador' as 'generador' | 'transportista' | 'operador',
-  razonSocial: '',
-  cuit: '',
-  domicilio: '',
-  telefono: '',
-  email: '',
-  password: '',
-  nombre: '',
-  numeroInscripcion: '',
-  categoria: '',
-  numeroHabilitacion: '',
 };
 
 export const ActoresPage: React.FC = () => {
@@ -86,10 +69,9 @@ export const ActoresPage: React.FC = () => {
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [actorSeleccionado, setActorSeleccionado] = useState<any>(null);
   const [modalDetalle, setModalDetalle] = useState(false);
-  const [modalCrear, setModalCrear] = useState(false);
+  const [modalAlta, setModalAlta] = useState(false);
   const [modalEliminar, setModalEliminar] = useState(false);
   const [actorEliminar, setActorEliminar] = useState<{ id: string; tipo: string; razonSocial: string } | null>(null);
-  const [form, setForm] = useState(INITIAL_FORM);
 
   const itemsPerPage = 20;
 
@@ -129,9 +111,6 @@ export const ActoresPage: React.FC = () => {
     limit: isTodos ? 100 : itemsPerPage,
   });
 
-  const createGenerador = useCreateGenerador();
-  const createTransportista = useCreateTransportista();
-  const createOperador = useCreateOperador();
   const deleteGenerador = useDeleteGenerador();
   const deleteTransportista = useDeleteTransportista();
   const deleteOperador = useDeleteOperador();
@@ -220,32 +199,6 @@ export const ActoresPage: React.FC = () => {
     setModalDetalle(true);
   };
 
-  const handleCrear = async () => {
-    try {
-      const base = {
-        email: form.email,
-        password: form.password || 'TempPass123!',
-        nombre: form.nombre || form.razonSocial,
-        razonSocial: form.razonSocial,
-        cuit: form.cuit,
-        domicilio: form.domicilio,
-        telefono: form.telefono,
-      };
-
-      if (form.tipo === 'generador') {
-        await createGenerador.mutateAsync({ ...base, numeroInscripcion: form.numeroInscripcion, categoria: form.categoria });
-      } else if (form.tipo === 'transportista') {
-        await createTransportista.mutateAsync({ ...base, numeroHabilitacion: form.numeroHabilitacion });
-      } else {
-        await createOperador.mutateAsync({ ...base, numeroHabilitacion: form.numeroHabilitacion, categoria: form.categoria });
-      }
-      setModalCrear(false);
-      setForm(INITIAL_FORM);
-    } catch {
-      // Error handled by React Query
-    }
-  };
-
   const handleEliminar = async () => {
     if (!actorEliminar) return;
     try {
@@ -258,8 +211,6 @@ export const ActoresPage: React.FC = () => {
       // Error handled by React Query
     }
   };
-
-  const updateField = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }));
 
   const handleExportPdf = () => {
     exportReportePDF({
@@ -498,7 +449,7 @@ export const ActoresPage: React.FC = () => {
               CSV
             </Button>
             <button onClick={handleExportPdf} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="Exportar PDF"><FileDown size={14} />PDF</button>
-            <Button leftIcon={<Plus size={18} />} onClick={() => setModalCrear(true)}>
+            <Button leftIcon={<Plus size={18} />} onClick={() => setModalAlta(true)}>
               Nuevo Actor
             </Button>
           </div>
@@ -806,65 +757,34 @@ export const ActoresPage: React.FC = () => {
         )}
       </Modal>
 
-      {/* Modal crear actor */}
+      {/* Selector de alta canónica: evita formularios parciales duplicados. */}
       <Modal
-        isOpen={modalCrear}
-        onClose={() => { setModalCrear(false); setForm(INITIAL_FORM); }}
-        title="Nuevo Actor"
-        size="lg"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => { setModalCrear(false); setForm(INITIAL_FORM); }}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleCrear}
-              disabled={createGenerador.isPending || createTransportista.isPending || createOperador.isPending}
-            >
-              {(createGenerador.isPending || createTransportista.isPending || createOperador.isPending) ? 'Guardando...' : 'Crear Actor'}
-            </Button>
-          </>
-        }
+        isOpen={modalAlta}
+        onClose={() => setModalAlta(false)}
+        title="Iniciar alta de actor"
+        description="Elegí el tipo para abrir el único formulario completo de alta, con sus validaciones y documentación correspondiente."
+        size="base"
       >
-        <div className="space-y-4">
-          <Select
-            label="Tipo de Actor"
-            value={form.tipo}
-            onChange={(val) => updateField('tipo', val)}
-            options={[
-              { value: 'generador', label: 'Generador' },
-              { value: 'transportista', label: 'Transportista' },
-              { value: 'operador', label: 'Operador' },
-            ]}
-          />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <Input label="Razon Social" value={form.razonSocial} onChange={(e) => updateField('razonSocial', e.target.value)} placeholder="Empresa S.A." />
-            <Input label="CUIT" value={form.cuit} onChange={(e) => updateField('cuit', e.target.value)} placeholder="30-12345678-9" />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <Input label="Email" type="email" value={form.email} onChange={(e) => updateField('email', e.target.value)} placeholder="contacto@empresa.com" />
-            <Input label="Telefono" value={form.telefono} onChange={(e) => updateField('telefono', e.target.value)} placeholder="+54 261 ..." />
-          </div>
-          <Input label="Domicilio" value={form.domicilio} onChange={(e) => updateField('domicilio', e.target.value)} placeholder="Av. San Martin 1234, Mendoza" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <Input label="Nombre Responsable" value={form.nombre} onChange={(e) => updateField('nombre', e.target.value)} placeholder="Juan Perez" />
-            <Input label="Password inicial" type="password" value={form.password} onChange={(e) => updateField('password', e.target.value)} placeholder="Min. 8 caracteres" />
-          </div>
-          {form.tipo === 'generador' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              <Input label="N. Inscripcion" value={form.numeroInscripcion} onChange={(e) => updateField('numeroInscripcion', e.target.value)} placeholder="DGFA-2024-XXXX" />
-              <Input label="Categoria" value={form.categoria} onChange={(e) => updateField('categoria', e.target.value)} placeholder="Grandes Generadores" />
-            </div>
-          )}
-          {form.tipo === 'transportista' && (
-            <Input label="N. Habilitacion" value={form.numeroHabilitacion} onChange={(e) => updateField('numeroHabilitacion', e.target.value)} placeholder="HAB-TR-2024-XXXX" />
-          )}
-          {form.tipo === 'operador' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              <Input label="N. Habilitacion" value={form.numeroHabilitacion} onChange={(e) => updateField('numeroHabilitacion', e.target.value)} placeholder="HAB-OP-2024-XXXX" />
-              <Input label="Categoria" value={form.categoria} onChange={(e) => updateField('categoria', e.target.value)} placeholder="Incineracion" />
-            </div>
-          )}
+        <div className="grid gap-3 sm:grid-cols-3">
+          {([
+            { tipo: 'generadores', label: 'Generador', icon: Factory, tone: 'text-purple-700 bg-purple-50 border-purple-200' },
+            { tipo: 'transportistas', label: 'Transportista', icon: Truck, tone: 'text-orange-700 bg-orange-50 border-orange-200' },
+            { tipo: 'operadores', label: 'Operador', icon: FlaskConical, tone: 'text-blue-700 bg-blue-50 border-blue-200' },
+          ] as const).map(({ tipo, label, icon: Icon, tone }) => (
+            <button
+              key={tipo}
+              type="button"
+              className={`min-h-32 rounded-2xl border p-4 text-left transition-transform hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${tone}`}
+              onClick={() => {
+                setModalAlta(false);
+                navigate(mp(`/admin/actores/${tipo}/nuevo`));
+              }}
+            >
+              <Icon size={24} />
+              <span className="mt-4 block font-bold">{label}</span>
+              <span className="mt-1 block text-xs opacity-80">Abrir formulario completo</span>
+            </button>
+          ))}
         </div>
       </Modal>
 

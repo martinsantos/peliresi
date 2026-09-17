@@ -27,9 +27,8 @@ import {
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
-import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/BadgeV2';
-import { Modal, ConfirmModal } from '../../components/ui/Modal';
+import { ConfirmModal } from '../../components/ui/Modal';
 import { Table, Pagination } from '../../components/ui/Table';
 import { Select } from '../../components/ui/Select';
 import { SearchInput } from '../../components/ui/SearchInput';
@@ -41,30 +40,8 @@ import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { formatRelativeTime } from '../../utils/formatters';
 import {
   useTransportistas,
-  useCreateTransportista,
-  useUpdateTransportista,
   useDeleteTransportista,
 } from '../../hooks/useActores';
-
-const INITIAL_FORM = {
-  razonSocial: '',
-  cuit: '',
-  domicilio: '',
-  localidad: '',
-  telefono: '',
-  email: '',
-  password: '',
-  nombre: '',
-  numeroHabilitacion: '',
-  vencimientoHabilitacion: '',
-  coordenadas: '',
-  corrientesAutorizadas: '',
-  expedienteDPA: '',
-  resolucionDPA: '',
-  resolucionSSP: '',
-  actaInspeccion: '',
-  actaInspeccion2: '',
-};
 
 const TransportistasPage: React.FC = () => {
   const navigate = useNavigate();
@@ -78,17 +55,11 @@ const TransportistasPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState<string | undefined>('ultimaActividad');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [modalCrear, setModalCrear] = useState(false);
-  const [modalEditar, setModalEditar] = useState(false);
   const [modalEliminar, setModalEliminar] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; razonSocial: string } | null>(null);
-  const [form, setForm] = useState(INITIAL_FORM);
 
   // API hooks
   const { data: apiData, isLoading, isError, error } = useTransportistas({ page: currentPage, limit: 20, search: busqueda || undefined, sortBy, sortOrder });
-  const createMutation = useCreateTransportista();
-  const updateMutation = useUpdateTransportista();
   const deleteMutation = useDeleteTransportista();
 
   const transportistasData = Array.isArray(apiData?.items) ? apiData.items : [];
@@ -170,107 +141,8 @@ const TransportistasPage: React.FC = () => {
     porVencer,
   };
 
-  const updateField = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }));
-
-  const parseCoords = (coords: string) => {
-    const parts = coords?.split(',').map(s => s.trim()).filter(Boolean);
-    const lat = parts?.[0] ? Number(parts[0]) : undefined;
-    const lng = parts?.[1] ? Number(parts[1]) : undefined;
-    return lat && lng && !isNaN(lat) && !isNaN(lng) ? { latitud: lat, longitud: lng } : {};
-  };
-
-  const handleCrear = async () => {
-    if (!form.razonSocial || !form.cuit || !form.email) {
-      toast.error('Campos requeridos', 'Razón social, CUIT y email son obligatorios');
-      return;
-    }
-    try {
-      await createMutation.mutateAsync({
-        email: form.email,
-        password: form.password || 'TempPass123!',
-        nombre: form.nombre || form.razonSocial,
-        razonSocial: form.razonSocial,
-        cuit: form.cuit,
-        domicilio: form.domicilio,
-        localidad: form.localidad || undefined,
-        telefono: form.telefono,
-        numeroHabilitacion: form.numeroHabilitacion,
-        vencimientoHabilitacion: form.vencimientoHabilitacion || undefined,
-        ...parseCoords(form.coordenadas),
-        corrientesAutorizadas: form.corrientesAutorizadas || undefined,
-        expedienteDPA: form.expedienteDPA || undefined,
-        resolucionDPA: form.resolucionDPA || undefined,
-        resolucionSSP: form.resolucionSSP || undefined,
-        actaInspeccion: form.actaInspeccion || undefined,
-        actaInspeccion2: form.actaInspeccion2 || undefined,
-      });
-      toast.success('Creado', `Transportista ${form.razonSocial} creado`);
-      setModalCrear(false);
-      setForm(INITIAL_FORM);
-    } catch (err: any) {
-      toast.error('Error', err?.response?.data?.message || 'No se pudo crear el transportista');
-    }
-  };
-
-  const handleEditar = async () => {
-    if (!editId) return;
-    try {
-      await updateMutation.mutateAsync({
-        id: editId,
-        data: {
-          razonSocial: form.razonSocial,
-          cuit: form.cuit,
-          domicilio: form.domicilio,
-          localidad: form.localidad || undefined,
-          telefono: form.telefono,
-          email: form.email,
-          numeroHabilitacion: form.numeroHabilitacion,
-          vencimientoHabilitacion: form.vencimientoHabilitacion || undefined,
-          ...parseCoords(form.coordenadas),
-          corrientesAutorizadas: form.corrientesAutorizadas || undefined,
-          expedienteDPA: form.expedienteDPA || undefined,
-          resolucionDPA: form.resolucionDPA || undefined,
-          resolucionSSP: form.resolucionSSP || undefined,
-          actaInspeccion: form.actaInspeccion || undefined,
-          actaInspeccion2: form.actaInspeccion2 || undefined,
-        },
-      });
-      toast.success('Actualizado', `Transportista ${form.razonSocial} actualizado`);
-      setModalEditar(false);
-      setEditId(null);
-      setForm(INITIAL_FORM);
-    } catch (err: any) {
-      toast.error('Error', err?.response?.data?.message || 'No se pudo actualizar');
-    }
-  };
-
   const openEditar = (row: typeof tableData[0]) => {
     navigate(`/admin/actores/transportistas/${row.id}/editar`);
-    return;
-    // Legacy modal code below - kept for reference
-    setEditId(row.id);
-    setForm({
-      razonSocial: row.razonSocial || '',
-      cuit: row.cuit || '',
-      domicilio: row.domicilio || '',
-      localidad: row.localidad || '',
-      telefono: row.telefono || '',
-      email: row.email || '',
-      password: '',
-      nombre: '',
-      numeroHabilitacion: row.numeroHabilitacion !== '-' ? row.numeroHabilitacion : '',
-      vencimientoHabilitacion: row.vencimientoHabilitacion
-        ? new Date(row.vencimientoHabilitacion as Date).toISOString().split('T')[0]
-        : '',
-      coordenadas: row._raw?.latitud ? `${row._raw.latitud}, ${row._raw.longitud}` : '',
-      corrientesAutorizadas: row._raw?.corrientesAutorizadas || '',
-      expedienteDPA: row._raw?.expedienteDPA || '',
-      resolucionDPA: row._raw?.resolucionDPA || '',
-      resolucionSSP: row._raw?.resolucionSSP || '',
-      actaInspeccion: row._raw?.actaInspeccion || '',
-      actaInspeccion2: row._raw?.actaInspeccion2 || '',
-    });
-    setModalEditar(true);
   };
 
   const handleEliminar = async () => {
@@ -336,50 +208,6 @@ const TransportistasPage: React.FC = () => {
       },
     });
   };
-
-  const renderForm = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-        <Input label="Razón Social" value={form.razonSocial} onChange={(e) => updateField('razonSocial', e.target.value)} placeholder="Empresa S.A." />
-        <Input label="CUIT" value={form.cuit} onChange={(e) => updateField('cuit', e.target.value)} placeholder="30-12345678-9" />
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-        <Input label="Email" type="email" value={form.email} onChange={(e) => updateField('email', e.target.value)} placeholder="contacto@empresa.com" />
-        <Input label="Teléfono" value={form.telefono} onChange={(e) => updateField('telefono', e.target.value)} placeholder="+54 261 ..." />
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-        <Input label="Domicilio" value={form.domicilio} onChange={(e) => updateField('domicilio', e.target.value)} placeholder="Av. Libertador 1234, Mendoza" />
-        <Input label="Localidad" value={form.localidad} onChange={(e) => updateField('localidad', e.target.value)} placeholder="Godoy Cruz, Mendoza" />
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-        <Input label="N° Habilitación" value={form.numeroHabilitacion} onChange={(e) => updateField('numeroHabilitacion', e.target.value)} placeholder="HAB-TR-2024-XXXX" />
-        <Input label="Vencimiento Habilitación" type="date" value={form.vencimientoHabilitacion} onChange={(e) => updateField('vencimientoHabilitacion', e.target.value)} />
-      </div>
-      <Input label="Coordenadas Geograficas" value={form.coordenadas} onChange={(e) => updateField('coordenadas', e.target.value)} placeholder="-32.89, -68.83" />
-      {/* Datos DPA */}
-      <div className="border-t border-neutral-100 pt-4 mt-2">
-        <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-3">Datos DPA</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          <Input label="Expediente DPA" value={form.expedienteDPA} onChange={(e) => updateField('expedienteDPA', e.target.value)} placeholder="EXP-DPA-XXXX" />
-          <Input label="Resolución DPA" value={form.resolucionDPA} onChange={(e) => updateField('resolucionDPA', e.target.value)} placeholder="0359/24" />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-4">
-          <Input label="Resolución SSP" value={form.resolucionSSP} onChange={(e) => updateField('resolucionSSP', e.target.value)} placeholder="SSP-XXXX" />
-          <Input label="Corrientes Autorizadas" value={form.corrientesAutorizadas} onChange={(e) => updateField('corrientesAutorizadas', e.target.value)} placeholder="Y4, Y8, Y9" />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-4">
-          <Input label="Acta Inspección" value={form.actaInspeccion} onChange={(e) => updateField('actaInspeccion', e.target.value)} placeholder="rp-g000040" />
-          <Input label="Acta Inspección 2" value={form.actaInspeccion2} onChange={(e) => updateField('actaInspeccion2', e.target.value)} placeholder="" />
-        </div>
-      </div>
-      {!editId && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          <Input label="Nombre Responsable" value={form.nombre} onChange={(e) => updateField('nombre', e.target.value)} placeholder="Juan Perez" />
-          <Input label="Password inicial" type="password" value={form.password} onChange={(e) => updateField('password', e.target.value)} placeholder="Min. 8 caracteres" />
-        </div>
-      )}
-    </div>
-  );
 
   const columns = [
     {
@@ -745,42 +573,6 @@ const TransportistasPage: React.FC = () => {
           </>
         )}
       </Card>
-
-      {/* Modal crear */}
-      <Modal
-        isOpen={modalCrear}
-        onClose={() => { setModalCrear(false); setForm(INITIAL_FORM); }}
-        title="Nuevo Transportista"
-        size="lg"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => { setModalCrear(false); setForm(INITIAL_FORM); }}>Cancelar</Button>
-            <Button onClick={handleCrear} disabled={createMutation.isPending}>
-              {createMutation.isPending ? 'Guardando...' : 'Crear Transportista'}
-            </Button>
-          </>
-        }
-      >
-        {renderForm()}
-      </Modal>
-
-      {/* Modal editar */}
-      <Modal
-        isOpen={modalEditar}
-        onClose={() => { setModalEditar(false); setEditId(null); setForm(INITIAL_FORM); }}
-        title="Editar Transportista"
-        size="lg"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => { setModalEditar(false); setEditId(null); setForm(INITIAL_FORM); }}>Cancelar</Button>
-            <Button onClick={handleEditar} disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? 'Guardando...' : 'Guardar Cambios'}
-            </Button>
-          </>
-        }
-      >
-        {renderForm()}
-      </Modal>
 
       {/* Modal eliminar */}
       <ConfirmModal

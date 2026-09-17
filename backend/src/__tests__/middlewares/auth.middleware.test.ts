@@ -33,10 +33,12 @@ vi.mock('../../lib/prisma', () => ({
   },
 }));
 
-import { isAuthenticated, hasRole, AuthRequest } from '../../middlewares/auth.middleware';
+import { isAuthenticated, hasRole, requireFullAccess, canAuditorAccessRequest, AuthRequest } from '../../middlewares/auth.middleware';
 
-function createMocks(authHeader?: string) {
+function createMocks(authHeader?: string, method = 'GET', originalUrl = '/api/manifiestos') {
   const req = {
+    method,
+    originalUrl,
     headers: {
       authorization: authHeader,
     },
@@ -194,6 +196,46 @@ describe('isAuthenticated middleware', () => {
       restricted: true,
     }));
   });
+
+  it('blocks AUDITOR mutations at the authentication boundary', async () => {
+    const token = createToken({ id: 'auditor-1' });
+    mockFindUnique.mockResolvedValue({
+      id: 'auditor-1', email: 'auditor@test.com', nombre: 'Auditor', rol: 'AUDITOR',
+      activo: true, esInspector: false, generador: null, transportista: null, operador: null,
+    });
+    const { req, res, next } = createMocks(`Bearer ${token}`, 'POST', '/api/manifiestos');
+
+    await isAuthenticated(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 403,
+      message: expect.stringContaining('solo lectura'),
+    }));
+  });
+
+  it('preserves legitimate ADMIN mutations', async () => {
+    const token = createToken({ id: 'admin-1' });
+    mockFindUnique.mockResolvedValue({
+      id: 'admin-1', email: 'admin@test.com', nombre: 'Admin', rol: 'ADMIN',
+      activo: true, esInspector: false, generador: null, transportista: null, operador: null,
+    });
+    const { req, res, next } = createMocks(`Bearer ${token}`, 'POST', '/api/admin/usuarios');
+
+    await isAuthenticated(req, res, next);
+
+    expect(next).toHaveBeenCalledWith();
+  });
+});
+
+describe('AUDITOR read-only request policy', () => {
+  it('allows safe reads and account-security actions only', () => {
+    expect(canAuditorAccessRequest('GET', '/api/reportes/manifiestos')).toBe(true);
+    expect(canAuditorAccessRequest('POST', '/api/auth/logout')).toBe(true);
+    expect(canAuditorAccessRequest('POST', '/api/auth/change-password')).toBe(true);
+    expect(canAuditorAccessRequest('POST', '/api/admin/usuarios')).toBe(false);
+    expect(canAuditorAccessRequest('PUT', '/api/alertas/id/resolver')).toBe(false);
+    expect(canAuditorAccessRequest('DELETE', '/api/manifiestos/id')).toBe(false);
+  });
 });
 
 describe('hasRole middleware', () => {
@@ -244,5 +286,25 @@ describe('hasRole middleware', () => {
     middleware(req, res, next);
 
     expect(next).toHaveBeenCalledWith(); // no error
+  });
+});
+
+describe('requireFullAccess middleware', () => {
+  it('requires a password change before protected routes', () => {
+    const { req, res, next } = createMocks();
+    req.user = { id: '1', rol: 'GENERADOR', forcePasswordChange: true, restricted: false };
+
+    requireFullAccess(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403, message: expect.stringContaining('cambiar tu contraseña') }));
+  });
+
+  it('allows normal users through', () => {
+    const { req, res, next } = createMocks();
+    req.user = { id: '1', rol: 'GENERADOR', forcePasswordChange: false, restricted: false };
+
+    requireFullAccess(req, res, next);
+
+    expect(next).toHaveBeenCalledWith();
   });
 });

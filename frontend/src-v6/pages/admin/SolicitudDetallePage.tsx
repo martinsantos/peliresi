@@ -14,6 +14,7 @@ import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Modal } from '../../components/ui/Modal';
 import { toast } from '../../components/ui/Toast';
+import api from '../../services/api';
 import {
   useSolicitud,
   useMensajesSolicitud,
@@ -181,6 +182,19 @@ const SolicitudDetallePage: React.FC = () => {
   const datosActor = parseDatosActor(solicitud.datosActor || '{}');
   const documentos = solicitud.documentos || [];
   const canAct = solicitud.estado === 'EN_REVISION' || solicitud.estado === 'OBSERVADA';
+  const downloadDocument = async (doc: DocumentoSolicitud) => {
+    try {
+      const response = await api.get(`/documentos/${doc.id}/download`, { responseType: 'blob' });
+      const url = URL.createObjectURL(response.data);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = doc.nombre;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Error', 'No se pudo descargar el documento');
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -295,15 +309,14 @@ const SolicitudDetallePage: React.FC = () => {
                     )}
 
                     <div className="flex items-center gap-1.5">
-                      <a
-                        href={doc.path}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <button
+                        type="button"
+                        onClick={() => downloadDocument(doc)}
                         className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-500"
                         title="Descargar"
                       >
                         <Download size={13} />
-                      </a>
+                      </button>
                       {doc.estado === 'PENDIENTE' && canAct && (
                         <>
                           <button

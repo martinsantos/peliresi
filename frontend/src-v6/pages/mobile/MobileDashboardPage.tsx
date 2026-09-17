@@ -26,6 +26,7 @@ import { useDashboardStats } from '../../hooks/useDashboard';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { useManifiestos } from '../../hooks/useManifiestos';
 import { EstadoManifiesto } from '../../types/models';
+import { activeTripStorageKey, tripSnapshotStorageKey } from '../../utils/userContext';
 
 const roleLabelMap: Record<string, string> = {
   ADMIN: 'Admin',
@@ -33,6 +34,9 @@ const roleLabelMap: Record<string, string> = {
   TRANSPORTISTA: 'Transportista',
   OPERADOR: 'Operador',
   AUDITOR: 'Auditor',
+  ADMIN_GENERADOR: 'Adm. Generadores',
+  ADMIN_OPERADOR: 'Adm. Operadores',
+  ADMIN_TRANSPORTISTA: 'Adm. Transportistas',
 };
 
 const roleBadgeColor: Record<string, 'primary' | 'info' | 'warning' | 'success'> = {
@@ -45,46 +49,64 @@ const roleBadgeColor: Record<string, 'primary' | 'info' | 'warning' | 'success'>
 
 export const MobileDashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
-  const { data: dashData, isLoading: dashLoading } = useDashboardStats();
+  const { currentUser, isAuditor } = useAuth();
+  const { data: dashData, isLoading: dashLoading, isError, isFetching, refetch } = useDashboardStats();
   const mp = useMobilePrefix();
   const isTransportista = currentUser?.rol === 'TRANSPORTISTA';
+  const canCreate = ['ADMIN', 'GENERADOR', 'ADMIN_GENERADOR'].includes(currentUser?.rol ?? '');
+  const canTrack = ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA', 'TRANSPORTISTA'].includes(currentUser?.rol ?? '');
 
   // FIX 2: Fetch assigned/active trips for TRANSPORTISTA
   const { data: tripsEnTransito } = useManifiestos(
-    isTransportista ? { estado: EstadoManifiesto.EN_TRANSITO, limit: 5 } : undefined
+    { estado: EstadoManifiesto.EN_TRANSITO, limit: 5 }, { enabled: isTransportista }
   );
   const { data: tripsAprobados } = useManifiestos(
-    isTransportista ? { estado: EstadoManifiesto.APROBADO, limit: 5 } : undefined
+    { estado: EstadoManifiesto.APROBADO, limit: 5 }, { enabled: isTransportista }
   );
 
   const activeTrips = tripsEnTransito?.items || [];
   const pendingTrips = tripsAprobados?.items || [];
 
   // Fallback: read active trip from localStorage when API hasn't responded yet
-  const savedTripId = useMemo(() => localStorage.getItem('sitrep_active_trip_id'), []);
+  const savedTripId = useMemo(() => (
+    currentUser?.id != null ? localStorage.getItem(activeTripStorageKey(currentUser.id)) : null
+  ), [currentUser?.id]);
   const savedTripSnapshot = useMemo(() => {
     if (!savedTripId) return null;
     try {
-      const s = localStorage.getItem(`viaje_snapshot_${savedTripId}`);
+      if (currentUser?.id == null) return null;
+      const s = localStorage.getItem(tripSnapshotStorageKey(currentUser.id, savedTripId));
       return s ? JSON.parse(s) : null;
     } catch { return null; }
-  }, [savedTripId]);
+  }, [savedTripId, currentUser?.id]);
 
-  const accesosRapidos = useMemo(() => [
-    { id: 1, label: 'Nuevo Manifiesto', icon: FileText, path: mp('/manifiestos/nuevo'), color: 'primary' },
+  const accesosRapidos = useMemo(() => isAuditor ? [
+    { id: 1, label: 'Ver Manifiestos', icon: FileText, path: mp('/manifiestos'), color: 'primary' },
+    { id: 2, label: 'Reportes', icon: TrendingUp, path: mp('/reportes'), color: 'purple' },
+  ] : [
+    { id: 1, label: canCreate ? 'Nuevo Manifiesto' : isTransportista ? 'Mis Viajes' : 'Ver Manifiestos', icon: FileText, path: mp(canCreate ? '/manifiestos/nuevo' : isTransportista ? '/transporte/perfil' : '/manifiestos'), color: 'primary' },
     { id: 2, label: 'Escanear QR', icon: MapPin, path: mp('/escaner-qr'), color: 'success' },
-    { id: 3, label: 'Ver Tracking', icon: Package, path: mp('/centro-control'), color: 'info' },
+    ...(canTrack ? [{ id: 3, label: 'Centro de Control', icon: Package, path: mp('/centro-control'), color: 'info' }] : []),
     { id: 4, label: 'Reportes', icon: TrendingUp, path: mp('/reportes'), color: 'purple' },
-  ], [mp]);
+  ], [isAuditor, canCreate, canTrack, isTransportista, mp]);
 
   const dashStats = dashData;
 
+  // The API's canonical shape is `estadisticas`; retain the legacy fallback
+  // so older demo deployments keep rendering useful counters.
+  const statsData = dashStats?.estadisticas;
+  const legacyStats = dashStats?.manifiestos;
+  const total = statsData?.total ?? legacyStats?.total;
+  const enTransito = statsData?.enTransito ?? legacyStats?.enTransito;
+  const pendientes = statsData ? statsData.borradores + statsData.aprobados : legacyStats?.pendientes;
+  const display = (value: number | undefined) => value === undefined ? '—' : String(value);
   const stats = [
-    { id: 1, label: 'Manifiestos Total', value: String(dashStats?.manifiestos?.total ?? 0), change: undefined, icon: FileText, color: 'primary', href: '/manifiestos' },
-    { id: 2, label: 'En Tránsito', value: String(dashStats?.manifiestos?.enTransito ?? 0), change: undefined, icon: MapPin, color: 'info', href: '/manifiestos?estado=EN_TRANSITO' },
-    { id: 3, label: 'Pendientes', value: String(dashStats?.manifiestos?.pendientes ?? 0), icon: Clock, color: 'warning', href: '/manifiestos?estado=BORRADOR' },
-    { id: 4, label: 'Completados', value: String(dashStats?.manifiestos?.completados ?? 0), change: undefined, icon: CheckCircle2, color: 'success', href: '/manifiestos?estado=TRATADO' },
+    { id: 1, label: 'Total de manifiestos', value: display(total), icon: FileText, color: 'primary', href: '/manifiestos' },
+    { id: 2, label: 'En Tránsito', value: display(enTransito), icon: MapPin, color: 'info', href: '/manifiestos?estado=EN_TRANSITO' },
+    { id: 3, label: 'Borradores', value: display(statsData?.borradores), icon: Clock, color: 'warning', href: '/manifiestos?estado=BORRADOR' },
+    { id: 4, label: 'Aprobados', value: display(statsData?.aprobados), icon: Truck, color: 'warning', href: '/manifiestos?estado=APROBADO' },
+    { id: 5, label: 'Recibidos', value: display(statsData?.recibidos), icon: Package, color: 'info', href: '/manifiestos?estado=RECIBIDO' },
+    { id: 6, label: 'Tratados', value: display(statsData?.tratados ?? legacyStats?.completados), icon: CheckCircle2, color: 'success', href: '/manifiestos?estado=TRATADO' },
   ];
 
   const greeting = () => {
@@ -106,6 +128,14 @@ export const MobileDashboardPage: React.FC = () => {
           {roleLabelMap[currentUser?.rol || 'ADMIN'] || currentUser?.rol || 'ADMIN'}
         </Badge>
       </div>
+
+      {isError && (
+        <div role="alert" className="rounded-xl border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">
+          <p>No pudimos actualizar el resumen. {dashData ? 'Los datos visibles son de la última consulta.' : 'Esto no significa que no haya manifiestos.'}</p>
+          <Button size="sm" variant="outline" className="mt-2" disabled={isFetching} onClick={() => void refetch()}>Reintentar</Button>
+        </div>
+      )}
+      {dashLoading && <p role="status" className="text-sm text-neutral-500">Cargando resumen…</p>}
 
       {/* FIX 2: TRANSPORTISTA Trip Assignment Banner */}
       {isTransportista && activeTrips.length === 0 && savedTripSnapshot && (
@@ -211,7 +241,8 @@ export const MobileDashboardPage: React.FC = () => {
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(mp(stat.href))}>
+            <button key={stat.id} type="button" className="text-left rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" onClick={() => navigate(mp(stat.href))}>
+            <Card className="hover:shadow-md transition-shadow h-full">
               <CardContent className="p-3">
                 <div className="flex items-start justify-between mb-2">
                   <div className={`p-2 rounded-lg ${
@@ -227,14 +258,12 @@ export const MobileDashboardPage: React.FC = () => {
                       'text-success-600'
                     } />
                   </div>
-                  {stat.change && (
-                    <span className="text-xs font-medium text-success-600">{stat.change}</span>
-                  )}
                 </div>
                 <p className="text-2xl font-bold text-neutral-900">{stat.value}</p>
                 <p className="text-xs text-neutral-500">{stat.label}</p>
               </CardContent>
             </Card>
+            </button>
           );
         })}
       </div>
@@ -264,7 +293,7 @@ export const MobileDashboardPage: React.FC = () => {
                     'text-purple-600'
                   } />
                 </div>
-                <span className="text-[10px] font-medium text-neutral-700 text-center leading-tight">
+                <span className="text-xs font-medium text-neutral-700 text-center leading-tight">
                   {item.label}
                 </span>
               </button>
@@ -294,13 +323,21 @@ export const MobileDashboardPage: React.FC = () => {
                 <p className="text-xs text-neutral-400">Cargando...</p>
               </CardContent>
             </Card>
+          ) : dashStats?.recientes?.length ? (
+            <div className="space-y-2">
+              {dashStats.recientes.slice(0, 3).map(manifiesto => (
+                <button key={manifiesto.id} type="button" onClick={() => navigate(mp(`/manifiestos/${manifiesto.id}`))} className="w-full flex items-center justify-between gap-2 rounded-xl border border-neutral-200 bg-white p-3 text-left">
+                  <span className="text-sm font-medium">{manifiesto.numero}</span>
+                  <span className="text-xs text-neutral-500">{manifiesto.estado.replaceAll('_', ' ')}</span>
+                  <ChevronRight size={16} aria-hidden="true" />
+                </button>
+              ))}
+            </div>
           ) : (
             <Card>
               <CardContent className="p-4 text-center">
                 <p className="text-sm text-neutral-500">
-                  {(dashStats?.manifiestos?.enTransito ?? 0) > 0
-                    ? `${dashStats?.manifiestos?.enTransito} manifiestos en tránsito`
-                    : 'Sin actividad reciente'}
+                  {isError ? 'Actividad no disponible. Reintentá la consulta.' : !dashData ? 'Actividad no disponible' : 'Sin actividad reciente'}
                 </p>
               </CardContent>
             </Card>
@@ -313,9 +350,9 @@ export const MobileDashboardPage: React.FC = () => {
         <CardContent className="p-4">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-primary-100 text-sm">Resumen del día</p>
-              <h3 className="text-xl font-bold mt-1">{dashStats?.manifiestos?.enTransito ?? 0} manifiestos activos</h3>
-              <p className="text-primary-100 text-sm mt-1">{dashStats?.manifiestos?.pendientes ?? 0} pendientes</p>
+              <p className="text-primary-100 text-sm">Estado de tus manifiestos</p>
+              <h3 className="text-xl font-bold mt-1">{display(enTransito)} en tránsito</h3>
+              <p className="text-primary-100 text-sm mt-1">{display(pendientes)} por preparar o retirar</p>
             </div>
             <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
               <TrendingUp size={24} className="text-white" />
@@ -328,12 +365,12 @@ export const MobileDashboardPage: React.FC = () => {
             >
               Ver manifiestos
             </button>
-            <button 
+            {canTrack && <button
               onClick={() => navigate(mp('/centro-control'))}
               className="flex-1 py-2 bg-primary-400/50 text-white font-medium rounded-lg text-sm"
             >
               Ver tracking
-            </button>
+            </button>}
           </div>
         </CardContent>
       </Card>

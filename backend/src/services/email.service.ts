@@ -14,6 +14,18 @@
 import nodemailer from 'nodemailer';
 import prisma from '../lib/prisma';
 import logger from '../utils/logger';
+import {
+  EmailField,
+  EmailMap,
+  escapeHtml,
+  renderAlertEmail,
+  renderAlertCard,
+  renderCrudEmail,
+  renderEmailLayout,
+  renderMapCard,
+  renderReportEmail,
+  renderWorkflowActionEmail,
+} from '../utils/emailTemplates';
 
 // ── Config ──────────────────────────────────────────────────────────
 
@@ -22,8 +34,13 @@ const SMTP_PASS = process.env.SMTP_PASS;
 const SMTP_HOST = process.env.SMTP_HOST || 'localhost';
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || '25');
 const FROM = process.env.SMTP_FROM || 'SITREP <no-reply@sitrep.ultimamilla.com.ar>';
-const FRONTEND_URL = process.env.FRONTEND_URL || 'https://sitrep.ultimamilla.com.ar';
+const FRONTEND_URL = process.env.FRONTEND_URL ||
+  (process.env.NODE_ENV === 'production' ? 'https://rptrazar.mendoza.gov.ar' : 'http://localhost:5173');
 const DISABLE_EMAILS = process.env.DISABLE_EMAILS === 'true';
+const EMAIL_ALLOWED_RECIPIENTS = (process.env.EMAIL_ALLOWED_RECIPIENTS || '')
+  .split(',')
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
 const LIMIT_TRANSACCIONAL = parseInt(process.env.EMAIL_DAILY_LIMIT_TRANSACCIONAL || '10');
 const LIMIT_ALERTA = parseInt(process.env.EMAIL_DAILY_LIMIT_ALERTA || '6');
 const MAX_RETRIES = parseInt(process.env.EMAIL_MAX_RETRIES || '3');
@@ -35,35 +52,39 @@ const transporter = nodemailer.createTransport(
     : { host: 'localhost', port: 25, secure: false, ignoreTLS: true }
 );
 
+/**
+ * Production egress guard. An explicit allowlist is required in production;
+ * an empty list therefore fails closed. Local/test environments keep the
+ * historical behavior so unit fixtures do not need real addresses.
+ */
+export function isEmailRecipientAllowed(to: string): boolean {
+  const normalized = String(to || '').trim().toLowerCase();
+  if (!normalized) return false;
+  if (EMAIL_ALLOWED_RECIPIENTS.length === 0) return process.env.NODE_ENV !== 'production';
+  return EMAIL_ALLOWED_RECIPIENTS.includes(normalized);
+}
+
 // ── HTML Templates ──────────────────────────────────────────────────
 
 function baseTemplate(contenido: string): string {
-  return `
-  <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
-    <div style="background:#1B5E3C;color:white;padding:16px 24px;border-radius:8px 8px 0 0">
-      <h2 style="margin:0;font-size:18px">SITREP — Trazabilidad de Residuos Peligrosos</h2>
-    </div>
-    <div style="background:#f9fafb;padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px">
-      ${contenido}
-      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0 16px"/>
-      <p style="font-size:12px;color:#6b7280">Provincia de Mendoza — Direccion General de Fiscalizacion Ambiental</p>
-    </div>
-  </div>`;
+  return renderEmailLayout({ contentHtml: contenido, frontendUrl: FRONTEND_URL });
 }
 
 function digestTemplate(items: { subject: string; html: string }[], hour: string): string {
-  const listItems = items.map(i =>
-    `<li style="margin:8px 0;padding:8px 12px;background:#fff;border-left:3px solid #1B5E3C;border-radius:0 4px 4px 0">${i.subject}</li>`
-  ).join('');
-  return baseTemplate(`
-    <h3 style="color:#1B5E3C">Resumen de alertas — ${hour}</h3>
-    <p>${items.length} alerta${items.length > 1 ? 's' : ''} en este periodo:</p>
-    <ul style="list-style:none;padding:0">${listItems}</ul>
-    <p style="font-size:13px;color:#6b7280;margin-top:16px">
-      Para configurar tus preferencias de notificacion, ingresa a
-      <a href="${FRONTEND_URL}" style="color:#1B5E3C">SITREP</a>.
-    </p>
-  `);
+  const cards = items.map((item) => `
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 14px;border:1px solid #e4eee8;border-radius:10px;background:#fff">
+      <tr><td style="padding:14px 16px 0;color:#1b5e3c;font-size:14px;font-weight:800">${escapeHtml(item.subject)}</td></tr>
+      <tr><td style="padding:0 16px 2px">${item.html}</td></tr>
+    </table>`).join('');
+  return renderEmailLayout({
+    title: `Resumen de alertas — ${hour}`,
+    eyebrow: 'Resumen operativo',
+    preheader: `${items.length} alerta${items.length === 1 ? '' : 's'} registrada${items.length === 1 ? '' : 's'}`,
+    tone: 'warning',
+    frontendUrl: FRONTEND_URL,
+    cta: { label: 'Ver centro de alertas', url: `${FRONTEND_URL.replace(/\/$/, '')}/alertas` },
+    contentHtml: `<p style="margin:0 0 18px;font-size:16px;line-height:1.55">${items.length} alerta${items.length === 1 ? '' : 's'} en este periodo:</p>${cards}`,
+  });
 }
 
 // ── Rate Limiting ───────────────────────────────────────────────────
@@ -87,13 +108,18 @@ async function checkDailyLimit(to: string, tipo: 'TRANSACCIONAL' | 'ALERTA'): Pr
 
 // ── Low-level send (SMTP) ───────────────────────────────────────────
 
-async function smtpSend(to: string, subject: string, html: string): Promise<void> {
+async function smtpSend(to: string, subject: string, html: string): Promise<boolean> {
+  if (!isEmailRecipientAllowed(to)) {
+    logger.warn({ to, subject }, 'Email suppressed (recipient not allowlisted)');
+    return false;
+  }
   if (DISABLE_EMAILS) {
     logger.info({ to, subject }, 'Email suppressed (DISABLE_EMAILS=true)');
-    return;
+    return false;
   }
   await transporter.sendMail({ from: FROM, to, subject, html });
   logger.info({ to, subject }, 'Email sent');
+  return true;
 }
 
 // ── Queue helpers ───────────────────────────────────────────────────
@@ -111,6 +137,10 @@ async function enqueueTransaccional(
   html: string,
   prioridad: 'CRITICA' | 'NORMAL' = 'NORMAL',
 ): Promise<void> {
+  if (!isEmailRecipientAllowed(to)) {
+    logger.warn({ to, subject }, 'Email not queued (recipient not allowlisted)');
+    return;
+  }
   const row = await prisma.emailQueue.create({
     data: { to, subject, html, tipo: 'TRANSACCIONAL', prioridad, estado: 'PENDIENTE' },
   });
@@ -127,10 +157,10 @@ async function enqueueTransaccional(
   }
 
   try {
-    await smtpSend(to, subject, html);
+    const sent = await smtpSend(to, subject, html);
     await prisma.emailQueue.update({
       where: { id: row.id },
-      data: { estado: 'ENVIADO', sentAt: new Date() },
+      data: sent ? { estado: 'ENVIADO', sentAt: new Date() } : { estado: 'SUPRIMIDO', error: 'emails disabled by configuration' },
     });
   } catch (err: any) {
     const retryAt = new Date(Date.now() + 5 * 60 * 1000);
@@ -143,6 +173,10 @@ async function enqueueTransaccional(
 }
 
 async function enqueueAlerta(to: string, subject: string, html: string): Promise<void> {
+  if (!isEmailRecipientAllowed(to)) {
+    logger.warn({ to, subject }, 'Email alert not queued (recipient not allowlisted)');
+    return;
+  }
   await prisma.emailQueue.create({
     data: {
       to,
@@ -176,6 +210,14 @@ export async function flushEmailQueue(): Promise<void> {
       const row = await prisma.emailQueue.findUnique({ where: { id } });
       if (!row) continue;
 
+      if (!isEmailRecipientAllowed(row.to)) {
+        await prisma.emailQueue.update({
+          where: { id },
+          data: { estado: 'SUPRIMIDO', error: 'recipient not allowlisted' },
+        });
+        continue;
+      }
+
       const withinLimit = await checkDailyLimit(row.to, row.tipo);
       if (!withinLimit) {
         await prisma.emailQueue.update({
@@ -186,10 +228,10 @@ export async function flushEmailQueue(): Promise<void> {
       }
 
       try {
-        await smtpSend(row.to, row.subject, row.html);
+        const sent = await smtpSend(row.to, row.subject, row.html);
         await prisma.emailQueue.update({
           where: { id },
-          data: { estado: 'ENVIADO', sentAt: new Date() },
+          data: sent ? { estado: 'ENVIADO', sentAt: new Date() } : { estado: 'SUPRIMIDO', error: 'emails disabled by configuration' },
         });
       } catch (err: any) {
         const newIntentos = row.intentos + 1;
@@ -222,6 +264,14 @@ export async function flushEmailQueue(): Promise<void> {
       const hourLabel = parts[parts.length - 1] + ':00';
       const dateLabel = parts[parts.length - 2];
 
+      if (!isEmailRecipientAllowed(to)) {
+        await prisma.emailQueue.updateMany({
+          where: { digestKey, estado: 'DIGEST_PENDIENTE' },
+          data: { estado: 'SUPRIMIDO', error: 'recipient not allowlisted' },
+        });
+        continue;
+      }
+
       const withinLimit = await checkDailyLimit(to, 'ALERTA');
 
       // Fetch all items in this digest group
@@ -247,10 +297,10 @@ export async function flushEmailQueue(): Promise<void> {
       const digestSubject = `[SITREP] Resumen de alertas — ${dateLabel} ${hourLabel}`;
 
       try {
-        await smtpSend(to, digestSubject, digestHtml);
+        const sent = await smtpSend(to, digestSubject, digestHtml);
         await prisma.emailQueue.updateMany({
           where: { id: { in: ids } },
-          data: { estado: 'ENVIADO', sentAt: new Date() },
+          data: sent ? { estado: 'ENVIADO', sentAt: new Date() } : { estado: 'SUPRIMIDO', error: 'emails disabled by configuration' },
         });
       } catch (err: any) {
         await prisma.emailQueue.updateMany({
@@ -295,10 +345,42 @@ export const emailService = {
     }
 
     const summary = `${regla.nombre}${manifiestoNumero ? ` — ${manifiestoNumero}` : ''}`;
-    const detail = datos?.descripcion || (manifiestoNumero ? `Manifiesto ${manifiestoNumero}` : regla.nombre);
+    const detail = datos?.descripcion || datos?.mensaje || (manifiestoNumero ? `Manifiesto ${manifiestoNumero}` : regla.nombre);
+    const lat = Number(datos?.lat ?? datos?.latitud);
+    const lng = Number(datos?.lng ?? datos?.longitud);
+    const map: EmailMap | null = Number.isFinite(lat) && Number.isFinite(lng)
+      ? {
+        lat,
+        lng,
+        label: datos?.generador || datos?.ubicacion || 'Ubicacion del evento',
+        address: datos?.direccion || datos?.domicilio || null,
+        url: datos?.mapsUrl || null,
+      }
+      : null;
+    const rawSeverity = String(datos?.severidad || datos?.prioridad || '').toUpperCase();
+    const severity = rawSeverity === 'CRITICA' || rawSeverity === 'ALTA' || rawSeverity === 'CRITICAL'
+      ? 'danger' as const
+      : rawSeverity === 'NORMAL' || rawSeverity === 'INFO'
+        ? 'info' as const
+        : 'warning' as const;
+    const alertOptions = {
+      title: regla.nombre,
+      message: detail,
+      manifestNumber: manifiestoNumero,
+      manifestId: manifiestoId,
+      severity,
+      map,
+      frontendUrl: FRONTEND_URL,
+      details: [
+        { label: 'Tipo de evento', value: datos?.tipo || datos?.evento },
+        { label: 'Estado', value: datos?.estado || datos?.estadoNuevo },
+        { label: 'Fecha', value: datos?.fecha || datos?.timestamp },
+      ],
+    };
+    const html = `${renderAlertCard(alertOptions)}${renderMapCard(map)}`;
 
     for (const email of emails) {
-      await enqueueAlerta(email, summary, detail);
+      await enqueueAlerta(email, summary, html);
     }
   },
 
@@ -502,6 +584,80 @@ export const emailService = {
       <p style="font-size:13px;color:#6b7280">Si tenes consultas, podes comunicarte con la Direccion General de Fiscalizacion Ambiental.</p>
     `);
     await enqueueTransaccional(email, '[SITREP] Tu solicitud de cambio fue rechazada', html);
+  },
+
+  // ── Acciones del ciclo de vida de un manifiesto ────────────────
+  async sendWorkflowActionEmail(options: {
+    email: string;
+    nombre?: string | null;
+    titulo: string;
+    mensaje: string;
+    accion: string;
+    manifiestoNumero?: string | null;
+    manifiestoId?: string | null;
+    responsable?: string | null;
+    mapa?: EmailMap | null;
+  }): Promise<void> {
+    const saludo = options.nombre ? `Hola ${options.nombre},` : 'Hola,';
+    const html = renderWorkflowActionEmail({
+      title: options.titulo,
+      message: `${saludo} ${options.mensaje}`,
+      action: options.accion,
+      manifestNumber: options.manifiestoNumero,
+      manifestId: options.manifiestoId,
+      actor: options.responsable,
+      map: options.mapa,
+      frontendUrl: FRONTEND_URL,
+    });
+    await enqueueTransaccional(options.email, `[SITREP] ${options.titulo}`, html);
+  },
+
+  // ── ABM de usuarios, actores y catálogos ───────────────────────
+  async sendCrudEmail(options: {
+    email: string;
+    titulo: string;
+    mensaje: string;
+    operacion: string;
+    entidad: string;
+    registro?: string | null;
+    campos?: EmailField[];
+    url?: string | null;
+  }): Promise<void> {
+    const html = renderCrudEmail({
+      title: options.titulo,
+      message: options.mensaje,
+      operation: options.operacion,
+      entity: options.entidad,
+      recordName: options.registro,
+      fields: options.campos,
+      url: options.url,
+      frontendUrl: FRONTEND_URL,
+    });
+    await enqueueTransaccional(options.email, `[SITREP] ${options.titulo}`, html);
+  },
+
+  // ── Informes generados o exportados ────────────────────────────
+  async sendReportEmail(options: {
+    email: string;
+    titulo: string;
+    mensaje: string;
+    informe: string;
+    periodo?: string | null;
+    registros?: number | null;
+    descargaUrl?: string | null;
+    mapa?: EmailMap | null;
+  }): Promise<void> {
+    const html = renderReportEmail({
+      title: options.titulo,
+      message: options.mensaje,
+      reportName: options.informe,
+      period: options.periodo,
+      rows: options.registros,
+      downloadUrl: options.descargaUrl,
+      map: options.mapa,
+      frontendUrl: FRONTEND_URL,
+    });
+    await enqueueTransaccional(options.email, `[SITREP] ${options.titulo}`, html);
   },
 };
 

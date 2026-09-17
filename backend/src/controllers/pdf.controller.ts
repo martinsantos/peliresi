@@ -149,6 +149,8 @@ export const generarPDFManifiesto = async (req: AuthRequest, res: Response, next
                 generador: true,
                 transportista: { include: { vehiculos: true, choferes: true } },
                 operador: true,
+                transportistaExterior: true,
+                operadorExterior: true,
                 residuos: { include: { tipoResiduo: true } },
                 eventos: { orderBy: { createdAt: 'asc' } },
             },
@@ -197,6 +199,15 @@ export const generarPDFManifiesto = async (req: AuthRequest, res: Response, next
         doc.y = numY + 40;
         doc.fillColor(COLORS.dark);
 
+        if (manifiesto.alcanceTratamiento === 'INTERNACIONAL') {
+            drawField(doc, 'Alcance', 'TRATAMIENTO INTERNACIONAL', 58, doc.y, 250);
+            doc.y += 24;
+            if (manifiesto.declaracionTratamientoInternacional) {
+                drawField(doc, 'Declaracion', manifiesto.declaracionTratamientoInternacional, 58, doc.y, 480);
+                doc.y += 36;
+            }
+        }
+
         // ── 1. Generador ──
         drawSectionTitle(doc, '01', 'GENERADOR DE RESIDUOS');
         const gY = doc.y;
@@ -224,6 +235,14 @@ export const generarPDFManifiesto = async (req: AuthRequest, res: Response, next
                 drawField(doc, 'Chofer', `${c.nombre} \u2014 DNI ${c.dni}`, 290, doc.y, 250);
             }
             doc.y += 30;
+        } else if (manifiesto.transportistaExterior) {
+            drawSectionTitle(doc, '02', 'TRANSPORTISTA EN EL EXTERIOR');
+            const tExtY = doc.y;
+            drawField(doc, 'Razon Social', manifiesto.transportistaExterior.razonSocial, 58, tExtY, 280);
+            drawField(doc, 'Pais', manifiesto.transportistaExterior.pais, 350, tExtY, 190);
+            doc.y = tExtY + 28;
+            drawField(doc, 'Identificacion', manifiesto.transportistaExterior.identificacionFiscal || 'N/A', 58, doc.y, 280);
+            doc.y += 30;
         } else {
             drawSectionTitle(doc, '02', 'MODALIDAD IN SITU');
             drawField(doc, 'Modalidad', 'Tratamiento in situ — sin transporte', 58, doc.y, 400);
@@ -233,11 +252,13 @@ export const generarPDFManifiesto = async (req: AuthRequest, res: Response, next
         // ── 3. Operador ──
         drawSectionTitle(doc, '03', 'OPERADOR DE TRATAMIENTO');
         const oY = doc.y;
-        drawField(doc, 'Razon Social', manifiesto.operador.razonSocial, 58, oY, 220);
-        drawField(doc, 'CUIT', manifiesto.operador.cuit, 290, oY, 100);
-        drawField(doc, 'N\u00BA Habilitacion', manifiesto.operador.numeroHabilitacion || 'N/A', 400, oY, 140);
+        const operadorNombre = manifiesto.operador?.razonSocial || manifiesto.operadorExterior?.razonSocial || 'N/A';
+        const operadorPais = manifiesto.operadorExterior?.pais;
+        drawField(doc, 'Razon Social', operadorNombre, 58, oY, 220);
+        drawField(doc, 'CUIT/Pais', manifiesto.operador?.cuit || operadorPais || 'N/A', 290, oY, 100);
+        drawField(doc, 'N\u00BA Habilitacion', manifiesto.operador?.numeroHabilitacion || manifiesto.operadorExterior?.numeroHabilitacion || 'N/A', 400, oY, 140);
         doc.y = oY + 28;
-        drawField(doc, 'Domicilio', manifiesto.operador.domicilio, 58, doc.y, 350);
+        drawField(doc, 'Domicilio', manifiesto.operador?.domicilio || manifiesto.operadorExterior?.domicilio || 'N/A', 58, doc.y, 350);
         doc.y += 30;
 
         // ── 4. Residuos table ──
@@ -386,6 +407,8 @@ export const generarCertificado = async (req: AuthRequest, res: Response, next: 
                 generador: true,
                 transportista: true,
                 operador: true,
+                transportistaExterior: true,
+                operadorExterior: true,
                 residuos: { include: { tipoResiduo: true } },
                 eventos: { orderBy: { createdAt: 'desc' } },
             },
@@ -413,8 +436,10 @@ export const generarCertificado = async (req: AuthRequest, res: Response, next: 
         // Body text
         doc.fontSize(10).font('Helvetica').fillColor(COLORS.dark);
         doc.text('Por medio del presente se certifica que la empresa ', { continued: true });
-        doc.font('Helvetica-Bold').text(manifiesto.operador.razonSocial, { continued: true });
-        doc.font('Helvetica').text(`, identificada con CUIT ${manifiesto.operador.cuit}, habilitada como Operador de Tratamiento de Residuos Peligrosos, ha recibido y tratado los residuos detallados a continuacion:`);
+        const operadorCert = manifiesto.operador || manifiesto.operadorExterior;
+        if (!operadorCert) throw new AppError('El manifiesto no tiene operador de tratamiento asociado', 400);
+        doc.font('Helvetica-Bold').text(operadorCert.razonSocial, { continued: true });
+        doc.font('Helvetica').text(`, identificada con ${manifiesto.operador?.cuit ? `CUIT ${manifiesto.operador.cuit}` : `pais ${manifiesto.operadorExterior?.pais || 'exterior'}`}, habilitada como Operador de Tratamiento de Residuos Peligrosos, ha recibido y tratado los residuos detallados a continuacion:`);
         doc.moveDown(1.2);
 
         // Generador
@@ -458,7 +483,7 @@ export const generarCertificado = async (req: AuthRequest, res: Response, next: 
         doc.fontSize(10).font('Helvetica').fillColor(COLORS.dark)
            .text('_______________________________', { align: 'center' });
         doc.text('Firma y Sello del Operador', { align: 'center' });
-        doc.font('Helvetica-Bold').text(manifiesto.operador.razonSocial, { align: 'center' });
+        doc.font('Helvetica-Bold').text(operadorCert.razonSocial, { align: 'center' });
         doc.moveDown(1.5);
 
         // Blockchain seal

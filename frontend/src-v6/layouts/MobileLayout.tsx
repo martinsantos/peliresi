@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import {
@@ -24,7 +24,6 @@ import {
   Plus,
   SwitchCamera,
   BarChart3,
-  AlertTriangle,
   Truck,
   Factory,
   FlaskConical,
@@ -36,21 +35,26 @@ import {
   Database,
   Upload,
   HelpCircle,
-  Navigation
+  Navigation,
+  FileCheck,
+  ClipboardCheck,
 } from 'lucide-react';
-import { Badge } from '../components/ui/BadgeV2';
 import { NotificationBell } from '../components/NotificationBell';
 import { ConnectivityIndicator } from '../components/ConnectivityIndicator';
 import { SWUpdateBanner } from '../components/SWUpdateBanner';
 import { InstallPWAButton } from '../components/InstallPWAButton';
 import { InstallPWAModal } from '../components/InstallPWAModal';
 import { useAuth } from '../contexts/AuthContext';
+import { useImpersonation } from '../contexts/ImpersonationContext';
+import { ImpersonationBanner } from '../components/ImpersonationBanner';
+import { DemoEnvironmentBanner } from '../components/DemoEnvironmentBanner';
 import type { UserRole } from '../contexts/AuthContext';
 import { useMobilePrefix } from '../hooks/useMobilePrefix';
 import { useActiveTripRecovery } from '../hooks/useActiveTripRecovery';
 import { useOfflineSync } from '../hooks/useOfflineSync';
 import { NotificacionesPoller } from '../components/NotificacionesPoller';
 import { ToastContainer, toast } from '../components/ui/Toast';
+import { activeTripStorageKey } from '../utils/userContext';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -113,7 +117,10 @@ export const MobileLayout: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentUser, users, switchUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isLoading, isDemo } = useAuth();
+  const { currentUser, logout, isAdmin, isAuditor, isGenerador, isTransportista, isAdminTransportista, isAdminGenerador, isAdminOperador, canImpersonate, isLoading } = useAuth();
+  const isSectorAdmin = isAdminTransportista || isAdminGenerador || isAdminOperador;
+  const isInspector = Boolean(currentUser?.esInspector);
+  const { impersonationData, exitImpersonation } = useImpersonation();
   const mp = useMobilePrefix();
 
   // Recover active trip from API after reinstall/crash
@@ -135,13 +142,15 @@ export const MobileLayout: React.FC = () => {
       });
     }
     prevUserIdRef.current = String(currentUser.id);
-  }, [currentUser?.id]);
+  }, [currentUser]);
 
   // Track active trip for TRANSPORTISTA — must be before any conditional returns (Rules of Hooks)
   const [activeTripId, setActiveTripId] = useState<string | null>(null);
   useEffect(() => {
     const checkActiveTrip = () => {
-      const tripId = localStorage.getItem('sitrep_active_trip_id');
+      const tripId = currentUser?.id != null
+        ? localStorage.getItem(activeTripStorageKey(currentUser.id))
+        : null;
       setActiveTripId(tripId);
     };
     checkActiveTrip();
@@ -149,7 +158,7 @@ export const MobileLayout: React.FC = () => {
     window.addEventListener('storage', checkActiveTrip);
     const interval = setInterval(checkActiveTrip, 5000);
     return () => { window.removeEventListener('storage', checkActiveTrip); clearInterval(interval); };
-  }, []);
+  }, [currentUser?.id]);
 
   // Items de navegación según rol — depend on currentUser.rol directly
   // NOTE: hooks must be called unconditionally (before any early returns)
@@ -157,26 +166,28 @@ export const MobileLayout: React.FC = () => {
     const items = [];
 
     items.push({ to: mp('/dashboard'), icon: <Home size={22} />, label: 'Inicio' });
-    items.push({
-      to: isTransportista ? mp('/transporte/perfil') : mp('/manifiestos'),
-      icon: isTransportista ? <Truck size={22} /> : <FileText size={22} />,
-      label: isTransportista ? 'Mis Viajes' : 'Manifiestos',
-    });
+    items.push(isInspector
+      ? { to: mp('/inspecciones'), icon: <ClipboardCheck size={22} />, label: 'Inspecciones' }
+      : {
+          to: isTransportista ? mp('/transporte/perfil') : mp('/manifiestos'),
+          icon: isTransportista ? <Truck size={22} /> : <FileText size={22} />,
+          label: isTransportista ? 'Mis Viajes' : 'Manifiestos',
+        });
 
-    if (isAdmin || isTransportista) {
+    if (isAdmin || isSectorAdmin || isTransportista) {
       items.push({ to: mp('/centro-control'), icon: <MapPin size={22} />, label: 'Control' });
     } else {
       items.push({ to: mp('/reportes'), icon: <BarChart3 size={22} />, label: 'Reportes' });
     }
 
-    if (isAdmin) {
+    if (isAdmin || isSectorAdmin) {
       items.push({ to: mp('/actores'), icon: <Users size={22} />, label: 'Actores' });
     } else {
-      items.push({ to: mp('/alertas'), icon: <Bell size={22} />, label: 'Alertas', badge: 3 });
+      items.push({ to: mp('/alertas'), icon: <Bell size={22} />, label: 'Alertas' });
     }
 
     return items;
-  }, [currentUser?.rol, mp]);
+  }, [isAdmin, isInspector, isSectorAdmin, isTransportista, mp]);
 
   // Menu items según rol
   const menuItems = useMemo(() => {
@@ -195,20 +206,25 @@ export const MobileLayout: React.FC = () => {
       items.push({ to: mp('/manifiestos'), icon: <FileText size={20} />, label: 'Manifiestos', section: 'main' });
     }
 
-    if (isAdmin || isTransportista) {
+    if (isInspector || isAdmin || isSectorAdmin) {
+      items.push({ to: mp('/inspecciones'), icon: <ClipboardCheck size={20} />, label: 'Inspecciones', section: 'main' });
+    }
+
+    if (isAdmin || isSectorAdmin || isTransportista) {
       items.push({ to: mp('/centro-control'), icon: <LayoutDashboard size={20} />, label: 'Centro de Control', section: 'main' });
     }
 
-    if (isAdmin) {
+    if (isAdmin || isSectorAdmin) {
       items.push({ to: mp('/actores'), icon: <Users size={20} />, label: 'Actores', section: 'main' });
     }
 
     items.push({ to: mp('/reportes'), icon: <BarChart3 size={20} />, label: 'Reportes', section: 'main' });
-    items.push({ to: mp('/alertas'), icon: <Bell size={20} />, label: 'Alertas', badge: 3, section: 'main' });
+    items.push({ to: mp('/alertas'), icon: <Bell size={20} />, label: 'Alertas', section: 'main' });
 
     // Admin section
     if (isAdmin) {
       items.push({ to: mp('/admin/usuarios'), icon: <User size={20} />, label: 'Usuarios', section: 'admin' });
+      items.push({ to: mp('/admin/solicitudes'), icon: <FileCheck size={20} />, label: 'Solicitudes', section: 'admin' });
       items.push({ to: mp('/admin/generadores'), icon: <Factory size={20} />, label: 'Generadores', section: 'admin' });
       items.push({ to: mp('/admin/operadores'), icon: <FlaskConical size={20} />, label: 'Operadores', section: 'admin' });
       items.push({ to: mp('/admin/vehiculos'), icon: <Truck size={20} />, label: 'Vehículos', section: 'admin' });
@@ -216,19 +232,35 @@ export const MobileLayout: React.FC = () => {
       items.push({ to: mp('/admin/auditoria'), icon: <Shield size={20} />, label: 'Auditoría', section: 'admin' });
       items.push({ to: mp('/admin/carga-masiva'), icon: <Upload size={20} />, label: 'Carga Masiva', section: 'admin' });
       items.push({ to: mp('/estadisticas'), icon: <PieChart size={20} />, label: 'Estadísticas', section: 'admin' });
+    } else if (isAuditor) {
+      items.push({ to: mp('/admin/auditoria'), icon: <Shield size={20} />, label: 'Auditoría', section: 'admin' });
+    } else if (isAdminGenerador) {
+      items.push({ to: mp('/admin/actores/generadores'), icon: <Factory size={20} />, label: 'Mis Generadores', section: 'admin' });
+      items.push({ to: mp('/admin/solicitudes'), icon: <FileCheck size={20} />, label: 'Solicitudes', section: 'admin' });
+      items.push({ to: mp('/admin/residuos'), icon: <Database size={20} />, label: 'Catálogo Residuos', section: 'admin' });
+    } else if (isAdminOperador) {
+      items.push({ to: mp('/admin/actores/operadores'), icon: <FlaskConical size={20} />, label: 'Mis Operadores', section: 'admin' });
+      items.push({ to: mp('/admin/solicitudes'), icon: <FileCheck size={20} />, label: 'Solicitudes', section: 'admin' });
+      items.push({ to: mp('/admin/tratamientos'), icon: <Database size={20} />, label: 'Tratamientos', section: 'admin' });
+    } else if (isAdminTransportista) {
+      items.push({ to: mp('/admin/actores/transportistas'), icon: <Truck size={20} />, label: 'Mis Transportistas', section: 'admin' });
+      items.push({ to: mp('/admin/solicitudes'), icon: <FileCheck size={20} />, label: 'Solicitudes', section: 'admin' });
+      items.push({ to: mp('/admin/vehiculos'), icon: <Truck size={20} />, label: 'Vehículos', section: 'admin' });
     } else if (isTransportista) {
       items.push({ to: mp('/admin/vehiculos'), icon: <Truck size={20} />, label: 'Mis Vehículos', section: 'admin' });
     }
 
     // Herramientas comunes
-    items.push({ to: mp('/escaner-qr'), icon: <ScanLine size={20} />, label: 'Escanear QR', section: 'tools' });
-    if (!isTransportista) {
+    if (!isAuditor) {
+      items.push({ to: mp('/escaner-qr'), icon: <ScanLine size={20} />, label: 'Escanear QR', section: 'tools' });
+    }
+    if (!isAuditor && !isTransportista) {
       items.push({ to: mp('/transporte/perfil'), icon: <Truck size={20} />, label: 'Mi Transporte', section: 'tools' });
     }
     items.push({ to: mp('/ayuda'), icon: <HelpCircle size={20} />, label: 'Ayuda', section: 'tools' });
 
     return items;
-  }, [currentUser?.rol, mp, activeTripId]);
+  }, [isAdmin, isAuditor, isInspector, isAdminGenerador, isAdminTransportista, isAdminOperador, isSectorAdmin, isTransportista, mp, activeTripId]);
 
   // Separar items por sección
   const mainItems = menuItems.filter(i => i.section === 'main');
@@ -239,6 +271,28 @@ export const MobileLayout: React.FC = () => {
   // Returns null while loading or if no user (AuthGate will redirect to /login).
   if (isLoading || !currentUser) return null;
 
+  // The menu is only a convenience; direct URLs must enforce the same role
+  // boundary as the web router. This intentionally uses the existing scalar
+  // role model and does not infer or add multi-role memberships.
+  const path = location.pathname;
+  const allowedRoles = path.startsWith('/switch-user') || path.startsWith('/admin/usuarios') ||
+    path === '/admin/actores' || path.startsWith('/admin/carga-masiva')
+    ? ['ADMIN']
+    : path.startsWith('/admin/auditoria')
+      ? ['ADMIN', 'AUDITOR']
+    : path.startsWith('/admin/actores/transportistas') || path.startsWith('/admin/vehiculos')
+      ? ['ADMIN', 'ADMIN_TRANSPORTISTA', 'TRANSPORTISTA']
+      : path.startsWith('/admin/actores/generadores') || path.startsWith('/admin/generadores') || path.startsWith('/admin/residuos')
+        ? ['ADMIN', 'ADMIN_GENERADOR']
+        : path.startsWith('/admin/actores/operadores') || path.startsWith('/admin/operadores') || path.startsWith('/admin/tratamientos') || path.startsWith('/admin/renovaciones')
+          ? ['ADMIN', 'ADMIN_OPERADOR']
+          : path.startsWith('/admin/solicitudes')
+            ? ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR']
+            : null;
+  if (allowedRoles && !allowedRoles.includes(currentUser.rol)) {
+    return <Navigate to={mp('/dashboard')} replace />;
+  }
+
   const config = roleConfig[currentUser.rol];
 
   // Título según la ruta actual
@@ -247,6 +301,7 @@ export const MobileLayout: React.FC = () => {
     if (path.includes('/dashboard')) return 'Inicio';
     if (path.includes('/manifiestos/nuevo')) return 'Nuevo Manifiesto';
     if (path.includes('/manifiestos')) return isTransportista ? 'Mis Viajes' : 'Manifiestos';
+    if (path.includes('/inspecciones')) return 'Inspecciones';
     if (path.includes('/transporte/perfil')) return 'Mis Viajes';
     if (path.includes('/transporte/viaje')) return 'Viaje en Curso';
     if (path.includes('/tracking')) return 'Tracking';
@@ -274,24 +329,17 @@ export const MobileLayout: React.FC = () => {
   // Determinar si mostrar FAB
   const showFab = location.pathname.includes('/manifiestos') && !location.pathname.includes('/nuevo') && (isAdmin || isGenerador);
 
-  const handleSwitchUser = (userId: number | string) => {
-    if (userId === currentUser.id) return;
-    switchUser(Number(userId));
-    // Brief delay so the user sees the menu update before it closes
-    setTimeout(() => setIsMenuOpen(false), 200);
-  };
-
   return (
-    <div className="h-screen overflow-hidden bg-[#F8F8F6] flex flex-col tap-transparent">
+    <div data-testid="app-shell" className={`h-screen overflow-hidden bg-[#F8F8F6] flex flex-col tap-transparent ${impersonationData ? 'pt-10' : ''}`}>
+      <DemoEnvironmentBanner />
       <NotificacionesPoller />
       <ToastContainer />
-      {/* Demo mode banner */}
-      {isDemo && (
-        <div className="bg-amber-500 text-white text-center text-xs sm:text-sm py-1 font-medium sticky top-0 z-50">
-          Modo Demo — Los datos no son reales
-        </div>
+      {impersonationData && (
+        <ImpersonationBanner
+          user={impersonationData.impersonatedUser}
+          onExit={exitImpersonation}
+        />
       )}
-
       {/* Connectivity indicator - always visible at top */}
       <ConnectivityIndicator />
 
@@ -360,7 +408,6 @@ export const MobileLayout: React.FC = () => {
               to={item.to} 
               icon={item.icon} 
               label={item.label}
-              badge={item.badge}
               roleColor={config.color}
             />
           ))}
@@ -426,7 +473,6 @@ export const MobileLayout: React.FC = () => {
                     to={item.to} 
                     icon={item.icon} 
                     label={item.label} 
-                    badge={item.badge}
                     onClick={() => setIsMenuOpen(false)}
                     activeColor={config.color}
                   />
@@ -483,48 +529,25 @@ export const MobileLayout: React.FC = () => {
                 </>
               )}
 
-              {/* User Switcher en Menu */}
-              <div className="border-t border-neutral-100 my-2" />
-              <p className="px-3 py-2 text-xs font-semibold text-neutral-400 uppercase">
-                Cambiar Usuario
-              </p>
-              <div className="space-y-1 px-2">
-                {users.slice(0, 5).map((user) => {
-                  const userConfig = roleConfig[user.rol];
-                  const isCurrent = user.id === currentUser.id;
-                  return (
-                    <button
-                      key={user.id}
-                      onClick={() => handleSwitchUser(user.id)}
-                      disabled={isCurrent}
-                      className={cn(
-                        'w-full flex items-center gap-2 px-2 py-2 rounded-lg transition-colors text-left',
-                        isCurrent
-                          ? `${userConfig.bgColor} bg-opacity-20`
-                          : 'hover:bg-neutral-100'
-                      )}
+              {/* Impersonación real — sólo ADMIN, contra usuarios activos de la API */}
+              {canImpersonate && (
+                <>
+                  <div className="border-t border-neutral-100 my-2" />
+                  <p className="px-3 py-2 text-xs font-semibold text-neutral-400 uppercase">
+                    Cambiar Usuario
+                  </p>
+                  <div className="space-y-1 px-2">
+                    <NavLink
+                      to={mp('/switch-user')}
+                      onClick={() => setIsMenuOpen(false)}
+                      className="flex items-center gap-2 px-2 py-2 text-indigo-600 hover:bg-indigo-50 rounded-lg"
                     >
-                      <div className={`w-8 h-8 ${userConfig.bgColor} rounded-lg flex items-center justify-center text-white text-xs font-bold`}>
-                        {user.avatar}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium truncate ${isCurrent ? userConfig.color : 'text-neutral-700'}`}>
-                          {user.nombre}
-                        </p>
-                      </div>
-                      {isCurrent && <div className={`w-2 h-2 ${userConfig.bgColor} rounded-full`} />}
-                    </button>
-                  );
-                })}
-                <NavLink
-                  to={mp('/switch-user')}
-                  onClick={() => setIsMenuOpen(false)}
-                  className="flex items-center gap-2 px-2 py-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                >
-                  <SwitchCamera size={18} />
-                  <span className="text-sm font-medium">Ver todos los usuarios</span>
-                </NavLink>
-              </div>
+                      <SwitchCamera size={18} />
+                      <span className="text-sm font-medium">Ver todos los usuarios</span>
+                    </NavLink>
+                  </div>
+                </>
+              )}
 
               <div className="border-t border-neutral-100 my-2" />
               <div className="space-y-1">
@@ -556,7 +579,7 @@ export const MobileLayout: React.FC = () => {
                 <span className="font-medium">Cerrar Sesión</span>
               </button>
               <div className="pt-2 flex justify-center">
-                <img src="/logo-mendoza.webp" alt="Gobierno de Mendoza" className="h-8 w-auto opacity-50" />
+                <img src={`${import.meta.env.BASE_URL}mendoza-marca-horizontal-transparente.png`} width={178} height={57} alt="Mendoza — Gobierno de la Provincia" className="h-8 w-auto" />
               </div>
             </div>
           </div>

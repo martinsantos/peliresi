@@ -11,10 +11,11 @@ const KEYS = {
   usuario: (id: string) => ['usuarios', 'detail', id] as const,
 };
 
-export function useUsuarios(filters?: UsuarioFilters) {
+export function useUsuarios(filters?: UsuarioFilters, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: KEYS.usuarios(filters),
     queryFn: () => usuarioService.list(filters),
+    enabled: options?.enabled ?? true,
   });
 }
 

@@ -11,6 +11,12 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import { getAccessToken, getRefreshToken, setTokens, api } from '../services/api';
 import { useAuth } from './AuthContext';
 import type { User } from './AuthContext';
+import {
+  currentAppLocation,
+  getImpersonationRedirectPath,
+  IMPERSONATION_STORAGE_KEY,
+  safeImpersonationReturnPath,
+} from '../utils/impersonationNavigation';
 
 // ========================================
 // TYPES
@@ -20,6 +26,7 @@ export interface ImpersonationData {
   adminRefreshToken: string;
   adminUser: User;
   impersonatedUser: User;
+  adminReturnPath: string;
 }
 
 export interface ImpersonationContextType {
@@ -31,8 +38,6 @@ export interface ImpersonationContextType {
 // ========================================
 // STORAGE KEY
 // ========================================
-const IMPERSONATION_KEY = 'sitrep_impersonation';
-
 // ========================================
 // CONTEXT
 // ========================================
@@ -51,43 +56,61 @@ export const ImpersonationProvider: React.FC<{ children: React.ReactNode }> = ({
       setImpersonationData(null);
       return;
     }
-    const saved = localStorage.getItem(IMPERSONATION_KEY);
+    const saved = localStorage.getItem(IMPERSONATION_STORAGE_KEY);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        if (
+          typeof parsed?.adminToken !== 'string' ||
+          typeof parsed?.adminRefreshToken !== 'string' ||
+          !parsed?.adminUser
+        ) {
+          throw new Error('Invalid impersonation state');
+        }
         setImpersonationData({
           adminToken: parsed.adminToken,
           adminRefreshToken: parsed.adminRefreshToken,
           adminUser: parsed.adminUser,
           impersonatedUser: currentUser, // fresh data from current JWT
+          adminReturnPath: safeImpersonationReturnPath(parsed.adminReturnPath, window.location.pathname),
         });
       } catch {
-        localStorage.removeItem(IMPERSONATION_KEY);
+        localStorage.removeItem(IMPERSONATION_STORAGE_KEY);
       }
     }
   }, [currentUser]);
 
   // Impersonar usuario (solo ADMIN) — full page reload clears React Query cache
   const impersonateUser = useCallback(async (userId: string) => {
-    const adminToken = getAccessToken() || '';
-    const adminRefreshToken = getRefreshToken() || '';
-    const adminUser = currentUser!;
+    if (!currentUser || currentUser.rol !== 'ADMIN') {
+      throw new Error('Solo ADMIN puede impersonar usuarios');
+    }
+
+    const adminToken = getAccessToken();
+    const adminRefreshToken = getRefreshToken();
+    if (!adminToken || !adminRefreshToken) {
+      throw new Error('La sesión ADMIN no tiene tokens completos');
+    }
+    const adminUser = currentUser;
+    const adminReturnPath = currentAppLocation(window.location);
 
     const resp = await api.post(`/admin/impersonate/${userId}`);
     const { tokens } = resp.data.data;
 
     // Persist admin tokens in localStorage BEFORE reload (survives page unload)
-    localStorage.setItem(IMPERSONATION_KEY, JSON.stringify({
+    localStorage.setItem(IMPERSONATION_STORAGE_KEY, JSON.stringify({
       adminToken,
       adminRefreshToken,
       adminUser,
+      adminReturnPath,
     }));
 
     // Set the impersonated user's tokens
     setTokens(tokens.accessToken, tokens.refreshToken);
 
-    // Full page reload: clears React Query cache + initAuth runs with new JWT
-    window.location.href = '/dashboard';
+    // Full page reload: clears React Query cache + initAuth runs with new JWT.
+    // Preserve the surface from which the impersonation was started (web/PWA).
+    window.location.href = getImpersonationRedirectPath(window.location.pathname, '/dashboard');
   }, [currentUser]);
 
   // Salir de impersonacion — full page reload to restore admin state cleanly
@@ -98,10 +121,13 @@ export const ImpersonationProvider: React.FC<{ children: React.ReactNode }> = ({
     setTokens(impersonationData.adminToken, impersonationData.adminRefreshToken);
 
     // Clear impersonation from localStorage
-    localStorage.removeItem(IMPERSONATION_KEY);
+    localStorage.removeItem(IMPERSONATION_STORAGE_KEY);
 
-    // Full page reload to admin usuarios panel
-    window.location.href = '/admin/usuarios';
+    // Full page reload to the exact admin location that initiated the switch.
+    window.location.href = safeImpersonationReturnPath(
+      impersonationData.adminReturnPath,
+      window.location.pathname,
+    );
   }, [impersonationData]);
 
   const value: ImpersonationContextType = {

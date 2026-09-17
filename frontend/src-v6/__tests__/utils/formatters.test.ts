@@ -11,6 +11,10 @@ import {
   formatNumber,
   formatCurrency,
   formatWeight,
+  sumQuantities,
+  normalizeUnit,
+  summarizeQuantities,
+  formatQuantitySummary,
   formatEstado,
   formatRol,
   formatCuit,
@@ -130,6 +134,38 @@ describe('formatWeight()', () => {
 
   it('returns "0 kg" for NaN', () => {
     expect(formatWeight(NaN)).toBe('0 kg');
+  });
+});
+
+describe('sumQuantities()', () => {
+  it('sums numeric and string quantities without concatenation', () => {
+    expect(sumQuantities([{ cantidad: 10 }, { cantidad: '2.5' }, { cantidad: null }])).toBe(12.5);
+  });
+
+  it('ignores invalid quantities', () => {
+    expect(sumQuantities([{ cantidad: 'no disponible' }, {}, { cantidad: 3 }])).toBe(3);
+  });
+});
+
+describe('quantity summaries', () => {
+  it('normalizes aliases and casing', () => {
+    expect(normalizeUnit(' KG ')).toBe('kg');
+    expect(normalizeUnit('toneladas')).toBe('tn');
+    expect(normalizeUnit('Litros')).toBe('lt');
+    expect(normalizeUnit('m3')).toBeNull();
+  });
+
+  it('converts mass while keeping incompatible dimensions separated', () => {
+    expect(summarizeQuantities([
+      { cantidad: 500, unidad: 'KG' },
+      { cantidad: 1.5, unidad: 'tn' },
+      { cantidad: 20, unidad: 'lt' },
+      { cantidad: 3, unidad: 'un' },
+    ])).toEqual({ massKg: 2000, volumeLiters: 20, units: 3, unknown: {} });
+    expect(formatQuantitySummary([
+      { cantidad: 500, unidad: 'kg' },
+      { cantidad: 20, unidad: 'lt' },
+    ])).toMatch(/500.*kg.*20.*lt/);
   });
 });
 

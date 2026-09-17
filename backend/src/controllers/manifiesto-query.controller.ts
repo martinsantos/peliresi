@@ -88,6 +88,7 @@ export const getManifiestos = async (req: AuthRequest, res: Response, next: Next
           fechaCierre: true,
           observaciones: true,
           blockchainStatus: true,
+          isDemoData: true,
           generadorId: true,
           transportistaId: true,
           operadorId: true,
@@ -210,7 +211,7 @@ export const getDashboardStats = async (req: AuthRequest, res: Response, next: N
 export const getSyncInicial = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     // Verificar que sea transportista u operador
-    if (req.user.rol !== 'TRANSPORTISTA' && req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') {
+    if (req.user.rol !== 'TRANSPORTISTA' && req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN' && req.user.rol !== 'ADMIN_TRANSPORTISTA' && req.user.rol !== 'ADMIN_OPERADOR') {
       throw new AppError('Endpoint disponible solo para transportistas y operadores', 403);
     }
 
@@ -333,7 +334,7 @@ export const getSyncInicial = async (req: AuthRequest, res: Response, next: Next
 // Validacion QR offline contra lista pre-descargada
 export const getManifiestosEsperados = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if ((req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') || (req.user.rol === 'OPERADOR' && !req.user.operador)) {
+    if ((req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN' && req.user.rol !== 'ADMIN_OPERADOR') || (req.user.rol === 'OPERADOR' && !req.user.operador)) {
       throw new AppError('Solo los operadores pueden acceder a esta funcion', 403);
     }
 
@@ -391,12 +392,11 @@ export const getManifiestosEsperados = async (req: AuthRequest, res: Response, n
       orderBy: { createdAt: 'desc' }
     });
 
-    // Calcular ETA estimado para cada manifiesto en transito
+    // No se publica una ETA ficticia. Se habilitara cuando exista un modelo
+    // basado en ruta, destino y velocidad suficientemente reciente.
     const esperadosConETA = esperados.map(m => ({
       ...m,
-      etaEstimado: m.estado === 'EN_TRANSITO' && m.tracking.length > 0
-        ? 'Calculando...' // En una implementacion real, usariamos API de rutas
-        : m.estado === 'ENTREGADO' ? 'Ya arribo' : 'No disponible'
+      etaEstimado: m.estado === 'ENTREGADO' ? 'Ya arribo' : null,
     }));
 
     res.json({

@@ -10,10 +10,15 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['src-v6/__tests__/setup.ts'],
     include: ['src-v6/**/*.test.{ts,tsx}'],
+    // Ignore macOS AppleDouble metadata files that can appear on shared volumes.
+    exclude: ['node_modules', 'dist', '**/._*'],
     coverage: {
       provider: 'v8',
       include: ['src-v6/**/*.{ts,tsx}'],
-      exclude: ['src-v6/**/*.test.{ts,tsx}', 'src-v6/__tests__/**'],
+      exclude: [
+        'src-v6/**/*.test.{ts,tsx}', 'src-v6/__tests__/**',
+        '**/._*', '**/.__*',
+      ],
       thresholds: {
         statements: 20,
         branches: 20,

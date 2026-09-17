@@ -10,6 +10,12 @@ import { useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { manifiestoService } from '../services/manifiesto.service';
 import { EstadoManifiesto } from '../types/models';
+import {
+  activeTripStorageKey,
+  gpsPendingStorageKey,
+  tripSnapshotStorageKey,
+  tripStatusStorageKey,
+} from '../utils/userContext';
 
 export function useActiveTripRecovery() {
   const { currentUser, isTransportista } = useAuth();
@@ -18,7 +24,8 @@ export function useActiveTripRecovery() {
     if (!isTransportista || !currentUser) return;
 
     // Only recover if there's no active trip in localStorage already
-    const existingTripId = localStorage.getItem('sitrep_active_trip_id');
+    const activeTripKey = activeTripStorageKey(currentUser.id);
+    const existingTripId = localStorage.getItem(activeTripKey);
     if (existingTripId) return;
 
     let cancelled = false;
@@ -32,8 +39,25 @@ export function useActiveTripRecovery() {
         if (manifiestos.length > 0) {
           const trip = manifiestos[0];
           const tripId = String(trip.id);
-          localStorage.setItem('sitrep_active_trip_id', tripId);
-          localStorage.setItem(`viaje_snapshot_${tripId}`, JSON.stringify({
+          // Safely adopt legacy context only after the API proves that the
+          // trip belongs to the currently authenticated transportista.
+          if (localStorage.getItem('sitrep_active_trip_id') === tripId) {
+            const legacyPairs = [
+              [`viaje_snapshot_${tripId}`, tripSnapshotStorageKey(currentUser.id, tripId)],
+              [`viaje_status_${tripId}`, tripStatusStorageKey(currentUser.id, tripId)],
+              [`gps_pending_${tripId}`, gpsPendingStorageKey(currentUser.id, tripId)],
+            ] as const;
+            for (const [legacyKey, scopedKey] of legacyPairs) {
+              const legacyValue = localStorage.getItem(legacyKey);
+              if (legacyValue != null && localStorage.getItem(scopedKey) == null) {
+                localStorage.setItem(scopedKey, legacyValue);
+              }
+              localStorage.removeItem(legacyKey);
+            }
+            localStorage.removeItem('sitrep_active_trip_id');
+          }
+          localStorage.setItem(activeTripKey, tripId);
+          localStorage.setItem(tripSnapshotStorageKey(currentUser.id, tripId), JSON.stringify({
             id: trip.id,
             numero: trip.numero,
             estado: trip.estado,

@@ -61,6 +61,68 @@ export function formatWeight(kg: number): string {
   return `${formatNumber(kg)} kg`;
 }
 
+/** Sum manifest quantities defensively across API/cache payloads. */
+export function sumQuantities(items: Array<{ cantidad?: number | string | null }>): number {
+  return items.reduce((sum, item) => {
+    const value = Number(item.cantidad);
+    return Number.isFinite(value) ? sum + value : sum;
+  }, 0);
+}
+
+export type CanonicalUnit = 'kg' | 'tn' | 'lt' | 'un';
+
+export interface QuantitySummary {
+  massKg: number;
+  volumeLiters: number;
+  units: number;
+  unknown: Record<string, number>;
+}
+
+export function normalizeUnit(value: unknown): CanonicalUnit | null {
+  if (typeof value !== 'string') return null;
+  const unit = value.trim().toLowerCase();
+  if (['kg', 'kgs', 'kilogramo', 'kilogramos'].includes(unit)) return 'kg';
+  if (['tn', 'ton', 'tonelada', 'toneladas', 't'].includes(unit)) return 'tn';
+  if (['lt', 'lts', 'l', 'litro', 'litros'].includes(unit)) return 'lt';
+  if (['un', 'u', 'unidad', 'unidades'].includes(unit)) return 'un';
+  return null;
+}
+
+export function summarizeQuantities(
+  items: Array<{ cantidad?: number | string | null; unidad?: string | null }>,
+): QuantitySummary {
+  const summary: QuantitySummary = { massKg: 0, volumeLiters: 0, units: 0, unknown: {} };
+  for (const item of items) {
+    const amount = Number(item.cantidad);
+    if (!Number.isFinite(amount) || amount < 0) continue;
+    const unit = normalizeUnit(item.unidad);
+    if (unit === 'kg') summary.massKg += amount;
+    else if (unit === 'tn') summary.massKg += amount * 1000;
+    else if (unit === 'lt') summary.volumeLiters += amount;
+    else if (unit === 'un') summary.units += amount;
+    else {
+      const raw = String(item.unidad ?? '').trim() || 'sin unidad';
+      summary.unknown[raw] = (summary.unknown[raw] ?? 0) + amount;
+    }
+  }
+  return summary;
+}
+
+/** Format quantities without adding incompatible dimensions together. */
+export function formatQuantitySummary(
+  items: Array<{ cantidad?: number | string | null; unidad?: string | null }>,
+): string {
+  const summary = summarizeQuantities(items);
+  const parts: string[] = [];
+  if (summary.massKg !== 0) parts.push(formatWeight(summary.massKg));
+  if (summary.volumeLiters !== 0) parts.push(`${formatNumber(summary.volumeLiters, 1)} lt`);
+  if (summary.units !== 0) parts.push(`${formatNumber(summary.units, 0)} un`);
+  for (const [unit, amount] of Object.entries(summary.unknown)) {
+    if (amount !== 0) parts.push(`${formatNumber(amount, 1)} ${unit}`);
+  }
+  return parts.length > 0 ? parts.join(' + ') : '0 kg';
+}
+
 // ========================================
 // DOMAIN
 // ========================================

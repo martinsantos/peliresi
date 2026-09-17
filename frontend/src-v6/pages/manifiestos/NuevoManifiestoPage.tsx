@@ -4,7 +4,7 @@
  * Formulario para crear nuevo manifiesto de residuos
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -32,7 +32,7 @@ import { Select } from '../../components/ui/Select';
 import { toast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCreateManifiesto } from '../../hooks/useManifiestos';
-import { useTiposResiduo, useCatalogoGeneradores, useCatalogoTransportistas, useCatalogoOperadores } from '../../hooks/useCatalogos';
+import { useTiposResiduo, useCatalogoGeneradores, useCatalogoTransportistas, useCatalogoOperadores, useCatalogoEntidadesExteriores } from '../../hooks/useCatalogos';
 
 
 /** Parse corrientes Basel codes from various formats: "Y8-Y48", "Y8,Y48", "Y4/Y8/Y9", "Y8, Y9 e Y48", ["Y8","Y48"] */
@@ -45,7 +45,7 @@ function parseCorrientes(raw: string | string[] | null | undefined): string[] {
 
 export const NuevoManifiestoPage: React.FC = () => {
   const navigate = useNavigate();
-  const { currentUser, isAdmin, isGenerador, isTransportista, isOperador } = useAuth();
+  const { currentUser, isAdmin, isGenerador, isAdminGenerador, isTransportista, isOperador } = useAuth();
   const [step, setStep] = useState(1);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
@@ -55,20 +55,28 @@ export const NuevoManifiestoPage: React.FC = () => {
   const { data: apiGeneradores } = useCatalogoGeneradores();
   const { data: apiTransportistas } = useCatalogoTransportistas();
   const { data: apiOperadores } = useCatalogoOperadores();
+  const { data: apiTransportistasExteriores } = useCatalogoEntidadesExteriores('TRANSPORTISTA');
+  const { data: apiOperadoresExteriores } = useCatalogoEntidadesExteriores('OPERADOR');
 
   // Use API catalogos only
   const tiposResiduo = apiTiposResiduo || [];
   const generadoresList = apiGeneradores || [];
   const transportistasList = apiTransportistas || [];
   const operadoresList = apiOperadores || [];
+  const transportistasExteriores = apiTransportistasExteriores || [];
+  const operadoresExteriores = apiOperadoresExteriores || [];
 
   // Form state
   const [formData, setFormData] = useState({
     generador: currentUser?.rol === 'GENERADOR' ? currentUser?.sector || '' : '',
     generadorId: currentUser?.rol === 'GENERADOR' ? currentUser?.actorId || '' : '',
     modalidad: 'FIJO' as 'FIJO' | 'IN_SITU',
+    alcanceTratamiento: 'NACIONAL' as 'NACIONAL' | 'INTERNACIONAL',
     transportista: '',
     operador: '',
+    transportistaExterior: '',
+    operadorExterior: '',
+    declaracionTratamientoInternacional: '',
     fechaRetiro: new Date().toISOString().split('T')[0],
     observaciones: '',
     residuos: [{ tipo: '', cantidad: '', unidad: 'kg' }],
@@ -78,6 +86,15 @@ export const NuevoManifiestoPage: React.FC = () => {
   const selectedGenerador = generadoresList.find((g) => g.id === formData.generadorId);
   const selectedTransportista = transportistasList.find((t) => t.id === formData.transportista);
   const selectedOperador = operadoresList.find((o) => o.id === formData.operador);
+  const selectedTransportistaExterior = transportistasExteriores.find((t: any) => t.id === formData.transportistaExterior);
+  const selectedOperadorExterior = operadoresExteriores.find((o: any) => o.id === formData.operadorExterior);
+  const isInternational = formData.alcanceTratamiento === 'INTERNACIONAL';
+
+  useEffect(() => {
+    if (selectedGenerador && formData.generadorId === selectedGenerador.id && selectedGenerador.alcanceTratamiento === 'INTERNACIONAL') {
+      setFormData(prev => prev.alcanceTratamiento === 'INTERNACIONAL' ? prev : { ...prev, alcanceTratamiento: 'INTERNACIONAL' });
+    }
+  }, [selectedGenerador, formData.generadorId]);
 
   // Cross-filter: only show operadores that can handle ALL selected residuos
   const selectedResiduoIds = useMemo(
@@ -165,11 +182,18 @@ export const NuevoManifiestoPage: React.FC = () => {
     if (!formData.generadorId && !formData.generador) {
       errors.generador = 'El generador es requerido';
     }
-    if (formData.modalidad !== 'IN_SITU' && !formData.transportista) {
-      errors.transportista = 'El transportista es requerido';
-    }
-    if (!formData.operador) {
-      errors.operador = 'El operador es requerido';
+    if (isInternational) {
+      if (formData.modalidad === 'IN_SITU') errors.modalidad = 'El tratamiento internacional requiere transporte internacional';
+      if (!formData.transportistaExterior) errors.transportistaExterior = 'El transportista exterior es requerido';
+      if (!formData.operadorExterior) errors.operadorExterior = 'El operador exterior es requerido';
+      if (!formData.declaracionTratamientoInternacional.trim()) errors.declaracionTratamientoInternacional = 'La declaración de tratamiento internacional es requerida';
+    } else {
+      if (formData.modalidad !== 'IN_SITU' && !formData.transportista) {
+        errors.transportista = 'El transportista es requerido';
+      }
+      if (!formData.operador) {
+        errors.operador = 'El operador es requerido';
+      }
     }
 
     const hasInvalidResiduos = formData.residuos.some(
@@ -192,8 +216,14 @@ export const NuevoManifiestoPage: React.FC = () => {
     try {
       const result = await createManifiesto.mutateAsync({
         generadorId: formData.generadorId || formData.generador,
-        ...(formData.modalidad !== 'IN_SITU' && { transportistaId: formData.transportista }),
-        operadorId: formData.operador,
+        ...(!isInternational && formData.modalidad !== 'IN_SITU' && { transportistaId: formData.transportista }),
+        ...(!isInternational && { operadorId: formData.operador }),
+        alcanceTratamiento: formData.alcanceTratamiento,
+        ...(isInternational && {
+          transportistaExteriorId: formData.transportistaExterior,
+          operadorExteriorId: formData.operadorExterior,
+          declaracionTratamientoInternacional: formData.declaracionTratamientoInternacional.trim(),
+        }),
         modalidad: formData.modalidad,
         fechaEstimadaRetiro: formData.fechaRetiro || undefined,
         observaciones: formData.observaciones || undefined,
@@ -217,7 +247,7 @@ export const NuevoManifiestoPage: React.FC = () => {
   // Removed isMobile — React Router handles /app/ basename
 
   // Only GENERADOR and ADMIN can create manifiestos
-  const canCreate = isAdmin || isGenerador;
+  const canCreate = isAdmin || isGenerador || isAdminGenerador;
 
   if (!canCreate) {
     return (
@@ -305,7 +335,8 @@ export const NuevoManifiestoPage: React.FC = () => {
                   value={formData.generadorId}
                   onChange={(val) => {
                     const gen = generadoresList.find((g: any) => g.id === val);
-                    setFormData({ ...formData, generadorId: val, generador: gen?.razonSocial || gen?.nombre || '', residuos: [{ tipo: '', cantidad: '', unidad: 'kg' }], transportista: '', operador: '' });
+                    const alcance = gen?.alcanceTratamiento === 'INTERNACIONAL' ? 'INTERNACIONAL' : 'NACIONAL';
+                    setFormData({ ...formData, generadorId: val, generador: gen?.razonSocial || gen?.nombre || '', residuos: [{ tipo: '', cantidad: '', unidad: 'kg' }], alcanceTratamiento: alcance, transportista: '', operador: '', transportistaExterior: '', operadorExterior: '', declaracionTratamientoInternacional: '' });
                   }}
                   options={[...generadoresList]
                     .sort((a: any, b: any) => (a.razonSocial || '').localeCompare(b.razonSocial || ''))
@@ -373,6 +404,13 @@ export const NuevoManifiestoPage: React.FC = () => {
                       <p className="text-sm font-semibold text-neutral-900">{selectedGenerador.numeroInscripcion}</p>
                     </div>
                   )}
+                  <div className={`rounded-lg border px-3 py-2 ${isInternational ? 'border-purple-200 bg-purple-50' : 'border-neutral-200 bg-white'}`}>
+                    <label className="block text-xs font-medium text-neutral-500 mb-0.5">Alcance del tratamiento</label>
+                    <p className={`text-sm font-semibold ${isInternational ? 'text-purple-700' : 'text-neutral-900'}`}>
+                      {isInternational ? 'INTERNACIONAL' : 'NACIONAL'}
+                    </p>
+                    {isInternational && <p className="text-xs text-purple-600 mt-1">Este manifiesto utilizará transportista y operador exterior aprobados.</p>}
+                  </div>
                 </div>
               )}
 
@@ -551,7 +589,7 @@ export const NuevoManifiestoPage: React.FC = () => {
                       setFormData(prev => ({ ...prev, modalidad: 'FIJO', operador: '' }));
                       setValidationErrors(prev => { const n = {...prev}; delete n.transportista; return n; });
                     }}
-                    className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left ${
+                    className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left ${isInternational ? 'opacity-50 cursor-not-allowed' : ''} ${
                       formData.modalidad === 'FIJO'
                         ? 'border-primary-500 bg-primary-50 shadow-sm'
                         : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
@@ -565,11 +603,12 @@ export const NuevoManifiestoPage: React.FC = () => {
                   </button>
                   <button
                     type="button"
+                    disabled={isInternational}
                     onClick={() => {
                       setFormData(prev => ({ ...prev, modalidad: 'IN_SITU', transportista: '', operador: '' }));
                       setValidationErrors(prev => { const n = {...prev}; delete n.transportista; return n; });
                     }}
-                    className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left ${
+                    className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left ${isInternational ? 'opacity-50 cursor-not-allowed' : ''} ${
                       formData.modalidad === 'IN_SITU'
                         ? 'border-emerald-500 bg-emerald-50 shadow-sm'
                         : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
@@ -585,7 +624,48 @@ export const NuevoManifiestoPage: React.FC = () => {
               </div>
 
               {/* In Situ note */}
-              {formData.modalidad === 'IN_SITU' && (
+              {isInternational && (
+                <div className="space-y-4 rounded-xl border border-purple-200 bg-purple-50 p-4">
+                  <div className="flex items-start gap-2 text-sm text-purple-800">
+                    <Info size={18} className="mt-0.5 shrink-0" />
+                    <span>Tratamiento internacional: seleccione entidades exteriores aprobadas y complete la declaración que quedará incorporada al manifiesto.</span>
+                  </div>
+                  <Select
+                    label="Transportista en el exterior *"
+                    value={formData.transportistaExterior}
+                    onChange={(val) => setFormData({ ...formData, transportistaExterior: val })}
+                    options={transportistasExteriores.map((t: any) => ({ value: t.id, label: `${t.razonSocial} — ${t.pais}` }))}
+                    placeholder="Buscar transportista exterior..."
+                    searchable
+                    errorMessage={validationErrors.transportistaExterior}
+                  />
+                  {selectedTransportistaExterior && <p className="text-xs text-purple-700">{selectedTransportistaExterior.pais} · {selectedTransportistaExterior.numeroHabilitacion || 'Sin habilitación informada'}</p>}
+                  <Select
+                    label="Operador de tratamiento en el exterior *"
+                    value={formData.operadorExterior}
+                    onChange={(val) => setFormData({ ...formData, operadorExterior: val })}
+                    options={operadoresExteriores.map((o: any) => ({ value: o.id, label: `${o.razonSocial} — ${o.pais}` }))}
+                    placeholder="Buscar operador exterior..."
+                    searchable
+                    errorMessage={validationErrors.operadorExterior}
+                  />
+                  {selectedOperadorExterior && <p className="text-xs text-purple-700">{selectedOperadorExterior.pais} · {selectedOperadorExterior.numeroHabilitacion || 'Sin habilitación informada'}</p>}
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Declaración de tratamiento internacional *</label>
+                    <textarea
+                      value={formData.declaracionTratamientoInternacional}
+                      onChange={(e) => setFormData({ ...formData, declaracionTratamientoInternacional: e.target.value })}
+                      rows={4}
+                      maxLength={4000}
+                      className="w-full px-3 py-2 rounded-lg border border-purple-200 bg-white focus:border-purple-500 focus:outline-none resize-none"
+                      placeholder="Describa el tratamiento, destino y condiciones internacionales..."
+                    />
+                    {validationErrors.declaracionTratamientoInternacional && <p className="text-xs text-error-500 mt-1">{validationErrors.declaracionTratamientoInternacional}</p>}
+                  </div>
+                </div>
+              )}
+
+              {!isInternational && formData.modalidad === 'IN_SITU' && (
                 <div className="flex items-start gap-2.5 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-800 animate-fade-in">
                   <MapPin size={16} className="shrink-0 mt-0.5" />
                   <span>El operador trabajara directamente en el domicilio del generador. No se requiere transporte.</span>
@@ -593,7 +673,7 @@ export const NuevoManifiestoPage: React.FC = () => {
               )}
 
               {/* Transportista - only shown for FIJO */}
-              {formData.modalidad === 'FIJO' && (
+              {!isInternational && formData.modalidad === 'FIJO' && (
                 <>
                   {selectedCodigos.length > 0 && transportistasFiltrados.length < transportistasList.length && (
                     <div className="flex items-center gap-2 p-2.5 bg-orange-50 border border-orange-200 rounded-xl text-xs text-orange-700">
@@ -648,7 +728,7 @@ export const NuevoManifiestoPage: React.FC = () => {
                 </>
               )}
 
-              <div>
+              {!isInternational && <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Operador / Destino *
                 </label>
@@ -676,9 +756,9 @@ export const NuevoManifiestoPage: React.FC = () => {
                   errorMessage={validationErrors.operador}
                   size="base"
                 />
-              </div>
+              </div>}
 
-              {selectedOperador && (
+              {!isInternational && selectedOperador && (
                 <div className="p-4 bg-green-50 rounded-xl border border-green-100 space-y-2 animate-fade-in">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>

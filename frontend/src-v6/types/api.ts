@@ -4,7 +4,7 @@
  */
 
 import type {
-  Usuario, Manifiesto, Generador, Transportista, Operador,
+  Usuario, Manifiesto, Generador, Transportista, Operador, EntidadExterior,
   Vehiculo, Chofer, TipoResiduo, Notificacion, ReglaAlerta,
   AlertaGenerada, AnomaliaTransporte, Auditoria, Rol, EstadoManifiesto,
 } from './models';
@@ -74,8 +74,12 @@ export interface ChangePasswordRequest {
 
 export interface CreateManifiestoRequest {
   generadorId: string;
-  transportistaId?: string;
-  operadorId: string;
+  transportistaId?: string | null;
+  operadorId?: string | null;
+  alcanceTratamiento?: 'NACIONAL' | 'INTERNACIONAL';
+  transportistaExteriorId?: string | null;
+  operadorExteriorId?: string | null;
+  declaracionTratamientoInternacional?: string | null;
   modalidad?: 'FIJO' | 'IN_SITU';
   fechaEstimadaRetiro?: string;
   observaciones?: string;
@@ -186,6 +190,11 @@ export interface CreateGeneradorRequest {
   categoriaIndividual?: string;
   libroOperatoria?: boolean;
   tefInputs?: Record<string, unknown>;
+  alcanceTratamiento?: 'NACIONAL' | 'INTERNACIONAL';
+}
+
+export interface EntidadesExterioresResponse {
+  entidadesExteriores: EntidadExterior[];
 }
 
 export interface CreateTransportistaRequest {
@@ -252,9 +261,10 @@ export interface CreateOperadorRequest {
 export interface Renovacion {
   id: string;
   anio: number;
-  tipoActor: 'GENERADOR' | 'OPERADOR';
+  tipoActor: 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR';
   generadorId?: string;
   operadorId?: string;
+  transportistaId?: string;
   modalidad: 'SIN_CAMBIOS' | 'CON_CAMBIOS';
   estado: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA';
   datosActuales?: string;
@@ -281,7 +291,7 @@ export interface RenovacionFilters {
 
 export interface CreateRenovacionRequest {
   anio: number;
-  tipoActor: 'GENERADOR' | 'OPERADOR';
+  tipoActor: 'GENERADOR' | 'OPERADOR' | 'TRANSPORTISTA';
   generadorId?: string;
   operadorId?: string;
   modalidad: 'SIN_CAMBIOS' | 'CON_CAMBIOS';
@@ -301,7 +311,7 @@ export type EstadoSolicitud = 'BORRADOR' | 'ENVIADA' | 'EN_REVISION' | 'OBSERVAD
 export interface SolicitudInscripcion {
   id: string;
   usuarioId: string;
-  tipoActor: 'GENERADOR' | 'OPERADOR';
+  tipoActor: 'GENERADOR' | 'OPERADOR' | 'TRANSPORTISTA';
   estado: EstadoSolicitud;
   datosActor: string;
   datosResiduos?: string;
@@ -327,7 +337,8 @@ export interface DocumentoSolicitud {
   solicitudId: string;
   tipo: string;
   nombre: string;
-  path: string;
+  /** Storage keys are intentionally never returned by the API. */
+  path?: never;
   mimeType: string;
   size: number;
   estado: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO';
@@ -335,6 +346,13 @@ export interface DocumentoSolicitud {
   revisadoPor?: string;
   revisadoAt?: string;
   createdAt: string;
+  archivoId?: string;
+  sha256?: string;
+  estadoScan?: 'CUARENTENA' | 'LIMPIO' | 'RECHAZADO';
+  vigenteDesde?: string;
+  vigenteHasta?: string;
+  datosOcr?: Record<string, unknown>;
+  confianzaOcr?: number;
 }
 
 export interface MensajeSolicitud {

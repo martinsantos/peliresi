@@ -196,7 +196,7 @@ const ReportesPage: React.FC = () => {
         (t.completados as number) || 0,
         (t.enTransito as number) || 0,
         (t.vehiculosRegistrados as number) || 0,
-        (t.tasaCompletitud as string) || '0%',
+        `${Number(t.tasaCompletitud || 0).toFixed(1)}%`,
       ]);
     }
 

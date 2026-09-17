@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { isAuthenticated, hasRole, requireFullAccess } from '../middlewares/auth.middleware';
-import { getVapidPublicKey, subscribe, unsubscribe } from '../controllers/push.controller';
+import { getVapidPublicKey, subscribe, testPush, unsubscribe } from '../controllers/push.controller';
 import { requireManifestAccess } from '../utils/authorization';
 import {
     getNotificaciones,
@@ -42,10 +42,11 @@ const upload = multer({
   },
 });
 
-// Push — clave pública es pública (sin auth), subscribe/unsubscribe requieren auth
-router.get('/push/vapid-key', getVapidPublicKey);
+// Push — todos los endpoints pertenecen a una sesión autenticada.
+router.get('/push/vapid-key',  isAuthenticated, requireFullAccess, getVapidPublicKey);
 router.post('/push/subscribe',   isAuthenticated, requireFullAccess, subscribe);
 router.post('/push/unsubscribe', isAuthenticated, requireFullAccess, unsubscribe);
+router.post('/push/test',        isAuthenticated, requireFullAccess, testPush);
 
 // Todas las rutas requieren autenticacion
 router.use(isAuthenticated);
@@ -142,7 +143,7 @@ router.delete('/notificaciones/:id', eliminarNotificacion);
  *       403:
  *         description: Solo ADMIN
  */
-router.get('/alertas/reglas', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'), getReglasAlerta);
+router.get('/alertas/reglas', hasRole('ADMIN', 'AUDITOR', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'), getReglasAlerta);
 
 /**
  * @openapi
@@ -237,7 +238,7 @@ router.delete('/alertas/reglas/:id', hasRole('ADMIN'), eliminarReglaAlerta);
  *       403:
  *         description: Solo ADMIN
  */
-router.get('/alertas', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'), getAlertasGeneradas);
+router.get('/alertas', hasRole('ADMIN', 'AUDITOR', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'), getAlertasGeneradas);
 
 /**
  * @openapi

@@ -3,7 +3,7 @@
  */
 
 import api from './api';
-import type { TipoResiduo } from '../types/models';
+import type { TipoResiduo, EntidadExterior } from '../types/models';
 import type { CatalogoItem } from '../types/api';
 
 export const catalogoService = {
@@ -38,6 +38,12 @@ export const catalogoService = {
     const { data } = await api.get('/catalogos/operadores');
     const raw = data.data;
     return Array.isArray(raw) ? raw : raw.operadores || [];
+  },
+
+  async entidadesExteriores(tipo?: 'TRANSPORTISTA' | 'OPERADOR'): Promise<EntidadExterior[]> {
+    const { data } = await api.get('/catalogos/entidades-exteriores', { params: tipo ? { tipo } : undefined });
+    const raw = data.data;
+    return Array.isArray(raw) ? raw : raw.entidadesExteriores || [];
   },
 
   async vehiculos(): Promise<CatalogoItem[]> {

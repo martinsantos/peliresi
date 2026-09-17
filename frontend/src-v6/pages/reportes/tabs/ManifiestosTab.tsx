@@ -20,6 +20,11 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
   const porEstado = data.porEstado || {};
   const porTipoResiduo = data.porTipoResiduo || {};
   const manifiestosList = data.manifiestos || [];
+  const cantidadesPorUnidad = resumen.totalResiduosPorUnidad || {};
+  const otrasCantidades = [
+    cantidadesPorUnidad.lt ? `${cantidadesPorUnidad.lt.toLocaleString('es-AR')} lt` : '',
+    cantidadesPorUnidad.un ? `${cantidadesPorUnidad.un.toLocaleString('es-AR')} un` : '',
+  ].filter(Boolean).join(' · ');
 
   const toggleSort = (key: string) => setSortConfig(prev =>
     prev?.key === key ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' }
@@ -57,8 +62,11 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
     Object.entries(porTipoResiduo)
       .map(([name, value], i) => {
         // Backend returns { cantidad, unidad } objects OR plain numbers
-        const numVal = typeof value === 'object' && value !== null
-          ? Number((value as { cantidad: number }).cantidad) || 0
+        const aggregate = typeof value === 'object' && value !== null
+          ? value as { cantidad: number | null; unidad?: string }
+          : null;
+        const numVal = aggregate
+          ? aggregate.unidad === 'kg' ? Number(aggregate.cantidad) || 0 : 0
           : Number(value) || 0;
         return {
           name: name.length > 25 ? name.substring(0, 22) + '...' : name,
@@ -74,7 +82,7 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
     <div className="space-y-6 animate-fade-in">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <KpiCard icon={FileText} label="Total Manifiestos" value={resumen.totalManifiestos || 0} color="from-emerald-600 to-emerald-700" />
-        <KpiCard icon={Package} label="Total Residuos" value={`${(resumen.totalResiduos || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })} kg`} color="from-blue-600 to-blue-700" />
+        <KpiCard icon={Package} label="Masa total" value={`${(resumen.totalResiduos || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })} kg`} color="from-blue-600 to-blue-700" sub={otrasCantidades || 'sin otras magnitudes'} />
         <KpiCard icon={Activity} label="Estados Activos" value={Object.keys(porEstado).length} color="from-indigo-600 to-indigo-700" sub="tipos de estado" />
         <KpiCard icon={TrendingUp} label="Tipos de Residuo" value={Object.keys(porTipoResiduo).length} color="from-amber-600 to-amber-700" sub="categorías" />
       </div>
@@ -104,7 +112,7 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
         </Card>
 
         <Card className="border-0 shadow-sm">
-          <CardHeader title="Distribución por Tipo de Residuo" subtitle="Proporción de cada categoría" />
+          <CardHeader title="Distribución de masa por residuo" subtitle="Solo cantidades compatibles expresadas en kg" />
           <CardContent>
             <div className="max-h-[320px] overflow-y-auto pr-2">
               <CategoryBarChart data={residuoData} maxItems={12} emptyMessage="Sin datos de residuos" />

@@ -6,6 +6,9 @@ import {
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import markerIconUrl from 'leaflet/dist/images/marker-icon.png';
+import markerShadowUrl from 'leaflet/dist/images/marker-shadow.png';
+import { BASE_MAP_ATTRIBUTION, BASE_MAP_MAX_ZOOM, BASE_MAP_TILE_URL } from '../../../utils/map-tiles';
 import { Card } from '../../../components/ui/CardV2';
 import { Badge } from '../../../components/ui/BadgeV2';
 import { Select } from '../../../components/ui/Select';
@@ -49,8 +52,8 @@ function deptFallback(id: string, domicilio?: string): [number, number] {
 
 // ── Leaflet default icon fix ──
 const DefaultIcon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconUrl: markerIconUrl,
+  shadowUrl: markerShadowUrl,
   iconSize: [25, 41], iconAnchor: [12, 41],
 });
 L.Marker.prototype.options.icon = DefaultIcon;
@@ -265,7 +268,7 @@ export default function MapaActoresTab({
               style={{ height: '100%', width: '100%', zIndex: 0 }}
               className="z-0"
             >
-              <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              <TileLayer attribution={BASE_MAP_ATTRIBUTION} url={BASE_MAP_TILE_URL} maxZoom={BASE_MAP_MAX_ZOOM} />
               <FlyToTarget target={flyTarget} zoom={12} />
 
               {/* Generadores */}

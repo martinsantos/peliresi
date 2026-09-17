@@ -1,9 +1,10 @@
 /**
  * Calculadora TEF - Decreto 2625/99
- * Formula: TEF = M x R x ISO
+ * Formula base estimada: MxR = M x R
  * R = Z x A x D x C
  *
- * Version didactica: siempre visible, explicaciones claras por seccion.
+ * The form collects declarative variables. The official amount is calculated
+ * at closure by the backend; it is never a live client-side quote.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -36,6 +37,8 @@ interface CalculadoraTEFProps {
   initialInputs?: TEFInputs | null;
   /** When true, renders expanded inline (wizard mode). When false, renders as collapsible card. */
   inline?: boolean;
+  /** Hide all live derived values and present this as deferred input. */
+  deferred?: boolean;
 }
 
 const fmtMoney = (v: number) => `$ ${v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -68,7 +71,7 @@ const A_HELP: Record<string, string> = {
   a10_idoneidad: 'Nivel de capacitacion y conciencia ambiental del personal.',
 };
 
-const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProps>(({ corrientesY, tieneISO, onResultChange, onInputsChange, initialInputs, inline = false }, ref) => {
+const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProps>(({ corrientesY, tieneISO, onResultChange, onInputsChange, initialInputs, inline = false, deferred = true }, ref) => {
   const [zona, setZona] = useState(initialInputs?.zona || 'zona_rural');
   const [coefA, setCoefA] = useState<CoeficientesA>(initialInputs?.coefA ? { ...initialInputs.coefA } : { ...DEFAULT_A });
   const [personal, setPersonal] = useState(initialInputs?.personal || 0);
@@ -95,12 +98,12 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
   const onInputsChangeRef = React.useRef(onInputsChange);
   onResultChangeRef.current = onResultChange;
   onInputsChangeRef.current = onInputsChange;
-  const resultKey = `${result.TEF}|${result.R}`;
+  const resultKey = `${result.MxR}|${result.R}`;
   const inputsKey = `${zona}|${personal}|${potenciaHP}|${superficieM2}`;
   const didMountRef = React.useRef(false);
   React.useEffect(() => {
     if (!didMountRef.current) { didMountRef.current = true; return; }
-    onResultChangeRef.current?.(result);
+    if (!deferred) onResultChangeRef.current?.(result);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resultKey]);
   React.useEffect(() => {
@@ -112,18 +115,29 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
   const updateA = (key: keyof CoeficientesA, val: number) =>
     setCoefA(prev => ({ ...prev, [key]: val }));
 
-  const maxC = corrientesY.length > 0 ? Math.max(...corrientesY.map(y => C_CORRIENTES[y.trim()] || 0)) : 0;
+  const maxC = corrientesY.length > 0
+    ? Math.max(...corrientesY.map(y => C_CORRIENTES[y.trim().toUpperCase()] || 0))
+    : 0;
+  const zeroFactors = [
+    result.A === 0 ? 'A (criterios ambientales)' : null,
+    result.D === 0 ? 'D (personal, potencia y superficie)' : null,
+    result.C === 0 ? 'C (corriente Y con coeficiente TEF)' : null,
+  ].filter((factor): factor is string => factor !== null);
 
   const content = (
     <div className="space-y-6">
-      {/* === RESULTADO TEF === */}
-      <div className="bg-neutral-900 rounded-2xl p-6 text-white shadow-xl">
-        <p className="text-neutral-400 text-xs font-semibold uppercase tracking-widest">Tasa de Evaluacion y Fiscalizacion</p>
+      {/* === RESULTADO BASE MxR === */}
+      {deferred ? <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 text-blue-950 shadow-sm" data-testid="tef-deferred-status">
+        <p className="text-xs font-semibold uppercase tracking-widest text-blue-700">Liquidación TEF diferida</p>
+        <p className="mt-2 text-lg font-bold">Importe pendiente de cálculo final</p>
+        <p className="mt-1 text-sm text-blue-800">Se guardan las variables declaradas y DGFA calculará el importe al cierre con la regla vigente. No se acepta ni se muestra un monto editable durante el alta.</p>
+      </div> : <div className="bg-neutral-900 rounded-2xl p-6 text-white shadow-xl">
+        <p className="text-neutral-400 text-xs font-semibold uppercase tracking-widest">Monto base estimado M x R</p>
         <div className="flex items-end justify-between mt-2">
-          <p className="text-5xl font-black font-mono tracking-tight text-white">{fmtMoney(result.TEF)}</p>
+          <p className="text-5xl font-black font-mono tracking-tight text-white">{fmtMoney(result.MxR)}</p>
           <div className="text-right text-neutral-400 text-xs space-y-0.5">
-            <p>TEF = M x R x ISO</p>
-            <p className="font-mono text-neutral-300">{result.M} x {result.R.toFixed(4)} x {result.ISO}</p>
+            <p>MxR = M x R</p>
+            <p className="font-mono text-neutral-300">{result.M} x {result.R.toFixed(4)}</p>
           </div>
         </div>
         <div className="grid grid-cols-5 gap-2 mt-5">
@@ -141,7 +155,24 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
             </div>
           ))}
         </div>
+      </div>}
+
+      <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" role="note">
+        <Info size={18} className="mt-0.5 shrink-0" />
+        <p>
+          {deferred ? 'Los valores informados quedan sujetos a revisión. El importe TEF se determina al cierre por DGFA.' : 'Este valor es una estimacion MxR, no una liquidacion TEF oficial. Categoria, vigencia anual y efecto de la certificacion ISO requieren homologacion DGFA antes de determinar el importe final.'}
+        </p>
       </div>
+
+      {!deferred && result.MxR === 0 && zeroFactors.length > 0 && (
+        <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800" role="status">
+          <Info size={18} className="mt-0.5 shrink-0" />
+          <p>
+            La estimacion permanece en $ 0,00 porque {zeroFactors.join(', ')} {zeroFactors.length === 1 ? 'tiene' : 'tienen'} valor cero.
+            Complete o revise esos datos; la formula multiplica los factores entre si.
+          </p>
+        </div>
+      )}
 
       {/* === SECCION 1: COEFICIENTE ZONAL Z === */}
       <div className="space-y-3">
@@ -213,8 +244,9 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
             />
           </div>
         </div>
-        <div className="bg-purple-50 rounded-lg px-3 py-2 text-xs text-purple-700 font-mono">
-          D = 0.15 x ({personal} + {potenciaHP}) + 0.005 x {superficieM2} = <strong>{result.D.toFixed(3)}</strong>
+        <div className="bg-purple-50 rounded-lg px-3 py-2 text-xs text-purple-700">
+          Variables declaradas para la liquidación final.
+          {!deferred && <span className="font-mono"> D = 0.15 x ({personal} + {potenciaHP}) + 0.005 x {superficieM2} = <strong>{result.D.toFixed(3)}</strong></span>}
         </div>
       </div>
 
@@ -225,7 +257,7 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
           <h4 className="text-sm font-bold text-neutral-800 uppercase tracking-wide">
             Coeficiente de Peligrosidad Ambiental (A)
           </h4>
-          <span className="text-xs text-neutral-400 font-mono ml-auto">Sumatoria: {result.A.toFixed(3)}</span>
+          {!deferred && <span className="text-xs text-neutral-400 font-mono ml-auto">Sumatoria: {result.A.toFixed(3)}</span>}
         </div>
         <p className="text-xs text-neutral-500">
           Tiene en cuenta las caracteristicas del emprendimiento (Art. 15 incisos c al j).
@@ -277,7 +309,7 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
           <h4 className="text-sm font-bold text-neutral-800 uppercase tracking-wide">
             Coeficiente de Peligrosidad del Residuo (C)
           </h4>
-          <span className="text-xs text-neutral-400 font-mono ml-auto">Max: {maxC}</span>
+          {!deferred && <span className="text-xs text-neutral-400 font-mono ml-auto">Max: {maxC}</span>}
         </div>
         <p className="text-xs text-neutral-500">
           Se determina por el tipo de residuos peligrosos generado. Se toma el valor maximo
@@ -323,15 +355,15 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
           <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
             tieneISO ? 'bg-green-600 text-white' : 'bg-neutral-300 text-white'
           }`}>
-            {result.ISO}
+            {tieneISO ? 'SI' : 'NO'}
           </div>
           <div>
             <p className="text-sm font-medium text-neutral-800">
-              {tieneISO ? 'Posee certificacion ISO 14000 — Factor x2' : 'No posee certificacion ISO 14000 — Factor x1'}
+              {tieneISO ? 'Posee certificacion ISO 14000' : 'No posee certificacion ISO 14000'}
             </p>
             <p className="text-[10px] text-neutral-500">
               {tieneISO
-                ? 'El factor ISO duplica la TEF como incentivo a mantener la certificacion.'
+                ? 'La certificacion queda registrada. Su efecto sobre el importe final requiere homologacion DGFA y no se aplica al MxR estimado.'
                 : 'Para indicar ISO, complete la fecha de certificacion en Datos Regulatorios (Paso 5).'}
             </p>
           </div>
@@ -339,19 +371,22 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
       </div>
 
       {/* === FORMULA DESGLOSADA === */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2">
+      {!deferred ? <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2">
         <div className="flex items-center gap-2 text-blue-800">
           <Info size={16} />
           <p className="text-sm font-bold">Desglose del Calculo</p>
         </div>
         <div className="text-xs text-blue-700 font-mono space-y-1">
           <p>R = Z x A x D x C = {result.Z} x {result.A.toFixed(3)} x {result.D.toFixed(3)} x {result.C} = <strong>{result.R.toFixed(4)}</strong></p>
-          <p>TEF = M x R x ISO = {result.M} x {result.R.toFixed(4)} x {result.ISO} = <strong>{result.TEF.toFixed(2)}</strong></p>
+          <p>MxR = M x R = {result.M} x {result.R.toFixed(4)} = <strong>{result.MxR.toFixed(2)}</strong></p>
         </div>
         <p className="text-[10px] text-blue-600 mt-2">
-          M = {M_COEFICIENTE} (coeficiente anual fijado por la Autoridad de Aplicacion para 2026)
+          M = {M_COEFICIENTE} (valor de referencia configurado). El importe TEF oficial puede aplicar categoria, vigencia y certificacion.
         </p>
-      </div>
+      </div> : <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-4 text-sm text-neutral-600">
+        <p className="font-semibold text-neutral-800">¿Qué se guarda?</p>
+        <p className="mt-1">Zona, personal, potencia, superficie, corrientes Y, criterios A1–A10 e ISO. La fórmula y el monto se aplican sólo al finalizar la revisión administrativa.</p>
+      </div>}
     </div>
   );
 
@@ -369,7 +404,7 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
             <span className="text-xs text-neutral-500">Decreto 2625/99</span>
           </div>
           <div className="text-right">
-            <p className="text-2xl font-bold text-primary-700 font-mono">{fmtMoney(result.TEF)}</p>
+            {deferred ? <><p className="text-sm font-bold text-primary-700">Pendiente de liquidación</p><p className="text-[10px] text-neutral-500">Cálculo final por DGFA</p></> : <><p className="text-2xl font-bold text-primary-700 font-mono">{fmtMoney(result.MxR)}</p><p className="text-[10px] text-neutral-500">MxR estimado, no liquidacion oficial</p></>}
           </div>
         </div>
       </CardHeader>

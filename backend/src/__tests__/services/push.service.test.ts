@@ -1,13 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Set VAPID keys and mocks BEFORE module imports (evaluated at module load time)
-const { mockSendNotification, mockSetVapidDetails, mockFindMany, mockDeleteMany } = vi.hoisted(() => {
+const { mockSendNotification, mockSetVapidDetails, mockFindMany, mockFindFirst, mockDeleteMany } = vi.hoisted(() => {
   process.env.VAPID_PUBLIC_KEY = 'test-public-key';
   process.env.VAPID_PRIVATE_KEY = 'test-private-key';
   return {
     mockSendNotification: vi.fn().mockResolvedValue({ statusCode: 201 }),
     mockSetVapidDetails: vi.fn(),
     mockFindMany: vi.fn().mockResolvedValue([]),
+    mockFindFirst: vi.fn().mockResolvedValue(null),
     mockDeleteMany: vi.fn(),
   };
 });
@@ -26,6 +27,7 @@ vi.mock('../../lib/prisma', () => ({
   default: {
     pushSubscripcion: {
       findMany: mockFindMany,
+      findFirst: mockFindFirst,
       deleteMany: mockDeleteMany,
     },
   },
@@ -37,13 +39,14 @@ vi.mock('../../utils/logger', () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
-import { enviarPushAlUsuario } from '../../services/push.service';
+import { enviarPushAlDispositivo, enviarPushAlUsuario } from '../../services/push.service';
 
 describe('PushService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Restore default resolved value for mockFindMany after clear
     mockFindMany.mockResolvedValue([]);
+    mockFindFirst.mockResolvedValue(null);
   });
 
   it('should be importable', () => {
@@ -128,6 +131,63 @@ describe('PushService', () => {
     const parsed = JSON.parse(payloadArg);
     expect(parsed.prioridad).toBe('CRITICA');
     expect(parsed.title).toBe('Critical Alert');
+  });
+
+  it('treats URGENTE as a high urgency push and includes the PWA route', async () => {
+    mockFindMany.mockResolvedValue([
+      { id: 'sub-1', endpoint: 'https://endpoint1', p256dh: 'key1', auth: 'auth1' },
+    ]);
+
+    await enviarPushAlUsuario('user-1', {
+      title: 'Alerta urgente',
+      body: 'Requiere atención',
+      url: '/manifiestos/1',
+      appUrl: '/app/manifiestos/1',
+      prioridad: 'URGENTE',
+    });
+
+    expect(mockSendNotification).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.any(String),
+      expect.objectContaining({ urgency: 'high' }),
+    );
+    const parsed = JSON.parse(mockSendNotification.mock.calls[0][1]);
+    expect(parsed).toEqual(expect.objectContaining({
+      prioridad: 'URGENTE',
+      appUrl: '/app/manifiestos/1',
+    }));
+  });
+
+  it('sends a device test only when the endpoint belongs to the user', async () => {
+    mockFindFirst.mockResolvedValue({
+      id: 'sub-device', endpoint: 'https://device', p256dh: 'key', auth: 'auth',
+    });
+
+    const sent = await enviarPushAlDispositivo('user-1', 'https://device', {
+      title: 'Test', body: 'Body',
+    });
+
+    expect(mockFindFirst).toHaveBeenCalledWith({
+      where: { usuarioId: 'user-1', endpoint: 'https://device' },
+    });
+    expect(sent).toBe(true);
+    expect(mockSendNotification).toHaveBeenCalledTimes(1);
+  });
+
+  it('removes a stale exact-device subscription and reports it as undelivered', async () => {
+    mockFindFirst.mockResolvedValue({
+      id: 'sub-stale', endpoint: 'https://stale-device', p256dh: 'key', auth: 'auth',
+    });
+    mockSendNotification.mockRejectedValueOnce({ statusCode: 410 });
+
+    const sent = await enviarPushAlDispositivo('user-1', 'https://stale-device', {
+      title: 'Test', body: 'Body',
+    });
+
+    expect(sent).toBe(false);
+    expect(mockDeleteMany).toHaveBeenCalledWith({
+      where: { id: 'sub-stale', usuarioId: 'user-1' },
+    });
   });
 
   it('does not throw when sendNotification fails with non-stale error', async () => {

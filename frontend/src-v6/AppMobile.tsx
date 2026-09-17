@@ -9,13 +9,23 @@ import React, { Suspense } from 'react';
 import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { MobileLayout } from './layouts/MobileLayout';
+import ProtectedRoute from './components/ProtectedRoute';
+import { canVisitRoute } from './utils/routeAccess';
+import { hasStoredImpersonationSession } from './utils/impersonationNavigation';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import {
+  activeTripStorageKey,
+  gpsPendingStorageKey,
+  tripSnapshotStorageKey,
+  tripStatusStorageKey,
+} from './utils/userContext';
 
 // Pages — shared lazy imports (single source of truth with App.tsx)
 import {
   LoginPage, ReclamarCuentaPage, RegistroPage, ForgotPasswordPage, ResetPasswordPage, UserSwitcherPage,
-  MobileDashboardPage, CentroControlPage,
+  MobileDashboardPage, CentroControlPage, InspeccionesPage, InspeccionDetallePage,
   ManifiestosPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
-  ViajeEnCursoPage, TransportePerfilPage, ViajeEnCursoTransportista,
+  TransportePerfilPage, ViajeEnCursoTransportista,
   ActoresPage, OperadoresPage, OperadorDetallePage, TransportistasPage, TransportistaDetallePage,
   ReportesPage, AlertasPage, NotificacionesPage, ConfiguracionPage,
   UsuariosPage, AdminGeneradoresPage, GeneradorDetallePage, NuevoGeneradorPage,
@@ -24,7 +34,7 @@ import {
   AdminRenovacionesPage, AdminSolicitudesPage, SolicitudDetallePage,
   AuditoriaPage, CargaMasivaPage, PerfilPage, SolicitarCambiosPage,
   AyudaPage, EscanerQRPage, EstadisticasPage,
-  InscripcionWizardPage, MiSolicitudPage, NotFoundPage,
+  InscripcionWizardPage, MiSolicitudPage, VerificarCertificadoPage, NotFoundPage,
 } from './routes/pages';
 
 const PageLoader: React.FC = () => (
@@ -49,21 +59,24 @@ const ViajeRedirectMobile: React.FC = () => {
 
 // Auto-redirect to active trip when PWA reopens
 const ActiveTripGuard: React.FC = () => {
-  const activeTripId = localStorage.getItem('sitrep_active_trip_id');
+  const { currentUser } = useAuth();
+  const activeTripId = currentUser?.id != null
+    ? localStorage.getItem(activeTripStorageKey(currentUser.id))
+    : null;
   if (activeTripId) {
     // A3: Verify trip hasn't ended — if status is terminal, clean up and go to dashboard
-    const savedStatus = localStorage.getItem(`viaje_status_${activeTripId}`);
-    const snapshot = localStorage.getItem(`viaje_snapshot_${activeTripId}`);
+    const savedStatus = localStorage.getItem(tripStatusStorageKey(currentUser!.id, activeTripId));
+    const snapshot = localStorage.getItem(tripSnapshotStorageKey(currentUser!.id, activeTripId));
     let snapshotEstado: string | null = null;
     if (snapshot) {
       try { snapshotEstado = JSON.parse(snapshot)?.estado; } catch { /* ignore */ }
     }
     const terminalStates = ['ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO', 'TRATADO', 'CANCELADO', 'RECHAZADO'];
     if ((snapshotEstado && terminalStates.includes(snapshotEstado)) || savedStatus === 'COMPLETED') {
-      localStorage.removeItem('sitrep_active_trip_id');
-      localStorage.removeItem(`viaje_snapshot_${activeTripId}`);
-      localStorage.removeItem(`viaje_status_${activeTripId}`);
-      localStorage.removeItem(`gps_pending_${activeTripId}`);
+      localStorage.removeItem(activeTripStorageKey(currentUser!.id));
+      localStorage.removeItem(tripSnapshotStorageKey(currentUser!.id, activeTripId));
+      localStorage.removeItem(tripStatusStorageKey(currentUser!.id, activeTripId));
+      localStorage.removeItem(gpsPendingStorageKey(currentUser!.id, activeTripId));
       return <Navigate to="/dashboard" replace />;
     }
     return <Navigate to={`/transporte/viaje/${activeTripId}`} replace />;
@@ -73,11 +86,11 @@ const ActiveTripGuard: React.FC = () => {
 
 /** Auth gate: single source of truth for public/private routing */
 const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, isLoading } = useAuth();
+  const { currentUser, isLoading, isRestricted } = useAuth();
   const location = useLocation();
 
   // Public routes that don't need auth
-  const publicPaths = ['/login', '/reclamar', '/manifiestos/verificar', '/inscripcion', '/registro', '/recuperar', '/reset-password'];
+  const publicPaths = ['/login', '/reclamar', '/manifiestos/verificar', '/certificados/verificar', '/inscripcion', '/registro', '/recuperar', '/reset-password'];
   const isPublic = publicPaths.some(p => location.pathname.startsWith(p));
 
   // While auth state is loading, show loader (even for public routes,
@@ -95,11 +108,36 @@ const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Private route without auth → redirect to login
   if (!currentUser) return <Navigate to="/login" replace />;
 
+  if (isRestricted && location.pathname !== '/mi-solicitud') return <Navigate to="/mi-solicitud" replace />;
+
+  // An administrator inspecting a pending account must never be forced to
+  // change that person's credentials. The real user still gets this gate.
+  if (currentUser.forcePasswordChange && !hasStoredImpersonationSession() && !location.pathname.startsWith('/configuracion')) {
+    return <Navigate to="/configuracion?tab=seguridad" replace />;
+  }
+
+  const inspectorRoute = Boolean(currentUser.esInspector) && location.pathname.startsWith('/inspecciones');
+  if (!inspectorRoute && !canVisitRoute(currentUser.rol, location.pathname)) return <Navigate to="/dashboard" replace />;
+
+  if (currentUser.rol === 'AUDITOR') {
+    const path = location.pathname;
+    if (path === '/') return <Navigate to="/dashboard" replace />;
+    const exactAllowed = new Set([
+      '/dashboard', '/manifiestos', '/reportes', '/alertas', '/ayuda', '/admin/auditoria',
+      ...(currentUser.forcePasswordChange ? ['/configuracion'] : []),
+    ]);
+    const manifestDetail = /^\/manifiestos\/[^/]+$/.test(path) && !path.endsWith('/nuevo');
+    if (!exactAllowed.has(path) && !manifestDetail) {
+      return <Navigate to="/dashboard" replace />;
+    }
+  }
+
   return <>{children}</>;
 };
 
 function AppMobile() {
   return (
+    <ErrorBoundary>
     <AuthProvider>
       <Suspense fallback={<PageLoader />}>
         <AuthGate>
@@ -120,6 +158,8 @@ function AppMobile() {
             <Route path="/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
             <Route path="/manifiestos/:id/editar" element={<EditarManifiestoPage />} />
             <Route path="/manifiestos/:id" element={<ManifiestoDetallePage />} />
+            <Route path="/inspecciones" element={<InspeccionesPage />} />
+            <Route path="/inspecciones/:id" element={<InspeccionDetallePage />} />
             <Route path="/transporte/perfil" element={<TransportePerfilPage />} />
             <Route path="/transporte/viaje/:id" element={<ViajeEnCursoTransportista />} />
             {/* Actores overview */}
@@ -157,10 +197,8 @@ function AppMobile() {
             <Route path="/mi-perfil/solicitar-cambios" element={<SolicitarCambiosPage />} />
             <Route path="/mi-solicitud" element={<MiSolicitudPage />} />
             <Route path="/ayuda" element={<AyudaPage />} />
-            <Route path="/switch-user" element={<UserSwitcherPage />} />
 
             {/* Admin */}
-            <Route path="/admin/usuarios" element={<UsuariosPage />} />
             <Route path="/admin/generadores" element={<AdminGeneradoresPage />} />
             <Route path="/admin/generadores/nuevo" element={<NuevoGeneradorPage />} />
             <Route path="/admin/generadores/:id/editar" element={<NuevoGeneradorPage />} />
@@ -171,18 +209,36 @@ function AppMobile() {
             <Route path="/admin/tratamientos" element={<AdminTratamientosPage />} />
             <Route path="/admin/blockchain" element={<AdminBlockchainPage />} />
             <Route path="/admin/renovaciones" element={<AdminRenovacionesPage />} />
-            <Route path="/admin/solicitudes" element={<AdminSolicitudesPage />} />
-            <Route path="/admin/solicitudes/:id" element={<SolicitudDetallePage />} />
             <Route path="/admin/auditoria" element={<AuditoriaPage />} />
             <Route path="/admin/carga-masiva" element={<CargaMasivaPage />} />
 
             {/* Special */}
             <Route path="/escaner-qr" element={<EscanerQRPage />} />
+            {/* Compatibility alias for links shared before the canonical QR route. */}
+            <Route path="/escaner" element={<Navigate to="/escaner-qr" replace />} />
             <Route path="/estadisticas" element={<EstadisticasPage />} />
+          </Route>
+
+          {/* Sector admins may review only their own actor type.  Keep the
+              guard in the PWA router as well as the API middleware. */}
+          <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR']} />}>
+            <Route element={<MobileLayout />}>
+              <Route path="/admin/solicitudes" element={<AdminSolicitudesPage />} />
+              <Route path="/admin/solicitudes/:id" element={<SolicitudDetallePage />} />
+            </Route>
+          </Route>
+
+          {/* Root admin only: user administration and impersonation */}
+          <Route element={<ProtectedRoute roles={['ADMIN']} />}>
+            <Route element={<MobileLayout />}>
+              <Route path="/switch-user" element={<UserSwitcherPage />} />
+              <Route path="/admin/usuarios" element={<UsuariosPage />} />
+            </Route>
           </Route>
 
           {/* Inscripcion publica de actores */}
           <Route path="/inscripcion/:tipo" element={<InscripcionWizardPage />} />
+          <Route path="/certificados/verificar/:token" element={<VerificarCertificadoPage />} />
 
           {/* Verificación pública de manifiesto (QR) */}
           <Route path="/manifiestos/verificar/:numero" element={<VerificarManifiestoPage />} />
@@ -200,6 +256,7 @@ function AppMobile() {
         </AuthGate>
       </Suspense>
     </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

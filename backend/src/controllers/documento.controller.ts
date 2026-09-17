@@ -9,7 +9,7 @@ import prisma from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { config } from '../config/config';
-import { isUnsafePathSegment } from '../utils/authorization';
+import { canAccessActor, isActorTypeAdmin, isRootAdmin, isUnsafePathSegment } from '../utils/authorization';
 
 const UPLOADS_DIR = process.env.UPLOADS_DIR || '/var/www/sitrep-uploads';
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -153,25 +153,35 @@ export const getDocumentos = async (req: AuthRequest, res: Response, next: NextF
             where: isOperador ? { operadorId: id } : { generadorId: id },
             orderBy: { createdAt: 'desc' }
         });
-        res.json({ success: true, data: { documentos } });
+        // Never return the persisted filesystem path. Legacy rows remain
+        // downloadable only through the authenticated endpoint below.
+        res.json({ success: true, data: { documentos: documentos.map(({ path: _path, ...documento }) => documento) } });
     } catch (error) {
         next(error);
     }
 };
 
 export const downloadDocumento = async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-        const { docId } = req.params;
-        const doc = await prisma.documento.findUnique({ where: { id: docId } });
-        if (!doc) throw new AppError('Documento no encontrado', 404);
+  try {
+    const { docId } = req.params;
+    const doc = await prisma.documento.findUnique({ where: { id: docId }, select: { id: true, generadorId: true, operadorId: true, nombre: true, path: true, mimeType: true } });
+    if (!doc) throw new AppError('Documento no encontrado', 404);
+
+    const actorType = doc.generadorId ? 'generador' : doc.operadorId ? 'operador' : null;
+    const actorId = doc.generadorId || doc.operadorId;
+    if (!actorType || !actorId || !canAccessActor(req.user, actorType, actorId, 'read')) {
+      throw new AppError('No tiene permisos sobre este documento', 403);
+    }
 
         const safePath = safeResolve(doc.path);
         if (!fs.existsSync(safePath)) {
             throw new AppError('Archivo no encontrado en disco', 404);
         }
 
-        res.setHeader('Content-Disposition', `attachment; filename="${doc.nombre}"`);
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.nombre)}"`);
         res.setHeader('Content-Type', doc.mimeType);
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Cache-Control', 'private, no-store');
         fs.createReadStream(safePath).pipe(res);
     } catch (error) {
         next(error);
@@ -187,8 +197,16 @@ export const revisarDocumento = async (req: AuthRequest, res: Response, next: Ne
             throw new AppError('Estado debe ser APROBADO o RECHAZADO', 400);
         }
 
-        const documento = await prisma.documento.update({
-            where: { id: docId },
+        const documento = await prisma.documento.findUnique({ where: { id: docId }, select: { id: true, generadorId: true, operadorId: true } });
+        if (!documento) throw new AppError('Documento no encontrado', 404);
+        const actorType = documento.generadorId ? 'generador' : documento.operadorId ? 'operador' : null;
+        const actorId = documento.generadorId || documento.operadorId;
+        if (!actorType || !actorId || !isRootAdmin(req.user) && !isActorTypeAdmin(req.user, actorType)) {
+            throw new AppError('No tiene permisos para revisar este documento', 403);
+        }
+
+        const updated = await prisma.documento.update({
+            where: { id: documento.id },
             data: {
                 estado,
                 observaciones,
@@ -197,7 +215,7 @@ export const revisarDocumento = async (req: AuthRequest, res: Response, next: Ne
             }
         });
 
-        res.json({ success: true, data: { documento } });
+        res.json({ success: true, data: { documento: updated } });
     } catch (error) {
         next(error);
     }
@@ -208,6 +226,11 @@ export const deleteDocumento = async (req: AuthRequest, res: Response, next: Nex
         const { docId } = req.params;
         const doc = await prisma.documento.findUnique({ where: { id: docId } });
         if (!doc) throw new AppError('Documento no encontrado', 404);
+        const actorType = doc.generadorId ? 'generador' : doc.operadorId ? 'operador' : null;
+        const actorId = doc.generadorId || doc.operadorId;
+        if (!actorType || !actorId || !canAccessActor(req.user, actorType, actorId, 'write')) {
+            throw new AppError('No tiene permisos sobre este documento', 403);
+        }
 
         // Delete file from disk
         const safePath = safeResolve(doc.path);

@@ -13,18 +13,18 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, Truck, MapPin, Clock, Navigation, Package,
+  ArrowLeft, Truck, MapPin, Clock, Package,
   Play, Pause, CheckCircle2, AlertTriangle, Radio, Map as MapIcon, List,
-  Loader2, Compass, Gauge, Crosshair, WifiOff, LocateFixed
+  Loader2, Compass, Gauge, Crosshair, WifiOff, LocateFixed, LockKeyhole, RefreshCw
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { toast } from '../../components/ui/Toast';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
-import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { BASE_MAP_ATTRIBUTION, BASE_MAP_MAX_ZOOM, BASE_MAP_TILE_URL } from '../../utils/map-tiles';
 import { ACTOR_ICONS } from '../../utils/map-icons';
 import {
   useManifiesto,
@@ -32,12 +32,21 @@ import {
   useConfirmarEntrega,
   useRegistrarIncidente,
 } from '../../hooks/useManifiestos';
-import { manifiestoService } from '../../services/manifiesto.service';
 import { EstadoManifiesto } from '../../types/models';
-import { formatDateTime, formatWeight } from '../../utils/formatters';
-import { offlineSafeMutation } from '../../utils/offline-mutation';
+import type { Manifiesto } from '../../types/models';
+import { formatDateTime, formatQuantitySummary } from '../../utils/formatters';
+import { offlineSafeMutation, queueOfflineMutation } from '../../utils/offline-mutation';
 import { useGPSTracking, headingToCompass } from '../../hooks/useGPSTracking';
 import type { GpsStatus } from '../../hooks/useGPSTracking';
+import { useScreenWakeLock } from '../../hooks/useScreenWakeLock';
+import { useAuth } from '../../contexts/AuthContext';
+import { getApiErrorMessage } from '../../utils/api-error';
+import {
+  activeTripStorageKey,
+  gpsPendingStorageKey,
+  tripSnapshotStorageKey,
+  tripStatusStorageKey,
+} from '../../utils/userContext';
 
 // Recenter map when position changes (respects user pan/zoom)
 function RecenterMap({ position, onUserInteract, followUser }: {
@@ -59,8 +68,8 @@ function RecenterMap({ position, onUserInteract, followUser }: {
 
 const ViajeEnCursoTransportista: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const { currentUser } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   // Map recenter control
   const [followUser, setFollowUser] = useState(true);
   const handleMapInteract = useCallback(() => setFollowUser(false), []);
@@ -68,11 +77,11 @@ const ViajeEnCursoTransportista: React.FC = () => {
   // Real data from API
   const { data: apiData, isLoading, isError } = useManifiesto(id || '');
   const manifiesto = apiData;
-  const m: Record<string, any> = manifiesto || {};
+  const m: Partial<Manifiesto> = manifiesto || {};
 
   // Persist active trip snapshot to localStorage for recovery after app restart
   useEffect(() => {
-    if (id && m.id && m.estado === EstadoManifiesto.EN_TRANSITO) {
+    if (id && currentUser?.id != null && m.id && m.estado === EstadoManifiesto.EN_TRANSITO) {
       const snapshot = {
         id: m.id,
         numero: m.numero,
@@ -83,21 +92,29 @@ const ViajeEnCursoTransportista: React.FC = () => {
         fechaRetiro: m.fechaRetiro,
         savedAt: new Date().toISOString(),
       };
-      localStorage.setItem(`viaje_snapshot_${id}`, JSON.stringify(snapshot));
-      localStorage.setItem('sitrep_active_trip_id', id);
+      localStorage.setItem(tripSnapshotStorageKey(currentUser.id, id), JSON.stringify(snapshot));
+      localStorage.setItem(activeTripStorageKey(currentUser.id), id);
     }
-  }, [id, m.id, m.estado]);
+  }, [
+    id,
+    m.id,
+    m.estado,
+    m.numero,
+    m.fechaRetiro,
+    m.generador?.razonSocial,
+    m.operador?.razonSocial,
+    m.transportista?.razonSocial,
+    currentUser?.id,
+  ]);
 
   // Restore cached trip data while API is loading (stale-while-revalidate)
   const cachedSnapshot = useMemo(() => {
-    if (!id) return null;
+    if (!id || currentUser?.id == null) return null;
     try {
-      const saved = localStorage.getItem(`viaje_snapshot_${id}`);
+      const saved = localStorage.getItem(tripSnapshotStorageKey(currentUser.id, id));
       return saved ? JSON.parse(saved) : null;
     } catch { return null; }
-  }, [id]);
-
-  const displayData = m.id ? m : (cachedSnapshot || {});
+  }, [id, currentUser?.id]);
 
   // Mutations
   const confirmarRetiro = useConfirmarRetiro();
@@ -115,6 +132,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
   // GPS tracking via custom hook
   const gps = useGPSTracking({
     manifiestoId: id,
+    userId: currentUser?.id,
     estado: m.estado,
     viajeStatus,
   });
@@ -124,7 +142,11 @@ const ViajeEnCursoTransportista: React.FC = () => {
   const gpsStatus = gps.status;
   const gpsDetails = gps.details;
   const gpsSendStatus = gps.sendStatus;
+  const gpsPendingCount = gps.pendingCount;
   const cleanupGps = gps.cleanupGps;
+  const wakeLock = useScreenWakeLock(
+    m.estado === EstadoManifiesto.EN_TRANSITO && viajeStatus === 'ACTIVO',
+  );
 
   const [elapsedTime, setElapsedTime] = useState(0);
 
@@ -135,11 +157,11 @@ const ViajeEnCursoTransportista: React.FC = () => {
 
   // Restore pause state from localStorage on mount
   useEffect(() => {
-    if (id) {
-      const saved = localStorage.getItem(`viaje_status_${id}`);
+    if (id && currentUser?.id != null) {
+      const saved = localStorage.getItem(tripStatusStorageKey(currentUser.id, id));
       if (saved === 'PAUSADO') setViajeStatus('PAUSADO');
     }
-  }, [id]);
+  }, [id, currentUser?.id]);
 
   // Timer persistence from server timestamp (fechaRetiro)
   useEffect(() => {
@@ -175,21 +197,46 @@ const ViajeEnCursoTransportista: React.FC = () => {
           longitud: currentPosition?.[1],
           observaciones: 'Retiro confirmado desde app móvil',
         }),
-        { type: 'POST', endpoint: `/manifiestos/${id}/confirmar-retiro`, data: { latitud: currentPosition?.[0], longitud: currentPosition?.[1], observaciones: 'Retiro confirmado desde app móvil' } }
+        { type: 'POST', endpoint: `/manifiestos/${id}/confirmar-retiro`, data: { latitud: currentPosition?.[0], longitud: currentPosition?.[1], observaciones: 'Retiro confirmado desde app móvil' }, userId: currentUser?.id }
       );
       if (result === 'QUEUED') {
         toast.info('Sin conexión — El retiro se confirmará al reconectar');
         return;
       }
       toast.success('Retiro confirmado — viaje iniciado');
-    } catch (err: any) {
-      toast.error('Error', err?.response?.data?.message || 'No se pudo confirmar el retiro');
+    } catch (err: unknown) {
+      toast.error('Error', getApiErrorMessage(err, 'No se pudo confirmar el retiro'));
     }
   };
 
   // Confirmar Entrega with GPS coordinates + offline queue
   const handleConfirmarEntrega = async () => {
     try {
+      // GPS points must reach the queue before the terminal workflow action.
+      // Otherwise the backend correctly rejects them once the trip is closed.
+      const gpsFlushed = await gps.flushPending();
+      if (!gpsFlushed) {
+        if (!currentUser?.id) throw new Error('No se pudo identificar al usuario para resguardar el GPS');
+        const staged = await gps.stagePendingForSync(currentUser.id);
+        await queueOfflineMutation({
+          type: 'POST',
+          endpoint: `/manifiestos/${id}/confirmar-entrega`,
+          data: {
+            latitud: currentPosition?.[0],
+            longitud: currentPosition?.[1],
+            observaciones: 'Entrega confirmada desde app móvil',
+          },
+          userId: currentUser.id,
+        });
+        toast.info(
+          'Entrega guardada sin conexión',
+          `${staged} punto${staged === 1 ? '' : 's'} GPS se sincronizarán antes de cerrar el viaje`,
+        );
+        cleanupGps();
+        setShowFinalizarModal(false);
+        return;
+      }
+
       const result = await offlineSafeMutation(
         () => confirmarEntrega.mutateAsync({
           id: id!,
@@ -197,26 +244,27 @@ const ViajeEnCursoTransportista: React.FC = () => {
           longitud: currentPosition?.[1],
           observaciones: 'Entrega confirmada desde app móvil',
         }),
-        { type: 'POST', endpoint: `/manifiestos/${id}/confirmar-entrega`, data: { latitud: currentPosition?.[0], longitud: currentPosition?.[1], observaciones: 'Entrega confirmada desde app móvil' } }
+        { type: 'POST', endpoint: `/manifiestos/${id}/confirmar-entrega`, data: { latitud: currentPosition?.[0], longitud: currentPosition?.[1], observaciones: 'Entrega confirmada desde app móvil' }, userId: currentUser?.id }
       );
       if (result === 'QUEUED') {
         toast.info('Sin conexión — La entrega se confirmará al reconectar');
-        if (id) localStorage.setItem(`viaje_status_${id}`, 'COMPLETED');
+        // Keep the trip recoverable until the queued delivery is accepted by
+        // the API; marking it completed here discarded pending GPS data.
         cleanupGps();
         setShowFinalizarModal(false);
         return;
       }
       toast.success('Entrega confirmada exitosamente');
       cleanupGps();
-      if (id) {
-        localStorage.removeItem(`viaje_snapshot_${id}`);
-        localStorage.removeItem(`viaje_status_${id}`);
-        localStorage.removeItem(`gps_pending_${id}`);
-        localStorage.removeItem('sitrep_active_trip_id');
+      if (id && currentUser?.id != null) {
+        localStorage.removeItem(tripSnapshotStorageKey(currentUser.id, id));
+        localStorage.removeItem(tripStatusStorageKey(currentUser.id, id));
+        localStorage.removeItem(gpsPendingStorageKey(currentUser.id, id));
+        localStorage.removeItem(activeTripStorageKey(currentUser.id));
       }
       setShowFinalizarModal(false);
-    } catch (err: any) {
-      toast.error('Error', err?.response?.data?.message || 'No se pudo confirmar la entrega');
+    } catch (err: unknown) {
+      toast.error('Error', getApiErrorMessage(err, 'No se pudo confirmar la entrega'));
     }
   };
 
@@ -247,8 +295,8 @@ const ViajeEnCursoTransportista: React.FC = () => {
       setShowIncidenteModal(false);
       setIncidenteTipo('');
       setIncidenteDescripcion('');
-    } catch (err: any) {
-      toast.error('Error', err?.response?.data?.message || 'No se pudo registrar el incidente');
+    } catch (err: unknown) {
+      toast.error('Error', getApiErrorMessage(err, 'No se pudo registrar el incidente'));
     }
   };
 
@@ -264,7 +312,9 @@ const ViajeEnCursoTransportista: React.FC = () => {
         longitud: currentPosition?.[1],
       });
       setViajeStatus(newStatus);
-      localStorage.setItem(`viaje_status_${id}`, newStatus);
+      if (id && currentUser?.id != null) {
+        localStorage.setItem(tripStatusStorageKey(currentUser.id, id), newStatus);
+      }
       toast.info(newStatus === 'PAUSADO' ? 'Viaje pausado' : 'Viaje reanudado');
     } catch {
       toast.error('No se pudo registrar la pausa');
@@ -365,7 +415,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
     );
   }
 
-  const totalPeso = Array.isArray(m.residuos) ? m.residuos.reduce((sum: number, r: any) => sum + (r.cantidad || 0), 0) : 0;
+  const totalCantidad = Array.isArray(m.residuos) ? formatQuantitySummary(m.residuos) : '0 kg';
   const eventos = Array.isArray(m.eventos) ? m.eventos : [];
 
   // GPS Status Panel component
@@ -381,7 +431,15 @@ const ViajeEnCursoTransportista: React.FC = () => {
       error: { color: 'text-error-600', bgColor: 'bg-error-50', label: 'Error GPS', icon: <AlertTriangle size={14} /> },
     };
 
-    const cfg = statusConfig[gpsStatus];
+    const isGpsStale = gpsStatus === 'active' && gps.isStale;
+    const cfg = isGpsStale
+      ? {
+        color: 'text-warning-700',
+        bgColor: 'bg-warning-50',
+        label: 'Señal GPS desactualizada',
+        icon: <AlertTriangle size={14} />,
+      }
+      : statusConfig[gpsStatus];
 
     return (
       <Card className={`${cfg.bgColor} border-none`}>
@@ -394,7 +452,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
             </div>
             {gpsSendStatus === 'error' && gpsStatus === 'active' && (
               <span className="text-xs text-error-500 flex items-center gap-1">
-                <WifiOff size={12} /> Sin conexión
+                <WifiOff size={12} /> {gpsPendingCount > 0 ? `${gpsPendingCount} pendientes` : 'Sin conexión'}
               </span>
             )}
           </div>
@@ -435,6 +493,42 @@ const ViajeEnCursoTransportista: React.FC = () => {
               </div>
             </div>
           )}
+
+          {isGpsStale && (
+            <p className="text-xs text-warning-700 mt-2">
+              No recibimos una posición nueva en los últimos 90 segundos. Desbloqueá el teléfono y verificá ubicación, ahorro de batería y conectividad.
+            </p>
+          )}
+
+          <div className="flex items-start gap-2 mt-3 pt-3 border-t border-black/5">
+            <LockKeyhole
+              size={14}
+              className={wakeLock.status === 'active' ? 'text-success-600 mt-0.5' : 'text-neutral-500 mt-0.5'}
+            />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-neutral-700">
+                {wakeLock.status === 'active' && 'Pantalla protegida durante el viaje'}
+                {wakeLock.status === 'requesting' && 'Activando protección de pantalla…'}
+                {wakeLock.status === 'released' && (viajeStatus === 'PAUSADO' ? 'Protección pausada con el viaje' : 'Protección de pantalla inactiva')}
+                {wakeLock.status === 'unsupported' && 'Este dispositivo no permite mantener la pantalla activa'}
+                {wakeLock.status === 'error' && 'No se pudo mantener la pantalla activa'}
+              </p>
+              <p className="text-[11px] text-neutral-500 mt-0.5">
+                {wakeLock.status === 'active'
+                  ? 'Evitá bloquearla manualmente: el navegador suspende el GPS cuando la app deja de estar visible.'
+                  : wakeLock.error || 'Mantené SITREP visible para conservar el seguimiento GPS continuo.'}
+              </p>
+            </div>
+            {wakeLock.supported && viajeStatus === 'ACTIVO' && (wakeLock.status === 'released' || wakeLock.status === 'error') && (
+              <button
+                type="button"
+                onClick={() => void wakeLock.request()}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-primary-700 hover:text-primary-800"
+              >
+                <RefreshCw size={12} /> Reintentar
+              </button>
+            )}
+          </div>
 
           {/* Acquiring animation */}
           {gpsStatus === 'acquiring' && (
@@ -491,7 +585,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
                 <p className="text-neutral-600 mb-1">Generador: <span className="font-semibold">{m.generador?.razonSocial || '-'}</span></p>
                 <p className="text-sm text-neutral-500">{m.generador?.domicilio || '-'}</p>
                 <div className="mt-4 p-3 bg-neutral-50 rounded-lg">
-                  <p className="text-sm text-neutral-600">Residuos: <span className="font-semibold">{m.residuos?.length || 0} items</span> — {formatWeight(totalPeso)}</p>
+                  <p className="text-sm text-neutral-600">Residuos: <span className="font-semibold">{m.residuos?.length || 0} items</span> — {totalCantidad}</p>
                 </div>
               </CardContent>
             </Card>
@@ -527,7 +621,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
                   </div>
                   <div className="text-center border-l border-white/30">
                     <p className="text-xs text-white/90 mb-1 font-medium tracking-wide">PESO TOTAL</p>
-                    <p className="text-lg font-bold text-white drop-shadow-sm">{formatWeight(totalPeso)}</p>
+                    <p className="text-lg font-bold text-white drop-shadow-sm">{totalCantidad}</p>
                   </div>
                 </div>
               </CardContent>
@@ -582,7 +676,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
                       style={{ height: '100%', width: '100%', zIndex: 0 }}
                       className="z-0"
                     >
-                      <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                      <TileLayer attribution={BASE_MAP_ATTRIBUTION} url={BASE_MAP_TILE_URL} maxZoom={BASE_MAP_MAX_ZOOM} />
                       {trackPoints.length > 1 && <Polyline positions={trackPoints} color="#0D8A4F" weight={4} opacity={0.8} />}
                       {currentPosition && <Marker position={currentPosition} icon={ACTOR_ICONS.enTransito}><Popup>Tu posición actual</Popup></Marker>}
                       <RecenterMap position={currentPosition} onUserInteract={handleMapInteract} followUser={followUser} />
@@ -604,7 +698,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
                 {eventos.length === 0 ? (
                   <Card className="p-4 text-center text-neutral-500">Sin eventos registrados</Card>
                 ) : (
-                  eventos.map((ev: any, i: number) => (
+                  eventos.map((ev, i: number) => (
                     <Card key={ev.id || i} className="p-3">
                       <div className="flex justify-between items-start">
                         <div>
@@ -643,7 +737,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
               <span className="font-semibold text-neutral-900">Residuos</span>
             </div>
             <div className="space-y-2">
-              {(m.residuos || []).map((r: any) => (
+              {(m.residuos || []).map((r) => (
                 <div key={r.id} className="flex justify-between items-center p-2 bg-neutral-50 rounded-lg">
                   <span className="text-sm text-neutral-700">{r.tipoResiduo?.nombre || r.descripcion || 'Residuo'}</span>
                   <span className="text-sm font-semibold text-neutral-900">{r.cantidad} {r.unidad}</span>

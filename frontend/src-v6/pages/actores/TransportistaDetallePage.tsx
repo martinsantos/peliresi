@@ -5,9 +5,9 @@
  * CRUD: Agregar vehículos y conductores (ADMIN only)
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Transportista, Vehiculo, Chofer } from '../../types/models';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   Truck,
@@ -24,11 +24,15 @@ import {
   Plus,
   Pencil,
   Trash2,
+  Upload,
+  Loader2,
+  ScanLine,
   FileText,
   FlaskConical,
   ChevronDown,
   ChevronUp,
   Route,
+  ClipboardCheck,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -47,16 +51,52 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from '../../components/ui/Toast';
 import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
+import { ActorInspectionsPanel } from '../inspecciones/ActorInspectionsPanel';
+import api from '../../services/api';
 
 const EMPTY_VEHICULO = { patente: '', marca: '', modelo: '', anio: new Date().getFullYear(), capacidad: 0, numeroHabilitacion: '', vencimiento: '' };
 const EMPTY_CHOFER = { nombre: '', apellido: '', dni: '', licencia: '', vencimiento: '', telefono: '' };
 
+type DocumentSubjectType = 'vehiculos' | 'choferes';
+type DocumentKind = 'TARJETA_IDENTIFICACION_VEHICULO' | 'AUTORIZACION_USO_VEHICULO' | 'LICENCIA_CONDUCIR';
+type DocumentFace = 'FRENTE' | 'DORSO';
+interface ActorDocumentSummary {
+  id: string;
+  tipo: DocumentKind;
+  estado: string;
+  cara?: string | null;
+  vigenteHasta?: string | null;
+  motivoRechazo?: string | null;
+  archivo?: { nombreOriginal?: string | null; mimeDetectado?: string | null };
+  datosOcr?: { texto?: string; [key: string]: unknown } | null;
+  confianzaOcr?: number | null;
+}
+interface DocumentUploadTarget {
+  subjectType: DocumentSubjectType;
+  subjectId: string;
+  tipo: DocumentKind;
+  cara: DocumentFace;
+  label: string;
+}
+interface DocumentManagerTarget {
+  subjectType: DocumentSubjectType;
+  subjectId: string;
+  subjectLabel: string;
+  vehicle: boolean;
+}
+
+const documentErrorMessage = (error: unknown, fallback: string) =>
+  (error as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback;
+
 const TransportistaDetallePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
   // Removed isMobile — React Router handles basename
-  const { isAdmin } = useAuth();
+  const { isAdmin, isAnyAdmin, isTransportista } = useAuth();
+  // The API authorizes a transportista against the transportistaId in the
+  // URL, so the actor can maintain its own vehicle/driver documents. CRUD of
+  // the vehicle/driver records remains restricted to the root admin below.
+  const canManageTransportDocuments = isAnyAdmin || isTransportista;
 
   const [showVehiculoModal, setShowVehiculoModal] = useState(false);
   const [showChoferModal, setShowChoferModal] = useState(false);
@@ -69,6 +109,14 @@ const TransportistaDetallePage: React.FC = () => {
   const [corrientesExpanded, setCorrientesExpanded] = useState(false);
   const [flotaSort, setFlotaSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const [choferSort, setChoferSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+  const [documentsBySubject, setDocumentsBySubject] = useState<Record<string, ActorDocumentSummary[]>>({});
+  const [uploadTarget, setUploadTarget] = useState<DocumentUploadTarget | null>(null);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
+  const [ocrDocumentId, setOcrDocumentId] = useState<string | null>(null);
+  const [reviewingDocumentId, setReviewingDocumentId] = useState<string | null>(null);
+  const [documentManagerTarget, setDocumentManagerTarget] = useState<DocumentManagerTarget | null>(null);
+  const [showOptionalVehicleDocument, setShowOptionalVehicleDocument] = useState(false);
+  const documentInputRef = useRef<HTMLInputElement>(null);
 
   const { data: apiTransportista, isLoading } = useTransportista(id || '');
   const createVehiculo = useCreateVehiculo();
@@ -101,6 +149,171 @@ const TransportistaDetallePage: React.FC = () => {
 
   const rawFlota: Vehiculo[] = transportista ? transportista.flota : [];
   const rawChoferes: Chofer[] = transportista ? transportista.conductores : [];
+
+  const loadSubjectDocuments = async (subjectType: DocumentSubjectType, subjectId: string) => {
+    if (!id || !subjectId) return;
+    try {
+      const response = await api.get(`/actores/transportistas/${id}/${subjectType}/${subjectId}/documentos`);
+      setDocumentsBySubject(prev => ({ ...prev, [subjectId]: response.data?.data?.documentos || [] }));
+    } catch {
+      // A sector user may see the actor record while lacking document write
+      // capability. The API remains the authority; keep the table usable.
+    }
+  };
+
+  useEffect(() => {
+    if (!id || !apiTransportista) return;
+    const subjects: Array<[DocumentSubjectType, string]> = [
+      ...(apiTransportista.vehiculos || []).map((v: Vehiculo) => ['vehiculos', v.id] as [DocumentSubjectType, string]),
+      ...(apiTransportista.choferes || []).map((c: Chofer) => ['choferes', c.id] as [DocumentSubjectType, string]),
+    ];
+    void Promise.all(subjects.map(([subjectType, subjectId]) => loadSubjectDocuments(subjectType, subjectId)));
+    // The actor query identity changes only when the transportista changes;
+    // individual uploads explicitly refresh their subject below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, apiTransportista]);
+
+  const beginDocumentUpload = (target: DocumentUploadTarget) => {
+    if (!canManageTransportDocuments) return;
+    setUploadTarget(target);
+    documentInputRef.current?.click();
+  };
+
+  const handleDocumentFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    const target = uploadTarget;
+    event.target.value = '';
+    if (!file || !target || !id) return;
+    setUploadingDocument(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('tipo', target.tipo);
+      formData.append('cara', target.cara);
+      await api.post(`/actores/transportistas/${id}/${target.subjectType}/${target.subjectId}/documentos`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      toast.success('Documento cargado', `${target.label} quedó en revisión`);
+      await loadSubjectDocuments(target.subjectType, target.subjectId);
+    } catch (error: unknown) {
+      toast.error('Carga rechazada', documentErrorMessage(error, 'No se pudo cargar el documento'));
+    } finally {
+      setUploadingDocument(false);
+      setUploadTarget(null);
+    }
+  };
+
+  const runDocumentOcr = async (documento: ActorDocumentSummary) => {
+    setOcrDocumentId(documento.id);
+    try {
+      const response = await api.post(`/documentos/${documento.id}/ocr`);
+      const result = response.data?.data?.ocr;
+      toast.success('OCR completado', `${Math.round(Number(result?.confidence || 0))}% de confianza. Revise el texto sugerido antes de aprobar.`);
+    } catch (error: unknown) {
+      toast.error('OCR no disponible', documentErrorMessage(error, 'No se pudo leer el documento'));
+    } finally {
+      setOcrDocumentId(null);
+    }
+  };
+
+  const reviewTransportDocument = async (documento: ActorDocumentSummary, estado: 'APROBADO' | 'RECHAZADO', subjectType: DocumentSubjectType, subjectId: string) => {
+    if (!isAnyAdmin) return;
+    const motivoRechazo = estado === 'RECHAZADO' ? window.prompt('Motivo del rechazo', documento.motivoRechazo || '') || 'Documento rechazado' : undefined;
+    setReviewingDocumentId(documento.id);
+    try {
+      await api.patch(`/admin/documentos-regulatorios/${documento.id}/revisar`, { estado, motivoRechazo });
+      toast.success('Documento actualizado', estado === 'APROBADO' ? 'Quedó aprobado' : 'Quedó rechazado');
+      await loadSubjectDocuments(subjectType, subjectId);
+    } catch (error: unknown) {
+      toast.error('Revisión rechazada', documentErrorMessage(error, 'No se pudo revisar el documento'));
+    } finally {
+      setReviewingDocumentId(null);
+    }
+  };
+
+  const openDocumentManager = (target: DocumentManagerTarget) => {
+    const documents = documentsBySubject[target.subjectId] || [];
+    setShowOptionalVehicleDocument(documents.some(documento => documento.tipo === 'AUTORIZACION_USO_VEHICULO'));
+    setDocumentManagerTarget(target);
+  };
+
+  const documentEntry = (subjectType: DocumentSubjectType, subjectId: string, subjectLabel: string, vehicle = false) => {
+    const documents = documentsBySubject[subjectId] || [];
+    const primaryType: DocumentKind = vehicle ? 'TARJETA_IDENTIFICACION_VEHICULO' : 'LICENCIA_CONDUCIR';
+    const primaryFaces = new Set(documents.filter(documento => documento.tipo === primaryType).map(documento => documento.cara));
+    const approvedFaces = new Set(documents.filter(documento => documento.tipo === primaryType && documento.estado === 'APROBADO').map(documento => documento.cara));
+    const completed = primaryFaces.has('FRENTE') && primaryFaces.has('DORSO');
+    return (
+      <div className="flex items-center justify-end gap-2">
+        <span className={`text-xs font-medium ${completed ? 'text-emerald-700' : 'text-neutral-500'}`}>
+          {approvedFaces.size === 2 ? 'Aprobado' : `${primaryFaces.size}/2 caras`}
+        </span>
+        <Button
+          size="sm"
+          variant="outline"
+          leftIcon={completed ? <CheckCircle2 size={14} /> : <FileText size={14} />}
+          onClick={() => openDocumentManager({ subjectType, subjectId, subjectLabel, vehicle })}
+          disabled={!canManageTransportDocuments}
+        >
+          Documentación
+        </Button>
+      </div>
+    );
+  };
+
+  const latestDocument = (tipo: DocumentKind, cara: DocumentFace) => {
+    if (!documentManagerTarget) return undefined;
+    return (documentsBySubject[documentManagerTarget.subjectId] || []).find(documento => documento.tipo === tipo && documento.cara === cara);
+  };
+
+  const renderFaceStep = (tipo: DocumentKind, cara: DocumentFace, step: number, documentLabel: string) => {
+    if (!documentManagerTarget) return null;
+    const documento = latestDocument(tipo, cara);
+    const statusLabel = documento?.estado === 'APROBADO' ? 'Aprobado' : documento?.estado === 'RECHAZADO' ? 'Rechazado' : documento ? 'En revisión' : 'Pendiente';
+    const statusClass = documento?.estado === 'APROBADO'
+      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+      : documento?.estado === 'RECHAZADO'
+        ? 'bg-red-50 text-red-800 border-red-200'
+        : documento
+          ? 'bg-amber-50 text-amber-800 border-amber-200'
+          : 'bg-neutral-50 text-neutral-600 border-neutral-200';
+    const busy = uploadingDocument && uploadTarget?.subjectId === documentManagerTarget.subjectId && uploadTarget.tipo === tipo && uploadTarget.cara === cara;
+    const faceLabel = cara === 'FRENTE' ? 'Frente' : 'Dorso';
+    return (
+      <div className="flex flex-col gap-3 rounded-xl border border-neutral-200 bg-white p-4 sm:flex-row sm:items-center">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${documento ? 'bg-primary-100 text-primary-800' : 'bg-neutral-100 text-neutral-600'}`}>{step}</span>
+          <div className="min-w-0">
+            <p className="font-semibold text-neutral-900">{faceLabel}</p>
+            <p className="text-sm text-neutral-500">{documento?.archivo?.nombreOriginal || `Fotografiá o adjuntá el ${faceLabel.toLowerCase()}`}</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClass}`}>{statusLabel}</span>
+          {documento && (
+            <Button size="sm" variant="ghost" leftIcon={ocrDocumentId === documento.id ? <Loader2 size={14} className="animate-spin" /> : <ScanLine size={14} />} disabled={ocrDocumentId !== null} onClick={() => runDocumentOcr(documento)}>
+              Leer datos
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant={documento ? 'outline' : 'primary'}
+            leftIcon={busy ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+            disabled={uploadingDocument}
+            onClick={() => beginDocumentUpload({ subjectType: documentManagerTarget.subjectType, subjectId: documentManagerTarget.subjectId, tipo, cara, label: `${documentManagerTarget.subjectLabel}: ${documentLabel}, ${faceLabel.toLowerCase()}` })}
+          >
+            {documento ? 'Reemplazar' : 'Adjuntar'}
+          </Button>
+          {isAnyAdmin && documento?.estado === 'PENDIENTE' && (
+            <>
+              <Button size="sm" variant="ghost" disabled={reviewingDocumentId !== null} onClick={() => reviewTransportDocument(documento, 'APROBADO', documentManagerTarget.subjectType, documentManagerTarget.subjectId)}>Aprobar</Button>
+              <Button size="sm" variant="ghost" className="text-red-700 hover:bg-red-50" disabled={reviewingDocumentId !== null} onClick={() => reviewTransportDocument(documento, 'RECHAZADO', documentManagerTarget.subjectType, documentManagerTarget.subjectId)}>Rechazar</Button>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const sortedFlota = useMemo(() => {
     if (!flotaSort) return rawFlota;
@@ -322,6 +535,14 @@ const TransportistaDetallePage: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
+      <input
+        ref={documentInputRef}
+        type="file"
+        accept=".pdf,.jpg,.jpeg,.png"
+        className="hidden"
+        onChange={handleDocumentFile}
+        aria-label="Seleccionar documento regulatorio"
+      />
       {/* Header */}
       <div className="space-y-2">
         <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>
@@ -368,6 +589,7 @@ const TransportistaDetallePage: React.FC = () => {
         <TabList>
           <Tab id="info" icon={<Truck size={16} />}>Información General</Tab>
           <Tab id="flota" icon={<Users size={16} />}>Flota y Conductores</Tab>
+          <Tab id="inspecciones" icon={<ClipboardCheck size={16} />}>Inspecciones</Tab>
           <Tab id="historial" icon={<Route size={16} />}>Trazabilidad</Tab>
         </TabList>
 
@@ -579,7 +801,7 @@ const TransportistaDetallePage: React.FC = () => {
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase cursor-pointer select-none hover:text-primary-600" style={{ width: '10%' }} onClick={() => toggleFlotaSort('estado')}>Estado{flotaSortIcon('estado')}</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden lg:table-cell" style={{ width: '13%' }}>Habilitación</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden lg:table-cell cursor-pointer select-none hover:text-primary-600" style={{ width: '12%' }} onClick={() => toggleFlotaSort('vencimiento')}>Vencimiento{flotaSortIcon('vencimiento')}</th>
-                        {isAdmin && <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase" style={{ width: '18%' }}>Acciones</th>}
+                        {(isAdmin || canManageTransportDocuments) && <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase" style={{ width: '24%' }}>Acciones</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-100">
@@ -595,30 +817,33 @@ const TransportistaDetallePage: React.FC = () => {
                           </td>
                           <td className="px-3 py-2.5 text-neutral-600 hidden lg:table-cell">{v.numeroHabilitacion || '-'}</td>
                           <td className="px-3 py-2.5 text-neutral-600 hidden lg:table-cell">{v.vencimiento ? new Date(v.vencimiento).toLocaleDateString('es-AR') : '-'}</td>
-                          {isAdmin && (
+                          {(isAdmin || canManageTransportDocuments) && (
                             <td className="px-3 py-2.5">
-                              <div className="flex items-center justify-end gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  leftIcon={<Pencil size={14} />}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openEditVehiculo(v);
-                                  }}
-                                >
-                                  Editar
-                                </Button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setDeleteVehiculoItem(v);
-                                  }}
-                                  className="p-2 rounded-lg hover:bg-red-50 text-neutral-400 hover:text-red-600 transition-colors"
-                                  title="Eliminar"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
+                              <div className="flex flex-col items-end gap-2">
+                                {isAdmin && <div className="flex items-center gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    leftIcon={<Pencil size={14} />}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openEditVehiculo(v);
+                                    }}
+                                  >
+                                    Editar
+                                  </Button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeleteVehiculoItem(v);
+                                    }}
+                                    className="p-2 rounded-lg hover:bg-red-50 text-neutral-400 hover:text-red-600 transition-colors"
+                                    title="Eliminar"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>}
+                                {canManageTransportDocuments && documentEntry('vehiculos', v.id, `Patente ${v.patente}`, true)}
                               </div>
                             </td>
                           )}
@@ -648,7 +873,7 @@ const TransportistaDetallePage: React.FC = () => {
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '15%' }}>Licencia</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden lg:table-cell" style={{ width: '14%' }}>Teléfono</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden lg:table-cell cursor-pointer select-none hover:text-primary-600" style={{ width: '16%' }} onClick={() => toggleChoferSort('vencimiento')}>Vto. Licencia{choferSortIcon('vencimiento')}</th>
-                        {isAdmin && <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase" style={{ width: '18%' }}>Acciones</th>}
+                        {(isAdmin || canManageTransportDocuments) && <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase" style={{ width: '24%' }}>Acciones</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-100">
@@ -659,30 +884,33 @@ const TransportistaDetallePage: React.FC = () => {
                           <td className="px-3 py-2.5 text-neutral-700">{c.licencia || '-'}</td>
                           <td className="px-3 py-2.5 text-neutral-700 hidden lg:table-cell">{c.telefono || '-'}</td>
                           <td className="px-3 py-2.5 text-neutral-600 hidden lg:table-cell">{c.vencimiento ? new Date(c.vencimiento).toLocaleDateString('es-AR') : '-'}</td>
-                          {isAdmin && (
+                          {(isAdmin || canManageTransportDocuments) && (
                             <td className="px-3 py-2.5">
-                              <div className="flex items-center justify-end gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  leftIcon={<Pencil size={14} />}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openEditChofer(c);
-                                  }}
-                                >
-                                  Editar
-                                </Button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setDeleteChoferItem(c);
-                                  }}
-                                  className="p-2 rounded-lg hover:bg-red-50 text-neutral-400 hover:text-red-600 transition-colors"
-                                  title="Eliminar"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
+                              <div className="flex flex-col items-end gap-2">
+                                {isAdmin && <div className="flex items-center gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    leftIcon={<Pencil size={14} />}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openEditChofer(c);
+                                    }}
+                                  >
+                                    Editar
+                                  </Button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeleteChoferItem(c);
+                                    }}
+                                    className="p-2 rounded-lg hover:bg-red-50 text-neutral-400 hover:text-red-600 transition-colors"
+                                    title="Eliminar"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>}
+                                {canManageTransportDocuments && documentEntry('choferes', c.id, `${c.nombre} ${c.apellido || ''}`)}
                               </div>
                             </td>
                           )}
@@ -698,6 +926,10 @@ const TransportistaDetallePage: React.FC = () => {
           </div>
         </TabPanel>
 
+        <TabPanel id="inspecciones">
+          <ActorInspectionsPanel actorType="TRANSPORTISTA" actorId={id || ''} actorName={transportista.nombre} />
+        </TabPanel>
+
         {/* Tab: Trazabilidad */}
         <TabPanel id="historial">
           <TrazabilidadTimeline
@@ -707,6 +939,73 @@ const TransportistaDetallePage: React.FC = () => {
           />
         </TabPanel>
       </Tabs>
+
+      <Modal
+        isOpen={!!documentManagerTarget}
+        onClose={() => !uploadingDocument && setDocumentManagerTarget(null)}
+        title={documentManagerTarget ? `Documentación · ${documentManagerTarget.subjectLabel}` : 'Documentación'}
+        description="Completá cada documento en orden: primero el frente y después el dorso. Los archivos quedan en revisión."
+        size="lg"
+        closeOnOverlayClick={!uploadingDocument}
+        closeOnEscape={!uploadingDocument}
+        footer={<Button variant="outline" onClick={() => setDocumentManagerTarget(null)} disabled={uploadingDocument}>Cerrar</Button>}
+      >
+        {documentManagerTarget && (
+          <div className="space-y-5">
+            <div className="rounded-xl border border-primary-100 bg-primary-50/60 p-4">
+              <div className="flex items-start gap-3">
+                <FileText size={20} className="mt-0.5 shrink-0 text-primary-700" />
+                <div>
+                  <p className="font-semibold text-primary-950">
+                    {documentManagerTarget.vehicle ? 'Cédula de identificación del vehículo' : 'Licencia de conducir'}
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-primary-800">
+                    Usá una imagen nítida por cara, con las cuatro esquinas visibles. También podés adjuntar PDF.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <section aria-labelledby="primary-document-title" className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <h4 id="primary-document-title" className="font-semibold text-neutral-900">
+                  {documentManagerTarget.vehicle ? 'Cédula del vehículo' : 'Licencia de conducir'}
+                </h4>
+                <span className="text-xs font-medium text-neutral-500">2 caras</span>
+              </div>
+              {renderFaceStep(documentManagerTarget.vehicle ? 'TARJETA_IDENTIFICACION_VEHICULO' : 'LICENCIA_CONDUCIR', 'FRENTE', 1, documentManagerTarget.vehicle ? 'Cédula del vehículo' : 'Licencia')}
+              {renderFaceStep(documentManagerTarget.vehicle ? 'TARJETA_IDENTIFICACION_VEHICULO' : 'LICENCIA_CONDUCIR', 'DORSO', 2, documentManagerTarget.vehicle ? 'Cédula del vehículo' : 'Licencia')}
+            </section>
+
+            {documentManagerTarget.vehicle && (
+              <section className="border-t border-neutral-200 pt-5">
+                {!showOptionalVehicleDocument ? (
+                  <button
+                    type="button"
+                    className="flex min-h-11 w-full items-center justify-between rounded-xl border border-dashed border-neutral-300 px-4 py-3 text-left text-sm font-semibold text-neutral-700 transition-colors hover:border-primary-400 hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                    onClick={() => setShowOptionalVehicleDocument(true)}
+                  >
+                    <span>¿El vehículo requiere autorización de uso?</span>
+                    <span className="text-primary-700">Agregar documento opcional</span>
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h4 className="font-semibold text-neutral-900">Autorización de uso</h4>
+                        <p className="mt-1 text-sm text-neutral-500">Sólo cuando quien conduce no figura como titular del vehículo.</p>
+                      </div>
+                      <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-semibold text-neutral-600">Opcional</span>
+                    </div>
+                    {renderFaceStep('AUTORIZACION_USO_VEHICULO', 'FRENTE', 1, 'Autorización de uso')}
+                    {renderFaceStep('AUTORIZACION_USO_VEHICULO', 'DORSO', 2, 'Autorización de uso')}
+                  </div>
+                )}
+              </section>
+            )}
+          </div>
+        )}
+      </Modal>
 
       {/* Modal: Nuevo/Editar Vehículo */}
       <Modal

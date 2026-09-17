@@ -32,16 +32,24 @@ export const ESTADO_COLORS: Record<EstadoManifiesto, { bg: string; text: string;
 
 export const ROL_LABELS: Record<Rol, string> = {
   [Rol.ADMIN]: 'Administrador',
+  [Rol.AUDITOR]: 'Auditor',
   [Rol.GENERADOR]: 'Generador',
   [Rol.TRANSPORTISTA]: 'Transportista',
   [Rol.OPERADOR]: 'Operador',
+  [Rol.ADMIN_TRANSPORTISTA]: 'Admin. Transporte',
+  [Rol.ADMIN_GENERADOR]: 'Admin. Generadores',
+  [Rol.ADMIN_OPERADOR]: 'Admin. Operadores',
 };
 
 export const ROL_COLORS: Record<Rol, { bg: string; text: string }> = {
   [Rol.ADMIN]: { bg: 'bg-purple-100', text: 'text-purple-700' },
+  [Rol.AUDITOR]: { bg: 'bg-sky-100', text: 'text-sky-700' },
   [Rol.GENERADOR]: { bg: 'bg-blue-100', text: 'text-blue-700' },
   [Rol.TRANSPORTISTA]: { bg: 'bg-amber-100', text: 'text-amber-700' },
   [Rol.OPERADOR]: { bg: 'bg-emerald-100', text: 'text-emerald-700' },
+  [Rol.ADMIN_TRANSPORTISTA]: { bg: 'bg-orange-100', text: 'text-orange-700' },
+  [Rol.ADMIN_GENERADOR]: { bg: 'bg-violet-100', text: 'text-violet-700' },
+  [Rol.ADMIN_OPERADOR]: { bg: 'bg-cyan-100', text: 'text-cyan-700' },
 };
 
 export const PRIORIDAD_LABELS: Record<PrioridadNotificacion, string> = {

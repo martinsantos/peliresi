@@ -21,6 +21,11 @@ export default function TratadosTab({ data, periodo, onExportPDF }: { data: any;
   const porGenerador = data.porGenerador || {};
   const totalPorTipo = data.totalPorTipo || {};
   const detalle = data.detalle || [];
+  const cantidadesPorUnidad = resumen.totalResiduosTratadosPorUnidad || {};
+  const otrasCantidades = [
+    cantidadesPorUnidad.lt ? `${cantidadesPorUnidad.lt.toLocaleString('es-AR')} lt` : '',
+    cantidadesPorUnidad.un ? `${cantidadesPorUnidad.un.toLocaleString('es-AR')} un` : '',
+  ].filter(Boolean).join(' · ');
 
   const toggleSort = (key: string) => setSortConfig(prev =>
     prev?.key === key ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' }
@@ -57,19 +62,26 @@ export default function TratadosTab({ data, periodo, onExportPDF }: { data: any;
   [porGenerador]);
 
   const tipoData = useMemo(() =>
-    Object.entries(totalPorTipo).map(([name, value], i) => ({
-      name: name.length > 25 ? name.substring(0, 22) + '...' : name,
-      fullName: name,
-      value: value as number,
-      fill: CHART_COLORS[i % CHART_COLORS.length],
-    })),
+    Object.entries(totalPorTipo)
+      .map(([name, value], i) => {
+        const aggregate = typeof value === 'object' && value !== null
+          ? value as { cantidad: number | null; unidad?: string }
+          : null;
+        return {
+          name: name.length > 25 ? name.substring(0, 22) + '...' : name,
+          fullName: name,
+          value: aggregate ? (aggregate.unidad === 'kg' ? Number(aggregate.cantidad) || 0 : 0) : Number(value) || 0,
+          fill: CHART_COLORS[i % CHART_COLORS.length],
+        };
+      })
+      .filter(item => item.value > 0),
   [totalPorTipo]);
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <KpiCard icon={Package} label="Manifiestos Tratados" value={resumen.totalManifiestosTratados || 0} color="from-emerald-600 to-emerald-700" />
-        <KpiCard icon={Activity} label="Residuos Tratados" value={`${(resumen.totalResiduosTratados || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })} kg`} color="from-teal-600 to-teal-700" />
+        <KpiCard icon={Activity} label="Masa tratada" value={`${(resumen.totalResiduosTratados || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })} kg`} color="from-teal-600 to-teal-700" sub={otrasCantidades || 'sin otras magnitudes'} />
         <KpiCard icon={Users} label="Generadores" value={Object.keys(porGenerador).length} color="from-blue-600 to-blue-700" sub="involucrados" />
       </div>
 
@@ -94,7 +106,7 @@ export default function TratadosTab({ data, periodo, onExportPDF }: { data: any;
         </Card>
 
         <Card className="border-0 shadow-sm">
-          <CardHeader title="Distribución por Código de Residuo" subtitle="Proporción de cada tipo tratado" />
+          <CardHeader title="Distribución de masa tratada" subtitle="Solo cantidades compatibles expresadas en kg" />
           <CardContent>
             <div className="max-h-[320px] overflow-y-auto pr-2">
               <CategoryBarChart data={tipoData} maxItems={12} emptyMessage="Sin datos de tipos" />

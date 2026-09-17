@@ -5,26 +5,62 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 import prisma from '../lib/prisma';
 import { generarNumeroManifiesto } from '../utils/manifiestoNumber';
 import { canAccessManifestRecord } from '../utils/authorization';
+import { parseQrPayload } from '../utils/qrPayload';
+import { normalizeUnit } from '../utils/quantities';
 
 // Re-export split modules so existing imports (e.g. routes) continue to work
 export { getManifiestos, getManifiestoById, getDashboardStats, getSyncInicial, getManifiestosEsperados } from './manifiesto-query.controller';
 export { firmarManifiesto, confirmarRetiro, confirmarEntrega, confirmarRecepcion, confirmarRecepcionInSitu, registrarTratamiento, cerrarManifiesto, rechazarCarga, registrarIncidente, revertirEstado, registrarPesaje, cancelarManifiesto } from './manifiesto-workflow.controller';
 export { actualizarUbicacion, getViajeActual } from './manifiesto-gps.controller';
 
+const unitSchema = z.string().trim().transform((value, ctx) => {
+  const normalized = normalizeUnit(value);
+  if (!normalized) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Unidad invalida. Use kg, tn, lt o un',
+    });
+    return z.NEVER;
+  }
+  return normalized;
+});
+
+const quantitySchema = z.preprocess(
+  value => typeof value === 'string' && value.trim() !== '' ? Number(value) : value,
+  z.number().finite('La cantidad debe ser numerica').positive('La cantidad debe ser mayor a 0'),
+);
+
+const residuoInputSchema = z.object({
+  tipoResiduoId: z.string().min(1, 'El tipo de residuo es requerido'),
+  cantidad: quantitySchema,
+  unidad: unitSchema,
+  descripcion: z.string().max(1000).optional(),
+});
+
 // Zod schemas for input validation
 const createManifiestoSchema = z.object({
   generadorId: z.string().min(1, 'El generador es requerido').optional(),
   transportistaId: z.string().min(1, 'El transportista es requerido').optional(),
-  operadorId: z.string().min(1, 'El operador es requerido'),
+  operadorId: z.string().min(1, 'El operador es requerido').optional(),
+  alcanceTratamiento: z.enum(['NACIONAL', 'INTERNACIONAL']).optional().default('NACIONAL'),
+  transportistaExteriorId: z.string().min(1).optional(),
+  operadorExteriorId: z.string().min(1).optional(),
+  declaracionTratamientoInternacional: z.string().trim().max(4000).optional(),
   modalidad: z.enum(['FIJO', 'IN_SITU']).optional().default('FIJO'),
   fechaEstimadaRetiro: z.string().optional(),
   observaciones: z.string().max(1000).optional(),
-  residuos: z.array(z.object({
-    tipoResiduoId: z.string().min(1, 'El tipo de residuo es requerido'),
-    cantidad: z.number().positive('La cantidad debe ser mayor a 0'),
-    unidad: z.string().min(1, 'La unidad es requerida'),
-    descripcion: z.string().optional(),
-  })).min(1, 'Debe incluir al menos un residuo'),
+  residuos: z.array(residuoInputSchema).min(1, 'Debe incluir al menos un residuo'),
+});
+
+const updateManifiestoSchema = z.object({
+  transportistaId: z.string().min(1).nullable().optional(),
+  operadorId: z.string().min(1).optional(),
+  alcanceTratamiento: z.enum(['NACIONAL', 'INTERNACIONAL']).optional(),
+  transportistaExteriorId: z.string().min(1).nullable().optional(),
+  operadorExteriorId: z.string().min(1).nullable().optional(),
+  declaracionTratamientoInternacional: z.string().trim().max(4000).nullable().optional(),
+  observaciones: z.string().max(1000).nullable().optional(),
+  residuos: z.array(residuoInputSchema).min(1, 'Debe incluir al menos un residuo').optional(),
 });
 
 // generarNumeroManifiesto moved to ../utils/manifiestoNumber.ts (O(1) via findFirst+orderBy)
@@ -104,21 +140,48 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
       throw new AppError(parsed.error.issues[0].message, 400);
     }
 
-    const { generadorId: bodyGeneradorId, transportistaId, operadorId, modalidad, residuos, observaciones, fechaEstimadaRetiro } = parsed.data;
+    const { generadorId: bodyGeneradorId, transportistaId, operadorId, alcanceTratamiento, transportistaExteriorId, operadorExteriorId, declaracionTratamientoInternacional, modalidad, residuos, observaciones, fechaEstimadaRetiro } = parsed.data;
     const userId = req.user.id;
 
     // Verificar que el usuario es un generador o admin
-    if (req.user.rol !== 'GENERADOR' && req.user.rol !== 'ADMIN') {
+    if (req.user.rol !== 'GENERADOR' && req.user.rol !== 'ADMIN' && req.user.rol !== 'ADMIN_GENERADOR') {
       throw new AppError('Solo los generadores pueden crear manifiestos', 403);
     }
 
     // ADMIN can specify generadorId in body; GENERADOR uses their own
-    const generadorId = req.user.rol === 'ADMIN'
+    const generadorId = (req.user.rol === 'ADMIN' || req.user.rol === 'ADMIN_GENERADOR')
       ? (bodyGeneradorId || (req.user.generador && req.user.generador.id))
       : req.user.generador?.id;
 
     if (!generadorId) {
       throw new AppError('Se requiere un generador para crear el manifiesto', 400);
+    }
+
+    const generador = await prisma.generador.findUnique({ where: { id: generadorId }, select: { id: true, alcanceTratamiento: true, activo: true } });
+    if (!generador) throw new AppError('Generador no encontrado', 404);
+    if (!generador.activo) throw new AppError('El generador está pendiente de habilitación o inactivo', 400);
+    if (transportistaId) {
+      const transportista = await prisma.transportista.findUnique({ where: { id: transportistaId }, select: { activo: true } });
+      if (!transportista?.activo) throw new AppError('El transportista está pendiente de habilitación o inactivo', 400);
+    }
+
+    const esInternacional = alcanceTratamiento === 'INTERNACIONAL';
+    if (esInternacional) {
+      if (generador.alcanceTratamiento !== 'INTERNACIONAL') throw new AppError('GENERADOR_SIN_HABILITACION_INTERNACIONAL', 400);
+      if (modalidad === 'IN_SITU') throw new AppError('El tratamiento internacional requiere modalidad FIJO', 400);
+      if (transportistaId || operadorId) throw new AppError('No mezcle actores locales y exteriores en un manifiesto internacional', 400);
+      if (!transportistaExteriorId || !operadorExteriorId) throw new AppError('ACTOR_EXTERIOR_REQUERIDO', 400);
+      if (!declaracionTratamientoInternacional) throw new AppError('DECLARACION_INTERNACIONAL_REQUERIDA', 400);
+      const [transportistaExterior, operadorExterior] = await Promise.all([
+        prisma.entidadExterior.findUnique({ where: { id: transportistaExteriorId }, select: { tipo: true, estado: true } }),
+        prisma.entidadExterior.findUnique({ where: { id: operadorExteriorId }, select: { tipo: true, estado: true } }),
+      ]);
+      if (transportistaExterior?.tipo !== 'TRANSPORTISTA' || transportistaExterior.estado !== 'APROBADO') throw new AppError('ACTOR_EXTERIOR_NO_APROBADO', 400);
+      if (operadorExterior?.tipo !== 'OPERADOR' || operadorExterior.estado !== 'APROBADO') throw new AppError('ACTOR_EXTERIOR_NO_APROBADO', 400);
+    } else if (!operadorId) {
+      throw new AppError('El operador es requerido', 400);
+    } else if (transportistaExteriorId || operadorExteriorId || declaracionTratamientoInternacional) {
+      throw new AppError('Los datos de tratamiento internacional requieren alcance INTERNACIONAL', 400);
     }
 
     // Modalidad validation
@@ -129,7 +192,7 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
       if (transportistaId) {
         throw new AppError('No se debe asignar transportista para modalidad IN_SITU', 400);
       }
-      const op = await prisma.operador.findUnique({ where: { id: operadorId }, select: { modalidades: true } });
+      const op = await prisma.operador.findUnique({ where: { id: operadorId! }, select: { modalidades: true } });
       if (!op?.modalidades?.includes('IN_SITU')) {
         throw new AppError('El operador no está habilitado para trabajar in situ', 400);
       }
@@ -137,10 +200,11 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
 
     // Validate operador can handle all selected residuos
     const tipoResiduoIds = residuos.map((r: { tipoResiduoId: string }) => r.tipoResiduoId);
-    const operador = await prisma.operador.findUnique({
+    const operador = operadorId ? await prisma.operador.findUnique({
       where: { id: operadorId },
       include: { tratamientos: { where: { activo: true } } },
-    });
+    }) : null;
+    if (operadorId && !operador?.activo) throw new AppError('El operador está pendiente de habilitación o inactivo', 400);
     if (operador) {
       const operadorResiduoIds = new Set(operador.tratamientos.map((t: any) => t.tipoResiduoId));
       const unsupported = tipoResiduoIds.filter((id: string) => !operadorResiduoIds.has(id));
@@ -160,7 +224,11 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
         numero,
         generadorId,
         transportistaId: modalidad === 'IN_SITU' ? null : transportistaId,
-        operadorId,
+        operadorId: esInternacional ? null : operadorId,
+        alcanceTratamiento,
+        transportistaExteriorId: esInternacional ? transportistaExteriorId : null,
+        operadorExteriorId: esInternacional ? operadorExteriorId : null,
+        declaracionTratamientoInternacional: esInternacional ? declaracionTratamientoInternacional : null,
         modalidad,
         observaciones,
         fechaEstimadaRetiro: fechaEstimadaRetiro ? new Date(fechaEstimadaRetiro) : null,
@@ -221,7 +289,25 @@ export const updateManifiesto = async (req: AuthRequest, res: Response, next: Ne
       throw new AppError('Solo se pueden editar manifiestos en estado BORRADOR', 400);
     }
 
-    const { transportistaId, operadorId, observaciones, residuos } = req.body;
+    const parsed = updateManifiestoSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError(parsed.error.issues[0].message, 400);
+    }
+
+    const { transportistaId, operadorId, alcanceTratamiento, transportistaExteriorId, operadorExteriorId, declaracionTratamientoInternacional, observaciones, residuos } = parsed.data;
+    const nextScope = alcanceTratamiento || manifiesto.alcanceTratamiento;
+    const generador = await prisma.generador.findUnique({ where: { id: manifiesto.generadorId }, select: { alcanceTratamiento: true } });
+    if (nextScope === 'INTERNACIONAL') {
+      if (generador?.alcanceTratamiento !== 'INTERNACIONAL') throw new AppError('GENERADOR_SIN_HABILITACION_INTERNACIONAL', 400);
+      const finalTransportistaExterior = transportistaExteriorId === undefined ? manifiesto.transportistaExteriorId : transportistaExteriorId;
+      const finalOperadorExterior = operadorExteriorId === undefined ? manifiesto.operadorExteriorId : operadorExteriorId;
+      const finalDeclaracion = declaracionTratamientoInternacional === undefined ? manifiesto.declaracionTratamientoInternacional : declaracionTratamientoInternacional;
+      if (!finalTransportistaExterior || !finalOperadorExterior) throw new AppError('ACTOR_EXTERIOR_REQUERIDO', 400);
+      if (!finalDeclaracion?.trim()) throw new AppError('DECLARACION_INTERNACIONAL_REQUERIDA', 400);
+      if (transportistaId || operadorId) throw new AppError('No mezcle actores locales y exteriores en un manifiesto internacional', 400);
+    } else if (!operadorId && !manifiesto.operadorId) {
+      throw new AppError('El operador es requerido', 400);
+    }
 
     const updated = await prisma.$transaction(async (tx) => {
       // Actualizar residuos si se proporcionan
@@ -244,8 +330,12 @@ export const updateManifiesto = async (req: AuthRequest, res: Response, next: Ne
       return tx.manifiesto.update({
         where: { id },
         data: {
-          ...(transportistaId && { transportistaId }),
-          ...(operadorId && { operadorId }),
+          ...(transportistaId !== undefined && { transportistaId }),
+          ...(operadorId !== undefined && { operadorId }),
+          ...(alcanceTratamiento && { alcanceTratamiento }),
+          ...(transportistaExteriorId !== undefined && { transportistaExteriorId }),
+          ...(operadorExteriorId !== undefined && { operadorExteriorId }),
+          ...(declaracionTratamientoInternacional !== undefined && { declaracionTratamientoInternacional }),
           ...(observaciones !== undefined && { observaciones }),
         },
         include: {
@@ -293,27 +383,28 @@ export const deleteManifiesto = async (req: AuthRequest, res: Response, next: Ne
 // Validar QR de manifiesto (para validacion offline/online) - CU-T08
 export const validarQR = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { qrData } = req.body;
+    // `code` was used by an older PWA bundle. Accept it during the rollout,
+    // while the canonical contract remains `{ qrData }`.
+    const qrData = typeof req.body?.qrData === 'string' ? req.body.qrData : req.body?.code;
 
-    if (!qrData) {
+    if (typeof qrData !== 'string' || !qrData.trim()) {
       throw new AppError('Datos de QR requeridos', 400);
     }
 
-    // Intentar parsear el QR
-    let qrInfo;
-    try {
-      qrInfo = JSON.parse(qrData);
-    } catch {
+    const qrInfo = parseQrPayload(qrData);
+    if (!qrInfo) {
       throw new AppError('Formato de QR invalido', 400);
     }
+
+    const identityFilters = [
+      qrInfo.id ? { id: qrInfo.id } : null,
+      qrInfo.numero ? { numero: qrInfo.numero } : null,
+    ].filter(Boolean) as Array<{ id: string } | { numero: string }>;
 
     // Buscar manifiesto por numero o ID
     const manifiesto = await prisma.manifiesto.findFirst({
       where: {
-        OR: [
-          { id: qrInfo.id },
-          { numero: qrInfo.numero }
-        ]
+        OR: identityFilters,
       },
       include: {
         generador: {
@@ -330,6 +421,12 @@ export const validarQR = async (req: AuthRequest, res: Response, next: NextFunct
         operador: {
           select: {
             razonSocial: true
+          }
+        },
+        operadorExterior: {
+          select: {
+            razonSocial: true,
+            pais: true,
           }
         },
         residuos: {
@@ -353,9 +450,13 @@ export const validarQR = async (req: AuthRequest, res: Response, next: NextFunct
       throw new AppError('No tiene permisos sobre este manifiesto', 403);
     }
 
-    // Verificar que el QR corresponde al manifiesto
-    const isValid = manifiesto.qrCode === qrData ||
-      (qrInfo.numero === manifiesto.numero && qrInfo.id === manifiesto.id);
+    // The QR payload is an identity reference; authorization is still checked
+    // above. URL/number payloads are supported for the public verification QR,
+    // while legacy JSON remains valid when both identifiers match.
+    const isValid = Boolean(
+      (qrInfo.numero && qrInfo.numero === manifiesto.numero) ||
+      (qrInfo.id && qrInfo.id === manifiesto.id && (!qrInfo.numero || qrInfo.numero === manifiesto.numero))
+    );
 
     res.json({
       success: true,
@@ -367,7 +468,7 @@ export const validarQR = async (req: AuthRequest, res: Response, next: NextFunct
           estado: manifiesto.estado,
           generador: manifiesto.generador.razonSocial,
           transportista: manifiesto.transportista?.razonSocial ?? null,
-          operador: manifiesto.operador.razonSocial,
+          operador: manifiesto.operador?.razonSocial || manifiesto.operadorExterior?.razonSocial || null,
           residuos: manifiesto.residuos.map(r => ({
             tipo: r.tipoResiduo.nombre,
             cantidad: r.cantidad,

@@ -16,20 +16,24 @@ import {
   Download,
   HelpCircle,
   RotateCcw,
+  BellRing,
+  CheckCircle2,
+  AlertTriangle,
+  Send,
+  BellOff,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
-import { Badge } from '../../components/ui/BadgeV2';
 import { resetOnboardingTour } from '../../components/OnboardingTour';
-import { resetDemoOnboarding } from '../../components/DemoAppOnboarding';
 import { toast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { InstallPWAButton } from '../../components/InstallPWAButton';
-import { usePWAInstall } from '../../hooks/usePWAInstall';
 import { authService } from '../../services/auth.service';
 import api from '../../services/api';
 import { usuarioService } from '../../services/usuario.service';
+import { usePushNotifications } from '../../hooks/usePushNotifications';
+import { hasStoredImpersonationSession } from '../../utils/impersonationNavigation';
 
 /** Extended user profile fields from /auth/profile (notification preferences) */
 interface UserWithPreferences {
@@ -40,6 +44,11 @@ interface UserWithPreferences {
   whatsappPhone?: string;
   telegramChatId?: string;
 }
+
+const resetRoleOnboarding = () => {
+  ['ADMIN', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'AUDITOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR']
+    .forEach(role => localStorage.removeItem(`sitrep_onboarding_${role}`));
+};
 
 // Secciones base de configuración
 const BASE_SECTIONS = [
@@ -64,6 +73,8 @@ const ConfiguracionPage: React.FC = () => {
   const [telegramChatId, setTelegramChatId] = useState('');
   const [savingNotif, setSavingNotif] = useState(false);
   const { currentUser, isAdmin } = useAuth();
+  const isImpersonating = hasStoredImpersonationSession();
+  const push = usePushNotifications();
 
   // Profile form state
   const [profile, setProfile] = useState({
@@ -120,6 +131,10 @@ const ConfiguracionPage: React.FC = () => {
   };
 
   const handleChangePassword = async () => {
+    if (isImpersonating) {
+      toast.warning('Acción bloqueada', 'No se pueden modificar credenciales durante una impersonación.');
+      return;
+    }
     if (passwordForm.nueva !== passwordForm.confirmar) {
       toast.error('Error', 'Las contraseñas no coinciden');
       return;
@@ -189,6 +204,11 @@ const ConfiguracionPage: React.FC = () => {
           <div className="space-y-6 animate-fade-in">
             <div>
               <h4 className="font-medium text-neutral-900 mb-4">Cambiar contraseña</h4>
+              {isImpersonating && (
+                <div role="status" className="mb-4 max-w-xl rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                  Las credenciales están protegidas durante la impersonación. Volvé a tu cuenta de administrador para gestionar este usuario.
+                </div>
+              )}
               <div className="space-y-4 max-w-md">
                 <Input
                   type="password"
@@ -196,6 +216,7 @@ const ConfiguracionPage: React.FC = () => {
                   placeholder="••••••••"
                   value={passwordForm.current}
                   onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })}
+                  disabled={isImpersonating}
                 />
                 <Input
                   type="password"
@@ -203,6 +224,7 @@ const ConfiguracionPage: React.FC = () => {
                   placeholder="••••••••"
                   value={passwordForm.nueva}
                   onChange={(e) => setPasswordForm({ ...passwordForm, nueva: e.target.value })}
+                  disabled={isImpersonating}
                 />
                 <Input
                   type="password"
@@ -210,8 +232,9 @@ const ConfiguracionPage: React.FC = () => {
                   placeholder="••••••••"
                   value={passwordForm.confirmar}
                   onChange={(e) => setPasswordForm({ ...passwordForm, confirmar: e.target.value })}
+                  disabled={isImpersonating}
                 />
-                <Button onClick={handleChangePassword}>Cambiar contraseña</Button>
+                <Button onClick={handleChangePassword} disabled={isImpersonating}>Cambiar contraseña</Button>
               </div>
             </div>
           </div>
@@ -241,7 +264,7 @@ const ConfiguracionPage: React.FC = () => {
                   leftIcon={<RotateCcw size={16} />}
                   onClick={() => {
                     resetOnboardingTour();
-                    resetDemoOnboarding();
+                    resetRoleOnboarding();
                     toast.success('Tour reiniciado', 'El tour se mostrara al recargar la pagina.');
                   }}
                 >
@@ -276,6 +299,94 @@ const ConfiguracionPage: React.FC = () => {
       case 'notificaciones':
         return (
           <div className="space-y-6 animate-fade-in">
+            <div>
+              <h4 className="font-medium text-neutral-900 mb-1">Notificaciones push en este dispositivo</h4>
+              <p className="text-sm text-neutral-500 mb-4">
+                Recibí alertas de manifiestos aun cuando la aplicación esté en segundo plano. Cada teléfono o navegador se activa por separado.
+              </p>
+              <div className="p-4 bg-white rounded-xl border border-neutral-200">
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 rounded-lg ${
+                    push.status === 'subscribed'
+                      ? 'bg-success-50 text-success-600'
+                      : push.status === 'denied' || push.status === 'error'
+                        ? 'bg-error-50 text-error-600'
+                        : 'bg-primary-50 text-primary-600'
+                  }`}>
+                    {push.status === 'subscribed' ? <CheckCircle2 size={20} />
+                      : push.status === 'denied' ? <BellOff size={20} />
+                        : push.status === 'error' ? <AlertTriangle size={20} />
+                          : <BellRing size={20} />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-neutral-900 text-sm">
+                      {push.status === 'checking' && 'Comprobando este dispositivo…'}
+                      {push.status === 'subscribed' && 'Notificaciones activas'}
+                      {push.status === 'prompt' && 'Listas para activar'}
+                      {push.status === 'denied' && 'Permiso bloqueado'}
+                      {push.status === 'unsupported' && 'Este navegador no admite notificaciones push'}
+                      {push.status === 'unavailable' && 'Servicio de notificaciones no disponible'}
+                      {push.status === 'error' && 'No se pudo completar la operación'}
+                    </p>
+                    <p className="text-xs text-neutral-500 mt-1">
+                      {push.status === 'subscribed' && 'Podés bloquear el teléfono y usar “Enviar prueba” para comprobar la recepción en reposo.'}
+                      {push.status === 'prompt' && 'Tocá “Activar notificaciones” y aceptá el permiso del sistema.'}
+                      {push.status === 'denied' && 'Habilitá las notificaciones para SITREP desde los ajustes del navegador o del sistema y volvé a esta pantalla.'}
+                      {push.status === 'unsupported' && 'En iPhone o iPad, instalá SITREP en la pantalla de inicio y abrila desde su icono.'}
+                      {push.status === 'unavailable' && 'Recargá la aplicación para terminar de instalar el servicio y reintentá.'}
+                      {push.status === 'checking' && 'La aplicación no solicitará permisos sin una acción tuya.'}
+                      {push.status === 'error' && (push.error || 'Reintentá o recargá la aplicación.')}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 mt-4">
+                  {(push.status === 'prompt' || push.status === 'error') && (
+                    <Button
+                      size="sm"
+                      leftIcon={<BellRing size={16} />}
+                      isLoading={push.busyAction === 'activate'}
+                      onClick={async () => {
+                        if (await push.activate()) toast.success('Notificaciones activadas', 'Este dispositivo quedó asociado a tu usuario actual.');
+                      }}
+                    >
+                      Activar notificaciones
+                    </Button>
+                  )}
+                  {push.status === 'subscribed' && (
+                    <>
+                      <Button
+                        size="sm"
+                        leftIcon={<Send size={16} />}
+                        isLoading={push.busyAction === 'test'}
+                        onClick={async () => {
+                          if (await push.sendTest()) toast.success('Prueba enviada', 'Bloqueá el teléfono para comprobar la recepción en reposo.');
+                        }}
+                      >
+                        Enviar prueba
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        leftIcon={<BellOff size={16} />}
+                        isLoading={push.busyAction === 'deactivate'}
+                        onClick={async () => {
+                          if (await push.deactivate()) toast.success('Notificaciones desactivadas', 'Este dispositivo dejó de recibir alertas push.');
+                        }}
+                      >
+                        Desactivar
+                      </Button>
+                    </>
+                  )}
+                  {push.status === 'unavailable' && (
+                    <Button size="sm" variant="outline" onClick={() => void push.refresh()}>
+                      Reintentar
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Visible a todos los usuarios */}
             <div>
               <h4 className="font-medium text-neutral-900 mb-1">Alertas del sistema</h4>

@@ -326,6 +326,66 @@ describe('ManifiestoWorkflowController', () => {
         expect.objectContaining({ statusCode: 403 })
       );
     });
+
+    it('rejects a partial weighing', async () => {
+      const { req, res, next } = createMocks({ rol: 'OPERADOR' });
+      req.params = { id: 'man-1' };
+      req.body = { residuos: [{ id: 'r-1', cantidadRecibida: 10 }] };
+      mockFindUnique.mockResolvedValue({
+        id: 'man-1', estado: 'ENTREGADO',
+        residuos: [
+          { id: 'r-1', cantidad: 10, unidad: 'kg' },
+          { id: 'r-2', cantidad: 20, unidad: 'kg' },
+        ],
+      });
+
+      await registrarPesaje(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(expect.objectContaining({
+        statusCode: 400,
+        message: expect.stringContaining('todos los residuos'),
+      }));
+    });
+
+    it('rejects duplicate residue IDs', async () => {
+      const { req, res, next } = createMocks({ rol: 'OPERADOR' });
+      req.params = { id: 'man-1' };
+      req.body = { residuos: [
+        { id: 'r-1', cantidadRecibida: 10 },
+        { id: 'r-1', cantidadRecibida: 10 },
+      ] };
+      mockFindUnique.mockResolvedValue({
+        id: 'man-1', estado: 'ENTREGADO',
+        residuos: [
+          { id: 'r-1', cantidad: 10, unidad: 'kg' },
+          { id: 'r-2', cantidad: 20, unidad: 'kg' },
+        ],
+      });
+
+      await registrarPesaje(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(expect.objectContaining({
+        statusCode: 400,
+        message: expect.stringContaining('dos veces'),
+      }));
+    });
+
+    it('rejects weighing non-mass quantities', async () => {
+      const { req, res, next } = createMocks({ rol: 'OPERADOR' });
+      req.params = { id: 'man-1' };
+      req.body = { residuos: [{ id: 'r-1', cantidadRecibida: 10 }] };
+      mockFindUnique.mockResolvedValue({
+        id: 'man-1', estado: 'ENTREGADO',
+        residuos: [{ id: 'r-1', cantidad: 10, unidad: 'lt' }],
+      });
+
+      await registrarPesaje(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(expect.objectContaining({
+        statusCode: 400,
+        message: expect.stringContaining('kg o tn'),
+      }));
+    });
   });
 
   describe('cancelarManifiesto', () => {

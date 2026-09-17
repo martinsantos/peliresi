@@ -13,7 +13,6 @@ import {
   Check,
   AlertCircle,
   Info,
-  X,
   Loader2,
   Settings,
   Plus,
@@ -25,7 +24,7 @@ import {
   ChevronRight,
   Calendar,
 } from 'lucide-react';
-import { Card, CardContent } from '../../components/ui/CardV2';
+import { Card } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Modal, ConfirmModal } from '../../components/ui/Modal';
@@ -37,8 +36,8 @@ import { toast } from '../../components/ui/Toast';
 import { useAlertas, useResolverAlerta, useReglasAlerta, useCreateReglaAlerta, useUpdateReglaAlerta, useDeleteReglaAlerta } from '../../hooks/useAlertas';
 import { useNotificaciones, useMarcarLeida, useMarcarTodasLeidas } from '../../hooks/useNotificaciones';
 import { useAuth } from '../../contexts/AuthContext';
-import { alertaService } from '../../services/alerta.service';
 import { formatRelativeTime } from '../../utils/formatters';
+import type { ReglaAlerta } from '../../types/models';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -123,7 +122,7 @@ function getTipoFromEvento(evento: string | undefined, estado: string): AlertaLo
 
 function parseMensaje(datosRaw: string | undefined | null, evento?: string): string {
   if (!datosRaw) return 'Sin detalles';
-  let d: Record<string, any> = {};
+  let d: Record<string, unknown> = {};
   try {
     d = typeof datosRaw === 'string' ? JSON.parse(datosRaw) : datosRaw;
   } catch {
@@ -133,16 +132,16 @@ function parseMensaje(datosRaw: string | undefined | null, evento?: string): str
   const num = d.numero ? `Manifiesto ${d.numero}` : '';
   switch (evento) {
     case 'CAMBIO_ESTADO': {
-      const de = d.estadoAnterior ? d.estadoAnterior.replace(/_/g, ' ') : '?';
-      const a = d.estadoNuevo ? d.estadoNuevo.replace(/_/g, ' ') : '?';
+      const de = d.estadoAnterior ? String(d.estadoAnterior).replace(/_/g, ' ') : '?';
+      const a = d.estadoNuevo ? String(d.estadoNuevo).replace(/_/g, ' ') : '?';
       return `${de} → ${a}${num ? ` · ${num}` : ''}`;
     }
     case 'INCIDENTE':
-      return `Incidente en tránsito${num ? ` · ${num}` : ''}${d.tipo ? ` — ${d.tipo}` : ''}`;
+      return `Incidente en tránsito${num ? ` · ${num}` : ''}${d.tipo ? ` — ${String(d.tipo)}` : ''}`;
     case 'RECHAZO_CARGA':
-      return `Rechazo de carga${num ? ` · ${num}` : ''}${d.motivo ? ` — ${d.motivo}` : ''}`;
+      return `Rechazo de carga${num ? ` · ${num}` : ''}${d.motivo ? ` — ${String(d.motivo)}` : ''}`;
     case 'DIFERENCIA_PESO':
-      return `Diferencia de peso${num ? ` · ${num}` : ''}${d.delta ? ` (${d.delta})` : ''}`;
+      return `Diferencia de peso${num ? ` · ${num}` : ''}${d.delta ? ` (${String(d.delta)})` : ''}`;
     case 'TIEMPO_EXCESIVO':
       return `Tiempo excesivo en tránsito${num ? ` · ${num}` : ''}`;
     case 'ANOMALIA_GPS':
@@ -260,13 +259,14 @@ function periodStart(period: string): Date | null {
 
 export const AlertasPage: React.FC = () => {
   const navigate = useNavigate();
-  const { isAdmin, isAnyAdmin } = useAuth();
+  const { isAuditor, isAnyAdmin } = useAuth();
+  const showsSystemAlerts = isAnyAdmin || isAuditor;
 
   // Any admin role: alertas generadas por reglas | Non-admin: notificaciones del usuario
-  const { data: apiAlertas, isLoading: isLoadingAlertas, isError: isErrorAlertas } = useAlertas(undefined, isAnyAdmin);
+  const { data: apiAlertas, isLoading: isLoadingAlertas, isError: isErrorAlertas } = useAlertas(undefined, showsSystemAlerts);
   const { data: apiNotifs, isLoading: isLoadingNotifs, isError: isErrorNotifs } = useNotificaciones(undefined);
-  const isLoading = isAnyAdmin ? isLoadingAlertas : isLoadingNotifs;
-  const isError = isAnyAdmin ? isErrorAlertas : isErrorNotifs;
+  const isLoading = showsSystemAlerts ? isLoadingAlertas : isLoadingNotifs;
+  const isError = showsSystemAlerts ? isErrorAlertas : isErrorNotifs;
   const resolverMutation = useResolverAlerta();
   const marcarLeidaMutation = useMarcarLeida();
   const marcarTodasLeidasMutation = useMarcarTodasLeidas();
@@ -278,40 +278,33 @@ export const AlertasPage: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState('alertas');
   const [showReglaModal, setShowReglaModal] = useState(false);
-  const [editingRegla, setEditingRegla] = useState<any | null>(null);
-  const [deletingRegla, setDeletingRegla] = useState<any | null>(null);
+  const [editingRegla, setEditingRegla] = useState<ReglaAlerta | null>(null);
+  const [deletingRegla, setDeletingRegla] = useState<ReglaAlerta | null>(null);
   const [reglaForm, setReglaForm] = useState(defaultReglaForm);
 
-  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
 
   // Filters
   const [periodo, setPeriodo] = useState<string>('30d');
   const [filtroEvento, setFiltroEvento] = useState<string>('');
   const [filtroLeidas, setFiltroLeidas] = useState<string>('todas');
-  const [showClearModal, setShowClearModal] = useState(false);
 
   // Pagination
   const [page, setPage] = useState(1);
 
   const alertas: AlertaLocal[] = useMemo(() => {
-    if (!isAnyAdmin) {
+    if (!showsSystemAlerts) {
       // Non-admin: map notificaciones to AlertaLocal format
-      const notifs = Array.isArray(apiNotifs) ? apiNotifs
-        : (apiNotifs as { items?: unknown[]; data?: { notificaciones?: unknown[] }; notificaciones?: unknown[] })?.items
-          || (apiNotifs as { data?: { notificaciones?: unknown[] } })?.data?.notificaciones
-          || (apiNotifs as { notificaciones?: unknown[] })?.notificaciones
-          || [];
+      const notifs = apiNotifs?.items || [];
       return notifs
-        .filter((n: any) => !deletedIds.has(n.id))
-        .map((n: any) => ({
+        .map((n) => ({
           id: n.id,
           tipo: getTipoFromNotifTipo(n.tipo),
           titulo: n.titulo || 'Notificacion',
           mensaje: n.mensaje || '',
           fecha: n.createdAt,
           leida: n.leida || false,
-          manifiestoId: n.manifiestoId,
+          manifiestoId: n.manifiestoId || undefined,
           manifiestoNumero: undefined,
           evento: n.tipo,
           estado: n.leida ? 'RESUELTA' : 'PENDIENTE',
@@ -320,8 +313,7 @@ export const AlertasPage: React.FC = () => {
     // Admin: alertas generadas by rules
     const items = Array.isArray(apiAlertas?.items) ? apiAlertas.items : [];
     return items
-      .filter((a: any) => !deletedIds.has(a.id))
-      .map((a: any) => {
+      .map((a) => {
         const evento = a.regla?.evento;
         const estado = resolvedIds.has(a.id) ? 'RESUELTA' : (a.estado || 'PENDIENTE');
         return {
@@ -337,7 +329,7 @@ export const AlertasPage: React.FC = () => {
           estado,
         };
       });
-  }, [isAnyAdmin, apiAlertas, apiNotifs, deletedIds, resolvedIds]);
+  }, [showsSystemAlerts, apiAlertas, apiNotifs, resolvedIds]);
 
   const alertasFiltradas = useMemo(() => {
     const since = periodStart(periodo);
@@ -358,14 +350,15 @@ export const AlertasPage: React.FC = () => {
 
   const noLeidasCount = alertas.filter(a => !a.leida).length;
 
-  const changeFilter = (setter: (v: any) => void, v: any) => {
-    setter(v);
+  const changeFilter = <T,>(setter: (value: T) => void, value: T) => {
+    setter(value);
     setPage(1);
   };
 
   // ─── Actions ───────────────────────────────────────────────────────────────
 
   const marcarComoLeida = (id: string) => {
+    if (isAuditor) return;
     if (!isAnyAdmin) {
       marcarLeidaMutation.mutate(id, {
         onSuccess: () => {
@@ -390,28 +383,39 @@ export const AlertasPage: React.FC = () => {
     );
   };
 
-  const marcarTodasComoLeidas = () => {
-    alertas.filter(a => !a.leida).forEach(a => {
-      resolverMutation.mutate(
-        { id: a.id, notas: 'Marcada como leida (batch)' },
-        { onSuccess: () => setResolvedIds(prev => new Set(prev).add(a.id)) }
-      );
-    });
-    toast.success('Listo', 'Todas las alertas fueron marcadas como leídas');
-  };
+  const marcarTodasComoLeidas = async () => {
+    if (isAuditor) return;
+    const pendientes = alertas.filter(a => !a.leida);
+    if (pendientes.length === 0) return;
 
-  const eliminarAlerta = (id: string) => {
-    alertaService.resolverAlerta(id, 'Eliminada por usuario').then(() => {
-      setDeletedIds(prev => new Set(prev).add(id));
-    }).catch(() => {
-      setDeletedIds(prev => new Set(prev).add(id));
-    });
-  };
+    if (!showsSystemAlerts) {
+      try {
+        await marcarTodasLeidasMutation.mutateAsync();
+        toast.success('Listo', 'Todas las notificaciones fueron marcadas como leídas');
+      } catch {
+        toast.error('No se pudo completar la acción', 'Las notificaciones conservan su estado anterior');
+      }
+      return;
+    }
 
-  const limpiarTodas = () => {
-    setDeletedIds(new Set(alertas.map(a => a.id)));
-    setShowClearModal(false);
-    toast.success('Alertas limpiadas', 'Se eliminaron todas las alertas');
+    const results = await Promise.allSettled(
+      pendientes.map(alerta => resolverMutation.mutateAsync({
+        id: alerta.id,
+        notas: 'Marcada como leída desde la lista',
+      }))
+    );
+    const resolved = pendientes
+      .filter((_, index) => results[index].status === 'fulfilled')
+      .map(alerta => alerta.id);
+    if (resolved.length > 0) {
+      setResolvedIds(prev => new Set([...prev, ...resolved]));
+    }
+    const failed = results.length - resolved.length;
+    if (failed === 0) {
+      toast.success('Listo', 'Todas las alertas fueron marcadas como leídas');
+    } else {
+      toast.error('Acción incompleta', `${failed} alerta${failed === 1 ? '' : 's'} no pudo${failed === 1 ? '' : 'ieron'} actualizarse`);
+    }
   };
 
   // ─── Reglas handlers ───────────────────────────────────────────────────────
@@ -422,7 +426,7 @@ export const AlertasPage: React.FC = () => {
     setShowReglaModal(true);
   };
 
-  const openEditRegla = (regla: any) => {
+  const openEditRegla = (regla: ReglaAlerta) => {
     setEditingRegla(regla);
     let destList: string[] = [];
     try {
@@ -495,7 +499,7 @@ export const AlertasPage: React.FC = () => {
 
   // ─── Reglas table ──────────────────────────────────────────────────────────
 
-  const reglasColumns: Column<any>[] = [
+  const reglasColumns: Column<ReglaAlerta>[] = [
     { key: 'nombre', header: 'Nombre', sortable: true },
     {
       key: 'evento',
@@ -529,7 +533,7 @@ export const AlertasPage: React.FC = () => {
       align: 'center',
       render: (r) => <Badge variant="soft" color={r.activa ? 'success' : 'neutral'} size="sm">{r.activa ? 'Sí' : 'No'}</Badge>,
     },
-    {
+    ...(!isAuditor ? [{
       key: 'acciones',
       header: 'Acciones',
       align: 'right',
@@ -539,13 +543,18 @@ export const AlertasPage: React.FC = () => {
           <Button variant="ghost" size="sm" className="text-error-500" onClick={() => setDeletingRegla(r)}><Trash2 size={14} /></Button>
         </div>
       ),
-    },
+    } as Column<ReglaAlerta>] : []),
   ];
 
   // ─── Alertas content ───────────────────────────────────────────────────────
 
   const alertasContent = (
     <div className="space-y-5">
+      {isError && (
+        <div role="alert" className="rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700">
+          No se pudieron actualizar las alertas. Conservamos la última información disponible; reintentá en unos segundos.
+        </div>
+      )}
 
       {/* Filter bar */}
       <div className="flex flex-wrap items-center gap-3">
@@ -661,19 +670,12 @@ export const AlertasPage: React.FC = () => {
                             </div>
                             <p className="text-sm text-neutral-600 leading-snug">{alerta.mensaje}</p>
                           </div>
-                          {/* Time + delete */}
+                          {/* Time */}
                           <div className="flex items-center gap-2 shrink-0">
                             <span className="text-xs text-neutral-400 flex items-center gap-1">
                               <Clock size={11} />
                               {formatRelativeTime(alerta.fecha)}
                             </span>
-                            <button
-                              onClick={() => eliminarAlerta(alerta.id)}
-                              className="p-1 rounded hover:bg-neutral-100 text-neutral-300 hover:text-neutral-500"
-                              title="Eliminar"
-                            >
-                              <X size={13} />
-                            </button>
                           </div>
                         </div>
 
@@ -689,7 +691,7 @@ export const AlertasPage: React.FC = () => {
                                 Ver manifiesto
                               </button>
                             )}
-                            {!alerta.leida && (
+                            {!isAuditor && !alerta.leida && (
                               <button
                                 onClick={() => marcarComoLeida(alerta.id)}
                                 disabled={resolverMutation.isPending}
@@ -766,13 +768,15 @@ export const AlertasPage: React.FC = () => {
         <p className="text-sm text-neutral-500">
           {Array.isArray(reglas) ? reglas.length : 0} reglas configuradas
         </p>
-        <Button variant="primary" size="sm" leftIcon={<Plus size={15} />} onClick={openCreateRegla}>
-          Nueva Regla
-        </Button>
+        {!isAuditor && (
+          <Button variant="primary" size="sm" leftIcon={<Plus size={15} />} onClick={openCreateRegla}>
+            Nueva Regla
+          </Button>
+        )}
       </div>
       {/* Mobile cards */}
       <div className="md:hidden space-y-2">
-        {(Array.isArray(reglas) ? reglas : []).map((r: any) => (
+        {(Array.isArray(reglas) ? reglas : []).map((r: ReglaAlerta) => (
           <div key={r.id} className="bg-white rounded-xl border border-neutral-100 p-3">
             <div className="flex items-center justify-between">
               <p className="font-medium text-sm text-neutral-900 truncate flex-1">{r.nombre}</p>
@@ -780,7 +784,7 @@ export const AlertasPage: React.FC = () => {
                 {r.activa ? 'Activa' : 'Inactiva'}
               </span>
             </div>
-            <p className="text-xs text-neutral-500 mt-1">{r.evento || r.tipo}</p>
+            <p className="text-xs text-neutral-500 mt-1">{r.evento}</p>
           </div>
         ))}
       </div>
@@ -828,7 +832,7 @@ export const AlertasPage: React.FC = () => {
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
+        {!isAuditor && <div className="flex gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -838,20 +842,11 @@ export const AlertasPage: React.FC = () => {
           >
             Marcar todas
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            leftIcon={<Trash2 size={15} />}
-            onClick={() => setShowClearModal(true)}
-            disabled={alertas.length === 0}
-          >
-            Limpiar
-          </Button>
-        </div>
+        </div>}
       </div>
 
       {/* Tabs (admin) or direct list */}
-      {isAnyAdmin ? (
+      {showsSystemAlerts ? (
         <Tabs activeTab={activeTab} onChange={setActiveTab}>
           <TabList>
             <Tab id="alertas">Alertas</Tab>
@@ -867,18 +862,6 @@ export const AlertasPage: React.FC = () => {
       ) : (
         alertasContent
       )}
-
-      {/* Confirm clear */}
-      <ConfirmModal
-        isOpen={showClearModal}
-        onClose={() => setShowClearModal(false)}
-        onConfirm={limpiarTodas}
-        title="Limpiar todas las alertas"
-        description="¿Estás seguro de que deseas eliminar todas las alertas? Esta acción no se puede deshacer."
-        confirmText="Sí, limpiar"
-        cancelText="Cancelar"
-        variant="danger"
-      />
 
       {/* Modal crear/editar regla — con scroll interno */}
       <Modal

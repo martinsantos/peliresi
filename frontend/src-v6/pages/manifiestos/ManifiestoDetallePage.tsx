@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   FileText,
@@ -27,6 +27,7 @@ import {
 import { MapContainer, TileLayer, Polyline, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { BASE_MAP_ATTRIBUTION, BASE_MAP_MAX_ZOOM, BASE_MAP_TILE_URL } from '../../utils/map-tiles';
 import { ACTOR_ICONS, ACTOR_COLORS } from '../../utils/map-icons';
 import { QRCodeSVG } from 'qrcode.react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
@@ -52,11 +53,12 @@ import {
 } from '../../hooks/useManifiestos';
 import { useAuth } from '../../contexts/AuthContext';
 import { manifiestoService } from '../../services/manifiesto.service';
-import { formatDateTime, formatNumber, formatWeight, formatEstado, formatCuit } from '../../utils/formatters';
+import { formatDateTime, formatNumber, formatEstado, formatCuit, formatQuantitySummary } from '../../utils/formatters';
 import type { Manifiesto } from '../../types/models';
 import { EstadoManifiesto } from '../../types/models';
 import ManifiestoTimeline from './components/ManifiestoTimeline';
 import ManifiestoActions from './components/ManifiestoActions';
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 
 function getEstadoBadgeColor(estado: EstadoManifiesto): 'info' | 'success' | 'warning' | 'error' | 'neutral' {
   switch (estado) {
@@ -74,15 +76,23 @@ function getEstadoBadgeColor(estado: EstadoManifiesto): 'info' | 'success' | 'wa
 
 const ManifiestoDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const location = useLocation();
   const navigate = useNavigate();
-  const isApp = location.pathname.startsWith('/app');
+  const mp = useMobilePrefix();
   const { data: apiData, isLoading, isError } = useManifiesto(id || '');
   const [qrCopied, setQrCopied] = React.useState(false);
 
   // Auth context for role-based visibility
-  const { currentUser, isAdmin } = useAuth();
-  const userRol = currentUser?.rol || '';
+  const { currentUser, isAdmin, isAdminGenerador, isAdminTransportista, isAdminOperador } = useAuth();
+  // Sector administrators operate the workflow of their domain. Keep the
+  // root ADMIN flag separate so they do not receive root-only actions such as
+  // state reversion or global cancellation.
+  const userRol = isAdminGenerador
+    ? 'GENERADOR'
+    : isAdminTransportista
+      ? 'TRANSPORTISTA'
+      : isAdminOperador
+        ? 'OPERADOR'
+        : (currentUser?.rol || '');
 
   // Action mutations
   const firmar = useFirmarManifiesto();
@@ -109,7 +119,7 @@ const ManifiestoDetailPage: React.FC = () => {
   // Use API data only
   const manifiesto = apiData;
   const m = (manifiesto || {}) as Partial<Manifiesto>;
-  const totalPeso = Array.isArray(m.residuos) ? m.residuos.reduce((sum, r) => sum + (typeof r.cantidad === 'number' ? r.cantidad : 0), 0) : 0;
+  const totalCantidad = Array.isArray(m.residuos) ? formatQuantitySummary(m.residuos) : '0 kg';
 
   // --- Tracking route for GPS map ---
   const trackingRoute = useMemo(() => {
@@ -236,7 +246,7 @@ const ManifiestoDetailPage: React.FC = () => {
     try {
       await cancelar.mutateAsync({ id: id! });
       toast.success('Manifiesto cancelado');
-      navigate('/manifiestos');
+      navigate(mp('/manifiestos'));
     } catch (err: any) {
       toast.error('Error al cancelar', err?.response?.data?.message || 'No se pudo cancelar el manifiesto');
     } finally {
@@ -283,8 +293,7 @@ const ManifiestoDetailPage: React.FC = () => {
   const isTransportista = userRol === 'TRANSPORTISTA';
   const transportistaStates = [EstadoManifiesto.APROBADO, EstadoManifiesto.EN_TRANSITO, EstadoManifiesto.ENTREGADO];
   if (!isLoading && manifiesto && isTransportista && m.estado && transportistaStates.includes(m.estado as EstadoManifiesto)) {
-    const prefix = isApp ? '/app' : '';
-    navigate(`${prefix}/transporte/viaje/${id}`, { replace: true });
+    navigate(mp(`/transporte/viaje/${id}`), { replace: true });
     return null;
   }
 
@@ -316,7 +325,7 @@ const ManifiestoDetailPage: React.FC = () => {
   if (!manifiesto && (isError || !isLoading)) {
     return (
       <div className="space-y-6 animate-fade-in">
-        <Link to="/manifiestos">
+        <Link to={mp('/manifiestos')}>
           <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />}>Volver</Button>
         </Link>
         <Card>
@@ -334,7 +343,7 @@ const ManifiestoDetailPage: React.FC = () => {
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="space-y-2">
-        <Link to="/manifiestos">
+        <Link to={mp('/manifiestos')}>
           <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />}>Volver</Button>
         </Link>
         <div className="flex items-center gap-2 flex-wrap min-w-0">
@@ -362,7 +371,7 @@ const ManifiestoDetailPage: React.FC = () => {
             </Button>
           )}
           {m.estado === EstadoManifiesto.BORRADOR && (isAdmin || userRol === 'GENERADOR') && (
-            <Button size="sm" onClick={() => navigate(`/manifiestos/${id}/editar`)}>
+            <Button size="sm" onClick={() => navigate(mp(`/manifiestos/${id}/editar`))}>
               Editar
             </Button>
           )}
@@ -380,7 +389,7 @@ const ManifiestoDetailPage: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div
                   className={`flex items-start gap-3 p-2 -m-2 rounded-lg transition-colors ${isAdmin ? 'cursor-pointer hover:bg-purple-50/50 group' : ''}`}
-                  onClick={() => isAdmin && m.generadorId && navigate(`/admin/actores/generadores/${m.generadorId}`)}
+                  onClick={() => isAdmin && m.generadorId && navigate(mp(`/admin/actores/generadores/${m.generadorId}`))}
                 >
                   <div className="p-2 bg-purple-50 rounded-lg text-purple-600">
                     <User size={20} />
@@ -395,7 +404,7 @@ const ManifiestoDetailPage: React.FC = () => {
                 {m.transportistaId ? (
                   <div
                     className={`flex items-start gap-3 p-2 -m-2 rounded-lg transition-colors ${isAdmin ? 'cursor-pointer hover:bg-orange-50/50 group' : ''}`}
-                    onClick={() => isAdmin && m.transportistaId && navigate(`/admin/actores/transportistas/${m.transportistaId}`)}
+                    onClick={() => isAdmin && m.transportistaId && navigate(mp(`/admin/actores/transportistas/${m.transportistaId}`))}
                   >
                     <div className="p-2 bg-orange-50 rounded-lg text-orange-600">
                       <Truck size={20} />
@@ -421,7 +430,7 @@ const ManifiestoDetailPage: React.FC = () => {
                 )}
                 <div
                   className={`flex items-start gap-3 p-2 -m-2 rounded-lg transition-colors ${isAdmin ? 'cursor-pointer hover:bg-blue-50/50 group' : ''}`}
-                  onClick={() => isAdmin && m.operadorId && navigate(`/admin/actores/operadores/${m.operadorId}`)}
+                  onClick={() => isAdmin && m.operadorId && navigate(mp(`/admin/actores/operadores/${m.operadorId}`))}
                 >
                   <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
                     <FlaskConical size={20} />
@@ -468,7 +477,7 @@ const ManifiestoDetailPage: React.FC = () => {
                   <Weight size={18} />
                   <span className="font-medium">Peso total:</span>
                 </div>
-                <span className="text-xl font-bold text-neutral-900">{formatWeight(totalPeso)}</span>
+                <span className="text-xl font-bold text-neutral-900">{totalCantidad}</span>
               </div>
             </CardContent>
           </Card>
@@ -502,7 +511,7 @@ const ManifiestoDetailPage: React.FC = () => {
                   style={{ height: '100%', width: '100%' }}
                   scrollWheelZoom={false}
                 >
-                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OSM" />
+                  <TileLayer url={BASE_MAP_TILE_URL} attribution={BASE_MAP_ATTRIBUTION} maxZoom={BASE_MAP_MAX_ZOOM} />
 
                   {/* Ruta planificada (generador → operador) */}
                   {generadorPos && operadorPos && (
@@ -618,7 +627,7 @@ const ManifiestoDetailPage: React.FC = () => {
             <CardContent>
               {(() => {
                 const numero = m.numero || id || 'M-2025-089';
-                const qrUrl = `${window.location.origin}/manifiestos/verificar/${encodeURIComponent(numero)}`;
+                const qrUrl = new URL(`${import.meta.env.BASE_URL}manifiestos/verificar/${encodeURIComponent(numero)}`, window.location.origin).toString();
                 return (
                   <div className="flex flex-col items-center gap-4">
                     <div className="qr-control-svg bg-white p-4 rounded-xl border border-neutral-100 shadow-sm">

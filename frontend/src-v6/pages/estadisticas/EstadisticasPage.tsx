@@ -56,7 +56,7 @@ const EstadisticasPage: React.FC = () => {
       color: 'secondary',
     },
     {
-      title: 'Residuos Tratados',
+      title: 'Manifiestos Tratados',
       value: stats?.tratados ?? '-',
       icon: Leaf,
       color: 'success',

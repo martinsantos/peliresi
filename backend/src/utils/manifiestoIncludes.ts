@@ -11,6 +11,8 @@ export const MANIFIESTO_LIST_INCLUDE = {
   generador: { select: { razonSocial: true, cuit: true } },
   transportista: { select: { razonSocial: true, cuit: true } },
   operador: { select: { razonSocial: true, cuit: true } },
+  transportistaExterior: { select: { razonSocial: true, pais: true, numeroHabilitacion: true, estado: true } },
+  operadorExterior: { select: { razonSocial: true, pais: true, numeroHabilitacion: true, estado: true } },
   residuos: { include: { tipoResiduo: true } },
 } as const;
 
@@ -24,6 +26,8 @@ export const MANIFIESTO_DETAIL_INCLUDE = {
     },
   },
   operador: true,
+  transportistaExterior: true,
+  operadorExterior: true,
   residuos: {
     include: {
       tipoResiduo: true,

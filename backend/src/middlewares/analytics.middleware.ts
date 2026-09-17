@@ -58,6 +58,15 @@ setInterval(flushAnalyticsBuffer, FLUSH_INTERVAL);
 
 // High-frequency GPS routes to skip — ~100 writes/min unnecessary at 50 transportistas
 const SKIP_ANALYTICS_PATHS = ['/ubicacion', '/gps'];
+// Document bodies can contain CUIT, DNI, tax references, OCR text and file
+// metadata. Analytics is for operational metrics, not a document archive.
+const SKIP_BODY_ANALYTICS_PATHS = [
+    '/solicitudes',
+    '/documentos',
+    '/comprobantes-atm',
+    '/credenciales',
+    '/certificados',
+];
 
 // Middleware
 export const analyticsMiddleware = (req: Request, res: Response, next: NextFunction) => {
@@ -87,8 +96,10 @@ export const analyticsMiddleware = (req: Request, res: Response, next: NextFunct
             responseTime: duration,
             query: Object.keys(req.query).length > 0 ? JSON.stringify(req.query) : undefined,
             // Only log body for certain methods, sanitize sensitive data
-            body: ['POST', 'PUT', 'PATCH'].includes(req.method) && !req.path.includes('login')
-                ? JSON.stringify(sanitizeBody(req.body)).substring(0, 500)
+            body: ['POST', 'PUT', 'PATCH'].includes(req.method)
+                && !req.path.includes('login')
+                && !SKIP_BODY_ANALYTICS_PATHS.some(p => req.path.includes(p))
+                ? JSON.stringify(sanitizeBodyForAnalytics(req.body)).substring(0, 500)
                 : undefined
         };
 
@@ -104,19 +115,24 @@ export const analyticsMiddleware = (req: Request, res: Response, next: NextFunct
 };
 
 // Sanitize sensitive data from request body
-function sanitizeBody(body: any): any {
+export function sanitizeBodyForAnalytics(body: any): any {
     if (!body) return body;
-
-    const sanitized = { ...body };
-    const sensitiveKeys = ['password', 'token', 'secret', 'credential'];
-
-    for (const key of Object.keys(sanitized)) {
-        if (sensitiveKeys.some(s => key.toLowerCase().includes(s))) {
-            sanitized[key] = '[REDACTED]';
+    if (typeof body !== 'object') return '[REDACTED]';
+    const sensitiveKeys = [
+        'password', 'token', 'secret', 'credential', 'datosactor',
+        'datosformulario', 'datosregulatorio', 'datosresiduos', 'datostef',
+        'ocr', 'archivo', 'file', 'cuit', 'dni', 'licencia', 'telefono',
+        'domicilio', 'email', 'referencia',
+    ];
+    const sanitize = (value: unknown, key = ''): unknown => {
+        if (sensitiveKeys.some(s => key.toLowerCase().includes(s))) return '[REDACTED]';
+        if (Array.isArray(value)) return value.map(item => sanitize(item));
+        if (value && typeof value === 'object') {
+            return Object.fromEntries(Object.entries(value).map(([childKey, childValue]) => [childKey, sanitize(childValue, childKey)]));
         }
-    }
-
-    return sanitized;
+        return value;
+    };
+    return sanitize(body);
 }
 
 // Export flush function for graceful shutdown

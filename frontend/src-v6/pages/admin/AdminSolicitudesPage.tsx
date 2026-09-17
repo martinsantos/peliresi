@@ -4,10 +4,11 @@
  */
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   FileText, Clock, Eye, Search, Filter, Loader2,
-  CheckCircle, AlertTriangle, Send, XCircle,
+  CheckCircle, AlertTriangle, Send, XCircle, Factory, Truck,
+  FlaskConical, ExternalLink,
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
 import { Badge } from '../../components/ui/BadgeV2';
@@ -29,6 +30,30 @@ const ESTADO_CONFIG: Record<EstadoSolicitud, {
   APROBADA:    { label: 'Aprobada',     color: 'success',  icon: CheckCircle },
   RECHAZADA:   { label: 'Rechazada',    color: 'error',    icon: XCircle },
 };
+
+const REVIEW_WIZARDS = [
+  {
+    tipo: 'generador',
+    label: 'Generador',
+    description: 'Establecimiento, datos regulatorios, TEF, documentos y resumen.',
+    icon: Factory,
+    accent: 'border-purple-200 bg-purple-50 text-purple-700',
+  },
+  {
+    tipo: 'transportista',
+    label: 'Transportista',
+    description: 'Datos básicos, habilitación, vehículos, choferes y documentos.',
+    icon: Truck,
+    accent: 'border-orange-200 bg-orange-50 text-orange-700',
+  },
+  {
+    tipo: 'operador',
+    label: 'Operador',
+    description: 'Establecimiento, representantes, corrientes, TEF y documentos.',
+    icon: FlaskConical,
+    accent: 'border-blue-200 bg-blue-50 text-blue-700',
+  },
+] as const;
 
 const AdminSolicitudesPage: React.FC = () => {
   const navigate = useNavigate();
@@ -70,6 +95,41 @@ const AdminSolicitudesPage: React.FC = () => {
           <p className="text-sm text-neutral-500">{total} solicitudes en total</p>
         </div>
       </div>
+
+      <section aria-labelledby="review-wizards-title" className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 sm:p-5">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h3 id="review-wizards-title" className="text-base font-bold text-emerald-950">Formularios de prueba</h3>
+            <p className="mt-1 max-w-3xl text-sm leading-relaxed text-emerald-800">
+              Recorré los wizards completos con datos sintéticos. Este modo no crea cuentas, no guarda solicitudes,
+              no sube documentos y no envía correos.
+            </p>
+          </div>
+          <Badge variant="soft" color="success">Modo revisión</Badge>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
+          {REVIEW_WIZARDS.map(({ tipo, label, description, icon: Icon, accent }) => (
+            <Link
+              key={tipo}
+              to={`/inscripcion/${tipo}?modo=revision`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Recorrer formulario de prueba de ${label}`}
+              className="group flex min-h-[132px] flex-col rounded-xl border border-neutral-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className={`flex h-10 w-10 items-center justify-center rounded-xl border ${accent}`}>
+                  <Icon size={20} aria-hidden="true" />
+                </div>
+                <ExternalLink size={16} className="text-neutral-400 transition group-hover:text-emerald-700" aria-hidden="true" />
+              </div>
+              <p className="mt-3 font-semibold text-neutral-900">{label}</p>
+              <p className="mt-1 text-xs leading-relaxed text-neutral-600">{description}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -116,6 +176,7 @@ const AdminSolicitudesPage: React.FC = () => {
           options={[
             { value: '', label: 'Todos los tipos' },
             { value: 'GENERADOR', label: 'Generadores' },
+            { value: 'TRANSPORTISTA', label: 'Transportistas' },
             { value: 'OPERADOR', label: 'Operadores' },
           ]}
           size="sm"

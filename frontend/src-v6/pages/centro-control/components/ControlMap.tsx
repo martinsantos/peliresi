@@ -7,6 +7,7 @@ import { RefreshCw } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { BASE_MAP_ATTRIBUTION, BASE_MAP_MAX_ZOOM, BASE_MAP_TILE_URL } from '../../../utils/map-tiles';
 import { Card } from '../../../components/ui/CardV2';
 import { Badge } from '../../../components/ui/BadgeV2';
 import { ACTOR_ICONS, ACTOR_COLORS, createClusterIcon } from '../../../utils/map-icons';
@@ -145,7 +146,7 @@ export const ControlMap: React.FC<ControlMapProps> = ({
               style={{ height: '100%', width: '100%', zIndex: 0 }}
               className="z-0"
             >
-              <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              <TileLayer attribution={BASE_MAP_ATTRIBUTION} url={BASE_MAP_TILE_URL} maxZoom={BASE_MAP_MAX_ZOOM} />
               <ZoomTracker onZoom={onZoomChange} />
               {/* Fly to selected active trip (all points) */}
               {activeTripFlyPoints.length > 0 && (

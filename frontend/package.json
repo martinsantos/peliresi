@@ -7,11 +7,15 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "lint:critical": "eslint playwright.config.ts src-v6/utils/userContext.ts src-v6/utils/impersonationNavigation.ts src-v6/utils/routeAccess.ts src-v6/contexts/AuthContext.tsx src-v6/contexts/ImpersonationContext.tsx src-v6/hooks/useConnectivity.ts src-v6/layouts/MainLayout.tsx src-v6/pages/auth/UserSwitcherPage.tsx src-v6/__tests__/hooks/useConnectivity.test.tsx e2e/safe-ui-quality.spec.ts e2e/safe-session-resilience.spec.ts e2e/user-context-persistence.spec.ts",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:coverage:critical": "vitest run --coverage --config vitest.critical.config.ts",
     "test:e2e": "playwright test",
+    "test:e2e:safe": "PLAYWRIGHT_SAFE_API=1 playwright test e2e/safe-ui-quality.spec.ts e2e/safe-session-resilience.spec.ts e2e/user-context-persistence.spec.ts",
+    "test:e2e:safe:cross-browser": "PLAYWRIGHT_SAFE_API=1 PLAYWRIGHT_CROSS_BROWSER=1 playwright test e2e/safe-ui-quality.spec.ts e2e/safe-session-resilience.spec.ts e2e/user-context-persistence.spec.ts",
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
@@ -28,11 +32,13 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-leaflet": "^5.0.0",
-    "react-router-dom": "^7.10.1",
+    "react-router-dom": "^7.18.3",
     "recharts": "^3.5.1",
-    "tailwind-merge": "^3.4.0"
+    "tailwind-merge": "^3.4.0",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^9.39.1",
     "@playwright/test": "^1.58.2",
     "@testing-library/jest-dom": "^6.9.1",
@@ -58,9 +64,10 @@
   },
   "overrides": {
     "@babel/core": "7.29.7",
-    "dompurify": "3.4.10",
+    "dompurify": "3.4.15",
     "esbuild": "0.28.1",
     "form-data": "4.0.6",
-    "js-yaml": "4.2.0"
+    "js-yaml": "4.2.0",
+    "fflate": "0.8.3"
   }
 }

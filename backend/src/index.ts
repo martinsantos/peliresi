@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express';
+import type { Server } from 'node:http';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -31,7 +32,11 @@ import { iniciarRecordatorioJob } from './jobs/recordatorio.job';
 import blockchainRoutes from './routes/blockchain.routes';
 import renovacionRoutes from './routes/renovacion.routes';
 import solicitudRoutes from './routes/solicitud.routes';
+import documentRoutes from './routes/document.routes';
+import inspeccionRoutes from './routes/inspeccion.routes';
 import { startEmailFlushTimer } from './services/email.service';
+import { terminateOcrWorker } from './utils/ocr';
+import { createAuthRateLimiter } from './middlewares/authRateLimit.middleware';
 
 // Inicializar la aplicación Express
 const app = express();
@@ -69,13 +74,7 @@ const generalLimiter = rateLimit({
 app.use('/api/', generalLimiter);
 
 // Rate limiting - Auth endpoints (stricter)
-const authLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 5, // 5 attempts per minute per IP
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { success: false, message: 'Demasiados intentos de autenticación, intente de nuevo en un minuto' },
-});
+const authLimiter = createAuthRateLimiter();
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 
@@ -234,12 +233,14 @@ app.use('/api/reportes', reporteRoutes);
 app.use('/api/actores', actorRoutes);
 app.use('/api/blockchain', blockchainRoutes);
 app.use('/api/solicitudes', solicitudRoutes);
+app.use('/api', documentRoutes);
 app.use('/api', notificationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/centro-control', trackingRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/renovaciones', renovacionRoutes);
+app.use('/api/inspecciones', inspeccionRoutes);
 
 // Manejador de rutas no encontradas
 app.use(notFoundHandler);
@@ -269,18 +270,49 @@ setInterval(async () => {
 
 // Iniciar el servidor
 const PORT = config.PORT;
-app.listen(PORT, () => {
-  logger.info({ port: PORT }, `Server running on port ${PORT}`);
+const server: Server = app.listen(PORT, config.HOST, () => {
+  logger.info({ host: config.HOST, port: PORT }, `Server running on ${config.HOST}:${PORT}`);
   logger.info({ url: `http://localhost:${PORT}` }, 'Server URL');
   startEmailFlushTimer();
 });
 
 // Graceful shutdown handlers
-const gracefulShutdown = async (signal: string) => {
-  logger.info({ signal }, 'Shutting down gracefully...');
-  await flushAnalytics();
-  await prisma.$disconnect();
-  process.exit(0);
+let shutdownPromise: Promise<void> | null = null;
+
+const closeHttpServer = () => new Promise<void>((resolve, reject) => {
+  server.close((error) => (error ? reject(error) : resolve()));
+});
+
+const gracefulShutdown = (signal: string) => {
+  if (shutdownPromise) return shutdownPromise;
+
+  shutdownPromise = (async () => {
+    logger.info({ signal }, 'Shutting down gracefully...');
+
+    // Stop accepting new requests first. server.close waits for the requests
+    // already in flight, so a deploy/restart cannot cut a workflow action or
+    // document upload midway through its HTTP response.
+    const forceExit = setTimeout(() => {
+      logger.error({ signal }, 'Graceful shutdown timed out; forcing exit');
+      process.exit(1);
+    }, 25_000);
+    forceExit.unref();
+
+    try {
+      await closeHttpServer();
+      await flushAnalytics();
+      await terminateOcrWorker().catch(() => undefined);
+      await prisma.$disconnect();
+      process.exit(0);
+    } catch (error) {
+      logger.error({ err: error, signal }, 'Graceful shutdown failed');
+      process.exit(1);
+    } finally {
+      clearTimeout(forceExit);
+    }
+  })();
+
+  return shutdownPromise;
 };
 
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
