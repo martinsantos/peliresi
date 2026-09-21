@@ -36,7 +36,8 @@ import {
   Database,
   Upload,
   HelpCircle,
-  Navigation
+  Navigation,
+  ClipboardCheck,
 } from 'lucide-react';
 import { Badge } from '../components/ui/BadgeV2';
 import { NotificationBell } from '../components/NotificationBell';
@@ -115,6 +116,8 @@ export const MobileLayout: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser, users, switchUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isLoading, isDemo } = useAuth();
   const mp = useMobilePrefix();
+  const isInspector = Boolean(currentUser?.esInspector);
+  const canInspect = Boolean(isInspector || currentUser?.rol === 'ADMIN' || currentUser?.rol.startsWith('ADMIN_'));
 
   // Recover active trip from API after reinstall/crash
   useActiveTripRecovery();
@@ -157,11 +160,13 @@ export const MobileLayout: React.FC = () => {
     const items = [];
 
     items.push({ to: mp('/dashboard'), icon: <Home size={22} />, label: 'Inicio' });
-    items.push({
-      to: isTransportista ? mp('/transporte/perfil') : mp('/manifiestos'),
-      icon: isTransportista ? <Truck size={22} /> : <FileText size={22} />,
-      label: isTransportista ? 'Viajes' : 'Manifiestos',
-    });
+    items.push(isInspector
+      ? { to: mp('/inspecciones'), icon: <ClipboardCheck size={22} />, label: 'Inspecciones' }
+      : {
+          to: isTransportista ? mp('/transporte/perfil') : mp('/manifiestos'),
+          icon: isTransportista ? <Truck size={22} /> : <FileText size={22} />,
+          label: isTransportista ? 'Viajes' : 'Manifiestos',
+        });
 
     if (isAdmin || isTransportista) {
       items.push({ to: mp('/centro-control'), icon: <MapPin size={22} />, label: 'Control' });
@@ -176,7 +181,7 @@ export const MobileLayout: React.FC = () => {
     }
 
     return items;
-  }, [currentUser?.rol, mp]);
+  }, [currentUser?.rol, currentUser?.esInspector, isInspector, isTransportista, isAdmin, mp]);
 
   // Menu items según rol
   const menuItems = useMemo(() => {
@@ -193,6 +198,10 @@ export const MobileLayout: React.FC = () => {
       }
     } else {
       items.push({ to: mp('/manifiestos'), icon: <FileText size={20} />, label: 'Manifiestos', section: 'main' });
+    }
+
+    if (canInspect) {
+      items.push({ to: mp('/inspecciones'), icon: <ClipboardCheck size={20} />, label: 'Inspecciones', section: 'main' });
     }
 
     if (isAdmin || isTransportista) {
@@ -228,7 +237,7 @@ export const MobileLayout: React.FC = () => {
     items.push({ to: mp('/ayuda'), icon: <HelpCircle size={20} />, label: 'Ayuda', section: 'tools' });
 
     return items;
-  }, [currentUser?.rol, mp, activeTripId]);
+  }, [currentUser?.rol, currentUser?.esInspector, canInspect, isAdmin, isTransportista, mp, activeTripId]);
 
   // Separar items por sección
   const mainItems = menuItems.filter(i => i.section === 'main');
@@ -247,6 +256,7 @@ export const MobileLayout: React.FC = () => {
     if (path.includes('/dashboard')) return 'Inicio';
     if (path.includes('/manifiestos/nuevo')) return 'Nuevo Manifiesto';
     if (path.includes('/manifiestos')) return isTransportista ? 'Mis Viajes' : 'Manifiestos';
+    if (path.includes('/inspecciones')) return 'Inspecciones';
     if (path.includes('/transporte/perfil')) return 'Mis Viajes';
     if (path.includes('/transporte/viaje')) return 'Viaje en Curso';
     if (path.includes('/tracking')) return 'Tracking';

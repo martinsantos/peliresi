@@ -14,6 +14,7 @@ import { MobileLayout } from './layouts/MobileLayout';
 import {
   LoginPage, ReclamarCuentaPage, RegistroPage, ForgotPasswordPage, ResetPasswordPage, UserSwitcherPage,
   MobileDashboardPage, CentroControlPage,
+  InspeccionesPage, InspeccionDetallePage,
   ManifiestosPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
   ViajeEnCursoPage, TransportePerfilPage, ViajeEnCursoTransportista,
   ActoresPage, OperadoresPage, OperadorDetallePage, TransportistasPage, TransportistaDetallePage,
@@ -122,6 +123,8 @@ function AppMobile() {
             <Route path="/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
             <Route path="/manifiestos/:id/editar" element={<EditarManifiestoPage />} />
             <Route path="/manifiestos/:id" element={<ManifiestoDetallePage />} />
+            <Route path="/inspecciones" element={<InspeccionesPage />} />
+            <Route path="/inspecciones/:id" element={<InspeccionDetallePage />} />
             <Route path="/transporte/perfil" element={<TransportePerfilPage />} />
             <Route path="/transporte/viaje/:id" element={<ViajeEnCursoTransportista />} />
             {/* Actores overview */}

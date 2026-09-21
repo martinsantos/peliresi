@@ -27,6 +27,7 @@ import {
   User,
   Briefcase,
   Route,
+  ClipboardCheck,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -38,6 +39,7 @@ import type { OperadorEnriched } from '../../data/operadores-enrichment';
 import { CORRIENTES_Y } from '../../data/corrientes-y';
 import { useOperadoresEnrichment } from '../../hooks/useEnrichment';
 import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
+import { ActorInspectionsPanel } from '../inspecciones/ActorInspectionsPanel';
 
 /** Local view-model that extends Operador with UI-specific derived fields */
 interface OperadorViewModel extends Operador {
@@ -190,6 +192,7 @@ const OperadorDetallePage: React.FC = () => {
         <TabList>
           <Tab id="info" icon={<FlaskConical size={16} />}>Información General</Tab>
           <Tab id="tratamientos" icon={<Beaker size={16} />}>Tratamientos</Tab>
+          <Tab id="inspecciones" icon={<ClipboardCheck size={16} />}>Inspecciones</Tab>
           <Tab id="historial" icon={<Route size={16} />}>Trazabilidad</Tab>
         </TabList>
 
@@ -473,6 +476,10 @@ const OperadorDetallePage: React.FC = () => {
         </TabPanel>
 
         {/* Tab: Trazabilidad */}
+        <TabPanel id="inspecciones">
+          <ActorInspectionsPanel actorType="OPERADOR" actorId={id || ''} actorName={operador.nombre} />
+        </TabPanel>
+
         <TabPanel id="historial">
           <TrazabilidadTimeline
             actorType="operador"

@@ -10,7 +10,7 @@ import {
   ArrowLeft, Factory, MapPin, Phone, Mail, Calendar, Download,
   CheckCircle, AlertTriangle, Biohazard, Shield, FileText,
   DollarSign, ClipboardList, Plus, Pencil, Trash2, X,
-  Building2, Award, BookOpen, Route,
+  Building2, Award, BookOpen, Route, ClipboardCheck,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -28,6 +28,7 @@ import CalculadoraTEF from '../../components/CalculadoraTEF';
 import type { PagoTEF, DeclaracionJurada } from '../../services/generador-fiscal.service';
 import api from '../../services/api';
 import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
+import { ActorInspectionsPanel } from '../inspecciones/ActorInspectionsPanel';
 
 // ===== Inline CRUD Modal =====
 function CrudModal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
@@ -345,6 +346,7 @@ const GeneradorDetallePage: React.FC = () => {
           <Tab id="residuos" icon={<Biohazard size={16} />}>Residuos</Tab>
           <Tab id="fiscal" icon={<DollarSign size={16} />}>Situacion Fiscal</Tab>
           <Tab id="ddjj" icon={<ClipboardList size={16} />}>DDJJ y Documentos</Tab>
+          <Tab id="inspecciones" icon={<ClipboardCheck size={16} />}>Inspecciones</Tab>
           <Tab id="historial" icon={<Route size={16} />}>Trazabilidad</Tab>
         </TabList>
 
@@ -625,6 +627,10 @@ const GeneradorDetallePage: React.FC = () => {
         </TabPanel>
 
         {/* ===== Tab 5: Trazabilidad ===== */}
+        <TabPanel id="inspecciones">
+          <ActorInspectionsPanel actorType="GENERADOR" actorId={id || ''} actorName={generador.razonSocial} />
+        </TabPanel>
+
         <TabPanel id="historial">
           <TrazabilidadTimeline
             actorType="generador"
