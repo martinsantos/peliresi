@@ -50,6 +50,10 @@ model Usuario {
   reglasCreadas     ReglaAlerta[]       @relation("ReglasCreadas")
   solicitudes       SolicitudInscripcion[]
   pushSubscripciones PushSubscripcion[]
+  inspeccionesAsignadas      Inspeccion[]            @relation("InspectorInspecciones")
+  comparacionesVerificadas   ComparacionInspeccion[] @relation("UsuarioComparacionesInspeccion")
+  evidenciasInspeccion       EvidenciaInspeccion[]   @relation("UsuarioEvidenciasInspeccion")
+  eventosInspeccion          EventoInspeccion[]      @relation("UsuarioEventosInspeccion")
 
   @@map("usuarios")
 }
@@ -96,6 +100,7 @@ model Generador {
   ddjj        DeclaracionJurada[]
   documentos  Documento[]
   renovaciones Renovacion[]
+  inspecciones Inspeccion[]
 
   @@map("generadores")
 }
@@ -130,6 +135,7 @@ model Transportista {
   vehiculos     Vehiculo[]
   choferes      Chofer[]
   manifiestos   Manifiesto[]
+  inspecciones  Inspeccion[]
 
   @@map("transportistas")
 }
@@ -182,6 +188,7 @@ model Operador {
   pagos         PagoTEF[]
   ddjj          DeclaracionJurada[]
   renovaciones  Renovacion[]
+  inspecciones  Inspeccion[]
 
   @@map("operadores")
 }
@@ -449,6 +456,152 @@ model SedeOperador {
   @@map("sedes_operador")
 }
 
+// Expediente digital de inspecciones en campo. Los ítems se copian desde la
+// plantilla vigente al crear el expediente para conservar el acta histórica.
+model Inspeccion {
+  id                String              @id @default(cuid())
+  numero            String              @unique
+  numeroActa        String?
+  tipoActor         TipoActorInspeccion
+  generadorId       String?
+  transportistaId   String?
+  operadorId        String?
+  inspectorId       String
+  estado            EstadoInspeccion    @default(BORRADOR)
+  ubicacion         String?
+  latitud           Float?
+  longitud          Float?
+  fechaProgramada   DateTime?
+  iniciadaAt        DateTime?
+  cerradaCampoAt    DateTime?
+  plazoRespuestaAt  DateTime?
+  observaciones     String?
+  declaradoSnapshot Json?
+  version           Int                 @default(1)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  inspector     Usuario                 @relation("InspectorInspecciones", fields: [inspectorId], references: [id], onDelete: Restrict)
+  generador     Generador?              @relation(fields: [generadorId], references: [id], onDelete: Restrict)
+  transportista Transportista?          @relation(fields: [transportistaId], references: [id], onDelete: Restrict)
+  operador      Operador?               @relation(fields: [operadorId], references: [id], onDelete: Restrict)
+  items         ItemInspeccion[]
+  comparaciones ComparacionInspeccion[]
+  evidencias    EvidenciaInspeccion[]
+  eventos       EventoInspeccion[]
+
+  @@index([estado, createdAt])
+  @@index([inspectorId, estado])
+  @@index([generadorId])
+  @@index([transportistaId])
+  @@index([operadorId])
+  @@map("inspecciones")
+}
+
+model ComparacionInspeccion {
+  id              String                         @id @default(cuid())
+  inspeccionId    String
+  codigo          String
+  categoria       String
+  etiqueta        String
+  origen          String
+  valorDeclarado  String?
+  valorObservado  String?
+  resultado       ResultadoComparacionInspeccion @default(PENDIENTE)
+  observacion     String?
+  orden           Int
+  verificadoPorId String?
+  verificadoAt    DateTime?
+  updatedAt       DateTime                       @updatedAt
+
+  inspeccion    Inspeccion            @relation(fields: [inspeccionId], references: [id], onDelete: Cascade)
+  verificadoPor Usuario?              @relation("UsuarioComparacionesInspeccion", fields: [verificadoPorId], references: [id], onDelete: SetNull)
+  evidencias    EvidenciaInspeccion[]
+
+  @@unique([inspeccionId, codigo])
+  @@index([inspeccionId, categoria, orden])
+  @@index([resultado])
+  @@map("comparaciones_inspeccion")
+}
+
+model ItemInspeccion {
+  id           String                  @id @default(cuid())
+  inspeccionId String
+  codigo       String
+  categoria    String
+  etiqueta     String
+  orden        Int
+  obligatorio  Boolean                 @default(true)
+  resultado    ResultadoItemInspeccion @default(PENDIENTE)
+  observacion  String?
+  updatedAt    DateTime                @updatedAt
+
+  inspeccion Inspeccion            @relation(fields: [inspeccionId], references: [id], onDelete: Cascade)
+  evidencias EvidenciaInspeccion[]
+
+  @@unique([inspeccionId, codigo])
+  @@index([inspeccionId, categoria, orden])
+  @@map("items_inspeccion")
+}
+
+model EvidenciaInspeccion {
+  id             String                  @id @default(cuid())
+  inspeccionId   String
+  tipo           TipoEvidenciaInspeccion
+  nombreOriginal String
+  storageKey     String                  @unique
+  mimeDetectado  String
+  bytes          Int
+  sha256         String
+  descripcion    String?
+  transcripcion  String?
+  creadoPorId    String
+  comparacionId  String?
+  eventoId       String?
+  itemId         String?
+  capturadaAt    DateTime                @default(now())
+  latitud        Float?
+  longitud       Float?
+  createdAt      DateTime                @default(now())
+
+  inspeccion  Inspeccion             @relation(fields: [inspeccionId], references: [id], onDelete: Cascade)
+  creadoPor   Usuario                @relation("UsuarioEvidenciasInspeccion", fields: [creadoPorId], references: [id], onDelete: Restrict)
+  comparacion ComparacionInspeccion? @relation(fields: [comparacionId], references: [id], onDelete: SetNull)
+  evento      EventoInspeccion?      @relation(fields: [eventoId], references: [id], onDelete: SetNull)
+  item        ItemInspeccion?        @relation(fields: [itemId], references: [id], onDelete: SetNull)
+
+  @@index([inspeccionId, createdAt])
+  @@index([sha256])
+  @@index([comparacionId])
+  @@index([eventoId])
+  @@index([itemId])
+  @@map("evidencias_inspeccion")
+}
+
+model EventoInspeccion {
+  id            String   @id @default(cuid())
+  inspeccionId  String
+  tipo          String
+  titulo        String
+  detalle       String?
+  estadoDesde   String?
+  estadoHasta   String?
+  visibleActor  Boolean  @default(false)
+  canal         String   @default("SISTEMA")
+  estadoEntrega String?
+  destinatario  String?
+  metadata      Json?
+  usuarioId     String
+  createdAt     DateTime @default(now())
+
+  inspeccion Inspeccion            @relation(fields: [inspeccionId], references: [id], onDelete: Cascade)
+  usuario    Usuario               @relation("UsuarioEventosInspeccion", fields: [usuarioId], references: [id], onDelete: Restrict)
+  adjuntos   EvidenciaInspeccion[]
+
+  @@index([inspeccionId, createdAt])
+  @@map("eventos_inspeccion")
+}
+
 // Enumeraciones
 enum Rol {
   ADMIN
@@ -471,6 +624,49 @@ enum EstadoManifiesto {
   TRATADO
   RECHAZADO
   CANCELADO
+}
+
+enum TipoActorInspeccion {
+  GENERADOR
+  TRANSPORTISTA
+  OPERADOR
+}
+
+enum EstadoInspeccion {
+  BORRADOR
+  PLANIFICADA
+  EN_CAMPO
+  EN_REVISION
+  NOTIFICADA
+  EN_DESCARGO
+  REQUIERE_SUBSANACION
+  CERRADA_CONFORME
+  DERIVADA_LEGALES
+  EN_TRAMITE_LEGAL
+  DERIVADA_ATM
+  FINALIZADA
+  CANCELADA
+}
+
+enum ResultadoItemInspeccion {
+  PENDIENTE
+  CUMPLE
+  NO_CUMPLE
+  NO_APLICA
+}
+
+enum ResultadoComparacionInspeccion {
+  PENDIENTE
+  COINCIDE
+  DIFIERE
+  NO_VERIFICADO
+  NO_APLICA
+}
+
+enum TipoEvidenciaInspeccion {
+  FOTO
+  AUDIO
+  DOCUMENTO
 }
 
 // ========== SISTEMA DE NOTIFICACIONES IN-APP ==========
