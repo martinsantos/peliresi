@@ -21,6 +21,10 @@ export const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage
 export const CentroControlPage = lazy(() => import('../pages/centro-control/CentroControlPage'));
 export const WarRoomPage = lazy(() => import('../pages/monitor/WarRoomPage'));
 
+// Inspecciones
+export const InspeccionesPage = lazy(() => import('../pages/inspecciones/InspeccionesPageV2'));
+export const InspeccionDetallePage = lazy(() => import('../pages/inspecciones/InspeccionExpedientePage'));
+
 // Manifiestos
 export const ManifiestosPage = lazy(() => import('../pages/manifiestos/ManifiestosPage'));
 export const ManifiestoDetallePage = lazy(() => import('../pages/manifiestos/ManifiestoDetallePage'));

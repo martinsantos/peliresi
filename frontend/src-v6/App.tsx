@@ -28,6 +28,7 @@ import {
   LoginPage, LandingPage, RegistroPage, VerificarEmailPage, ForgotPasswordPage,
   ResetPasswordPage, ReclamarCuentaPage, UserSwitcherPage,
   DashboardPage, CentroControlPage, WarRoomPage,
+  InspeccionesPage, InspeccionDetallePage,
   ManifiestosPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
   ViajeEnCursoPage, TransportePerfilPage, ViajeEnCursoTransportista,
   ActoresPage, OperadoresPage, OperadorDetallePage, TransportistasPage, TransportistaDetallePage,
@@ -110,6 +111,8 @@ function App() {
             <Route path="/mobile/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
             <Route path="/mobile/manifiestos/:id/editar" element={<EditarManifiestoPage />} />
             <Route path="/mobile/manifiestos/:id" element={<ManifiestoDetallePage />} />
+            <Route path="/mobile/inspecciones" element={<InspeccionesPage />} />
+            <Route path="/mobile/inspecciones/:id" element={<InspeccionDetallePage />} />
             <Route path="/mobile/transporte/perfil" element={<TransportePerfilPage />} />
             <Route path="/mobile/transporte/viaje/:id" element={<ViajeEnCursoTransportista />} />
             <Route path="/mobile/admin/usuarios" element={<UsuariosPage />} />
@@ -199,6 +202,8 @@ function App() {
             <Route path="/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
             <Route path="/manifiestos/:id/editar" element={<EditarManifiestoPage />} />
             <Route path="/manifiestos/:id" element={<ManifiestoDetallePage />} />
+            <Route path="/inspecciones" element={<InspeccionesPage />} />
+            <Route path="/inspecciones/:id" element={<InspeccionDetallePage />} />
 
             {/* Transporte */}
             <Route path="/transporte/perfil" element={<TransportePerfilPage />} />

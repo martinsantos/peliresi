@@ -31,7 +31,7 @@ import {
   Factory,
   Building2,
   SwitchCamera,
-  QrCode,
+  ClipboardCheck,
   HelpCircle,
   BookOpen,
   FileCheck,
@@ -163,6 +163,11 @@ export const MainLayout: React.FC = () => {
 
     // Manifiestos para todos
     items.push({ path: '/manifiestos', icon: FileText, label: 'Manifiestos' });
+
+    // Expedientes de inspección: inspectores y administradores gubernamentales.
+    if (currentUser?.esInspector || isAdmin || isAdminTransportista || isAdminOperador || isAdminGenerador) {
+      items.push({ path: '/inspecciones', icon: ClipboardCheck, label: 'Inspecciones' });
+    }
     
     // Usuarios del sistema solo para Admin
     if (isAdmin) {

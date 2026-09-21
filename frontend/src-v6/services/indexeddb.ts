@@ -2,12 +2,12 @@
  * SITREP v6 - IndexedDB Offline Storage
  * ======================================
  * Servicio standalone para almacenamiento offline usando IndexedDB nativo.
- * Stores: manifiestos, catalogos, sync_queue
+ * Stores: manifiestos, catalogos, sync_queue, inspection_evidence_queue
  */
 
 const DB_NAME = 'sitrep_offline_db';
-const DB_VERSION = 1;
-const STORES = ['manifiestos', 'catalogos', 'sync_queue'] as const;
+const DB_VERSION = 3;
+const STORES = ['manifiestos', 'catalogos', 'sync_queue', 'inspection_evidence_queue', 'inspection_cases'] as const;
 
 export type StoreName = (typeof STORES)[number];
 
@@ -65,7 +65,7 @@ function getDB(): Promise<IDBDatabase> {
  * Guarda un registro en el store indicado.
  * El objeto debe tener un campo `id` (excepto sync_queue que usa autoIncrement).
  */
-export async function saveOffline(store: StoreName, data: any): Promise<void> {
+export async function saveOffline(store: StoreName, data: unknown): Promise<void> {
   const db = await getDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(store, 'readwrite');
@@ -78,12 +78,12 @@ export async function saveOffline(store: StoreName, data: any): Promise<void> {
 /**
  * Obtiene un registro por su clave primaria.
  */
-export async function getOffline(store: StoreName, key: string): Promise<any> {
+export async function getOffline<T = unknown>(store: StoreName, key: string): Promise<T | null> {
   const db = await getDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(store, 'readonly');
     const request = tx.objectStore(store).get(key);
-    request.onsuccess = () => resolve(request.result ?? null);
+    request.onsuccess = () => resolve((request.result as T | undefined) ?? null);
     request.onerror = () => reject(request.error);
   });
 }
@@ -91,12 +91,12 @@ export async function getOffline(store: StoreName, key: string): Promise<any> {
 /**
  * Obtiene todos los registros de un store.
  */
-export async function getAllOffline(store: StoreName): Promise<any[]> {
+export async function getAllOffline<T = unknown>(store: StoreName): Promise<T[]> {
   const db = await getDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(store, 'readonly');
     const request = tx.objectStore(store).getAll();
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => resolve(request.result as T[]);
     request.onerror = () => reject(request.error);
   });
 }
@@ -142,7 +142,7 @@ export async function addToSyncQueue(action: Omit<SyncAction, 'id' | 'createdAt'
  * Retorna todas las acciones pendientes en la cola.
  */
 export async function getSyncQueue(): Promise<SyncAction[]> {
-  return getAllOffline('sync_queue');
+  return getAllOffline<SyncAction>('sync_queue');
 }
 
 /**

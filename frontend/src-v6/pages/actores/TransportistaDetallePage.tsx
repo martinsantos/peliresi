@@ -29,6 +29,7 @@ import {
   ChevronDown,
   ChevronUp,
   Route,
+  ClipboardCheck,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -47,6 +48,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from '../../components/ui/Toast';
 import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
+import { ActorInspectionsPanel } from '../inspecciones/ActorInspectionsPanel';
 
 const EMPTY_VEHICULO = { patente: '', marca: '', modelo: '', anio: new Date().getFullYear(), capacidad: 0, numeroHabilitacion: '', vencimiento: '' };
 const EMPTY_CHOFER = { nombre: '', apellido: '', dni: '', licencia: '', vencimiento: '', telefono: '' };
@@ -368,6 +370,7 @@ const TransportistaDetallePage: React.FC = () => {
         <TabList>
           <Tab id="info" icon={<Truck size={16} />}>Información General</Tab>
           <Tab id="flota" icon={<Users size={16} />}>Flota y Conductores</Tab>
+          <Tab id="inspecciones" icon={<ClipboardCheck size={16} />}>Inspecciones</Tab>
           <Tab id="historial" icon={<Route size={16} />}>Trazabilidad</Tab>
         </TabList>
 
@@ -699,6 +702,10 @@ const TransportistaDetallePage: React.FC = () => {
         </TabPanel>
 
         {/* Tab: Trazabilidad */}
+        <TabPanel id="inspecciones">
+          <ActorInspectionsPanel actorType="TRANSPORTISTA" actorId={id || ''} actorName={transportista.nombre} />
+        </TabPanel>
+
         <TabPanel id="historial">
           <TrazabilidadTimeline
             actorType="transportista"

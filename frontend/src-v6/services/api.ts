@@ -37,6 +37,11 @@ export const clearTokens = () => {
 // ========================================
 
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  // La instancia usa JSON por defecto, pero un FormData debe conservar sus bytes.
+  // Al quitar este header, el navegador agrega multipart/form-data con su boundary.
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    config.headers.delete('Content-Type');
+  }
   const token = getAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
