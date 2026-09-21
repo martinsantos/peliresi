@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { AlertTriangle, Camera, CheckCircle2, CircleMinus, ClipboardCheck, FileAudio, FileText, XCircle } from 'lucide-react';
+import { AlertTriangle, Camera, CheckCircle2, CircleMinus, ClipboardCheck, FileAudio, FileText, Fingerprint, ShieldCheck, XCircle } from 'lucide-react';
 import { Badge } from '../../components/ui/BadgeV2';
 import type { Inspection } from '../../types/inspection';
 import { InspectionEvidenceImage } from './InspectionEvidenceImage';
@@ -17,7 +17,7 @@ export function InspectionReport({ inspection }: { inspection: Inspection }) {
 
   return (
     <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
-      <div className="border-b border-neutral-200 px-4 py-5 sm:px-6"><h3 className="text-xl font-extrabold tracking-tight text-[#10213A]">Resultado del acta</h3><p className="mt-1 text-sm text-neutral-600">Informe consolidado de hallazgos, evidencias y controles.</p></div>
+      <div className="border-b border-neutral-200 px-4 py-5 sm:px-6"><h3 className="text-xl font-extrabold tracking-tight text-[#10213A]">Informe de inspección</h3><p className="mt-1 text-sm text-neutral-600">Resultado consolidado de hallazgos, evidencias y controles del expediente.</p></div>
       <div className="space-y-7 px-4 py-5 sm:px-6">
         <div className="border-l-4 border-primary-600 bg-emerald-50 px-4 py-3">
           <div className="flex items-start gap-3"><ClipboardCheck className="mt-0.5 shrink-0 text-primary-700" size={20} /><div><p className="font-bold text-[#10213A]">Síntesis ejecutiva</p><p className="mt-1 text-sm leading-relaxed text-neutral-700">{summary}</p></div></div>
@@ -34,6 +34,11 @@ export function InspectionReport({ inspection }: { inspection: Inspection }) {
           <div className="mb-3 flex items-center justify-between"><h4 className="font-extrabold text-[#10213A]">Evidencia incorporada</h4><span className="text-xs font-semibold text-neutral-500">{inspection.evidencias.length} archivos</span></div>
           {photos.length > 0 ? <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{photos.slice(0, 6).map((photo, index) => <figure key={photo.id} className="overflow-hidden rounded-xl border border-neutral-200"><InspectionEvidenceImage inspectionId={inspection.id} evidenceId={photo.id} alt={photo.descripcion || photo.nombreOriginal} className="aspect-[4/3] w-full object-cover" /><figcaption className="p-3"><p className="text-sm font-bold text-[#10213A]">{String(index + 1).padStart(2, '0')}. {photo.nombreOriginal}</p><p className="mt-1 text-xs leading-relaxed text-neutral-600">{photo.descripcion || `Capturada ${new Date(photo.capturadaAt).toLocaleString('es-AR')}`}</p></figcaption></figure>)}</div> : <div className="flex min-h-28 items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-neutral-50 text-sm text-neutral-500"><Camera size={18} className="mr-2" />Aún no hay fotografías.</div>}
           {inspection.evidencias.some((item) => item.tipo !== 'FOTO') && <div className="mt-3 flex flex-wrap gap-2">{inspection.evidencias.filter((item) => item.tipo !== 'FOTO').map((item) => <span key={item.id} className="inline-flex max-w-full min-w-0 items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-xs font-semibold text-neutral-700">{item.tipo === 'AUDIO' ? <FileAudio className="shrink-0" size={16} /> : <FileText className="shrink-0" size={16} />}<span className="min-w-0 break-all">{item.nombreOriginal}</span></span>)}</div>}
+        </div>
+
+        <div className="overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50">
+          <div className="flex items-start gap-3 border-b border-neutral-200 bg-white px-4 py-4"><ShieldCheck className="mt-0.5 shrink-0 text-primary-700" size={20} /><div><h4 className="font-extrabold text-[#10213A]">Integridad de las evidencias</h4><p className="mt-1 text-xs leading-relaxed text-neutral-600">Cada archivo conserva autor, hora de captura, hora de recepción y huella SHA-256. Es trazabilidad técnica; no reemplaza la firma de los intervinientes ni una firma digital.</p></div></div>
+          {inspection.evidencias.length === 0 ? <p className="px-4 py-4 text-sm text-neutral-500">No hay archivos cuya integridad verificar.</p> : <div className="divide-y divide-neutral-200">{inspection.evidencias.map((evidence) => <div key={evidence.id} className="grid min-w-0 gap-2 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div className="min-w-0"><p className="truncate text-sm font-bold text-[#10213A]">{evidence.nombreOriginal}</p><p className="mt-0.5 text-xs text-neutral-600">Captura {new Date(evidence.capturadaAt).toLocaleString('es-AR')} · Recepción {new Date(evidence.createdAt).toLocaleString('es-AR')}{evidence.creadoPor ? ` · ${evidence.creadoPor.nombre} ${evidence.creadoPor.apellido || ''}` : ''}</p></div><p title={evidence.sha256 || 'Huella no disponible'} className="flex max-w-full items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2 py-1 font-mono text-[10px] font-semibold text-primary-800"><Fingerprint size={13} className="shrink-0" />{evidence.sha256 ? `${evidence.sha256.slice(0, 16)}…` : 'Sin huella'}</p></div>)}</div>}
         </div>
 
         <div>

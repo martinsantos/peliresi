@@ -30,10 +30,12 @@ export interface InspectionItem {
 
 export interface InspectionEvidence {
   id: string;
+  clienteId?: string | null;
   tipo: InspectionEvidenceType;
   nombreOriginal: string;
   mimeDetectado: string;
   bytes: number;
+  sha256?: string;
   descripcion?: string | null;
   transcripcion?: string | null;
   capturadaAt: string;

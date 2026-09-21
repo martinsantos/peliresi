@@ -20,11 +20,11 @@ describe('inspeccionService evidence upload', () => {
     });
 
     expect(mocks.post).toHaveBeenCalledTimes(1);
-    const [url, form, config] = mocks.post.mock.calls[0] as [string, FormData, { headers: Record<string, string> }];
+    const [url, form, config] = mocks.post.mock.calls[0] as [string, FormData, unknown];
     expect(url).toBe('/inspecciones/inspection-1/evidencias');
     expect(form.get('file')).toBe(file);
     expect(form.get('itemId')).toBe('item-1');
     expect(form.get('descripcion')).toBe('Falta la señalización reglamentaria');
-    expect(config.headers['Content-Type']).toBe('multipart/form-data');
+    expect(config).toBeUndefined();
   });
 });

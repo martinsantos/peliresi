@@ -547,6 +547,7 @@ model ItemInspeccion {
 model EvidenciaInspeccion {
   id             String                  @id @default(cuid())
   inspeccionId   String
+  clienteId      String?
   tipo           TipoEvidenciaInspeccion
   nombreOriginal String
   storageKey     String                  @unique
@@ -572,6 +573,7 @@ model EvidenciaInspeccion {
 
   @@index([inspeccionId, createdAt])
   @@index([sha256])
+  @@unique([inspeccionId, clienteId])
   @@index([comparacionId])
   @@index([eventoId])
   @@index([itemId])

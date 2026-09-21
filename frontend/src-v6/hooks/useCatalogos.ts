@@ -25,7 +25,7 @@ async function fetchWithOfflineFallback<T>(
     return data;
   } catch (err) {
     // Try IndexedDB fallback
-    const cached = await getOffline('catalogos', key).catch(() => null);
+    const cached = await getOffline<{ data: T }>('catalogos', key).catch(() => null);
     if (cached?.data) return cached.data as T;
     throw err; // No cache available — propagate original error
   }

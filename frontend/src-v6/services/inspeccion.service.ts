@@ -76,15 +76,14 @@ export const inspeccionService = {
     return data.data;
   },
 
-  async uploadEvidence(id: string, file: File, fields?: { tipo?: string; descripcion?: string; transcripcion?: string; latitud?: number; longitud?: number; comparacionId?: string; eventoId?: string; itemId?: string }): Promise<Inspection['evidencias'][number]> {
+  async uploadEvidence(id: string, file: File, fields?: { tipo?: string; descripcion?: string; transcripcion?: string; latitud?: number; longitud?: number; comparacionId?: string; eventoId?: string; itemId?: string; clienteId?: string; capturadaAt?: string; clienteSha256?: string }): Promise<Inspection['evidencias'][number]> {
     const form = new FormData();
     form.append('file', file);
     Object.entries(fields || {}).forEach(([key, value]) => {
       if (value !== undefined) form.append(key, String(value));
     });
-    const { data } = await api.post(`/inspecciones/${id}/evidencias`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    // No fijar Content-Type: el navegador debe incorporar el boundary multipart.
+    const { data } = await api.post(`/inspecciones/${id}/evidencias`, form);
     return data.data;
   },
 
@@ -102,7 +101,7 @@ export const inspeccionService = {
     const url = URL.createObjectURL(response.data);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `acta_${numero}.pdf`;
+    link.download = `informe_inspeccion_${numero}.pdf`;
     document.body.appendChild(link);
     link.click();
     link.remove();

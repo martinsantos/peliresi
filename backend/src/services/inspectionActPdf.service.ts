@@ -1,4 +1,5 @@
 import fs from 'fs';
+import crypto from 'crypto';
 import type { Response } from 'express';
 import PDFDocument from 'pdfkit';
 
@@ -22,6 +23,26 @@ function formatDate(value?: Date | string | null, withTime = false): string {
 
 function stateLabel(value: string): string {
   return value.toLowerCase().replace(/_/g, ' ').replace(/(^|\s)\S/g, (letter) => letter.toUpperCase());
+}
+
+function inspectionFingerprint(inspection: any): string {
+  const canonical = {
+    numero: inspection.numero,
+    numeroActa: inspection.numeroActa,
+    version: inspection.version,
+    tipoActor: inspection.tipoActor,
+    actor: actorOf(inspection)?.id,
+    inspector: inspection.inspectorId,
+    estado: inspection.estado,
+    iniciadaAt: inspection.iniciadaAt,
+    cerradaCampoAt: inspection.cerradaCampoAt,
+    observaciones: inspection.observaciones,
+    comparaciones: inspection.comparaciones.map((row: any) => ({ id: row.id, resultado: row.resultado, valorDeclarado: row.valorDeclarado, valorObservado: row.valorObservado, observacion: row.observacion })),
+    items: inspection.items.map((row: any) => ({ id: row.id, resultado: row.resultado, observacion: row.observacion, evidencias: (row.evidencias || []).map((item: any) => item.sha256) })),
+    evidencias: inspection.evidencias.map((item: any) => ({ id: item.id, sha256: item.sha256, capturadaAt: item.capturadaAt, createdAt: item.createdAt, creadoPorId: item.creadoPorId })),
+    eventos: inspection.eventos.map((event: any) => ({ id: event.id, tipo: event.tipo, detalle: event.detalle, usuarioId: event.usuarioId, createdAt: event.createdAt })),
+  };
+  return crypto.createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
 }
 
 function ensureSpace(doc: PDFKit.PDFDocument, height: number) {
@@ -49,7 +70,7 @@ function header(doc: PDFKit.PDFDocument, inspection: any) {
   doc.rect(0, 0, doc.page.width, 92).fill(C.darkGreen);
   doc.fillColor(C.white).font('Helvetica-Bold').fontSize(20).text('SITREP Mendoza', 44, 22);
   doc.font('Helvetica').fontSize(8).fillColor('#CDEBDD').text('Sistema de Trazabilidad de Residuos Peligrosos', 44, 47);
-  doc.font('Helvetica-Bold').fontSize(11).fillColor(C.white).text('ACTA DIGITAL DE INSPECCIÓN', 44, 67);
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(C.white).text('INFORME DIGITAL DEL EXPEDIENTE', 44, 67);
   doc.font('Helvetica-Bold').fontSize(14).text(inspection.numero, 360, 25, { width: 190, align: 'right' });
   doc.font('Helvetica').fontSize(8).fillColor('#CDEBDD').text(`Estado: ${stateLabel(String(inspection.estado))}`, 360, 47, { width: 190, align: 'right' });
   doc.y = 112;
@@ -213,14 +234,31 @@ function timeline(doc: PDFKit.PDFDocument, events: any[]) {
   });
 }
 
+function integrityLedger(doc: PDFKit.PDFDocument, inspection: any, fingerprint: string) {
+  doc.roundedRect(44, doc.y, doc.page.width - 88, 55, 5).fill(C.soft);
+  const startY = doc.y;
+  doc.font('Helvetica-Bold').fontSize(8).fillColor(C.navy).text('Huella técnica del expediente', 56, startY + 9);
+  doc.font('Courier').fontSize(6.6).fillColor(C.blue).text(fingerprint, 56, startY + 23, { width: doc.page.width - 112 });
+  doc.font('Helvetica').fontSize(6.7).fillColor(C.muted).text(`Versión ${inspection.version} · SHA-256 · esta huella no sustituye una firma digital`, 56, startY + 39, { width: doc.page.width - 112 });
+  doc.y = startY + 64;
+  inspection.evidencias.forEach((evidence: any, index: number) => {
+    ensureSpace(doc, 39);
+    const y = doc.y;
+    doc.font('Helvetica-Bold').fontSize(7.5).fillColor(C.navy).text(`${index + 1}. ${evidence.nombreOriginal}`, 50, y, { width: 300, height: 12, ellipsis: true });
+    doc.font('Helvetica').fontSize(6.8).fillColor(C.muted).text(`Captura ${formatDate(evidence.capturadaAt, true)} · Recepción ${formatDate(evidence.createdAt, true)} · ${evidence.creadoPor ? `${evidence.creadoPor.nombre} ${evidence.creadoPor.apellido || ''}`.trim() : 'Autor sin informar'}`, 50, y + 13, { width: 495 });
+    doc.font('Courier').fontSize(6.2).fillColor(C.blue).text(evidence.sha256 || 'Huella no disponible', 50, y + 25, { width: 495 });
+    doc.y = y + 39;
+  });
+}
+
 export async function streamInspectionActPdf(
   res: Response,
   inspection: any,
   resolveEvidence: (key: string) => string,
 ): Promise<void> {
-  const doc = new PDFDocument({ size: 'A4', margin: 44, bufferPages: true, info: { Title: `Acta ${inspection.numero}`, Author: 'SITREP Mendoza' } });
+  const doc = new PDFDocument({ size: 'A4', margin: 44, bufferPages: true, info: { Title: `Informe de inspección ${inspection.numero}`, Author: 'SITREP Mendoza' } });
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename=acta_${inspection.numero}.pdf`);
+  res.setHeader('Content-Disposition', `attachment; filename=informe_inspeccion_${inspection.numero}.pdf`);
   doc.pipe(res);
 
   header(doc, inspection);
@@ -248,16 +286,17 @@ export async function streamInspectionActPdf(
   section(doc, 'Trazabilidad del expediente', 'Comentarios, revisiones, comunicaciones, respuestas y documentos adjuntos');
   timeline(doc, inspection.eventos);
 
-  ensureSpace(doc, 95);
+  const fingerprint = inspectionFingerprint(inspection);
+  section(doc, 'Integridad y cadena de custodia', 'Identificadores técnicos para verificar que las evidencias y el contenido no fueron sustituidos');
+  integrityLedger(doc, inspection, fingerprint);
+
+  ensureSpace(doc, 74);
   const closureY = doc.y + 8;
-  doc.roundedRect(44, closureY, doc.page.width - 88, 82, 5).fill(C.soft);
-  doc.font('Helvetica-Bold').fontSize(10).fillColor(C.navy).text('Cierre y validez', 56, closureY + 10);
-  doc.font('Helvetica').fontSize(7).fillColor(C.muted).text('El documento reproduce el expediente digital SITREP. La trazabilidad identifica autor, fecha, visibilidad y estado de entrega; “Correo no enviado” acredita preparación, no despacho.', 56, closureY + 26, { width: doc.page.width - 112 });
-  doc.moveTo(56, closureY + 61).lineTo(250, closureY + 61).lineWidth(0.5).strokeColor(C.line).stroke();
-  doc.moveTo(330, closureY + 61).lineTo(doc.page.width - 56, closureY + 61).lineWidth(0.5).strokeColor(C.line).stroke();
-  doc.font('Helvetica-Bold').fontSize(7).fillColor(C.navy).text('Firma del inspector', 56, closureY + 66, { width: 194 });
-  doc.text('Revisión administrativa', 330, closureY + 66, { width: doc.page.width - 386 });
-  doc.y = closureY + 88;
+  doc.roundedRect(44, closureY, doc.page.width - 88, 66, 5).fill(C.soft);
+  doc.font('Helvetica-Bold').fontSize(10).fillColor(C.navy).text('Control documental', 56, closureY + 10);
+  doc.font('Helvetica').fontSize(6.7).fillColor(C.muted).text('El documento reproduce la versión indicada del expediente SITREP. Las huellas SHA-256 permiten verificar integridad técnica, pero no sustituyen la firma de los intervinientes ni una firma digital emitida conforme al régimen aplicable.', 56, closureY + 25, { width: doc.page.width - 112 });
+  doc.font('Helvetica-Bold').fontSize(6.7).fillColor(C.navy).text('Marco de referencia: Ley Provincial 5.917 y Decreto Provincial 2.625/1999, art. 44.', 56, closureY + 52, { width: doc.page.width - 112 });
+  doc.y = closureY + 72;
 
   const range = doc.bufferedPageRange();
   for (let i = range.start; i < range.start + range.count; i += 1) {
@@ -265,7 +304,7 @@ export async function streamInspectionActPdf(
     const footerY = doc.page.height - 78;
     doc.moveTo(44, footerY - 8).lineTo(doc.page.width - 44, footerY - 8).lineWidth(0.5).strokeColor(C.line).stroke();
     doc.font('Helvetica').fontSize(7).fillColor(C.muted)
-      .text(`${inspection.numero} · Generado ${formatDate(new Date(), true)} · SITREP Mendoza`, 44, footerY, { width: 390, lineBreak: false })
+      .text(`${inspection.numero} · v${inspection.version} · ${fingerprint.slice(0, 16)}… · SITREP Mendoza`, 44, footerY, { width: 390, lineBreak: false })
       .text(`Página ${i + 1} de ${range.count}`, 454, footerY, { width: 97, align: 'right', lineBreak: false });
   }
   doc.end();

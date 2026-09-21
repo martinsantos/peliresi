@@ -127,6 +127,8 @@ test('inspector can attach an image to one checklist comment without losing the 
   const mobile = testInfo.project.name === 'mobile';
   const state = structuredClone(inspection);
   let uploadBody = '';
+  let allowUpload = false;
+  let failDetailLoad = false;
 
   await page.route('**/api/inspecciones/inspection-qa**', async (route) => {
     const request = route.request();
@@ -136,7 +138,10 @@ test('inspector can attach an image to one checklist comment without losing the 
     if (request.method() === 'GET' && /\/evidencias\/(e-1|e-item-new)$/.test(url.pathname)) {
       return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480"><rect width="640" height="480" fill="#dff5e9"/><path d="M90 330 230 185l95 90 70-65 155 120" fill="none" stroke="#0D8A4F" stroke-width="24"/></svg>' });
     }
-    if (request.method() === 'GET' && url.pathname === '/api/inspecciones/inspection-qa') return respond(state);
+    if (request.method() === 'GET' && url.pathname === '/api/inspecciones/inspection-qa') {
+      if (failDetailLoad) return route.abort('internetdisconnected');
+      return respond(state);
+    }
     if (request.method() === 'PATCH' && url.pathname === '/api/inspecciones/inspection-qa') {
       Object.assign(state, request.postDataJSON(), { version: state.version + 1 });
       return respond(state);
@@ -152,6 +157,7 @@ test('inspector can attach an image to one checklist comment without losing the 
       return respond(state);
     }
     if (request.method() === 'POST' && url.pathname.endsWith('/evidencias')) {
+      if (!allowUpload) return route.abort('internetdisconnected');
       uploadBody = request.postData() || '';
       const evidence = { id: 'e-item-new', tipo: 'FOTO', nombreOriginal: 'senalizacion-nueva.png', mimeDetectado: 'image/png', bytes: 512, capturadaAt: new Date().toISOString(), createdAt: new Date().toISOString(), itemId: 'item-6', descripcion: 'Falta completar la señalización del kit de emergencia.' };
       state.evidencias.unshift(evidence);
@@ -165,12 +171,30 @@ test('inspector can attach an image to one checklist comment without losing the 
   await page.goto(mobile ? '/mobile/inspecciones/inspection-qa' : '/inspecciones/inspection-qa');
   const emergencyItem = page.getByText('Señalización y elementos de emergencia operativos', { exact: true }).locator('xpath=ancestor::div[@data-result][1]');
   await emergencyItem.getByRole('textbox', { name: /Observación:/ }).fill('Falta completar la señalización del kit de emergencia.');
-  await emergencyItem.getByLabel(/Adjuntar foto:/).setInputFiles({ name: 'senalizacion-nueva.png', mimeType: 'image/png', buffer: Buffer.from('qa-image') });
+  await page.context().setOffline(true);
+  const realPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+  await emergencyItem.getByLabel(/Adjuntar foto:/).setInputFiles({ name: 'senalizacion-nueva.png', mimeType: 'image/png', buffer: realPng });
 
-  await expect(emergencyItem.getByText('senalizacion-nueva.png')).toBeVisible();
+  await expect(emergencyItem.getByTestId('pending-inspection-evidence')).toBeVisible();
+  await expect(emergencyItem.getByText('Pendiente de sincronizar')).toBeVisible();
+  await page.context().setOffline(false);
+  failDetailLoad = true;
+  await expect(emergencyItem.getByTestId('pending-inspection-evidence')).toBeVisible();
+  await page.reload();
+  const recoveredItem = page.getByText('Señalización y elementos de emergencia operativos', { exact: true }).locator('xpath=ancestor::div[@data-result][1]');
+  await expect(recoveredItem.getByTestId('pending-inspection-evidence')).toBeVisible();
+  await expect(recoveredItem.getByRole('textbox', { name: /Observación:/ })).toHaveValue('Falta completar la señalización del kit de emergencia.');
+  failDetailLoad = false;
+  allowUpload = true;
+  await page.getByRole('button', { name: 'Sincronizar ahora' }).click();
+
+  await expect(recoveredItem.getByText('senalizacion-nueva.png')).toBeVisible();
+  await expect(recoveredItem.getByTestId('pending-inspection-evidence')).toHaveCount(0);
   expect(uploadBody).toContain('name="itemId"');
   expect(uploadBody).toContain('item-6');
   expect(uploadBody).toContain('Falta completar la señalización del kit de emergencia.');
+  expect(uploadBody).toContain('name="clienteId"');
+  expect(uploadBody).toContain('name="clienteSha256"');
 });
 
 test('inspection list uses one active destination for the whole row', async ({ page }, testInfo) => {

@@ -527,6 +527,10 @@ export async function subirEvidencia(req: AuthRequest, res: Response, next: Next
     const eventoId = req.body.eventoId ? String(req.body.eventoId) : null;
     const comparacionId = req.body.comparacionId ? String(req.body.comparacionId) : null;
     const itemId = req.body.itemId ? String(req.body.itemId) : null;
+    const clienteId = req.body.clienteId ? String(req.body.clienteId).trim() : null;
+    if (clienteId && !/^[a-zA-Z0-9_-]{8,128}$/.test(clienteId)) {
+      throw new AppError('Identificador de captura inválido', 400);
+    }
     if (!hasSingleEvidenceTarget([eventoId, comparacionId, itemId])) {
       throw new AppError('La evidencia debe vincularse a un único comentario, comparación o evento', 400);
     }
@@ -550,6 +554,15 @@ export async function subirEvidencia(req: AuthRequest, res: Response, next: Next
       });
       if (!itemTarget) throw new AppError('Ítem de checklist inválido', 400);
     }
+    if (clienteId) {
+      const retried = await prisma.evidenciaInspeccion.findFirst({ where: { inspeccionId: req.params.id, clienteId } });
+      if (retried) {
+        if ((itemId && retried.itemId !== itemId) || (comparacionId && retried.comparacionId !== comparacionId) || (eventoId && retried.eventoId !== eventoId)) {
+          throw new AppError('La captura ya fue vinculada a otro punto del expediente', 409);
+        }
+        return res.json({ success: true, data: retried, message: 'La captura ya estaba sincronizada' });
+      }
+    }
     const stored = await persistInspectionEvidence(req.file, req.params.id);
     storedKey = stored.storageKey;
     const requestedType = String(req.body.tipo || '').toUpperCase();
@@ -562,6 +575,14 @@ export async function subirEvidencia(req: AuthRequest, res: Response, next: Next
     }
     if (itemId && !stored.mimeType.startsWith('image/')) {
       throw new AppError('Los comentarios del checklist admiten imágenes JPG o PNG', 400);
+    }
+    const clientHash = req.body.clienteSha256 ? String(req.body.clienteSha256).toLowerCase() : null;
+    if (clientHash && (!/^[a-f0-9]{64}$/.test(clientHash) || clientHash !== stored.sha256)) {
+      throw new AppError('La evidencia cambió durante la sincronización', 400);
+    }
+    const requestedCaptureDate = req.body.capturadaAt ? new Date(String(req.body.capturadaAt)) : null;
+    if (requestedCaptureDate && Number.isNaN(requestedCaptureDate.getTime())) {
+      throw new AppError('Fecha de captura inválida', 400);
     }
     const duplicate = await prisma.evidenciaInspeccion.findFirst({ where: { inspeccionId: req.params.id, sha256: stored.sha256 } });
     if (duplicate) {
@@ -599,6 +620,7 @@ export async function subirEvidencia(req: AuthRequest, res: Response, next: Next
       const created = await tx.evidenciaInspeccion.create({
         data: {
           inspeccionId: req.params.id,
+          clienteId,
           creadoPorId: req.user.id,
           comparacionId,
           eventoId,
@@ -611,6 +633,7 @@ export async function subirEvidencia(req: AuthRequest, res: Response, next: Next
           sha256: stored.sha256,
           descripcion: req.body.descripcion ? String(req.body.descripcion).slice(0, 2_000) : null,
           transcripcion: req.body.transcripcion ? String(req.body.transcripcion).slice(0, 20_000) : null,
+          capturadaAt: requestedCaptureDate || new Date(),
           latitud: req.body.latitud ? Number(req.body.latitud) : null,
           longitud: req.body.longitud ? Number(req.body.longitud) : null,
         },

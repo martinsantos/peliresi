@@ -84,4 +84,16 @@ describe('inspection checklist evidence', () => {
     expect(mocks.persist).not.toHaveBeenCalled();
     expect(mocks.createEvidence).not.toHaveBeenCalled();
   });
+
+  it('returns an already synchronized client capture without persisting it twice', async () => {
+    mocks.duplicate.mockResolvedValueOnce({ id: 'evidence-existing', clienteId: 'capture_12345678', itemId: 'item-1' });
+    const res = response();
+    const next = vi.fn();
+
+    await subirEvidencia(request({ itemId: 'item-1', clienteId: 'capture_12345678' }), res as any, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mocks.persist).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ id: 'evidence-existing' }) }));
+  });
 });
