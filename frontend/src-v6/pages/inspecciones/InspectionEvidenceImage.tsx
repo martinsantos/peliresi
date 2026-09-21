@@ -9,17 +9,18 @@ export function InspectionEvidenceImage({ inspectionId, evidenceId, alt, classNa
   className?: string;
 }) {
   const requestKey = `${inspectionId}:${evidenceId}`;
-  const [image, setImage] = useState<{ key: string; url: string | null; failed: boolean }>({ key: '', url: null, failed: false });
-  const current = image.key === requestKey ? image : { key: requestKey, url: null, failed: false };
+  const [image, setImage] = useState<{ key: string; url: string | null; failed: boolean; loaded: boolean }>({ key: '', url: null, failed: false, loaded: false });
+  const current = image.key === requestKey ? image : { key: requestKey, url: null, failed: false, loaded: false };
   useEffect(() => {
     let active = true;
     let objectUrl: string | null = null;
+    setImage({ key: requestKey, url: null, failed: false, loaded: false });
     inspeccionService.evidenceObjectUrl(inspectionId, evidenceId).then((next) => {
       objectUrl = next;
-      if (active) setImage({ key: requestKey, url: next, failed: false });
+      if (active) setImage({ key: requestKey, url: next, failed: false, loaded: false });
       else URL.revokeObjectURL(next);
     }).catch(() => {
-      if (active) setImage({ key: requestKey, url: null, failed: true });
+      if (active) setImage({ key: requestKey, url: null, failed: true, loaded: false });
     });
     return () => {
       active = false;
@@ -27,6 +28,17 @@ export function InspectionEvidenceImage({ inspectionId, evidenceId, alt, classNa
     };
   }, [inspectionId, evidenceId, requestKey]);
 
-  if (!current.url) return <div role="img" aria-label={current.failed ? `Miniatura no disponible: ${alt}` : `Cargando miniatura: ${alt}`} className={`flex items-center justify-center bg-neutral-100 text-neutral-400 ${className}`}><ImageIcon size={24} /></div>;
-  return <img src={current.url} alt={alt} loading="lazy" decoding="async" onError={() => setImage({ key: requestKey, url: null, failed: true })} className={className} />;
+  return <span className={`relative block overflow-hidden bg-neutral-100 text-neutral-400 ${className}`}>
+    {(!current.url || !current.loaded) && <span role="img" aria-label={current.failed ? `Miniatura no disponible: ${alt}` : `Cargando miniatura: ${alt}`} className="absolute inset-0 flex items-center justify-center bg-neutral-100"><ImageIcon size={24} /></span>}
+    {current.url && !current.failed && <img
+      src={current.url}
+      alt={alt}
+      loading="eager"
+      decoding="sync"
+      data-loaded={current.loaded ? 'true' : 'false'}
+      onLoad={() => setImage((value) => value.key === requestKey ? { ...value, loaded: true } : value)}
+      onError={() => setImage({ key: requestKey, url: null, failed: true, loaded: false })}
+      className={`h-full w-full object-cover transition-opacity duration-150 ${current.loaded ? 'opacity-100' : 'opacity-0'}`}
+    />}
+  </span>;
 }

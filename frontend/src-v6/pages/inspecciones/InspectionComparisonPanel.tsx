@@ -37,7 +37,7 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, editable,
             <span className="rounded-full bg-primary-50 px-2.5 py-1 text-primary-700">{completed}/{comparisons.length}</span>
           </div>
         </div>
-        <div className="mt-4 h-2 overflow-hidden rounded-full bg-neutral-200"><span className="block h-full rounded-full bg-primary-600 transition-all" style={{ width: `${Math.round((completed / Math.max(1, comparisons.length)) * 100)}%` }} /></div>
+        <div className="mt-4 h-2 overflow-hidden rounded-full bg-neutral-200"><span className="block h-full rounded-full bg-primary-600 transition-[width] duration-200" style={{ width: `${Math.round((completed / Math.max(1, comparisons.length)) * 100)}%` }} /></div>
       </div>
 
       {groups.map((group) => {

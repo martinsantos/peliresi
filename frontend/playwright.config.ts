@@ -13,6 +13,7 @@ export default defineConfig({
     baseURL: process.env.PLAYWRIGHT_BASE_URL || 'https://sitrep.ultimamilla.com.ar',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    ...(process.env.PLAYWRIGHT_USE_SYSTEM_CHROME === '1' ? { channel: 'chrome' as const } : {}),
   },
 
   projects: [

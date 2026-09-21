@@ -98,6 +98,7 @@ test('inspection field screen is usable on web and PWA layouts', async ({ page }
   await expect(page.getByRole('button', { name: 'Difiere' }).first()).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByRole('button', { name: 'Guardar borrador' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Enviar a revisión' })).toBeVisible();
+  await expect(page.getByTestId('inspection-action-bar')).toHaveCSS('position', 'static');
   const actorLink = page.getByRole('link', { name: /Abrir actor inspeccionado: Transportes Andinos S\.A\./ });
   await expect(actorLink).toBeVisible();
   await expect(actorLink).toHaveAttribute('href', mobile
@@ -111,6 +112,10 @@ test('inspection field screen is usable on web and PWA layouts', async ({ page }
   await expect(page.getByRole('textbox', { name: /Observación: Señalización y elementos de emergencia operativos/ })).toBeVisible();
   const emergencyItem = page.getByText('Señalización y elementos de emergencia operativos', { exact: true }).locator('xpath=ancestor::div[@data-result][1]');
   await expect(emergencyItem.getByText('vehiculo_frente.jpg')).toBeVisible();
+  const itemPhoto = emergencyItem.getByAltText('Señalización de emergencia incompleta');
+  await expect(itemPhoto).toBeVisible();
+  await expect(itemPhoto).toHaveAttribute('data-loaded', 'true');
+  expect(await itemPhoto.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
   await expect(emergencyItem.getByLabel(/Adjuntar foto: Señalización y elementos de emergencia operativos/)).toBeAttached();
   await expect(emergencyItem.getByText('La imagen también queda disponible en Evidencias del expediente.')).toBeVisible();
   await emergencyItem.scrollIntoViewIfNeeded();
