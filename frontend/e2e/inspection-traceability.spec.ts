@@ -29,6 +29,23 @@ async function mockPublicApi(page: import('@playwright/test').Page, authenticate
     if (url.pathname.includes('/inspecciones/verificar/')) {
       return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: 'Código de verificación inválido' }) });
     }
+    if (authenticated && url.pathname === '/api/inspecciones/inspection-qa') {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: {
+        id: 'inspection-qa', numero: verification.numero, numeroActa: verification.numeroActa,
+        estado: 'CERRADA_CONFORME', tipoActor: 'GENERADOR', version: 3,
+        inspectorId: 'qa-admin', inspector: { id: 'qa-admin', nombre: 'QA' },
+        generador: { id: 'generator-qa', razonSocial: 'Generador de prueba', cuit: '30-12345678-9' },
+        createdAt: verification.createdAt, updatedAt: verification.updatedAt,
+        items: [], comparaciones: [], evidencias: [], verificacion: verification.verificacion,
+        eventos: [{ id: 'event-qa', tipo: 'CAMBIO_ESTADO', titulo: 'Cierre conforme documentado', visibleActor: true, createdAt: verification.updatedAt, usuario: { id: 'qa-admin', nombre: 'QA' } }],
+      } }) });
+    }
+    if (authenticated && url.pathname.endsWith('/intercambios')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: {
+        inspeccion: { id: 'inspection-qa', numero: verification.numero, estado: 'CERRADA_CONFORME', tipoActor: 'GENERADOR', version: 3 },
+        parteActual: 'AUTORIDAD', intercambios: [], comunicacionExterna: false,
+      } }) });
+    }
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: [] }) });
   });
 }
@@ -66,6 +83,12 @@ test.describe('public inspection QR traceability', () => {
     await page.goto(`/verificar/inspecciones/${token}`);
     const cta = page.getByRole('link', { name: 'Ver trazabilidad autorizada' });
     await expect(cta).toHaveAttribute('href', '/inspecciones/inspection-qa#trazabilidad');
+    await cta.click();
+    await expect(page).toHaveURL(/\/inspecciones\/inspection-qa#trazabilidad$/);
+    await expect(page.getByRole('heading', { name: 'Historial de la inspección' })).toBeVisible();
+    await expect(page.getByText('Cierre conforme documentado', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Resultado de la inspección' })).toHaveCount(0);
+    await expect(page.getByTestId('inspection-action-bar')).toHaveCSS('position', 'static');
   });
 
   test('PWA basename serves the same public verification route', async ({ page }) => {

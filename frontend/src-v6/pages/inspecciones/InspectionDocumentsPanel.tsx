@@ -9,6 +9,7 @@ interface Props {
   actEditable: boolean;
   reportEditable: boolean;
   reportFirst?: boolean;
+  section?: 'acta' | 'informe';
   onActDataChange: (value: InspectionActData) => void;
   onReportChange: (value: InspectionTechnicalReport) => void;
 }
@@ -20,14 +21,14 @@ function countValues(value: Record<string, unknown>): number {
   return Object.values(value).filter((entry) => entry !== undefined && entry !== null && String(entry).trim() !== '').length;
 }
 
-export const InspectionDocumentsPanel: React.FC<Props> = ({ actData, report, actEditable, reportEditable, reportFirst = false, onActDataChange, onReportChange }) => {
+export const InspectionDocumentsPanel: React.FC<Props> = ({ actData, report, actEditable, reportEditable, reportFirst = false, section, onActDataChange, onReportChange }) => {
   const actCount = countValues(actData as Record<string, unknown>);
   const reportCount = countValues(report as Record<string, unknown>);
   const actField = <Key extends keyof InspectionActData>(key: Key, value: InspectionActData[Key]) => onActDataChange({ ...actData, [key]: value });
   const reportField = <Key extends keyof InspectionTechnicalReport>(key: Key, value: InspectionTechnicalReport[Key]) => onReportChange({ ...report, [key]: value });
 
-  const actSection = <details className="group border-b border-neutral-200" open={!reportFirst && actEditable && actCount === 0}>
-    <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-4 hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 sm:px-5">
+  const actSection = <details className="group border-b border-neutral-200" open={section === 'acta' || (!reportFirst && actEditable && actCount === 0)}>
+    <summary hidden={Boolean(section)} className={`${section ? 'hidden' : 'flex'} cursor-pointer list-none items-center gap-3 px-4 py-4 hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 sm:px-5`}>
       <ClipboardCheck size={18} className="shrink-0 text-primary-700" />
       <span className="min-w-0 flex-1"><h4 className="text-sm font-bold text-[#10213A]">Acta de inspección / constatación</h4><span className="block text-xs text-neutral-500">Datos de campo, intervinientes, alcance y notificación</span></span>
       <span className="rounded-full bg-neutral-100 px-2 py-1 text-[10px] font-bold text-neutral-600">{actCount} datos</span>
@@ -76,8 +77,8 @@ export const InspectionDocumentsPanel: React.FC<Props> = ({ actData, report, act
     </div>
   </details>;
 
-  const reportSection = <details className={`group ${reportFirst ? 'border-b border-neutral-200' : ''}`} open={reportFirst || (reportEditable && reportCount === 0)}>
-    <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-4 hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 sm:px-5">
+  const reportSection = <details className={`group ${reportFirst ? 'border-b border-neutral-200' : ''}`} open={section === 'informe' || reportFirst || (reportEditable && reportCount === 0)}>
+    <summary hidden={Boolean(section)} className={`${section ? 'hidden' : 'flex'} cursor-pointer list-none items-center gap-3 px-4 py-4 hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 sm:px-5`}>
       <FileText size={18} className="shrink-0 text-blue-700" />
       <span className="min-w-0 flex-1"><h4 className="text-sm font-bold text-[#10213A]">Informe técnico para Legales</h4><span className="block text-xs text-neutral-500">Objetivo, antecedentes, evaluación, conclusión y recomendación</span></span>
       <span className="rounded-full bg-neutral-100 px-2 py-1 text-[10px] font-bold text-neutral-600">{reportCount}/7</span>
@@ -92,6 +93,8 @@ export const InspectionDocumentsPanel: React.FC<Props> = ({ actData, report, act
       <label className="block text-xs font-bold text-neutral-700">5. Recomendación<textarea disabled={!reportEditable} value={report.recomendacion || ''} onChange={(event) => reportField('recomendacion', event.target.value)} rows={3} placeholder="No se completa automáticamente" className={textareaClass} /></label>
     </div>
   </details>;
+
+  if (section) return <div className="min-w-0 [&>details]:border-0 [&>details>div]:border-0 [&>details>div]:bg-transparent [&>details>div]:p-0">{section === 'acta' ? actSection : reportSection}</div>;
 
   return <Card className="!p-0 overflow-hidden">
     <div className="border-b border-neutral-200 px-4 py-4 sm:px-5">

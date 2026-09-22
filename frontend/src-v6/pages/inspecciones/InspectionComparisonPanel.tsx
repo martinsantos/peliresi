@@ -9,10 +9,11 @@ const OPTIONS: Array<{ value: InspectionComparisonResult; label: string; icon: R
   { value: 'NO_VERIFICADO', label: 'No verificado', icon: <CircleMinus size={17} />, active: 'border-slate-500 bg-slate-100 text-slate-800' },
 ];
 
-export function InspectionComparisonPanel({ inspectionId, comparisons, editable, onChange, onEvidence }: {
+export function InspectionComparisonPanel({ inspectionId, comparisons, editable, onChange, onEvidence, embedded = false }: {
   inspectionId: string;
   comparisons: InspectionComparison[];
   editable: boolean;
+  embedded?: boolean;
   onChange: (id: string, patch: Partial<InspectionComparison>) => void;
   onEvidence: (file: File, comparisonId: string) => void;
 }) {
@@ -26,7 +27,7 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, editable,
 
   return (
     <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
-      <div className="border-b border-neutral-200 px-4 py-5 sm:px-6">
+      {!embedded && <div className="border-b border-neutral-200 px-4 py-5 sm:px-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h3 className="text-xl font-extrabold tracking-tight text-[#10213A]">Declarado vs. verificado</h3>
@@ -38,7 +39,7 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, editable,
           </div>
         </div>
         <div className="mt-4 h-2 overflow-hidden rounded-full bg-neutral-200"><span className="block h-full rounded-full bg-primary-600 transition-[width] duration-200" style={{ width: `${Math.round((completed / Math.max(1, comparisons.length)) * 100)}%` }} /></div>
-      </div>
+      </div>}
 
       {groups.map((group) => {
         const rows = comparisons.filter((row) => row.categoria === group);

@@ -121,7 +121,7 @@ function inspectionFixture(overrides: Partial<Inspection> = {}): Inspection {
   };
 }
 
-function renderPage(inspection: Inspection, mobile = false) {
+function renderPage(inspection: Inspection, mobile = false, hash = '') {
   useInspectionMock.mockReturnValue({
     data: inspection,
     isLoading: false,
@@ -129,7 +129,7 @@ function renderPage(inspection: Inspection, mobile = false) {
   });
   const path = mobile ? `/mobile/inspecciones/${inspection.id}` : `/inspecciones/${inspection.id}`;
   return render(
-    <MemoryRouter initialEntries={[path]}>
+    <MemoryRouter initialEntries={[path + hash]}>
       <Routes>
         <Route path="/inspecciones/:id" element={<InspeccionExpedientePage />} />
         <Route path="/mobile/inspecciones/:id" element={<InspeccionExpedientePage />} />
@@ -146,12 +146,15 @@ describe('InspeccionExpedientePage critical review UX', () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
   });
 
-  it('prioritizes the editable technical report before the consolidated view during review', async () => {
+  it('prioritizes the editable technical report in its own step during review', async () => {
     renderPage(inspectionFixture());
 
     const editor = await screen.findByRole('heading', { name: /informe técnico para legales/i });
-    const consolidated = screen.getByRole('heading', { name: /vista consolidada del expediente/i });
-    expect(editor.compareDocumentPosition(consolidated) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(editor).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /vista consolidada del expediente/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('link', { name: /Revisar y enviar/ }));
+    expect(await screen.findByRole('heading', { name: /vista consolidada del expediente/i })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /informe técnico para legales/i })).not.toBeInTheDocument();
   });
 
   it('lists approval blockers and disables approval while the dossier is incomplete', async () => {
@@ -170,7 +173,7 @@ describe('InspeccionExpedientePage critical review UX', () => {
         id: 'comparison-1', codigo: 'REG-01', categoria: 'Registro', etiqueta: 'Habilitación', origen: 'registro',
         valorDeclarado: 'A-001', valorObservado: null, resultado: 'PENDIENTE', observacion: null, orden: 1, evidencias: [],
       }],
-    }));
+    }), false, '#revision');
 
     const readiness = await screen.findByTestId('inspection-dossier-readiness');
     expect(within(readiness).getByRole('heading', { name: /preparación para aprobar/i })).toBeInTheDocument();
@@ -237,12 +240,26 @@ describe('InspeccionExpedientePage critical review UX', () => {
     await waitFor(() => expect(localStorage.getItem(key)).toBeNull());
   });
 
-  it('keeps the mobile action bar sticky below the device safe area', async () => {
+  it('keeps mobile actions in normal flow without covering the active wizard step', async () => {
     renderPage(inspectionFixture(), true);
 
     const actionBar = await screen.findByTestId('inspection-action-bar');
     const positioningContract = `${actionBar.className} ${actionBar.getAttribute('style') || ''}`;
-    expect(positioningContract).toMatch(/\bsticky\b/);
-    expect(positioningContract).toMatch(/safe-area-inset-top/);
+    expect(positioningContract).not.toMatch(/\b(?:sticky|fixed|absolute)\b/);
+    const content = screen.getByTestId('inspection-step-content');
+    expect(content.compareDocumentPosition(actionBar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole('progressbar', { name: 'Paso actual del recorrido' })).toHaveAttribute('aria-valuemax', '7');
+  });
+
+  it('flushes the field draft before step navigation and restores it when returning', async () => {
+    const inspection = inspectionFixture({ estado: 'EN_CAMPO' });
+    renderPage(inspection);
+    fireEvent.change(await screen.findByLabelText('Ubicación', { exact: true }), { target: { value: 'Ubicación validada en campo' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente', exact: true }));
+    expect(await screen.findByTestId('comparison-editor')).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem('sitrep_inspection_draft_admin-1_inspection-1') || '{}')).toMatchObject({ ubicacion: 'Ubicación validada en campo' });
+    fireEvent.click(screen.getByRole('button', { name: 'Anterior', exact: true }));
+    expect(await screen.findByLabelText('Ubicación', { exact: true })).toHaveValue('Ubicación validada en campo');
+    expect(screen.getByTestId('comparison-editor')).not.toBeVisible();
   });
 });

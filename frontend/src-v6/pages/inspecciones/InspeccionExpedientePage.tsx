@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { isAxiosError } from 'axios';
-import { AlertTriangle, ArchiveX, ArrowLeft, CalendarDays, Camera, Check, ChevronDown, ChevronUp, CircleMinus, ClipboardCheck, CloudOff, CloudUpload, Download, FileAudio, FileText, History, Loader2, MapPin, Mic, Paperclip, RotateCcw, Save, Send, ShieldCheck, Square, Trash2, UserRound, XCircle } from 'lucide-react';
+import { AlertTriangle, ArchiveX, ArrowLeft, Camera, Check, ChevronDown, ChevronUp, CircleMinus, ClipboardCheck, CloudOff, CloudUpload, Download, FileAudio, FileText, History, Loader2, Mic, Paperclip, RotateCcw, Save, Send, ShieldCheck, Square, Trash2, UserRound, XCircle } from 'lucide-react';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge, type BadgeColor } from '../../components/ui/BadgeV2';
 import { Card } from '../../components/ui/CardV2';
@@ -26,7 +26,7 @@ import { InspectionEvidenceImage } from './InspectionEvidenceImage';
 import { InspectionReport } from './InspectionReport';
 import { InspectionTimeline } from './InspectionTimeline';
 import { InspectionExchangePanel } from './InspectionExchangePanel';
-import { InspectionInstitutionalMasthead } from './InspectionInstitutionalMasthead';
+import { InspectionWorkspace, type InspectionWorkspaceStep } from './InspectionWorkspace';
 import { InspectionVerificationBlock } from './InspectionVerificationBlock';
 import { InspectionDocumentsPanel } from './InspectionDocumentsPanel';
 import { getInspectionDossierReadiness, type InspectionDossierReadiness } from './inspectionDossierReadiness';
@@ -61,12 +61,6 @@ const InspeccionExpedientePage: React.FC = () => {
   const canEditReport = Boolean(inspection && (canEdit || (inspection.estado === 'EN_REVISION' && (isAdmin || isAssignedInspector))));
 
   useEffect(() => { const on = () => setIsOnline(true); const off = () => setIsOnline(false); window.addEventListener('online', on); window.addEventListener('offline', off); return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); }; }, []);
-  useEffect(() => {
-    if (!inspection || !location.hash) return;
-    const targetId = decodeURIComponent(location.hash.slice(1));
-    const frame = window.requestAnimationFrame(() => document.getElementById(targetId)?.scrollIntoView({ block: 'start' }));
-    return () => window.cancelAnimationFrame(frame);
-  }, [inspection, location.hash]);
   useEffect(() => {
     if (!inspection) return;
     const draft: Draft = { version: inspection.version, observaciones: inspection.observaciones || '', numeroActa: inspection.numeroActa || '', ubicacion: inspection.ubicacion || '', plazoRespuestaAt: localDate(inspection.plazoRespuestaAt), datosActa: inspection.datosActa || {}, informeTecnico: inspection.informeTecnico || {}, items: inspection.items, comparaciones: inspection.comparaciones || [] };
@@ -272,48 +266,75 @@ const InspeccionExpedientePage: React.FC = () => {
   const actorRoute = actor ? inspectionActorRoute(inspection.tipoActor, actor.id, mobile) : '';
   const completed = items.filter((item) => item.resultado !== 'PENDIENTE').length; const groups = Array.from(new Set(items.map((item) => item.categoria)));
   const primaryAction = inspection.estado === 'BORRADOR' || inspection.estado === 'PLANIFICADA' ? { label: 'Iniciar inspección', state: 'EN_CAMPO' as InspectionState } : inspection.estado === 'EN_CAMPO' ? { label: 'Enviar a revisión', state: 'EN_REVISION' as InspectionState } : inspection.estado === 'EN_REVISION' && isAdmin ? { label: 'Aprobar expediente', state: 'NOTIFICADA' as InspectionState } : null;
-  const showActionBar = canEdit || canEditReport || Boolean(primaryAction);
-  const showReadiness = !['BORRADOR', 'PLANIFICADA', 'EN_CAMPO', 'CANCELADA'].includes(inspection.estado);
   const showExchangePanel = !['BORRADOR', 'PLANIFICADA', 'EN_CAMPO', 'EN_REVISION', 'CANCELADA'].includes(inspection.estado);
   const approvalBlocked = inspection.estado === 'EN_REVISION' && (!dossierReadiness?.ready || Boolean(staleDraft));
-  const stickyPosition = hasMobileNav ? 'sticky top-[calc(3.5rem+env(safe-area-inset-top))]' : 'sticky top-20';
-
-  return <div className={`space-y-4 animate-fade-in ${hasMobileNav ? 'pb-20 sm:pb-0' : ''}`}>
-    {(!isOnline || pendingEvidence.length > 0) && <div className="flex flex-col gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-950 sm:flex-row sm:items-center sm:justify-between"><span className="flex items-center gap-2">{isOnline ? <CloudUpload size={18} /> : <CloudOff size={18} />}{!isOnline ? 'Sin conexión · el borrador y las capturas quedan protegidos en este dispositivo' : `${pendingEvidence.length} ${pendingEvidence.length === 1 ? 'captura pendiente' : 'capturas pendientes'} de sincronización`}</span>{isOnline && pendingEvidence.length > 0 && <button type="button" onClick={() => void syncEvidence()} disabled={syncingEvidence} className="w-fit rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-bold text-amber-950 disabled:opacity-60">{syncingEvidence ? 'Sincronizando…' : 'Sincronizar ahora'}</button>}</div>}
-    {staleDraft && <StaleDraftNotice serverVersion={inspection.version} draftVersion={staleDraft.version} onRecover={recoverStaleDraft} onDiscard={discardStaleDraft} />}
-    <InspectionInstitutionalMasthead inspectionNumber={inspection.numero} actNumber={inspection.numeroActa} state={inspection.estado} version={inspection.version} />
-    <nav aria-label="Secciones del expediente" className="flex min-w-0 gap-1 overflow-x-auto border-b border-neutral-200 pb-1 text-xs font-bold text-neutral-600">
-      <a href="#resumen" className="shrink-0 rounded-md px-3 py-2 hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">Resumen</a>
-      <a href="#informe-tecnico" className="shrink-0 rounded-md px-3 py-2 hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">Informe técnico</a>
-      <a href="#evidencias" className="shrink-0 rounded-md px-3 py-2 hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">Evidencias</a>
-      <a href="#trazabilidad" className="shrink-0 rounded-md px-3 py-2 hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">Trazabilidad</a>
-      <a href="#verificacion" className="shrink-0 rounded-md px-3 py-2 hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">Verificación QR</a>
-    </nav>
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><button onClick={() => navigate(`${mobile ? '/mobile' : ''}/inspecciones`)} className="flex w-fit items-center gap-2 rounded-lg px-2 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-100"><ArrowLeft size={18} />Volver al listado</button><div className="flex flex-wrap items-center gap-2"><Badge color={COLORS[inspection.estado] || 'neutral'} size="lg" dot>{LABELS[inspection.estado]}</Badge><DropdownMenu><DropdownTrigger asChild><Button variant="outline" size="sm" leftIcon={<Download size={16} />} rightIcon={<ChevronDown size={14} />} isLoading={pdfMutation.isPending}>Exportar</Button></DropdownTrigger><DropdownContent className="w-72"><DropdownLabel>Documentos del expediente</DropdownLabel><DropdownItem icon={<ClipboardCheck size={16} />} onClick={() => pdfMutation.mutate('acta')}>Acta de inspección<span className="block text-[11px] font-normal text-neutral-500">Salida de campo levantada desde la tablet</span></DropdownItem><DropdownItem icon={<FileText size={16} />} onClick={() => pdfMutation.mutate('informe-tecnico')}>Informe técnico<span className="block text-[11px] font-normal text-neutral-500">Evaluación que acompaña al acta para dictamen</span></DropdownItem></DropdownContent></DropdownMenu></div></div>
-    <div id="resumen" className="scroll-mt-24"><Card className="!p-4 sm:!p-5"><div className="flex flex-col gap-4 border-b border-neutral-200 pb-4 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-sm font-semibold text-primary-700">Expediente de inspección</p><h2 className="mt-1 text-2xl font-extrabold tracking-tight text-[#10213A]">{inspection.numero}</h2></div><label className="text-xs font-semibold uppercase tracking-wide text-neutral-500 sm:w-64">Número de acta<input disabled={!canEdit} value={numeroActa} onChange={(e) => setNumeroActa(e.target.value)} placeholder="Asignar número" className="mt-1.5 h-10 w-full rounded-lg border border-neutral-300 px-3 text-sm font-medium normal-case text-neutral-900 disabled:bg-neutral-50" /></label></div><div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"><Meta icon={<ClipboardCheck />} label="Actor inspeccionado" value={actor?.razonSocial || ''} detail={`CUIT ${actor?.cuit || 's/d'}`} to={actor ? actorRoute : undefined} /><Meta icon={<UserRound />} label="Inspector" value={`${inspection.inspector.nombre} ${inspection.inspector.apellido || ''}`} /><div className="flex gap-3"><MapPin className="mt-0.5 shrink-0 text-neutral-500" size={19} /><div className="min-w-0 flex-1"><p className="text-xs text-neutral-500">Ubicación</p>{canEdit ? <input value={ubicacion} onChange={(e) => setUbicacion(e.target.value)} className="mt-1 h-9 w-full rounded-lg border border-neutral-300 px-2 text-sm" /> : <p className="font-bold text-[#10213A]">{ubicacion || 'Sin informar'}</p>}</div></div><Meta icon={<CalendarDays />} label="Inicio" value={inspectionDate(inspection.iniciadaAt, true)} /></div><div className="mt-4 border-t border-neutral-200 pt-4"><p className="text-xs leading-relaxed text-neutral-500 lg:text-right">Creada {inspectionDate(inspection.createdAt, true)} · Programada {inspectionDate(inspection.fechaProgramada, true)}<br className="hidden lg:block" /> Actualizada {inspectionDate(inspection.updatedAt, true)}{inspection.plazoRespuestaAt ? ` · Plazo ${inspectionDate(inspection.plazoRespuestaAt, true)}` : ''}</p></div></Card></div>
-    {showReadiness && dossierReadiness && <DossierReadinessPanel readiness={dossierReadiness} />}
-    {showActionBar && <div data-testid="inspection-action-bar" className={`${stickyPosition} z-30 rounded-xl border border-neutral-200 bg-white/95 px-2 py-2 shadow-md backdrop-blur sm:px-4 sm:py-3`}><div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div className="hidden sm:block"><p className="text-sm font-extrabold text-[#10213A]">Acciones del expediente</p><p className="mt-0.5 text-xs text-neutral-500">{staleDraft ? 'Resolvé el borrador anterior antes de guardar o cambiar de etapa.' : canEdit ? 'Guardá el avance antes de cambiar la etapa.' : 'El acta de campo está cerrada; sólo puede versionarse el informe técnico.'}</p></div><div className={`grid gap-2 [&>button]:min-w-0 [&>button]:px-2 sm:flex sm:justify-end sm:[&>button]:flex-none sm:[&>button]:px-5 ${inspection.estado === 'EN_REVISION' && isAdmin ? 'grid-cols-3' : 'grid-cols-2'}`}>{(canEdit || canEditReport) && <Button aria-label={canEdit ? 'Guardar borrador' : 'Guardar informe técnico'} variant="outline" leftIcon={<Save size={17} />} isLoading={saveMutation.isPending} onClick={save} disabled={Boolean(staleDraft)}><span className="sm:hidden">Guardar</span><span className="hidden sm:inline">{canEdit ? 'Guardar borrador' : 'Guardar informe técnico'}</span></Button>}{inspection.estado === 'EN_REVISION' && isAdmin && <Button aria-label="Devolver a campo" variant="outline" onClick={() => transition('EN_CAMPO')} disabled={Boolean(staleDraft)}><span className="sm:hidden">Devolver</span><span className="hidden sm:inline">Devolver a campo</span></Button>}{primaryAction && <Button aria-label={primaryAction.label} aria-describedby={primaryAction.state === 'NOTIFICADA' ? 'approval-readiness-hint' : undefined} leftIcon={primaryAction.state === 'EN_REVISION' ? <Send size={17} /> : <ShieldCheck size={17} />} isLoading={transitionMutation.isPending} onClick={() => transition(primaryAction.state)} disabled={Boolean(staleDraft) || (primaryAction.state === 'NOTIFICADA' && (!plazoRespuestaAt || approvalBlocked))}><span className="sm:hidden">{primaryAction.state === 'EN_REVISION' ? 'Enviar' : primaryAction.state === 'EN_CAMPO' ? 'Iniciar' : 'Aprobar'}</span><span className="hidden sm:inline">{primaryAction.label}</span></Button>}</div></div></div>}
-    {canEdit && <InspectionComparisonPanel inspectionId={inspection.id} comparisons={comparisons} editable onChange={(rowId, patch) => setComparisons((rows) => rows.map((row) => row.id === rowId ? { ...row, ...patch } : row))} onEvidence={(file, comparisonId) => upload(file, { comparacionId: comparisonId })} />}
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.62fr)_minmax(330px,0.72fr)]">
-      <div className="space-y-4">
-        <div id="informe-tecnico" className="scroll-mt-24">
-        {canEditReport && !canEdit && <InspectionDocumentsPanel actData={datosActa} report={informeTecnico} actEditable={false} reportEditable reportFirst onActDataChange={setDatosActa} onReportChange={setInformeTecnico} />}
-        {!canEdit && <InspectionReport inspection={{ ...inspection, items, comparaciones: comparisons, informeTecnico }} readiness={dossierReadiness || undefined} />}
-        {canEdit && <Checklist inspectionId={inspection.id} groups={groups} items={items} completed={completed} editable setItems={setItems} uploadingItemId={uploadingItemId} pendingEvidence={pendingEvidence} onEvidence={(file, item) => upload(file, { itemId: item.id, descripcion: item.observacion?.trim() || `Evidencia vinculada al control ${item.codigo}` }, true)} onAnnul={annulEvidence} />}
-        {(canEdit || !canEditReport) && <InspectionDocumentsPanel actData={datosActa} report={informeTecnico} actEditable={canEdit} reportEditable={canEditReport} onActDataChange={setDatosActa} onReportChange={setInformeTecnico} />}
-        </div>
-        {showExchangePanel && <InspectionExchangePanel inspectionId={inspection.id} compact />}
-      </div>
-      <div className="space-y-4">
-        <div id="evidencias" className="scroll-mt-24"><EvidenceCard inspection={inspection} pendingEvidence={pendingEvidence} editable={canEdit} recording={recording} onCamera={() => cameraRef.current?.click()} onFile={() => fileRef.current?.click()} onAudio={toggleRecording} onAnnul={annulEvidence} /></div>
-        <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={uploadFromInput} />
-        <input ref={fileRef} type="file" accept="image/*,application/pdf,audio/*" className="hidden" onChange={uploadFromInput} />
-        <div id="trazabilidad" className="scroll-mt-24"><InspectionTimeline inspection={inspection} canComment={Boolean(isAdmin)} busy={eventMutation.isPending} onAdd={async (input, file) => { try { await eventMutation.mutateAsync({ input, file }); toast.success('Registro actualizado', input.tipo === 'NOTIFICACION_PREPARADA' ? 'Borrador de notificación registrado como no enviado.' : 'Nota interna incorporada.'); } catch (error: unknown) { toast.error('No se pudo registrar', inspectionErrorMessage(error, 'Revise los datos.')); throw error; } }} /></div>
-        <Card><h3 className="font-extrabold text-[#10213A]">Observaciones generales</h3><textarea disabled={!canEdit} value={observaciones} onChange={(e) => setObservaciones(e.target.value)} rows={5} placeholder="Describa hallazgos, contexto y acciones requeridas…" className="mt-3 w-full resize-y rounded-lg border border-neutral-300 p-3 text-sm leading-relaxed disabled:bg-neutral-50" /></Card>
-        {(inspection.estado === 'EN_REVISION' || inspection.estado === 'NOTIFICADA') && isAdmin && <Card><h3 className="font-extrabold text-[#10213A]">Plazo de respuesta</h3><p className="mt-1 text-xs text-neutral-500">La aprobación no envía correos; deja el expediente preparado.</p><input aria-label="Plazo de respuesta" type="datetime-local" value={plazoRespuestaAt} onChange={(e) => setPlazoRespuestaAt(e.target.value)} className="mt-3 h-11 w-full rounded-lg border border-neutral-300 px-3 text-sm" /></Card>}
-      </div>
+  const guided = canEdit || canEditReport;
+  const reviewedComparisons = comparisons.filter((row) => row.resultado !== 'PENDIENTE').length;
+  const reportFields = [informeTecnico.objetivo, informeTecnico.antecedentes, informeTecnico.evaluacion, informeTecnico.conclusion, informeTecnico.recomendacion];
+  const reportCompleted = reportFields.filter((value) => value?.trim()).length;
+  const flushDraft = () => {
+    if (!draftKey || !guided || staleDraft) return;
+    try {
+      localStorage.setItem(draftKey, JSON.stringify({ version: inspection.version, observaciones, numeroActa, ubicacion, plazoRespuestaAt, datosActa, informeTecnico, items, comparaciones: comparisons } satisfies Draft));
+    } catch { toast.warning('No se pudo guardar en este dispositivo', 'Guardá en el servidor antes de salir de la inspección.'); }
+  };
+  const draftInspection = { ...inspection, items, comparaciones: comparisons, informeTecnico, datosActa, numeroActa, ubicacion, observaciones };
+  const context = <div className="space-y-6">
+    <div className="grid gap-5 sm:grid-cols-2"><Meta icon={<ClipboardCheck />} label="Actor inspeccionado" value={actor?.razonSocial || ''} detail={'CUIT ' + (actor?.cuit || 's/d')} /><Meta icon={<UserRound />} label="Inspector" value={inspection.inspector.nombre + ' ' + (inspection.inspector.apellido || '')} /></div>
+    <div className="grid gap-5 border-t border-neutral-200 pt-5 sm:grid-cols-2">
+      <label className="text-sm font-semibold text-neutral-700">Número de acta<input disabled={!canEdit} value={numeroActa} onChange={(event) => setNumeroActa(event.target.value)} placeholder="Asignar número" className="mt-2 h-11 w-full rounded-lg border border-neutral-300 px-3 text-sm font-normal text-neutral-900 disabled:bg-neutral-50" /></label>
+      <label className="text-sm font-semibold text-neutral-700">Ubicación<input disabled={!canEdit} value={ubicacion} onChange={(event) => setUbicacion(event.target.value)} placeholder="Dirección o referencia del lugar" className="mt-2 h-11 w-full rounded-lg border border-neutral-300 px-3 text-sm font-normal text-neutral-900 disabled:bg-neutral-50" /></label>
     </div>
-    <InspectionVerificationBlock verification={inspection.verificacion} />
+    <dl className="grid gap-4 border-t border-neutral-200 pt-5 text-sm sm:grid-cols-2"><div><dt className="text-xs text-neutral-500">Programada</dt><dd className="mt-1 font-medium">{inspectionDate(inspection.fechaProgramada, true)}</dd></div><div><dt className="text-xs text-neutral-500">Inicio de campo</dt><dd className="mt-1 font-medium">{inspectionDate(inspection.iniciadaAt, true)}</dd></div></dl>
+    {canEdit && primaryAction?.state === 'EN_CAMPO' && <div className="border-t border-neutral-200 pt-5"><p className="mb-3 text-sm text-neutral-600">Confirmá el inicio al llegar al lugar. Podés preparar los demás pasos antes.</p><Button leftIcon={<ShieldCheck size={17} />} isLoading={transitionMutation.isPending} disabled={!isOnline || Boolean(staleDraft)} onClick={() => transition('EN_CAMPO')}>Iniciar inspección</Button></div>}
+  </div>;
+  const act = <><label className="block text-sm font-semibold text-neutral-700">Observaciones generales<textarea disabled={!canEdit} value={observaciones} onChange={(event) => setObservaciones(event.target.value)} rows={4} placeholder="Describí el contexto, los hallazgos y las acciones requeridas." className="mt-2 w-full resize-y rounded-lg border border-neutral-300 p-3 text-sm font-normal leading-relaxed disabled:bg-neutral-50" /></label><InspectionDocumentsPanel section="acta" actData={datosActa} report={informeTecnico} actEditable={canEdit} reportEditable={false} onActDataChange={setDatosActa} onReportChange={setInformeTecnico} /></>;
+  const evidence = <EvidenceCard inspection={inspection} pendingEvidence={pendingEvidence} editable={canEdit} recording={recording} onCamera={() => cameraRef.current?.click()} onFile={() => fileRef.current?.click()} onAudio={toggleRecording} onAnnul={annulEvidence} />;
+  const report = <InspectionDocumentsPanel section="informe" actData={datosActa} report={informeTecnico} actEditable={false} reportEditable={canEditReport} onActDataChange={setDatosActa} onReportChange={setInformeTecnico} />;
+  const readiness = <>{canEdit ? <FieldReadinessPanel state={inspection.estado} items={items} comparisons={comparisons} pendingEvidenceCount={pendingEvidence.length} /> : dossierReadiness && <DossierReadinessPanel readiness={dossierReadiness} />}
+    {(inspection.estado === 'EN_REVISION' || inspection.estado === 'NOTIFICADA') && isAdmin && <label className="block text-sm font-semibold text-neutral-700">Plazo de respuesta<input aria-label="Plazo de respuesta" type="datetime-local" value={plazoRespuestaAt} onChange={(event) => setPlazoRespuestaAt(event.target.value)} className="mt-2 h-11 w-full max-w-sm rounded-lg border border-neutral-300 px-3 text-sm" /><span className="mt-2 block text-xs font-normal text-neutral-500">La aprobación no envía correos; deja el expediente preparado.</span></label>}
+    {guided && <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4"><h3 className="text-sm font-bold text-neutral-900">Cambio de etapa</h3><p className="mt-2 text-sm leading-relaxed text-neutral-600">{canEdit ? 'Enviar a revisión cierra la edición de campo. Los cambios y las evidencias deben estar guardados antes de continuar.' : 'El acta de campo está cerrada. Podés completar el informe técnico; los datos de campo requieren una devolución expresa.'}</p><div className="mt-4 flex flex-wrap gap-3">
+      {inspection.estado === 'EN_REVISION' && isAdmin && <Button variant="outline" onClick={() => transition('EN_CAMPO')} disabled={!isOnline || Boolean(staleDraft) || transitionMutation.isPending}>Devolver a campo</Button>}
+      {primaryAction && <Button aria-label={primaryAction.label} aria-describedby={primaryAction.state === 'NOTIFICADA' ? 'approval-readiness-hint' : undefined} leftIcon={primaryAction.state === 'EN_REVISION' ? <Send size={17} /> : <ShieldCheck size={17} />} isLoading={transitionMutation.isPending} onClick={() => transition(primaryAction.state)} disabled={!isOnline || pendingEvidence.length > 0 || Boolean(staleDraft) || (primaryAction.state === 'NOTIFICADA' && (!plazoRespuestaAt || approvalBlocked))}>{primaryAction.label}</Button>}
+    </div></div>}
+    <InspectionReport inspection={draftInspection} readiness={canEdit ? undefined : dossierReadiness || undefined} />
+  </>;
+  const steps: InspectionWorkspaceStep[] = guided ? [
+    { id: 'resumen', label: 'Contexto', title: 'Preparar la inspección', description: 'Confirmá a quién vas a inspeccionar, dónde y con qué número de acta.', detail: numeroActa || 'Acta sin numerar', complete: Boolean(numeroActa.trim() && ubicacion.trim()), content: context },
+    { id: 'declaracion', label: 'Declaración', title: 'Declarado vs. verificado', description: 'Contrastá los datos declarados con lo que encontrás en campo. Cada diferencia conserva su observación y evidencia.', detail: reviewedComparisons + ' de ' + comparisons.length + ' contrastados', complete: comparisons.length > 0 && reviewedComparisons === comparisons.length, content: <InspectionComparisonPanel embedded inspectionId={inspection.id} comparisons={comparisons} editable={canEdit} onChange={(rowId, patch) => setComparisons((rows) => rows.map((row) => row.id === rowId ? { ...row, ...patch } : row))} onEvidence={(file, comparisonId) => upload(file, { comparacionId: comparisonId })} /> },
+    { id: 'checklist', label: 'Checklist', title: 'Checklist regulatorio', description: 'Verificá cada control por separado. Abrilo para indicar el resultado, comentar y adjuntar fotos.', detail: completed + ' de ' + items.length + ' controles', complete: items.length > 0 && completed === items.length, content: <Checklist inspectionId={inspection.id} groups={groups} items={items} completed={completed} editable={canEdit} setItems={setItems} uploadingItemId={uploadingItemId} pendingEvidence={pendingEvidence} onEvidence={(file, item) => upload(file, { itemId: item.id, descripcion: item.observacion?.trim() || 'Evidencia vinculada al control ' + item.codigo }, true)} onAnnul={annulEvidence} /> },
+    { id: 'evidencias', label: 'Evidencias', title: 'Evidencias de la inspección', description: 'Revisá los archivos incorporados. Para vincular una foto a un hallazgo, adjuntala desde su control en el checklist o la comparación.', detail: pendingEvidence.length ? pendingEvidence.length + ' por sincronizar' : inspection.evidencias.filter((entry) => !entry.anuladaAt).length + ' archivos', content: evidence },
+    { id: 'acta', label: 'Acta de campo', title: 'Acta de inspección / constatación', description: 'Registrá lo constatado, quién intervino y las formalidades. Una negativa o imposibilidad se documenta; no se presume.', detail: canEdit ? 'Registro de campo' : 'Campo cerrado · consulta', content: act },
+    { id: 'informe-tecnico', label: 'Informe técnico', title: 'Informe técnico para Legales', description: 'Fundamentá la evaluación. Este documento complementa el acta de campo y no la reemplaza.', detail: reportCompleted + ' de 5 apartados' + (reportCompleted === 5 && !informeTecnico.expedienteElectronico?.trim() ? ' · falta expediente electrónico' : ''), complete: reportCompleted === 5 && Boolean(informeTecnico.expedienteElectronico?.trim()), content: report },
+    { id: 'revision', label: 'Revisar y enviar', title: 'Revisión del expediente', description: 'Verificá los pendientes y el informe consolidado antes de cambiar de etapa. Recorrer los pasos no aprueba ni envía la inspección.', detail: LABELS[inspection.estado], complete: dossierReadiness?.ready, content: readiness },
+  ] : [
+    { id: 'resumen', label: 'Informe consolidado', title: 'Resultado de la inspección', description: 'Hallazgos, controles y documentación del expediente.', detail: LABELS[inspection.estado], content: <>{context}<InspectionReport inspection={draftInspection} readiness={dossierReadiness || undefined} /></> },
+    { id: 'acta', label: 'Acta de campo', title: 'Acta de inspección / constatación', description: 'Registro de campo cerrado. Consulta de los hechos y formalidades.', content: act },
+    { id: 'informe-tecnico', label: 'Informe técnico', title: 'Informe técnico para Legales', description: 'Evaluación técnica que acompaña el acta.', content: report },
+    { id: 'evidencias', label: 'Evidencias', title: 'Evidencias de la inspección', description: 'Archivos y fotografías, conservando su relación con los hallazgos.', content: evidence },
+  ];
+  const reference: InspectionWorkspaceStep[] = [
+    ...(showExchangePanel ? [{ id: 'intercambios', label: 'Ida y vuelta', title: 'Comunicaciones y respuestas', description: 'Intercambios auditados con el inspeccionado y documentación de cada intervención.', content: <InspectionExchangePanel inspectionId={inspection.id} /> }] : []),
+    { id: 'trazabilidad', label: 'Trazabilidad', title: 'Historial de la inspección', description: 'Quién hizo cada intervención, cuándo y con qué documentación.', content: <InspectionTimeline inspection={inspection} canComment={Boolean(isAdmin)} busy={eventMutation.isPending} onAdd={async (input, file) => { try { await eventMutation.mutateAsync({ input, file }); toast.success('Registro actualizado', input.tipo === 'NOTIFICACION_PREPARADA' ? 'Borrador de notificación registrado como no enviado.' : 'Nota interna incorporada.'); } catch (error: unknown) { toast.error('No se pudo registrar', inspectionErrorMessage(error, 'Revise los datos.')); throw error; } }} /> },
+    { id: 'verificacion', label: 'Verificación QR', title: 'Verificar el expediente', description: 'Referencia verificable de la versión registrada en el servidor.', content: <InspectionVerificationBlock verification={inspection.verificacion} /> },
+  ];
+  return <div className={'min-w-0 space-y-4 ' + (hasMobileNav ? 'pb-20 sm:pb-0' : '')}>
+    <header className="space-y-3">
+      <button onClick={() => { flushDraft(); navigate((mobile ? '/mobile' : '') + '/inspecciones'); }} className="flex min-h-10 w-fit items-center gap-2 rounded-lg px-1 text-sm font-semibold text-neutral-600 hover:text-primary-700"><ArrowLeft size={17} />Volver al listado</button>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0"><div className="flex flex-wrap items-center gap-3"><h1 className="text-2xl font-extrabold tracking-tight text-neutral-900">{inspection.numero}</h1><Badge color={COLORS[inspection.estado] || 'neutral'} dot>{LABELS[inspection.estado]}</Badge></div>
+          {actor && <Link to={actorRoute} onClick={flushDraft} aria-label={'Abrir actor inspeccionado: ' + actor.razonSocial} className="mt-1.5 block w-fit rounded-sm text-sm font-semibold text-neutral-700 !no-underline hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{actor.razonSocial}</Link>}
+          <p className="mt-1 text-xs text-neutral-500">Actualizada {inspectionDate(inspection.updatedAt, true)} · Versión {inspection.version}</p>
+        </div>
+        <DropdownMenu><DropdownTrigger asChild><Button variant="outline" size="sm" leftIcon={<Download size={16} />} rightIcon={<ChevronDown size={14} />} isLoading={pdfMutation.isPending}>Exportar</Button></DropdownTrigger><DropdownContent className="w-72"><DropdownLabel>Documentos del expediente</DropdownLabel><DropdownItem icon={<ClipboardCheck size={16} />} onClick={() => pdfMutation.mutate('acta')}>Acta de inspección<span className="block text-[11px] font-normal text-neutral-500">Registro de campo</span></DropdownItem><DropdownItem icon={<FileText size={16} />} onClick={() => pdfMutation.mutate('informe-tecnico')}>Informe técnico<span className="block text-[11px] font-normal text-neutral-500">Evaluación para dictamen</span></DropdownItem></DropdownContent></DropdownMenu>
+      </div>
+    </header>
+    {(!isOnline || pendingEvidence.length > 0) && <div role="status" className="flex flex-col gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 sm:flex-row sm:items-center sm:justify-between"><span className="flex items-center gap-2">{isOnline ? <CloudUpload size={18} className="shrink-0" /> : <CloudOff size={18} className="shrink-0" />}{!isOnline ? 'Sin conexión · el borrador y las capturas quedan protegidos en este dispositivo' : pendingEvidence.length + ' capturas pendientes de sincronización'}</span>{isOnline && pendingEvidence.length > 0 && <button type="button" onClick={() => void syncEvidence()} disabled={syncingEvidence} className="min-h-11 w-fit rounded-lg border border-amber-400 bg-white px-3 text-xs font-bold disabled:opacity-60">{syncingEvidence ? 'Sincronizando…' : 'Sincronizar ahora'}</button>}</div>}
+    {recording && <div role="status" className="flex items-center justify-between gap-3 rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-800"><span>Grabando audio de campo</span><Button variant="danger" size="sm" onClick={toggleRecording} leftIcon={<Square size={14} />}>Detener grabación</Button></div>}
+    {staleDraft && <StaleDraftNotice serverVersion={inspection.version} draftVersion={staleDraft.version} onRecover={recoverStaleDraft} onDiscard={discardStaleDraft} />}
+    <InspectionWorkspace steps={steps} reference={reference} guided={guided} defaultStep={canEditReport && !canEdit ? 'informe-tecnico' : 'resumen'} onBeforeNavigate={flushDraft} saveAction={guided ? <Button variant="outline" leftIcon={<Save size={16} />} isLoading={saveMutation.isPending} disabled={Boolean(staleDraft)} onClick={() => { flushDraft(); void save(); }}>{canEdit ? 'Guardar borrador' : 'Guardar informe técnico'}</Button> : undefined} />
+    <input ref={cameraRef} aria-label="Tomar foto general" type="file" accept="image/*" capture="environment" className="hidden" onChange={uploadFromInput} />
+    <input ref={fileRef} aria-label="Adjuntar archivo general" type="file" accept="image/*,application/pdf,audio/*" className="hidden" onChange={uploadFromInput} />
   </div>;
 };
 
@@ -331,6 +352,28 @@ function StaleDraftNotice({ serverVersion, draftVersion, onRecover, onDiscard }:
         </div>
       </div>
     </div>
+  </section>;
+}
+
+/** Mirrors EN_REVISION transition guards; approval and legal readiness belong to the following stage. */
+export function FieldReadinessPanel({ state, items, comparisons, pendingEvidenceCount }: {
+  state: InspectionState;
+  items: Pick<InspectionItem, 'obligatorio' | 'resultado'>[];
+  comparisons: Pick<InspectionComparison, 'resultado'>[];
+  pendingEvidenceCount: number;
+}) {
+  const checks = [
+    { ready: state === 'EN_CAMPO', label: 'Inspección iniciada en campo' },
+    { ready: items.every((item) => !item.obligatorio || item.resultado !== 'PENDIENTE'), label: 'Checklist obligatorio completo' },
+    { ready: comparisons.length > 0 && comparisons.every((row) => row.resultado !== 'PENDIENTE'), label: 'Todos los datos declarados contrastados' },
+    { ready: pendingEvidenceCount === 0, label: 'Sin capturas pendientes de sincronizar' },
+  ];
+  const complete = checks.filter((check) => check.ready).length;
+  const ready = complete === checks.length;
+  return <section data-testid="inspection-field-readiness" aria-live="polite" className={`rounded-xl border p-4 sm:p-5 ${ready ? 'border-success-200 bg-success-50' : 'border-amber-300 bg-amber-50'}`}>
+    <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0 flex-1"><h3 className="font-extrabold text-[#10213A]">Preparación para enviar a revisión</h3><p className="mt-2 text-sm leading-relaxed text-neutral-700">{ready ? 'Los controles previos al envío están completos. Revisá el acta y sus evidencias antes de cerrar la edición de campo.' : 'Completá estos controles para enviar el trabajo de campo a revisión administrativa.'}</p></div><span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-neutral-800">{complete}/{checks.length} completos</span></div>
+    <ul className="mt-4 grid gap-2 sm:grid-cols-2">{checks.map((check) => <li key={check.label} className="flex items-start gap-2 rounded-lg bg-white/80 p-3 text-xs font-semibold text-neutral-800">{check.ready ? <Check size={15} className="shrink-0 text-success-700" /> : <CircleMinus size={15} className="shrink-0 text-amber-700" />}<span>{check.label}</span></li>)}</ul>
+    <p className="mt-3 text-xs leading-relaxed text-neutral-700">El cierre de campo se registra al confirmar el envío. El plazo de respuesta y la aprobación documental corresponden a la etapa siguiente; enviar a revisión no notifica al inspeccionado.</p>
   </section>;
 }
 
@@ -353,14 +396,16 @@ function DossierReadinessPanel({ readiness }: { readiness: InspectionDossierRead
 function Meta({ icon, label, value, detail, to }: { icon: React.ReactNode; label: string; value: string; detail?: string; to?: string }) { return <div className="flex gap-3"><span className="mt-0.5 shrink-0 text-neutral-500 [&>svg]:h-[19px] [&>svg]:w-[19px]">{icon}</span><div className="min-w-0"><p className="text-xs text-neutral-500">{label}</p>{to ? <Link to={to} className="rounded-sm font-bold text-[#10213A] transition-colors hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" aria-label={`Abrir ${label.toLowerCase()}: ${value}`}>{value}</Link> : <p className="font-bold text-[#10213A]">{value}</p>}{detail && <p className="text-xs text-neutral-500">{detail}</p>}</div></div>; }
 function Checklist({ inspectionId, groups, items, completed, editable, setItems, uploadingItemId, pendingEvidence, onEvidence, onAnnul }: { inspectionId: string; groups: string[]; items: InspectionItem[]; completed: number; editable: boolean; setItems: React.Dispatch<React.SetStateAction<InspectionItem[]>>; uploadingItemId: string | null; pendingEvidence: PendingInspectionEvidence[]; onEvidence: (file: File, item: InspectionItem) => void; onAnnul: (evidenceId: string, reason: string) => Promise<void> }) {
   const nonCompliant = items.filter((item) => item.resultado === 'NO_CUMPLE').length;
+  const [expandedItem, setExpandedItem] = useState<string>();
+  const activeItem = expandedItem ?? items.find((item) => item.resultado === 'PENDIENTE')?.id ?? items[0]?.id;
   const [expandedNotes, setExpandedNotes] = useState<string[]>([]);
   const [expandedEvidence, setExpandedEvidence] = useState<string[]>([]);
   const updateItem = (id: string, patch: Partial<InspectionItem>) => setItems((rows) => rows.map((row) => row.id === id ? { ...row, ...patch } : row));
 
-  return <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+  return <section className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
     <div className="border-b border-neutral-200 px-4 py-4 sm:px-6">
       <div className="flex items-start justify-between gap-4">
-        <div><h3 className="font-extrabold text-[#10213A]">Checklist regulatorio</h3><p className="mt-0.5 text-xs text-neutral-500">Valide cada control por separado y documente las no conformidades.</p></div>
+        <p className="text-sm font-medium text-neutral-600">Avance de los controles</p>
         <div className="flex shrink-0 items-center gap-2 text-xs font-bold">{nonCompliant > 0 && <span className="rounded-full bg-error-50 px-2.5 py-1 text-error-700">{nonCompliant} {nonCompliant === 1 ? 'falla' : 'fallas'}</span>}<span className="rounded-full bg-primary-50 px-2.5 py-1 text-primary-700">{completed}/{items.length}</span></div>
       </div>
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-neutral-200"><span className="block h-full rounded-full bg-primary-600 transition-[width] duration-200" style={{ width: `${Math.round((completed / Math.max(1, items.length)) * 100)}%` }} /></div>
@@ -381,25 +426,27 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
           const visibleItemEvidence = itemEvidenceExpanded ? itemEvidence : itemEvidence.slice(0, 4);
           const pendingItemEvidence = pendingEvidence.filter((evidence) => evidence.fields.itemId === item.id);
           const showObservation = isFail || Boolean(item.observacion) || itemEvidence.length > 0 || pendingItemEvidence.length > 0 || expandedNotes.includes(item.id);
-          return <div key={item.id} data-result={item.resultado} className={`border-t border-neutral-100 px-4 py-4 first:border-0 sm:px-6 ${isFail ? 'border-l-[3px] border-l-error-500 bg-error-50/30 pl-[13px] sm:pl-[21px]' : ''}`}>
-            <div className="flex items-start gap-3">
+          const expanded = activeItem === item.id;
+          return <div key={item.id} id={'control-' + item.id} data-result={item.resultado} className={`scroll-mt-24 border-t border-neutral-100 px-3 py-1 first:border-0 sm:px-5 ${isFail ? 'border-l-[3px] border-l-error-500 bg-error-50/30' : ''}`}>
+            <button type="button" aria-expanded={expanded} aria-controls={'control-detail-' + item.id} onClick={() => setExpandedItem(expanded ? '' : item.id)} className="flex min-h-16 w-full items-start gap-3 rounded-lg py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
               <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${item.resultado === 'CUMPLE' ? 'bg-success-100 text-success-700' : isFail ? 'bg-error-100 text-error-700' : item.resultado === 'NO_APLICA' ? 'bg-neutral-200 text-neutral-700' : 'border border-neutral-300 bg-white text-neutral-300'}`}>{item.resultado === 'CUMPLE' ? <Check size={16} /> : isFail ? <XCircle size={16} /> : item.resultado === 'NO_APLICA' ? <CircleMinus size={16} /> : null}</div>
               <div className="min-w-0 flex-1"><p className="text-sm font-semibold leading-relaxed text-[#10213A]">{item.etiqueta}</p><p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-neutral-400">{item.codigo}</p></div>
-              {item.resultado === 'PENDIENTE' && <span className="shrink-0 rounded-full bg-warning-50 px-2 py-1 text-[10px] font-bold text-warning-800">Pendiente</span>}
-            </div>
-            {editable && <div className="mt-3 pl-0 sm:pl-10">
-              <div role="group" aria-label={`Validación: ${item.etiqueta}`} className="grid grid-cols-3 gap-2">
+              <span className="hidden shrink-0 text-xs font-semibold text-neutral-600 sm:block">{RESULTS.find((option) => option.value === item.resultado)?.label || 'Pendiente'}</span>
+              {expanded ? <ChevronUp size={17} className="mt-1 shrink-0 text-neutral-500" /> : <ChevronDown size={17} className="mt-1 shrink-0 text-neutral-500" />}
+            </button>
+            {expanded && <div id={'control-detail-' + item.id} className="pb-5 pl-0 sm:pl-10">
+              <div role="group" aria-label={`Validación: ${item.etiqueta}`} className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-3">
                 {RESULTS.map((option) => {
                   const selected = item.resultado === option.value;
-                  return <button key={option.value} type="button" aria-pressed={selected} onClick={() => updateItem(item.id, { resultado: option.value })} className={`flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-xl border px-2 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 sm:text-sm ${selected ? option.active : 'border-neutral-300 bg-white text-neutral-700 hover:border-neutral-400 hover:bg-neutral-50'}`}>{option.icon}<span className="truncate">{option.label}</span>{selected && <Check size={13} className="hidden sm:block" aria-hidden="true" />}</button>;
+                  return <button key={option.value} type="button" disabled={!editable} aria-pressed={selected} onClick={() => updateItem(item.id, { resultado: option.value })} className={`flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg border px-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${selected ? option.active : 'border-neutral-300 bg-white text-neutral-700 hover:border-neutral-400 hover:bg-neutral-50'}`}>{option.icon}<span>{option.label}</span></button>;
                 })}
               </div>
-              {!showObservation && <button type="button" onClick={() => setExpandedNotes((ids) => [...ids, item.id])} className="mt-2 rounded-md px-1 py-1 text-xs font-bold text-primary-700 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">+ Agregar observación o foto</button>}
+              {!showObservation && editable && <button type="button" onClick={() => setExpandedNotes((ids) => [...ids, item.id])} className="mt-2 min-h-11 rounded-md px-2 text-sm font-semibold text-primary-700 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">Agregar observación o foto</button>}
               {showObservation && <div className={`mt-3 border-l-2 pl-3 ${isFail ? 'border-error-300' : 'border-neutral-300'}`}>
-                <label><span className={`mb-1 block text-xs font-bold ${isFail ? 'text-error-800' : 'text-neutral-700'}`}>{isFail ? 'Hallazgo y acción requerida' : 'Observación registrada'}</span><textarea aria-label={`Observación: ${item.etiqueta}`} value={item.observacion || ''} onChange={(event) => updateItem(item.id, { observacion: event.target.value })} rows={2} placeholder={isFail ? 'Describa qué no cumple, la evidencia y qué debe corregirse' : 'Observación del control'} className={`w-full resize-y rounded-xl border bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 ${isFail ? 'border-error-200 focus:border-error-500 focus:ring-error-100' : 'border-neutral-300 focus:border-primary-600 focus:ring-primary-100'}`} /></label>
+                <label><span className={`mb-1 block text-xs font-bold ${isFail ? 'text-error-800' : 'text-neutral-700'}`}>{isFail ? 'Hallazgo y acción requerida' : 'Observación registrada'}</span><textarea disabled={!editable} aria-label={`Observación: ${item.etiqueta}`} value={item.observacion || ''} onChange={(event) => updateItem(item.id, { observacion: event.target.value })} rows={2} placeholder={isFail ? 'Describa qué no cumple, la evidencia y qué debe corregirse' : 'Observación del control'} className={`w-full resize-y rounded-xl border bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 ${isFail ? 'border-error-200 focus:border-error-500 focus:ring-error-100' : 'border-neutral-300 focus:border-primary-600 focus:ring-primary-100'}`} /></label>
                 {itemEvidence.length > 0 && <div className="mt-3"><div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{visibleItemEvidence.map((evidence) => <EvidenceTile key={evidence.id} inspectionId={inspectionId} evidence={evidence} editable={editable} onAnnul={onAnnul} />)}</div>{itemEvidence.length > 4 && <button type="button" onClick={() => setExpandedEvidence((ids) => itemEvidenceExpanded ? ids.filter((id) => id !== item.id) : [...ids, item.id])} className="mt-2 inline-flex min-h-9 items-center gap-1 rounded-lg px-2 text-xs font-bold text-primary-800 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{itemEvidenceExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}{itemEvidenceExpanded ? 'Mostrar menos' : `Ver las ${itemEvidence.length} evidencias`}</button>}</div>}
                 {pendingItemEvidence.length > 0 && <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">{pendingItemEvidence.map((evidence) => <PendingEvidenceThumbnail key={evidence.id} evidence={evidence} />)}</div>}
-                <div className="mt-3 flex flex-wrap gap-2">
+                {editable && <div className="mt-3 flex flex-wrap gap-2">
                   <label className={`inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition-colors focus-within:ring-2 focus-within:ring-primary-500 focus-within:ring-offset-2 ${uploadingItemId === item.id ? 'cursor-wait border-neutral-200 bg-neutral-100 text-neutral-500' : 'border-primary-200 bg-primary-50 text-primary-800 hover:border-primary-300 hover:bg-primary-100'}`}>
                     {uploadingItemId === item.id ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
                     {uploadingItemId === item.id ? 'Subiendo…' : 'Tomar foto'}
@@ -410,8 +457,8 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
                     Elegir imagen
                     <input aria-label={`Adjuntar foto: ${item.etiqueta}`} type="file" accept="image/*" disabled={uploadingItemId !== null} className="sr-only" onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) onEvidence(file, item); }} />
                   </label>
-                </div>
-                <p className="mt-1.5 text-[11px] leading-relaxed text-neutral-500">Use la cámara o elija una imagen del dispositivo. Máximo 25 MB; también quedará en Evidencias del expediente.</p>
+                </div>}
+                {editable && <p className="mt-1.5 text-xs leading-relaxed text-neutral-500">Use la cámara o elija una imagen del dispositivo. Máximo 25 MB; también quedará en Evidencias del expediente.</p>}
               </div>}
             </div>}
           </div>;

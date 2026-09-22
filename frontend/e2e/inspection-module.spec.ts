@@ -1,4 +1,19 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+async function openSection(page: Page, hash: string) {
+  const index = page.locator('#inspection-step-index');
+  if (!await index.isVisible()) await page.getByRole('button', { name: /Ver todos los pasos/ }).click();
+  await index.locator(`a[href="#${hash}"]`).click();
+  await expect(page).toHaveURL(new RegExp(`#${hash}$`));
+  await expect(page.getByTestId('inspection-step-content')).toBeVisible();
+}
+
+async function openEmergencyControl(page: Page) {
+  const item = page.locator('#control-item-6');
+  const toggle = item.getByRole('button', { name: /Señalización y elementos de emergencia operativos/ });
+  if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+  return item;
+}
 
 const user = {
   id: 'inspector-qa', email: 'inspector.qa@sitrep.local', nombre: 'María', apellido: 'Fernández',
@@ -115,16 +130,18 @@ test.beforeEach(async ({ page }) => {
 
 test('inspection field screen is usable on web and PWA layouts', async ({ page }, testInfo) => {
   const mobile = testInfo.project.name === 'mobile';
+  const runtimeErrors: string[] = [];
+  page.on('pageerror', (error) => runtimeErrors.push(error.message));
+  page.on('console', (message) => { if (message.type() === 'error') runtimeErrors.push(message.text()); });
   await page.goto(mobile ? '/mobile/inspecciones/inspection-qa' : '/inspecciones/inspection-qa');
   await expect(page.getByRole('heading', { name: 'I-2026-000001' })).toBeVisible();
-  await expect(page.getByText('Checklist regulatorio', { exact: true })).toBeVisible();
-  await expect(page.getByText('Evidencias (2)')).toBeVisible();
-  await expect(page.getByText('Declarado vs. verificado')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Difiere' }).first()).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByRole('heading', { name: 'Preparar la inspección' })).toBeVisible();
+  await expect(page.getByRole('progressbar', { name: 'Paso actual del recorrido' })).toHaveAttribute('aria-valuemax', '7');
+  await expect(page.getByRole('heading', { name: 'Checklist regulatorio' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Guardar borrador' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Enviar a revisión' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Enviar a revisión' })).toHaveCount(0);
   await page.screenshot({ path: `/tmp/sitrep-inspection-first-viewport-${testInfo.project.name}.png`, fullPage: false });
-  await expect(page.getByTestId('inspection-action-bar')).toHaveCSS('position', 'sticky');
+  await expect(page.getByTestId('inspection-action-bar')).toHaveCSS('position', 'static');
   const actorLink = page.getByRole('link', { name: /Abrir actor inspeccionado: Transportes Andinos S\.A\./ });
   await expect(actorLink).toBeVisible();
   await expect(actorLink).toHaveAttribute('href', mobile
@@ -133,10 +150,16 @@ test('inspection field screen is usable on web and PWA layouts', async ({ page }
   expect(await actorLink.evaluate((element) => getComputedStyle(element).textDecorationLine)).toBe('none');
   await expect(page.getByRole('button', { name: 'Ver ficha del actor' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Todas sus inspecciones' })).toHaveCount(0);
+  await openSection(page, 'declaracion');
+  await expect(page.getByRole('heading', { name: 'Declarado vs. verificado' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Difiere' }).first()).toHaveAttribute('aria-pressed', 'false');
+  await page.screenshot({ path: `/tmp/sitrep-inspection-field-comparison-${testInfo.project.name}.png`, fullPage: false });
+  await openSection(page, 'checklist');
+  await expect(page.getByRole('heading', { name: 'Checklist regulatorio' })).toBeVisible();
+  const emergencyItem = await openEmergencyControl(page);
   const emergencyControl = page.getByRole('group', { name: /Validación: Señalización y elementos de emergencia operativos/ });
   await expect(emergencyControl.getByRole('button', { name: 'No cumple' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('textbox', { name: /Observación: Señalización y elementos de emergencia operativos/ })).toBeVisible();
-  const emergencyItem = page.getByText('Señalización y elementos de emergencia operativos', { exact: true }).locator('xpath=ancestor::div[@data-result][1]');
   await expect(emergencyItem.getByText('vehiculo_frente.jpg')).toBeVisible();
   const itemPhoto = emergencyItem.getByAltText('Señalización de emergencia incompleta');
   await expect(itemPhoto).toBeVisible();
@@ -151,11 +174,64 @@ test('inspection field screen is usable on web and PWA layouts', async ({ page }
   await emergencyItem.scrollIntoViewIfNeeded();
   await page.screenshot({ path: `/tmp/sitrep-inspection-item-evidence-${testInfo.project.name}.png`, fullPage: false });
   await expect(page.locator('body')).not.toHaveCSS('overflow-x', 'scroll');
-  await page.screenshot({ path: `../output/inspection-${mobile ? 'mobile' : 'desktop'}-qa.png`, fullPage: true });
-  await page.getByText('Declarado vs. verificado').scrollIntoViewIfNeeded();
-  await page.screenshot({ path: `/tmp/sitrep-inspection-field-comparison-${testInfo.project.name}.png`, fullPage: false });
-  await page.getByText('Checklist regulatorio', { exact: true }).scrollIntoViewIfNeeded();
+  expect(await page.locator('html').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await page.screenshot({ path: `/tmp/sitrep-inspection-${mobile ? 'mobile' : 'desktop'}-qa.png`, fullPage: true });
+  await page.getByRole('heading', { name: 'Checklist regulatorio' }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: `/tmp/sitrep-inspection-field-checklist-${testInfo.project.name}.png`, fullPage: false });
+  await openSection(page, 'evidencias');
+  await expect(page.getByText('Evidencias (2)')).toBeVisible();
+  await openSection(page, 'revision');
+  await expect(page.getByRole('button', { name: 'Enviar a revisión' })).toBeVisible();
+  const footer = page.getByTestId('inspection-action-bar');
+  const content = page.getByTestId('inspection-step-content');
+  const footerBox = await footer.boundingBox();
+  const contentBox = await content.boundingBox();
+  expect(footerBox!.y).toBeGreaterThanOrEqual(contentBox!.y + contentBox!.height - 1);
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('seven-step wizard preserves field values across steps, reload and browser history', async ({ page }, testInfo) => {
+  const prefix = testInfo.project.name === 'mobile' ? '/mobile' : '';
+  await page.goto(`${prefix}/inspecciones/inspection-qa#resumen`);
+  await page.getByLabel('Ubicación', { exact: true }).fill('Depósito de campo · revisión preservada');
+  const hashes = ['declaracion', 'checklist', 'evidencias', 'acta', 'informe-tecnico', 'revision'];
+  for (const [index, hash] of hashes.entries()) {
+    await page.getByRole('button', { name: 'Siguiente', exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`#${hash}$`));
+    await expect(page.getByTestId('inspection-workspace').getByText(`Paso ${index + 2} de 7`, { exact: true })).toBeVisible();
+    expect(await page.locator('html').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  }
+  await expect(page.getByRole('button', { name: 'Siguiente', exact: true })).toHaveCount(0);
+  await page.goBack();
+  await expect(page).toHaveURL(/#informe-tecnico$/);
+  await page.getByLabel('1. Objetivo').fill('Objetivo preservado al recorrer el expediente.');
+  await openSection(page, 'resumen');
+  await expect(page.getByLabel('Ubicación', { exact: true })).toHaveValue('Depósito de campo · revisión preservada');
+  await page.reload();
+  await expect(page.getByLabel('Ubicación', { exact: true })).toHaveValue('Depósito de campo · revisión preservada');
+  await openSection(page, 'informe-tecnico');
+  await expect(page.getByLabel('1. Objetivo')).toHaveValue('Objetivo preservado al recorrer el expediente.');
+  await page.getByRole('button', { name: 'Anterior', exact: true }).click();
+  await expect(page).toHaveURL(/#acta$/);
+});
+
+test('section navigation preserves an unsubmitted audit note and its selected attachment', async ({ page }, testInfo) => {
+  const prefix = testInfo.project.name === 'mobile' ? '/mobile' : '';
+  let writes = 0;
+  page.on('request', (request) => {
+    if (request.url().includes('/api/inspecciones/') && ['POST', 'PATCH', 'PUT'].includes(request.method())) writes += 1;
+  });
+  await page.goto(`${prefix}/inspecciones/inspection-qa#trazabilidad`);
+  await page.getByRole('button', { name: 'Agregar nota', exact: true }).click();
+  await page.getByLabel('Detalle del registro').fill('Nota de campo pendiente de enviar, no se debe perder al consultar el QR.');
+  await page.getByLabel('Adjunto del registro').setInputFiles({ name: 'nota-pendiente.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n% QA note') });
+  await openSection(page, 'verificacion');
+  await expect(page.getByTestId('inspection-verification')).toBeVisible();
+  await openSection(page, 'trazabilidad');
+  await expect(page.getByLabel('Detalle del registro')).toHaveValue('Nota de campo pendiente de enviar, no se debe perder al consultar el QR.');
+  await expect(page.getByRole('button', { name: 'nota-pendiente.pdf', exact: true })).toBeVisible();
+  expect(await page.getByLabel('Adjunto del registro').evaluate((input: HTMLInputElement) => input.files?.length)).toBe(1);
+  expect(writes).toBe(0);
 });
 
 test('inspector can attach an image to one checklist comment without losing the draft', async ({ page }, testInfo) => {
@@ -205,8 +281,8 @@ test('inspector can attach an image to one checklist comment without losing the 
     return route.fallback();
   });
 
-  await page.goto(mobile ? '/mobile/inspecciones/inspection-qa' : '/inspecciones/inspection-qa');
-  const emergencyItem = page.getByText('Señalización y elementos de emergencia operativos', { exact: true }).locator('xpath=ancestor::div[@data-result][1]');
+  await page.goto(mobile ? '/mobile/inspecciones/inspection-qa#checklist' : '/inspecciones/inspection-qa#checklist');
+  const emergencyItem = await openEmergencyControl(page);
   await emergencyItem.getByRole('textbox', { name: /Observación:/ }).fill('Falta completar la señalización del kit de emergencia.');
   await page.context().setOffline(true);
   const realPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
@@ -218,7 +294,7 @@ test('inspector can attach an image to one checklist comment without losing the 
   failDetailLoad = true;
   await expect(emergencyItem.getByTestId('pending-inspection-evidence')).toBeVisible();
   await page.reload();
-  const recoveredItem = page.getByText('Señalización y elementos de emergencia operativos', { exact: true }).locator('xpath=ancestor::div[@data-result][1]');
+  const recoveredItem = await openEmergencyControl(page);
   await expect(recoveredItem.getByTestId('pending-inspection-evidence')).toBeVisible();
   await expect(recoveredItem.getByRole('textbox', { name: /Observación:/ })).toHaveValue('Falta completar la señalización del kit de emergencia.');
   failDetailLoad = false;
@@ -258,7 +334,8 @@ test('review keeps the field act frozen while versioning the later technical rep
   });
 
   await page.goto(mobile ? '/mobile/inspecciones/inspection-review' : '/inspecciones/inspection-review');
-  await page.getByText('Acta de inspección / constatación').click();
+  await expect(page.getByRole('heading', { name: 'Informe técnico para Legales' }).first()).toBeVisible();
+  await openSection(page, 'acta');
   await expect(page.getByLabel('Atendido por')).toBeDisabled();
   await expect(page.getByLabel('Daños a personas o bienes')).toBeDisabled();
   await expect(page.getByLabel('Libro de Registro de Operaciones')).toBeDisabled();
@@ -266,7 +343,8 @@ test('review keeps the field act frozen while versioning the later technical rep
   await expect(page.getByLabel('Domicilio legal constituido')).toBeDisabled();
   await page.getByText('Formalidades de constatación · art. 44', { exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: `/tmp/sitrep-inspection-art44-${testInfo.project.name}.png`, fullPage: false });
-  await expect(page.getByText('Informe técnico para Legales', { exact: true })).toBeVisible();
+  await openSection(page, 'informe-tecnico');
+  await expect(page.getByRole('heading', { name: 'Informe técnico para Legales' }).first()).toBeVisible();
   await expect(page.getByLabel('1. Objetivo')).toBeEnabled();
   await page.getByLabel('3. Evaluación').fill('La evaluación contrasta el acta, el checklist y las evidencias preservadas.');
   await page.getByRole('button', { name: 'Guardar informe técnico' }).click();
@@ -308,8 +386,8 @@ test('inspector annuls a mistaken photo with a mandatory reason while preserving
     return route.fallback();
   });
 
-  await page.goto(mobile ? '/mobile/inspecciones/inspection-qa' : '/inspecciones/inspection-qa');
-  const emergencyItem = page.getByText('Señalización y elementos de emergencia operativos', { exact: true }).locator('xpath=ancestor::div[@data-result][1]');
+  await page.goto(mobile ? '/mobile/inspecciones/inspection-qa#checklist' : '/inspecciones/inspection-qa#checklist');
+  const emergencyItem = await openEmergencyControl(page);
   await emergencyItem.getByRole('button', { name: 'Anular con motivo' }).click();
   const reason = emergencyItem.getByRole('textbox', { name: /Motivo para anular vehiculo_frente.jpg/ });
   await reason.fill('La fotografía quedó movida y se reemplazará por una toma legible.');
@@ -356,7 +434,18 @@ test('closed inspection report reflows without horizontal scroll or an empty sti
   await expect(page.getByTestId('comparison-ledger')).toBeVisible();
   await expect(page.getByTestId('inspection-checklist-report')).toBeVisible();
   await expect(page.getByTestId('inspection-checklist-report').locator('[data-result="NO_CUMPLE"]')).toHaveCount(1);
-  await expect(page.locator('header img[alt="Gobierno de Mendoza"]')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Resultado de la inspección' })).toBeVisible();
+  await expect(page.getByRole('progressbar', { name: 'Paso actual del recorrido' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Guardar borrador' })).toHaveCount(0);
+  await expect(findings.getByText('Declarado').nth(mobile ? 1 : 0)).toBeVisible();
+  await expect(findings.getByText('Verificado').nth(mobile ? 1 : 0)).toBeVisible();
+  await expect(findings.locator('table')).toHaveCount(0);
+  await page.screenshot({ path: `/tmp/sitrep-inspection-closed-${testInfo.project.name}.png`, fullPage: true });
+  await findings.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `/tmp/sitrep-inspection-ledger-${testInfo.project.name}.png`, fullPage: false });
+  await page.getByTestId('inspection-checklist-report').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `/tmp/sitrep-inspection-checklist-report-${testInfo.project.name}.png`, fullPage: false });
+  await openSection(page, 'verificacion');
   const verification = page.getByTestId('inspection-verification');
   await expect(verification).toBeVisible();
   await expect(verification.getByRole('heading', { name: 'Trazabilidad pública de la inspección' })).toBeVisible();
@@ -364,19 +453,11 @@ test('closed inspection report reflows without horizontal scroll or an empty sti
   await expect(qr).toBeVisible();
   await expect(qr.locator('svg')).toHaveCount(1);
   await expect(verification.getByRole('link', { name: 'Abrir verificación pública' })).toHaveAttribute('href', /\/verificar\/inspecciones\/eyJ2IjoxfQ\.signature$/);
-  await expect(page.getByRole('link', { name: 'Trazabilidad' })).toHaveAttribute('href', '#trazabilidad');
-  await expect(page.locator('#trazabilidad')).toBeVisible();
   await verification.scrollIntoViewIfNeeded();
   await page.screenshot({ path: `/tmp/sitrep-inspection-verification-anchor-${testInfo.project.name}.png`, fullPage: false });
-  await expect(findings.getByText('Declarado').nth(mobile ? 1 : 0)).toBeVisible();
-  await expect(findings.getByText('Verificado').nth(mobile ? 1 : 0)).toBeVisible();
-  await expect(findings.locator('table')).toHaveCount(0);
-  await expect(page.getByTestId('inspection-action-bar')).toHaveCount(0);
+  await openSection(page, 'trazabilidad');
+  await expect(page.locator('#trazabilidad')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Historial de la inspección' })).toBeVisible();
+  await expect(page.getByTestId('inspection-action-bar')).toHaveCSS('position', 'static');
   expect(await page.locator('html').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
-
-  await page.screenshot({ path: `/tmp/sitrep-inspection-closed-${testInfo.project.name}.png`, fullPage: true });
-  await findings.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: `/tmp/sitrep-inspection-ledger-${testInfo.project.name}.png`, fullPage: false });
-  await page.getByTestId('inspection-checklist-report').scrollIntoViewIfNeeded();
-  await page.screenshot({ path: `/tmp/sitrep-inspection-checklist-report-${testInfo.project.name}.png`, fullPage: false });
 });
