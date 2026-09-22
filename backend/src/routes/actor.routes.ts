@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { isAuthenticated, requireAdminOrTransportista, requireAdminOrGenerador, requireAdminOrOperador } from '../middlewares/auth.middleware';
+import { isAuthenticated, requireAdminOrTransportista, requireAdminOrGenerador, requireAdminOrOperador, requireFullAccess } from '../middlewares/auth.middleware';
 import {
     getGeneradores, getGeneradorById, createGenerador, updateGenerador, deleteGenerador,
     getTransportistas, getTransportistaById, createTransportista, updateTransportista, deleteTransportista,
@@ -14,6 +14,7 @@ import { upload, uploadDocumento, getDocumentos, downloadDocumento, revisarDocum
 
 const router = Router();
 router.use(isAuthenticated);
+router.use(requireFullAccess);
 
 // ===== GENERADORES =====
 

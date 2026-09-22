@@ -2,6 +2,10 @@ export type InspectionActorType = 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR';
 export type InspectionItemResult = 'PENDIENTE' | 'CUMPLE' | 'NO_CUMPLE' | 'NO_APLICA';
 export type InspectionEvidenceType = 'FOTO' | 'AUDIO' | 'DOCUMENTO';
 export type InspectionComparisonResult = 'PENDIENTE' | 'COINCIDE' | 'DIFIERE' | 'NO_VERIFICADO' | 'NO_APLICA';
+export type InspectionExchangeParty = 'AUTORIDAD' | 'INSPECCIONADO' | 'SISTEMA';
+export type InspectionExchangeType =
+  | 'REQUERIMIENTO' | 'RESPUESTA' | 'DESCARGO' | 'SUBSANACION'
+  | 'PRONUNCIAMIENTO' | 'CIERRE_CONFORME' | 'DERIVACION_LEGALES';
 export type InspectionState =
   | 'BORRADOR' | 'PLANIFICADA' | 'EN_CAMPO' | 'EN_REVISION' | 'NOTIFICADA'
   | 'EN_DESCARGO' | 'REQUIERE_SUBSANACION' | 'CERRADA_CONFORME'
@@ -13,7 +17,65 @@ export interface InspectionActor {
   razonSocial: string;
   cuit: string;
   domicilio?: string;
+  telefono?: string;
+  email?: string;
+  representanteLegalNombre?: string | null;
+  representanteLegalDNI?: string | null;
   activo?: boolean;
+}
+
+export interface InspectionActData {
+  codigoPostal?: string;
+  departamento?: string;
+  calle?: string;
+  numeroDomicilio?: string;
+  titular?: string;
+  dniTitular?: string;
+  atendidoPor?: string;
+  dniAtendido?: string;
+  cargoAtendido?: string;
+  area?: string;
+  lugarAfectacion?: string;
+  motivoInspeccion?: string;
+  infraestructura?: 'SI' | 'NO' | 'NO_VERIFICADO';
+  detalleInfraestructura?: string;
+  estadoInfraestructura?: string;
+  generacion?: string;
+  requerimientos?: string;
+  actaAnterior?: string;
+  plazoDescargoDias?: number;
+  danosEstado?: 'OBSERVADOS' | 'NO_OBSERVADOS' | 'NO_VERIFICADO';
+  danosDetalle?: string;
+  tercerosTestigosEstado?: 'IDENTIFICADOS' | 'NO_IDENTIFICADOS' | 'NO_VERIFICADO';
+  tercerosTestigosDetalle?: string;
+  libroOperacionesEstado?: 'EXHIBIDO' | 'NO_EXHIBIDO' | 'NO_DISPONIBLE' | 'SECUESTRADO' | 'NO_APLICA' | 'NO_VERIFICADO';
+  libroOperacionesDetalle?: string;
+  firmaIntervinienteEstado?: 'FIRMADA' | 'NEGATIVA' | 'IMPOSIBILIDAD' | 'AUSENTE' | 'PENDIENTE';
+  firmaIntervinienteDetalle?: string;
+  copiaActaEstado?: 'ENTREGADA' | 'NEGATIVA_RECEPCION' | 'NO_ENTREGADA' | 'PENDIENTE';
+  copiaActaDetalle?: string;
+  domicilioLegal?: string;
+  notificacionEstado?: 'COMUNICADA_EN_ACTA' | 'CONSTANCIA_FORMAL' | 'NO_REALIZADA' | 'PENDIENTE';
+  notificacionDetalle?: string;
+}
+
+export interface InspectionTechnicalReport {
+  expedienteElectronico?: string;
+  referencias?: string;
+  objetivo?: string;
+  antecedentes?: string;
+  evaluacion?: string;
+  conclusion?: string;
+  recomendacion?: string;
+}
+
+export interface InspectionVerification {
+  url: string;
+  huella: string;
+  version: number;
+  estadoVerificacion?: 'VIGENTE' | 'HISTORICA_AUTENTICA';
+  versionActual?: number;
+  huellaActual?: string;
 }
 
 export interface InspectionItem {
@@ -83,6 +145,56 @@ export interface InspectionEvent {
   adjuntos?: InspectionEvidence[];
 }
 
+export interface InspectionExchangeAttachment {
+  id: string;
+  nombreOriginal: string;
+  mimeDetectado: string;
+  bytes: number;
+  sha256: string;
+  descripcion?: string | null;
+  capturadaAt: string;
+  createdAt: string;
+}
+
+export interface InspectionExchange {
+  id: string;
+  inspeccionId: string;
+  secuencia: number;
+  clienteId?: string | null;
+  respondeAId?: string | null;
+  tipo: InspectionExchangeType;
+  parte: InspectionExchangeParty;
+  asunto: string;
+  cuerpo: string;
+  plazoRespuestaAt?: string | null;
+  presentadoFueraDePlazo: boolean;
+  canal: 'PORTAL_SITREP';
+  versionExpediente: number;
+  contenidoSha256: string;
+  hashAnterior?: string | null;
+  hashCadena: string;
+  autorId: string;
+  createdAt: string;
+  autor: { id: string; nombre: string; apellido?: string | null; rol: string };
+  adjuntos: InspectionExchangeAttachment[];
+}
+
+export interface InspectionExchangeTimeline {
+  inspeccion: {
+    id: string;
+    numero: string;
+    numeroActa?: string | null;
+    estado: InspectionState;
+    tipoActor: InspectionActorType;
+    actor: InspectionActor | null;
+    plazoRespuestaAt?: string | null;
+    version: number;
+  };
+  parteActual: InspectionExchangeParty;
+  intercambios: InspectionExchange[];
+  comunicacionExterna: false;
+}
+
 export interface Inspection {
   id: string;
   numero: string;
@@ -102,9 +214,12 @@ export interface Inspection {
   cerradaCampoAt?: string | null;
   plazoRespuestaAt?: string | null;
   observaciones?: string | null;
+  datosActa?: InspectionActData | null;
+  informeTecnico?: InspectionTechnicalReport | null;
   version: number;
   createdAt: string;
   updatedAt: string;
+  verificacion?: InspectionVerification | null;
   items: InspectionItem[];
   comparaciones: InspectionComparison[];
   evidencias: InspectionEvidence[];

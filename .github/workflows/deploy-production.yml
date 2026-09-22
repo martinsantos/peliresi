@@ -74,10 +74,15 @@ jobs:
         run: cd backend && npm ci
 
       - name: Audit dependencies for vulnerabilities
-        run: cd backend && npm audit --audit-level=high || true
+        run: cd backend && npm audit --omit=dev --audit-level=high
 
       - name: TypeScript type-check
         run: cd backend && npx tsc --noEmit
+
+      - name: Install Poppler for PDF presentation tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends poppler-utils
 
       - name: Run backend tests
         run: cd backend && npm test
@@ -101,14 +106,23 @@ jobs:
       - name: Install frontend dependencies
         run: cd frontend && npm ci
 
+      - name: Audit runtime dependencies for vulnerabilities
+        run: cd frontend && npm audit --omit=dev --audit-level=high
+
       - name: Lint frontend
         run: cd frontend && npm run lint
+
+      - name: Lint inspection critical path without warnings
+        run: cd frontend && npm run lint:critical
 
       - name: Run frontend tests
         run: cd frontend && npm test
 
       - name: Build frontend
         run: cd frontend && npm run build
+
+      - name: Build PWA app
+        run: cd frontend && npx vite build --config vite.config.app.ts
 
   validate-blockchain:
     if: github.event_name == 'push' || github.event.inputs.deploy_target != 'frontend-only'

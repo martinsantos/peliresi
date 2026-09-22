@@ -6,7 +6,6 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { processSyncQueue } from '../services/indexeddb';
 
 export interface ConnectivityState {
   /** true si navigator.onLine reporta conectividad */
@@ -86,15 +85,11 @@ export function useConnectivity(options: UseConnectivityOptions = {}): Connectiv
   useEffect(() => {
     const handleOnline = () => {
       updateState({ isOnline: true, lastOnline: new Date() });
-      // When coming back online, check API and process sync queue
+      // When coming back online, verify API reachability. User-scoped queue
+      // processing lives in useOfflineSync, where the authenticated user is known.
       if (wasOffline.current) {
         wasOffline.current = false;
         checkApi();
-        processSyncQueue().then(() => {
-          // Sync queue processed on reconnect
-        }).catch(() => {
-          // Silently handle sync errors
-        });
       }
     };
 

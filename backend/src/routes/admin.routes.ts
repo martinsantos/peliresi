@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { isAuthenticated, hasRole } from '../middlewares/auth.middleware';
+import { isAuthenticated, hasRole, requireFullAccess } from '../middlewares/auth.middleware';
 import {
   getUsuarios,
   getUsuarioById,
@@ -40,10 +40,11 @@ const router = Router();
  *         description: No autenticado
  */
 // Preferencias propias — solo autenticacion (cualquier admin puede actualizar las suyas)
-router.put('/preferencias-notificacion', isAuthenticated, updatePreferenciasNotificacion);
+router.put('/preferencias-notificacion', isAuthenticated, requireFullAccess, updatePreferenciasNotificacion);
 
 // All admin routes require authentication + any admin role
 router.use(isAuthenticated);
+router.use(requireFullAccess);
 router.use(hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'));
 
 // ===== USUARIOS CRUD =====
@@ -226,7 +227,7 @@ router.patch('/usuarios/:id/toggle-activo', hasRole('ADMIN'), toggleActivo);
  *       404:
  *         description: Usuario no encontrado
  */
-router.post('/impersonate/:userId', impersonateUsuario);
+router.post('/impersonate/:userId', hasRole('ADMIN'), impersonateUsuario);
 
 // ===== JOBS =====
 
@@ -241,9 +242,9 @@ router.post('/impersonate/:userId', impersonateUsuario);
  *       200:
  *         description: Job ejecutado exitosamente
  */
-router.post('/jobs/vencimientos', ejecutarJobVencimientos);
+router.post('/jobs/vencimientos', hasRole('ADMIN'), ejecutarJobVencimientos);
 
 // ===== EMAIL QUEUE =====
-router.get('/email-queue', getEmailQueue);
+router.get('/email-queue', hasRole('ADMIN'), getEmailQueue);
 
 export default router;

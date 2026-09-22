@@ -34,7 +34,8 @@ vi.mock('../../services/inspectionDeclaredSnapshot.service', () => ({
   buildDeclaredInspectionSnapshot: vi.fn(),
   ensureInspectionDeclaredComparisons: vi.fn(),
 }));
-vi.mock('../../services/inspectionActPdf.service', () => ({ streamInspectionActPdf: vi.fn() }));
+vi.mock('../../services/inspectionActPdf.service', () => ({ streamInspectionTechnicalReportPdf: vi.fn() }));
+vi.mock('../../services/inspectionFieldActPdf.service', () => ({ streamInspectionActPdf: vi.fn() }));
 
 import { anularEvidencia, subirEvidencia } from '../../controllers/inspeccion.controller';
 
@@ -54,7 +55,7 @@ function request(body: Record<string, unknown>) {
 describe('inspection checklist evidence', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.inspection.mockResolvedValue({ inspectorId: 'inspector-1', estado: 'EN_CAMPO' });
+    mocks.inspection.mockResolvedValue({ inspectorId: 'inspector-1', tipoActor: 'GENERADOR', estado: 'EN_CAMPO', version: 7 });
     mocks.item.mockResolvedValue({ codigo: 'SEG-02', etiqueta: 'Señalización y elementos de emergencia operativos' });
     mocks.duplicate.mockResolvedValue(null);
     mocks.persist.mockResolvedValue({ storageKey: 'inspecciones/inspection-1/evidence.png', mimeType: 'image/png', bytes: 9, sha256: 'sha-qa' });
@@ -72,7 +73,7 @@ describe('inspection checklist evidence', () => {
     mocks.transaction.mockImplementation(async (callback) => callback({
       evidenciaInspeccion: { create: mocks.createEvidence },
       eventoInspeccion: { create: mocks.createEvent },
-      inspeccion: { update: mocks.updateInspection },
+      inspeccion: { updateMany: mocks.updateInspectionMany },
     }));
   });
 
@@ -96,7 +97,7 @@ describe('inspection checklist evidence', () => {
     await anularEvidencia(req, res as any, next);
 
     expect(next).not.toHaveBeenCalled();
-    expect(mocks.updateInspectionMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'inspection-1', version: 7 } }));
+    expect(mocks.updateInspectionMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: 'inspection-1', version: 7 }) }));
     expect(mocks.updateEvidenceMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: 'evidence-1', inspeccionId: 'inspection-1', anuladaAt: null },
       data: expect.objectContaining({ anuladaPorId: 'inspector-1', motivoAnulacion: reason }),
@@ -117,6 +118,9 @@ describe('inspection checklist evidence', () => {
     expect(next).not.toHaveBeenCalled();
     expect(mocks.item).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'item-1', inspeccionId: 'inspection-1' } }));
     expect(mocks.createEvidence).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ itemId: 'item-1', tipo: 'FOTO', descripcion: 'Falta completar la señalización' }) }));
+    expect(mocks.updateInspectionMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: 'inspection-1', version: 7, estado: expect.any(Object) }),
+    }));
     expect(mocks.createEvent).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ titulo: 'Evidencia vinculada a SEG-02' }) }));
     expect(res.status).toHaveBeenCalledWith(201);
   });

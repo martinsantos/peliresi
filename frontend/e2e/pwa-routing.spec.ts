@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { ADMIN_EMAIL, ADMIN_PASS, loginWithCredentials } from './helpers/auth';
+import { loginAsAdmin } from './helpers/auth';
 
 /**
  * PWA routing regression tests.
@@ -13,17 +13,15 @@ const KNOWN_OPERADOR_ID = 'cmmpaa2b100edlvk7p577bmap';
 const KNOWN_GENERADOR_ID = 'cmmpaawor00a14kd0ogaieve9';
 
 async function loginToPwa(page: import('@playwright/test').Page) {
-  await loginWithCredentials(page, {
-    email: ADMIN_EMAIL,
-    password: ADMIN_PASS,
-    onboardingRole: 'ADMIN',
+  await loginAsAdmin(page, {
     startPath: '/app/',
     clickLoginLink: false,
   });
 }
 
 test.describe('PWA routing — canonical /admin/actores paths', () => {
-  test.beforeEach(({}, testInfo) => {
+  test.beforeEach(({ page }, testInfo) => {
+    void page;
     testInfo.setTimeout(180_000);
   });
 

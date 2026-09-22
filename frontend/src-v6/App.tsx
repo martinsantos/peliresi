@@ -29,9 +29,11 @@ import {
   ResetPasswordPage, ReclamarCuentaPage, UserSwitcherPage,
   DashboardPage, CentroControlPage, WarRoomPage,
   InspeccionesPage, InspeccionDetallePage,
+  VerificarInspeccionPage,
+  InspeccionadoParticipacionPage,
   ManifiestosPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
-  ViajeEnCursoPage, TransportePerfilPage, ViajeEnCursoTransportista,
-  ActoresPage, OperadoresPage, OperadorDetallePage, TransportistasPage, TransportistaDetallePage,
+  TransportePerfilPage, ViajeEnCursoTransportista,
+  ActoresPage, OperadorDetallePage, TransportistasPage, TransportistaDetallePage,
   ReportesPage, AlertasPage, ConfiguracionPage,
   UsuariosPage, AdminGeneradoresPage, GeneradorDetallePage, NuevoGeneradorPage,
   AdminOperadoresPage, NuevoOperadorPage, NuevoTransportistaPage,
@@ -113,6 +115,8 @@ function App() {
             <Route path="/mobile/manifiestos/:id" element={<ManifiestoDetallePage />} />
             <Route path="/mobile/inspecciones" element={<InspeccionesPage />} />
             <Route path="/mobile/inspecciones/:id" element={<InspeccionDetallePage />} />
+            <Route path="/mobile/mis-inspecciones" element={<InspeccionadoParticipacionPage />} />
+            <Route path="/mobile/mis-inspecciones/:id" element={<InspeccionadoParticipacionPage />} />
             <Route path="/mobile/transporte/perfil" element={<TransportePerfilPage />} />
             <Route path="/mobile/transporte/viaje/:id" element={<ViajeEnCursoTransportista />} />
             <Route path="/mobile/admin/usuarios" element={<UsuariosPage />} />
@@ -204,6 +208,8 @@ function App() {
             <Route path="/manifiestos/:id" element={<ManifiestoDetallePage />} />
             <Route path="/inspecciones" element={<InspeccionesPage />} />
             <Route path="/inspecciones/:id" element={<InspeccionDetallePage />} />
+            <Route path="/mis-inspecciones" element={<InspeccionadoParticipacionPage />} />
+            <Route path="/mis-inspecciones/:id" element={<InspeccionadoParticipacionPage />} />
 
             {/* Transporte */}
             <Route path="/transporte/perfil" element={<TransportePerfilPage />} />
@@ -304,6 +310,7 @@ function App() {
 
         {/* Verificación pública de manifiesto (QR) */}
         <Route path="/manifiestos/verificar/:numero" element={<VerificarManifiestoPage />} />
+        <Route path="/verificar/inspecciones/:token" element={<VerificarInspeccionPage />} />
 
         {/* Legacy /v6/ QR redirect — QR codes ya impresos apuntan a /v6/manifiestos/verificar/... */}
         <Route path="/v6/manifiestos/verificar/:numero" element={<V6VerificarRedirect />} />

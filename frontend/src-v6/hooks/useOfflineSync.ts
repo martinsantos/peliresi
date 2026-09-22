@@ -8,6 +8,7 @@ import { useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useConnectivity } from './useConnectivity';
 import { syncOfflineData } from '../services/offline-sync';
+import { processSyncQueue } from '../services/indexeddb';
 
 const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -23,6 +24,7 @@ export function useOfflineSync(): void {
       if (syncingRef.current) return;
       syncingRef.current = true;
       try {
+        await processSyncQueue(currentUser.id);
         await syncOfflineData(currentUser.id);
       } catch {
         // Silent fail — offline sync is best-effort

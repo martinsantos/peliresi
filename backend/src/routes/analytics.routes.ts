@@ -1,6 +1,6 @@
 // Analytics Routes
 import { Router } from 'express';
-import { isAuthenticated } from '../middlewares/auth.middleware';
+import { isAuthenticated, requireFullAccess } from '../middlewares/auth.middleware';
 import {
     isSuperAdmin,
     getAnalyticsSummary,
@@ -16,6 +16,7 @@ const router = Router();
 
 // All routes require authentication
 router.use(isAuthenticated);
+router.use(requireFullAccess);
 
 /**
  * @openapi

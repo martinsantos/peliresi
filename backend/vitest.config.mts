@@ -12,10 +12,10 @@ export default defineConfig({
       include: ['src/**/*.ts'],
       exclude: ['src/**/*.test.ts', 'src/__tests__/**'],
       thresholds: {
-        statements: 2,
-        branches: 3,
-        functions: 2,
-        lines: 2,
+        statements: 15,
+        branches: 14,
+        functions: 22,
+        lines: 15,
       },
     },
     // Faster startup: don't type-check tests

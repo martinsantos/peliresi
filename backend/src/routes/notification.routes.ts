@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { isAuthenticated, hasRole } from '../middlewares/auth.middleware';
+import { isAuthenticated, hasRole, requireFullAccess } from '../middlewares/auth.middleware';
+import { AppError } from '../middlewares/errorHandler';
 import { getVapidPublicKey, subscribe, unsubscribe } from '../controllers/push.controller';
 import {
     getNotificaciones,
@@ -23,15 +24,29 @@ import {
 } from '../controllers/notification.controller';
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage() });
+const BULK_UPLOAD_MIMES = new Set([
+    'text/csv',
+    'application/csv',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+]);
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+    fileFilter: (_req, file, callback) => {
+        if (BULK_UPLOAD_MIMES.has(file.mimetype)) callback(null, true);
+        else callback(new AppError('Formato no permitido. Use CSV o XLSX.', 400));
+    },
+});
 
 // Push — clave pública es pública (sin auth), subscribe/unsubscribe requieren auth
 router.get('/push/vapid-key', getVapidPublicKey);
-router.post('/push/subscribe',   isAuthenticated, subscribe);
-router.post('/push/unsubscribe', isAuthenticated, unsubscribe);
+router.post('/push/subscribe',   isAuthenticated, requireFullAccess, subscribe);
+router.post('/push/unsubscribe', isAuthenticated, requireFullAccess, unsubscribe);
 
 // Todas las rutas requieren autenticacion
 router.use(isAuthenticated);
+router.use(requireFullAccess);
 
 // ============ NOTIFICACIONES ============
 
@@ -335,7 +350,7 @@ router.put('/anomalias/:id/resolver', hasRole('ADMIN'), resolverAnomalia);
  *       403:
  *         description: Solo ADMIN
  */
-router.post('/carga-masiva/generadores', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'), upload.single('archivo'), cargaMasivaGeneradores);
+router.post('/carga-masiva/generadores', hasRole('ADMIN', 'ADMIN_GENERADOR'), upload.single('archivo'), cargaMasivaGeneradores);
 
 /**
  * @openapi
@@ -361,7 +376,7 @@ router.post('/carga-masiva/generadores', hasRole('ADMIN', 'ADMIN_GENERADOR', 'AD
  *       403:
  *         description: Solo ADMIN
  */
-router.post('/carga-masiva/transportistas', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'), upload.single('archivo'), cargaMasivaTransportistas);
+router.post('/carga-masiva/transportistas', hasRole('ADMIN', 'ADMIN_TRANSPORTISTA'), upload.single('archivo'), cargaMasivaTransportistas);
 
 /**
  * @openapi
@@ -387,7 +402,7 @@ router.post('/carga-masiva/transportistas', hasRole('ADMIN', 'ADMIN_GENERADOR', 
  *       403:
  *         description: Solo ADMIN
  */
-router.post('/carga-masiva/operadores', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'), upload.single('archivo'), cargaMasivaOperadores);
+router.post('/carga-masiva/operadores', hasRole('ADMIN', 'ADMIN_OPERADOR'), upload.single('archivo'), cargaMasivaOperadores);
 
 /**
  * @openapi

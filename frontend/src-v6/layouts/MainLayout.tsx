@@ -36,6 +36,7 @@ import {
   BookOpen,
   FileCheck,
   Radio,
+  Scale,
 } from 'lucide-react';
 import { Button } from '../components/ui/ButtonV2';
 import { Badge } from '../components/ui/BadgeV2';
@@ -163,6 +164,11 @@ export const MainLayout: React.FC = () => {
 
     // Manifiestos para todos
     items.push({ path: '/manifiestos', icon: FileText, label: 'Manifiestos' });
+
+    // Canal contradictorio: sólo la entidad inspeccionada ve sus propios casos.
+    if (['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(currentUser.rol)) {
+      items.push({ path: '/mis-inspecciones', icon: Scale, label: 'Mis inspecciones' });
+    }
 
     // Expedientes de inspección: inspectores y administradores gubernamentales.
     if (currentUser?.esInspector || isAdmin || isAdminTransportista || isAdminOperador || isAdminGenerador) {
@@ -480,8 +486,8 @@ export const MainLayout: React.FC = () => {
           </div>
         </header>
 
-        {/* Page content */}
-        <main className="flex-1 px-4 lg:px-8 pb-4 lg:pb-8 overflow-auto bg-[#FAFAF8]">
+        {/* Keep absolutely positioned field controls inside this scroll container. */}
+        <main className="relative flex-1 px-4 lg:px-8 pb-4 lg:pb-8 overflow-auto bg-[#FAFAF8]">
           <Outlet />
         </main>
 

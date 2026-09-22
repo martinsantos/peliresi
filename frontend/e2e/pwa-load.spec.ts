@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { ADMIN_EMAIL, ADMIN_PASS, loginWithCredentials } from './helpers/auth';
+import { loginAsAdmin } from './helpers/auth';
 
 /**
  * PWA load test — visits all canonical /app/admin/actores/* routes
@@ -12,6 +12,7 @@ const KNOWN = {
   operadorId: 'cmmpaa2b100edlvk7p577bmap',
   generadorId: 'cmmpaawor00a14kd0ogaieve9',
   manifiestoId: 'cmnajhaw206fhga9dgw6pg3qh',
+  inspectionId: 'cmu61kwhk009z1297m2qkoc7i',
 };
 
 const PWA_ROUTES = [
@@ -34,6 +35,8 @@ const PWA_ROUTES = [
   '/dashboard',
   '/manifiestos',
   `/manifiestos/${KNOWN.manifiestoId}`,
+  '/inspecciones',
+  `/inspecciones/${KNOWN.inspectionId}`,
   `/transporte/viaje/${KNOWN.manifiestoId}`,
   '/reportes',
   '/alertas',
@@ -41,10 +44,7 @@ const PWA_ROUTES = [
 ];
 
 async function loginPwa(page: import('@playwright/test').Page) {
-  await loginWithCredentials(page, {
-    email: ADMIN_EMAIL,
-    password: ADMIN_PASS,
-    onboardingRole: 'ADMIN',
+  await loginAsAdmin(page, {
     startPath: '/app/',
     clickLoginLink: false,
   });

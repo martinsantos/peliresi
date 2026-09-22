@@ -13,9 +13,9 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, Truck, MapPin, Clock, Navigation, Package,
+  ArrowLeft, Truck, MapPin, Clock, Package,
   CheckCircle2, AlertTriangle, Radio, Map as MapIcon, List,
   Loader2, Crosshair, WifiOff
 } from 'lucide-react';
@@ -25,7 +25,6 @@ import { toast } from '../../components/ui/Toast';
 import { GpsStatusPanel } from '../../components/mobile/GpsStatusPanel';
 import { TripActionBar } from '../../components/mobile/TripActionBar';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
-import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { ACTOR_ICONS } from '../../utils/map-icons';
 import {
@@ -34,11 +33,11 @@ import {
   useConfirmarEntrega,
   useRegistrarIncidente,
 } from '../../hooks/useManifiestos';
-import { manifiestoService } from '../../services/manifiesto.service';
-import { EstadoManifiesto } from '../../types/models';
+import { EstadoManifiesto, type EventoManifiesto, type Manifiesto, type ManifiestoResiduo } from '../../types/models';
 import { formatDateTime, formatWeight } from '../../utils/formatters';
 import { offlineSafeMutation } from '../../utils/offline-mutation';
 import { useGPSTracking } from '../../hooks/useGPSTracking';
+import { useAuth } from '../../contexts/AuthContext';
 
 // Recenter map when position changes (respects user pan/zoom)
 function RecenterMap({ position, onUserInteract, followUser }: {
@@ -61,15 +60,24 @@ function RecenterMap({ position, onUserInteract, followUser }: {
 const ViajeEnCursoTransportista: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
+  const { currentUser } = useAuth();
   // Map recenter control
   const [followUser, setFollowUser] = useState(true);
   const handleMapInteract = useCallback(() => setFollowUser(false), []);
 
   // Real data from API
   const { data: apiData, isLoading, isError } = useManifiesto(id || '');
-  const manifiesto = apiData;
-  const m: Record<string, any> = manifiesto || {};
+
+  // Restore cached trip data while API is loading (stale-while-revalidate).
+  // Keep the same nested shape as the API so the recovery view actually renders.
+  const cachedSnapshot = useMemo<Partial<Manifiesto> | null>(() => {
+    if (!id) return null;
+    try {
+      const saved = localStorage.getItem(`viaje_snapshot_${id}`);
+      return saved ? JSON.parse(saved) as Partial<Manifiesto> : null;
+    } catch { return null; }
+  }, [id]);
+  const m: Partial<Manifiesto> = apiData || cachedSnapshot || {};
 
   // Persist active trip snapshot to localStorage for recovery after app restart
   useEffect(() => {
@@ -78,27 +86,18 @@ const ViajeEnCursoTransportista: React.FC = () => {
         id: m.id,
         numero: m.numero,
         estado: m.estado,
-        generador: m.generador?.razonSocial,
-        operador: m.operador?.razonSocial,
-        transportista: m.transportista?.razonSocial,
+        generador: m.generador ? { razonSocial: m.generador.razonSocial, domicilio: m.generador.domicilio } : undefined,
+        operador: m.operador ? { razonSocial: m.operador.razonSocial, domicilio: m.operador.domicilio } : undefined,
+        transportista: m.transportista ? { razonSocial: m.transportista.razonSocial } : undefined,
+        residuos: m.residuos,
+        eventos: m.eventos,
         fechaRetiro: m.fechaRetiro,
         savedAt: new Date().toISOString(),
       };
       localStorage.setItem(`viaje_snapshot_${id}`, JSON.stringify(snapshot));
       localStorage.setItem('sitrep_active_trip_id', id);
     }
-  }, [id, m.id, m.estado]);
-
-  // Restore cached trip data while API is loading (stale-while-revalidate)
-  const cachedSnapshot = useMemo(() => {
-    if (!id) return null;
-    try {
-      const saved = localStorage.getItem(`viaje_snapshot_${id}`);
-      return saved ? JSON.parse(saved) : null;
-    } catch { return null; }
-  }, [id]);
-
-  const displayData = m.id ? m : (cachedSnapshot || {});
+  }, [id, m.id, m.numero, m.estado, m.generador, m.operador, m.transportista, m.residuos, m.eventos, m.fechaRetiro]);
 
   // Mutations
   const confirmarRetiro = useConfirmarRetiro();
@@ -106,7 +105,9 @@ const ViajeEnCursoTransportista: React.FC = () => {
   const registrarIncidente = useRegistrarIncidente();
 
   // UI state
-  const [viajeStatus, setViajeStatus] = useState<'ACTIVO' | 'PAUSADO'>('ACTIVO');
+  const [viajeStatus, setViajeStatus] = useState<'ACTIVO' | 'PAUSADO'>(() => (
+    id && localStorage.getItem(`viaje_status_${id}`) === 'PAUSADO' ? 'PAUSADO' : 'ACTIVO'
+  ));
   const [showFinalizarModal, setShowFinalizarModal] = useState(false);
   const [showIncidenteModal, setShowIncidenteModal] = useState(false);
   const [incidenteTipo, setIncidenteTipo] = useState('');
@@ -134,14 +135,6 @@ const ViajeEnCursoTransportista: React.FC = () => {
   // Default center (Mendoza, Argentina)
   const defaultCenter: [number, number] = [-32.9287, -68.8535];
 
-  // Restore pause state from localStorage on mount
-  useEffect(() => {
-    if (id) {
-      const saved = localStorage.getItem(`viaje_status_${id}`);
-      if (saved === 'PAUSADO') setViajeStatus('PAUSADO');
-    }
-  }, [id]);
-
   // Timer persistence from server timestamp (fechaRetiro)
   useEffect(() => {
     if (m.estado === EstadoManifiesto.EN_TRANSITO && m.fechaRetiro) {
@@ -168,6 +161,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
 
   // Confirmar Retiro with GPS coordinates + offline queue
   const handleConfirmarRetiro = async () => {
+    if (!currentUser) return toast.error('Sesión no disponible', 'Vuelva a iniciar sesión.');
     try {
       const result = await offlineSafeMutation(
         () => confirmarRetiro.mutateAsync({
@@ -176,7 +170,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
           longitud: currentPosition?.[1],
           observaciones: 'Retiro confirmado desde app móvil',
         }),
-        { type: 'POST', endpoint: `/manifiestos/${id}/confirmar-retiro`, data: { latitud: currentPosition?.[0], longitud: currentPosition?.[1], observaciones: 'Retiro confirmado desde app móvil' } }
+        { type: 'POST', endpoint: `/manifiestos/${id}/confirmar-retiro`, data: { latitud: currentPosition?.[0], longitud: currentPosition?.[1], observaciones: 'Retiro confirmado desde app móvil' }, userId: currentUser.id }
       );
       if (result === 'QUEUED') {
         toast.info('Sin conexión — El retiro se confirmará al reconectar');
@@ -190,6 +184,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
 
   // Confirmar Entrega with GPS coordinates + offline queue
   const handleConfirmarEntrega = async () => {
+    if (!currentUser) return toast.error('Sesión no disponible', 'Vuelva a iniciar sesión.');
     try {
       const result = await offlineSafeMutation(
         () => confirmarEntrega.mutateAsync({
@@ -198,11 +193,11 @@ const ViajeEnCursoTransportista: React.FC = () => {
           longitud: currentPosition?.[1],
           observaciones: 'Entrega confirmada desde app móvil',
         }),
-        { type: 'POST', endpoint: `/manifiestos/${id}/confirmar-entrega`, data: { latitud: currentPosition?.[0], longitud: currentPosition?.[1], observaciones: 'Entrega confirmada desde app móvil' } }
+        { type: 'POST', endpoint: `/manifiestos/${id}/confirmar-entrega`, data: { latitud: currentPosition?.[0], longitud: currentPosition?.[1], observaciones: 'Entrega confirmada desde app móvil' }, userId: currentUser.id }
       );
       if (result === 'QUEUED') {
         toast.info('Sin conexión — La entrega se confirmará al reconectar');
-        if (id) localStorage.setItem(`viaje_status_${id}`, 'COMPLETED');
+        if (id) localStorage.setItem(`viaje_status_${id}`, 'ENTREGA_PENDIENTE');
         cleanupGps();
         setShowFinalizarModal(false);
         return;
@@ -296,9 +291,9 @@ const ViajeEnCursoTransportista: React.FC = () => {
             <Card variant="elevated">
               <CardContent className="p-4">
                 <div className="space-y-2">
-                  {cachedSnapshot.generador && <p className="text-sm text-neutral-600">Generador: <span className="font-semibold">{cachedSnapshot.generador}</span></p>}
-                  {cachedSnapshot.transportista && <p className="text-sm text-neutral-600">Transportista: <span className="font-semibold">{cachedSnapshot.transportista}</span></p>}
-                  {cachedSnapshot.operador && <p className="text-sm text-neutral-600">Destino: <span className="font-semibold">{cachedSnapshot.operador}</span></p>}
+                  {cachedSnapshot.generador && <p className="text-sm text-neutral-600">Generador: <span className="font-semibold">{cachedSnapshot.generador.razonSocial}</span></p>}
+                  {cachedSnapshot.transportista && <p className="text-sm text-neutral-600">Transportista: <span className="font-semibold">{cachedSnapshot.transportista.razonSocial}</span></p>}
+                  {cachedSnapshot.operador && <p className="text-sm text-neutral-600">Destino: <span className="font-semibold">{cachedSnapshot.operador.razonSocial}</span></p>}
                 </div>
               </CardContent>
             </Card>
@@ -317,7 +312,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
     );
   }
 
-  if ((!manifiesto || isError) && cachedSnapshot) {
+  if ((!apiData || isError) && cachedSnapshot) {
     return (
       <div className="min-h-screen bg-neutral-50 pb-24">
         <header className="sticky top-0 z-40 bg-white border-b border-neutral-200">
@@ -341,9 +336,9 @@ const ViajeEnCursoTransportista: React.FC = () => {
           <Card variant="elevated">
             <CardContent className="p-4">
               <div className="space-y-2">
-                {cachedSnapshot.generador && <p className="text-sm text-neutral-600">Generador: <span className="font-semibold">{cachedSnapshot.generador}</span></p>}
-                {cachedSnapshot.transportista && <p className="text-sm text-neutral-600">Transportista: <span className="font-semibold">{cachedSnapshot.transportista}</span></p>}
-                {cachedSnapshot.operador && <p className="text-sm text-neutral-600">Destino: <span className="font-semibold">{cachedSnapshot.operador}</span></p>}
+                {cachedSnapshot.generador && <p className="text-sm text-neutral-600">Generador: <span className="font-semibold">{cachedSnapshot.generador.razonSocial}</span></p>}
+                {cachedSnapshot.transportista && <p className="text-sm text-neutral-600">Transportista: <span className="font-semibold">{cachedSnapshot.transportista.razonSocial}</span></p>}
+                {cachedSnapshot.operador && <p className="text-sm text-neutral-600">Destino: <span className="font-semibold">{cachedSnapshot.operador.razonSocial}</span></p>}
               </div>
             </CardContent>
           </Card>
@@ -352,7 +347,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
     );
   }
 
-  if (!manifiesto || isError) {
+  if (!apiData || isError) {
     return (
       <div className="min-h-screen bg-neutral-50 p-4">
         <div className="flex items-center gap-3 mb-6">
@@ -366,8 +361,8 @@ const ViajeEnCursoTransportista: React.FC = () => {
     );
   }
 
-  const totalPeso = Array.isArray(m.residuos) ? m.residuos.reduce((sum: number, r: any) => sum + (r.cantidad || 0), 0) : 0;
-  const eventos = Array.isArray(m.eventos) ? m.eventos : [];
+  const totalPeso = Array.isArray(m.residuos) ? m.residuos.reduce((sum: number, residue: ManifiestoResiduo) => sum + (residue.cantidad || 0), 0) : 0;
+  const eventos: EventoManifiesto[] = Array.isArray(m.eventos) ? m.eventos : [];
 
   return (
     <div className="min-h-screen bg-neutral-50 pb-24">
@@ -559,7 +554,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
               <span className="font-semibold text-neutral-900">Residuos</span>
             </div>
             <div className="space-y-2">
-              {(m.residuos || []).map((r: any) => (
+              {(m.residuos || []).map((r: ManifiestoResiduo) => (
                 <div key={r.id} className="flex justify-between items-center p-2 bg-neutral-50 rounded-lg">
                   <span className="text-sm text-neutral-700">{r.tipoResiduo?.nombre || r.descripcion || 'Residuo'}</span>
                   <span className="text-sm font-semibold text-neutral-900">{r.cantidad} {r.unidad}</span>

@@ -29,7 +29,7 @@ vi.mock('../../lib/prisma', () => ({
   },
 }));
 
-import { isAuthenticated, hasRole, AuthRequest } from '../../middlewares/auth.middleware';
+import { isAuthenticated, hasRole, requireFullAccess, AuthRequest } from '../../middlewares/auth.middleware';
 
 function createMocks(authHeader?: string) {
   const req = {
@@ -238,5 +238,28 @@ describe('hasRole middleware', () => {
     middleware(req, res, next);
 
     expect(next).toHaveBeenCalledWith(); // no error
+  });
+});
+
+describe('requireFullAccess middleware', () => {
+  it('blocks restricted accounts from business routes', () => {
+    const { req, res, next } = createMocks();
+    req.user = { id: 'candidate-1', rol: 'GENERADOR', restricted: true };
+
+    requireFullAccess(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 403,
+      message: expect.stringContaining('Acceso restringido'),
+    }));
+  });
+
+  it('allows active full-access accounts', () => {
+    const { req, res, next } = createMocks();
+    req.user = { id: 'operator-1', rol: 'OPERADOR', restricted: false };
+
+    requireFullAccess(req, res, next);
+
+    expect(next).toHaveBeenCalledWith();
   });
 });

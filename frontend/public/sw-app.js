@@ -5,6 +5,39 @@ const SW_VERSION = '__SW_VERSION__'.startsWith('__') ? 'dev-' + Date.now() : '__
 const CACHE_NAME = `sitrep-app-${SW_VERSION}`;
 const RUNTIME_CACHE = `sitrep-app-runtime-${SW_VERSION}`;
 
+function isSpaNavigation(pathname) {
+  return !/^\/app\/(manual|public)(\/|$)/.test(pathname)
+    && (pathname === '/app/index.html' || pathname === '/app/app.html' || !/\.(html?|pdf|json|xml|txt|csv|zip|png|jpe?g|svg|webp|ico|js|css)$/i.test(pathname));
+}
+
+function isCacheableAsset(request, response) {
+  if (!response || response.status !== 200 || response.redirected) return false;
+  const pathname = new URL(request.url).pathname;
+  const contentType = response.headers.get('Content-Type') || '';
+  if (/\.m?js$/i.test(pathname)) return /(?:java|ecma)script/i.test(contentType);
+  if (/\.css$/i.test(pathname)) return /text\/css/i.test(contentType);
+  return !pathname.startsWith('/app/assets/') || !/text\/html/i.test(contentType);
+}
+
+async function matchOwnCache(request) {
+  const precache = await caches.open(CACHE_NAME);
+  const runtime = await caches.open(RUNTIME_CACHE);
+  return await precache.match(request) || await runtime.match(request);
+}
+
+async function offlineNavigation(request, pathname) {
+  const exact = await matchOwnCache(request);
+  if (exact) return exact;
+  if (isSpaNavigation(pathname)) {
+    const shell = await matchOwnCache('/app/index.html');
+    if (shell?.ok && /text\/html/i.test(shell.headers.get('Content-Type') || '')) return shell;
+  }
+  return await matchOwnCache('/app/offline.html') || new Response('<h1>Sin conexión</h1><p>Abra esta pantalla con conexión antes de usarla sin red.</p>', {
+    status: 503,
+    headers: { 'Content-Type': 'text/html; charset=utf-8' }
+  });
+}
+
 // Try to load build-time precache manifest, fallback to minimal list
 let PRECACHE_URLS = ['/app/', '/app/index.html', '/app/offline.html', '/app/manifest-app.json'];
 try {
@@ -68,46 +101,45 @@ self.addEventListener('fetch', (event) => {
   // Only handle http/https schemes (filter chrome-extension://, etc.)
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
 
+  // Scope controls navigations, not subresource requests made by a controlled page.
+  if (url.origin !== self.location.origin || !url.pathname.startsWith('/app/')) return;
+
   // Never cache API calls — let the app handle offline via IndexedDB
-  if (url.pathname.startsWith('/api/')) return;
+  if (/^\/(?:app\/)?api(\/|$)/.test(url.pathname)) return;
 
   // --- Navigation requests (SPA) ---
   // Network-first, fallback to cached index.html (React SPA shell), then offline.html
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
-        .then((response) => {
-          if (response.ok) {
-            // Only cache successful responses as the SPA shell
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put('/app/index.html', clone);
-            });
-            return response;
+        .then(async (response) => {
+          // Only canonical entry documents may update the SPA shell. A manual,
+          // download or public HTML page must never replace it.
+          if (response.ok && !response.redirected && /text\/html/i.test(response.headers.get('Content-Type') || '')
+            && ['/app/', '/app/index.html', '/app/app.html'].includes(url.pathname)) {
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put('/app/index.html', response.clone()).catch(() => {});
           }
+          if (response.ok || !isSpaNavigation(url.pathname)) return response;
           // Non-OK (404, 500): fall back to cached SPA shell so React Router handles the route
-          return caches.match('/app/index.html')
+          return matchOwnCache('/app/index.html')
             .then((cached) => cached || response);
         })
-        .catch(() => {
-          // Offline: serve the cached SPA shell so React can render with offline data
-          return caches.match('/app/index.html')
-            .then((cached) => cached || caches.match('/app/offline.html'));
-        })
+        .catch(() => offlineNavigation(request, url.pathname))
     );
     return;
   }
 
   // --- Hashed assets (vendor-CYrAbLGl.js, main-BpK6mu12.css) ---
   // Cache-first: content-hashed files never change
-  if (url.pathname.match(/\/assets\/.*-[a-zA-Z0-9]{8}\./)) {
+  if (url.pathname.match(/\/assets\/.*-[a-zA-Z0-9_-]{8}\./)) {
     event.respondWith(
-      caches.match(request).then((cached) => {
-        if (cached) return cached;
-        return fetch(request).then((response) => {
-          if (response.status === 200) {
-            const clone = response.clone();
-            caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, clone));
+      matchOwnCache(request).then((cached) => {
+        if (isCacheableAsset(request, cached)) return cached;
+        return fetch(request).then(async (response) => {
+          if (isCacheableAsset(request, response)) {
+            const cache = await caches.open(RUNTIME_CACHE);
+            await cache.put(request, response.clone()).catch(() => {});
           }
           return response;
         });
@@ -121,13 +153,16 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.open(RUNTIME_CACHE).then((cache) => {
       return fetch(request)
-        .then((response) => {
-          if (response.status === 200) {
-            cache.put(request, response.clone());
+        .then(async (response) => {
+          if (isCacheableAsset(request, response)) {
+            await cache.put(request, response.clone()).catch(() => {});
           }
           return response;
         })
-        .catch(() => cache.match(request));
+        .catch(async () => {
+          const cached = await cache.match(request);
+          return (isCacheableAsset(request, cached) && cached) || new Response('', { status: 408, statusText: 'Offline' });
+        });
     })
   );
 });

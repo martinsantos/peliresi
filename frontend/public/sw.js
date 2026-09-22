@@ -1,17 +1,37 @@
 // Service Worker para modo Offline-First (CU-T09)
 // Scope: / (main site)
-const CACHE_NAME = 'trazabilidad-rrpp-v52';
-const RUNTIME_CACHE = 'runtime-cache-v52';
+const CACHE_NAME = 'trazabilidad-rrpp-v56';
+const RUNTIME_CACHE = 'runtime-cache-v56';
 
 // Recursos críticos para cachear en instalación
 const PRECACHE_URLS = [
     '/',
-    '/index.html'
+    '/index.html',
+    '/offline.html'
 ];
+
+function isSpaNavigation(pathname) {
+    return !/^\/(manual|public)(\/|$)/.test(pathname)
+        && (pathname === '/index.html' || !/\.(html?|pdf|json|xml|txt|csv|zip|png|jpe?g|svg|webp|ico|js|css)$/i.test(pathname));
+}
+
+function isCacheableAsset(request, response) {
+    if (!response || response.status !== 200 || response.redirected) return false;
+    const pathname = new URL(request.url).pathname;
+    const contentType = response.headers.get('Content-Type') || '';
+    if (/\.m?js$/i.test(pathname)) return /(?:java|ecma)script/i.test(contentType);
+    if (/\.css$/i.test(pathname)) return /text\/css/i.test(contentType);
+    return !pathname.startsWith('/assets/') || !/text\/html/i.test(contentType);
+}
+
+const offlineResponse = () => new Response('<html><body><h1>Offline</h1><p>Sin conexion. Intente de nuevo.</p></body></html>', {
+    status: 503,
+    headers: { 'Content-Type': 'text/html; charset=utf-8' }
+});
 
 // Instalación del Service Worker
 self.addEventListener('install', (event) => {
-    console.log('[SW] Installing Service Worker v52...');
+    console.log('[SW] Installing', CACHE_NAME);
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then((cache) => {
@@ -30,13 +50,13 @@ self.addEventListener('install', (event) => {
 
 // Activación del Service Worker
 self.addEventListener('activate', (event) => {
-    console.log('[SW] Activando Service Worker v52...');
+    console.log('[SW] Activando', CACHE_NAME);
     event.waitUntil(
         caches.keys().then((cacheNames) => {
             const currentCaches = [CACHE_NAME, RUNTIME_CACHE];
             return Promise.all(
                 cacheNames
-                    .filter((name) => !currentCaches.includes(name))
+                    .filter((name) => (name.startsWith('trazabilidad-rrpp-') || name.startsWith('runtime-cache-')) && !currentCaches.includes(name))
                     .map((name) => {
                         console.log('[SW] Eliminando cache antigua:', name);
                         return caches.delete(name);
@@ -56,8 +76,11 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    // The root worker must not own /app/, external resources or their caches.
+    if (url.origin !== self.location.origin || /^\/app(\/|$)/.test(url.pathname)) return;
+
     // No cachear requests a la API (solo datos estáticos)
-    if (url.pathname.startsWith('/api/')) {
+    if (/^\/api(\/|$)/.test(url.pathname)) {
         return;
     }
 
@@ -67,14 +90,19 @@ self.addEventListener('fetch', (event) => {
             fetch(request)
                 .then((response) => response)
                 .catch(async () => {
-                    const cached = await caches.match(request);
+                    const cache = await caches.open(CACHE_NAME);
+                    const runtime = await caches.open(RUNTIME_CACHE);
+                    const cached = await cache.match(request) || await runtime.match(request);
                     if (cached) return cached;
-                    const offline = await caches.match('/offline.html');
+                    // Deep SPA URLs are not precached individually. Their shell
+                    // can load the same user's bounded IndexedDB snapshot.
+                    if (isSpaNavigation(url.pathname)) {
+                        const shell = await cache.match('/index.html');
+                        if (shell?.ok && /text\/html/i.test(shell.headers.get('Content-Type') || '')) return shell;
+                    }
+                    const offline = await cache.match('/offline.html');
                     if (offline) return offline;
-                    // Last resort: return a minimal HTML response to avoid SW error
-                    return new Response('<html><body><h1>Offline</h1><p>Sin conexion. Intente de nuevo.</p></body></html>', {
-                        headers: { 'Content-Type': 'text/html' }
-                    });
+                    return offlineResponse();
                 })
         );
         return;
@@ -85,14 +113,14 @@ self.addEventListener('fetch', (event) => {
         caches.open(RUNTIME_CACHE).then(async (cache) => {
             try {
                 const response = await fetch(request);
-                if (response && response.status === 200) {
-                    cache.put(request, response.clone());
+                if (isCacheableAsset(request, response)) {
+                    await cache.put(request, response.clone()).catch(() => {});
                 }
                 return response;
             } catch {
                 const cached = await cache.match(request);
                 // Always return a Response — never undefined
-                return cached || new Response('', { status: 408, statusText: 'Offline' });
+                return (isCacheableAsset(request, cached) && cached) || new Response('', { status: 408, statusText: 'Offline' });
             }
         })
     );
@@ -143,7 +171,7 @@ self.addEventListener('push', (event) => {
     event.waitUntil(self.registration.showNotification(data.title || 'RP Trazar', options));
 });
 
-console.log('[SW] Service Worker v52 cargado');
+console.log('[SW] Service Worker cargado', CACHE_NAME);
 
 // ========================================
 // NOTIFICATION CLICK — abrir/enfocar la web

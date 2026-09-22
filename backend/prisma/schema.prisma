@@ -55,6 +55,7 @@ model Usuario {
   evidenciasInspeccion         EvidenciaInspeccion[]   @relation("UsuarioEvidenciasInspeccion")
   evidenciasAnuladasInspeccion EvidenciaInspeccion[]   @relation("UsuarioAnulacionEvidenciasInspeccion")
   eventosInspeccion            EventoInspeccion[]      @relation("UsuarioEventosInspeccion")
+  intercambiosInspeccion       IntercambioInspeccion[] @relation("UsuarioIntercambiosInspeccion")
 
   @@map("usuarios")
 }
@@ -478,6 +479,8 @@ model Inspeccion {
   plazoRespuestaAt  DateTime?
   observaciones     String?
   declaradoSnapshot Json?
+  datosActa         Json?
+  informeTecnico    Json?
   version           Int                 @default(1)
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
@@ -490,6 +493,7 @@ model Inspeccion {
   comparaciones ComparacionInspeccion[]
   evidencias    EvidenciaInspeccion[]
   eventos       EventoInspeccion[]
+  intercambios  IntercambioInspeccion[]
 
   @@index([estado, createdAt])
   @@index([inspectorId, estado])
@@ -561,6 +565,7 @@ model EvidenciaInspeccion {
   comparacionId   String?
   eventoId        String?
   itemId          String?
+  intercambioId   String?
   capturadaAt     DateTime                @default(now())
   latitud         Float?
   longitud        Float?
@@ -575,6 +580,7 @@ model EvidenciaInspeccion {
   comparacion ComparacionInspeccion? @relation(fields: [comparacionId], references: [id], onDelete: SetNull)
   evento      EventoInspeccion?      @relation(fields: [eventoId], references: [id], onDelete: SetNull)
   item        ItemInspeccion?        @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  intercambio IntercambioInspeccion? @relation(fields: [intercambioId], references: [id], onDelete: SetNull)
 
   @@unique([inspeccionId, clienteId])
   @@index([inspeccionId, createdAt])
@@ -582,8 +588,46 @@ model EvidenciaInspeccion {
   @@index([comparacionId])
   @@index([eventoId])
   @@index([itemId])
+  @@index([intercambioId])
   @@index([inspeccionId, anuladaAt])
   @@map("evidencias_inspeccion")
+}
+
+// Presentaciones inmutables intercambiadas entre la autoridad y el sujeto
+// inspeccionado. Cada entrada encadena su huella con la anterior y conserva
+// los adjuntos por contenido, sin depender del correo electrónico.
+model IntercambioInspeccion {
+  id                 String                   @id @default(cuid())
+  inspeccionId       String
+  secuencia          Int
+  clienteId          String?
+  respondeAId        String?
+  tipo               TipoIntercambioInspeccion
+  parte              ParteIntercambioInspeccion
+  asunto             String
+  cuerpo             String
+  plazoRespuestaAt   DateTime?
+  presentadoFueraDePlazo Boolean @default(false)
+  canal              String                   @default("PORTAL_SITREP")
+  versionExpediente  Int
+  contenidoSha256    String
+  hashAnterior       String?
+  hashCadena         String
+  autorId            String
+  createdAt          DateTime                 @default(now())
+
+  inspeccion Inspeccion              @relation(fields: [inspeccionId], references: [id], onDelete: Cascade)
+  autor      Usuario                 @relation("UsuarioIntercambiosInspeccion", fields: [autorId], references: [id], onDelete: Restrict)
+  respondeA  IntercambioInspeccion?  @relation("RespuestaIntercambio", fields: [respondeAId], references: [id], onDelete: Restrict)
+  respuestas IntercambioInspeccion[] @relation("RespuestaIntercambio")
+  adjuntos   EvidenciaInspeccion[]
+
+  @@unique([inspeccionId, secuencia])
+  @@unique([inspeccionId, clienteId])
+  @@unique([hashCadena])
+  @@index([inspeccionId, createdAt])
+  @@index([respondeAId])
+  @@map("intercambios_inspeccion")
 }
 
 model EventoInspeccion {
@@ -675,6 +719,22 @@ enum TipoEvidenciaInspeccion {
   FOTO
   AUDIO
   DOCUMENTO
+}
+
+enum ParteIntercambioInspeccion {
+  AUTORIDAD
+  INSPECCIONADO
+  SISTEMA
+}
+
+enum TipoIntercambioInspeccion {
+  REQUERIMIENTO
+  RESPUESTA
+  DESCARGO
+  SUBSANACION
+  PRONUNCIAMIENTO
+  CIERRE_CONFORME
+  DERIVACION_LEGALES
 }
 
 // ========== SISTEMA DE NOTIFICACIONES IN-APP ==========

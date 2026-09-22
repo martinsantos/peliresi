@@ -8,16 +8,21 @@ import { domainEvents } from '../services/domainEvent.service';
 import { computeRollingHash, computeClosureHash, hashManifiesto, registrarSello } from '../services/blockchain.service';
 import { invalidateGpsCache } from './manifiesto-gps.controller';
 import { assertCanAccessManifiesto } from '../utils/roleFilter';
+import {
+  cancelarManifiestoSchema,
+  canRevertManifest,
+  confirmarRecepcionSchema,
+  hasCompleteCoordinates,
+  rechazarCargaSchema,
+  registrarIncidenteSchema,
+  registrarPesajeSchema,
+  registrarTratamientoSchema,
+  revertirManifiestoSchema,
+  reversionCleanup,
+  VALID_MANIFEST_REVERSIONS,
+} from '../domain/manifiestoWorkflow';
 
 // Zod schemas
-const registrarIncidenteSchema = z.object({
-  tipoIncidente: z.string().optional(),
-  tipo: z.string().optional(),
-  descripcion: z.string().min(1, 'La descripcion es requerida').max(1000),
-  latitud: z.number().optional(),
-  longitud: z.number().optional(),
-});
-
 const cerrarManifiestoSchema = z.object({
   metodoTratamiento: z.string().optional(),
   observaciones: z.string().max(1000).optional(),
@@ -220,12 +225,12 @@ export const confirmarRetiro = async (req: AuthRequest, res: Response, next: Nex
         }
       });
 
-      if (latitud && longitud) {
+      if (hasCompleteCoordinates(latitud, longitud)) {
         await tx.trackingGPS.create({
           data: {
             manifiestoId: id,
-            latitud,
-            longitud
+            latitud: latitud!,
+            longitud: longitud!
           }
         });
       }
@@ -336,7 +341,9 @@ export const confirmarRecepcion = async (req: AuthRequest, res: Response, next: 
   try {
     const { id } = req.params;
     await assertCanAccessManifiesto(prisma, req.user, id);
-    const { observaciones, pesoReal } = req.body;
+    const parsed = confirmarRecepcionSchema.safeParse(req.body);
+    if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
+    const { observaciones, pesoReal } = parsed.data;
     const userId = req.user.id;
 
     if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') {
@@ -603,7 +610,9 @@ export const rechazarCarga = async (req: AuthRequest, res: Response, next: NextF
   try {
     const { id } = req.params;
     await assertCanAccessManifiesto(prisma, req.user, id);
-    const { motivo, descripcion, cantidadRechazada } = req.body;
+    const parsed = rechazarCargaSchema.safeParse(req.body);
+    if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
+    const { motivo, descripcion, cantidadRechazada } = parsed.data;
     const userId = req.user.id;
 
     if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') {
@@ -674,43 +683,40 @@ export const registrarIncidente = async (req: AuthRequest, res: Response, next: 
       throw new AppError(parsed.error.issues[0].message, 400);
     }
     const { tipoIncidente, tipo, descripcion, latitud, longitud } = parsed.data;
-    const tipoFinal = tipoIncidente || tipo; // Accept both field names
+    const tipoFinal = (tipoIncidente || tipo)!; // Schema guarantees one is present.
     const userId = req.user.id;
 
     if (req.user.rol !== 'TRANSPORTISTA' && req.user.rol !== 'ADMIN') {
       throw new AppError('Solo los transportistas pueden registrar incidentes', 403);
     }
 
-    const manifiesto = await prisma.manifiesto.findUnique({
-      where: { id }
-    });
+    const evento = await prisma.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM manifiestos WHERE id = ${id} FOR UPDATE
+      `;
+      if (locked.length === 0) throw new AppError('Manifiesto no encontrado', 404);
 
-    if (!manifiesto) {
-      throw new AppError('Manifiesto no encontrado', 404);
-    }
-
-    if (manifiesto.estado !== 'EN_TRANSITO') {
-      throw new AppError('Solo se pueden registrar incidentes en transportes activos', 400);
-    }
-
-    // Registrar evento de incidente
-    const evento = await prisma.eventoManifiesto.create({
-      data: {
-        manifiestoId: id,
-        tipo: 'INCIDENTE',
-        descripcion: `INCIDENTE: ${tipoFinal}. ${descripcion}`,
-        latitud,
-        longitud,
-        usuarioId: userId
+      const manifiesto = await tx.manifiesto.findUnique({ where: { id } });
+      if (!manifiesto) throw new AppError('Manifiesto no encontrado', 404);
+      if (manifiesto.estado !== 'EN_TRANSITO') {
+        throw new AppError('Solo se pueden registrar incidentes en transportes activos', 400);
       }
-    });
 
-    // Marcar manifiesto con incidente
-    await prisma.manifiesto.update({
-      where: { id },
-      data: {
-        observaciones: `${manifiesto.observaciones || ''} [INCIDENTE: ${tipoFinal}]`
-      }
+      const created = await tx.eventoManifiesto.create({
+        data: {
+          manifiestoId: id,
+          tipo: 'INCIDENTE',
+          descripcion: `INCIDENTE: ${tipoFinal}. ${descripcion}`,
+          latitud,
+          longitud,
+          usuarioId: userId,
+        },
+      });
+
+      const observaciones = `${manifiesto.observaciones || ''} [INCIDENTE: ${tipoFinal}]`.trim();
+      await tx.manifiesto.update({ where: { id }, data: { observaciones } });
+      await updateRollingHash(tx, id, manifiesto.estado, new Date(), observaciones, created.id);
+      return created;
     });
 
     res.json({
@@ -721,8 +727,8 @@ export const registrarIncidente = async (req: AuthRequest, res: Response, next: 
     domainEvents.emit({
       type: 'INCIDENTE_REGISTRADO',
       manifiestoId: id,
-      tipoIncidente: tipoFinal ?? '',
-      descripcion: descripcion ?? '',
+      tipoIncidente: tipoFinal,
+      descripcion,
       userId,
       latitud,
       longitud,
@@ -737,7 +743,9 @@ export const registrarTratamiento = async (req: AuthRequest, res: Response, next
   try {
     const { id } = req.params;
     await assertCanAccessManifiesto(prisma, req.user, id);
-    const { metodoTratamiento, metodo, fechaTratamiento, observaciones } = req.body;
+    const parsed = registrarTratamientoSchema.safeParse(req.body);
+    if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
+    const { metodoTratamiento, metodo, fechaTratamiento, observaciones } = parsed.data;
     const metodoFinal = metodoTratamiento || metodo; // Accept both field names
     const userId = req.user.id;
 
@@ -834,55 +842,55 @@ export const revertirEstado = async (req: AuthRequest, res: Response, next: Next
   try {
     const { id } = req.params;
     await assertCanAccessManifiesto(prisma, req.user, id);
-    const { estadoNuevo, motivo } = req.body;
+    const parsed = revertirManifiestoSchema.safeParse(req.body);
+    if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
+    const { estadoNuevo, motivo } = parsed.data;
 
-    const manifiesto = await prisma.manifiesto.findUnique({ where: { id } });
-    if (!manifiesto) {
-      throw new AppError('Manifiesto no encontrado', 404);
-    }
+    const result = await prisma.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM manifiestos WHERE id = ${id} FOR UPDATE
+      `;
+      if (locked.length === 0) throw new AppError('Manifiesto no encontrado', 404);
 
-    const estadosValidos = ['BORRADOR', 'PENDIENTE_APROBACION', 'APROBADO', 'EN_TRANSITO',
-                            'ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO', 'TRATADO'];
-    if (!estadosValidos.includes(estadoNuevo)) {
-      throw new AppError('Estado destino no valido', 400);
-    }
+      const manifiesto = await tx.manifiesto.findUnique({ where: { id } });
+      if (!manifiesto) throw new AppError('Manifiesto no encontrado', 404);
 
-    // Valid state reversions (current state -> allowed target states)
-    const VALID_REVERSIONS: Record<string, string[]> = {
-      'APROBADO': ['BORRADOR'],
-      'EN_TRANSITO': ['APROBADO'],
-      'ENTREGADO': ['EN_TRANSITO'],
-      'RECIBIDO': ['ENTREGADO'],
-      'EN_TRATAMIENTO': ['RECIBIDO'],
-      'TRATADO': ['EN_TRATAMIENTO', 'RECIBIDO'],
-      'RECHAZADO': ['ENTREGADO'],
-    };
+      const estadoAnterior = manifiesto.estado;
+      if (!canRevertManifest(estadoAnterior, estadoNuevo)) {
+        const validTargets = VALID_MANIFEST_REVERSIONS[estadoAnterior];
+        throw new AppError(
+          `No se puede revertir de ${estadoAnterior} a ${estadoNuevo}. Transiciones validas: ${validTargets?.join(', ') || 'ninguna'}`,
+          400,
+        );
+      }
 
-    const currentEstado = manifiesto.estado;
-    const validTargets = VALID_REVERSIONS[currentEstado];
-    if (!validTargets || !validTargets.includes(estadoNuevo)) {
-      throw new AppError(
-        `No se puede revertir de ${currentEstado} a ${estadoNuevo}. Transiciones validas: ${validTargets?.join(', ') || 'ninguna'}`,
-        400
-      );
-    }
-
-    const estadoAnterior = manifiesto.estado;
-    const updated = await prisma.manifiesto.update({
-      where: { id },
-      data: { estado: estadoNuevo },
+      const updated = await tx.manifiesto.update({
+        where: { id, estado: estadoAnterior },
+        data: { estado: estadoNuevo, ...reversionCleanup(estadoNuevo) },
+      });
+      const evento = await tx.eventoManifiesto.create({
+        data: {
+          manifiestoId: id,
+          tipo: 'REVERSION',
+          descripcion: `Reversion: ${estadoAnterior} -> ${estadoNuevo}${motivo ? '. Motivo: ' + motivo : ''}`,
+          usuarioId: req.user!.id,
+        },
+      });
+      await updateRollingHash(tx, id, estadoNuevo, new Date(), updated.observaciones, evento.id);
+      return { updated, estadoAnterior };
     });
 
-    await prisma.eventoManifiesto.create({
-      data: {
-        manifiestoId: id,
-        tipo: 'REVERSION',
-        descripcion: `Reversion: ${estadoAnterior} -> ${estadoNuevo}${motivo ? '. Motivo: ' + motivo : ''}`,
-        usuarioId: req.user!.id,
-      },
-    });
+    invalidateGpsCache(id);
+    res.json({ success: true, data: { manifiesto: result.updated } });
 
-    res.json({ success: true, data: { manifiesto: updated } });
+    domainEvents.emit({
+      type: 'MANIFIESTO_ESTADO_CAMBIADO',
+      manifiestoId: id,
+      estadoAnterior: result.estadoAnterior,
+      estadoNuevo,
+      numero: result.updated.numero,
+      userId: req.user.id,
+    });
   } catch (error) {
     next(error);
   }
@@ -893,91 +901,81 @@ export const registrarPesaje = async (req: AuthRequest, res: Response, next: Nex
   try {
     const { id } = req.params;
     await assertCanAccessManifiesto(prisma, req.user, id);
-    const { residuosPesados, residuos, observaciones } = req.body; // Accept both formats
     const userId = req.user.id;
 
     if (req.user.rol !== 'OPERADOR' && req.user.rol !== 'ADMIN') {
       throw new AppError('Solo los operadores pueden registrar pesajes', 403);
     }
 
-    const manifiesto = await prisma.manifiesto.findUnique({
-      where: { id },
-      include: {
-        residuos: true
+    const parsed = registrarPesajeSchema.safeParse(req.body);
+    if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
+    const { items, observaciones } = parsed.data;
+
+    const result = await prisma.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM manifiestos WHERE id = ${id} FOR UPDATE
+      `;
+      if (locked.length === 0) throw new AppError('Manifiesto no encontrado', 404);
+
+      const manifiesto = await tx.manifiesto.findUnique({ where: { id }, include: { residuos: true } });
+      if (!manifiesto) throw new AppError('Manifiesto no encontrado', 404);
+      if (manifiesto.estado !== 'ENTREGADO' && manifiesto.estado !== 'RECIBIDO') {
+        throw new AppError('El manifiesto debe estar entregado o recibido para registrar pesaje', 400);
       }
-    });
 
-    if (!manifiesto) {
-      throw new AppError('Manifiesto no encontrado', 404);
-    }
-
-    // Accept pesaje in both ENTREGADO and RECIBIDO states
-    if (manifiesto.estado !== 'ENTREGADO' && manifiesto.estado !== 'RECIBIDO') {
-      throw new AppError('El manifiesto debe estar entregado o recibido para registrar pesaje', 400);
-    }
-
-    // Normalize input: accept both {residuosPesados: [{id, pesoReal}]} and {residuos: [{id, cantidadRecibida}]}
-    const normalizedResiduos = residuosPesados || (residuos ? residuos.map((r: any) => ({ id: r.id, pesoReal: r.cantidadRecibida })) : null);
-    if (!normalizedResiduos || !Array.isArray(normalizedResiduos)) {
-      throw new AppError('Formato de residuos incorrecto', 400);
-    }
-
-    let pesoDeclaradoTotal = 0;
-    let pesoRealTotal = 0;
-
-    // Actualizar cada residuo en una transaccion
-    await prisma.$transaction(
-      normalizedResiduos.map((item: any) => {
-        const residuoOriginal = manifiesto.residuos.find(r => r.id === item.id);
+      let pesoDeclaradoTotal = 0;
+      let pesoRealTotal = 0;
+      for (const item of items) {
+        const residuoOriginal = manifiesto.residuos.find((residuo) => residuo.id === item.id);
         if (!residuoOriginal) throw new AppError(`Residuo con ID ${item.id} no encontrado en el manifiesto`, 400);
 
         pesoDeclaradoTotal += residuoOriginal.cantidad;
-        pesoRealTotal += Number(item.pesoReal);
+        pesoRealTotal += item.pesoReal;
+        const tipoDiferencia = item.pesoReal > residuoOriginal.cantidad
+          ? 'EXCEDENTE'
+          : item.pesoReal < residuoOriginal.cantidad ? 'FALTANTE' : 'NINGUNA';
 
-        let tipoDiferencia: 'NINGUNA' | 'FALTANTE' | 'EXCEDENTE' = 'NINGUNA';
-        if (Number(item.pesoReal) > residuoOriginal.cantidad) tipoDiferencia = 'EXCEDENTE';
-        if (Number(item.pesoReal) < residuoOriginal.cantidad) tipoDiferencia = 'FALTANTE';
-
-        return prisma.manifiestoResiduo.update({
+        await tx.manifiestoResiduo.update({
           where: { id: item.id },
-          data: {
-            cantidadRecibida: Number(item.pesoReal),
-            tipoDiferencia,
-            estado: 'pesado'
-          }
+          data: { cantidadRecibida: item.pesoReal, tipoDiferencia, estado: 'pesado' },
         });
-      })
-    );
-
-    const diferencia = pesoRealTotal - pesoDeclaradoTotal;
-    const porcentajeDif = pesoDeclaradoTotal > 0 ? ((diferencia / pesoDeclaradoTotal) * 100).toFixed(2) : '0';
-
-    // Registrar evento de pesaje
-    await prisma.eventoManifiesto.create({
-      data: {
-        manifiestoId: id,
-        tipo: 'PESAJE',
-        descripcion: `Pesaje realizado. Declarado Total: ${pesoDeclaradoTotal}, Real Total: ${pesoRealTotal}. Diferencia: ${porcentajeDif}%. ${observaciones || ''}`,
-        usuarioId: userId
       }
-    });
 
-    // Generate anomalies if needed (Logic for CU-O05 could be here or separate)
-    if (Math.abs(Number(porcentajeDif)) > 5) { // 5% tolerance
-      await prisma.eventoManifiesto.create({
+      const diferencia = pesoRealTotal - pesoDeclaradoTotal;
+      const porcentajeDif = pesoDeclaradoTotal > 0 ? (diferencia / pesoDeclaradoTotal) * 100 : 0;
+      const evento = await tx.eventoManifiesto.create({
         data: {
           manifiestoId: id,
-          tipo: 'INCIDENTE',
-          descripcion: `Diferencia de peso significativa detectada (${porcentajeDif}%)`,
-          usuarioId: userId
-        }
+          tipo: 'PESAJE',
+          descripcion: `Pesaje realizado. Declarado Total: ${pesoDeclaradoTotal}, Real Total: ${pesoRealTotal}. Diferencia: ${porcentajeDif.toFixed(2)}%. ${observaciones || ''}`,
+          usuarioId: userId,
+        },
       });
+      await updateRollingHash(tx, id, manifiesto.estado, new Date(), manifiesto.observaciones, evento.id);
+
+      const hasSignificantDifference = Math.abs(porcentajeDif) > 5;
+      if (hasSignificantDifference) {
+        const anomaly = await tx.eventoManifiesto.create({
+          data: {
+            manifiestoId: id,
+            tipo: 'INCIDENTE',
+            descripcion: `Diferencia de peso significativa detectada (${porcentajeDif.toFixed(2)}%)`,
+            usuarioId: userId,
+          },
+        });
+        await updateRollingHash(tx, id, manifiesto.estado, new Date(), manifiesto.observaciones, anomaly.id);
+      }
+
+      return { pesoDeclaradoTotal, pesoRealTotal, diferencia, porcentajeDif, hasSignificantDifference };
+    });
+
+    if (result.hasSignificantDifference) {
       domainEvents.emit({
         type: 'DIFERENCIA_PESO',
         manifiestoId: id,
-        pesoDeclarado: pesoDeclaradoTotal,
-        pesoReal: pesoRealTotal,
-        delta: `${porcentajeDif}%`,
+        pesoDeclarado: result.pesoDeclaradoTotal,
+        pesoReal: result.pesoRealTotal,
+        delta: `${result.porcentajeDif.toFixed(2)}%`,
         userId,
       });
     }
@@ -985,10 +983,10 @@ export const registrarPesaje = async (req: AuthRequest, res: Response, next: Nex
     res.json({
       success: true,
       data: {
-        pesoDeclarado: pesoDeclaradoTotal,
-        pesoReal: pesoRealTotal,
-        diferencia,
-        porcentajeDif: parseFloat(porcentajeDif as string)
+        pesoDeclarado: result.pesoDeclaradoTotal,
+        pesoReal: result.pesoRealTotal,
+        diferencia: result.diferencia,
+        porcentajeDif: result.porcentajeDif,
       }
     });
   } catch (error) {
@@ -1001,7 +999,9 @@ export const cancelarManifiesto = async (req: AuthRequest, res: Response, next: 
   try {
     const { id } = req.params;
     await assertCanAccessManifiesto(prisma, req.user, id);
-    const { motivo } = req.body || {};
+    const parsed = cancelarManifiestoSchema.safeParse(req.body || {});
+    if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
+    const { motivo } = parsed.data;
     const userId = req.user.id;
 
     const manifiesto = await prisma.manifiesto.findUnique({
@@ -1023,7 +1023,7 @@ export const cancelarManifiesto = async (req: AuthRequest, res: Response, next: 
 
     const result = await prisma.$transaction(async (tx) => {
       const updated = await tx.manifiesto.update({
-        where: { id },
+        where: { id, estado: estadoAnterior },
         data: { estado: 'CANCELADO' },
         include: {
           generador: true,
@@ -1045,6 +1045,8 @@ export const cancelarManifiesto = async (req: AuthRequest, res: Response, next: 
 
       return updated;
     });
+
+    invalidateGpsCache(id);
 
     res.json({ success: true, data: { manifiesto: result } });
 

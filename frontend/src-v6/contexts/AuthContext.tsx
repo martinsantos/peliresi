@@ -4,7 +4,7 @@
  * Contexto de autenticacion contra API real
  */
 
-import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import OnboardingWizard from '../components/OnboardingWizard';
 import { authService } from '../services/auth.service';
 import { useQueryClient } from '@tanstack/react-query';
@@ -12,6 +12,7 @@ import { clearUserOfflineData } from '../services/offline-sync';
 import { clearSyncQueue } from '../services/indexeddb';
 import { useSessionTimeout } from '../hooks/useSessionTimeout';
 import { getAccessToken, clearTokens } from '../services/api';
+import { clearOfflineSession, isOfflineNetworkError, readOfflineSession, saveOfflineSession } from '../services/offlineSession';
 import { ImpersonationProvider } from './ImpersonationContext';
 import type { Usuario } from '../types/models';
 
@@ -48,7 +49,7 @@ export interface AuthContextType {
   isAdminOperador: boolean;
   isAnyAdmin: boolean;
   canAccess: (permission: string) => boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
   logout: () => Promise<void>;
   isRestricted: boolean;
   solicitudId: string | null;
@@ -151,32 +152,114 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isRestricted, setIsRestricted] = useState(false);
   const [solicitudId, setSolicitudId] = useState<string | null>(null);
+  const authGeneration = useRef(0);
+  const sessionChanging = useRef(false);
+  const [offlineExpiresAt, setOfflineExpiresAt] = useState<number | null>(null);
 
-  // On mount: check for existing token and validate it
+  // A saved profile only restores the same, unexpired session after a transport
+  // failure. Reconnect/focus always asks the server again before renewing it.
   useEffect(() => {
-    const initAuth = async () => {
+    let disposed = false;
+    let pendingToken: string | null = null;
+    const validateSession = async () => {
+      if (sessionChanging.current) return;
       const token = getAccessToken();
-      if (token) {
-        try {
-          const apiUser = await authService.getMe();
-          const mapped = apiUserToUser(apiUser);
-          setCurrentUser(mapped);
-          setIsLoading(false);
+      if (token && pendingToken === token) return;
+      const generation = ++authGeneration.current;
+      pendingToken = token;
+      const isCurrent = () => !disposed && generation === authGeneration.current && getAccessToken() === token;
+      try {
+        if (!token) {
+          clearOfflineSession();
+          setCurrentUser(null);
           return;
-        } catch {
-          // Token invalid, clear it
-          clearTokens();
-          localStorage.removeItem('sitrep_impersonation');
         }
+        const apiUser = await authService.getMe();
+        if (!isCurrent()) return;
+        const mapped = apiUserToUser(apiUser);
+        if (apiUser.activo) saveOfflineSession(mapped, token);
+        else clearOfflineSession();
+        setOfflineExpiresAt(null);
+        setCurrentUser(mapped);
+      } catch (error) {
+        if (!isCurrent()) return;
+        const cached = token && isOfflineNetworkError(error) ? readOfflineSession(token) : null;
+        if (cached) {
+          setCurrentUser(cached.user);
+          setOfflineExpiresAt(cached.expiresAt);
+        } else {
+          clearTokens();
+          clearOfflineSession();
+          localStorage.removeItem('sitrep_impersonation');
+          setCurrentUser(null);
+          setOfflineExpiresAt(null);
+          setIsRestricted(false);
+          setSolicitudId(null);
+          qc.clear();
+        }
+      } finally {
+        if (pendingToken === token) pendingToken = null;
+        if (!disposed && generation === authGeneration.current) setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
-    initAuth();
-  }, []);
+    const reconnect = () => { void validateSession(); };
+    const visibility = () => { if (document.visibilityState === 'visible') reconnect(); };
+    const storage = (event: StorageEvent) => {
+      if (event.key !== 'sitrep_access_token' && event.key !== null) return;
+      if (event.oldValue === event.newValue && event.key !== null) return;
+      // Another tab may have logged out or selected a different account.
+      ++authGeneration.current;
+      pendingToken = null;
+      clearOfflineSession();
+      setCurrentUser(null);
+      setOfflineExpiresAt(null);
+      setIsRestricted(false);
+      setSolicitudId(null);
+      setIsLoading(true);
+      qc.clear();
+      reconnect();
+    };
+    reconnect();
+    window.addEventListener('online', reconnect);
+    window.addEventListener('focus', reconnect);
+    window.addEventListener('storage', storage);
+    document.addEventListener('visibilitychange', visibility);
+    return () => {
+      disposed = true;
+      window.removeEventListener('online', reconnect);
+      window.removeEventListener('focus', reconnect);
+      window.removeEventListener('storage', storage);
+      document.removeEventListener('visibilitychange', visibility);
+    };
+  }, [qc]);
+
+  // Offline reads do not extend the deadline, including an already-open app.
+  useEffect(() => {
+    if (offlineExpiresAt === null) return;
+    const timer = window.setTimeout(() => {
+      ++authGeneration.current;
+      clearTokens();
+      clearOfflineSession();
+      localStorage.removeItem('sitrep_impersonation');
+      setCurrentUser(null);
+      setOfflineExpiresAt(null);
+      setIsLoading(false);
+      qc.clear();
+    }, Math.max(0, offlineExpiresAt - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [offlineExpiresAt, qc]);
 
   // Real login via API — accepts email or CUIT
   const login = useCallback(async (identifier: string, password: string) => {
+    sessionChanging.current = true;
+    ++authGeneration.current;
+    clearOfflineSession();
+    setOfflineExpiresAt(null);
+    setCurrentUser(null);
+    setIsRestricted(false);
+    setSolicitudId(null);
+    qc.clear();
     setAuthError(null);
     setIsLoading(true);
     try {
@@ -191,22 +274,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSolicitudId(response.solicitudId || null);
       }
       const user = apiUserToUser(response.user);
+      if (!response.restricted && response.user.activo) saveOfflineSession(user, response.accessToken);
       setCurrentUser(user);
       const isFirstSession = !localStorage.getItem(`sitrep_onboarding_${user.id}`);
       const isPostReset = localStorage.getItem('sitrep_post_reset') === '1';
       if (isFirstSession || isPostReset) setShowOnboarding(true);
+      return user;
     } catch (err: any) {
       clearTokens();
+      clearOfflineSession();
       const message = err.response?.data?.message || 'Credenciales incorrectas o API no disponible.';
       setAuthError(message);
       throw err;
     } finally {
+      sessionChanging.current = false;
       setIsLoading(false);
     }
-  }, []);
+  }, [qc]);
 
   // Logout
   const logout = useCallback(async () => {
+    sessionChanging.current = true;
+    ++authGeneration.current;
+    clearOfflineSession();
+    setOfflineExpiresAt(null);
+    setCurrentUser(null);
+    setIsLoading(false);
+    qc.clear();
     try {
       await authService.logout();
     } catch {
@@ -233,6 +327,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       clearSyncQueue().catch(() => {});
       qc.clear();
       setCurrentUser(null);
+      sessionChanging.current = false;
     }
   }, [currentUser, qc]);
 
@@ -242,16 +337,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Switch user — real API login with known credentials
   const switchUser = useCallback(async (userId: number) => {
+    ++authGeneration.current;
     setIsLoading(true);
     setAuthError(null);
     clearTokens();
+    clearOfflineSession();
+    setOfflineExpiresAt(null);
+    setCurrentUser(null);
+    setIsRestricted(false);
+    setSolicitudId(null);
+    qc.clear();
 
     const credentials = DEMO_CREDENTIALS[userId];
-    if (credentials) {
-      await login(credentials.email, credentials.password);
+    try {
+      if (credentials) await login(credentials.email, credentials.password);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
-  }, [login]);
+  }, [login, qc]);
 
   const getUsersByRole = useCallback((role: UserRole) => {
     return Object.values(DEMO_CREDENTIALS)

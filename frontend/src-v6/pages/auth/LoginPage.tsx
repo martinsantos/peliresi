@@ -5,9 +5,10 @@
  */
 
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Leaf, AlertCircle, Factory, Truck, FlaskConical, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { postLoginDestination } from '../../utils/authRedirect';
 
 const ENABLE_QUICK_LOGINS = import.meta.env.VITE_DEMO_MODE === 'true';
 
@@ -23,6 +24,7 @@ const QUICK_LOGINS = ENABLE_QUICK_LOGINS
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, authError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -40,8 +42,10 @@ const LoginPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      await login(email, password);
-      navigate('/dashboard');
+      const authenticatedUser = await login(email, password);
+      const requestedPath = (location.state as { from?: unknown } | null)?.from;
+      const destination = postLoginDestination(requestedPath, authenticatedUser?.rol);
+      navigate(destination, { replace: true });
     } catch (err: any) {
       setError(authError || err?.response?.data?.message || 'Error al iniciar sesion. Verifica tus credenciales.');
     } finally {

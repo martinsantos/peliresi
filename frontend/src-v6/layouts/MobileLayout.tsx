@@ -38,6 +38,7 @@ import {
   HelpCircle,
   Navigation,
   ClipboardCheck,
+  Scale,
 } from 'lucide-react';
 import { Badge } from '../components/ui/BadgeV2';
 import { NotificationBell } from '../components/NotificationBell';
@@ -204,6 +205,10 @@ export const MobileLayout: React.FC = () => {
       items.push({ to: mp('/inspecciones'), icon: <ClipboardCheck size={20} />, label: 'Inspecciones', section: 'main' });
     }
 
+    if (currentUser && ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(currentUser.rol)) {
+      items.push({ to: mp('/mis-inspecciones'), icon: <Scale size={20} />, label: 'Mis inspecciones', section: 'main' });
+    }
+
     if (isAdmin || isTransportista) {
       items.push({ to: mp('/centro-control'), icon: <LayoutDashboard size={20} />, label: 'Centro de Control', section: 'main' });
     }
@@ -332,8 +337,8 @@ export const MobileLayout: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto">
+      {/* Keep absolutely positioned field controls inside this scroll container. */}
+      <main className="relative flex-1 overflow-y-auto">
         <div className={cn('p-4', isFieldTripRoute ? 'pb-6' : 'pb-28')}>
           <Outlet />
         </div>

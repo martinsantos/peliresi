@@ -34,7 +34,15 @@ const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadDir),
   filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
 });
-export const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB
+const SOLICITUD_DOCUMENT_MIMES = new Set(['application/pdf', 'image/jpeg', 'image/png']);
+export const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, callback) => {
+    if (SOLICITUD_DOCUMENT_MIMES.has(file.mimetype)) callback(null, true);
+    else callback(new AppError('Tipo de archivo no permitido. Solo PDF, JPG o PNG.', 400));
+  },
+});
 
 // Helper: check if user is an admin role
 const ADMIN_ROLES = ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA'];

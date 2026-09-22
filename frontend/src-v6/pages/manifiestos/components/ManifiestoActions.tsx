@@ -45,7 +45,7 @@ interface ManifiestoActionsProps {
   onTratamiento: (metodo: string, observaciones?: string) => void;
   onCerrar: () => void;
   onRechazar: (motivo: string, descripcion?: string) => void;
-  onIncidente: (tipo: string, descripcion?: string) => void;
+  onIncidente: (tipo: string, descripcion: string) => void;
   onCancelar: () => void;
   onRevertir: (estadoNuevo: string, motivo?: string) => void;
   onDescargarPDF: () => void;

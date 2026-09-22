@@ -224,7 +224,7 @@ const ManifiestoDetailPage: React.FC = () => {
     );
   };
 
-  const handleIncidente = (tipo: string, descripcion?: string) => {
+  const handleIncidente = (tipo: string, descripcion: string) => {
     handleAction(
       () => registrarIncidente.mutateAsync({ id: id!, tipo, descripcion }),
       'Incidente registrado exitosamente',
