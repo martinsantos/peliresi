@@ -43,8 +43,8 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
   const visibleAnchor = visibleAnchorKey === null ? selectedAnchor : active.anchors?.find((anchor) => `${active.id}/${anchor.id}` === visibleAnchorKey);
   const anchorIds = active.anchors?.map((anchor) => anchor.id).join('|') || '';
 
-  // The application scrolls <main>, not window. Track the control that passes
-  // beneath the pinned guide without rewriting the URL or interrupting typing.
+  // The application scrolls <main>, not window. Track the control as it enters
+  // the readable area below the pinned guide, without interrupting typing.
   useEffect(() => {
     const main = workspaceRef.current?.closest('main');
     if (!main || !anchorIds) return;
@@ -53,7 +53,7 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
       frame = 0;
       const guide = workspaceRef.current?.querySelector<HTMLElement>('[data-testid="inspection-navigation"]');
       const compact = window.matchMedia('(max-width: 1023px)').matches;
-      const threshold = main.getBoundingClientRect().top + (compact ? guide?.getBoundingClientRect().height || 0 : 0) + 12;
+      const threshold = main.getBoundingClientRect().top + (compact ? (guide?.getBoundingClientRect().height || 0) + 32 : 112);
       const markers = Array.from(workspaceRef.current?.querySelectorAll<HTMLElement>('[data-inspection-anchor]') || [])
         .filter((element) => element.getClientRects().length && element.dataset.inspectionAnchor?.startsWith(`${active.id}/`));
       let current = '';
