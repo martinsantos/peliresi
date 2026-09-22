@@ -38,6 +38,7 @@ import {
   HelpCircle,
   Navigation,
   ClipboardCheck,
+  Scale,
 } from 'lucide-react';
 import { Badge } from '../components/ui/BadgeV2';
 import { NotificationBell } from '../components/NotificationBell';
@@ -202,6 +203,10 @@ export const MobileLayout: React.FC = () => {
 
     if (canInspect) {
       items.push({ to: mp('/inspecciones'), icon: <ClipboardCheck size={20} />, label: 'Inspecciones', section: 'main' });
+    }
+
+    if (currentUser && ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(currentUser.rol)) {
+      items.push({ to: mp('/mis-inspecciones'), icon: <Scale size={20} />, label: 'Mis inspecciones', section: 'main' });
     }
 
     if (isAdmin || isTransportista) {

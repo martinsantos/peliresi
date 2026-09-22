@@ -24,6 +24,7 @@ export const WarRoomPage = lazy(() => import('../pages/monitor/WarRoomPage'));
 // Inspecciones
 export const InspeccionesPage = lazy(() => import('../pages/inspecciones/InspeccionesPageV2'));
 export const InspeccionDetallePage = lazy(() => import('../pages/inspecciones/InspeccionExpedientePage'));
+export const InspeccionadoParticipacionPage = lazy(() => import('../pages/inspecciones/InspeccionadoParticipacionPage'));
 
 // Manifiestos
 export const ManifiestosPage = lazy(() => import('../pages/manifiestos/ManifiestosPage'));

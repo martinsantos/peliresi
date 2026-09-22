@@ -34,12 +34,31 @@ describe('inspection act PDF', () => {
 
     await streamInspectionTechnicalReportPdf(stream as any, {
       id: 'inspection-1', numero: 'I-2026-000001', numeroActa: 'ACTA-001', version: 4,
-      tipoActor: 'GENERADOR', estado: 'EN_REVISION', inspectorId: 'user-1',
+      tipoActor: 'GENERADOR', estado: 'DERIVADA_LEGALES', inspectorId: 'user-1',
       inspector: { nombre: 'Inspectora', apellido: 'QA' },
       generador: { id: 'actor-1', razonSocial: 'Actor de prueba', cuit: '30-00000000-0', domicilio: 'Mendoza' },
       fechaProgramada: new Date('2026-09-20T12:00:00Z'), iniciadaAt: new Date('2026-09-20T12:05:00Z'),
       cerradaCampoAt: new Date('2026-09-20T13:00:00Z'), plazoRespuestaAt: null, createdAt: new Date('2026-09-20T11:00:00Z'), updatedAt: new Date('2026-09-20T13:00:00Z'),
       ubicacion: 'Planta de prueba', observaciones: `Inspección de prueba sin datos personales reales. ${'Detalle operativo '.repeat(80)}${longTail}`,
+      datosActa: {
+        area: 'Fiscalización ambiental',
+        motivoInspeccion: 'Control programado de cumplimiento documental y operativo',
+        lugarAfectacion: 'Sector de almacenamiento transitorio',
+        atendidoPor: 'Responsable técnico de prueba',
+        cargoAtendido: 'Responsable de planta',
+        danosEstado: 'NO_OBSERVADOS',
+        tercerosTestigosEstado: 'NO_IDENTIFICADOS',
+        libroOperacionesEstado: 'EXHIBIDO',
+        libroOperacionesDetalle: 'Libro exhibido y contrastado con el último asiento disponible.',
+        firmaIntervinienteEstado: 'NEGATIVA',
+        firmaIntervinienteDetalle: 'La negativa fue asentada por la inspectora interviniente.',
+        copiaActaEstado: 'ENTREGADA',
+        copiaActaDetalle: 'Copia entregada a la persona atendiente, con constancia en el expediente.',
+        domicilioLegal: 'Domicilio sintético 100, Mendoza',
+        notificacionEstado: 'CONSTANCIA_FORMAL',
+        notificacionDetalle: 'Constancia formal incorporada al portal SITREP.',
+        plazoDescargoDias: 5,
+      },
       informeTecnico: {
         expedienteElectronico: 'EX-DEMO-0001',
         objetivo: 'Evaluar el cumplimiento documentado durante una inspección sintética.',
@@ -52,6 +71,29 @@ describe('inspection act PDF', () => {
       items: [{ id: 'item-1', codigo: 'SEG-01', etiqueta: 'Libro disponible', resultado: 'NO_CUMPLE', observacion: `Hallazgo completo. ${longTail}`, evidencias: photos.slice(0, 2) }],
       evidencias: photos,
       eventos: [{ id: 'event-1', tipo: 'OBSERVACION', titulo: 'Relato completo del procedimiento', detalle: `${'Secuencia cronológica documentada. '.repeat(40)}${longTail}`, canal: null, estadoEntrega: null, destinatario: null, createdAt: new Date('2026-09-20T13:30:00Z'), usuarioId: 'user-1', usuario: { nombre: 'Inspectora', apellido: 'QA' }, adjuntos: [] }],
+      intercambios: [
+        {
+          id: 'exchange-1', secuencia: 1, tipo: 'REQUERIMIENTO', parte: 'AUTORIDAD', asunto: 'Requerimiento documental',
+          cuerpo: 'Se solicita acompañar documentación respaldatoria dentro del plazo indicado.', plazoRespuestaAt: new Date('2026-09-25T15:00:00Z'),
+          presentadoFueraDePlazo: false, canal: 'PORTAL_SITREP', versionExpediente: 4, contenidoSha256: 'a'.repeat(64), hashAnterior: null,
+          hashCadena: 'b'.repeat(64), autorId: 'user-1', createdAt: new Date('2026-09-20T14:00:00Z'),
+          autor: { nombre: 'Inspectora', apellido: 'QA', rol: 'ADMIN' }, adjuntos: [photos[2]],
+        },
+        {
+          id: 'exchange-2', secuencia: 2, respondeAId: 'exchange-1', tipo: 'DESCARGO', parte: 'INSPECCIONADO', asunto: 'Presentación de descargo',
+          cuerpo: `Se presenta la respuesta con su documentación de respaldo. ${longTail}`, plazoRespuestaAt: null,
+          presentadoFueraDePlazo: true, canal: 'PORTAL_SITREP', versionExpediente: 5, contenidoSha256: 'c'.repeat(64), hashAnterior: 'b'.repeat(64),
+          hashCadena: 'd'.repeat(64), autorId: 'actor-user', createdAt: new Date('2026-09-26T14:00:00Z'),
+          autor: { nombre: 'Representante', apellido: 'QA', rol: 'GENERADOR' }, adjuntos: [photos[3]],
+        },
+        {
+          id: 'exchange-3', secuencia: 3, respondeAId: null, tipo: 'DERIVACION_LEGALES', parte: 'AUTORIDAD', asunto: 'Derivación del expediente a Legales',
+          cuerpo: 'Concluida la instancia de intercambio, se remiten el acta, el informe técnico, las presentaciones y sus adjuntos para la intervención legal competente.', plazoRespuestaAt: null,
+          presentadoFueraDePlazo: false, canal: 'PORTAL_SITREP', versionExpediente: 6, contenidoSha256: 'e'.repeat(64), hashAnterior: 'd'.repeat(64),
+          hashCadena: 'f'.repeat(64), autorId: 'admin-1', createdAt: new Date('2026-09-27T14:00:00Z'),
+          autor: { nombre: 'Administradora', apellido: 'DGFA', rol: 'ADMIN' }, adjuntos: [photos[4]],
+        },
+      ],
     }, () => imagePath);
     await finished;
 

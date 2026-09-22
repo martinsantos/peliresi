@@ -18,6 +18,10 @@ const hasRole = (user: User, roles: UserRole[]) => roles.includes(user.rol);
  * screens from being rendered and issuing doomed/forbidden API requests.
  */
 export function canAccessMobilePath(user: User, path: string): boolean {
+  if (path === '/mis-inspecciones' || path.startsWith('/mis-inspecciones/')) {
+    return hasRole(user, ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR']);
+  }
+
   if (path === '/inspecciones' || path.startsWith('/inspecciones/')) {
     return user.esInspector === true || hasRole(user, ALL_ADMIN_ROLES);
   }

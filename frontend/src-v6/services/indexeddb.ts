@@ -14,8 +14,8 @@ import {
 import api from './api';
 
 const DB_NAME = 'sitrep_offline_db';
-const DB_VERSION = 3;
-const STORES = ['manifiestos', 'catalogos', 'sync_queue', 'inspection_evidence_queue', 'inspection_cases'] as const;
+const DB_VERSION = 4;
+const STORES = ['manifiestos', 'catalogos', 'sync_queue', 'inspection_evidence_queue', 'inspection_cases', 'inspection_exchange_drafts'] as const;
 
 export type StoreName = (typeof STORES)[number];
 

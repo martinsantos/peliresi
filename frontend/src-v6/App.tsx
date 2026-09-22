@@ -29,6 +29,7 @@ import {
   ResetPasswordPage, ReclamarCuentaPage, UserSwitcherPage,
   DashboardPage, CentroControlPage, WarRoomPage,
   InspeccionesPage, InspeccionDetallePage,
+  InspeccionadoParticipacionPage,
   ManifiestosPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
   TransportePerfilPage, ViajeEnCursoTransportista,
   ActoresPage, OperadorDetallePage, TransportistasPage, TransportistaDetallePage,
@@ -113,6 +114,8 @@ function App() {
             <Route path="/mobile/manifiestos/:id" element={<ManifiestoDetallePage />} />
             <Route path="/mobile/inspecciones" element={<InspeccionesPage />} />
             <Route path="/mobile/inspecciones/:id" element={<InspeccionDetallePage />} />
+            <Route path="/mobile/mis-inspecciones" element={<InspeccionadoParticipacionPage />} />
+            <Route path="/mobile/mis-inspecciones/:id" element={<InspeccionadoParticipacionPage />} />
             <Route path="/mobile/transporte/perfil" element={<TransportePerfilPage />} />
             <Route path="/mobile/transporte/viaje/:id" element={<ViajeEnCursoTransportista />} />
             <Route path="/mobile/admin/usuarios" element={<UsuariosPage />} />
@@ -204,6 +207,8 @@ function App() {
             <Route path="/manifiestos/:id" element={<ManifiestoDetallePage />} />
             <Route path="/inspecciones" element={<InspeccionesPage />} />
             <Route path="/inspecciones/:id" element={<InspeccionDetallePage />} />
+            <Route path="/mis-inspecciones" element={<InspeccionadoParticipacionPage />} />
+            <Route path="/mis-inspecciones/:id" element={<InspeccionadoParticipacionPage />} />
 
             {/* Transporte */}
             <Route path="/transporte/perfil" element={<TransportePerfilPage />} />

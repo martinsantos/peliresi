@@ -79,7 +79,12 @@ describe('inspection technical report review editing', () => {
     expect(mocks.createEvent).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         tipo: 'INFORME_TECNICO_ACTUALIZADO',
-        metadata: { versionBase: 9 },
+        metadata: expect.objectContaining({
+          versionBase: 9,
+          versionNueva: 10,
+          contenidoSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+          snapshot: expect.objectContaining({ objetivo: 'Evaluar la situación constatada.' }),
+        }),
         visibleActor: false,
       }),
     }));

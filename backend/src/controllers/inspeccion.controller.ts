@@ -23,6 +23,10 @@ import {
 } from '../services/inspectionDeclaredSnapshot.service';
 import { streamInspectionActPdf } from '../services/inspectionFieldActPdf.service';
 import { streamInspectionTechnicalReportPdf } from '../services/inspectionActPdf.service';
+import {
+  hashCanonicalPayload,
+  inspectDossierReadiness,
+} from '../services/inspectionDocumentIntegrity.service';
 import { inspectionEvidenceMetadataSchema } from '../domain/inspectionEvidence';
 
 type ChecklistDefinition = { codigo: string; categoria: string; etiqueta: string; orden: number; obligatorio?: boolean };
@@ -86,6 +90,17 @@ const inspectionInclude = {
       adjuntos: { orderBy: { createdAt: 'asc' as const }, include: { anuladaPor: { select: { id: true, nombre: true, apellido: true } } } },
     },
   },
+  intercambios: {
+    orderBy: { secuencia: 'asc' as const },
+    include: {
+      autor: { select: { id: true, nombre: true, apellido: true, rol: true } },
+      adjuntos: {
+        where: { anuladaAt: null },
+        orderBy: { createdAt: 'asc' as const },
+        include: { anuladaPor: { select: { id: true, nombre: true, apellido: true } } },
+      },
+    },
+  },
 } satisfies Prisma.InspeccionInclude;
 
 const createSchema = z.object({
@@ -98,7 +113,7 @@ const createSchema = z.object({
   observaciones: z.string().trim().max(10_000).optional().nullable(),
 });
 
-const actaDataSchema = z.object({
+export const actaDataSchema = z.object({
   codigoPostal: z.string().trim().max(20).optional(),
   departamento: z.string().trim().max(120).optional(),
   calle: z.string().trim().max(200).optional(),
@@ -118,6 +133,19 @@ const actaDataSchema = z.object({
   requerimientos: z.string().trim().max(5_000).optional(),
   actaAnterior: z.string().trim().max(120).optional(),
   plazoDescargoDias: z.number().int().min(0).max(365).optional(),
+  danosEstado: z.enum(['OBSERVADOS', 'NO_OBSERVADOS', 'NO_VERIFICADO']).optional(),
+  danosDetalle: z.string().trim().max(5_000).optional(),
+  tercerosTestigosEstado: z.enum(['IDENTIFICADOS', 'NO_IDENTIFICADOS', 'NO_VERIFICADO']).optional(),
+  tercerosTestigosDetalle: z.string().trim().max(5_000).optional(),
+  libroOperacionesEstado: z.enum(['EXHIBIDO', 'NO_EXHIBIDO', 'NO_DISPONIBLE', 'SECUESTRADO', 'NO_APLICA', 'NO_VERIFICADO']).optional(),
+  libroOperacionesDetalle: z.string().trim().max(5_000).optional(),
+  firmaIntervinienteEstado: z.enum(['FIRMADA', 'NEGATIVA', 'IMPOSIBILIDAD', 'AUSENTE', 'PENDIENTE']).optional(),
+  firmaIntervinienteDetalle: z.string().trim().max(5_000).optional(),
+  copiaActaEstado: z.enum(['ENTREGADA', 'NEGATIVA_RECEPCION', 'NO_ENTREGADA', 'PENDIENTE']).optional(),
+  copiaActaDetalle: z.string().trim().max(5_000).optional(),
+  domicilioLegal: z.string().trim().max(500).optional(),
+  notificacionEstado: z.enum(['COMUNICADA_EN_ACTA', 'CONSTANCIA_FORMAL', 'NO_REALIZADA', 'PENDIENTE']).optional(),
+  notificacionDetalle: z.string().trim().max(5_000).optional(),
 }).strict();
 
 const technicalReportSchema = z.object({
@@ -228,16 +256,62 @@ function isSectorReviewer(user: any, tipoActor: TipoActorInspeccion): boolean {
   return user.rol === 'ADMIN' || user.rol === `ADMIN_${tipoActor}`;
 }
 
+type InspectionAccessTarget = {
+  inspectorId: string;
+  tipoActor: TipoActorInspeccion;
+};
+
+/**
+ * One authorization rule for the whole inspection module. Sector
+ * administrators are administrators only for their own actor type; an
+ * inspector without an administrative role is limited to assigned cases.
+ */
+export function canAccessInspection(user: any, inspection: InspectionAccessTarget): boolean {
+  const role = String(user?.rol || '');
+  if (role === 'ADMIN') return true;
+  if (role.startsWith('ADMIN_')) return role === `ADMIN_${inspection.tipoActor}`;
+  return Boolean(user?.esInspector) && user?.id === inspection.inspectorId;
+}
+
+export function inspectionScopeForUser(user: any): Prisma.InspeccionWhereInput {
+  const role = String(user?.rol || '');
+  if (role === 'ADMIN') return {};
+  if (role === 'ADMIN_GENERADOR') return { tipoActor: 'GENERADOR' };
+  if (role === 'ADMIN_TRANSPORTISTA') return { tipoActor: 'TRANSPORTISTA' };
+  if (role === 'ADMIN_OPERADOR') return { tipoActor: 'OPERADOR' };
+  return { inspectorId: user?.id };
+}
+
 function assertInspectionStaff(req: AuthRequest): void {
   if (!isInspectionStaff(req.user)) throw new AppError('Se requiere perfil inspector o administrador autorizado', 403);
 }
 
-function assertCanEdit(req: AuthRequest, inspection: { inspectorId: string; estado: EstadoInspeccion }): void {
+function assertCanAccess(req: AuthRequest, inspection: InspectionAccessTarget): void {
   assertInspectionStaff(req);
-  if (!isAuthorizedAdmin(req.user) && inspection.inspectorId !== req.user.id) {
-    throw new AppError('Solo el inspector asignado puede modificar esta inspeccion', 403);
-  }
+  if (!canAccessInspection(req.user, inspection)) throw new AppError('No autorizado para este expediente', 403);
+}
+
+function assertCanEdit(req: AuthRequest, inspection: InspectionAccessTarget & { estado: EstadoInspeccion }): void {
+  assertCanAccess(req, inspection);
   if (!EDITABLE_STATES.has(inspection.estado)) throw new AppError('La inspeccion ya no admite cambios de campo', 409);
+}
+
+async function reserveFieldMutation(
+  tx: Prisma.TransactionClient,
+  inspectionId: string,
+  version: number,
+): Promise<void> {
+  const reserved = await tx.inspeccion.updateMany({
+    where: {
+      id: inspectionId,
+      version,
+      estado: { in: Array.from(EDITABLE_STATES) },
+    },
+    data: { version: { increment: 1 } },
+  });
+  if (reserved.count !== 1) {
+    throw new AppError('La inspeccion cambio o cerro mientras se procesaba la accion. Actualice antes de continuar.', 409);
+  }
 }
 
 async function actorExists(tipoActor: TipoActorInspeccion, actorId: string): Promise<boolean> {
@@ -285,7 +359,9 @@ export async function listarInspecciones(req: AuthRequest, res: Response, next: 
       ...(actorId && tipoActor === 'GENERADOR' ? { generadorId: actorId } : {}),
       ...(actorId && tipoActor === 'TRANSPORTISTA' ? { transportistaId: actorId } : {}),
       ...(actorId && tipoActor === 'OPERADOR' ? { operadorId: actorId } : {}),
-      ...(!isAuthorizedAdmin(req.user) ? { inspectorId: req.user.id } : {}),
+      // Apply this after user filters so a query parameter can never widen a
+      // sector administrator's scope.
+      ...inspectionScopeForUser(req.user),
       ...(search ? {
         OR: [
           { numero: { contains: search, mode: 'insensitive' } },
@@ -343,7 +419,7 @@ export async function obtenerInspeccion(req: AuthRequest, res: Response, next: N
     assertInspectionStaff(req);
     let inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, include: inspectionInclude });
     if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
-    if (!isAuthorizedAdmin(req.user) && inspection.inspectorId !== req.user.id) throw new AppError('No autorizado para esta inspeccion', 403);
+    assertCanAccess(req, inspection);
     if (!inspection.declaradoSnapshot || inspection.comparaciones.length === 0 || inspection.comparaciones.some((row) => row.codigo === 'RES-CORRIENTES' || row.codigo === 'RES-CORRIENTES-RESUMEN')) {
       await ensureInspectionDeclaredComparisons(prisma, inspection);
       inspection = await prisma.inspeccion.findUniqueOrThrow({ where: { id: req.params.id }, include: inspectionInclude });
@@ -356,6 +432,9 @@ export async function crearInspeccion(req: AuthRequest, res: Response, next: Nex
   try {
     assertInspectionStaff(req);
     const input = createSchema.parse(req.body);
+    if (String(req.user?.rol).startsWith('ADMIN_') && !isSectorReviewer(req.user, input.tipoActor)) {
+      throw new AppError('El administrador sectorial solo puede crear inspecciones de su tipo de actor', 403);
+    }
     if (!(await actorExists(input.tipoActor, input.actorId))) throw new AppError('El actor inspeccionado no existe', 404);
     const inspectorId = input.inspectorId || req.user.id;
     if (!isAuthorizedAdmin(req.user) && inspectorId !== req.user.id) throw new AppError('Un inspector solo puede asignarse inspecciones a si mismo', 403);
@@ -400,12 +479,16 @@ export async function crearInspeccion(req: AuthRequest, res: Response, next: Nex
 export async function actualizarComparaciones(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const body = z.object({ version: z.number().int().positive(), comparaciones: z.array(comparisonSchema).min(1).max(100) }).parse(req.body);
-    const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, select: { inspectorId: true, estado: true, version: true } });
+    const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, select: { inspectorId: true, tipoActor: true, estado: true, version: true } });
     if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
     assertCanEdit(req, inspection);
     if (inspection.version !== body.version) throw new AppError('La inspeccion fue modificada en otro dispositivo. Actualice antes de continuar.', 409);
 
     await prisma.$transaction(async (tx) => {
+      // Reserve the parent version and re-check the editable state in the
+      // transaction. A simultaneous field closure or another device edit now
+      // makes this request fail before any comparison row is changed.
+      await reserveFieldMutation(tx, req.params.id, body.version);
       for (const comparison of body.comparaciones) {
         const updated = await tx.comparacionInspeccion.updateMany({
           where: { id: comparison.id, inspeccionId: req.params.id },
@@ -419,7 +502,6 @@ export async function actualizarComparaciones(req: AuthRequest, res: Response, n
         });
         if (updated.count !== 1) throw new AppError('Dato comparativo inválido', 400);
       }
-      await tx.inspeccion.update({ where: { id: req.params.id }, data: { version: { increment: 1 } } });
       await tx.eventoInspeccion.create({
         data: { inspeccionId: req.params.id, usuarioId: req.user.id, tipo: 'COMPARACION_ACTUALIZADA', titulo: 'Datos declarados contrastados en campo' },
       });
@@ -434,8 +516,7 @@ export async function agregarEventoInspeccion(req: AuthRequest, res: Response, n
     const input = eventSchema.parse(req.body);
     const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, select: { inspectorId: true, tipoActor: true } });
     if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
-    assertInspectionStaff(req);
-    if (!isAuthorizedAdmin(req.user) && inspection.inspectorId !== req.user.id) throw new AppError('No autorizado para este expediente', 403);
+    assertCanAccess(req, inspection);
     if (input.tipo === 'RESPUESTA_ACTOR' && !isAuthorizedAdmin(req.user)) throw new AppError('La respuesta del actor debe registrarse por un administrador', 403);
 
     const event = await prisma.$transaction(async (tx) => {
@@ -463,12 +544,12 @@ export async function agregarEventoInspeccion(req: AuthRequest, res: Response, n
 export async function actualizarInspeccion(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const input = updateSchema.parse(req.body);
-    const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, select: { inspectorId: true, estado: true, version: true } });
+    const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, select: { inspectorId: true, tipoActor: true, estado: true, version: true } });
     if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
     assertCanEdit(req, inspection);
     const { version, datosActa, informeTecnico, ...fields } = input;
     const result = await prisma.inspeccion.updateMany({
-      where: { id: req.params.id, version },
+      where: { id: req.params.id, version, estado: { in: Array.from(EDITABLE_STATES) } },
       data: {
         ...fields,
         datosActa: datosActa === undefined ? undefined : datosActa === null ? Prisma.DbNull : datosActa as Prisma.InputJsonValue,
@@ -492,10 +573,7 @@ export async function actualizarInformeTecnico(req: AuthRequest, res: Response, 
       select: { id: true, inspectorId: true, estado: true, version: true, tipoActor: true },
     });
     if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
-    assertInspectionStaff(req);
-    const assignedInspector = inspection.inspectorId === req.user.id;
-    const sectorReviewer = isSectorReviewer(req.user, inspection.tipoActor);
-    if (!assignedInspector && !sectorReviewer) {
+    if (!canAccessInspection(req.user, inspection)) {
       throw new AppError('Solo el inspector asignado o el administrador competente puede completar el informe tecnico', 403);
     }
     if (inspection.estado !== 'EN_REVISION') {
@@ -521,7 +599,13 @@ export async function actualizarInformeTecnico(req: AuthRequest, res: Response, 
           titulo: 'Informe tecnico actualizado',
           detalle: 'Se guardo una nueva version de la evaluacion tecnica sin modificar el acta de campo.',
           visibleActor: false,
-          metadata: { versionBase: input.version },
+          metadata: {
+            schemaVersion: 1,
+            versionBase: input.version,
+            versionNueva: input.version + 1,
+            contenidoSha256: hashCanonicalPayload(input.informeTecnico),
+            snapshot: input.informeTecnico,
+          },
         },
       });
     });
@@ -534,12 +618,13 @@ export async function actualizarInformeTecnico(req: AuthRequest, res: Response, 
 export async function actualizarItems(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const body = z.object({ version: z.number().int().positive(), items: z.array(itemSchema).min(1).max(100) }).parse(req.body);
-    const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, select: { inspectorId: true, estado: true, version: true } });
+    const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, select: { inspectorId: true, tipoActor: true, estado: true, version: true } });
     if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
     assertCanEdit(req, inspection);
     if (inspection.version !== body.version) throw new AppError('La inspeccion fue modificada en otro dispositivo. Actualice antes de continuar.', 409);
 
     await prisma.$transaction(async (tx) => {
+      await reserveFieldMutation(tx, req.params.id, body.version);
       for (const item of body.items) {
         const updated = await tx.itemInspeccion.updateMany({
           where: { id: item.id, inspeccionId: req.params.id },
@@ -547,7 +632,6 @@ export async function actualizarItems(req: AuthRequest, res: Response, next: Nex
         });
         if (updated.count !== 1) throw new AppError('Item de checklist invalido', 400);
       }
-      await tx.inspeccion.update({ where: { id: req.params.id }, data: { version: { increment: 1 } } });
       await tx.eventoInspeccion.create({
         data: { inspeccionId: req.params.id, usuarioId: req.user.id, tipo: 'CHECKLIST_ACTUALIZADO', titulo: 'Checklist actualizado' },
       });
@@ -563,20 +647,22 @@ export async function cambiarEstadoInspeccion(req: AuthRequest, res: Response, n
     const inspection = await prisma.inspeccion.findUnique({
       where: { id: req.params.id },
       include: {
-        items: { select: { obligatorio: true, resultado: true } },
-        comparaciones: { select: { resultado: true } },
+        items: { select: { id: true, codigo: true, categoria: true, etiqueta: true, obligatorio: true, resultado: true, observacion: true, updatedAt: true } },
+        comparaciones: { select: { id: true, codigo: true, categoria: true, etiqueta: true, origen: true, valorDeclarado: true, valorObservado: true, resultado: true, observacion: true, verificadoPorId: true, verificadoAt: true, updatedAt: true } },
+        evidencias: { select: { id: true, tipo: true, sha256: true, capturadaAt: true, createdAt: true, creadoPorId: true, itemId: true, comparacionId: true, eventoId: true, anuladaAt: true, anuladaPorId: true, motivoAnulacion: true } },
       },
     });
     if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
     assertInspectionStaff(req);
+    if (!canAccessInspection(req.user, inspection)) throw new AppError('No autorizado para cambiar el estado de esta inspeccion', 403);
+    const admin = isSectorReviewer(req.user, inspection.tipoActor);
+    const assignedInspector = inspection.inspectorId === req.user.id;
+    if (!admin && !assignedInspector) throw new AppError('No autorizado para cambiar el estado de esta inspeccion', 403);
     if (inspection.estado === input.estado) {
       const current = await prisma.inspeccion.findUniqueOrThrow({ where: { id: inspection.id }, include: inspectionInclude });
       return res.json({ success: true, data: current });
     }
     if (inspection.version !== input.version) throw new AppError('La inspeccion fue modificada en otro dispositivo. Actualice antes de continuar.', 409);
-    const admin = isSectorReviewer(req.user, inspection.tipoActor);
-    const assignedInspector = inspection.inspectorId === req.user.id;
-    if (!admin && !assignedInspector) throw new AppError('No autorizado para cambiar el estado de esta inspeccion', 403);
     if (!canTransitionInspection(inspection.estado, input.estado, admin)) throw new AppError(`Transicion ${inspection.estado} a ${input.estado} no permitida`, 409);
     if (input.estado === 'EN_REVISION' && !isChecklistReadyForReview(inspection.items)) {
       throw new AppError('Complete todos los items obligatorios antes de enviar a revision', 400);
@@ -585,6 +671,38 @@ export async function cambiarEstadoInspeccion(req: AuthRequest, res: Response, n
       throw new AppError('Complete el contraste de todos los datos declarados antes de enviar a revision', 400);
     }
     if (input.estado === 'NOTIFICADA' && !input.plazoRespuestaAt) throw new AppError('Defina el plazo de respuesta antes de notificar', 400);
+    if (input.estado === 'NOTIFICADA') {
+      const readiness = inspectDossierReadiness(inspection);
+      if (!readiness.ready) {
+        throw new AppError(`Complete el expediente antes de notificar: ${readiness.missing.join(', ')}`, 400);
+      }
+    }
+
+    const transitionAt = new Date();
+    const fieldClosureSnapshot = input.estado === 'EN_REVISION' ? {
+      schemaVersion: 1,
+      numero: inspection.numero,
+      numeroActa: inspection.numeroActa,
+      tipoActor: inspection.tipoActor,
+      generadorId: inspection.generadorId,
+      transportistaId: inspection.transportistaId,
+      operadorId: inspection.operadorId,
+      inspectorId: inspection.inspectorId,
+      ubicacion: inspection.ubicacion,
+      latitud: inspection.latitud,
+      longitud: inspection.longitud,
+      iniciadaAt: inspection.iniciadaAt,
+      cerradaCampoAt: transitionAt,
+      observaciones: inspection.observaciones,
+      declaradoSnapshot: inspection.declaradoSnapshot,
+      datosActa: inspection.datosActa,
+      items: inspection.items,
+      comparaciones: inspection.comparaciones,
+      evidencias: inspection.evidencias,
+    } : null;
+    const fieldClosureSnapshotJson = fieldClosureSnapshot
+      ? JSON.parse(JSON.stringify(fieldClosureSnapshot)) as Prisma.InputJsonValue
+      : null;
 
     await prisma.$transaction(async (tx) => {
       const updated = await tx.inspeccion.updateMany({
@@ -592,8 +710,8 @@ export async function cambiarEstadoInspeccion(req: AuthRequest, res: Response, n
         data: {
           estado: input.estado,
           version: { increment: 1 },
-          iniciadaAt: input.estado === 'EN_CAMPO' && !inspection.iniciadaAt ? new Date() : undefined,
-          cerradaCampoAt: input.estado === 'EN_REVISION' ? new Date() : undefined,
+          iniciadaAt: input.estado === 'EN_CAMPO' && !inspection.iniciadaAt ? transitionAt : undefined,
+          cerradaCampoAt: input.estado === 'EN_REVISION' ? transitionAt : undefined,
           plazoRespuestaAt: input.plazoRespuestaAt ? new Date(input.plazoRespuestaAt) : undefined,
         },
       });
@@ -608,6 +726,13 @@ export async function cambiarEstadoInspeccion(req: AuthRequest, res: Response, n
           estadoDesde: inspection.estado,
           estadoHasta: input.estado,
           visibleActor: ['NOTIFICADA', 'EN_DESCARGO', 'REQUIERE_SUBSANACION', 'CERRADA_CONFORME', 'DERIVADA_LEGALES', 'FINALIZADA'].includes(input.estado),
+          metadata: fieldClosureSnapshot ? {
+            schemaVersion: 1,
+            versionBase: input.version,
+            versionNueva: input.version + 1,
+            actaSha256: hashCanonicalPayload(fieldClosureSnapshot),
+            actaSnapshot: fieldClosureSnapshotJson,
+          } as Prisma.InputJsonValue : undefined,
         },
       });
     });
@@ -623,7 +748,7 @@ export async function subirEvidencia(req: AuthRequest, res: Response, next: Next
     const parsedMetadata = inspectionEvidenceMetadataSchema.safeParse(req.body || {});
     if (!parsedMetadata.success) throw new AppError(parsedMetadata.error.issues[0].message, 400);
     const metadata = parsedMetadata.data;
-    const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, select: { inspectorId: true, estado: true } });
+    const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, select: { inspectorId: true, tipoActor: true, estado: true, version: true } });
     if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
     const eventoId = metadata.eventoId || null;
     const comparacionId = metadata.comparacionId || null;
@@ -632,14 +757,14 @@ export async function subirEvidencia(req: AuthRequest, res: Response, next: Next
     if (!hasSingleEvidenceTarget([eventoId, comparacionId, itemId])) {
       throw new AppError('La evidencia debe vincularse a un único comentario, comparación o evento', 400);
     }
+    // Evidence is part of the field record. Re-checking the same state/version
+    // in the transaction below prevents an upload that started online from
+    // landing after another device closed the field act.
+    assertCanEdit(req, inspection);
     let itemTarget: { codigo: string; etiqueta: string } | null = null;
     if (eventoId) {
-      assertInspectionStaff(req);
-      if (!isAuthorizedAdmin(req.user) && inspection.inspectorId !== req.user.id) throw new AppError('No autorizado para adjuntar al expediente', 403);
       const eventExists = await prisma.eventoInspeccion.count({ where: { id: eventoId, inspeccionId: req.params.id } });
       if (!eventExists) throw new AppError('Evento de trazabilidad inválido', 400);
-    } else {
-      assertCanEdit(req, inspection);
     }
     if (comparacionId) {
       const comparisonExists = await prisma.comparacionInspeccion.count({ where: { id: comparacionId, inspeccionId: req.params.id } });
@@ -683,6 +808,7 @@ export async function subirEvidencia(req: AuthRequest, res: Response, next: Next
       storedKey = null;
       if (itemId && !duplicate.itemId && !duplicate.comparacionId && !duplicate.eventoId) {
         const linked = await prisma.$transaction(async (tx) => {
+          await reserveFieldMutation(tx, req.params.id, inspection.version);
           const updated = await tx.evidenciaInspeccion.update({
             where: { id: duplicate.id },
             data: {
@@ -699,7 +825,6 @@ export async function subirEvidencia(req: AuthRequest, res: Response, next: Next
               detalle: `${duplicate.nombreOriginal} · ${itemTarget!.etiqueta}`,
             },
           });
-          await tx.inspeccion.update({ where: { id: req.params.id }, data: { version: { increment: 1 } } });
           return updated;
         });
         return res.json({ success: true, data: linked, message: 'La evidencia existente quedó vinculada al ítem' });
@@ -710,6 +835,7 @@ export async function subirEvidencia(req: AuthRequest, res: Response, next: Next
       return res.json({ success: true, data: duplicate, message: 'La evidencia ya estaba incorporada' });
     }
     const evidence = await prisma.$transaction(async (tx) => {
+      await reserveFieldMutation(tx, req.params.id, inspection.version);
       const created = await tx.evidenciaInspeccion.create({
         data: {
           inspeccionId: req.params.id,
@@ -740,7 +866,6 @@ export async function subirEvidencia(req: AuthRequest, res: Response, next: Next
           detalle: itemTarget ? `${req.file!.originalname} · ${itemTarget.etiqueta}` : req.file!.originalname,
         },
       });
-      await tx.inspeccion.update({ where: { id: req.params.id }, data: { version: { increment: 1 } } });
       return created;
     });
     storedKey = null;
@@ -756,7 +881,7 @@ export async function anularEvidencia(req: AuthRequest, res: Response, next: Nex
     const input = annulEvidenceSchema.parse(req.body);
     const inspection = await prisma.inspeccion.findUnique({
       where: { id: req.params.id },
-      select: { id: true, inspectorId: true, estado: true, version: true },
+      select: { id: true, inspectorId: true, tipoActor: true, estado: true, version: true },
     });
     if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
     assertCanEdit(req, inspection);
@@ -782,7 +907,7 @@ export async function anularEvidencia(req: AuthRequest, res: Response, next: Nex
 
     await prisma.$transaction(async (tx) => {
       const inspectionUpdate = await tx.inspeccion.updateMany({
-        where: { id: inspection.id, version: input.version },
+        where: { id: inspection.id, version: input.version, estado: { in: Array.from(EDITABLE_STATES) } },
         data: { version: { increment: 1 } },
       });
       if (inspectionUpdate.count !== 1) throw new AppError('La inspeccion cambio mientras se procesaba la accion', 409);
@@ -821,7 +946,7 @@ export async function generarActaInspeccionPdf(req: AuthRequest, res: Response, 
     assertInspectionStaff(req);
     const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, include: inspectionInclude });
     if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
-    if (!isAuthorizedAdmin(req.user) && inspection.inspectorId !== req.user.id) throw new AppError('No autorizado para exportar esta acta', 403);
+    assertCanAccess(req, inspection);
     await streamInspectionActPdf(res, inspection, resolveInspectionEvidence);
   } catch (error) { next(error); }
 }
@@ -831,7 +956,7 @@ export async function generarInformeTecnicoInspeccionPdf(req: AuthRequest, res: 
     assertInspectionStaff(req);
     const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, include: inspectionInclude });
     if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
-    if (!isAuthorizedAdmin(req.user) && inspection.inspectorId !== req.user.id) throw new AppError('No autorizado para exportar este informe', 403);
+    assertCanAccess(req, inspection);
     await streamInspectionTechnicalReportPdf(res, inspection, resolveInspectionEvidence);
   } catch (error) { next(error); }
 }
@@ -841,10 +966,10 @@ export async function descargarEvidencia(req: AuthRequest, res: Response, next: 
     assertInspectionStaff(req);
     const evidence = await prisma.evidenciaInspeccion.findUnique({
       where: { id: req.params.evidenciaId },
-      include: { inspeccion: { select: { id: true, inspectorId: true } } },
+      include: { inspeccion: { select: { id: true, inspectorId: true, tipoActor: true } } },
     });
     if (!evidence || evidence.inspeccionId !== req.params.id) throw new AppError('Evidencia no encontrada', 404);
-    if (!isAuthorizedAdmin(req.user) && evidence.inspeccion.inspectorId !== req.user.id) throw new AppError('No autorizado para esta evidencia', 403);
+    assertCanAccess(req, evidence.inspeccion);
     const filePath = resolveInspectionEvidence(evidence.storageKey);
     await fs.promises.access(filePath, fs.constants.R_OK);
     res.setHeader('Content-Type', evidence.mimeDetectado);

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { isAxiosError } from 'axios';
-import { ArchiveX, ArrowLeft, CalendarDays, Camera, Check, ChevronDown, ChevronUp, CircleMinus, ClipboardCheck, CloudOff, CloudUpload, Download, FileAudio, FileText, Loader2, MapPin, Mic, Paperclip, Save, Send, ShieldCheck, Square, UserRound, XCircle } from 'lucide-react';
+import { AlertTriangle, ArchiveX, ArrowLeft, CalendarDays, Camera, Check, ChevronDown, ChevronUp, CircleMinus, ClipboardCheck, CloudOff, CloudUpload, Download, FileAudio, FileText, History, Loader2, MapPin, Mic, Paperclip, RotateCcw, Save, Send, ShieldCheck, Square, Trash2, UserRound, XCircle } from 'lucide-react';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge, type BadgeColor } from '../../components/ui/BadgeV2';
 import { Card } from '../../components/ui/CardV2';
@@ -25,7 +25,9 @@ import { InspectionComparisonPanel } from './InspectionComparisonPanel';
 import { InspectionEvidenceImage } from './InspectionEvidenceImage';
 import { InspectionReport } from './InspectionReport';
 import { InspectionTimeline } from './InspectionTimeline';
+import { InspectionExchangePanel } from './InspectionExchangePanel';
 import { InspectionDocumentsPanel } from './InspectionDocumentsPanel';
+import { getInspectionDossierReadiness, type InspectionDossierReadiness } from './inspectionDossierReadiness';
 import { inspectionActorRoute, inspectionDate, inspectionErrorMessage } from './inspectionPresentation';
 
 const LABELS: Record<InspectionState, string> = { BORRADOR: 'Borrador', PLANIFICADA: 'Planificada', EN_CAMPO: 'En campo', EN_REVISION: 'En revisión', NOTIFICADA: 'Notificada', EN_DESCARGO: 'En descargo', REQUIERE_SUBSANACION: 'Requiere subsanación', CERRADA_CONFORME: 'Cerrada conforme', DERIVADA_LEGALES: 'Derivada a legales', EN_TRAMITE_LEGAL: 'En trámite legal', DERIVADA_ATM: 'Derivada a ATM', FINALIZADA: 'Finalizada', CANCELADA: 'Cancelada' };
@@ -46,6 +48,7 @@ const InspeccionExpedientePage: React.FC = () => {
   const [datosActa, setDatosActa] = useState<InspectionActData>({}); const [informeTecnico, setInformeTecnico] = useState<InspectionTechnicalReport>({});
   const [isOnline, setIsOnline] = useState(navigator.onLine); const [recording, setRecording] = useState(false); const [uploadingItemId, setUploadingItemId] = useState<string | null>(null);
   const [pendingEvidence, setPendingEvidence] = useState<PendingInspectionEvidence[]>([]); const [syncingEvidence, setSyncingEvidence] = useState(false);
+  const [staleDraft, setStaleDraft] = useState<Draft | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null); const chunksRef = useRef<Blob[]>([]); const fileRef = useRef<HTMLInputElement | null>(null); const cameraRef = useRef<HTMLInputElement | null>(null);
   const syncingRef = useRef(false);
   const syncEvidenceRef = useRef<() => Promise<void>>(async () => undefined);
@@ -59,6 +62,7 @@ const InspeccionExpedientePage: React.FC = () => {
   useEffect(() => {
     if (!inspection) return;
     const draft: Draft = { version: inspection.version, observaciones: inspection.observaciones || '', numeroActa: inspection.numeroActa || '', ubicacion: inspection.ubicacion || '', plazoRespuestaAt: localDate(inspection.plazoRespuestaAt), datosActa: inspection.datosActa || {}, informeTecnico: inspection.informeTecnico || {}, items: inspection.items, comparaciones: inspection.comparaciones || [] };
+    setStaleDraft(null);
     if (draftKey) try {
       const saved = JSON.parse(localStorage.getItem(draftKey) || 'null') as Draft | null;
       if (saved?.version === inspection.version) {
@@ -66,11 +70,16 @@ const InspeccionExpedientePage: React.FC = () => {
         const savedComparisonsAreCurrent = saved.comparaciones.length === draft.comparaciones.length
           && saved.comparaciones.every((row) => serverComparisonIds.has(row.id));
         Object.assign(draft, saved, { comparaciones: savedComparisonsAreCurrent ? saved.comparaciones : draft.comparaciones });
+        setStaleDraft(null);
+      } else if (saved && typeof saved.version === 'number') {
+        // Never discard field work merely because another device advanced the
+        // server version. The user decides whether to recover or discard it.
+        setStaleDraft(saved);
       }
-    } catch { /* ignore */ }
+    } catch { setStaleDraft(null); }
     setItems(draft.items); setComparisons(draft.comparaciones); setObservaciones(draft.observaciones); setNumeroActa(draft.numeroActa); setUbicacion(draft.ubicacion); setPlazoRespuestaAt(draft.plazoRespuestaAt); setDatosActa(draft.datosActa); setInformeTecnico(draft.informeTecnico);
   }, [inspection, draftKey]);
-  useEffect(() => { if (!draftKey || !inspection || !items.length || (!canEdit && !canEditReport)) return; const timer = window.setTimeout(() => localStorage.setItem(draftKey, JSON.stringify({ version: inspection.version, observaciones, numeroActa, ubicacion, plazoRespuestaAt, datosActa, informeTecnico, items, comparaciones: comparisons } satisfies Draft)), 350); return () => window.clearTimeout(timer); }, [canEdit, canEditReport, draftKey, inspection, observaciones, numeroActa, ubicacion, plazoRespuestaAt, datosActa, informeTecnico, items, comparisons]);
+  useEffect(() => { if (!draftKey || !inspection || !items.length || staleDraft || (!canEdit && !canEditReport)) return; const timer = window.setTimeout(() => localStorage.setItem(draftKey, JSON.stringify({ version: inspection.version, observaciones, numeroActa, ubicacion, plazoRespuestaAt, datosActa, informeTecnico, items, comparaciones: comparisons } satisfies Draft)), 350); return () => window.clearTimeout(timer); }, [canEdit, canEditReport, draftKey, inspection, observaciones, numeroActa, ubicacion, plazoRespuestaAt, datosActa, informeTecnico, items, comparisons, staleDraft]);
 
   const refreshPendingEvidence = useCallback(async () => {
     if (!id || !currentUser?.id) return;
@@ -91,7 +100,13 @@ const InspeccionExpedientePage: React.FC = () => {
   const syncEvidence = useCallback(async () => {
     if (!navigator.onLine || !id || !currentUser?.id || syncingRef.current) return;
     const entries = await listPendingInspectionEvidence(id, String(currentUser.id));
-    const hasStoredDraft = Boolean(draftKey && localStorage.getItem(draftKey));
+    let hasStoredDraft = false;
+    if (draftKey && inspection) {
+      try {
+        const stored = JSON.parse(localStorage.getItem(draftKey) || 'null') as Draft | null;
+        hasStoredDraft = stored?.version === inspection.version;
+      } catch { /* a damaged draft is never auto-synchronized */ }
+    }
     if (!entries.length && !hasStoredDraft) return;
     syncingRef.current = true; setSyncingEvidence(true);
     let synchronized = 0;
@@ -123,7 +138,7 @@ const InspeccionExpedientePage: React.FC = () => {
     } finally {
       syncingRef.current = false; setSyncingEvidence(false);
     }
-  }, [currentUser?.id, draftKey, id, persistChanges, query, refreshPendingEvidence]);
+  }, [currentUser?.id, draftKey, id, inspection, persistChanges, query, refreshPendingEvidence]);
   useEffect(() => { syncEvidenceRef.current = syncEvidence; }, [syncEvidence]);
   useEffect(() => { if (isOnline) void syncEvidenceRef.current(); }, [currentUser?.id, id, isOnline]);
 
@@ -198,6 +213,51 @@ const InspeccionExpedientePage: React.FC = () => {
   };
   const toggleRecording = async () => { if (recording && recorderRef.current) { recorderRef.current.stop(); setRecording(false); return; } if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') return toast.warning('Audio no disponible', 'El navegador no permite grabar audio.'); try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); const recorder = new MediaRecorder(stream); chunksRef.current = []; recorder.ondataavailable = (event) => event.data.size && chunksRef.current.push(event.data); recorder.onstop = async () => { stream.getTracks().forEach((track) => track.stop()); const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' }); await upload(new File([blob], `audio-inspeccion-${Date.now()}.webm`, { type: blob.type })); }; recorder.start(); recorderRef.current = recorder; setRecording(true); } catch { toast.error('Micrófono denegado', 'Habilite el permiso para incorporar audio.'); } };
 
+  const dossierReadiness = useMemo<InspectionDossierReadiness | null>(() => inspection ? getInspectionDossierReadiness(inspection, {
+    numeroActa,
+    plazoRespuestaAt,
+    observaciones,
+    datosActa,
+    informeTecnico,
+    items,
+    comparaciones: comparisons,
+  }) : null, [comparisons, datosActa, informeTecnico, inspection, items, numeroActa, observaciones, plazoRespuestaAt]);
+
+  const recoverStaleDraft = () => {
+    if (!inspection || !staleDraft) return;
+    const savedItems = new Map((staleDraft.items || []).map((item) => [item.id, item]));
+    const savedComparisons = new Map((staleDraft.comparaciones || []).map((row) => [row.id, row]));
+    const recoveredItems = inspection.items.map((current) => {
+      const saved = savedItems.get(current.id);
+      return saved ? { ...current, resultado: saved.resultado, observacion: saved.observacion } : current;
+    });
+    const recoveredComparisons = inspection.comparaciones.map((current) => {
+      const saved = savedComparisons.get(current.id);
+      return saved ? { ...current, resultado: saved.resultado, valorObservado: saved.valorObservado, observacion: saved.observacion } : current;
+    });
+    const recovered: Draft = {
+      version: inspection.version,
+      observaciones: staleDraft.observaciones || '',
+      numeroActa: staleDraft.numeroActa || '',
+      ubicacion: staleDraft.ubicacion || '',
+      plazoRespuestaAt: staleDraft.plazoRespuestaAt || '',
+      datosActa: staleDraft.datosActa || {},
+      informeTecnico: staleDraft.informeTecnico || {},
+      items: recoveredItems,
+      comparaciones: recoveredComparisons,
+    };
+    setObservaciones(recovered.observaciones); setNumeroActa(recovered.numeroActa); setUbicacion(recovered.ubicacion); setPlazoRespuestaAt(recovered.plazoRespuestaAt); setDatosActa(recovered.datosActa); setInformeTecnico(recovered.informeTecnico); setItems(recovered.items); setComparisons(recovered.comparaciones);
+    if (draftKey) localStorage.setItem(draftKey, JSON.stringify(recovered));
+    setStaleDraft(null);
+    toast.warning('Borrador anterior recuperado', 'Revisá las diferencias con la versión del servidor antes de guardar.');
+  };
+
+  const discardStaleDraft = () => {
+    if (draftKey) localStorage.removeItem(draftKey);
+    setStaleDraft(null);
+    toast.info('Borrador anterior descartado', 'Se conserva la versión actualmente registrada en el servidor.');
+  };
+
   if (query.isLoading) return <p className="p-8 text-center text-sm text-neutral-500">Cargando expediente…</p>;
   if (!inspection) return <Card><p className="font-semibold text-neutral-900">Inspección no encontrada</p></Card>;
   const actor = inspectionActor(inspection);
@@ -205,16 +265,71 @@ const InspeccionExpedientePage: React.FC = () => {
   const completed = items.filter((item) => item.resultado !== 'PENDIENTE').length; const groups = Array.from(new Set(items.map((item) => item.categoria)));
   const primaryAction = inspection.estado === 'BORRADOR' || inspection.estado === 'PLANIFICADA' ? { label: 'Iniciar inspección', state: 'EN_CAMPO' as InspectionState } : inspection.estado === 'EN_CAMPO' ? { label: 'Enviar a revisión', state: 'EN_REVISION' as InspectionState } : inspection.estado === 'EN_REVISION' && isAdmin ? { label: 'Aprobar expediente', state: 'NOTIFICADA' as InspectionState } : null;
   const showActionBar = canEdit || canEditReport || Boolean(primaryAction);
+  const showReadiness = !['BORRADOR', 'PLANIFICADA', 'EN_CAMPO', 'CANCELADA'].includes(inspection.estado);
+  const showExchangePanel = !['BORRADOR', 'PLANIFICADA', 'EN_CAMPO', 'EN_REVISION', 'CANCELADA'].includes(inspection.estado);
+  const approvalBlocked = inspection.estado === 'EN_REVISION' && (!dossierReadiness?.ready || Boolean(staleDraft));
+  const stickyPosition = hasMobileNav ? 'sticky top-[calc(3.5rem+env(safe-area-inset-top))]' : 'sticky top-20';
 
   return <div className={`space-y-4 animate-fade-in ${hasMobileNav ? 'pb-20 sm:pb-0' : ''}`}>
     {(!isOnline || pendingEvidence.length > 0) && <div className="flex flex-col gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-950 sm:flex-row sm:items-center sm:justify-between"><span className="flex items-center gap-2">{isOnline ? <CloudUpload size={18} /> : <CloudOff size={18} />}{!isOnline ? 'Sin conexión · el borrador y las capturas quedan protegidos en este dispositivo' : `${pendingEvidence.length} ${pendingEvidence.length === 1 ? 'captura pendiente' : 'capturas pendientes'} de sincronización`}</span>{isOnline && pendingEvidence.length > 0 && <button type="button" onClick={() => void syncEvidence()} disabled={syncingEvidence} className="w-fit rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-bold text-amber-950 disabled:opacity-60">{syncingEvidence ? 'Sincronizando…' : 'Sincronizar ahora'}</button>}</div>}
+    {staleDraft && <StaleDraftNotice serverVersion={inspection.version} draftVersion={staleDraft.version} onRecover={recoverStaleDraft} onDiscard={discardStaleDraft} />}
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><button onClick={() => navigate(`${mobile ? '/mobile' : ''}/inspecciones`)} className="flex w-fit items-center gap-2 rounded-lg px-2 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-100"><ArrowLeft size={18} />Volver al listado</button><div className="flex flex-wrap items-center gap-2"><Badge color={COLORS[inspection.estado] || 'neutral'} size="lg" dot>{LABELS[inspection.estado]}</Badge><DropdownMenu><DropdownTrigger asChild><Button variant="outline" size="sm" leftIcon={<Download size={16} />} rightIcon={<ChevronDown size={14} />} isLoading={pdfMutation.isPending}>Exportar</Button></DropdownTrigger><DropdownContent className="w-72"><DropdownLabel>Documentos del expediente</DropdownLabel><DropdownItem icon={<ClipboardCheck size={16} />} onClick={() => pdfMutation.mutate('acta')}>Acta de inspección<span className="block text-[11px] font-normal text-neutral-500">Salida de campo levantada desde la tablet</span></DropdownItem><DropdownItem icon={<FileText size={16} />} onClick={() => pdfMutation.mutate('informe-tecnico')}>Informe técnico<span className="block text-[11px] font-normal text-neutral-500">Evaluación que acompaña al acta para dictamen</span></DropdownItem></DropdownContent></DropdownMenu></div></div>
     <Card className="!p-4 sm:!p-5"><div className="flex flex-col gap-4 border-b border-neutral-200 pb-4 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-sm font-semibold text-primary-700">Expediente de inspección</p><h2 className="mt-1 text-2xl font-extrabold tracking-tight text-[#10213A]">{inspection.numero}</h2></div><label className="text-xs font-semibold uppercase tracking-wide text-neutral-500 sm:w-64">Número de acta<input disabled={!canEdit} value={numeroActa} onChange={(e) => setNumeroActa(e.target.value)} placeholder="Asignar número" className="mt-1.5 h-10 w-full rounded-lg border border-neutral-300 px-3 text-sm font-medium normal-case text-neutral-900 disabled:bg-neutral-50" /></label></div><div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"><Meta icon={<ClipboardCheck />} label="Actor inspeccionado" value={actor?.razonSocial || ''} detail={`CUIT ${actor?.cuit || 's/d'}`} to={actor ? actorRoute : undefined} /><Meta icon={<UserRound />} label="Inspector" value={`${inspection.inspector.nombre} ${inspection.inspector.apellido || ''}`} /><div className="flex gap-3"><MapPin className="mt-0.5 shrink-0 text-neutral-500" size={19} /><div className="min-w-0 flex-1"><p className="text-xs text-neutral-500">Ubicación</p>{canEdit ? <input value={ubicacion} onChange={(e) => setUbicacion(e.target.value)} className="mt-1 h-9 w-full rounded-lg border border-neutral-300 px-2 text-sm" /> : <p className="font-bold text-[#10213A]">{ubicacion || 'Sin informar'}</p>}</div></div><Meta icon={<CalendarDays />} label="Inicio" value={inspectionDate(inspection.iniciadaAt, true)} /></div><div className="mt-4 border-t border-neutral-200 pt-4"><p className="text-xs leading-relaxed text-neutral-500 lg:text-right">Creada {inspectionDate(inspection.createdAt, true)} · Programada {inspectionDate(inspection.fechaProgramada, true)}<br className="hidden lg:block" /> Actualizada {inspectionDate(inspection.updatedAt, true)}{inspection.plazoRespuestaAt ? ` · Plazo ${inspectionDate(inspection.plazoRespuestaAt, true)}` : ''}</p></div></Card>
-    {showActionBar && <div data-testid="inspection-action-bar" className="rounded-xl border border-neutral-200 bg-white px-3 py-3 shadow-sm sm:px-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-extrabold text-[#10213A]">Acciones del expediente</p><p className="mt-0.5 text-xs text-neutral-500">{canEdit ? 'Guardá el avance antes de cambiar la etapa.' : 'El acta de campo está cerrada; sólo puede versionarse el informe técnico.'}</p></div><div className="grid grid-cols-2 gap-2 [&>button]:min-w-0 [&>button]:px-2 sm:flex sm:justify-end sm:[&>button]:flex-none sm:[&>button]:px-5">{(canEdit || canEditReport) && <Button aria-label={canEdit ? 'Guardar borrador' : 'Guardar informe técnico'} variant="outline" leftIcon={<Save size={17} />} isLoading={saveMutation.isPending} onClick={save}><span className="sm:hidden">Guardar</span><span className="hidden sm:inline">{canEdit ? 'Guardar borrador' : 'Guardar informe técnico'}</span></Button>}{inspection.estado === 'EN_REVISION' && isAdmin && <Button aria-label="Devolver a campo" variant="outline" onClick={() => transition('EN_CAMPO')}><span className="sm:hidden">Devolver</span><span className="hidden sm:inline">Devolver a campo</span></Button>}{primaryAction && <Button aria-label={primaryAction.label} leftIcon={primaryAction.state === 'EN_REVISION' ? <Send size={17} /> : <ShieldCheck size={17} />} isLoading={transitionMutation.isPending} onClick={() => transition(primaryAction.state)} disabled={primaryAction.state === 'NOTIFICADA' && !plazoRespuestaAt}><span className="sm:hidden">{primaryAction.state === 'EN_REVISION' ? 'Enviar' : primaryAction.state === 'EN_CAMPO' ? 'Iniciar' : 'Aprobar'}</span><span className="hidden sm:inline">{primaryAction.label}</span></Button>}</div></div></div>}
+    {showReadiness && dossierReadiness && <DossierReadinessPanel readiness={dossierReadiness} />}
+    {showActionBar && <div data-testid="inspection-action-bar" className={`${stickyPosition} z-30 rounded-xl border border-neutral-200 bg-white/95 px-2 py-2 shadow-md backdrop-blur sm:px-4 sm:py-3`}><div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div className="hidden sm:block"><p className="text-sm font-extrabold text-[#10213A]">Acciones del expediente</p><p className="mt-0.5 text-xs text-neutral-500">{staleDraft ? 'Resolvé el borrador anterior antes de guardar o cambiar de etapa.' : canEdit ? 'Guardá el avance antes de cambiar la etapa.' : 'El acta de campo está cerrada; sólo puede versionarse el informe técnico.'}</p></div><div className={`grid gap-2 [&>button]:min-w-0 [&>button]:px-2 sm:flex sm:justify-end sm:[&>button]:flex-none sm:[&>button]:px-5 ${inspection.estado === 'EN_REVISION' && isAdmin ? 'grid-cols-3' : 'grid-cols-2'}`}>{(canEdit || canEditReport) && <Button aria-label={canEdit ? 'Guardar borrador' : 'Guardar informe técnico'} variant="outline" leftIcon={<Save size={17} />} isLoading={saveMutation.isPending} onClick={save} disabled={Boolean(staleDraft)}><span className="sm:hidden">Guardar</span><span className="hidden sm:inline">{canEdit ? 'Guardar borrador' : 'Guardar informe técnico'}</span></Button>}{inspection.estado === 'EN_REVISION' && isAdmin && <Button aria-label="Devolver a campo" variant="outline" onClick={() => transition('EN_CAMPO')} disabled={Boolean(staleDraft)}><span className="sm:hidden">Devolver</span><span className="hidden sm:inline">Devolver a campo</span></Button>}{primaryAction && <Button aria-label={primaryAction.label} aria-describedby={primaryAction.state === 'NOTIFICADA' ? 'approval-readiness-hint' : undefined} leftIcon={primaryAction.state === 'EN_REVISION' ? <Send size={17} /> : <ShieldCheck size={17} />} isLoading={transitionMutation.isPending} onClick={() => transition(primaryAction.state)} disabled={Boolean(staleDraft) || (primaryAction.state === 'NOTIFICADA' && (!plazoRespuestaAt || approvalBlocked))}><span className="sm:hidden">{primaryAction.state === 'EN_REVISION' ? 'Enviar' : primaryAction.state === 'EN_CAMPO' ? 'Iniciar' : 'Aprobar'}</span><span className="hidden sm:inline">{primaryAction.label}</span></Button>}</div></div></div>}
     {canEdit && <InspectionComparisonPanel inspectionId={inspection.id} comparisons={comparisons} editable onChange={(rowId, patch) => setComparisons((rows) => rows.map((row) => row.id === rowId ? { ...row, ...patch } : row))} onEvidence={(file, comparisonId) => upload(file, { comparacionId: comparisonId })} />}
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.62fr)_minmax(330px,0.72fr)]"><div className="space-y-4">{!canEdit && <InspectionReport inspection={{ ...inspection, items, comparaciones: comparisons }} />}{canEdit && <Checklist inspectionId={inspection.id} groups={groups} items={items} completed={completed} editable setItems={setItems} uploadingItemId={uploadingItemId} pendingEvidence={pendingEvidence} onEvidence={(file, item) => upload(file, { itemId: item.id, descripcion: item.observacion?.trim() || `Evidencia vinculada al control ${item.codigo}` }, true)} onAnnul={annulEvidence} />}<InspectionDocumentsPanel actData={datosActa} report={informeTecnico} actEditable={canEdit} reportEditable={canEditReport} onActDataChange={setDatosActa} onReportChange={setInformeTecnico} /></div><div className="space-y-4"><EvidenceCard inspection={inspection} pendingEvidence={pendingEvidence} editable={canEdit} recording={recording} onCamera={() => cameraRef.current?.click()} onFile={() => fileRef.current?.click()} onAudio={toggleRecording} onAnnul={annulEvidence} /><input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={uploadFromInput} /><input ref={fileRef} type="file" accept="image/*,application/pdf,audio/*" className="hidden" onChange={uploadFromInput} /><InspectionTimeline inspection={inspection} canComment={Boolean(isAdmin)} busy={eventMutation.isPending} onAdd={async (input, file) => { try { await eventMutation.mutateAsync({ input, file }); toast.success('Trazabilidad actualizada', input.tipo === 'NOTIFICACION_PREPARADA' ? 'Correo registrado como no enviado.' : 'Evento incorporado.'); } catch (error: unknown) { toast.error('No se pudo registrar', inspectionErrorMessage(error, 'Revise los datos.')); throw error; } }} /><Card><h3 className="font-extrabold text-[#10213A]">Observaciones generales</h3><textarea disabled={!canEdit} value={observaciones} onChange={(e) => setObservaciones(e.target.value)} rows={5} placeholder="Describa hallazgos, contexto y acciones requeridas…" className="mt-3 w-full resize-y rounded-lg border border-neutral-300 p-3 text-sm leading-relaxed disabled:bg-neutral-50" /></Card>{(inspection.estado === 'EN_REVISION' || inspection.estado === 'NOTIFICADA') && isAdmin && <Card><h3 className="font-extrabold text-[#10213A]">Plazo de respuesta</h3><p className="mt-1 text-xs text-neutral-500">La aprobación no envía correos; deja el expediente preparado.</p><input type="datetime-local" value={plazoRespuestaAt} onChange={(e) => setPlazoRespuestaAt(e.target.value)} className="mt-3 h-11 w-full rounded-lg border border-neutral-300 px-3 text-sm" /></Card>}</div></div>
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.62fr)_minmax(330px,0.72fr)]">
+      <div className="space-y-4">
+        {canEditReport && !canEdit && <InspectionDocumentsPanel actData={datosActa} report={informeTecnico} actEditable={false} reportEditable reportFirst onActDataChange={setDatosActa} onReportChange={setInformeTecnico} />}
+        {!canEdit && <InspectionReport inspection={{ ...inspection, items, comparaciones: comparisons, informeTecnico }} readiness={dossierReadiness || undefined} />}
+        {canEdit && <Checklist inspectionId={inspection.id} groups={groups} items={items} completed={completed} editable setItems={setItems} uploadingItemId={uploadingItemId} pendingEvidence={pendingEvidence} onEvidence={(file, item) => upload(file, { itemId: item.id, descripcion: item.observacion?.trim() || `Evidencia vinculada al control ${item.codigo}` }, true)} onAnnul={annulEvidence} />}
+        {(canEdit || !canEditReport) && <InspectionDocumentsPanel actData={datosActa} report={informeTecnico} actEditable={canEdit} reportEditable={canEditReport} onActDataChange={setDatosActa} onReportChange={setInformeTecnico} />}
+        {showExchangePanel && <InspectionExchangePanel inspectionId={inspection.id} compact />}
+      </div>
+      <div className="space-y-4">
+        <EvidenceCard inspection={inspection} pendingEvidence={pendingEvidence} editable={canEdit} recording={recording} onCamera={() => cameraRef.current?.click()} onFile={() => fileRef.current?.click()} onAudio={toggleRecording} onAnnul={annulEvidence} />
+        <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={uploadFromInput} />
+        <input ref={fileRef} type="file" accept="image/*,application/pdf,audio/*" className="hidden" onChange={uploadFromInput} />
+        <InspectionTimeline inspection={inspection} canComment={Boolean(isAdmin)} busy={eventMutation.isPending} onAdd={async (input, file) => { try { await eventMutation.mutateAsync({ input, file }); toast.success('Registro actualizado', input.tipo === 'NOTIFICACION_PREPARADA' ? 'Borrador de notificación registrado como no enviado.' : 'Nota interna incorporada.'); } catch (error: unknown) { toast.error('No se pudo registrar', inspectionErrorMessage(error, 'Revise los datos.')); throw error; } }} />
+        <Card><h3 className="font-extrabold text-[#10213A]">Observaciones generales</h3><textarea disabled={!canEdit} value={observaciones} onChange={(e) => setObservaciones(e.target.value)} rows={5} placeholder="Describa hallazgos, contexto y acciones requeridas…" className="mt-3 w-full resize-y rounded-lg border border-neutral-300 p-3 text-sm leading-relaxed disabled:bg-neutral-50" /></Card>
+        {(inspection.estado === 'EN_REVISION' || inspection.estado === 'NOTIFICADA') && isAdmin && <Card><h3 className="font-extrabold text-[#10213A]">Plazo de respuesta</h3><p className="mt-1 text-xs text-neutral-500">La aprobación no envía correos; deja el expediente preparado.</p><input aria-label="Plazo de respuesta" type="datetime-local" value={plazoRespuestaAt} onChange={(e) => setPlazoRespuestaAt(e.target.value)} className="mt-3 h-11 w-full rounded-lg border border-neutral-300 px-3 text-sm" /></Card>}
+      </div>
+    </div>
   </div>;
 };
+
+function StaleDraftNotice({ serverVersion, draftVersion, onRecover, onDiscard }: { serverVersion: number; draftVersion: number; onRecover: () => void; onDiscard: () => void }) {
+  return <section role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950">
+    <div className="flex items-start gap-3">
+      <History size={19} className="mt-0.5 shrink-0" />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-extrabold">Hay un borrador anterior sin conciliar</p>
+        <p className="mt-1 text-xs leading-relaxed">El dispositivo conserva cambios de la versión {draftVersion}; el servidor está en la versión {serverVersion}. No se descartó ni fusionó nada automáticamente.</p>
+        <p className="mt-1 text-xs font-semibold">Si lo recuperás, revisá los datos antes de guardar: la versión del servidor seguirá intacta hasta esa acción.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" onClick={onRecover} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-amber-900 px-3 text-xs font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2"><RotateCcw size={15} />Recuperar borrador anterior</button>
+          <button type="button" onClick={onDiscard} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-amber-400 bg-white px-3 text-xs font-bold text-amber-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2"><Trash2 size={15} />Descartar borrador anterior</button>
+        </div>
+      </div>
+    </div>
+  </section>;
+}
+
+function DossierReadinessPanel({ readiness }: { readiness: InspectionDossierReadiness }) {
+  return <section data-testid="inspection-dossier-readiness" aria-live="polite" className={`rounded-2xl border px-4 py-4 sm:px-5 ${readiness.ready ? 'border-success-200 bg-success-50' : 'border-amber-300 bg-amber-50'}`}>
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex min-w-0 items-start gap-3">
+        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${readiness.ready ? 'bg-success-100 text-success-800' : 'bg-amber-100 text-amber-900'}`}>{readiness.ready ? <ShieldCheck size={19} /> : <AlertTriangle size={19} />}</span>
+        <div>
+          <h3 className="font-extrabold text-[#10213A]">Preparación para aprobar</h3>
+          <p id="approval-readiness-hint" className="mt-1 text-xs leading-relaxed text-neutral-700">{readiness.ready ? 'El dossier reúne los controles documentales definidos para esta etapa. La aprobación administrativa no reemplaza el dictamen de Legales.' : 'El expediente todavía no debe presentarse como final. Completá o devolvé a campo los puntos pendientes.'}</p>
+        </div>
+      </div>
+      <span className={`w-fit shrink-0 rounded-full px-3 py-1 text-xs font-extrabold ${readiness.ready ? 'bg-success-100 text-success-800' : 'bg-white text-amber-900 ring-1 ring-amber-300'}`}>{readiness.completed}/{readiness.total} completos</span>
+    </div>
+    {!readiness.ready && <div className="mt-3 border-t border-amber-200 pt-3"><p className="text-[11px] font-bold uppercase tracking-wider text-amber-900">Falta completar</p><ul className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{readiness.missing.map((item) => <li key={item} className="flex items-start gap-2 rounded-lg bg-white/80 px-3 py-2 text-xs font-semibold text-neutral-800"><CircleMinus size={14} className="mt-0.5 shrink-0 text-amber-700" />{item}</li>)}</ul></div>}
+  </section>;
+}
 
 function Meta({ icon, label, value, detail, to }: { icon: React.ReactNode; label: string; value: string; detail?: string; to?: string }) { return <div className="flex gap-3"><span className="mt-0.5 shrink-0 text-neutral-500 [&>svg]:h-[19px] [&>svg]:w-[19px]">{icon}</span><div className="min-w-0"><p className="text-xs text-neutral-500">{label}</p>{to ? <Link to={to} className="rounded-sm font-bold text-[#10213A] transition-colors hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" aria-label={`Abrir ${label.toLowerCase()}: ${value}`}>{value}</Link> : <p className="font-bold text-[#10213A]">{value}</p>}{detail && <p className="text-xs text-neutral-500">{detail}</p>}</div></div>; }
 function Checklist({ inspectionId, groups, items, completed, editable, setItems, uploadingItemId, pendingEvidence, onEvidence, onAnnul }: { inspectionId: string; groups: string[]; items: InspectionItem[]; completed: number; editable: boolean; setItems: React.Dispatch<React.SetStateAction<InspectionItem[]>>; uploadingItemId: string | null; pendingEvidence: PendingInspectionEvidence[]; onEvidence: (file: File, item: InspectionItem) => void; onAnnul: (evidenceId: string, reason: string) => Promise<void> }) {

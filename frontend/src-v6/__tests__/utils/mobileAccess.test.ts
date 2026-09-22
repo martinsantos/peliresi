@@ -29,6 +29,14 @@ describe('canAccessMobilePath', () => {
     expect(canAccessMobilePath(user('ADMIN_OPERADOR'), '/inspecciones')).toBe(true);
   });
 
+  it('exposes the contradiction portal only to inspected actor roles', () => {
+    expect(canAccessMobilePath(user('GENERADOR'), '/mis-inspecciones')).toBe(true);
+    expect(canAccessMobilePath(user('TRANSPORTISTA'), '/mis-inspecciones/case-1')).toBe(true);
+    expect(canAccessMobilePath(user('OPERADOR'), '/mis-inspecciones')).toBe(true);
+    expect(canAccessMobilePath(user('ADMIN'), '/mis-inspecciones')).toBe(false);
+    expect(canAccessMobilePath(user('ADMIN_GENERADOR'), '/mis-inspecciones')).toBe(false);
+  });
+
   it('mirrors sector-admin boundaries from the web router', () => {
     expect(canAccessMobilePath(user('ADMIN_GENERADOR'), '/admin/actores/generadores')).toBe(true);
     expect(canAccessMobilePath(user('ADMIN_GENERADOR'), '/admin/actores/operadores')).toBe(false);

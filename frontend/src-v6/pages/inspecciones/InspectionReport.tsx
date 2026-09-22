@@ -3,8 +3,9 @@ import { AlertTriangle, Camera, CheckCircle2, ChevronDown, ChevronUp, CircleMinu
 import { Badge } from '../../components/ui/BadgeV2';
 import type { Inspection } from '../../types/inspection';
 import { InspectionEvidenceImage } from './InspectionEvidenceImage';
+import type { InspectionDossierReadiness } from './inspectionDossierReadiness';
 
-export function InspectionReport({ inspection }: { inspection: Inspection }) {
+export function InspectionReport({ inspection, readiness }: { inspection: Inspection; readiness?: InspectionDossierReadiness }) {
   const [showAllPhotos, setShowAllPhotos] = useState(false);
   const photos = inspection.evidencias.filter((item) => item.tipo === 'FOTO' && !item.anuladaAt);
   const activeEvidence = inspection.evidencias.filter((item) => !item.anuladaAt);
@@ -17,13 +18,24 @@ export function InspectionReport({ inspection }: { inspection: Inspection }) {
   const notApplicable = inspection.items.filter((item) => item.resultado === 'NO_APLICA').length;
   const checklistGroups = useMemo(() => Array.from(new Set(inspection.items.map((item) => item.categoria))), [inspection.items]);
   const summary = useMemo(() => inspection.observaciones || `Se contrastaron ${checked} de ${inspection.comparaciones.length} datos declarados y se registraron ${differs.length} diferencias. El checklist presenta ${noComply.length} puntos no conformes.`, [checked, differs.length, inspection.comparaciones.length, inspection.observaciones, noComply.length]);
+  const technicalSections = useMemo(() => {
+    const report = inspection.informeTecnico || {};
+    return [
+      ['Objetivo', report.objetivo],
+      ['Antecedentes', report.antecedentes],
+      ['Evaluación', report.evaluacion],
+      ['Conclusión', report.conclusion],
+      ['Recomendación', report.recomendacion],
+    ].filter((entry): entry is [string, string] => Boolean(entry[1]?.trim()));
+  }, [inspection.informeTecnico]);
 
   return (
     <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
-      <div className="border-b border-neutral-200 px-4 py-5 sm:px-6"><h3 className="text-xl font-extrabold tracking-tight text-[#10213A]">Informe de inspección</h3><p className="mt-1 text-sm text-neutral-600">Resultado consolidado de hallazgos, evidencias y controles del expediente.</p></div>
+      <div className="border-b border-neutral-200 px-4 py-5 sm:px-6"><h3 className="text-xl font-extrabold tracking-tight text-[#10213A]">Vista consolidada del expediente</h3><p className="mt-1 text-sm text-neutral-600">Lectura preservada de hallazgos, evidencias, controles y criterio técnico registrado.</p></div>
       <div className="space-y-7 px-4 py-5 sm:px-6">
+        {readiness && !readiness.ready && <div role="status" className="flex items-start gap-3 border-l-4 border-amber-500 bg-amber-50 px-4 py-3 text-amber-950"><AlertTriangle size={20} className="mt-0.5 shrink-0" /><div><p className="font-extrabold">Expediente documental incompleto</p><p className="mt-1 text-xs leading-relaxed">Esta vista es de trabajo y no debe presentarse como versión final. Restan {readiness.missing.length} controles documentales para aprobar.</p></div></div>}
         <div className="border-l-4 border-primary-600 bg-emerald-50 px-4 py-3">
-          <div className="flex items-start gap-3"><ClipboardCheck className="mt-0.5 shrink-0 text-primary-700" size={20} /><div><p className="font-bold text-[#10213A]">Síntesis ejecutiva</p><p className="mt-1 text-sm leading-relaxed text-neutral-700">{summary}</p></div></div>
+          <div className="flex items-start gap-3"><ClipboardCheck className="mt-0.5 shrink-0 text-primary-700" size={20} /><div><p className="font-bold text-[#10213A]">Síntesis de la constatación</p><p className="mt-1 text-sm leading-relaxed text-neutral-700">{summary}</p></div></div>
         </div>
 
         <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-neutral-200 bg-neutral-200 lg:grid-cols-4">
@@ -32,6 +44,11 @@ export function InspectionReport({ inspection }: { inspection: Inspection }) {
           <ReportKpi label="Controles conformes" value={`${complies}/${inspection.items.length}`} tone="text-emerald-700" />
           <ReportKpi label="Pendientes" value={String(pending)} tone={pending ? 'text-amber-800' : 'text-neutral-700'} />
         </div>
+
+        <section aria-labelledby="registered-technical-report-title">
+          <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between"><div><h4 id="registered-technical-report-title" className="font-extrabold text-[#10213A]">Informe técnico registrado</h4><p className="mt-1 text-sm text-neutral-600">Criterio profesional que acompaña al acta; no constituye dictamen legal.</p></div>{inspection.informeTecnico?.expedienteElectronico && <span className="font-mono text-xs font-semibold text-neutral-600">{inspection.informeTecnico.expedienteElectronico}</span>}</div>
+          {technicalSections.length > 0 ? <div className="divide-y divide-neutral-200 border-y border-neutral-200">{technicalSections.map(([title, body]) => <article key={title} className="grid gap-1 py-3 sm:grid-cols-[130px_minmax(0,1fr)] sm:gap-4"><h5 className="text-xs font-extrabold uppercase tracking-wide text-neutral-500">{title}</h5><p className="whitespace-pre-line text-sm leading-relaxed text-[#10213A]">{body}</p></article>)}</div> : <div className="border-l-2 border-amber-400 bg-amber-50 px-3 py-3 text-sm text-amber-950">Todavía no se registró contenido técnico. Complete el informe antes de presentar el expediente como final.</div>}
+        </section>
 
         <div>
           <div className="mb-3 flex items-center justify-between"><h4 className="font-extrabold text-[#10213A]">Evidencia incorporada</h4><span className="text-xs font-semibold text-neutral-500">{activeEvidence.length} vigentes{annulledEvidence.length ? ` · ${annulledEvidence.length} anuladas` : ''}</span></div>

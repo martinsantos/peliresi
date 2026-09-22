@@ -16,6 +16,7 @@ import {
   LoginPage, ReclamarCuentaPage, RegistroPage, ForgotPasswordPage, ResetPasswordPage, UserSwitcherPage,
   MobileDashboardPage, CentroControlPage,
   InspeccionesPage, InspeccionDetallePage,
+  InspeccionadoParticipacionPage,
   ManifiestosPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
   TransportePerfilPage, ViajeEnCursoTransportista,
   ActoresPage, OperadoresPage, OperadorDetallePage, TransportistasPage, TransportistaDetallePage,
@@ -135,6 +136,8 @@ function AppMobile() {
             <Route path="/manifiestos/:id" element={<ManifiestoDetallePage />} />
             <Route path="/inspecciones" element={<InspeccionesPage />} />
             <Route path="/inspecciones/:id" element={<InspeccionDetallePage />} />
+            <Route path="/mis-inspecciones" element={<InspeccionadoParticipacionPage />} />
+            <Route path="/mis-inspecciones/:id" element={<InspeccionadoParticipacionPage />} />
             <Route path="/transporte/perfil" element={<TransportePerfilPage />} />
             <Route path="/transporte/viaje/:id" element={<ViajeEnCursoTransportista />} />
             {/* Actores overview */}

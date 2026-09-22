@@ -36,6 +36,7 @@ import {
   BookOpen,
   FileCheck,
   Radio,
+  Scale,
 } from 'lucide-react';
 import { Button } from '../components/ui/ButtonV2';
 import { Badge } from '../components/ui/BadgeV2';
@@ -163,6 +164,11 @@ export const MainLayout: React.FC = () => {
 
     // Manifiestos para todos
     items.push({ path: '/manifiestos', icon: FileText, label: 'Manifiestos' });
+
+    // Canal contradictorio: sólo la entidad inspeccionada ve sus propios casos.
+    if (['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(currentUser.rol)) {
+      items.push({ path: '/mis-inspecciones', icon: Scale, label: 'Mis inspecciones' });
+    }
 
     // Expedientes de inspección: inspectores y administradores gubernamentales.
     if (currentUser?.esInspector || isAdmin || isAdminTransportista || isAdminOperador || isAdminGenerador) {

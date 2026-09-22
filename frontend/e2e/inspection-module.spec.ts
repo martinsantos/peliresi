@@ -91,6 +91,13 @@ test.beforeEach(async ({ page }) => {
     const url = new URL(route.request().url());
     let data: unknown = [];
     if (url.pathname.endsWith('/auth/profile')) data = { user };
+    else if (url.pathname.endsWith('/intercambios')) {
+      const source = url.pathname.includes('inspection-closed') ? closedInspection : url.pathname.includes('inspection-review') ? reviewInspection : inspection;
+      data = {
+        inspeccion: { id: source.id, numero: source.numero, numeroActa: source.numeroActa, estado: source.estado, tipoActor: source.tipoActor, actor: source.transportista, plazoRespuestaAt: source.plazoRespuestaAt, version: source.version },
+        parteActual: 'AUTORIDAD', intercambios: [], comunicacionExterna: false,
+      };
+    }
     else if (url.pathname.endsWith('/evidencias/e-1')) return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480"><rect width="640" height="480" fill="#dff5e9"/><path d="M90 330 230 185l95 90 70-65 155 120" fill="none" stroke="#0D8A4F" stroke-width="24"/><circle cx="455" cy="125" r="45" fill="#0D8A4F"/><text x="320" y="420" text-anchor="middle" font-family="sans-serif" font-size="28" fill="#10213A">Evidencia de campo</text></svg>' });
     else if (url.pathname === '/api/inspecciones/inspection-qa') data = inspection;
     else if (url.pathname === '/api/inspecciones/inspection-closed') data = closedInspection;
@@ -111,7 +118,7 @@ test('inspection field screen is usable on web and PWA layouts', async ({ page }
   await expect(page.getByRole('button', { name: 'Difiere' }).first()).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByRole('button', { name: 'Guardar borrador' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Enviar a revisión' })).toBeVisible();
-  await expect(page.getByTestId('inspection-action-bar')).toHaveCSS('position', 'static');
+  await expect(page.getByTestId('inspection-action-bar')).toHaveCSS('position', 'sticky');
   const actorLink = page.getByRole('link', { name: /Abrir actor inspeccionado: Transportes Andinos S\.A\./ });
   await expect(actorLink).toBeVisible();
   await expect(actorLink).toHaveAttribute('href', mobile
@@ -247,7 +254,13 @@ test('review keeps the field act frozen while versioning the later technical rep
   await page.goto(mobile ? '/mobile/inspecciones/inspection-review' : '/inspecciones/inspection-review');
   await page.getByText('Acta de inspección / constatación').click();
   await expect(page.getByLabel('Atendido por')).toBeDisabled();
-  await page.getByText('Informe técnico', { exact: true }).click();
+  await expect(page.getByLabel('Daños a personas o bienes')).toBeDisabled();
+  await expect(page.getByLabel('Libro de Registro de Operaciones')).toBeDisabled();
+  await expect(page.getByLabel('Firma de la persona interviniente')).toBeDisabled();
+  await expect(page.getByLabel('Domicilio legal constituido')).toBeDisabled();
+  await page.getByText('Formalidades de constatación · art. 44', { exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `/tmp/sitrep-inspection-art44-${testInfo.project.name}.png`, fullPage: false });
+  await expect(page.getByText('Informe técnico para Legales', { exact: true })).toBeVisible();
   await expect(page.getByLabel('1. Objetivo')).toBeEnabled();
   await page.getByLabel('3. Evaluación').fill('La evaluación contrasta el acta, el checklist y las evidencias preservadas.');
   await page.getByRole('button', { name: 'Guardar informe técnico' }).click();
