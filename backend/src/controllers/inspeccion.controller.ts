@@ -64,11 +64,11 @@ const inspectionInclude = {
   operador: { select: { id: true, razonSocial: true, cuit: true, domicilio: true, activo: true } },
   items: {
     orderBy: [{ categoria: 'asc' as const }, { orden: 'asc' as const }],
-    include: { evidencias: { orderBy: { createdAt: 'asc' as const }, include: { anuladaPor: { select: { id: true, nombre: true, apellido: true } } } } },
+    include: { evidencias: { orderBy: { createdAt: 'desc' as const }, include: { anuladaPor: { select: { id: true, nombre: true, apellido: true } } } } },
   },
   comparaciones: {
     orderBy: [{ categoria: 'asc' as const }, { orden: 'asc' as const }],
-    include: { evidencias: { orderBy: { createdAt: 'asc' as const }, include: { anuladaPor: { select: { id: true, nombre: true, apellido: true } } } } },
+    include: { evidencias: { orderBy: { createdAt: 'desc' as const }, include: { anuladaPor: { select: { id: true, nombre: true, apellido: true } } } } },
   },
   evidencias: {
     orderBy: { createdAt: 'desc' as const },

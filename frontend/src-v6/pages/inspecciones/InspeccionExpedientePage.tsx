@@ -230,7 +230,7 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
         </div>
         {groupItems.map((item) => {
           const isFail = item.resultado === 'NO_CUMPLE';
-          const itemEvidence = item.evidencias || [];
+          const itemEvidence = [...(item.evidencias || [])].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
           const itemEvidenceExpanded = expandedEvidence.includes(item.id);
           const visibleItemEvidence = itemEvidenceExpanded ? itemEvidence : itemEvidence.slice(0, 4);
           const pendingItemEvidence = pendingEvidence.filter((evidence) => evidence.fields.itemId === item.id);
