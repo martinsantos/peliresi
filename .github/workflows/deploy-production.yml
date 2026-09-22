@@ -107,6 +107,9 @@ jobs:
       - name: Lint frontend
         run: cd frontend && npm run lint
 
+      - name: Lint inspection critical path without warnings
+        run: cd frontend && npm run lint:critical
+
       - name: Run frontend tests
         run: cd frontend && npm test
 

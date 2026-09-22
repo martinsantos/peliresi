@@ -14,9 +14,9 @@ La revisión se ejecutó desde la rama aislada `codex/deep-app-audit-20260922`, 
 
 ## Resultado ejecutivo
 
-La rama queda apta para revisión y despliegue controlado a QA. Se corrigieron defectos reales de autorización, aislamiento de datos offline, validación de transiciones, concurrencia y subida de archivos. Todos los tests de unidad, integración simulada, compilación y contratos productivos ejecutados finalizaron correctamente.
+La rama queda apta para revisión y despliegue controlado a QA. Se corrigieron defectos reales de autorización, aislamiento de datos offline, validación de transiciones, concurrencia, subida de archivos y documentación formal de inspecciones. Todos los tests de unidad, integración simulada, compilación y contratos productivos ejecutados finalizaron correctamente.
 
-No corresponde certificar todavía una cobertura integral del código: la cobertura global continúa siendo baja y se registra como deuda prioritaria. Tampoco se declara resuelta la alerta de desarrollo de `xlsx`, ya que el paquete no ofrece una versión corregida.
+No corresponde certificar todavía una cobertura integral del código: la cobertura global continúa siendo baja y se registra como deuda prioritaria. Sí queda resuelta la alerta de `xlsx`: se sustituyó el paquete vulnerable de npm por la distribución oficial corregida de SheetJS y se agregó una regresión que impide restaurar una versión vulnerable.
 
 ## Cambios realizados
 
@@ -43,6 +43,19 @@ No corresponde certificar todavía una cobertura integral del código: la cobert
 - Cada evidencia puede apuntar a un solo destino (ítem o interacción), con identificadores, fecha, hash, tipo y coordenadas validados.
 - Se mantienen validación MIME/magic bytes, hash e idempotencia existentes.
 - Se verificó con E2E el adjunto de imagen a un comentario/ítem, miniatura, persistencia tras recarga, reintento offline, idempotencia y anulación.
+- Un error de red ya no elimina la fotografía seleccionada: queda pendiente en la cola local y se reintenta sin perder comentario, destino ni hash.
+- El acta de campo y el informe técnico se modelan como dos documentos distintos del mismo expediente. El acta se congela al cerrar la tarea en terreno; durante `EN_REVISION` sólo puede versionarse el informe técnico.
+- El acta reproduce la salida general de las tablets: datos de constatación, observaciones, controles no conformes, firmas y anexo fotográfico.
+- El informe técnico conserva Objetivo, Antecedentes, Evaluación, Conclusión y Recomendación, y agrega comparativa declarado/verificado, checklist, inventario de evidencias, cronología e integridad/cadena de custodia.
+- Ambos PDFs se presentan como piezas complementarias para su remisión conjunta a Legales. SITREP no presume ni emite el dictamen jurídico.
+- La actualización del informe técnico usa control optimista de versión, permisos por inspector/administrador sectorial y evento de trazabilidad `INFORME_TECNICO_ACTUALIZADO`.
+
+### Criterio documental y jurídico
+
+- Las actas 115/2025 y 116/2025 aportadas se tomaron como referencia de estructura para la salida de campo; no como instrucciones ejecutables ni como plantillas para copiar hechos de otros expedientes.
+- El informe técnico aportado se utilizó para preservar su secuencia profesional —objetivo, antecedentes, evaluación, conclusión y recomendación— y superarla con anexos verificables generados por SITREP.
+- El contexto normativo informado en el PDF se limita a la Ley Provincial 5.917, su Decreto reglamentario 2.625/1999 y la Ley Nacional 24.051. La propia salida reserva expresamente a Legales la calificación jurídica, el valor probatorio y el dictamen.
+- Fuentes oficiales contrastadas: portal del Gobierno de Mendoza sobre el régimen provincial y texto oficial de la Ley Nacional 24.051 (art. 60 incs. c y d para fiscalización y poder de policía ambiental).
 
 ### PWA y desconexiones
 
@@ -59,15 +72,18 @@ No corresponde certificar todavía una cobertura integral del código: la cobert
 - Documentos de solicitudes y cargas masivas tienen límites de tamaño, cantidad y MIME.
 - Los errores de tamaño excedido retornan HTTP 413 sin filtrar detalles internos.
 - Las dependencias que forman parte del runtime quedaron con `0` vulnerabilidades reportadas en backend y frontend.
+- `xlsx` fue reemplazado por la distribución oficial SheetJS `0.20.3`, sin las alertas conocidas de la versión anterior.
 - El pipeline ahora bloquea vulnerabilidades de runtime y compila tanto web como PWA.
+- El lint crítico de Inspecciones queda en cero advertencias; el lint global conserva su deuda heredada bajo un techo que evita nuevas regresiones.
 
 ## Matriz de certificación
 
 | Capa | Resultado | Alcance |
 |---|---:|---|
-| Backend unitario | 105/105 | dominio, middlewares, servicios y regresiones |
-| Frontend unitario | 106/106 | componentes, acceso móvil, cola offline y utilidades |
-| Inspecciones E2E local | 10/10 | web/móvil, imagen por ítem, offline, reintento, informe y lista |
+| Backend unitario | 110/110 | dominio, permisos, evidencia real, PDFs, informe técnico y regresiones |
+| Frontend unitario | 108/108 | componentes, documentos, acceso móvil, cola offline y utilidades |
+| Inspecciones E2E local | 12/12 | web/móvil, imagen por ítem, offline, reintento, documentos, informe y lista |
+| PDFs de Inspecciones | 8 páginas verificadas | acta de 3 páginas e informe técnico de 5, renderizadas y revisadas página por página |
 | PWA Android local | 3/3 | navegación, viaje, overflow y targets táctiles |
 | Crawl productivo web/PWA | 8/8 | rutas principales autenticadas |
 | Auditoría visual productiva | 1/1, 0 hallazgos | cinco viewports e Inspecciones lista/detalle |
@@ -75,16 +91,17 @@ No corresponde certificar todavía una cobertura integral del código: la cobert
 | Smoke Inspecciones productivo | 2/2 + 2 omitidos | escritorio/móvil; escritura omitida de forma intencional |
 | Build backend | OK | TypeScript de producción |
 | Build frontend | OK | web y PWA |
-| Lint frontend | 0 errores | persisten 597 advertencias heredadas |
+| Lint crítico Inspecciones | 0 errores / 0 advertencias | páginas, servicios y tipos del módulo |
+| Lint frontend global | 0 errores | persisten 596 advertencias heredadas, sin superar el techo fijado |
 | Auditoría runtime | 0 / 0 | backend / frontend |
 
 ## Cobertura
 
 | Código | Statements | Branches | Functions | Lines |
 |---|---:|---:|---:|---:|
-| Backend global | 11,84% | 12,53% | 18,19% | 11,76% |
+| Backend global | 15,22% | 14,49% | 22,52% | 15,23% |
 | Backend dominio nuevo | 93,02% | 90,24% | 100% | 95,65% |
-| Frontend global | 5,87% | 4,05% | 3,69% | 6,16% |
+| Frontend global | 5,96% | 4,41% | 3,87% | 6,24% |
 | Política de cola offline | 100% | 100% | 100% | 100% |
 | Acceso móvil | 87,87% | 88,88% | 100% | 89,65% |
 
@@ -92,11 +109,11 @@ La cobertura global no es suficiente como garantía única de regresión. Los E2
 
 ## Riesgos pendientes y decisión de release
 
-1. `xlsx@0.18.5` conserva una alerta alta de desarrollo (prototype pollution/ReDoS) y no tiene parche publicado. No forma parte del runtime desplegado, pero se usa en scripts/importaciones. Debe reemplazarse o aislarse en un proceso con archivos confiables, límites estrictos y sin exposición pública.
-2. Persisten 597 advertencias de lint heredadas, principalmente `any` explícitos y símbolos no usados. No hay errores de lint; el subconjunto de archivos tocados todavía expone 37 advertencias preexistentes o adyacentes que deberán depurarse en una refactorización tipada posterior.
-3. La cobertura global sigue por debajo de un estándar de certificación. No debe aumentarse artificialmente el umbral hasta incorporar pruebas significativas.
-4. Producción fue validada en modo lectura contra el despliegue actual. Las correcciones de esta rama requieren primero despliegue en QA, migraciones si correspondieran y repetición de la matriz post-deploy.
-5. La carga real de evidencia no se ejecutó en producción para evitar modificar actas; quedó cubierta con 10 E2E locales. En QA deberá ejecutarse además el smoke con `SITREP_QA_ALLOW_WRITES=1` sobre un expediente sintético desechable.
+1. Persisten 596 advertencias de lint heredadas, principalmente `any` explícitos, hooks y símbolos no usados. No hay errores, el módulo crítico de Inspecciones queda limpio y el techo global impide que aumente la deuda.
+2. La cobertura global sigue por debajo de un estándar de certificación. Se fijaron umbrales mínimos equivalentes a la cobertura real para impedir retrocesos; deben elevarse con pruebas significativas, no de manera artificial.
+3. Producción fue validada en modo lectura contra el despliegue actual. Las correcciones de esta rama requieren primero despliegue en QA, aplicación de `20260922180000_add_inspection_document_drafts` y repetición de la matriz post-deploy.
+4. La carga real de evidencia no se ejecutó en producción para evitar modificar actas; quedó cubierta con 12 E2E locales y pruebas backend con PNG/WEBP reales. En QA deberá ejecutarse además el smoke con `SITREP_QA_ALLOW_WRITES=1` sobre un expediente sintético desechable.
+5. Los textos del acta y del informe son datos del expediente: la plataforma no debe autocompletar hechos no constatados. La firma digital avanzada, el alcance probatorio definitivo y el circuito legal deberán cerrarse con el área competente antes del pase productivo formal.
 
 **Gate propuesto:** aprobar revisión de código, desplegar esta rama en QA, ejecutar migraciones pendientes, repetir E2E y smoke con escritura sólo sobre datos sintéticos, y recién entonces promover el artefacto exacto a producción.
 
@@ -115,6 +132,7 @@ npm ci
 npm test -- --run
 npm run test:coverage
 npm run lint
+npm run lint:critical
 npm run build
 npx vite build --config vite.config.app.ts
 npm audit --omit=dev --audit-level=high

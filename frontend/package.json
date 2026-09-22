@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings=596",
+    "lint:critical": "eslint src-v6/pages/inspecciones src-v6/services/inspeccion.service.ts src-v6/services/inspectionOfflineEvidence.ts src-v6/types/inspection.ts --max-warnings=0",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
