@@ -185,6 +185,11 @@ test('inspection guide stays pinned and identifies the visible control during a 
   const prefix = testInfo.project.name === 'mobile' ? '/mobile' : '';
   await page.goto(`${prefix}/inspecciones/inspection-qa#checklist`);
   await expect(page.getByRole('heading', { name: 'Checklist regulatorio' })).toBeVisible();
+  const iconHref = await page.locator('link[rel="icon"]').getAttribute('href');
+  expect(iconHref).toBe('/favicon.svg');
+  const iconResponse = await page.request.get(iconHref!);
+  expect(iconResponse.ok()).toBe(true);
+  expect(iconResponse.headers()['content-type']).toContain('image/svg+xml');
   const main = page.locator('main');
   await main.evaluate((element) => { element.scrollTop = Math.min(1500, element.scrollHeight - element.clientHeight); });
   await expect.poll(() => main.evaluate((element) => element.scrollTop)).toBeGreaterThan(400);
@@ -193,11 +198,17 @@ test('inspection guide stays pinned and identifies the visible control during a 
   const positions = await page.evaluate(() => {
     const mainRect = document.querySelector('main')!.getBoundingClientRect();
     const navRect = document.querySelector(window.innerWidth < 1024 ? '[data-testid="inspection-navigation"]' : '#inspection-step-index')!.getBoundingClientRect();
-    return { mainTop: mainRect.top, navTop: navRect.top, navBottom: navRect.bottom };
+    const headingRect = document.querySelector('[data-testid="inspection-step-header"]')!.getBoundingClientRect();
+    return { mainTop: mainRect.top, navTop: navRect.top, navBottom: navRect.bottom, headingTop: headingRect.top, headingBottom: headingRect.bottom };
   });
   expect(positions.navTop).toBeGreaterThanOrEqual(positions.mainTop - 6);
   expect(positions.navTop).toBeLessThanOrEqual(positions.mainTop + 6);
   expect(positions.navBottom).toBeGreaterThan(positions.mainTop + 40);
+  if (!compact) {
+    expect(positions.headingTop).toBeGreaterThanOrEqual(positions.mainTop - 6);
+    expect(positions.headingTop).toBeLessThanOrEqual(positions.mainTop + 6);
+    expect(positions.headingBottom).toBeGreaterThan(positions.mainTop + 72);
+  }
   await expect(guide).toBeInViewport();
   const current = compact ? page.getByTestId('inspection-current-point') : page.getByTestId('inspection-current-point-desktop');
   await expect(current).toContainText(/(DOC|GEN|HAB|SEG|TRZ)-\d/);
@@ -303,6 +314,12 @@ for (const layout of ['project layout', '390px web', '600px web', 'PWA'] as cons
 
     await page.goto(path);
     await expect(page.getByRole('heading', { name: 'Preparar la inspección' })).toBeVisible();
+    if (layout === 'PWA') {
+      await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/app/favicon.svg');
+      const icon = await page.request.get('/app/favicon.svg');
+      expect(icon.ok()).toBe(true);
+      expect(icon.headers()['content-type']).toContain('image/svg+xml');
+    }
     await assertGeometry(false);
     await openSection(page, 'checklist');
     const item = await openEmergencyControl(page);

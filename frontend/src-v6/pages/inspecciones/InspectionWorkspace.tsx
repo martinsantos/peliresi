@@ -127,7 +127,7 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
       </nav>
     </aside>
     <div className="min-w-0">
-      <header className="border-b border-neutral-200 px-4 py-5 sm:px-6 sm:py-6">
+      <header data-testid="inspection-step-header" className="border-b border-neutral-200 bg-white px-4 py-5 sm:px-6 sm:py-6 lg:sticky lg:top-0 lg:z-10">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs font-medium text-neutral-500"><span>{guided && index >= 0 ? `Paso ${index + 1} de ${steps.length}` : 'Consulta del expediente'}</span>{active.detail && <span>{active.detail}</span>}</div>
         <h2 ref={headingRef} id="inspection-step-heading" tabIndex={-1} className="scroll-mt-24 text-xl font-extrabold tracking-tight text-neutral-900 outline-none sm:text-2xl">{active.title}</h2>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-neutral-600">{active.description}</p>
