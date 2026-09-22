@@ -582,7 +582,7 @@ export async function subirEvidencia(req: AuthRequest, res: Response, next: Next
       throw new AppError('El tipo declarado no coincide con el contenido del archivo', 400);
     }
     if (itemId && !stored.mimeType.startsWith('image/')) {
-      throw new AppError('Los comentarios del checklist admiten imágenes JPG o PNG', 400);
+      throw new AppError('Los comentarios del checklist admiten imágenes JPG, PNG o WEBP', 400);
     }
     const clientHash = req.body.clienteSha256 ? String(req.body.clienteSha256).toLowerCase() : null;
     if (clientHash && (!/^[a-f0-9]{64}$/.test(clientHash) || clientHash !== stored.sha256)) {

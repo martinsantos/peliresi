@@ -94,7 +94,7 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, editable,
           </div>
         );
       })}
-      <input ref={inputRef} type="file" accept="image/jpeg,image/png" capture="environment" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file && targetId) onEvidence(file, targetId); event.currentTarget.value = ''; }} />
+      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file && targetId) onEvidence(file, targetId); event.currentTarget.value = ''; }} />
       {!editable && <div className="flex items-center gap-2 border-t border-neutral-200 bg-neutral-50 px-4 py-3 text-xs text-neutral-600 sm:px-6"><Paperclip size={15} />La comparación quedó preservada al cerrar la etapa de campo.</div>}
     </section>
   );

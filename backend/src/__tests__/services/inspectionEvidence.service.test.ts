@@ -9,6 +9,11 @@ const PNG_1PX = Buffer.from(
   'base64',
 );
 
+const WEBP_1PX = Buffer.from(
+  'UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEAAUAmJaQAA3AA/v89WAAAAA==',
+  'base64',
+);
+
 function uploadFile(buffer: Buffer, name = 'hallazgo.png', mimetype = 'image/png'): Express.Multer.File {
   return { buffer, originalname: name, mimetype, size: buffer.length } as Express.Multer.File;
 }
@@ -46,5 +51,13 @@ describe('inspection evidence filesystem persistence', () => {
     await expect(service.persistInspectionEvidence(uploadFile(Buffer.from('not-an-image')), 'inspection-qa'))
       .rejects.toMatchObject({ statusCode: 400 });
     expect(await fs.promises.readdir(uploadsDir)).toEqual([]);
+  });
+
+  it('accepts WEBP images produced by Android and modern browsers', async () => {
+    const service = await import('../../services/inspectionEvidence.service');
+    const stored = await service.persistInspectionEvidence(uploadFile(WEBP_1PX, 'campo.webp', 'image/webp'), 'inspection-qa');
+
+    expect(stored.mimeType).toBe('image/webp');
+    expect(stored.storageKey).toMatch(/\.webp$/);
   });
 });
