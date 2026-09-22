@@ -88,7 +88,7 @@ test.describe('public inspection QR traceability', () => {
     await expect(page.getByRole('heading', { name: 'Historial de la inspección' })).toBeVisible();
     await expect(page.getByText('Cierre conforme documentado', { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Resultado de la inspección' })).toHaveCount(0);
-    await expect(page.getByTestId('inspection-action-bar')).toHaveCSS('position', 'static');
+    await expect(page.getByTestId('inspection-action-bar')).toHaveCount(0);
   });
 
   test('PWA basename serves the same public verification route', async ({ page }) => {

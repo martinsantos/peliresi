@@ -10,7 +10,7 @@ async function openSection(page: Page, hash: string) {
 
 async function openEmergencyControl(page: Page) {
   const item = page.locator('#control-item-6');
-  const toggle = item.getByRole('button', { name: /Señalización y elementos de emergencia operativos/ });
+  const toggle = item.locator('button[aria-controls="control-detail-item-6"]');
   if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
   return item;
 }
@@ -511,6 +511,7 @@ test('closed inspection report reflows without horizontal scroll or an empty sti
   await openSection(page, 'trazabilidad');
   await expect(page.locator('#trazabilidad')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Historial de la inspección' })).toBeVisible();
-  await expect(page.getByTestId('inspection-action-bar')).toHaveCSS('position', 'static');
+  // Reference sections do not expose wizard/save actions for an unsent audit note.
+  await expect(page.getByTestId('inspection-action-bar')).toHaveCount(0);
   expect(await page.locator('html').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
 });
