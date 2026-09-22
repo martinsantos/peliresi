@@ -80,6 +80,7 @@ export async function saveOffline(store: StoreName, data: unknown): Promise<void
     tx.objectStore(store).put(data);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error('No se confirmó el guardado local.'));
   });
 }
 
@@ -119,6 +120,21 @@ export async function removeOffline(store: StoreName, key: string | number): Pro
     tx.objectStore(store).delete(key as IDBValidKey);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error('No se confirmó la eliminación local.'));
+  });
+}
+
+/** Commits a replacement and removal together; an abort preserves the original. */
+export async function replaceOffline(store: StoreName, previousKey: string, replacement: unknown): Promise<void> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    const records = tx.objectStore(store);
+    records.put(replacement);
+    records.delete(previousKey);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error('No se confirmó el reemplazo local.'));
   });
 }
 

@@ -486,8 +486,8 @@ export const MainLayout: React.FC = () => {
           </div>
         </header>
 
-        {/* Page content */}
-        <main className="flex-1 px-4 lg:px-8 pb-4 lg:pb-8 overflow-auto bg-[#FAFAF8]">
+        {/* Keep absolutely positioned field controls inside this scroll container. */}
+        <main className="relative flex-1 px-4 lg:px-8 pb-4 lg:pb-8 overflow-auto bg-[#FAFAF8]">
           <Outlet />
         </main>
 

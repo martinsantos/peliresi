@@ -13,6 +13,7 @@ import {
   type InspectionPdfBranding,
 } from './inspectionPdfBranding.service';
 import { buildInspectionPdfQr, drawInspectionPdfQrCard } from './inspectionPdfQr.service';
+import { drawInspectionPdfBlocks, inspectionEvidenceReference, measureInspectionPdfBlocks, type InspectionPdfTextBlock } from './inspectionPdfLayout.service';
 
 const C = {
   green: '#0D8A4F', darkGreen: '#1B5E3C', paleGreen: '#ECFDF5',
@@ -48,8 +49,8 @@ function ensureSpace(doc: PDFKit.PDFDocument, height: number) {
   }
 }
 
-function section(doc: PDFKit.PDFDocument, title: string, subtitle?: string) {
-  ensureSpace(doc, subtitle ? 58 : 40);
+function section(doc: PDFKit.PDFDocument, title: string, subtitle?: string, firstBlockHeight = 32) {
+  ensureSpace(doc, (subtitle ? 58 : 40) + firstBlockHeight);
   const y = doc.y + 10;
   doc.font('Helvetica-Bold').fontSize(13).fillColor(C.navy).text(title, 44, y, { width: doc.page.width - 88 });
   if (subtitle) doc.font('Helvetica').fontSize(8).fillColor(C.muted).text(subtitle, 44, y + 19, { width: doc.page.width - 88 });
@@ -195,6 +196,15 @@ function narrativeBox(doc: PDFKit.PDFDocument, text: string) {
   doc.y += 8;
 }
 
+function executiveExcerpt(doc: PDFKit.PDFDocument, title: string, text: string) {
+  doc.font('Helvetica').fontSize(9);
+  const height = doc.heightOfString(text, { width: doc.page.width - 114, lineGap: 2 });
+  ensureSpace(doc, 26 + Math.max(58, height + 24));
+  doc.font('Helvetica-Bold').fontSize(8).fillColor(C.darkGreen).text(title, 44, doc.y + 2);
+  doc.y += 18;
+  narrativeBox(doc, text);
+}
+
 function comparisonTable(doc: PDFKit.PDFDocument, rows: any[]) {
   if (rows.length === 0) {
     doc.font('Helvetica').fontSize(9).fillColor(C.muted).text('No se incorporaron comparaciones a esta inspección.');
@@ -243,7 +253,7 @@ function checklist(doc: PDFKit.PDFDocument, items: any[]) {
     return;
   }
   items.forEach((item, index) => {
-    const evidenceNames = (item.evidencias || []).map((evidence: any) => `${evidence.anuladaAt ? '[ANULADA] ' : ''}${evidence.nombreOriginal}${evidence.anuladaAt && evidence.motivoAnulacion ? ` (${evidence.motivoAnulacion})` : ''}`).join(' · ');
+    const evidenceNames = (item.evidencias || []).map((evidence: any) => `${evidence.anuladaAt ? '[ANULADA] ' : ''}${inspectionEvidenceReference(evidence)}${evidence.anuladaAt && evidence.motivoAnulacion ? ` (${evidence.motivoAnulacion})` : ''}`).join(' · ');
     doc.font('Helvetica').fontSize(8.4);
     const observationHeight = item.observacion ? Math.max(12, doc.heightOfString(item.observacion, { width: 465 })) : 0;
     const evidenceHeight = evidenceNames ? Math.max(12, doc.heightOfString(`Evidencia vinculada: ${evidenceNames}`, { width: 465 })) : 0;
@@ -276,40 +286,63 @@ function evidenceGallery(doc: PDFKit.PDFDocument, inspection: any, preparedImage
   }
   const gap = 12;
   const width = (doc.page.width - 88 - gap) / 2;
+  const caption = (photo: any): InspectionPdfTextBlock[] => [
+    { text: inspectionEvidenceReference(photo), font: 'Helvetica-Bold', size: 8.2, color: C.navy },
+    { text: evidenceTargetLabel(inspection, photo), size: 7.2, color: C.muted },
+    { text: photo.descripcion || 'Sin descripción adicional.', size: 7.3, color: C.ink },
+    { text: `Captura ${formatDate(photo.capturadaAt, true)}${photo.latitud != null && photo.longitud != null ? ` · ${photo.latitud}, ${photo.longitud}` : ''}`, size: 6.6, color: C.muted },
+    { text: `SHA-256 ${photo.sha256 || 'no disponible'}`, font: 'Courier', size: 6.1, color: C.blue, gap: 0 },
+  ];
+  let started = false;
+  const reserve = (height: number) => {
+    if (!started) {
+      section(doc, 'Evidencia fotográfica', 'Imágenes con identificador estable, descripción completa, captura y huella técnica', height);
+      started = true;
+    } else ensureSpace(doc, height);
+  };
+  const drawImage = (photo: any, x: number, y: number, imageWidth: number) => {
+    const prepared = preparedImages.get(photo.id);
+    doc.rect(x, y, imageWidth, 139).fill(C.soft);
+    if (prepared?.buffer) doc.image(prepared.buffer, x, y, { fit: [imageWidth, 139], align: 'center', valign: 'center' });
+    else doc.font('Helvetica-Bold').fontSize(8).fillColor(C.muted).text(
+      prepared?.status === 'MISSING'
+        ? 'El archivo no estaba disponible al emitir esta copia; el registro y la huella permanecen preservados.'
+        : 'No fue posible representar la imagen; el original y la huella permanecen preservados.',
+      x + 16, y + 48, { width: imageWidth - 32, align: 'center' },
+    );
+  };
   for (let i = 0; i < photos.length; i += 2) {
     const row = photos.slice(i, i + 2);
-    doc.font('Helvetica').fontSize(7.4);
-    const rowHeight = Math.max(...row.map((photo: any) => {
-      const description = photo.descripcion || 'Sin descripción adicional.';
-      return 222 + Math.min(44, doc.heightOfString(description, { width: width - 20, lineGap: 1.5 }));
-    }), 246);
-    ensureSpace(doc, rowHeight + 12);
+    const rowHeight = Math.max(...row.map((photo: any) => 166 + measureInspectionPdfBlocks(doc, caption(photo), width - 20)), 246);
+    // Very long captions use the full page width and flow across pages with
+    // their persistent identity repeated, rather than clipping a gallery card.
+    if (rowHeight > 450) {
+      row.forEach((photo: any) => {
+        reserve(230);
+        const y = doc.y;
+        drawImage(photo, 44, y, doc.page.width - 88);
+        doc.y = y + 152;
+        drawInspectionPdfBlocks(doc, caption(photo), {
+          x: 54, width: doc.page.width - 108, bottom: doc.page.height - PAGE.bottom,
+          newPage: () => { doc.addPage(); doc.y = PAGE.top; },
+          continuation: `${inspectionEvidenceReference(photo)} - continuación`,
+        });
+        doc.y += 16;
+      });
+      continue;
+    }
+    reserve(rowHeight + 12);
     const y = doc.y;
     row.forEach((photo: any, column: number) => {
       const x = 44 + column * (width + gap);
-      const prepared = preparedImages.get(photo.id);
       doc.roundedRect(x, y, width, rowHeight, 4).fillAndStroke(C.white, C.line);
-      doc.rect(x + 7, y + 7, width - 14, 139).fill(C.soft);
-      if (prepared?.buffer) doc.image(prepared.buffer, x + 7, y + 7, { fit: [width - 14, 139], align: 'center', valign: 'center' });
-      else doc.font('Helvetica-Bold').fontSize(8).fillColor(C.muted).text(
-        prepared?.status === 'MISSING'
-          ? 'El archivo no estaba disponible al emitir esta copia; el registro y la huella permanecen preservados.'
-          : 'No fue posible representar la imagen; el original y la huella permanecen preservados.',
-        x + 24,
-        y + 59,
-        { width: width - 48, align: 'center' },
-      );
-      doc.font('Helvetica-Bold').fontSize(8.2).fillColor(C.navy)
-        .text(`E-${String(i + column + 1).padStart(3, '0')} · ${photo.nombreOriginal}`, x + 10, y + 154, { width: width - 20, height: 22, ellipsis: true });
-      const target = evidenceTargetLabel(inspection, photo);
-      doc.font('Helvetica').fontSize(7.2).fillColor(C.muted).text(target, x + 10, y + 176, { width: width - 20, height: 20, ellipsis: true });
-      doc.font('Helvetica').fontSize(7.3).fillColor(C.ink)
-        .text(photo.descripcion || 'Sin descripción adicional.', x + 10, y + 198, { width: width - 20, height: rowHeight - 239, lineGap: 1.5, ellipsis: true });
-      const coordinates = photo.latitud != null && photo.longitud != null ? ` · ${photo.latitud}, ${photo.longitud}` : '';
-      doc.font('Helvetica').fontSize(6.6).fillColor(C.muted)
-        .text(`Captura ${formatDate(photo.capturadaAt, true)}${coordinates}`, x + 10, y + rowHeight - 30, { width: width - 20, height: 10, ellipsis: true });
-      doc.font('Courier').fontSize(6.1).fillColor(C.blue)
-        .text(`SHA-256 ${(photo.sha256 || 'no disponible').slice(0, 24)}…`, x + 10, y + rowHeight - 17, { width: width - 20, lineBreak: false });
+      drawImage(photo, x + 7, y + 7, width - 14);
+      doc.y = y + 154;
+      drawInspectionPdfBlocks(doc, caption(photo), {
+        x: x + 10, width: width - 20, bottom: doc.page.height - PAGE.bottom,
+        newPage: () => { doc.addPage(); doc.y = PAGE.top; },
+        continuation: `${inspectionEvidenceReference(photo)} - continuación`,
+      });
     });
     doc.y = y + rowHeight + 10;
   }
@@ -339,6 +372,7 @@ function evidenceTargetLabel(inspection: any, evidence: any): string {
 
 function evidenceInventory(doc: PDFKit.PDFDocument, inspection: any) {
   if (inspection.evidencias.length === 0) {
+    section(doc, 'Inventario de evidencias', 'Archivos vigentes y anulados, vínculos, autores, tiempos, observaciones y transcripciones');
     doc.font('Helvetica').fontSize(8).fillColor(C.muted).text('No se incorporaron archivos al expediente.');
     return;
   }
@@ -357,18 +391,26 @@ function evidenceInventory(doc: PDFKit.PDFDocument, inspection: any) {
       evidence.transcripcion ? `Transcripción: ${evidence.transcripcion}` : '',
       evidence.anuladaAt ? `Anulación ${formatDate(evidence.anuladaAt, true)} por ${evidence.anuladaPor ? `${evidence.anuladaPor.nombre} ${evidence.anuladaPor.apellido || ''}`.trim() : 'usuario no informado'}. Motivo: ${evidence.motivoAnulacion || 'sin motivo informado'}` : '',
     ].filter(Boolean).join('\n');
-    doc.font('Helvetica').fontSize(6.8);
-    const metadataHeight = Math.max(12, doc.heightOfString(metadata, { width: 475 }));
-    doc.font('Helvetica').fontSize(7.2);
-    const detailsHeight = details ? Math.max(12, doc.heightOfString(details, { width: 475 })) : 0;
-    const height = 34 + metadataHeight + detailsHeight;
-    ensureSpace(doc, height + 8);
+    const blocks: InspectionPdfTextBlock[] = [
+      { text: inspectionEvidenceReference(evidence), font: 'Helvetica-Bold', size: 8.2, color: evidence.anuladaAt ? C.muted : C.navy },
+      { text: metadata, size: 6.8, color: C.muted },
+      ...(details ? [{ text: details, size: 7.2, color: C.navy }] : []),
+    ];
+    const height = 16 + measureInspectionPdfBlocks(doc, blocks, 475);
+    const reserve = Math.min(height + 8, 160);
+    if (index === 0) section(doc, 'Inventario de evidencias', 'Archivos vigentes y anulados, vínculos, autores, tiempos, observaciones y transcripciones', reserve);
+    else ensureSpace(doc, height < doc.page.height - PAGE.bottom - PAGE.top ? height + 8 : reserve);
     const y = doc.y;
-    doc.roundedRect(44, y, doc.page.width - 88, height, 4).fill(evidence.anuladaAt ? C.soft : C.white).strokeColor(C.line).lineWidth(0.5).stroke();
-    doc.font('Helvetica-Bold').fontSize(8.2).fillColor(evidence.anuladaAt ? C.muted : C.navy).text(`${index + 1}. ${evidence.nombreOriginal}`, 56, y + 8, { width: 475 });
-    doc.font('Helvetica').fontSize(6.8).fillColor(C.muted).text(metadata, 56, y + 21, { width: 475 });
-    if (details) doc.font('Helvetica').fontSize(7.2).fillColor(C.navy).text(details, 56, y + 24 + metadataHeight, { width: 475 });
-    doc.y = y + height + 6;
+    if (y + height <= doc.page.height - PAGE.bottom) {
+      doc.roundedRect(44, y, doc.page.width - 88, height, 4).fillAndStroke(evidence.anuladaAt ? C.soft : C.white, C.line);
+    }
+    doc.y = y + 8;
+    drawInspectionPdfBlocks(doc, blocks, {
+      x: 56, width: 475, bottom: doc.page.height - PAGE.bottom,
+      newPage: () => { doc.addPage(); doc.y = PAGE.top; },
+      continuation: `${inspectionEvidenceReference(evidence)} - inventario, continuación`,
+    });
+    doc.y += 14;
   });
 }
 
@@ -417,7 +459,7 @@ function timeline(doc: PDFKit.PDFDocument, inspection: any) {
       cursor += 15;
     }
     attachments.forEach((file: any) => {
-      doc.font('Helvetica-Bold').fontSize(7.4).fillColor(C.blue).text(`Adjunto de ${side.toLowerCase()}: ${file.nombreOriginal}`, 60, cursor, { width: 475 });
+      doc.font('Helvetica-Bold').fontSize(7.4).fillColor(C.blue).text(`Adjunto de ${side.toLowerCase()}: ${inspectionEvidenceReference(file)}`, 60, cursor, { width: 475 });
       cursor += 15;
     });
     doc.y = Math.max(y + eventHeight, cursor + 7) + 7;
@@ -484,9 +526,9 @@ function formalExchange(doc: PDFKit.PDFDocument, inspection: any) {
       doc.font('Helvetica-Bold').fontSize(7.4).fillColor(C.navy)
         .text(`ADJUNTOS DE LA PRESENTACIÓN (${attachments.length})`, 56, doc.y, { width: 483 });
       doc.y += 13;
-      attachments.forEach((file: any, index: number) => {
+      attachments.forEach((file: any) => {
         ensureSpace(doc, 31);
-        const attachmentText = `${index + 1}. ${file.nombreOriginal || 'Archivo sin nombre'} · ${file.mimeDetectado || 'tipo no informado'} · ${file.bytes != null ? `${file.bytes} bytes` : 'tamaño no informado'}`;
+        const attachmentText = `${inspectionEvidenceReference(file)} · ${file.mimeDetectado || 'tipo no informado'} · ${file.bytes != null ? `${file.bytes} bytes` : 'tamaño no informado'}`;
         doc.font('Helvetica-Bold').fontSize(7.4).fillColor(C.blue)
           .text(attachmentText, 64, doc.y, { width: 467 });
         doc.y += 11;
@@ -521,16 +563,16 @@ function integrityLedger(doc: PDFKit.PDFDocument, inspection: any, fingerprint: 
   doc.font('Courier').fontSize(6.6).fillColor(C.blue).text(fingerprint, 56, startY + 23, { width: doc.page.width - 112 });
   doc.font('Helvetica').fontSize(6.7).fillColor(C.muted).text(`Versión ${inspection.version} · SHA-256 · esta huella no sustituye una firma digital`, 56, startY + 39, { width: doc.page.width - 112 });
   doc.y = startY + 64;
-  inspection.evidencias.forEach((evidence: any, index: number) => {
+  inspection.evidencias.forEach((evidence: any) => {
     const lifecycle = evidence.anuladaAt ? `Captura ${formatDate(evidence.capturadaAt, true)} · Recepción ${formatDate(evidence.createdAt, true)} · ${evidence.creadoPor ? `${evidence.creadoPor.nombre} ${evidence.creadoPor.apellido || ''}`.trim() : 'Autor sin informar'} · ANULADA ${formatDate(evidence.anuladaAt, true)} · ${evidence.motivoAnulacion || 'sin motivo'}` : `Captura ${formatDate(evidence.capturadaAt, true)} · Recepción ${formatDate(evidence.createdAt, true)} · ${evidence.creadoPor ? `${evidence.creadoPor.nombre} ${evidence.creadoPor.apellido || ''}`.trim() : 'Autor sin informar'} · VIGENTE`;
     doc.font('Helvetica-Bold').fontSize(7.5);
-    const nameHeight = Math.max(10, doc.heightOfString(`${index + 1}. ${evidence.nombreOriginal}`, { width: 495 }));
+    const nameHeight = Math.max(10, doc.heightOfString(inspectionEvidenceReference(evidence), { width: 495 }));
     doc.font('Helvetica').fontSize(6.8);
     const lifecycleHeight = Math.max(10, doc.heightOfString(lifecycle, { width: 495 }));
     const rowHeight = nameHeight + lifecycleHeight + 21;
     ensureSpace(doc, rowHeight);
     const y = doc.y;
-    doc.font('Helvetica-Bold').fontSize(7.5).fillColor(C.navy).text(`${index + 1}. ${evidence.nombreOriginal}`, 50, y, { width: 495 });
+    doc.font('Helvetica-Bold').fontSize(7.5).fillColor(C.navy).text(inspectionEvidenceReference(evidence), 50, y, { width: 495 });
     doc.font('Helvetica').fontSize(6.8).fillColor(C.muted).text(lifecycle, 50, y + nameHeight + 2, { width: 495 });
     doc.font('Courier').fontSize(6.2).fillColor(C.blue).text(evidence.sha256 || 'Huella no disponible', 50, y + nameHeight + lifecycleHeight + 6, { width: 495 });
     doc.y = y + rowHeight;
@@ -552,7 +594,7 @@ function priorityFindings(doc: PDFKit.PDFDocument, inspection: any) {
     return;
   }
   rows.forEach((row: any, index: number) => {
-    const evidence = row.evidence.map((item: any) => item.nombreOriginal).join(' · ');
+    const evidence = row.evidence.map((item: any) => `${item.anuladaAt ? '[ANULADA] ' : ''}${inspectionEvidenceReference(item)}`).join(' · ');
     doc.font('Helvetica').fontSize(8.4);
     const detailHeight = Math.max(14, doc.heightOfString(row.detail, { width: 475, lineGap: 2 }));
     const evidenceHeight = evidence ? Math.max(12, doc.heightOfString(`Evidencias: ${evidence}`, { width: 475, lineGap: 1 })) : 0;
@@ -605,16 +647,13 @@ export async function streamInspectionTechnicalReportPdf(
   const technical = inspection.informeTecnico && typeof inspection.informeTecnico === 'object' ? inspection.informeTecnico : {};
   const actor = actorOf(inspection);
 
-  section(doc, 'Resumen ejecutivo', 'Lectura inicial del alcance, el resultado y el respaldo documental');
+  section(doc, 'Resumen ejecutivo', 'Lectura inicial del alcance, el resultado y el respaldo documental', 68);
   metrics(doc, inspection);
-  doc.font('Helvetica-Bold').fontSize(8).fillColor(C.darkGreen).text('CONCLUSIÓN TÉCNICA · EXTRACTO', 44, doc.y + 2);
-  doc.y += 18;
-  const conclusion = String(technical.conclusion || inspection.observaciones || 'No se registró una conclusión técnica.');
-  narrativeBox(doc, conclusion.length > 620 ? `${conclusion.slice(0, conclusion.lastIndexOf(' ', 620))}… (ver conclusión completa)` : conclusion);
-  doc.font('Helvetica-Bold').fontSize(8).fillColor(C.darkGreen).text('RECOMENDACIÓN · EXTRACTO', 44, doc.y + 2);
-  doc.y += 18;
+  const recordedConclusion = String(technical.conclusion || '').trim();
+  const conclusion = recordedConclusion || 'No se registró una conclusión técnica.';
+  executiveExcerpt(doc, 'CONCLUSIÓN TÉCNICA · EXTRACTO', conclusion.length > 620 ? `${conclusion.slice(0, conclusion.lastIndexOf(' ', 620))}… (ver conclusión completa)` : conclusion);
   const recommendation = String(technical.recomendacion || 'No se registró una recomendación técnica.');
-  narrativeBox(doc, recommendation.length > 420 ? `${recommendation.slice(0, recommendation.lastIndexOf(' ', 420))}… (ver recomendación completa)` : recommendation);
+  executiveExcerpt(doc, 'RECOMENDACIÓN · EXTRACTO', recommendation.length > 420 ? `${recommendation.slice(0, recommendation.lastIndexOf(' ', 420))}… (ver recomendación completa)` : recommendation);
 
   // Keep the section title with the first finding instead of leaving an
   // orphan heading at the bottom of the executive-summary page.
@@ -626,7 +665,7 @@ export async function streamInspectionTechnicalReportPdf(
     ['1. Objetivo', technical.objetivo || `No se registró un objetivo técnico específico para ${actor.razonSocial || 'la entidad inspeccionada'}. Esta ausencia se explicita para evitar que el sistema complete el criterio profesional del inspector.`],
     ['2. Antecedentes y referencias', technical.antecedentes || [technical.expedienteElectronico ? `Expediente electrónico: ${technical.expedienteElectronico}.` : '', technical.referencias || '', `Inspección SITREP ${inspection.numero}${inspection.numeroActa ? `, acta ${inspection.numeroActa}` : ''}.`].filter(Boolean).join('\n\n')],
     ['3. Evaluación técnica', technical.evaluacion || inspection.observaciones || 'No se incorporó una evaluación narrativa adicional. Los resultados verificables se detallan en las comparativas, el checklist y las evidencias de este informe.'],
-    ['4. Conclusión técnica', technical.conclusion || 'No se registró una conclusión técnica específica. Esta ausencia se explicita para evitar inferencias automáticas sobre los hallazgos.'],
+    ['4. Conclusión técnica', recordedConclusion || 'No se registró una conclusión técnica específica. Esta ausencia se explicita para evitar inferencias automáticas sobre los hallazgos.'],
     ['5. Recomendación técnica', technical.recomendacion || 'No se registró una recomendación técnica específica. Toda medida o derivación deberá ser consignada y validada por el área competente.'],
   ];
   technicalSections.forEach(([title, body]) => {
@@ -639,7 +678,7 @@ export async function streamInspectionTechnicalReportPdf(
   doc.font('Helvetica').fontSize(10).fillColor(C.ink).text('El expediente se documenta en el marco general de la Ley Provincial 5.917, el Decreto Provincial 2.625/1999 y la Ley Nacional 24.051, según resulte aplicable. Los hallazgos son constataciones y evaluaciones técnicas. La determinación de obligaciones concretas, artículos aplicables, infracciones, sanciones y efectos jurídicos requiere revisión legal y no es inferida automáticamente por SITREP.', 44, doc.y, { width: doc.page.width - 88, lineGap: 3.2 });
   doc.y += 10;
 
-  section(doc, 'Anexo técnico de constatación', 'Matrices, controles, evidencias y trazabilidad que sustentan la evaluación profesional');
+  section(doc, 'Anexo técnico de constatación', 'Matrices, controles, evidencias y trazabilidad que sustentan la evaluación profesional', 208);
 
   ensureSpace(doc, 150);
   section(doc, 'Declarado y verificado', 'Datos declarados al abrir la inspección y resultado constatado en campo');
@@ -649,20 +688,18 @@ export async function streamInspectionTechnicalReportPdf(
   checklist(doc, inspection.items);
 
   if (inspection.evidencias.some((item: any) => item.tipo === 'FOTO' && !item.anuladaAt && !item.intercambioId)) {
-    section(doc, 'Evidencia fotográfica', 'Láminas de dos imágenes con vínculo, descripción, captura y huella técnica');
     evidenceGallery(doc, inspection, preparedImages);
   }
 
-  section(doc, 'Inventario de evidencias', 'Archivos vigentes y anulados, vínculos, autores, tiempos, observaciones y transcripciones');
   evidenceInventory(doc, inspection);
 
   section(doc, 'Trazabilidad operativa', 'Bitácora de estados, actuaciones, comunicaciones preparadas y eventos internos del expediente');
   timeline(doc, inspection);
 
-  section(doc, 'Intercambio formal y contradicción', 'Presentaciones inmutables del organismo y del inspeccionado, con plazos, adjuntos y encadenamiento criptográfico');
+  section(doc, 'Intercambio formal y contradicción', 'Presentaciones inmutables del organismo y del inspeccionado, con plazos, adjuntos y encadenamiento criptográfico', inspection.intercambios?.length ? 108 : 32);
   formalExchange(doc, inspection);
 
-  section(doc, 'Integridad y cadena de custodia', 'Identificadores técnicos para detectar sustituciones en los datos fuente y en las evidencias');
+  section(doc, 'Integridad y cadena de custodia', 'Identificadores técnicos para detectar sustituciones en los datos fuente y en las evidencias', 64);
   integrityLedger(doc, inspection, fingerprint);
 
   section(doc, 'Control documental y remisión', 'Condición de la versión exportada y responsabilidad profesional');
@@ -682,12 +719,12 @@ export async function streamInspectionTechnicalReportPdf(
   // Keep the validation context with its signature fields. If the closure
   // ends near the bottom, the new page must still carry explanatory content,
   // never an isolated pair of signature lines.
-  ensureSpace(doc, 205);
-  section(doc, 'Validación profesional y revisión institucional', 'Espacios de firma y control de la versión exportada');
-  doc.roundedRect(44, doc.y, doc.page.width - 88, 42, 5).fill(C.soft);
+  section(doc, 'Validación profesional y revisión institucional', 'Espacios de firma y control de la versión exportada', 160);
+  const validationY = doc.y;
+  doc.roundedRect(44, validationY, doc.page.width - 88, 42, 5).fill(C.soft);
   doc.font('Helvetica').fontSize(8.2).fillColor(C.ink)
-    .text('La firma técnica y la revisión institucional deben incorporarse conforme al circuito aplicable. Su ausencia en esta exportación no se interpreta como aprobación ni reemplaza una firma digital.', 56, doc.y + 10, { width: doc.page.width - 112, lineGap: 1.5 });
-  doc.y += 56;
+    .text('La firma técnica y la revisión institucional deben incorporarse conforme al circuito aplicable. Su ausencia en esta exportación no se interpreta como aprobación ni reemplaza una firma digital.', 56, validationY + 10, { width: doc.page.width - 112, lineGap: 1.5 });
+  doc.y = validationY + 56;
   ensureSpace(doc, 104);
   const signatureY = doc.y + 10;
   const half = (doc.page.width - 104) / 2;

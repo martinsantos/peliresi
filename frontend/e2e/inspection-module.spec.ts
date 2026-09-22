@@ -181,6 +181,223 @@ test('closed controls state their result in words and deep anchors resume the ex
   expect(await page.locator('html').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
 });
 
+for (const layout of ['project viewport', '600px web'] as const) {
+  test(`comparison index remains reachable after scrolling and restores an exact point at ${layout}`, async ({ page }, testInfo) => {
+    test.skip(layout === '600px web' && testInfo.project.name === 'mobile', 'The narrow web layout is covered by the desktop browser project.');
+    if (layout === '600px web') await page.setViewportSize({ width: 600, height: 850 });
+    const compact = page.viewportSize()!.width < 1024;
+    const runtimeErrors: string[] = [];
+    page.on('pageerror', (error) => runtimeErrors.push(error.message));
+    page.on('console', (message) => { if (message.type() === 'error') runtimeErrors.push(message.text()); });
+    const state = structuredClone(inspection);
+    state.comparaciones.push({
+      id: 'comparison-load', codigo: 'CAR-01', categoria: 'Carga', etiqueta: 'Identificación de la carga',
+      valorDeclarado: 'Residuos identificados y acondicionados', valorObservado: '', resultado: 'PENDIENTE', observacion: null, evidencias: [],
+    });
+    await page.route('**/api/inspecciones/inspection-qa', (route) => route.fulfill({ json: { success: true, data: state } }));
+    const prefix = testInfo.project.name === 'mobile' ? '/mobile' : '';
+    await page.goto(`${prefix}/inspecciones/inspection-qa#declaracion`);
+    await expect(page).toHaveTitle(/RP Trazar/);
+    await expect(page.getByRole('heading', { name: 'Declarado vs. verificado' })).toBeVisible();
+    await page.getByRole('textbox', { name: 'Valor verificado: Domicilio declarado', exact: true }).scrollIntoViewIfNeeded();
+    await expect(page.getByRole('heading', { name: 'Declarado vs. verificado' })).not.toBeInViewport();
+
+    const toggle = page.getByRole('button', { name: /Ver todos los pasos/ });
+    const pointIndex = page.getByRole('combobox', { name: 'Ir a un punto de Declaración', exact: true });
+    if (compact) {
+      // Visibility alone does not detect a sticky control hidden under the app header.
+      await expect(toggle).toBeInViewport({ ratio: 1 });
+      expect(await toggle.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        return element.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+      })).toBe(true);
+      await page.screenshot({ path: `/tmp/sitrep-field-v2-sticky-index-${testInfo.project.name}-${layout.replaceAll(' ', '-')}.png` });
+      await toggle.click();
+    }
+    await expect(pointIndex).toBeInViewport({ ratio: 1 });
+    await pointIndex.selectOption('CAR-01');
+    await expect(page).toHaveURL(/#declaracion\/CAR-01$/);
+
+    const target = page.locator('[data-inspection-anchor="declaracion/CAR-01"]');
+    const verified = target.getByRole('textbox', { name: 'Valor verificado: Identificación de la carga', exact: true });
+    for (const reloaded of [false, true]) {
+      if (reloaded) await page.reload();
+      await expect(page).toHaveURL(/#declaracion\/CAR-01$/);
+      await expect(page.getByRole('button', { name: /Carga.*revisados/ })).toHaveAttribute('aria-expanded', 'true');
+      await expect(target.getByText('Identificación de la carga', { exact: true })).toBeInViewport({ ratio: 1 });
+      await expect(verified).toBeInViewport({ ratio: 1 });
+      expect(await verified.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        return document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2) === element;
+      })).toBe(true);
+      if (compact) {
+        const navigationBox = await page.getByTestId('inspection-navigation').boundingBox();
+        const fieldBox = await verified.boundingBox();
+        expect(navigationBox).not.toBeNull();
+        expect(fieldBox!.y).toBeGreaterThanOrEqual(navigationBox!.y + navigationBox!.height);
+        await expect(page.locator('#inspection-step-index')).toBeHidden();
+      }
+    }
+    await page.screenshot({ path: `/tmp/sitrep-field-v2-comparison-anchor-${testInfo.project.name}-${layout.replaceAll(' ', '-')}.png` });
+    expect(await page.locator('html').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await expect(page.locator('vite-error-overlay')).toHaveCount(0);
+    expect(runtimeErrors).toEqual([]);
+  });
+}
+
+for (const layout of ['project layout', '390px web', '600px web', 'PWA'] as const) {
+  test(`inspection anchors scroll only the content and preserve the application header in ${layout}`, async ({ page }, testInfo) => {
+    const mobileProject = testInfo.project.name === 'mobile';
+    test.skip((layout.endsWith('web') && mobileProject) || (layout === 'PWA' && !mobileProject), 'Each additional layout runs in its matching browser project.');
+    if (layout.endsWith('web')) await page.setViewportSize({ width: layout === '390px web' ? 390 : 600, height: 844 });
+    const originalViewport = page.viewportSize()!;
+    const prefix = layout === 'PWA' ? '/app' : mobileProject ? '/mobile' : '';
+    const path = `${prefix}/inspecciones/inspection-qa`;
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    const assertGeometry = async (scrolled: boolean) => {
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+      const geometry = await page.evaluate(() => {
+        const main = document.querySelector('main')!;
+        const header = document.querySelector('header')!.getBoundingClientRect();
+        const navigation = document.querySelector('[data-testid="inspection-navigation"]')!.getBoundingClientRect();
+        return {
+          documentHeight: document.documentElement.scrollHeight, viewportHeight: window.innerHeight,
+          documentWidth: document.documentElement.scrollWidth, viewportWidth: window.innerWidth,
+          headerTop: header.top, headerBottom: header.bottom, headerHeight: header.height,
+          mainTop: main.getBoundingClientRect().top, mainScroll: main.scrollTop,
+          navigationTop: navigation.top,
+        };
+      });
+      expect(geometry.documentHeight).toBeLessThanOrEqual(geometry.viewportHeight);
+      expect(geometry.documentWidth).toBeLessThanOrEqual(geometry.viewportWidth);
+      expect(geometry.headerTop).toBeGreaterThanOrEqual(0);
+      expect(geometry.headerHeight).toBeGreaterThanOrEqual(56);
+      expect(geometry.mainTop).toBeGreaterThanOrEqual(geometry.headerBottom);
+      if (scrolled) expect(geometry.mainScroll).toBeGreaterThan(0);
+      if (page.viewportSize()!.width < 1024) expect(geometry.navigationTop).toBeGreaterThanOrEqual(geometry.headerBottom);
+    };
+
+    await page.goto(path);
+    await expect(page.getByRole('heading', { name: 'Preparar la inspección' })).toBeVisible();
+    await assertGeometry(false);
+    await openSection(page, 'checklist');
+    const item = await openEmergencyControl(page);
+    await expect(page).toHaveURL(/#checklist\/SEG-02$/);
+    await assertGeometry(true);
+    await expect(item.locator('button[aria-controls="control-detail-item-6"]')).toBeInViewport({ ratio: 1 });
+    const observation = item.getByRole('textbox', { name: /Observación:/ });
+    const assertObservationVisible = async () => {
+      await expect(observation).toBeInViewport({ ratio: 1 });
+      if (page.viewportSize()!.width < 1024) {
+        const navigation = await page.getByTestId('inspection-navigation').boundingBox();
+        const field = await observation.boundingBox();
+        expect(field!.y).toBeGreaterThanOrEqual(navigation!.y + navigation!.height);
+      }
+    };
+    await observation.focus();
+    await observation.scrollIntoViewIfNeeded();
+    await assertGeometry(true);
+    await assertObservationVisible();
+
+    if (originalViewport.width < 1024) {
+      // A smaller viewport exercises reflow while an input has focus; it does not emulate an OS keyboard.
+      await page.setViewportSize({ width: originalViewport.width, height: 430 });
+      await observation.evaluate((element) => element.scrollIntoView({ block: 'center', behavior: 'instant' }));
+      await assertGeometry(true);
+      await assertObservationVisible();
+      await page.screenshot({ path: `/tmp/sitrep-field-v3-compact-${testInfo.project.name}-${layout.replaceAll(' ', '-')}.png` });
+      await page.setViewportSize({ width: 844, height: 390 });
+      await observation.evaluate((element) => element.scrollIntoView({ block: 'center', behavior: 'instant' }));
+      await assertGeometry(true);
+      await assertObservationVisible();
+      await page.screenshot({ path: `/tmp/sitrep-field-v3-landscape-${testInfo.project.name}-${layout.replaceAll(' ', '-')}.png` });
+      await page.setViewportSize(originalViewport);
+    }
+    await page.reload();
+    await expect(page).toHaveURL(/#checklist\/SEG-02$/);
+    await expect(observation).toBeVisible();
+    await assertGeometry(true);
+    await page.screenshot({ path: `/tmp/sitrep-field-v3-header-${testInfo.project.name}-${layout.replaceAll(' ', '-')}.png` });
+    expect(errors).toEqual([]);
+  });
+}
+
+test('saving beside a checklist comment confirms the whole draft and survives a server-only reload', async ({ page }, testInfo) => {
+  const state = structuredClone(inspection);
+  const savedPaths: string[] = [];
+  await page.route('**/api/inspecciones/inspection-qa**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    const respond = () => route.fulfill({ json: { success: true, data: state } });
+    if (request.method() === 'GET' && path === '/api/inspecciones/inspection-qa') return respond();
+    if (request.method() !== 'PATCH') return route.fallback();
+    const body = request.postDataJSON();
+    if (body.version !== state.version) return route.fulfill({ status: 409, json: { success: false, message: 'Versión de borrador incorrecta' } });
+    if (path.endsWith('/borrador')) {
+      const { items: _items, comparaciones: _comparaciones, ...metadata } = body;
+      Object.assign(state, metadata);
+      state.items = state.items.map((item) => ({ ...item, ...body.items.find((row: { id: string }) => row.id === item.id) }));
+      state.comparaciones = state.comparaciones.map((row) => ({ ...row, ...body.comparaciones.find((entry: { id: string }) => entry.id === row.id) }));
+      state.version++;
+    } else return route.fallback();
+    savedPaths.push(path);
+    return respond();
+  });
+
+  const prefix = testInfo.project.name === 'mobile' ? '/mobile' : '';
+  await page.goto(`${prefix}/inspecciones/inspection-qa`);
+  await page.getByRole('textbox', { name: 'Número de acta', exact: true }).fill('ACTA-QA-GUARDADA');
+  await openSection(page, 'declaracion');
+  await page.getByRole('textbox', { name: 'Valor verificado: Número de habilitación', exact: true }).fill('T-000105 verificada en campo');
+  await openSection(page, 'checklist');
+  const item = await openEmergencyControl(page);
+  const observation = 'Se completó la señalización del kit y se documentó la corrección.';
+  await item.getByRole('textbox', { name: /Observación:/ }).fill(observation);
+  const itemSave = item.getByTestId('inspection-item-save-item-6');
+  await expect(itemSave.getByText(/borrador completo, incluido este comentario/)).toBeVisible();
+  await itemSave.getByRole('button', { name: 'Guardar cambios', exact: true }).click();
+  await expect(itemSave.getByRole('status')).toHaveText('Sin cambios pendientes en el borrador del servidor.');
+  expect(savedPaths).toEqual(['/api/inspecciones/inspection-qa/borrador']);
+  expect(state.numeroActa).toBe('ACTA-QA-GUARDADA');
+  expect(state.items.find((entry) => entry.id === 'item-6')?.observacion).toBe(observation);
+  expect(state.comparaciones[0].valorObservado).toBe('T-000105 verificada en campo');
+  expect(state.estado).toBe('EN_CAMPO');
+  await itemSave.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `/tmp/sitrep-field-v2-comment-saved-${testInfo.project.name}.png` });
+
+  // Remove the device copy before boot so a local restore cannot masquerade as server persistence.
+  await page.addInitScript(() => localStorage.removeItem('sitrep_inspection_draft_inspector-qa_inspection-qa'));
+  await page.reload();
+  const restoredItem = await openEmergencyControl(page);
+  await expect(restoredItem.getByRole('textbox', { name: /Observación:/ })).toHaveValue(observation);
+  await expect(restoredItem.getByTestId('inspection-item-save-item-6').getByRole('status')).toHaveText('Sin cambios pendientes en el borrador del servidor.');
+  await openSection(page, 'declaracion');
+  await expect(page.getByRole('textbox', { name: 'Valor verificado: Número de habilitación', exact: true })).toHaveValue('T-000105 verificada en campo');
+  await openSection(page, 'resumen');
+  await expect(page.getByRole('textbox', { name: 'Número de acta', exact: true })).toHaveValue('ACTA-QA-GUARDADA');
+});
+
+test('saving a checklist comment offline reports device-only protection without server confirmation', async ({ page }, testInfo) => {
+  let writes = 0;
+  page.on('request', (request) => { if (request.url().includes('/api/inspecciones/') && request.method() === 'PATCH') writes++; });
+  const prefix = testInfo.project.name === 'mobile' ? '/mobile' : '';
+  await page.goto(`${prefix}/inspecciones/inspection-qa#checklist/SEG-02`);
+  const item = await openEmergencyControl(page);
+  await page.context().setOffline(true);
+  const observation = 'Observación sin conexión pendiente de sincronizar.';
+  await item.getByRole('textbox', { name: /Observación:/ }).fill(observation);
+  const itemSave = item.getByTestId('inspection-item-save-item-6');
+  await itemSave.getByRole('button', { name: 'Guardar cambios', exact: true }).click();
+  await expect(itemSave.getByRole('status')).toHaveText('Guardado solo en este dispositivo. Pendiente de confirmar en el servidor.');
+  expect(await page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem('sitrep_inspection_draft_inspector-qa_inspection-qa') || 'null');
+    return saved?.items.find((entry: { id: string }) => entry.id === 'item-6')?.observacion;
+  })).toBe(observation);
+  expect(writes).toBe(0);
+  await page.screenshot({ path: `/tmp/sitrep-field-v2-comment-offline-${testInfo.project.name}.png` });
+});
+
 test('inspection field screen is usable on web and PWA layouts', async ({ page }, testInfo) => {
   const mobile = testInfo.project.name === 'mobile';
   const runtimeErrors: string[] = [];
@@ -307,17 +524,12 @@ test('inspector can attach an image to one checklist comment without losing the 
       if (failDetailLoad) return route.abort('internetdisconnected');
       return respond(state);
     }
-    if (request.method() === 'PATCH' && url.pathname === '/api/inspecciones/inspection-qa') {
-      Object.assign(state, request.postDataJSON(), { version: state.version + 1 });
-      return respond(state);
-    }
-    if (request.method() === 'PATCH' && url.pathname.endsWith('/items')) {
+    if (request.method() === 'PATCH' && url.pathname.endsWith('/borrador')) {
       const body = request.postDataJSON();
+      const { items: _items, comparaciones: _comparaciones, ...metadata } = body;
+      Object.assign(state, metadata);
       state.items = state.items.map((item) => ({ ...item, ...(body.items.find((row: { id: string }) => row.id === item.id) || {}) }));
-      state.version += 1;
-      return respond(state);
-    }
-    if (request.method() === 'PATCH' && url.pathname.endsWith('/comparaciones')) {
+      state.comparaciones = state.comparaciones.map((row) => ({ ...row, ...body.comparaciones.find((entry: { id: string }) => entry.id === row.id) }));
       state.version += 1;
       return respond(state);
     }
@@ -342,7 +554,7 @@ test('inspector can attach an image to one checklist comment without losing the 
   await emergencyItem.getByLabel(/Adjuntar foto:/).setInputFiles({ name: 'senalizacion-nueva.png', mimeType: 'image/png', buffer: realPng });
 
   await expect(emergencyItem.getByTestId('pending-inspection-evidence')).toBeVisible();
-  await expect(emergencyItem.getByText('Pendiente de sincronizar')).toBeVisible();
+  await expect(emergencyItem.getByTestId('pending-inspection-evidence').getByText('Pendiente de sincronizar')).toBeVisible();
   await page.context().setOffline(false);
   failDetailLoad = true;
   await expect(emergencyItem.getByTestId('pending-inspection-evidence')).toBeVisible();
@@ -514,4 +726,81 @@ test('closed inspection report reflows without horizontal scroll or an empty sti
   // Reference sections do not expose wizard/save actions for an unsent audit note.
   await expect(page.getByTestId('inspection-action-bar')).toHaveCount(0);
   expect(await page.locator('html').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+});
+
+test('two real tabs allow one draft editor and recover the latest comment after ownership is released', async ({ page, context }, testInfo) => {
+  const state = structuredClone(inspection);
+  const draftKey = 'sitrep_inspection_draft_inspector-qa_inspection-qa';
+  let secondPage: Page | undefined;
+  let blockedPhase = true;
+  let blockedTabWrites = 0;
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  // The second tab shares real storage and browser locks, so both pages need the same API boundary.
+  await page.unroute('**/api/**');
+  await context.route('**/api/**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (!['GET', 'HEAD'].includes(request.method()) && blockedPhase && request.frame().page() === secondPage) blockedTabWrites++;
+    let data: unknown = [];
+    if (path.endsWith('/auth/profile')) data = { user };
+    else if (path.endsWith('/health')) return route.fulfill({ json: { status: 'ok' } });
+    else if (path.endsWith('/evidencias/e-1')) return route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480"><rect width="640" height="480" fill="#dff5e9"/></svg>' });
+    else if (path.endsWith('/intercambios')) data = { inspeccion: state, parteActual: 'AUTORIDAD', intercambios: [], comunicacionExterna: false };
+    else if (path === '/api/inspecciones/inspection-qa') data = state;
+    else if (path === '/api/inspecciones/inspection-qa/borrador' && request.method() === 'PATCH') {
+      const body = request.postDataJSON();
+      if (body.version !== state.version) return route.fulfill({ status: 409, json: { success: false, message: 'Versión de borrador incorrecta' } });
+      const { items: _items, comparaciones: _comparaciones, ...metadata } = body;
+      Object.assign(state, metadata);
+      state.items = state.items.map((item) => ({ ...item, ...body.items.find((entry: { id: string }) => entry.id === item.id) }));
+      state.comparaciones = state.comparaciones.map((row) => ({ ...row, ...body.comparaciones.find((entry: { id: string }) => entry.id === row.id) }));
+      state.version++;
+      data = state;
+    }
+    return route.fulfill({ json: { success: true, data } });
+  });
+  const prefix = testInfo.project.name === 'mobile' ? '/mobile' : '';
+  const path = `${prefix}/inspecciones/inspection-qa#checklist/SEG-02`;
+  const storedComment = (target: Page) => target.evaluate((key) => {
+    const draft = JSON.parse(localStorage.getItem(key) || 'null');
+    return draft?.items.find((entry: { id: string }) => entry.id === 'item-6')?.observacion;
+  }, draftKey);
+
+  await page.goto(path);
+  expect(await page.evaluate(() => typeof navigator.locks?.request)).toBe('function');
+  const firstComment = page.getByRole('textbox', { name: /Observación: Señalización/ });
+  await expect(firstComment).toBeEnabled();
+  await firstComment.fill('Primer comentario conservado por la pestaña propietaria.');
+  await expect.poll(() => storedComment(page)).toBe('Primer comentario conservado por la pestaña propietaria.');
+
+  secondPage = await context.newPage();
+  secondPage.on('pageerror', (error) => errors.push(error.message));
+  await secondPage.goto(path);
+  await expect(secondPage.getByText('Otra pestaña está editando este expediente', { exact: true })).toBeVisible();
+  const secondComment = secondPage.getByRole('textbox', { name: /Observación: Señalización/ });
+  await expect(secondComment).toBeDisabled();
+  await expect(firstComment).toBeEnabled();
+  const latestComment = 'Última corrección de campo antes de cerrar la primera pestaña.';
+  await firstComment.fill(latestComment);
+  await expect.poll(() => storedComment(page)).toBe(latestComment);
+  await expect.poll(() => storedComment(secondPage!)).toBe(latestComment);
+  await expect(firstComment).toHaveValue(latestComment);
+  expect(blockedTabWrites).toBe(0);
+  await secondPage.getByTestId('inspection-editor-ownership').evaluate((element) => element.scrollIntoView({ block: 'center', behavior: 'instant' }));
+  await expect(secondPage.getByTestId('inspection-editor-ownership')).toBeInViewport({ ratio: 1 });
+  await secondPage.screenshot({ path: `/tmp/sitrep-field-v3-second-tab-readonly-${testInfo.project.name}.png` });
+
+  await page.close();
+  blockedPhase = false;
+  await secondPage.getByRole('button', { name: 'Reintentar edición', exact: true }).click();
+  await expect(secondPage.getByText('Otra pestaña está editando este expediente', { exact: true })).toHaveCount(0);
+  await expect(secondComment).toBeEnabled();
+  await expect(secondComment).toHaveValue(latestComment);
+  await secondComment.fill('Edición continuada desde la segunda pestaña con el borrador recuperado.');
+  await expect.poll(() => storedComment(secondPage!)).toBe('Edición continuada desde la segunda pestaña con el borrador recuperado.');
+  await secondComment.evaluate((element) => element.scrollIntoView({ block: 'center', behavior: 'instant' }));
+  await expect(secondComment).toBeInViewport({ ratio: 1 });
+  await secondPage.screenshot({ path: `/tmp/sitrep-field-v3-second-tab-recovered-${testInfo.project.name}.png` });
+  expect(errors).toEqual([]);
 });

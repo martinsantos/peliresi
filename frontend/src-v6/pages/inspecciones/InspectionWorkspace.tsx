@@ -12,6 +12,7 @@ export interface InspectionWorkspaceStep {
   complete?: boolean;
   content: React.ReactNode;
   nextAction?: React.ReactNode;
+  anchors?: Array<{ id: string; label: string; detail?: string }>;
 }
 
 interface Props {
@@ -36,6 +37,7 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
   const active = all.find((step) => step.id === hash.split('/')[0])
     || all.find((step) => step.id === defaultStep) || steps[0];
   const index = steps.findIndex((step) => step.id === active.id);
+  const selectedAnchor = active.anchors?.find((anchor) => anchor.id === hash.split('/').slice(1).join('/'));
 
   useEffect(() => {
     if (previousHash.current === location.hash) return;
@@ -51,6 +53,18 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
     setIndexOpen(false);
     navigate({ pathname: location.pathname, search: location.search, hash: `#${step.id}` });
   };
+  const goToAnchor = (code: string) => {
+    if (!active.anchors?.some((anchor) => anchor.id === code)) return;
+    onBeforeNavigate();
+    setIndexOpen(false);
+    navigate({ pathname: location.pathname, search: location.search, hash: `#${active.id}/${encodeURIComponent(code)}` }, { replace: true });
+    // Also return to a selected point when its hash is already the current URL.
+    requestAnimationFrame(() => {
+      const target = Array.from(document.querySelectorAll<HTMLElement>('[data-inspection-anchor]'))
+        .find((element) => element.dataset.inspectionAnchor === `${active.id}/${code}`);
+      target?.scrollIntoView({ block: 'start', behavior: 'instant' });
+    });
+  };
   const stepLink = (step: InspectionWorkspaceStep, order?: number) => {
     const selected = active.id === step.id;
     return <a key={step.id} href={`#${step.id}`} aria-current={selected ? 'step' : undefined}
@@ -62,12 +76,18 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
   };
 
   return <div data-testid="inspection-workspace" className="min-w-0 overflow-clip rounded-xl border border-neutral-200 bg-white lg:grid lg:grid-cols-[210px_minmax(0,1fr)] xl:grid-cols-[224px_minmax(0,1fr)]">
-    <aside className="min-w-0 border-b border-neutral-200 bg-neutral-50/50 lg:border-b-0 lg:border-r">
+    <aside data-testid="inspection-navigation" className="sticky top-0 z-20 min-w-0 self-start border-b border-neutral-200 bg-white lg:static lg:self-stretch lg:border-b-0 lg:border-r lg:bg-neutral-50/50">
       <button type="button" aria-expanded={indexOpen} aria-controls="inspection-step-index" onClick={() => setIndexOpen((open) => !open)} className="flex min-h-16 w-full items-center justify-between gap-3 px-4 py-3 text-left lg:hidden">
         <span className="min-w-0 flex-1"><span className="block text-sm font-bold text-neutral-900">{guided && index >= 0 ? `Paso ${index + 1} de ${steps.length} · ` : ''}{active.label}</span><span className="mt-1 block text-xs text-neutral-600">{indexOpen ? 'Ocultar índice' : 'Ver todos los pasos'}</span></span><ChevronDown size={18} className={`shrink-0 transition-transform ${indexOpen ? 'rotate-180' : ''}`} />
       </button>
-      <nav id="inspection-step-index" aria-label={guided ? 'Pasos de la inspección' : 'Secciones del expediente'} className={`${indexOpen ? 'block' : 'hidden'} px-3 pb-4 lg:sticky lg:top-0 lg:block lg:max-h-[calc(100dvh-7rem)] lg:overflow-y-auto lg:py-5`}>
+      <nav id="inspection-step-index" aria-label={guided ? 'Pasos de la inspección' : 'Secciones del expediente'} className={`${indexOpen ? 'block' : 'hidden'} max-h-[55dvh] overflow-y-auto overscroll-contain px-3 pb-4 lg:sticky lg:top-0 lg:block lg:max-h-[calc(100dvh-7rem)] lg:py-5`}>
         <p className="hidden px-3 pb-3 text-xs font-semibold text-neutral-500 lg:block">{guided ? 'Completar inspección' : 'Consultar expediente'}</p>
+        {!!active.anchors?.length && <label className="mb-3 block px-1 text-xs font-semibold text-neutral-700">Ir a un punto de {active.label}
+          <select aria-label={`Ir a un punto de ${active.label}`} value={selectedAnchor?.id || ''} onChange={(event) => goToAnchor(event.target.value)} className="mt-2 min-h-11 w-full min-w-0 rounded-lg border border-neutral-300 bg-white px-2 text-sm font-normal text-neutral-900">
+            <option value="" disabled>Elegir control · {active.anchors.length} puntos</option>
+            {active.anchors.map((anchor, i) => <option key={anchor.id} value={anchor.id}>{i + 1}. {anchor.id} · {anchor.detail} · {anchor.label}</option>)}
+          </select>
+        </label>}
         <ol className="space-y-1">{steps.map((step, i) => <li key={step.id}>{stepLink(step, guided ? i : undefined)}</li>)}</ol>
         {reference.length > 0 && <div className="mt-4 border-t border-neutral-200 pt-3"><p className="px-3 pb-1 text-xs font-semibold text-neutral-500">Seguimiento del expediente</p>{reference.map((step) => stepLink(step))}</div>}
       </nav>

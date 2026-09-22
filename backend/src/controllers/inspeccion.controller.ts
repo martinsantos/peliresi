@@ -190,6 +190,17 @@ const comparisonSchema = z.object({
   observacion: z.string().trim().max(2_000).optional().nullable(),
 });
 
+const draftSchema = updateSchema.extend({
+  items: z.array(itemSchema).max(100).refine(
+    (rows) => new Set(rows.map((row) => row.id)).size === rows.length,
+    'No se puede repetir un item de checklist',
+  ),
+  comparaciones: z.array(comparisonSchema).max(100).refine(
+    (rows) => new Set(rows.map((row) => row.id)).size === rows.length,
+    'No se puede repetir un dato comparativo',
+  ),
+}).strict();
+
 const eventSchema = z.object({
   tipo: z.enum(['COMENTARIO_INTERNO', 'SOLICITUD_CORRECCION', 'RESPUESTA_ACTOR', 'RESOLUCION', 'NOTIFICACION_PREPARADA']),
   titulo: z.string().trim().min(3).max(180),
@@ -618,6 +629,88 @@ export async function actualizarInspeccion(req: AuthRequest, res: Response, next
     });
     if (result.count !== 1) throw new AppError('La inspeccion fue modificada en otro dispositivo. Actualice antes de continuar.', 409);
     const full = await prisma.inspeccion.findUniqueOrThrow({ where: { id: req.params.id }, include: inspectionInclude });
+    res.json({ success: true, data: full });
+  } catch (error) { next(error); }
+}
+
+export async function guardarBorradorInspeccion(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const input = draftSchema.parse(req.body);
+    const inspection = await prisma.inspeccion.findUnique({
+      where: { id: req.params.id },
+      select: { inspectorId: true, tipoActor: true, estado: true, version: true },
+    });
+    if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
+    assertCanEdit(req, inspection);
+    if (inspection.version !== input.version) throw new AppError('La inspeccion fue modificada en otro dispositivo. Actualice antes de continuar.', 409);
+
+    const { version, items, comparaciones, datosActa, informeTecnico, ...fields } = input;
+    const full = await prisma.$transaction(async (tx) => {
+      // Reserve once for the complete draft. A failure in any section also
+      // rolls back this reservation, so retries never inherit a partial save.
+      await reserveFieldMutation(tx, req.params.id, version);
+      const itemIds = items.map((item) => item.id);
+      const comparacionIds = comparaciones.map((comparison) => comparison.id);
+      if (itemIds.length && await tx.itemInspeccion.count({ where: { id: { in: itemIds }, inspeccionId: req.params.id } }) !== itemIds.length) {
+        throw new AppError('Item de checklist invalido', 400);
+      }
+      const existingComparisons = comparacionIds.length ? await tx.comparacionInspeccion.findMany({
+        where: { id: { in: comparacionIds }, inspeccionId: req.params.id },
+        select: { id: true, resultado: true, valorObservado: true, observacion: true },
+      }) : [];
+      if (existingComparisons.length !== comparacionIds.length) {
+        throw new AppError('Dato comparativo inválido', 400);
+      }
+      const comparisonsById = new Map(existingComparisons.map((comparison) => [comparison.id, comparison]));
+
+      await tx.inspeccion.update({
+        where: { id: req.params.id },
+        data: {
+          ...fields,
+          datosActa: datosActa === undefined ? undefined : datosActa === null ? Prisma.DbNull : datosActa as Prisma.InputJsonValue,
+          informeTecnico: informeTecnico === undefined ? undefined : informeTecnico === null ? Prisma.DbNull : informeTecnico as Prisma.InputJsonValue,
+          fechaProgramada: fields.fechaProgramada === undefined ? undefined : fields.fechaProgramada ? new Date(fields.fechaProgramada) : null,
+          plazoRespuestaAt: fields.plazoRespuestaAt === undefined ? undefined : fields.plazoRespuestaAt ? new Date(fields.plazoRespuestaAt) : null,
+        },
+      });
+      for (const item of items) {
+        const updated = await tx.itemInspeccion.updateMany({
+          where: { id: item.id, inspeccionId: req.params.id },
+          data: { resultado: item.resultado, observacion: item.observacion || null },
+        });
+        if (updated.count !== 1) throw new AppError('Item de checklist invalido', 400);
+      }
+      for (const comparison of comparaciones) {
+        const existing = comparisonsById.get(comparison.id)!;
+        const valorObservado = comparison.valorObservado || null;
+        const observacion = comparison.observacion || null;
+        // Saving another section must not reattribute an earlier verification
+        // or change its timestamp when the comparison content is unchanged.
+        if (existing.resultado === comparison.resultado && (existing.valorObservado || null) === valorObservado && (existing.observacion || null) === observacion) continue;
+        const updated = await tx.comparacionInspeccion.updateMany({
+          where: { id: comparison.id, inspeccionId: req.params.id },
+          data: {
+            resultado: comparison.resultado,
+            valorObservado,
+            observacion,
+            verificadoPorId: comparison.resultado === 'PENDIENTE' ? null : req.user.id,
+            verificadoAt: comparison.resultado === 'PENDIENTE' ? null : new Date(),
+          },
+        });
+        if (updated.count !== 1) throw new AppError('Dato comparativo inválido', 400);
+      }
+      await tx.eventoInspeccion.create({
+        data: {
+          inspeccionId: req.params.id,
+          usuarioId: req.user.id,
+          tipo: 'BORRADOR_ACTUALIZADO',
+          titulo: 'Borrador de campo guardado',
+          visibleActor: false,
+          metadata: { schemaVersion: 1, versionBase: version, versionNueva: version + 1, itemIds, comparacionIds, contenidoSha256: hashCanonicalPayload(input) },
+        },
+      });
+      return tx.inspeccion.findUniqueOrThrow({ where: { id: req.params.id }, include: inspectionInclude });
+    });
     res.json({ success: true, data: full });
   } catch (error) { next(error); }
 }

@@ -337,8 +337,8 @@ export const MobileLayout: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto">
+      {/* Keep absolutely positioned field controls inside this scroll container. */}
+      <main className="relative flex-1 overflow-y-auto">
         <div className={cn('p-4', isFieldTripRoute ? 'pb-6' : 'pb-28')}>
           <Outlet />
         </div>

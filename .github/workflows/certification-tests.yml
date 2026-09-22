@@ -44,6 +44,12 @@ jobs:
         if: ${{ inputs.profile == 'post-deploy' || inputs.profile == 'certification' }}
         run: cd frontend && npx playwright install --with-deps chromium
 
+      - name: Install Poppler for backend PDF tests
+        if: ${{ inputs.profile == 'quick' || inputs.profile == 'certification' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends poppler-utils
+
       - name: Run certification suite
         env:
           RUN_PROFILE: ${{ inputs.profile }}

@@ -12,6 +12,7 @@ import {
   type InspectionPdfBranding,
 } from './inspectionPdfBranding.service';
 import { buildInspectionPdfQr, drawInspectionPdfQrCard } from './inspectionPdfQr.service';
+import { drawInspectionPdfBlocks, inspectionEvidenceReference, measureInspectionPdfBlocks, type InspectionPdfTextBlock } from './inspectionPdfLayout.service';
 
 const COLORS = {
   green: '#1B5E3C',
@@ -556,7 +557,14 @@ function article44Section(
   doc.y += noteHeight + 10;
 
   presentation.formalities.forEach((formality) => {
-    if (doc.y + 70 > doc.page.height - 82) {
+    doc.font('Helvetica').fontSize(8.2);
+    const detail = formality.unresolvedReason
+      ? `${formality.detail}\nControl de completitud: ${formality.unresolvedReason}`
+      : formality.detail;
+    const blockHeight = 43 + 11 + wrappedLines(doc, detail, doc.page.width - 80).length * 11 + 9;
+    // Keep a compact formality together. Longer statements still paginate,
+    // repeating their own heading on each continuation page.
+    if (doc.y + Math.min(blockHeight, doc.page.height - 82 - 216) > doc.page.height - 82) {
       doc.addPage();
       article44PageHeader(doc, actNumber, inspection.numero, presentation, branding, true);
     }
@@ -694,7 +702,7 @@ function evidenceTarget(inspection: any, evidence: any): string {
     const comparison = inspection.comparaciones.find((row: any) => row.id === evidence.comparacionId);
     if (comparison) return `${comparison.etiqueta}: ${comparison.valorObservado || comparison.resultado}`;
   }
-  return evidence.descripcion || 'Evidencia general del expediente';
+  return 'Evidencia general del expediente';
 }
 
 function photoAnnex(
@@ -705,16 +713,25 @@ function photoAnnex(
   branding: InspectionPdfBranding,
 ) {
   const photos = inspection.evidencias.filter((evidence: any) => evidence.tipo === 'FOTO' && !evidence.anuladaAt && !evidence.intercambioId);
+  const newPhotoPage = () => {
+    doc.addPage();
+    institutionalHeader(doc, actNumber, branding, `ANEXO FOTOGRÁFICO · ${inspection.numero}`);
+    doc.y += 7;
+  };
   photos.forEach((photo: any, index: number) => {
-    if (index % 2 === 0) {
-      doc.addPage();
-      institutionalHeader(doc, actNumber, branding, `ANEXO FOTOGRÁFICO · ${inspection.numero}`);
-      doc.y += 7;
-    }
+    const caption: InspectionPdfTextBlock[] = [
+      { text: `Fotografía · ${inspectionEvidenceReference(photo)}`, font: 'Helvetica-Bold', size: 8.2, color: COLORS.ink },
+      { text: evidenceTarget(inspection, photo), size: 7.4, color: COLORS.muted },
+      { text: photo.descripcion || 'Sin descripción adicional.', size: 8, color: COLORS.ink },
+      { text: `Captura: ${dateParts(photo.capturadaAt).date} ${dateParts(photo.capturadaAt).time}`, size: 6.5, color: COLORS.muted },
+      { text: `SHA-256 ${value(photo.sha256)}`, font: 'Courier', size: 6.2, color: COLORS.muted },
+    ];
+    const captionHeight = measureInspectionPdfBlocks(doc, caption, doc.page.width - 76);
+    const minimumCaption = Math.min(captionHeight, 90);
+    if (index === 0 || doc.y + 212 + Math.min(captionHeight, doc.page.height - 82 - 150 - 212) > doc.page.height - 82) newPhotoPage();
+    if (doc.y + 212 + minimumCaption > doc.page.height - 82) newPhotoPage();
     const y = doc.y;
-    // Two evidence cards must fit below the institutional header and above the
-    // footer. Keeping the illustration at 205pt prevents PDFKit from creating
-    // an implicit overflow page for the second card.
+    // Caption height, not a fixed photograph count, determines page breaks.
     const imageHeight = 205;
     doc.roundedRect(34, y, doc.page.width - 68, imageHeight, 4).fill(COLORS.soft);
     const prepared = preparedImages.get(photo.id);
@@ -728,12 +745,12 @@ function photoAnnex(
       { width: doc.page.width - 96, align: 'center' },
     );
     doc.y = y + imageHeight + 7;
-    doc.font('Helvetica-Bold').fontSize(8.2).fillColor(COLORS.ink).text(`Fotografía ${index + 1} · ${value(photo.nombreOriginal)}`, 38, doc.y, { width: doc.page.width - 76 });
-    doc.y += 13;
-    doc.font('Helvetica').fontSize(7.4).fillColor(COLORS.muted).text(evidenceTarget(inspection, photo), 38, doc.y, { width: doc.page.width - 76, height: 30, ellipsis: true });
-    doc.y += 31;
-    doc.font('Helvetica').fontSize(6.5).fillColor(COLORS.muted).text(`Captura: ${dateParts(photo.capturadaAt).date} ${dateParts(photo.capturadaAt).time} · SHA-256 ${value(photo.sha256).slice(0, 20)}…`, 38, doc.y, { width: doc.page.width - 76 });
-    doc.y += 22;
+    drawInspectionPdfBlocks(doc, caption, {
+      x: 38, width: doc.page.width - 76, bottom: doc.page.height - 82,
+      newPage: newPhotoPage,
+      continuation: `Fotografía · ${inspectionEvidenceReference(photo)} - continuación`,
+    });
+    doc.y += 12;
   });
 }
 

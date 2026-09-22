@@ -10,7 +10,7 @@ function setup(hash = '') {
       saveAction={<button>Guardar borrador</button>}
       steps={[
         { id: 'contexto', label: 'Contexto', title: 'Preparar visita', description: 'Datos generales', content: <input aria-label="Ubicación QA" defaultValue="" /> },
-        { id: 'checklist', label: 'Checklist', title: 'Controles', description: 'Verificación', content: <p>Control de prueba</p> },
+        { id: 'checklist', label: 'Checklist', title: 'Controles', description: 'Verificación', anchors: [{ id: 'DOC-01', label: 'Documento', detail: 'Pendiente' }], content: <p>Control de prueba</p> },
       ]}
       reference={[{ id: 'trazabilidad', label: 'Trazabilidad', title: 'Registro', description: 'Notas', content: <textarea aria-label="Nota sin enviar" /> }]} />
   </MemoryRouter>);
@@ -47,5 +47,13 @@ describe('InspectionWorkspace navigation contract', () => {
     const bar = screen.getByTestId('inspection-action-bar');
     expect(bar.className).not.toMatch(/\b(sticky|fixed|absolute)\b/);
     expect(within(bar).getByRole('button', { name: 'Siguiente' })).toBeVisible();
+  });
+
+  it('keeps a mobile navigation landmark and exposes direct links to field points', () => {
+    setup('#checklist/DOC-01');
+    expect(screen.getByTestId('inspection-navigation')).toHaveClass('sticky', 'top-0');
+    expect(screen.getByRole('combobox', { name: 'Ir a un punto de Checklist' })).toHaveValue('DOC-01');
+    expect(screen.getByRole('option', { name: /DOC-01 · Pendiente · Documento/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Controles' })).toBeVisible();
   });
 });

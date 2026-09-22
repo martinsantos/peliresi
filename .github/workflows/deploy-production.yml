@@ -79,6 +79,11 @@ jobs:
       - name: TypeScript type-check
         run: cd backend && npx tsc --noEmit
 
+      - name: Install Poppler for PDF presentation tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends poppler-utils
+
       - name: Run backend tests
         run: cd backend && npm test
 

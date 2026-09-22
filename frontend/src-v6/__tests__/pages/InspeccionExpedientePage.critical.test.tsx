@@ -7,6 +7,7 @@ import InspeccionExpedientePage from '../../pages/inspecciones/InspeccionExpedie
 const useInspectionMock = vi.hoisted(() => vi.fn());
 const listPendingEvidenceMock = vi.hoisted(() => vi.fn());
 const transitionMock = vi.hoisted(() => vi.fn());
+vi.mock('../../hooks/useInspectionDraftOwnership', () => ({ useInspectionDraftOwnership: () => ({ status: 'owned', canWrite: () => true, retry: vi.fn() }) }));
 
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ currentUser: { id: 'admin-1', rol: 'ADMIN', nombre: 'Admin' } }),
@@ -27,6 +28,7 @@ vi.mock('../../services/inspeccion.service', () => ({
     update: vi.fn(),
     updateItems: vi.fn(),
     updateComparisons: vi.fn(),
+    saveDraft: vi.fn().mockResolvedValue({ version: 8 }),
     updateTechnicalReport: vi.fn().mockResolvedValue({ version: 8 }),
     transition: transitionMock,
     uploadEvidence: vi.fn(),
@@ -36,7 +38,8 @@ vi.mock('../../services/inspeccion.service', () => ({
   },
 }));
 
-vi.mock('../../services/inspectionOfflineEvidence', () => ({
+vi.mock('../../services/inspectionOfflineEvidence', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../services/inspectionOfflineEvidence')>(),
   listPendingInspectionEvidence: listPendingEvidenceMock,
   pendingEvidenceFile: vi.fn(),
   queueInspectionEvidence: vi.fn(),

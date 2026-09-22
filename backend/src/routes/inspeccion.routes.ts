@@ -14,6 +14,7 @@ import {
   descargarEvidencia,
   generarActaInspeccionPdf,
   generarInformeTecnicoInspeccionPdf,
+  guardarBorradorInspeccion,
   listarInspecciones,
   obtenerInspeccion,
   subirEvidencia,
@@ -60,6 +61,7 @@ router.post('/:id/intercambios/decision', exchangeUpload.array('files', 5), deci
 router.get('/:id/intercambios/:intercambioId/adjuntos/:evidenciaId', descargarAdjuntoIntercambio);
 router.get('/:id', obtenerInspeccion);
 router.patch('/:id', actualizarInspeccion);
+router.patch('/:id/borrador', guardarBorradorInspeccion);
 router.patch('/:id/informe-tecnico', actualizarInformeTecnico);
 router.patch('/:id/items', actualizarItems);
 router.patch('/:id/comparaciones', actualizarComparaciones);

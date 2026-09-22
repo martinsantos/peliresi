@@ -118,6 +118,24 @@ export const inspeccionService = {
     return data.data;
   },
 
+  async saveDraft(id: string, input: {
+    version: number;
+    numeroActa?: string | null;
+    ubicacion?: string | null;
+    latitud?: number | null;
+    longitud?: number | null;
+    fechaProgramada?: string | null;
+    plazoRespuestaAt?: string | null;
+    observaciones?: string | null;
+    datosActa?: InspectionActData | null;
+    informeTecnico?: InspectionTechnicalReport | null;
+    items: Array<{ id: string; resultado: InspectionItemResult; observacion?: string | null }>;
+    comparaciones: Array<{ id: string; resultado: InspectionComparisonResult; valorObservado?: string | null; observacion?: string | null }>;
+  }): Promise<Inspection> {
+    const { data } = await api.patch(`/inspecciones/${id}/borrador`, input);
+    return data.data;
+  },
+
   async updateItems(id: string, version: number, items: Array<{ id: string; resultado: InspectionItemResult; observacion?: string | null }>): Promise<Inspection> {
     const { data } = await api.patch(`/inspecciones/${id}/items`, { version, items });
     return data.data;
