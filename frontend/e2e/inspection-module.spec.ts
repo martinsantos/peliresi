@@ -201,18 +201,71 @@ test('inspection guide stays pinned and identifies the visible control during a 
     const headingRect = document.querySelector('[data-testid="inspection-step-header"]')!.getBoundingClientRect();
     return { mainTop: mainRect.top, navTop: navRect.top, navBottom: navRect.bottom, headingTop: headingRect.top, headingBottom: headingRect.bottom };
   });
-  expect(positions.navTop).toBeGreaterThanOrEqual(positions.mainTop - 6);
+  // The guide may shift a little above the viewport when the workspace footer
+  // reaches its containing edge; the current point must remain readable.
+  expect(positions.navTop).toBeGreaterThanOrEqual(positions.mainTop - 36);
   expect(positions.navTop).toBeLessThanOrEqual(positions.mainTop + 6);
   expect(positions.navBottom).toBeGreaterThan(positions.mainTop + 40);
   if (!compact) {
     expect(positions.headingTop).toBeGreaterThanOrEqual(positions.mainTop - 6);
     expect(positions.headingTop).toBeLessThanOrEqual(positions.mainTop + 6);
-    expect(positions.headingBottom).toBeGreaterThan(positions.mainTop + 72);
+    expect(positions.headingBottom).toBeGreaterThan(positions.mainTop + 40);
   }
   await expect(guide).toBeInViewport();
   const current = compact ? page.getByTestId('inspection-current-point') : page.getByTestId('inspection-current-point-desktop');
   await expect(current).toContainText(/(DOC|GEN|HAB|SEG|TRZ)-\d/);
   await page.screenshot({ path: `/tmp/sitrep-inspection-pinned-${testInfo.project.name}.png` });
+});
+
+test('compact step and intermediate group stay pinned; next advances in sequence', async ({ page }, testInfo) => {
+  const state = structuredClone(inspection);
+  state.comparaciones = Array.from({ length: 12 }, (_, index) => ({
+    id: `comparison-qa-${index + 1}`, codigo: `CAR-${String(index + 1).padStart(2, '0')}`,
+    categoria: 'Carga', etiqueta: `Dato declarado ${index + 1}`,
+    valorDeclarado: `Valor declarado ${index + 1}`, valorObservado: '',
+    resultado: 'PENDIENTE' as const, observacion: null, evidencias: [],
+  }));
+  await page.route('**/api/inspecciones/inspection-qa', (route) => route.fulfill({ json: { success: true, data: state } }));
+  const prefix = process.env.PLAYWRIGHT_INSPECTION_PREFIX ?? (testInfo.project.name === 'mobile' ? '/mobile' : '');
+  await page.goto(`${prefix}/inspecciones/inspection-qa#declaracion/CAR-04`);
+  await expect(page.getByRole('heading', { name: 'Declarado vs. verificado' })).toBeVisible();
+  const main = page.locator('main');
+  await main.evaluate((element) => { element.scrollTop = 1300; });
+  const compact = page.viewportSize()!.width < 1024;
+  const geometry = await page.evaluate(() => {
+    const mainTop = document.querySelector('main')!.getBoundingClientRect().top;
+    const step = document.querySelector('[data-testid="inspection-step-header"]')!.getBoundingClientRect();
+    const guide = document.querySelector('[data-testid="inspection-navigation"]')!.getBoundingClientRect();
+    const group = Array.from(document.querySelectorAll('button')).find((button) => button.textContent?.includes('Carga') && button.getAttribute('aria-expanded') === 'true')!.getBoundingClientRect();
+    return { mainTop, stepTop: step.top, stepHeight: step.height, guideTop: guide.top, guideHeight: guide.height, groupTop: group.top, groupHeight: group.height };
+  });
+  const stickyHeight = compact ? geometry.guideHeight : geometry.stepHeight;
+  expect(stickyHeight).toBeLessThan(compact ? 125 : 90);
+  expect(compact ? geometry.guideTop : geometry.stepTop).toBeGreaterThanOrEqual(geometry.mainTop - 6);
+  expect(compact ? geometry.guideTop : geometry.stepTop).toBeLessThanOrEqual(geometry.mainTop + 6);
+  expect(geometry.groupTop).toBeGreaterThanOrEqual(geometry.mainTop + stickyHeight - 6);
+  expect(geometry.groupTop).toBeLessThanOrEqual(geometry.mainTop + stickyHeight + 6);
+  expect(geometry.groupHeight).toBeLessThan(65);
+  await page.screenshot({ path: `/tmp/sitrep-inspection-compact-${testInfo.project.name}.png` });
+
+  const fourth = page.locator('[data-inspection-anchor="declaracion/CAR-04"]');
+  await fourth.getByRole('button', { name: 'Siguiente dato pendiente' }).click();
+  await expect(page).toHaveURL(/#declaracion\/CAR-05$/);
+  await expect(page.locator('[data-inspection-anchor="declaracion/CAR-05"]')).toBeInViewport();
+
+  await page.getByTestId('inspection-action-bar').getByRole('button', { name: 'Siguiente', exact: true }).click();
+  await expect(page).toHaveURL(/#checklist$/);
+  await expect(page.getByRole('heading', { name: 'Checklist regulatorio' })).toBeInViewport();
+  const landing = await page.evaluate(() => ({
+    mainTop: document.querySelector('main')!.getBoundingClientRect().top,
+    guideBottom: document.querySelector('[data-testid="inspection-navigation"]')!.getBoundingClientRect().bottom,
+    headingTop: document.querySelector('#inspection-step-heading')!.getBoundingClientRect().top,
+    workspaceTop: document.querySelector('[data-testid="inspection-workspace"]')!.getBoundingClientRect().top,
+  }));
+  expect(landing.workspaceTop).toBeGreaterThanOrEqual(landing.mainTop - 6);
+  expect(landing.workspaceTop).toBeLessThanOrEqual(landing.mainTop + 6);
+  if (compact) expect(landing.headingTop).toBeGreaterThanOrEqual(landing.guideBottom - 2);
+  await page.screenshot({ path: `/tmp/sitrep-inspection-next-${testInfo.project.name}.png` });
 });
 
 for (const layout of ['project viewport', '600px web'] as const) {
@@ -234,7 +287,10 @@ for (const layout of ['project viewport', '600px web'] as const) {
     await expect(page).toHaveTitle(/RP Trazar/);
     await expect(page.getByRole('heading', { name: 'Declarado vs. verificado' })).toBeVisible();
     await page.getByRole('textbox', { name: 'Valor verificado: Domicilio declarado', exact: true }).scrollIntoViewIfNeeded();
-    await expect(page.getByRole('heading', { name: 'Declarado vs. verificado' })).not.toBeInViewport();
+    // On desktop the compact step title is intentionally pinned; on narrow
+    // screens the two-line mobile guide takes over that role.
+    if (compact) await expect(page.getByRole('heading', { name: 'Declarado vs. verificado' })).not.toBeInViewport();
+    else await expect(page.getByRole('heading', { name: 'Declarado vs. verificado' })).toBeInViewport();
 
     const toggle = page.getByRole('button', { name: /Ver todos los pasos/ });
     const pointIndex = page.getByRole('combobox', { name: 'Ir a un punto de Declaración', exact: true });
@@ -258,6 +314,7 @@ for (const layout of ['project viewport', '600px web'] as const) {
       if (reloaded) await page.reload();
       await expect(page).toHaveURL(/#declaracion\/CAR-01$/);
       await expect(page.getByRole('button', { name: /Carga.*revisados/ })).toHaveAttribute('aria-expanded', 'true');
+      await expect(page.getByRole('button', { name: /Carga.*revisados/ })).toBeInViewport();
       await expect(target.getByText('Identificación de la carga', { exact: true })).toBeInViewport({ ratio: 1 });
       await expect(verified).toBeInViewport({ ratio: 1 });
       expect(await verified.evaluate((element) => {

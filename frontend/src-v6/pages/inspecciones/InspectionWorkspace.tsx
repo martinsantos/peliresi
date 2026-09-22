@@ -49,11 +49,20 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
     const main = workspaceRef.current?.closest('main');
     if (!main || !anchorIds) return;
     let frame = 0;
+    let previousOffset = -1;
     const update = () => {
       frame = 0;
       const guide = workspaceRef.current?.querySelector<HTMLElement>('[data-testid="inspection-navigation"]');
+      const stepHeader = workspaceRef.current?.querySelector<HTMLElement>('[data-testid="inspection-step-header"]');
       const compact = window.matchMedia('(max-width: 1023px)').matches;
-      const threshold = main.getBoundingClientRect().top + (compact ? (guide?.getBoundingClientRect().height || 0) + 32 : 112);
+      const offset = Math.ceil((compact ? guide : stepHeader)?.getBoundingClientRect().height || 0);
+      if (offset !== previousOffset) {
+        workspaceRef.current?.style.setProperty('--inspection-middle-top', `${offset}px`);
+        workspaceRef.current?.style.setProperty('--inspection-anchor-offset', `${offset + 64}px`);
+        previousOffset = offset;
+      }
+      // Count the row immediately below the intermediate pinned group as current.
+      const threshold = main.getBoundingClientRect().top + offset + 72;
       const markers = Array.from(workspaceRef.current?.querySelectorAll<HTMLElement>('[data-inspection-anchor]') || [])
         .filter((element) => element.getClientRects().length && element.dataset.inspectionAnchor?.startsWith(`${active.id}/`));
       let current = '';
@@ -66,6 +75,10 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
     const schedule = () => { if (!frame) frame = requestAnimationFrame(update); };
     const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule);
     if (workspaceRef.current) resizeObserver?.observe(workspaceRef.current);
+    const guide = workspaceRef.current?.querySelector<HTMLElement>('[data-testid="inspection-navigation"]');
+    const stepHeader = workspaceRef.current?.querySelector<HTMLElement>('[data-testid="inspection-step-header"]');
+    if (guide) resizeObserver?.observe(guide);
+    if (stepHeader) resizeObserver?.observe(stepHeader);
     main.addEventListener('scroll', schedule, { passive: true });
     window.addEventListener('resize', schedule);
     schedule();
@@ -78,7 +91,9 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
     previousHash.current = location.hash;
     if (previousSection === location.hash.split('/')[0]) return;
     headingRef.current?.focus({ preventScroll: true });
-    headingRef.current?.scrollIntoView?.({ block: 'start', behavior: 'instant' });
+    // Align the whole workspace: on mobile the pinned guide sits above the
+    // heading, so scrolling the heading itself would hide the next step.
+    workspaceRef.current?.scrollIntoView?.({ block: 'start', behavior: 'instant' });
   }, [location.hash]);
 
   const go = (step: InspectionWorkspaceStep) => {
@@ -110,8 +125,8 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
 
   return <div ref={workspaceRef} data-testid="inspection-workspace" className="min-w-0 rounded-xl border border-neutral-200 bg-white lg:grid lg:grid-cols-[210px_minmax(0,1fr)] xl:grid-cols-[224px_minmax(0,1fr)]">
     <aside data-testid="inspection-navigation" className="sticky top-0 z-20 min-w-0 self-start border-b border-neutral-200 bg-white lg:static lg:self-stretch lg:border-b-0 lg:border-r lg:bg-neutral-50/50">
-      <button type="button" aria-label={`Ver todos los pasos · ${active.label}`} aria-expanded={indexOpen} aria-controls="inspection-step-index" onClick={() => setIndexOpen((open) => !open)} className="flex min-h-16 w-full items-center justify-between gap-3 px-4 py-3 text-left lg:hidden">
-        <span className="min-w-0 flex-1"><span className="block text-sm font-bold text-neutral-900">{guided && index >= 0 ? `Paso ${index + 1} de ${steps.length} · ` : ''}{active.label}</span><span data-testid="inspection-current-point" className="mt-1 block text-xs text-neutral-600">{visibleAnchor ? <><span className="block font-semibold text-neutral-800">{visibleAnchor.id} · {visibleAnchor.detail || 'Sin revisar'}</span><span className="block truncate">{visibleAnchor.label}</span></> : 'Inicio de la sección'}</span></span><span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-primary-800">Índice<ChevronDown size={17} className={`transition-transform ${indexOpen ? 'rotate-180' : ''}`} /></span>
+      <button type="button" aria-label={`Ver todos los pasos · ${active.label}`} aria-expanded={indexOpen} aria-controls="inspection-step-index" onClick={() => setIndexOpen((open) => !open)} className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-2 text-left lg:hidden">
+        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-neutral-900">{guided && index >= 0 ? `Paso ${index + 1} de ${steps.length} · ` : ''}{active.label}</span><span data-testid="inspection-current-point" className="mt-0.5 block truncate text-xs text-neutral-600">{visibleAnchor ? `${visibleAnchor.id} · ${visibleAnchor.detail || 'Sin revisar'} · ${visibleAnchor.label}` : 'Inicio de la sección'}</span></span><span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-primary-800">Índice<ChevronDown size={17} className={`transition-transform ${indexOpen ? 'rotate-180' : ''}`} /></span>
       </button>
       <nav id="inspection-step-index" aria-label={guided ? 'Pasos de la inspección' : 'Secciones del expediente'} className={`${indexOpen ? 'block' : 'hidden'} max-h-[55dvh] overflow-y-auto overscroll-contain px-3 pb-4 lg:sticky lg:top-0 lg:block lg:max-h-[calc(100dvh-7rem)] lg:py-5`}>
         <p className="hidden px-3 pb-3 text-xs font-semibold text-neutral-500 lg:block">{guided ? 'Completar inspección' : 'Consultar expediente'}</p>
@@ -127,12 +142,14 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
       </nav>
     </aside>
     <div className="min-w-0">
-      <header data-testid="inspection-step-header" className="border-b border-neutral-200 bg-white px-4 py-5 sm:px-6 sm:py-6 lg:sticky lg:top-0 lg:z-10">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs font-medium text-neutral-500"><span>{guided && index >= 0 ? `Paso ${index + 1} de ${steps.length}` : 'Consulta del expediente'}</span>{active.detail && <span>{active.detail}</span>}</div>
-        <h2 ref={headingRef} id="inspection-step-heading" tabIndex={-1} className="scroll-mt-24 text-xl font-extrabold tracking-tight text-neutral-900 outline-none sm:text-2xl">{active.title}</h2>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-neutral-600">{active.description}</p>
-        {guided && index >= 0 && <div role="progressbar" aria-label="Paso actual del recorrido" aria-valuemin={1} aria-valuemax={steps.length} aria-valuenow={index + 1} className="mt-4 h-1.5 overflow-hidden rounded-full bg-neutral-200"><span className="block h-full bg-primary-600 transition-[width]" style={{ width: `${(index + 1) / steps.length * 100}%` }} /></div>}
+      <header data-testid="inspection-step-header" className="border-b border-neutral-200 bg-white px-4 py-3 sm:px-6 lg:sticky lg:top-0 lg:z-20">
+        <div className="flex min-w-0 items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5"><span className="shrink-0 text-xs font-semibold text-neutral-500">{guided && index >= 0 ? `Paso ${index + 1} de ${steps.length}` : 'Expediente'}</span><h2 ref={headingRef} id="inspection-step-heading" tabIndex={-1} className="min-w-0 text-lg font-extrabold leading-snug tracking-tight text-neutral-900 outline-none sm:text-xl">{active.title}</h2></div>
+          {active.detail && <span className="hidden max-w-[38%] shrink-0 truncate text-right text-xs font-medium text-neutral-600 xl:block">{active.detail}</span>}
+        </div>
+        {guided && index >= 0 && <div role="progressbar" aria-label="Paso actual del recorrido" aria-valuemin={1} aria-valuemax={steps.length} aria-valuenow={index + 1} className="mt-2 h-1 overflow-hidden rounded-full bg-neutral-200"><span className="block h-full bg-primary-600 transition-[width]" style={{ width: `${(index + 1) / steps.length * 100}%` }} /></div>}
       </header>
+      <p className="border-b border-neutral-200 px-4 py-3 text-sm leading-relaxed text-neutral-600 sm:px-6">{active.description}</p>
       {/* Keep child drafts and selected files alive when navigating. Hidden panels
           are removed from layout and the accessibility tree, not from React. */}
       {all.map((step) => <section key={step.id} hidden={step.id !== active.id} aria-label={step.title} id={step.id === 'verificacion' ? undefined : step.id} data-testid={step.id === active.id ? 'inspection-step-content' : undefined} className="min-w-0 space-y-5 p-4 sm:p-6 [&>section]:shadow-none [&>div]:shadow-none">

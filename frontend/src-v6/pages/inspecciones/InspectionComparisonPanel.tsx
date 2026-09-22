@@ -28,6 +28,8 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, editable,
   const groups = useMemo(() => Array.from(new Set(comparisons.map((row) => row.categoria))), [comparisons]);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const initialHashRef = useRef(location.hash);
+  const alignedInitialAnchorRef = useRef(false);
   const [targetId, setTargetId] = useState<string | null>(null);
   const completed = comparisons.filter((row) => row.resultado !== 'PENDIENTE').length;
   const differences = comparisons.filter((row) => row.resultado === 'DIFIERE').length;
@@ -37,21 +39,38 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, editable,
   const linkedRowId = linkedRow?.id;
   const activeGroup = linkedRow?.categoria || (expandedGroup && groups.includes(expandedGroup) ? expandedGroup : groups[0] || null);
   const pending = comparisons.filter((row) => row.resultado === 'PENDIENTE');
+  const nextPendingAfter = (row: InspectionComparison) => {
+    const position = comparisons.indexOf(row);
+    return comparisons.slice(position + 1).find((entry) => entry.resultado === 'PENDIENTE')
+      || comparisons.slice(0, position).find((entry) => entry.resultado === 'PENDIENTE');
+  };
   const openComparison = (row?: InspectionComparison) => {
     if (!row) return;
     setExpandedGroup(row.categoria);
-    navigate({ pathname: location.pathname, search: location.search, hash: '#declaracion/' + encodeURIComponent(row.codigo) }, { replace: true });
-    requestAnimationFrame(() => document.getElementById('comparison-' + row.id)?.scrollIntoView?.({ block: 'start', behavior: 'instant' }));
+    const hash = '#declaracion/' + encodeURIComponent(row.codigo);
+    const align = () => document.getElementById('comparison-' + row.id)?.scrollIntoView?.({ block: 'start', behavior: 'instant' });
+    navigate({ pathname: location.pathname, search: location.search, hash }, { replace: true });
+    requestAnimationFrame(align);
+    // Selecting a native <select> may restore focus/scroll after React commits.
+    window.setTimeout(() => { if (window.location.hash === hash) align(); }, 120);
   };
   useEffect(() => {
     if (!linkedRowId) return;
-    const frame = requestAnimationFrame(() => document.getElementById('comparison-' + linkedRowId)?.scrollIntoView?.({ block: 'start', behavior: 'instant' }));
-    return () => cancelAnimationFrame(frame);
+    const align = () => document.getElementById('comparison-' + linkedRowId)?.scrollIntoView?.({ block: 'start', behavior: 'instant' });
+    const frame = requestAnimationFrame(align);
+    // A browser may restore its old scroll position after the React tree paints
+    // on reload. Only correct that initial deep link; a later timer must never
+    // pull the inspector away from a control they have already scrolled to.
+    const initialDeepLink = !alignedInitialAnchorRef.current && initialHashRef.current === location.hash;
+    alignedInitialAnchorRef.current = true;
+    const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+    const restoration = initialDeepLink && navigation?.type === 'reload' ? window.setTimeout(align, 120) : null;
+    return () => { cancelAnimationFrame(frame); if (restoration !== null) window.clearTimeout(restoration); };
   }, [linkedRowId, location.hash]);
   const resultLabel = (row: InspectionComparison) => row.resultado === 'PENDIENTE' ? 'Pendiente de validar' : 'Revisado · ' + (row.resultado === 'NO_APLICA' ? 'No aplica' : OPTIONS.find((option) => option.value === row.resultado)?.label || row.resultado);
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+    <section className="rounded-2xl border border-neutral-200 bg-white">
       {!embedded && <div className="border-b border-neutral-200 px-4 py-5 sm:px-6">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -80,12 +99,12 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, editable,
         const groupDone = rows.filter((row) => row.resultado !== 'PENDIENTE').length;
         return (
           <div key={group} className="border-b border-neutral-200 last:border-0">
-            <button type="button" aria-expanded={activeGroup === group} onClick={() => openComparison(rows[0])} className="flex min-h-14 w-full items-center justify-between gap-3 bg-neutral-50 px-4 py-3 text-left sm:px-6">
+            <button type="button" aria-expanded={activeGroup === group} onClick={() => openComparison(rows[0])} style={{ top: 'var(--inspection-middle-top, 0px)' }} className="sticky z-10 flex min-h-11 w-full items-center justify-between gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-2 text-left sm:px-6">
               <span className="flex min-w-0 flex-wrap items-center gap-2.5"><FileSearch size={19} className="shrink-0 text-primary-700" /><span className="font-bold text-[#10213A]">{group}</span><span className="text-xs font-semibold text-neutral-600">{groupDone}/{rows.length} revisados · {rows.length - groupDone} pendientes</span></span>
               {activeGroup === group ? <ChevronUp size={18} className="shrink-0" /> : <ChevronDown size={18} className="shrink-0" />}
             </button>
             {activeGroup === group && rows.map((row) => (
-              <article key={row.id} id={'comparison-' + row.id} data-inspection-anchor={'declaracion/' + row.codigo} data-result={row.resultado} className={`scroll-mt-24 border-t border-neutral-100 px-4 py-5 first:border-t-0 sm:px-6 ${row.resultado === 'DIFIERE' ? 'border-l-[3px] border-l-error-500 bg-error-50/30 pl-[13px] sm:pl-[21px]' : ''}`}>
+              <article key={row.id} id={'comparison-' + row.id} data-inspection-anchor={'declaracion/' + row.codigo} data-result={row.resultado} style={{ scrollMarginTop: 'var(--inspection-anchor-offset, 8rem)' }} className={`border-t border-neutral-100 px-4 py-5 first:border-t-0 sm:px-6 ${row.resultado === 'DIFIERE' ? 'border-l-[3px] border-l-error-500 bg-error-50/30 pl-[13px] sm:pl-[21px]' : ''}`}>
                 <div className="mb-3 flex min-w-0 flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="min-w-0 text-sm font-extrabold text-[#10213A]">{row.etiqueta}</p>
@@ -131,7 +150,7 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, editable,
                   </div>}
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <a href="#declaracion" onClick={(event) => { event.preventDefault(); document.getElementById('declaracion')?.scrollIntoView({ block: 'start' }); }} className="rounded-md px-2 py-3 text-xs font-semibold text-neutral-600 !no-underline hover:bg-neutral-100">Volver al índice de datos</a>
-                    <button type="button" disabled={!pending.length} onClick={() => openComparison(pending.find((entry) => entry.id !== row.id) || pending[0])} className="min-h-11 rounded-lg border border-primary-200 bg-primary-50 px-3 text-xs font-bold text-primary-800 disabled:bg-neutral-50 disabled:text-neutral-500">{pending.length ? 'Siguiente dato pendiente' : 'Datos revisados'}</button>
+                    <button type="button" disabled={!nextPendingAfter(row)} onClick={() => openComparison(nextPendingAfter(row))} className="min-h-11 rounded-lg border border-primary-200 bg-primary-50 px-3 text-xs font-bold text-primary-800 disabled:bg-neutral-50 disabled:text-neutral-500">{nextPendingAfter(row) ? 'Siguiente dato pendiente' : pending.length ? 'Último dato pendiente' : 'Datos revisados'}</button>
                   </div>
                 </div>
               </article>
