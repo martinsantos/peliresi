@@ -181,6 +181,40 @@ test('closed controls state their result in words and deep anchors resume the ex
   expect(await page.locator('html').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
 });
 
+test('inspection guide stays pinned and identifies the visible control during a long scroll', async ({ page }, testInfo) => {
+  const prefix = testInfo.project.name === 'mobile' ? '/mobile' : '';
+  await page.goto(`${prefix}/inspecciones/inspection-qa#checklist`);
+  await expect(page.getByRole('heading', { name: 'Checklist regulatorio' })).toBeVisible();
+  const iconHref = await page.locator('link[rel="icon"]').getAttribute('href');
+  expect(iconHref).toBe('/favicon.svg');
+  const iconResponse = await page.request.get(iconHref!);
+  expect(iconResponse.ok()).toBe(true);
+  expect(iconResponse.headers()['content-type']).toContain('image/svg+xml');
+  const main = page.locator('main');
+  await main.evaluate((element) => { element.scrollTop = Math.min(1500, element.scrollHeight - element.clientHeight); });
+  await expect.poll(() => main.evaluate((element) => element.scrollTop)).toBeGreaterThan(400);
+  const compact = page.viewportSize()!.width < 1024;
+  const guide = compact ? page.getByTestId('inspection-navigation') : page.locator('#inspection-step-index');
+  const positions = await page.evaluate(() => {
+    const mainRect = document.querySelector('main')!.getBoundingClientRect();
+    const navRect = document.querySelector(window.innerWidth < 1024 ? '[data-testid="inspection-navigation"]' : '#inspection-step-index')!.getBoundingClientRect();
+    const headingRect = document.querySelector('[data-testid="inspection-step-header"]')!.getBoundingClientRect();
+    return { mainTop: mainRect.top, navTop: navRect.top, navBottom: navRect.bottom, headingTop: headingRect.top, headingBottom: headingRect.bottom };
+  });
+  expect(positions.navTop).toBeGreaterThanOrEqual(positions.mainTop - 6);
+  expect(positions.navTop).toBeLessThanOrEqual(positions.mainTop + 6);
+  expect(positions.navBottom).toBeGreaterThan(positions.mainTop + 40);
+  if (!compact) {
+    expect(positions.headingTop).toBeGreaterThanOrEqual(positions.mainTop - 6);
+    expect(positions.headingTop).toBeLessThanOrEqual(positions.mainTop + 6);
+    expect(positions.headingBottom).toBeGreaterThan(positions.mainTop + 72);
+  }
+  await expect(guide).toBeInViewport();
+  const current = compact ? page.getByTestId('inspection-current-point') : page.getByTestId('inspection-current-point-desktop');
+  await expect(current).toContainText(/(DOC|GEN|HAB|SEG|TRZ)-\d/);
+  await page.screenshot({ path: `/tmp/sitrep-inspection-pinned-${testInfo.project.name}.png` });
+});
+
 for (const layout of ['project viewport', '600px web'] as const) {
   test(`comparison index remains reachable after scrolling and restores an exact point at ${layout}`, async ({ page }, testInfo) => {
     test.skip(layout === '600px web' && testInfo.project.name === 'mobile', 'The narrow web layout is covered by the desktop browser project.');
@@ -280,6 +314,12 @@ for (const layout of ['project layout', '390px web', '600px web', 'PWA'] as cons
 
     await page.goto(path);
     await expect(page.getByRole('heading', { name: 'Preparar la inspección' })).toBeVisible();
+    if (layout === 'PWA') {
+      await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/app/favicon.svg');
+      const icon = await page.request.get('/app/favicon.svg');
+      expect(icon.ok()).toBe(true);
+      expect(icon.headers()['content-type']).toContain('image/svg+xml');
+    }
     await assertGeometry(false);
     await openSection(page, 'checklist');
     const item = await openEmergencyControl(page);

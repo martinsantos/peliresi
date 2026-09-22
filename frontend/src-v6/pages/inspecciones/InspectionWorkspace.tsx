@@ -29,6 +29,8 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
   const location = useLocation();
   const navigate = useNavigate();
   const [indexOpen, setIndexOpen] = useState(false);
+  const [visibleAnchorKey, setVisibleAnchorKey] = useState<string | null>(null);
+  const workspaceRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const previousHash = useRef(location.hash);
   const all = [...steps, ...reference];
@@ -38,6 +40,37 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
     || all.find((step) => step.id === defaultStep) || steps[0];
   const index = steps.findIndex((step) => step.id === active.id);
   const selectedAnchor = active.anchors?.find((anchor) => anchor.id === hash.split('/').slice(1).join('/'));
+  const visibleAnchor = visibleAnchorKey === null ? selectedAnchor : active.anchors?.find((anchor) => `${active.id}/${anchor.id}` === visibleAnchorKey);
+  const anchorIds = active.anchors?.map((anchor) => anchor.id).join('|') || '';
+
+  // The application scrolls <main>, not window. Track the control as it enters
+  // the readable area below the pinned guide, without interrupting typing.
+  useEffect(() => {
+    const main = workspaceRef.current?.closest('main');
+    if (!main || !anchorIds) return;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const guide = workspaceRef.current?.querySelector<HTMLElement>('[data-testid="inspection-navigation"]');
+      const compact = window.matchMedia('(max-width: 1023px)').matches;
+      const threshold = main.getBoundingClientRect().top + (compact ? (guide?.getBoundingClientRect().height || 0) + 32 : 112);
+      const markers = Array.from(workspaceRef.current?.querySelectorAll<HTMLElement>('[data-inspection-anchor]') || [])
+        .filter((element) => element.getClientRects().length && element.dataset.inspectionAnchor?.startsWith(`${active.id}/`));
+      let current = '';
+      for (const marker of markers) {
+        if (marker.getBoundingClientRect().top > threshold) break;
+        current = marker.dataset.inspectionAnchor || '';
+      }
+      setVisibleAnchorKey((previous) => previous === current ? previous : current);
+    };
+    const schedule = () => { if (!frame) frame = requestAnimationFrame(update); };
+    const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule);
+    if (workspaceRef.current) resizeObserver?.observe(workspaceRef.current);
+    main.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    schedule();
+    return () => { resizeObserver?.disconnect(); main.removeEventListener('scroll', schedule); window.removeEventListener('resize', schedule); if (frame) cancelAnimationFrame(frame); };
+  }, [active.id, anchorIds]);
 
   useEffect(() => {
     if (previousHash.current === location.hash) return;
@@ -75,15 +108,16 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
     </a>;
   };
 
-  return <div data-testid="inspection-workspace" className="min-w-0 overflow-clip rounded-xl border border-neutral-200 bg-white lg:grid lg:grid-cols-[210px_minmax(0,1fr)] xl:grid-cols-[224px_minmax(0,1fr)]">
+  return <div ref={workspaceRef} data-testid="inspection-workspace" className="min-w-0 rounded-xl border border-neutral-200 bg-white lg:grid lg:grid-cols-[210px_minmax(0,1fr)] xl:grid-cols-[224px_minmax(0,1fr)]">
     <aside data-testid="inspection-navigation" className="sticky top-0 z-20 min-w-0 self-start border-b border-neutral-200 bg-white lg:static lg:self-stretch lg:border-b-0 lg:border-r lg:bg-neutral-50/50">
-      <button type="button" aria-expanded={indexOpen} aria-controls="inspection-step-index" onClick={() => setIndexOpen((open) => !open)} className="flex min-h-16 w-full items-center justify-between gap-3 px-4 py-3 text-left lg:hidden">
-        <span className="min-w-0 flex-1"><span className="block text-sm font-bold text-neutral-900">{guided && index >= 0 ? `Paso ${index + 1} de ${steps.length} · ` : ''}{active.label}</span><span className="mt-1 block text-xs text-neutral-600">{indexOpen ? 'Ocultar índice' : 'Ver todos los pasos'}</span></span><ChevronDown size={18} className={`shrink-0 transition-transform ${indexOpen ? 'rotate-180' : ''}`} />
+      <button type="button" aria-label={`Ver todos los pasos · ${active.label}`} aria-expanded={indexOpen} aria-controls="inspection-step-index" onClick={() => setIndexOpen((open) => !open)} className="flex min-h-16 w-full items-center justify-between gap-3 px-4 py-3 text-left lg:hidden">
+        <span className="min-w-0 flex-1"><span className="block text-sm font-bold text-neutral-900">{guided && index >= 0 ? `Paso ${index + 1} de ${steps.length} · ` : ''}{active.label}</span><span data-testid="inspection-current-point" className="mt-1 block text-xs text-neutral-600">{visibleAnchor ? <><span className="block font-semibold text-neutral-800">{visibleAnchor.id} · {visibleAnchor.detail || 'Sin revisar'}</span><span className="block truncate">{visibleAnchor.label}</span></> : 'Inicio de la sección'}</span></span><span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-primary-800">Índice<ChevronDown size={17} className={`transition-transform ${indexOpen ? 'rotate-180' : ''}`} /></span>
       </button>
       <nav id="inspection-step-index" aria-label={guided ? 'Pasos de la inspección' : 'Secciones del expediente'} className={`${indexOpen ? 'block' : 'hidden'} max-h-[55dvh] overflow-y-auto overscroll-contain px-3 pb-4 lg:sticky lg:top-0 lg:block lg:max-h-[calc(100dvh-7rem)] lg:py-5`}>
         <p className="hidden px-3 pb-3 text-xs font-semibold text-neutral-500 lg:block">{guided ? 'Completar inspección' : 'Consultar expediente'}</p>
+        {!!active.anchors?.length && <p data-testid="inspection-current-point-desktop" className="mb-3 hidden rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-xs leading-snug text-primary-900 lg:block"><span className="block font-bold">Ahora · {active.label}</span><span className="mt-1 block">{visibleAnchor ? `${visibleAnchor.id} · ${visibleAnchor.label}` : 'Inicio de la sección'}</span>{visibleAnchor?.detail && <span className="mt-1 block font-semibold">{visibleAnchor.detail}</span>}</p>}
         {!!active.anchors?.length && <label className="mb-3 block px-1 text-xs font-semibold text-neutral-700">Ir a un punto de {active.label}
-          <select aria-label={`Ir a un punto de ${active.label}`} value={selectedAnchor?.id || ''} onChange={(event) => goToAnchor(event.target.value)} className="mt-2 min-h-11 w-full min-w-0 rounded-lg border border-neutral-300 bg-white px-2 text-sm font-normal text-neutral-900">
+          <select aria-label={`Ir a un punto de ${active.label}`} value={visibleAnchor?.id || ''} onChange={(event) => goToAnchor(event.target.value)} className="mt-2 min-h-11 w-full min-w-0 rounded-lg border border-neutral-300 bg-white px-2 text-sm font-normal text-neutral-900">
             <option value="" disabled>Elegir control · {active.anchors.length} puntos</option>
             {active.anchors.map((anchor, i) => <option key={anchor.id} value={anchor.id}>{i + 1}. {anchor.id} · {anchor.detail} · {anchor.label}</option>)}
           </select>
@@ -93,7 +127,7 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
       </nav>
     </aside>
     <div className="min-w-0">
-      <header className="border-b border-neutral-200 px-4 py-5 sm:px-6 sm:py-6">
+      <header data-testid="inspection-step-header" className="border-b border-neutral-200 bg-white px-4 py-5 sm:px-6 sm:py-6 lg:sticky lg:top-0 lg:z-10">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs font-medium text-neutral-500"><span>{guided && index >= 0 ? `Paso ${index + 1} de ${steps.length}` : 'Consulta del expediente'}</span>{active.detail && <span>{active.detail}</span>}</div>
         <h2 ref={headingRef} id="inspection-step-heading" tabIndex={-1} className="scroll-mt-24 text-xl font-extrabold tracking-tight text-neutral-900 outline-none sm:text-2xl">{active.title}</h2>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-neutral-600">{active.description}</p>
