@@ -584,6 +584,11 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
   const linkedItemId = linkedItem?.id;
   const activeItem = linkedItem?.id ?? expandedItem ?? items.find((item) => item.resultado === 'PENDIENTE')?.id ?? items[0]?.id;
   const remaining = items.filter((item) => item.resultado === 'PENDIENTE');
+  const nextPendingAfter = (item?: InspectionItem) => {
+    const position = item ? items.indexOf(item) : -1;
+    return items.slice(position + 1).find((entry) => entry.resultado === 'PENDIENTE')
+      || items.slice(0, position).find((entry) => entry.resultado === 'PENDIENTE');
+  };
   const itemStatus = (item: InspectionItem) => item.resultado === 'PENDIENTE' ? 'Pendiente' : item.resultado === 'CUMPLE' ? 'Revisado · Cumple' : item.resultado === 'NO_CUMPLE' ? 'Revisado · No cumple' : 'Revisado · No aplica';
   const openControl = (item?: InspectionItem) => {
     setExpandedItem(item?.id || '');
@@ -598,7 +603,7 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
   const [expandedEvidence, setExpandedEvidence] = useState<string[]>([]);
   const updateItem = (id: string, patch: Partial<InspectionItem>) => setItems((rows) => rows.map((row) => row.id === id ? { ...row, ...patch } : row));
 
-  return <section className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
+  return <section className="rounded-xl border border-neutral-200 bg-white">
     <div className="border-b border-neutral-200 px-4 py-4 sm:px-6">
       <div className="flex items-start justify-between gap-4">
         <p className="text-sm font-semibold text-neutral-700">{completed} de {items.length} revisados</p>
@@ -607,7 +612,7 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-neutral-200"><span className="block h-full rounded-full bg-primary-600 transition-[width] duration-200" style={{ width: `${Math.round((completed / Math.max(1, items.length)) * 100)}%` }} /></div>
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
         <label className="min-w-0 flex-1 text-xs font-semibold text-neutral-700">Ir a un control<select aria-label="Ir a un control" value={activeItem || ''} onChange={(event) => openControl(items.find((item) => item.id === event.target.value))} className="mt-1.5 h-11 w-full min-w-0 rounded-lg border border-neutral-300 bg-white px-2 text-sm font-normal"><option value="">Índice de controles</option>{groups.map((group) => <optgroup key={group} label={group}>{items.filter((item) => item.categoria === group).map((item) => <option key={item.id} value={item.id}>{items.indexOf(item) + 1}. {item.codigo} · {itemStatus(item)} · {item.etiqueta}</option>)}</optgroup>)}</select></label>
-        <Button variant="outline" disabled={!remaining.length} onClick={() => openControl(remaining.find((item) => item.id !== activeItem) || remaining[0])}>{remaining.length ? 'Ir al siguiente pendiente (' + remaining.length + ')' : 'Todos revisados'}</Button>
+        <Button variant="outline" disabled={!nextPendingAfter(items.find((item) => item.id === activeItem))} onClick={() => openControl(nextPendingAfter(items.find((item) => item.id === activeItem)))}>{nextPendingAfter(items.find((item) => item.id === activeItem)) ? 'Ir al siguiente pendiente (' + remaining.length + ')' : remaining.length ? 'Último control pendiente' : 'Todos revisados'}</Button>
       </div>
     </div>
     {groups.map((group) => {
@@ -615,9 +620,9 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
       const groupCompleted = groupItems.filter((item) => item.resultado !== 'PENDIENTE').length;
       const groupFails = groupItems.filter((item) => item.resultado === 'NO_CUMPLE').length;
       return <div key={group} className="border-b border-neutral-200 last:border-0">
-        <div className="flex items-center justify-between gap-3 bg-neutral-50 px-4 py-3 sm:px-6">
+        <div style={{ top: 'var(--inspection-middle-top, 0px)' }} className="sticky z-10 flex min-h-11 items-center justify-between gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-2 sm:px-6">
           <p className="font-bold text-[#10213A]">{group}</p>
-          <div className="text-right text-xs font-semibold text-neutral-600"><span className="block">{groupCompleted}/{groupItems.length} revisados</span><span className={groupCompleted === groupItems.length ? 'text-success-800' : 'text-warning-800'}>{groupItems.length - groupCompleted} pendientes</span>{groupFails > 0 && <span className="block text-error-800">{groupFails} {groupFails === 1 ? 'no cumple' : 'no cumplen'}</span>}</div>
+          <div className="text-right text-xs font-semibold text-neutral-600"><span>{groupCompleted}/{groupItems.length} revisados</span><span className={groupCompleted === groupItems.length ? 'text-success-800' : 'text-warning-800'}> · {groupItems.length - groupCompleted} pendientes</span>{groupFails > 0 && <span className="text-error-800"> · {groupFails} {groupFails === 1 ? 'no cumple' : 'no cumplen'}</span>}</div>
         </div>
         {groupItems.map((item) => {
           const isFail = item.resultado === 'NO_CUMPLE';
@@ -628,7 +633,7 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
           const showObservation = isFail || Boolean(item.observacion) || itemEvidence.length > 0 || pendingItemEvidence.length > 0 || expandedNotes.includes(item.id);
           const expanded = activeItem === item.id;
           const inlineSave = editable && <div data-testid={'inspection-item-save-' + item.id} className="mt-3 space-y-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0 flex-1"><DraftSaveFeedback status={saveStatus} /><p className="mt-1 text-xs text-neutral-600">Guarda los cambios del borrador completo, incluido este comentario. No cambia la etapa.</p></div><Button leftIcon={<Save size={16} />} isLoading={saving} disabled={saveDisabled} onClick={() => { void onSave(); }}>Guardar cambios</Button></div>{pendingItemEvidence.length > 0 && <p className="text-xs font-semibold text-warning-900">{pendingItemEvidence.length} {pendingItemEvidence.length === 1 ? 'foto pendiente' : 'fotos pendientes'} de sincronizar. Guardar texto no confirma la carga de imágenes.</p>}</div>;
-          return <div key={item.id} id={'control-' + item.id} data-inspection-anchor={'checklist/' + item.codigo} data-result={item.resultado} className={`scroll-mt-24 border-t border-neutral-100 px-3 py-1 first:border-0 sm:px-5 ${isFail ? 'border-l-[3px] border-l-error-500 bg-error-50/30' : ''}`}>
+          return <div key={item.id} id={'control-' + item.id} data-inspection-anchor={'checklist/' + item.codigo} data-result={item.resultado} style={{ scrollMarginTop: 'var(--inspection-anchor-offset, 8rem)' }} className={`border-t border-neutral-100 px-3 py-1 first:border-0 sm:px-5 ${isFail ? 'border-l-[3px] border-l-error-500 bg-error-50/30' : ''}`}>
             <button type="button" aria-expanded={expanded} aria-controls={'control-detail-' + item.id} onClick={() => openControl(expanded ? undefined : item)} className="flex min-h-16 w-full items-start gap-3 rounded-lg py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
               <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${item.resultado === 'CUMPLE' ? 'bg-success-100 text-success-700' : isFail ? 'bg-error-100 text-error-700' : item.resultado === 'NO_APLICA' ? 'bg-neutral-200 text-neutral-700' : 'border border-neutral-300 bg-white text-neutral-600'}`}>{item.resultado === 'CUMPLE' ? <Check size={16} /> : isFail ? <XCircle size={16} /> : item.resultado === 'NO_APLICA' ? <CircleMinus size={16} /> : <span className="text-xs font-bold">{items.indexOf(item) + 1}</span>}</div>
               <div className="min-w-0 flex-1"><p className="text-sm font-semibold leading-relaxed text-[#10213A]">{item.etiqueta}</p><div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1"><span className="text-xs font-medium text-neutral-500">{items.indexOf(item) + 1}/{items.length} · {item.codigo}</span><span data-testid={'inspection-item-status-' + item.id} className={'rounded-md px-2 py-1 text-xs font-semibold ' + (item.resultado === 'PENDIENTE' ? 'bg-warning-50 text-warning-900' : isFail ? 'bg-error-50 text-error-800' : item.resultado === 'CUMPLE' ? 'bg-success-50 text-success-800' : 'bg-neutral-100 text-neutral-700')}>{itemStatus(item)}</span>{item.observacion && <span className="text-xs text-neutral-600">Con observación</span>}{itemEvidence.length + pendingItemEvidence.length > 0 && <span className="text-xs text-neutral-600">{itemEvidence.length + pendingItemEvidence.length} adjuntos</span>}</div></div>
@@ -663,7 +668,7 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
                 {editable && <p className="mt-1.5 text-xs leading-relaxed text-neutral-500">Use la cámara o elija una imagen del dispositivo. Máximo 25 MB; también quedará en Evidencias del expediente.</p>}
               </div>}
               {!showObservation && inlineSave}
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 pt-3"><a href="#checklist" onClick={(event) => { event.preventDefault(); document.getElementById('checklist')?.scrollIntoView({ block: 'start' }); }} className="rounded-md px-2 py-2 text-xs font-semibold text-neutral-600 !no-underline hover:bg-neutral-100">Volver al índice de controles</a><button type="button" disabled={!remaining.length} onClick={() => openControl(remaining.find((row) => row.id !== item.id) || remaining[0])} className="min-h-11 rounded-lg border border-primary-200 bg-primary-50 px-3 text-xs font-bold text-primary-800 disabled:bg-neutral-50 disabled:text-neutral-500">{remaining.length ? 'Siguiente pendiente' : 'Checklist revisado'}</button></div>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 pt-3"><a href="#checklist" onClick={(event) => { event.preventDefault(); document.getElementById('checklist')?.scrollIntoView({ block: 'start' }); }} className="rounded-md px-2 py-2 text-xs font-semibold text-neutral-600 !no-underline hover:bg-neutral-100">Volver al índice de controles</a><button type="button" disabled={!nextPendingAfter(item)} onClick={() => openControl(nextPendingAfter(item))} className="min-h-11 rounded-lg border border-primary-200 bg-primary-50 px-3 text-xs font-bold text-primary-800 disabled:bg-neutral-50 disabled:text-neutral-500">{nextPendingAfter(item) ? 'Siguiente pendiente' : remaining.length ? 'Último control pendiente' : 'Checklist revisado'}</button></div>
             </div>}
           </div>;
         })}
