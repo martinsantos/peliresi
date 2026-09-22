@@ -69,6 +69,19 @@ const closedInspection = {
   ],
 };
 
+const reviewInspection = {
+  ...inspection,
+  id: 'inspection-review',
+  numero: 'I-2026-000003',
+  numeroActa: 'ACTA-QA-003',
+  estado: 'EN_REVISION',
+  version: 5,
+  datosActa: { atendidoPor: 'Responsable de planta', motivoInspeccion: 'Control programado' },
+  informeTecnico: { objetivo: 'Evaluar la situación constatada en campo.' },
+  items: inspection.items.map((item) => ({ ...item, resultado: item.resultado === 'PENDIENTE' ? 'CUMPLE' : item.resultado })),
+  comparaciones: inspection.comparaciones.map((row) => ({ ...row, resultado: row.resultado === 'PENDIENTE' ? 'COINCIDE' : row.resultado })),
+};
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('sitrep_access_token', 'qa-access-token');
@@ -209,6 +222,42 @@ test('inspector can attach an image to one checklist comment without losing the 
   await page.evaluate(() => { window.dispatchEvent(new Event('online')); window.dispatchEvent(new Event('online')); });
   await page.waitForTimeout(250);
   expect(successfulUploads).toBe(1);
+});
+
+test('review keeps the field act frozen while versioning the later technical report', async ({ page }, testInfo) => {
+  const mobile = testInfo.project.name === 'mobile';
+  const state = structuredClone(reviewInspection);
+  let savedBody: { version: number; informeTecnico: { evaluacion?: string } } | null = null;
+
+  await page.route('**/api/inspecciones/inspection-review**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() === 'GET' && url.pathname === '/api/inspecciones/inspection-review') {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: state }) });
+    }
+    if (request.method() === 'PATCH' && url.pathname.endsWith('/informe-tecnico')) {
+      savedBody = request.postDataJSON();
+      state.informeTecnico = savedBody!.informeTecnico as typeof state.informeTecnico;
+      state.version += 1;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: state }) });
+    }
+    return route.fallback();
+  });
+
+  await page.goto(mobile ? '/mobile/inspecciones/inspection-review' : '/inspecciones/inspection-review');
+  await page.getByText('Acta de inspección / constatación').click();
+  await expect(page.getByLabel('Atendido por')).toBeDisabled();
+  await page.getByText('Informe técnico', { exact: true }).click();
+  await expect(page.getByLabel('1. Objetivo')).toBeEnabled();
+  await page.getByLabel('3. Evaluación').fill('La evaluación contrasta el acta, el checklist y las evidencias preservadas.');
+  await page.getByRole('button', { name: 'Guardar informe técnico' }).click();
+
+  await expect.poll(() => savedBody).not.toBeNull();
+  expect(savedBody).toEqual({
+    version: 5,
+    informeTecnico: expect.objectContaining({ evaluacion: 'La evaluación contrasta el acta, el checklist y las evidencias preservadas.' }),
+  });
+  await expect(page.getByText(/sin modificar el acta de campo/i)).toBeVisible();
 });
 
 test('inspector annuls a mistaken photo with a mandatory reason while preserving its trace', async ({ page }, testInfo) => {

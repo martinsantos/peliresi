@@ -34,7 +34,8 @@ vi.mock('../../services/inspectionDeclaredSnapshot.service', () => ({
   buildDeclaredInspectionSnapshot: vi.fn(),
   ensureInspectionDeclaredComparisons: vi.fn(),
 }));
-vi.mock('../../services/inspectionActPdf.service', () => ({ streamInspectionActPdf: vi.fn() }));
+vi.mock('../../services/inspectionActPdf.service', () => ({ streamInspectionTechnicalReportPdf: vi.fn() }));
+vi.mock('../../services/inspectionFieldActPdf.service', () => ({ streamInspectionActPdf: vi.fn() }));
 
 import { anularEvidencia, subirEvidencia } from '../../controllers/inspeccion.controller';
 

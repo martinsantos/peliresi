@@ -478,6 +478,8 @@ model Inspeccion {
   plazoRespuestaAt  DateTime?
   observaciones     String?
   declaradoSnapshot Json?
+  datosActa         Json?
+  informeTecnico    Json?
   version           Int                 @default(1)
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt

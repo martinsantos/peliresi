@@ -84,5 +84,8 @@ test.describe('read-only production API contract', () => {
     const inspectionPdf = await request.get(`/api/inspecciones/${inspection.id}/acta.pdf`, { headers });
     expect(inspectionPdf.status()).toBe(200);
     expect(inspectionPdf.headers()['content-type']).toContain('application/pdf');
+    const technicalReportPdf = await request.get(`/api/inspecciones/${inspection.id}/informe-tecnico.pdf`, { headers });
+    expect(technicalReportPdf.status()).toBe(200);
+    expect(technicalReportPdf.headers()['content-type']).toContain('application/pdf');
   });
 });

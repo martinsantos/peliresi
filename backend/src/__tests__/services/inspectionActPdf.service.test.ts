@@ -3,7 +3,7 @@ import os from 'os';
 import path from 'path';
 import { PassThrough } from 'stream';
 import { describe, expect, it } from 'vitest';
-import { streamInspectionActPdf } from '../../services/inspectionActPdf.service';
+import { streamInspectionTechnicalReportPdf } from '../../services/inspectionActPdf.service';
 
 const pixelPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
 
@@ -32,7 +32,7 @@ describe('inspection act PDF', () => {
       motivoAnulacion: index === 1 ? 'La toma quedó movida; se conserva pero no integra la conclusión.' : null,
     }));
 
-    await streamInspectionActPdf(stream as any, {
+    await streamInspectionTechnicalReportPdf(stream as any, {
       id: 'inspection-1', numero: 'I-2026-000001', numeroActa: 'ACTA-001', version: 4,
       tipoActor: 'GENERADOR', estado: 'EN_REVISION', inspectorId: 'user-1',
       inspector: { nombre: 'Inspectora', apellido: 'QA' },
@@ -40,6 +40,14 @@ describe('inspection act PDF', () => {
       fechaProgramada: new Date('2026-09-20T12:00:00Z'), iniciadaAt: new Date('2026-09-20T12:05:00Z'),
       cerradaCampoAt: new Date('2026-09-20T13:00:00Z'), plazoRespuestaAt: null, createdAt: new Date('2026-09-20T11:00:00Z'), updatedAt: new Date('2026-09-20T13:00:00Z'),
       ubicacion: 'Planta de prueba', observaciones: `Inspección de prueba sin datos personales reales. ${'Detalle operativo '.repeat(80)}${longTail}`,
+      informeTecnico: {
+        expedienteElectronico: 'EX-DEMO-0001',
+        objetivo: 'Evaluar el cumplimiento documentado durante una inspección sintética.',
+        antecedentes: 'Antecedente sintético sin datos personales.',
+        evaluacion: `Evaluación técnica completa. ${longTail}`,
+        conclusion: 'Conclusión técnica redactada y validable.',
+        recomendacion: 'Remitir junto con el acta para dictamen.',
+      },
       comparaciones: [{ id: 'comparison-1', codigo: 'DOM-01', etiqueta: 'Domicilio', valorDeclarado: 'Mendoza', valorObservado: 'Mendoza', resultado: 'COINCIDE', observacion: `Observación completa. ${longTail}`, evidencias: [] }],
       items: [{ id: 'item-1', codigo: 'SEG-01', etiqueta: 'Libro disponible', resultado: 'NO_CUMPLE', observacion: `Hallazgo completo. ${longTail}`, evidencias: photos.slice(0, 2) }],
       evidencias: photos,

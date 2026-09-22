@@ -21,7 +21,8 @@ import {
   buildDeclaredInspectionSnapshot,
   ensureInspectionDeclaredComparisons,
 } from '../services/inspectionDeclaredSnapshot.service';
-import { streamInspectionActPdf } from '../services/inspectionActPdf.service';
+import { streamInspectionActPdf } from '../services/inspectionFieldActPdf.service';
+import { streamInspectionTechnicalReportPdf } from '../services/inspectionActPdf.service';
 import { inspectionEvidenceMetadataSchema } from '../domain/inspectionEvidence';
 
 type ChecklistDefinition = { codigo: string; categoria: string; etiqueta: string; orden: number; obligatorio?: boolean };
@@ -60,9 +61,9 @@ export const CHECKLIST_BY_ACTOR: Record<TipoActorInspeccion, ChecklistDefinition
 
 const inspectionInclude = {
   inspector: { select: { id: true, nombre: true, apellido: true, email: true, esInspector: true } },
-  generador: { select: { id: true, razonSocial: true, cuit: true, domicilio: true, activo: true } },
-  transportista: { select: { id: true, razonSocial: true, cuit: true, domicilio: true, activo: true } },
-  operador: { select: { id: true, razonSocial: true, cuit: true, domicilio: true, activo: true } },
+  generador: { select: { id: true, razonSocial: true, cuit: true, domicilio: true, telefono: true, email: true, activo: true } },
+  transportista: { select: { id: true, razonSocial: true, cuit: true, domicilio: true, telefono: true, email: true, activo: true } },
+  operador: { select: { id: true, razonSocial: true, cuit: true, domicilio: true, telefono: true, email: true, representanteLegalNombre: true, representanteLegalDNI: true, activo: true } },
   items: {
     orderBy: [{ categoria: 'asc' as const }, { orden: 'asc' as const }],
     include: { evidencias: { orderBy: { createdAt: 'desc' as const }, include: { anuladaPor: { select: { id: true, nombre: true, apellido: true } } } } },
@@ -97,6 +98,38 @@ const createSchema = z.object({
   observaciones: z.string().trim().max(10_000).optional().nullable(),
 });
 
+const actaDataSchema = z.object({
+  codigoPostal: z.string().trim().max(20).optional(),
+  departamento: z.string().trim().max(120).optional(),
+  calle: z.string().trim().max(200).optional(),
+  numeroDomicilio: z.string().trim().max(40).optional(),
+  titular: z.string().trim().max(200).optional(),
+  dniTitular: z.string().trim().max(40).optional(),
+  atendidoPor: z.string().trim().max(200).optional(),
+  dniAtendido: z.string().trim().max(40).optional(),
+  cargoAtendido: z.string().trim().max(120).optional(),
+  area: z.string().trim().max(160).optional(),
+  lugarAfectacion: z.string().trim().max(500).optional(),
+  motivoInspeccion: z.string().trim().max(500).optional(),
+  infraestructura: z.enum(['SI', 'NO', 'NO_VERIFICADO']).optional(),
+  detalleInfraestructura: z.string().trim().max(2_000).optional(),
+  estadoInfraestructura: z.string().trim().max(1_000).optional(),
+  generacion: z.string().trim().max(1_000).optional(),
+  requerimientos: z.string().trim().max(5_000).optional(),
+  actaAnterior: z.string().trim().max(120).optional(),
+  plazoDescargoDias: z.number().int().min(0).max(365).optional(),
+}).strict();
+
+const technicalReportSchema = z.object({
+  expedienteElectronico: z.string().trim().max(300).optional(),
+  referencias: z.string().trim().max(5_000).optional(),
+  objetivo: z.string().trim().max(5_000).optional(),
+  antecedentes: z.string().trim().max(20_000).optional(),
+  evaluacion: z.string().trim().max(30_000).optional(),
+  conclusion: z.string().trim().max(20_000).optional(),
+  recomendacion: z.string().trim().max(10_000).optional(),
+}).strict();
+
 const updateSchema = z.object({
   version: z.number().int().positive(),
   numeroActa: z.string().trim().max(80).optional().nullable(),
@@ -106,6 +139,13 @@ const updateSchema = z.object({
   fechaProgramada: z.string().datetime().optional().nullable(),
   plazoRespuestaAt: z.string().datetime().optional().nullable(),
   observaciones: z.string().trim().max(10_000).optional().nullable(),
+  datosActa: actaDataSchema.optional().nullable(),
+  informeTecnico: technicalReportSchema.optional().nullable(),
+});
+
+const technicalReportUpdateSchema = z.object({
+  version: z.number().int().positive(),
+  informeTecnico: technicalReportSchema.nullable(),
 });
 
 const itemSchema = z.object({
@@ -426,11 +466,13 @@ export async function actualizarInspeccion(req: AuthRequest, res: Response, next
     const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, select: { inspectorId: true, estado: true, version: true } });
     if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
     assertCanEdit(req, inspection);
-    const { version, ...fields } = input;
+    const { version, datosActa, informeTecnico, ...fields } = input;
     const result = await prisma.inspeccion.updateMany({
       where: { id: req.params.id, version },
       data: {
         ...fields,
+        datosActa: datosActa === undefined ? undefined : datosActa === null ? Prisma.DbNull : datosActa as Prisma.InputJsonValue,
+        informeTecnico: informeTecnico === undefined ? undefined : informeTecnico === null ? Prisma.DbNull : informeTecnico as Prisma.InputJsonValue,
         fechaProgramada: fields.fechaProgramada === undefined ? undefined : fields.fechaProgramada ? new Date(fields.fechaProgramada) : null,
         plazoRespuestaAt: fields.plazoRespuestaAt === undefined ? undefined : fields.plazoRespuestaAt ? new Date(fields.plazoRespuestaAt) : null,
         version: { increment: 1 },
@@ -438,6 +480,53 @@ export async function actualizarInspeccion(req: AuthRequest, res: Response, next
     });
     if (result.count !== 1) throw new AppError('La inspeccion fue modificada en otro dispositivo. Actualice antes de continuar.', 409);
     const full = await prisma.inspeccion.findUniqueOrThrow({ where: { id: req.params.id }, include: inspectionInclude });
+    res.json({ success: true, data: full });
+  } catch (error) { next(error); }
+}
+
+export async function actualizarInformeTecnico(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const input = technicalReportUpdateSchema.parse(req.body);
+    const inspection = await prisma.inspeccion.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, inspectorId: true, estado: true, version: true, tipoActor: true },
+    });
+    if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
+    assertInspectionStaff(req);
+    const assignedInspector = inspection.inspectorId === req.user.id;
+    const sectorReviewer = isSectorReviewer(req.user, inspection.tipoActor);
+    if (!assignedInspector && !sectorReviewer) {
+      throw new AppError('Solo el inspector asignado o el administrador competente puede completar el informe tecnico', 403);
+    }
+    if (inspection.estado !== 'EN_REVISION') {
+      throw new AppError('El informe tecnico posterior solo puede editarse durante la revision del expediente', 409);
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const updated = await tx.inspeccion.updateMany({
+        where: { id: inspection.id, version: input.version, estado: 'EN_REVISION' },
+        data: {
+          informeTecnico: input.informeTecnico === null ? Prisma.DbNull : input.informeTecnico as Prisma.InputJsonValue,
+          version: { increment: 1 },
+        },
+      });
+      if (updated.count !== 1) {
+        throw new AppError('La inspeccion fue modificada en otro dispositivo. Actualice antes de continuar.', 409);
+      }
+      await tx.eventoInspeccion.create({
+        data: {
+          inspeccionId: inspection.id,
+          usuarioId: req.user.id,
+          tipo: 'INFORME_TECNICO_ACTUALIZADO',
+          titulo: 'Informe tecnico actualizado',
+          detalle: 'Se guardo una nueva version de la evaluacion tecnica sin modificar el acta de campo.',
+          visibleActor: false,
+          metadata: { versionBase: input.version },
+        },
+      });
+    });
+
+    const full = await prisma.inspeccion.findUniqueOrThrow({ where: { id: inspection.id }, include: inspectionInclude });
     res.json({ success: true, data: full });
   } catch (error) { next(error); }
 }
@@ -734,6 +823,16 @@ export async function generarActaInspeccionPdf(req: AuthRequest, res: Response, 
     if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
     if (!isAuthorizedAdmin(req.user) && inspection.inspectorId !== req.user.id) throw new AppError('No autorizado para exportar esta acta', 403);
     await streamInspectionActPdf(res, inspection, resolveInspectionEvidence);
+  } catch (error) { next(error); }
+}
+
+export async function generarInformeTecnicoInspeccionPdf(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    assertInspectionStaff(req);
+    const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, include: inspectionInclude });
+    if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
+    if (!isAuthorizedAdmin(req.user) && inspection.inspectorId !== req.user.id) throw new AppError('No autorizado para exportar este informe', 403);
+    await streamInspectionTechnicalReportPdf(res, inspection, resolveInspectionEvidence);
   } catch (error) { next(error); }
 }
 

@@ -42,7 +42,10 @@ test('live inspection UI keeps list, field evidence and report usable', async ({
   await page.goto(`${basePath}/inspecciones/${reportId}`);
   await expect(page.getByRole('heading', { name: 'Informe de inspección' })).toBeVisible();
   await expect(page.getByTestId('inspection-action-bar')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Exportar informe PDF' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Exportar' })).toBeVisible();
+  await page.getByRole('button', { name: 'Exportar' }).click();
+  await expect(page.getByRole('button', { name: /Acta de inspección/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Informe técnico/ })).toBeVisible();
   expect(await page.locator('html').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   if (process.env.SITREP_QA_SCREENSHOTS === '1') await page.screenshot({ path: `/tmp/sitrep-live-report-${testInfo.project.name}.png`, fullPage: false });
   expect(consoleErrors).toEqual([]);

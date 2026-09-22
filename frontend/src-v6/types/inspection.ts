@@ -13,7 +13,43 @@ export interface InspectionActor {
   razonSocial: string;
   cuit: string;
   domicilio?: string;
+  telefono?: string;
+  email?: string;
+  representanteLegalNombre?: string | null;
+  representanteLegalDNI?: string | null;
   activo?: boolean;
+}
+
+export interface InspectionActData {
+  codigoPostal?: string;
+  departamento?: string;
+  calle?: string;
+  numeroDomicilio?: string;
+  titular?: string;
+  dniTitular?: string;
+  atendidoPor?: string;
+  dniAtendido?: string;
+  cargoAtendido?: string;
+  area?: string;
+  lugarAfectacion?: string;
+  motivoInspeccion?: string;
+  infraestructura?: 'SI' | 'NO' | 'NO_VERIFICADO';
+  detalleInfraestructura?: string;
+  estadoInfraestructura?: string;
+  generacion?: string;
+  requerimientos?: string;
+  actaAnterior?: string;
+  plazoDescargoDias?: number;
+}
+
+export interface InspectionTechnicalReport {
+  expedienteElectronico?: string;
+  referencias?: string;
+  objetivo?: string;
+  antecedentes?: string;
+  evaluacion?: string;
+  conclusion?: string;
+  recomendacion?: string;
 }
 
 export interface InspectionItem {
@@ -102,6 +138,8 @@ export interface Inspection {
   cerradaCampoAt?: string | null;
   plazoRespuestaAt?: string | null;
   observaciones?: string | null;
+  datosActa?: InspectionActData | null;
+  informeTecnico?: InspectionTechnicalReport | null;
   version: number;
   createdAt: string;
   updatedAt: string;

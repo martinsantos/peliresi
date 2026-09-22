@@ -5,6 +5,7 @@ import { ArchiveX, ArrowLeft, CalendarDays, Camera, Check, ChevronDown, ChevronU
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge, type BadgeColor } from '../../components/ui/BadgeV2';
 import { Card } from '../../components/ui/CardV2';
+import { DropdownContent, DropdownItem, DropdownLabel, DropdownMenu, DropdownTrigger } from '../../components/ui/DropdownMenu';
 import { toast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useInspection, useInspectionMutation } from '../../hooks/useInspecciones';
@@ -18,12 +19,13 @@ import {
   type PendingInspectionEvidence,
   type PendingInspectionEvidenceFields,
 } from '../../services/inspectionOfflineEvidence';
-import type { InspectionComparison, InspectionEvidence, InspectionItem, InspectionItemResult, InspectionState } from '../../types/inspection';
+import type { InspectionActData, InspectionComparison, InspectionEvidence, InspectionItem, InspectionItemResult, InspectionState, InspectionTechnicalReport } from '../../types/inspection';
 import { inspectionActor } from '../../types/inspection';
 import { InspectionComparisonPanel } from './InspectionComparisonPanel';
 import { InspectionEvidenceImage } from './InspectionEvidenceImage';
 import { InspectionReport } from './InspectionReport';
 import { InspectionTimeline } from './InspectionTimeline';
+import { InspectionDocumentsPanel } from './InspectionDocumentsPanel';
 import { inspectionActorRoute, inspectionDate, inspectionErrorMessage } from './inspectionPresentation';
 
 const LABELS: Record<InspectionState, string> = { BORRADOR: 'Borrador', PLANIFICADA: 'Planificada', EN_CAMPO: 'En campo', EN_REVISION: 'En revisión', NOTIFICADA: 'Notificada', EN_DESCARGO: 'En descargo', REQUIERE_SUBSANACION: 'Requiere subsanación', CERRADA_CONFORME: 'Cerrada conforme', DERIVADA_LEGALES: 'Derivada a legales', EN_TRAMITE_LEGAL: 'En trámite legal', DERIVADA_ATM: 'Derivada a ATM', FINALIZADA: 'Finalizada', CANCELADA: 'Cancelada' };
@@ -33,7 +35,7 @@ const RESULTS: Array<{ value: InspectionItemResult; label: string; icon: React.R
   { value: 'NO_CUMPLE', label: 'No cumple', icon: <XCircle size={16} />, active: 'border-error-600 bg-error-50 text-error-800' },
   { value: 'NO_APLICA', label: 'No aplica', icon: <CircleMinus size={16} />, active: 'border-neutral-500 bg-neutral-100 text-neutral-800' },
 ];
-type Draft = { version: number; observaciones: string; numeroActa: string; ubicacion: string; plazoRespuestaAt: string; items: InspectionItem[]; comparaciones: InspectionComparison[] };
+type Draft = { version: number; observaciones: string; numeroActa: string; ubicacion: string; plazoRespuestaAt: string; datosActa: InspectionActData; informeTecnico: InspectionTechnicalReport; items: InspectionItem[]; comparaciones: InspectionComparison[] };
 const localDate = (value?: string | null) => value ? new Date(new Date(value).getTime() - new Date(value).getTimezoneOffset() * 60_000).toISOString().slice(0, 16) : '';
 
 const InspeccionExpedientePage: React.FC = () => {
@@ -41,17 +43,22 @@ const InspeccionExpedientePage: React.FC = () => {
   const query = useInspection(id); const inspection = query.data;
   const [items, setItems] = useState<InspectionItem[]>([]); const [comparisons, setComparisons] = useState<InspectionComparison[]>([]);
   const [observaciones, setObservaciones] = useState(''); const [numeroActa, setNumeroActa] = useState(''); const [ubicacion, setUbicacion] = useState(''); const [plazoRespuestaAt, setPlazoRespuestaAt] = useState('');
+  const [datosActa, setDatosActa] = useState<InspectionActData>({}); const [informeTecnico, setInformeTecnico] = useState<InspectionTechnicalReport>({});
   const [isOnline, setIsOnline] = useState(navigator.onLine); const [recording, setRecording] = useState(false); const [uploadingItemId, setUploadingItemId] = useState<string | null>(null);
   const [pendingEvidence, setPendingEvidence] = useState<PendingInspectionEvidence[]>([]); const [syncingEvidence, setSyncingEvidence] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null); const chunksRef = useRef<Blob[]>([]); const fileRef = useRef<HTMLInputElement | null>(null); const cameraRef = useRef<HTMLInputElement | null>(null);
   const syncingRef = useRef(false);
   const syncEvidenceRef = useRef<() => Promise<void>>(async () => undefined);
   const draftKey = currentUser?.id && id ? `sitrep_inspection_draft_${currentUser.id}_${id}` : '';
+  const isAdmin = Boolean(inspection && (currentUser?.rol === 'ADMIN' || currentUser?.rol === `ADMIN_${inspection.tipoActor}`));
+  const isAssignedInspector = Boolean(inspection && currentUser && String(inspection.inspectorId) === String(currentUser.id));
+  const canEdit = Boolean(inspection && ['BORRADOR', 'PLANIFICADA', 'EN_CAMPO'].includes(inspection.estado) && (isAdmin || isAssignedInspector));
+  const canEditReport = Boolean(inspection && (canEdit || (inspection.estado === 'EN_REVISION' && (isAdmin || isAssignedInspector))));
 
   useEffect(() => { const on = () => setIsOnline(true); const off = () => setIsOnline(false); window.addEventListener('online', on); window.addEventListener('offline', off); return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); }; }, []);
   useEffect(() => {
     if (!inspection) return;
-    const draft: Draft = { version: inspection.version, observaciones: inspection.observaciones || '', numeroActa: inspection.numeroActa || '', ubicacion: inspection.ubicacion || '', plazoRespuestaAt: localDate(inspection.plazoRespuestaAt), items: inspection.items, comparaciones: inspection.comparaciones || [] };
+    const draft: Draft = { version: inspection.version, observaciones: inspection.observaciones || '', numeroActa: inspection.numeroActa || '', ubicacion: inspection.ubicacion || '', plazoRespuestaAt: localDate(inspection.plazoRespuestaAt), datosActa: inspection.datosActa || {}, informeTecnico: inspection.informeTecnico || {}, items: inspection.items, comparaciones: inspection.comparaciones || [] };
     if (draftKey) try {
       const saved = JSON.parse(localStorage.getItem(draftKey) || 'null') as Draft | null;
       if (saved?.version === inspection.version) {
@@ -61,9 +68,9 @@ const InspeccionExpedientePage: React.FC = () => {
         Object.assign(draft, saved, { comparaciones: savedComparisonsAreCurrent ? saved.comparaciones : draft.comparaciones });
       }
     } catch { /* ignore */ }
-    setItems(draft.items); setComparisons(draft.comparaciones); setObservaciones(draft.observaciones); setNumeroActa(draft.numeroActa); setUbicacion(draft.ubicacion); setPlazoRespuestaAt(draft.plazoRespuestaAt);
+    setItems(draft.items); setComparisons(draft.comparaciones); setObservaciones(draft.observaciones); setNumeroActa(draft.numeroActa); setUbicacion(draft.ubicacion); setPlazoRespuestaAt(draft.plazoRespuestaAt); setDatosActa(draft.datosActa); setInformeTecnico(draft.informeTecnico);
   }, [inspection, draftKey]);
-  useEffect(() => { if (!draftKey || !inspection || !items.length) return; const timer = window.setTimeout(() => localStorage.setItem(draftKey, JSON.stringify({ version: inspection.version, observaciones, numeroActa, ubicacion, plazoRespuestaAt, items, comparaciones: comparisons } satisfies Draft)), 350); return () => window.clearTimeout(timer); }, [draftKey, inspection, observaciones, numeroActa, ubicacion, plazoRespuestaAt, items, comparisons]);
+  useEffect(() => { if (!draftKey || !inspection || !items.length || (!canEdit && !canEditReport)) return; const timer = window.setTimeout(() => localStorage.setItem(draftKey, JSON.stringify({ version: inspection.version, observaciones, numeroActa, ubicacion, plazoRespuestaAt, datosActa, informeTecnico, items, comparaciones: comparisons } satisfies Draft)), 350); return () => window.clearTimeout(timer); }, [canEdit, canEditReport, draftKey, inspection, observaciones, numeroActa, ubicacion, plazoRespuestaAt, datosActa, informeTecnico, items, comparisons]);
 
   const refreshPendingEvidence = useCallback(async () => {
     if (!id || !currentUser?.id) return;
@@ -71,13 +78,15 @@ const InspeccionExpedientePage: React.FC = () => {
   }, [currentUser?.id, id]);
   useEffect(() => { void refreshPendingEvidence(); }, [refreshPendingEvidence]);
 
-  const persistDraft = useCallback(async () => { if (!inspection) return; const meta = await inspeccionService.update(id, { version: inspection.version, observaciones: observaciones || null, numeroActa: numeroActa || null, ubicacion: ubicacion || null, plazoRespuestaAt: plazoRespuestaAt ? new Date(plazoRespuestaAt).toISOString() : null }); const checked = await inspeccionService.updateItems(id, meta.version, items.map((item) => ({ id: item.id, resultado: item.resultado, observacion: item.observacion || null }))); return inspeccionService.updateComparisons(id, checked.version, comparisons.map((row) => ({ id: row.id, resultado: row.resultado, valorObservado: row.valorObservado || null, observacion: row.observacion || null }))); }, [comparisons, id, inspection, items, numeroActa, observaciones, plazoRespuestaAt, ubicacion]);
-  const saveMutation = useInspectionMutation(persistDraft, id);
+  const persistDraft = useCallback(async () => { if (!inspection) return; const meta = await inspeccionService.update(id, { version: inspection.version, observaciones: observaciones || null, numeroActa: numeroActa || null, ubicacion: ubicacion || null, plazoRespuestaAt: plazoRespuestaAt ? new Date(plazoRespuestaAt).toISOString() : null, datosActa, informeTecnico }); const checked = await inspeccionService.updateItems(id, meta.version, items.map((item) => ({ id: item.id, resultado: item.resultado, observacion: item.observacion || null }))); return inspeccionService.updateComparisons(id, checked.version, comparisons.map((row) => ({ id: row.id, resultado: row.resultado, valorObservado: row.valorObservado || null, observacion: row.observacion || null }))); }, [comparisons, datosActa, id, informeTecnico, inspection, items, numeroActa, observaciones, plazoRespuestaAt, ubicacion]);
+  const persistTechnicalReport = useCallback(async () => { if (!inspection) return; return inspeccionService.updateTechnicalReport(id, inspection.version, informeTecnico); }, [id, informeTecnico, inspection]);
+  const persistChanges = useCallback(async () => canEdit ? persistDraft() : canEditReport ? persistTechnicalReport() : undefined, [canEdit, canEditReport, persistDraft, persistTechnicalReport]);
+  const saveMutation = useInspectionMutation(persistChanges, id);
   const transitionMutation = useInspectionMutation(async ({ next, version }: { next: InspectionState; version: number }) => inspeccionService.transition(id, version, next, { plazoRespuestaAt: plazoRespuestaAt ? new Date(plazoRespuestaAt).toISOString() : undefined }), id);
   const uploadMutation = useInspectionMutation(async ({ file, fields }: { file: File; fields?: PendingInspectionEvidenceFields & { clienteId?: string; capturadaAt?: string; clienteSha256?: string } }) => inspeccionService.uploadEvidence(id, file, fields), id);
   const annulMutation = useInspectionMutation(async ({ evidenceId, version, motivo }: { evidenceId: string; version: number; motivo: string }) => inspeccionService.annulEvidence(id, evidenceId, version, motivo), id);
   const eventMutation = useInspectionMutation(async ({ input, file }: { input: Parameters<typeof inspeccionService.addEvent>[1]; file?: File }) => { const event = await inspeccionService.addEvent(id, input); if (file) await inspeccionService.uploadEvidence(id, file, { eventoId: event.id }); }, id);
-  const pdfMutation = useInspectionMutation(async () => inspection && inspeccionService.downloadActPdf(id, inspection.numero), id);
+  const pdfMutation = useInspectionMutation(async (kind: 'acta' | 'informe-tecnico') => inspection && inspeccionService.downloadPdf(id, inspection.numero, kind), id);
 
   const syncEvidence = useCallback(async () => {
     if (!navigator.onLine || !id || !currentUser?.id || syncingRef.current) return;
@@ -87,8 +96,10 @@ const InspeccionExpedientePage: React.FC = () => {
     syncingRef.current = true; setSyncingEvidence(true);
     let synchronized = 0;
     try {
-      await persistDraft();
-      if (draftKey) localStorage.removeItem(draftKey);
+      if (hasStoredDraft) {
+        await persistChanges();
+        if (draftKey) localStorage.removeItem(draftKey);
+      }
       for (const entry of entries) {
         try {
           await inspeccionService.uploadEvidence(id, pendingEvidenceFile(entry), {
@@ -112,20 +123,20 @@ const InspeccionExpedientePage: React.FC = () => {
     } finally {
       syncingRef.current = false; setSyncingEvidence(false);
     }
-  }, [currentUser?.id, draftKey, id, persistDraft, query, refreshPendingEvidence]);
+  }, [currentUser?.id, draftKey, id, persistChanges, query, refreshPendingEvidence]);
   useEffect(() => { syncEvidenceRef.current = syncEvidence; }, [syncEvidence]);
   useEffect(() => { if (isOnline) void syncEvidenceRef.current(); }, [currentUser?.id, id, isOnline]);
 
-  const save = async () => { if (!isOnline) return toast.info('Borrador guardado en el dispositivo', 'Se sincronizará cuando vuelva la conexión.'); try { await saveMutation.mutateAsync(undefined); if (draftKey) localStorage.removeItem(draftKey); toast.success('Inspección guardada', 'Comparación, checklist y observaciones quedaron sincronizados.'); } catch (error: unknown) { toast.error('No se pudo guardar', inspectionErrorMessage(error, 'Los cambios siguen guardados en este dispositivo.')); } };
+  const save = async () => { if (!isOnline) return toast.info('Borrador guardado en el dispositivo', 'Se sincronizará cuando vuelva la conexión.'); try { await saveMutation.mutateAsync(undefined); if (draftKey) localStorage.removeItem(draftKey); toast.success(canEdit ? 'Inspección guardada' : 'Informe técnico guardado', canEdit ? 'Comparación, checklist, acta e informe quedaron sincronizados.' : 'La evaluación técnica quedó versionada sin modificar el acta de campo.'); } catch (error: unknown) { toast.error('No se pudo guardar', inspectionErrorMessage(error, 'Los cambios siguen guardados en este dispositivo.')); } };
   const transition = async (next: InspectionState) => {
     if (!isOnline) return toast.warning('Conexión requerida', 'El cierre requiere confirmación del servidor.');
     if (pendingEvidence.length) return toast.warning('Sincronización pendiente', 'Espere a que todas las capturas queden incorporadas antes de cambiar el estado.');
     if (!inspection) return;
     try {
-      const saved = canEdit ? await persistDraft() : null;
-      if (canEdit && draftKey) localStorage.removeItem(draftKey);
+      const saved = canEdit || canEditReport ? await persistChanges() : null;
+      if ((canEdit || canEditReport) && draftKey) localStorage.removeItem(draftKey);
       await transitionMutation.mutateAsync({ next, version: saved?.version ?? inspection.version });
-      toast.success('Estado actualizado', next === 'NOTIFICADA' ? 'Acta aprobada; no se envió correo externo.' : LABELS[next]);
+      toast.success('Estado actualizado', next === 'NOTIFICADA' ? 'Expediente aprobado; no se envió correo externo.' : LABELS[next]);
     } catch (error: unknown) { toast.error('Acción rechazada', inspectionErrorMessage(error, 'No se pudo cambiar el estado.')); }
   };
   const upload = async (file?: File, fields: PendingInspectionEvidenceFields = {}, persistDraft = false) => {
@@ -162,11 +173,12 @@ const InspeccionExpedientePage: React.FC = () => {
       );
     } catch (error: unknown) {
       const networkFailure = !navigator.onLine || (isAxiosError(error) && !error.response);
-      if (pending && !networkFailure) {
-        await removePendingInspectionEvidence(pending.id).catch(() => undefined);
+      if (pending) {
+        await updatePendingInspectionEvidence({ ...pending, attempts: pending.attempts + 1, lastError: inspectionErrorMessage(error, 'No se pudo sincronizar') }).catch(() => undefined);
         await refreshPendingEvidence();
       }
       if (pending && networkFailure) toast.warning('Conexión interrumpida', 'La captura quedó protegida y se reintentará sin duplicarla.');
+      else if (pending) toast.error('Evidencia pendiente', 'La carga no fue aceptada, pero la imagen quedó protegida en este dispositivo para corregir o reintentar.');
       else toast.error('Evidencia rechazada', inspectionErrorMessage(error, 'No se pudo cargar.'));
     } finally {
       if (fields?.itemId) setUploadingItemId(null);
@@ -188,19 +200,19 @@ const InspeccionExpedientePage: React.FC = () => {
 
   if (query.isLoading) return <p className="p-8 text-center text-sm text-neutral-500">Cargando expediente…</p>;
   if (!inspection) return <Card><p className="font-semibold text-neutral-900">Inspección no encontrada</p></Card>;
-  const actor = inspectionActor(inspection); const canEdit = ['BORRADOR', 'PLANIFICADA', 'EN_CAMPO'].includes(inspection.estado); const isAdmin = currentUser?.rol === 'ADMIN' || currentUser?.rol === `ADMIN_${inspection.tipoActor}`;
+  const actor = inspectionActor(inspection);
   const actorRoute = actor ? inspectionActorRoute(inspection.tipoActor, actor.id, mobile) : '';
   const completed = items.filter((item) => item.resultado !== 'PENDIENTE').length; const groups = Array.from(new Set(items.map((item) => item.categoria)));
-  const primaryAction = inspection.estado === 'BORRADOR' || inspection.estado === 'PLANIFICADA' ? { label: 'Iniciar inspección', state: 'EN_CAMPO' as InspectionState } : inspection.estado === 'EN_CAMPO' ? { label: 'Enviar a revisión', state: 'EN_REVISION' as InspectionState } : inspection.estado === 'EN_REVISION' && isAdmin ? { label: 'Aprobar acta', state: 'NOTIFICADA' as InspectionState } : null;
-  const showActionBar = canEdit || (inspection.estado === 'EN_REVISION' && isAdmin) || Boolean(primaryAction);
+  const primaryAction = inspection.estado === 'BORRADOR' || inspection.estado === 'PLANIFICADA' ? { label: 'Iniciar inspección', state: 'EN_CAMPO' as InspectionState } : inspection.estado === 'EN_CAMPO' ? { label: 'Enviar a revisión', state: 'EN_REVISION' as InspectionState } : inspection.estado === 'EN_REVISION' && isAdmin ? { label: 'Aprobar expediente', state: 'NOTIFICADA' as InspectionState } : null;
+  const showActionBar = canEdit || canEditReport || Boolean(primaryAction);
 
   return <div className={`space-y-4 animate-fade-in ${hasMobileNav ? 'pb-20 sm:pb-0' : ''}`}>
     {(!isOnline || pendingEvidence.length > 0) && <div className="flex flex-col gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-950 sm:flex-row sm:items-center sm:justify-between"><span className="flex items-center gap-2">{isOnline ? <CloudUpload size={18} /> : <CloudOff size={18} />}{!isOnline ? 'Sin conexión · el borrador y las capturas quedan protegidos en este dispositivo' : `${pendingEvidence.length} ${pendingEvidence.length === 1 ? 'captura pendiente' : 'capturas pendientes'} de sincronización`}</span>{isOnline && pendingEvidence.length > 0 && <button type="button" onClick={() => void syncEvidence()} disabled={syncingEvidence} className="w-fit rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-bold text-amber-950 disabled:opacity-60">{syncingEvidence ? 'Sincronizando…' : 'Sincronizar ahora'}</button>}</div>}
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><button onClick={() => navigate(`${mobile ? '/mobile' : ''}/inspecciones`)} className="flex w-fit items-center gap-2 rounded-lg px-2 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-100"><ArrowLeft size={18} />Volver al listado</button><div className="flex flex-wrap items-center gap-2"><Badge color={COLORS[inspection.estado] || 'neutral'} size="lg" dot>{LABELS[inspection.estado]}</Badge><Button variant="outline" size="sm" leftIcon={<Download size={16} />} isLoading={pdfMutation.isPending} onClick={() => pdfMutation.mutate(undefined)}>Exportar informe PDF</Button></div></div>
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><button onClick={() => navigate(`${mobile ? '/mobile' : ''}/inspecciones`)} className="flex w-fit items-center gap-2 rounded-lg px-2 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-100"><ArrowLeft size={18} />Volver al listado</button><div className="flex flex-wrap items-center gap-2"><Badge color={COLORS[inspection.estado] || 'neutral'} size="lg" dot>{LABELS[inspection.estado]}</Badge><DropdownMenu><DropdownTrigger asChild><Button variant="outline" size="sm" leftIcon={<Download size={16} />} rightIcon={<ChevronDown size={14} />} isLoading={pdfMutation.isPending}>Exportar</Button></DropdownTrigger><DropdownContent className="w-72"><DropdownLabel>Documentos del expediente</DropdownLabel><DropdownItem icon={<ClipboardCheck size={16} />} onClick={() => pdfMutation.mutate('acta')}>Acta de inspección<span className="block text-[11px] font-normal text-neutral-500">Salida de campo levantada desde la tablet</span></DropdownItem><DropdownItem icon={<FileText size={16} />} onClick={() => pdfMutation.mutate('informe-tecnico')}>Informe técnico<span className="block text-[11px] font-normal text-neutral-500">Evaluación que acompaña al acta para dictamen</span></DropdownItem></DropdownContent></DropdownMenu></div></div>
     <Card className="!p-4 sm:!p-5"><div className="flex flex-col gap-4 border-b border-neutral-200 pb-4 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-sm font-semibold text-primary-700">Expediente de inspección</p><h2 className="mt-1 text-2xl font-extrabold tracking-tight text-[#10213A]">{inspection.numero}</h2></div><label className="text-xs font-semibold uppercase tracking-wide text-neutral-500 sm:w-64">Número de acta<input disabled={!canEdit} value={numeroActa} onChange={(e) => setNumeroActa(e.target.value)} placeholder="Asignar número" className="mt-1.5 h-10 w-full rounded-lg border border-neutral-300 px-3 text-sm font-medium normal-case text-neutral-900 disabled:bg-neutral-50" /></label></div><div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"><Meta icon={<ClipboardCheck />} label="Actor inspeccionado" value={actor?.razonSocial || ''} detail={`CUIT ${actor?.cuit || 's/d'}`} to={actor ? actorRoute : undefined} /><Meta icon={<UserRound />} label="Inspector" value={`${inspection.inspector.nombre} ${inspection.inspector.apellido || ''}`} /><div className="flex gap-3"><MapPin className="mt-0.5 shrink-0 text-neutral-500" size={19} /><div className="min-w-0 flex-1"><p className="text-xs text-neutral-500">Ubicación</p>{canEdit ? <input value={ubicacion} onChange={(e) => setUbicacion(e.target.value)} className="mt-1 h-9 w-full rounded-lg border border-neutral-300 px-2 text-sm" /> : <p className="font-bold text-[#10213A]">{ubicacion || 'Sin informar'}</p>}</div></div><Meta icon={<CalendarDays />} label="Inicio" value={inspectionDate(inspection.iniciadaAt, true)} /></div><div className="mt-4 border-t border-neutral-200 pt-4"><p className="text-xs leading-relaxed text-neutral-500 lg:text-right">Creada {inspectionDate(inspection.createdAt, true)} · Programada {inspectionDate(inspection.fechaProgramada, true)}<br className="hidden lg:block" /> Actualizada {inspectionDate(inspection.updatedAt, true)}{inspection.plazoRespuestaAt ? ` · Plazo ${inspectionDate(inspection.plazoRespuestaAt, true)}` : ''}</p></div></Card>
-    {showActionBar && <div data-testid="inspection-action-bar" className="rounded-xl border border-neutral-200 bg-white px-3 py-3 shadow-sm sm:px-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-extrabold text-[#10213A]">Acciones del expediente</p><p className="mt-0.5 text-xs text-neutral-500">Guardá el avance antes de cambiar la etapa.</p></div><div className="grid grid-cols-2 gap-2 [&>button]:min-w-0 [&>button]:px-2 sm:flex sm:justify-end sm:[&>button]:flex-none sm:[&>button]:px-5">{canEdit && <Button aria-label="Guardar borrador" variant="outline" leftIcon={<Save size={17} />} isLoading={saveMutation.isPending} onClick={save}><span className="sm:hidden">Guardar</span><span className="hidden sm:inline">Guardar borrador</span></Button>}{inspection.estado === 'EN_REVISION' && isAdmin && <Button aria-label="Devolver a campo" variant="outline" onClick={() => transition('EN_CAMPO')}><span className="sm:hidden">Devolver</span><span className="hidden sm:inline">Devolver a campo</span></Button>}{primaryAction && <Button aria-label={primaryAction.label} leftIcon={primaryAction.state === 'EN_REVISION' ? <Send size={17} /> : <ShieldCheck size={17} />} isLoading={transitionMutation.isPending} onClick={() => transition(primaryAction.state)} disabled={primaryAction.state === 'NOTIFICADA' && !plazoRespuestaAt}><span className="sm:hidden">{primaryAction.state === 'EN_REVISION' ? 'Enviar' : primaryAction.state === 'EN_CAMPO' ? 'Iniciar' : 'Aprobar'}</span><span className="hidden sm:inline">{primaryAction.label}</span></Button>}</div></div></div>}
+    {showActionBar && <div data-testid="inspection-action-bar" className="rounded-xl border border-neutral-200 bg-white px-3 py-3 shadow-sm sm:px-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-extrabold text-[#10213A]">Acciones del expediente</p><p className="mt-0.5 text-xs text-neutral-500">{canEdit ? 'Guardá el avance antes de cambiar la etapa.' : 'El acta de campo está cerrada; sólo puede versionarse el informe técnico.'}</p></div><div className="grid grid-cols-2 gap-2 [&>button]:min-w-0 [&>button]:px-2 sm:flex sm:justify-end sm:[&>button]:flex-none sm:[&>button]:px-5">{(canEdit || canEditReport) && <Button aria-label={canEdit ? 'Guardar borrador' : 'Guardar informe técnico'} variant="outline" leftIcon={<Save size={17} />} isLoading={saveMutation.isPending} onClick={save}><span className="sm:hidden">Guardar</span><span className="hidden sm:inline">{canEdit ? 'Guardar borrador' : 'Guardar informe técnico'}</span></Button>}{inspection.estado === 'EN_REVISION' && isAdmin && <Button aria-label="Devolver a campo" variant="outline" onClick={() => transition('EN_CAMPO')}><span className="sm:hidden">Devolver</span><span className="hidden sm:inline">Devolver a campo</span></Button>}{primaryAction && <Button aria-label={primaryAction.label} leftIcon={primaryAction.state === 'EN_REVISION' ? <Send size={17} /> : <ShieldCheck size={17} />} isLoading={transitionMutation.isPending} onClick={() => transition(primaryAction.state)} disabled={primaryAction.state === 'NOTIFICADA' && !plazoRespuestaAt}><span className="sm:hidden">{primaryAction.state === 'EN_REVISION' ? 'Enviar' : primaryAction.state === 'EN_CAMPO' ? 'Iniciar' : 'Aprobar'}</span><span className="hidden sm:inline">{primaryAction.label}</span></Button>}</div></div></div>}
     {canEdit && <InspectionComparisonPanel inspectionId={inspection.id} comparisons={comparisons} editable onChange={(rowId, patch) => setComparisons((rows) => rows.map((row) => row.id === rowId ? { ...row, ...patch } : row))} onEvidence={(file, comparisonId) => upload(file, { comparacionId: comparisonId })} />}
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.62fr)_minmax(330px,0.72fr)]"><div className="space-y-4">{!canEdit && <InspectionReport inspection={{ ...inspection, items, comparaciones: comparisons }} />}{canEdit && <Checklist inspectionId={inspection.id} groups={groups} items={items} completed={completed} editable setItems={setItems} uploadingItemId={uploadingItemId} pendingEvidence={pendingEvidence} onEvidence={(file, item) => upload(file, { itemId: item.id, descripcion: item.observacion?.trim() || `Evidencia vinculada al control ${item.codigo}` }, true)} onAnnul={annulEvidence} />}</div><div className="space-y-4"><EvidenceCard inspection={inspection} pendingEvidence={pendingEvidence} editable={canEdit} recording={recording} onCamera={() => cameraRef.current?.click()} onFile={() => fileRef.current?.click()} onAudio={toggleRecording} onAnnul={annulEvidence} /><input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={uploadFromInput} /><input ref={fileRef} type="file" accept="image/*,application/pdf,audio/*" className="hidden" onChange={uploadFromInput} /><InspectionTimeline inspection={inspection} canComment={Boolean(isAdmin)} busy={eventMutation.isPending} onAdd={async (input, file) => { try { await eventMutation.mutateAsync({ input, file }); toast.success('Trazabilidad actualizada', input.tipo === 'NOTIFICACION_PREPARADA' ? 'Correo registrado como no enviado.' : 'Evento incorporado.'); } catch (error: unknown) { toast.error('No se pudo registrar', inspectionErrorMessage(error, 'Revise los datos.')); throw error; } }} /><Card><h3 className="font-extrabold text-[#10213A]">Observaciones generales</h3><textarea disabled={!canEdit} value={observaciones} onChange={(e) => setObservaciones(e.target.value)} rows={5} placeholder="Describa hallazgos, contexto y acciones requeridas…" className="mt-3 w-full resize-y rounded-lg border border-neutral-300 p-3 text-sm leading-relaxed disabled:bg-neutral-50" /></Card>{(inspection.estado === 'EN_REVISION' || inspection.estado === 'NOTIFICADA') && isAdmin && <Card><h3 className="font-extrabold text-[#10213A]">Plazo de respuesta</h3><p className="mt-1 text-xs text-neutral-500">La aprobación no envía correos; deja el expediente preparado.</p><input type="datetime-local" value={plazoRespuestaAt} onChange={(e) => setPlazoRespuestaAt(e.target.value)} className="mt-3 h-11 w-full rounded-lg border border-neutral-300 px-3 text-sm" /></Card>}</div></div>
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.62fr)_minmax(330px,0.72fr)]"><div className="space-y-4">{!canEdit && <InspectionReport inspection={{ ...inspection, items, comparaciones: comparisons }} />}{canEdit && <Checklist inspectionId={inspection.id} groups={groups} items={items} completed={completed} editable setItems={setItems} uploadingItemId={uploadingItemId} pendingEvidence={pendingEvidence} onEvidence={(file, item) => upload(file, { itemId: item.id, descripcion: item.observacion?.trim() || `Evidencia vinculada al control ${item.codigo}` }, true)} onAnnul={annulEvidence} />}<InspectionDocumentsPanel actData={datosActa} report={informeTecnico} actEditable={canEdit} reportEditable={canEditReport} onActDataChange={setDatosActa} onReportChange={setInformeTecnico} /></div><div className="space-y-4"><EvidenceCard inspection={inspection} pendingEvidence={pendingEvidence} editable={canEdit} recording={recording} onCamera={() => cameraRef.current?.click()} onFile={() => fileRef.current?.click()} onAudio={toggleRecording} onAnnul={annulEvidence} /><input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={uploadFromInput} /><input ref={fileRef} type="file" accept="image/*,application/pdf,audio/*" className="hidden" onChange={uploadFromInput} /><InspectionTimeline inspection={inspection} canComment={Boolean(isAdmin)} busy={eventMutation.isPending} onAdd={async (input, file) => { try { await eventMutation.mutateAsync({ input, file }); toast.success('Trazabilidad actualizada', input.tipo === 'NOTIFICACION_PREPARADA' ? 'Correo registrado como no enviado.' : 'Evento incorporado.'); } catch (error: unknown) { toast.error('No se pudo registrar', inspectionErrorMessage(error, 'Revise los datos.')); throw error; } }} /><Card><h3 className="font-extrabold text-[#10213A]">Observaciones generales</h3><textarea disabled={!canEdit} value={observaciones} onChange={(e) => setObservaciones(e.target.value)} rows={5} placeholder="Describa hallazgos, contexto y acciones requeridas…" className="mt-3 w-full resize-y rounded-lg border border-neutral-300 p-3 text-sm leading-relaxed disabled:bg-neutral-50" /></Card>{(inspection.estado === 'EN_REVISION' || inspection.estado === 'NOTIFICADA') && isAdmin && <Card><h3 className="font-extrabold text-[#10213A]">Plazo de respuesta</h3><p className="mt-1 text-xs text-neutral-500">La aprobación no envía correos; deja el expediente preparado.</p><input type="datetime-local" value={plazoRespuestaAt} onChange={(e) => setPlazoRespuestaAt(e.target.value)} className="mt-3 h-11 w-full rounded-lg border border-neutral-300 px-3 text-sm" /></Card>}</div></div>
   </div>;
 };
 

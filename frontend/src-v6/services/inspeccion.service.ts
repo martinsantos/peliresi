@@ -5,6 +5,8 @@ import type {
   InspectionItemResult,
   InspectionComparisonResult,
   InspectionState,
+  InspectionActData,
+  InspectionTechnicalReport,
 } from '../types/inspection';
 
 export interface PaginatedInspections {
@@ -51,8 +53,15 @@ export const inspeccionService = {
     fechaProgramada?: string | null;
     plazoRespuestaAt?: string | null;
     observaciones?: string | null;
+    datosActa?: InspectionActData | null;
+    informeTecnico?: InspectionTechnicalReport | null;
   }): Promise<Inspection> {
     const { data } = await api.patch(`/inspecciones/${id}`, input);
+    return data.data;
+  },
+
+  async updateTechnicalReport(id: string, version: number, informeTecnico: InspectionTechnicalReport | null): Promise<Inspection> {
+    const { data } = await api.patch(`/inspecciones/${id}/informe-tecnico`, { version, informeTecnico });
     return data.data;
   },
 
@@ -101,12 +110,12 @@ export const inspeccionService = {
     return URL.createObjectURL(response.data);
   },
 
-  async downloadActPdf(id: string, numero: string): Promise<void> {
-    const response = await api.get(`/inspecciones/${id}/acta.pdf`, { responseType: 'blob' });
+  async downloadPdf(id: string, numero: string, kind: 'acta' | 'informe-tecnico'): Promise<void> {
+    const response = await api.get(`/inspecciones/${id}/${kind}.pdf`, { responseType: 'blob' });
     const url = URL.createObjectURL(response.data);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `informe_inspeccion_${numero}.pdf`;
+    link.download = kind === 'acta' ? `acta_inspeccion_${numero}.pdf` : `informe_tecnico_${numero}.pdf`;
     document.body.appendChild(link);
     link.click();
     link.remove();

@@ -3,6 +3,7 @@ import multer from 'multer';
 import { isAuthenticated, requireFullAccess } from '../middlewares/auth.middleware';
 import {
   actualizarInspeccion,
+  actualizarInformeTecnico,
   actualizarItems,
   actualizarComparaciones,
   anularEvidencia,
@@ -11,6 +12,7 @@ import {
   crearInspeccion,
   descargarEvidencia,
   generarActaInspeccionPdf,
+  generarInformeTecnicoInspeccionPdf,
   listarInspecciones,
   obtenerInspeccion,
   subirEvidencia,
@@ -28,11 +30,13 @@ router.get('/', listarInspecciones);
 router.post('/', crearInspeccion);
 router.get('/:id', obtenerInspeccion);
 router.patch('/:id', actualizarInspeccion);
+router.patch('/:id/informe-tecnico', actualizarInformeTecnico);
 router.patch('/:id/items', actualizarItems);
 router.patch('/:id/comparaciones', actualizarComparaciones);
 router.post('/:id/estado', cambiarEstadoInspeccion);
 router.post('/:id/eventos', agregarEventoInspeccion);
 router.get('/:id/acta.pdf', generarActaInspeccionPdf);
+router.get('/:id/informe-tecnico.pdf', generarInformeTecnicoInspeccionPdf);
 router.post('/:id/evidencias', evidenceUpload.single('file'), subirEvidencia);
 router.patch('/:id/evidencias/:evidenciaId/anular', anularEvidencia);
 router.get('/:id/evidencias/:evidenciaId', descargarEvidencia);
