@@ -1,11 +1,16 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { User } from '../../contexts/AuthContext';
 import { InspectionExchangePanel } from '../../pages/inspecciones/InspectionExchangePanel';
 import type { InspectionExchangeTimeline } from '../../types/inspection';
 
-const auth = vi.hoisted(() => ({ currentUser: { id: 'actor-user-1', rol: 'GENERADOR', nombre: 'Responsable' } as any }));
+const auth = vi.hoisted(() => ({
+  currentUser: {
+    id: 'actor-user-1', rol: 'GENERADOR', nombre: 'Responsable', email: '', sector: '', avatar: '', telefono: '', ubicacion: '', permisos: [],
+  } as User,
+}));
 const mocks = vi.hoisted(() => ({
   getExchanges: vi.fn(),
   presentExchange: vi.fn(),
@@ -62,7 +67,7 @@ describe('InspectionExchangePanel', () => {
     vi.clearAllMocks();
     localStorage.clear();
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
-    auth.currentUser = { id: 'actor-user-1', rol: 'GENERADOR', nombre: 'Responsable' };
+    auth.currentUser = { id: 'actor-user-1', rol: 'GENERADOR', nombre: 'Responsable', email: '', sector: '', avatar: '', telefono: '', ubicacion: '', permisos: [] };
     mocks.getExchanges.mockResolvedValue(timeline);
     mocks.presentExchange.mockResolvedValue({ id: 'exchange-2' });
     mocks.decideExchange.mockResolvedValue({ id: 'exchange-3' });
@@ -80,7 +85,7 @@ describe('InspectionExchangePanel', () => {
     expect(screen.getByText(/no envía correos/i)).toBeInTheDocument();
     expect(screen.getByRole('region', { name: /Ciclo 1:/ })).toBeInTheDocument();
     expect(screen.getByText('2 actuaciones vinculadas')).toBeInTheDocument();
-    expect(screen.getByText(/Responde a #1: Acompañar constancia vigente/)).toBeInTheDocument();
+    expect(screen.getByText(/Responde a actuación #1 · Acompañar constancia vigente/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Responder esta actuación' }));
     expect(screen.getByText(/Antecedente: presentación #1/i)).toBeInTheDocument();
@@ -97,8 +102,30 @@ describe('InspectionExchangePanel', () => {
     })));
   });
 
+  it('renders one compact official ledger with a linear chronology and overflow-safe hashes', async () => {
+    renderPanel();
+
+    const ledger = await screen.findByTestId('inspection-exchange-ledger');
+    expect(within(ledger).getByRole('heading', { name: 'Registro cronológico formal' })).toBeInTheDocument();
+    expect(within(ledger).getByText('Libro de actuaciones')).toBeInTheDocument();
+    expect(within(ledger).getByText('2 actuaciones · 1 ciclo')).toBeInTheDocument();
+
+    const rows = within(ledger).getAllByTestId('inspection-exchange-row');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveClass('grid', 'min-w-0');
+    expect(within(rows[0]).getByText('Acompañar constancia vigente')).toBeInTheDocument();
+    expect(within(rows[1]).getByText('Respuesta documental inicial')).toBeInTheDocument();
+
+    const contentHashes = within(ledger).getAllByTestId('exchange-content-hash');
+    const chainHashes = within(ledger).getAllByTestId('exchange-chain-hash');
+    for (const hash of [...contentHashes, ...chainHashes]) {
+      expect(hash).toHaveClass('break-all', 'max-w-full');
+      expect(hash.className).toContain('[overflow-wrap:anywhere]');
+    }
+  });
+
   it('allows only the competent administrator view to record a reasoned legal derivation', async () => {
-    auth.currentUser = { id: 'admin-1', rol: 'ADMIN_GENERADOR', nombre: 'Ana Auditora' };
+    auth.currentUser = { id: 'admin-1', rol: 'ADMIN_GENERADOR', nombre: 'Ana Auditora', email: '', sector: '', avatar: '', telefono: '', ubicacion: '', permisos: [] };
     mocks.getExchanges.mockResolvedValue({ ...timeline, parteActual: 'AUTORIDAD' });
     const user = userEvent.setup();
     renderPanel();

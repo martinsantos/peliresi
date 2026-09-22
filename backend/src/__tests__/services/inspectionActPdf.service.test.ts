@@ -5,6 +5,7 @@ import { spawnSync } from 'child_process';
 import { PassThrough } from 'stream';
 import { describe, expect, it } from 'vitest';
 import { streamInspectionTechnicalReportPdf } from '../../services/inspectionActPdf.service';
+import { verifyInspectionTraceToken } from '../../services/inspectionTraceToken.service';
 
 const pixelPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
 
@@ -102,6 +103,9 @@ describe('inspection act PDF', () => {
     expect(headers.get('Content-Type')).toBe('application/pdf');
     expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
     expect(pdf.length).toBeGreaterThan(10_000);
+    // At least the real QR plus photographic evidence must be embedded.
+    expect((pdf.toString('latin1').match(/\/Subtype\s*\/Image\b/g) || []).length).toBeGreaterThanOrEqual(2);
+    expect((pdf.toString('latin1').match(/\/Subtype\s*\/Link\b/g) || []).length).toBeGreaterThanOrEqual(1);
     expect((pdf.toString('latin1').match(/\/Type\s*\/Page\b/g) || []).length).toBeGreaterThanOrEqual(4);
     const renderedPdf = path.join(tempDir, 'informe-tecnico.pdf');
     fs.writeFileSync(renderedPdf, pdf);
@@ -111,6 +115,14 @@ describe('inspection act PDF', () => {
       expect(extracted.stdout).toContain('TRAZABILIDAD DE RESIDUOS PELIGROSOS');
       expect(extracted.stdout).toContain('Gobierno de Mendoza');
       expect(extracted.stdout).toContain('Documento oficial generado por SITREP');
+      expect(extracted.stdout).toContain('VERIFICAR TRAZABILIDAD DE ESTA INSPECCIÓN');
+      expect(extracted.stdout).toContain('HUELLA SHA-256 DEL EXPEDIENTE');
+      const normalized = extracted.stdout.replace(/\s/g, '');
+      const tokenMatch = normalized.match(/verificar\/inspecciones\/([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)HUELLA/);
+      expect(tokenMatch?.[1]).toBeTruthy();
+      const claims = verifyInspectionTraceToken(tokenMatch![1]);
+      expect(claims).toMatchObject({ recordVersion: 4, fingerprint: expect.stringMatching(/^[a-f0-9]{64}$/) });
+      expect(normalized).toContain(claims!.fingerprint);
     } else {
       expect((extracted.error as NodeJS.ErrnoException).code).toBe('ENOENT');
     }

@@ -10,6 +10,7 @@ import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-do
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { MobileLayout } from './layouts/MobileLayout';
 import { canAccessMobilePath } from './utils/mobileAccess';
+import { postLoginDestination } from './utils/authRedirect';
 
 // Pages — shared lazy imports (single source of truth with App.tsx)
 import {
@@ -18,6 +19,7 @@ import {
   InspeccionesPage, InspeccionDetallePage,
   InspeccionadoParticipacionPage,
   ManifiestosPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
+  VerificarInspeccionPage,
   TransportePerfilPage, ViajeEnCursoTransportista,
   ActoresPage, OperadoresPage, OperadorDetallePage, TransportistasPage, TransportistaDetallePage,
   ReportesPage, AlertasPage, NotificacionesPage, ConfiguracionPage,
@@ -75,28 +77,32 @@ const ActiveTripGuard: React.FC = () => {
 };
 
 /** Auth gate: single source of truth for public/private routing */
-const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser, isLoading, isRestricted } = useAuth();
   const location = useLocation();
 
   // Public routes that don't need auth
-  const publicPaths = ['/l', '/login', '/reclamar', '/manifiestos/verificar', '/inscripcion', '/registro', '/recuperar', '/reset-password'];
+  const publicPaths = ['/l', '/login', '/reclamar', '/manifiestos/verificar', '/verificar/inspecciones', '/inscripcion', '/registro', '/recuperar', '/reset-password'];
   const isPublic = publicPaths.some(p => location.pathname.startsWith(p));
 
   // While auth state is loading, show loader (even for public routes,
   // so we can redirect logged-in users away from /login once resolved)
   if (isLoading) return <PageLoader />;
 
-  // Logged-in user on /login → redirect to dashboard
+  // Logged-in user on /login → resume a safe local deep link when available
   if (currentUser && location.pathname === '/login') {
-    return <Navigate to="/dashboard" replace />;
+    const requestedPath = (location.state as { from?: unknown } | null)?.from;
+    return <Navigate to={postLoginDestination(requestedPath, currentUser.rol)} replace />;
   }
 
   // Public route → render
   if (isPublic) return <>{children}</>;
 
   // Private route without auth → redirect to login
-  if (!currentUser) return <Navigate to="/login" replace />;
+  if (!currentUser) {
+    const from = `${location.pathname}${location.search}${location.hash}`;
+    return <Navigate to="/login" state={{ from }} replace />;
+  }
 
   // Keep the standalone PWA aligned with ProtectedRoute in the web build.
   if (isRestricted && !location.pathname.startsWith('/mi-solicitud')) {
@@ -204,6 +210,7 @@ function AppMobile() {
 
           {/* Verificación pública de manifiesto (QR) */}
           <Route path="/manifiestos/verificar/:numero" element={<VerificarManifiestoPage />} />
+          <Route path="/verificar/inspecciones/:token" element={<VerificarInspeccionPage />} />
 
           {/* Root redirect */}
           <Route path="/" element={<ActiveTripGuard />} />

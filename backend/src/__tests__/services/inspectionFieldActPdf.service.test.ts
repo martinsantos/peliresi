@@ -4,11 +4,15 @@ import path from 'path';
 import { spawnSync } from 'child_process';
 import { PassThrough } from 'stream';
 import { describe, expect, it } from 'vitest';
-import { buildInspectionFieldActFingerprint } from '../../services/inspectionDocumentIntegrity.service';
+import {
+  buildInspectionDocumentFingerprint,
+  buildInspectionFieldActFingerprint,
+} from '../../services/inspectionDocumentIntegrity.service';
 import {
   buildInspectionFieldActPresentation,
   streamInspectionActPdf,
 } from '../../services/inspectionFieldActPdf.service';
+import { inspectionTraceUrl } from '../../services/inspectionTraceToken.service';
 
 const pixelPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
 
@@ -144,6 +148,9 @@ describe('inspection field act PDF', () => {
     expect(headers.get('Content-Disposition')).toContain('acta_inspeccion_');
     expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
     expect(pdf.length).toBeGreaterThan(6_000);
+    // At least the real QR plus the photographic evidence must be embedded.
+    expect((pdf.toString('latin1').match(/\/Subtype\s*\/Image\b/g) || []).length).toBeGreaterThanOrEqual(2);
+    expect((pdf.toString('latin1').match(/\/Subtype\s*\/Link\b/g) || []).length).toBeGreaterThanOrEqual(1);
     expect((pdf.toString('latin1').match(/\/Type\s*\/Page\b/g) || []).length).toBeGreaterThanOrEqual(4);
 
     const renderedPdf = path.join(tempDir, 'acta-art44.pdf');
@@ -161,6 +168,10 @@ describe('inspection field act PDF', () => {
       expect(extracted.stdout).toContain('Notificación y domicilio legal');
       expect(extracted.stdout).toContain('DOCUMENTO OFICIAL GENERADO POR SITREP');
       expect(extracted.stdout).toContain('Gobierno de Mendoza');
+      expect(extracted.stdout).toContain('VERIFICAR TRAZABILIDAD DEL ACTA');
+      expect(extracted.stdout).toContain('HUELLA SHA-256 DEL EXPEDIENTE');
+      expect(extracted.stdout.replace(/\s/g, '')).toContain(inspectionTraceUrl(inspection.id, inspection.numero, inspection.version, buildInspectionDocumentFingerprint(inspection)).replace(/\s/g, ''));
+      expect(extracted.stdout.replace(/\s/g, '')).toContain(buildInspectionDocumentFingerprint(inspection));
       expect(extracted.stdout.replace(/\s/g, '')).toContain(buildInspectionFieldActFingerprint(inspection));
     } else {
       expect((extracted.error as NodeJS.ErrnoException).code).toBe('ENOENT');

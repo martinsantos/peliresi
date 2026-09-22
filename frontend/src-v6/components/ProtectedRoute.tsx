@@ -36,7 +36,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // Not authenticated -> redirect to login (save origin for post-login redirect)
   if (!currentUser) {
-    return <Navigate to={redirectTo} state={{ from: location.pathname }} replace />;
+    const from = `${location.pathname}${location.search}${location.hash}`;
+    return <Navigate to={redirectTo} state={{ from }} replace />;
   }
 
   // Restricted users can only access /mi-solicitud

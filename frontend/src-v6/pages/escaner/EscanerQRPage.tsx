@@ -18,51 +18,11 @@ import { toast } from '../../components/ui/Toast';
 import QRScanner from '../../components/QRScanner';
 import { getCachedManifiestos } from '../../services/offline-sync';
 import { useAuth } from '../../contexts/AuthContext';
+import { parseQrPayload } from './qrParser';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/** Very simple heuristic: a manifiesto ID starts with "M-" */
-const isValidManifiestoId = (data: string): boolean => {
-  return /^M-\d{4}-\d{4,}$/i.test(data.trim());
-};
-
-/**
- * Try to extract a manifiesto ID from the scanned data.
- * Supports:
- *   - Raw ID like "M-2025-0089"
- *   - URL containing the ID as the last path segment, e.g.
- *     https://sitrep.gob.ar/manifiestos/M-2025-0089
- *   - JSON with an "id" or "manifiestoId" key
- */
-const parseManifiestoId = (raw: string): string | null => {
-  const trimmed = raw.trim();
-
-  // 1. Direct ID
-  if (isValidManifiestoId(trimmed)) return trimmed;
-
-  // 2. URL with the ID as the last path segment
-  try {
-    const url = new URL(trimmed);
-    const segments = url.pathname.split('/').filter(Boolean);
-    const last = segments[segments.length - 1];
-    if (last && isValidManifiestoId(last)) return last;
-  } catch {
-    // not a URL, continue
-  }
-
-  // 3. JSON payload
-  try {
-    const json = JSON.parse(trimmed);
-    const candidate = json.id ?? json.manifiestoId ?? json.manifiesto_id;
-    if (candidate && isValidManifiestoId(String(candidate))) return String(candidate);
-  } catch {
-    // not JSON, continue
-  }
-
-  return null;
-};
 
 // ---------------------------------------------------------------------------
 // Page Component
@@ -75,7 +35,7 @@ const EscanerQRPage: React.FC = () => {
   // "success"    -> valid manifiesto detected
   // "error"      -> QR decoded but not a valid manifiesto
   const [phase, setPhase] = useState<'idle' | 'success' | 'error'>('idle');
-  const [scanResult, setScanResult] = useState<string | null>(null);
+  const [scanResult, setScanResult] = useState<{ kind: 'inspection' | 'manifiesto'; value: string } | null>(null);
   const [rawData, setRawData] = useState<string>('');
 
   // -----------------------------------------------------------
@@ -84,9 +44,9 @@ const EscanerQRPage: React.FC = () => {
 
   const handleScan = (data: string) => {
     setRawData(data);
-    const id = parseManifiestoId(data);
-    if (id) {
-      setScanResult(id);
+    const parsed = parseQrPayload(data);
+    if (parsed) {
+      setScanResult({ kind: parsed.kind, value: parsed.kind === 'inspection' ? parsed.token : parsed.id });
       setPhase('success');
     } else {
       setScanResult(null);
@@ -108,21 +68,25 @@ const EscanerQRPage: React.FC = () => {
 
   const handleViewManifiesto = async () => {
     if (!scanResult) return;
+    if (scanResult.kind === 'inspection') {
+      navigate(`/verificar/inspecciones/${encodeURIComponent(scanResult.value)}`);
+      return;
+    }
     // Offline check: verify we have this manifiesto cached before navigating
     if (!navigator.onLine && currentUser?.id) {
       const cached = await getCachedManifiestos(currentUser.id);
-      const found = cached.find(m => m.numero === scanResult || m.id === scanResult);
+      const found = cached.find(m => m.numero === scanResult.value || m.id === scanResult.value);
       if (!found) {
         toast.info('Sin conexión — Se verificará cuando haya conexión');
         // Save for later verification
         const pending = JSON.parse(localStorage.getItem('sitrep_pending_qr') || '[]');
-        if (!pending.includes(scanResult)) pending.push(scanResult);
+        if (!pending.includes(scanResult.value)) pending.push(scanResult.value);
         localStorage.setItem('sitrep_pending_qr', JSON.stringify(pending));
         return;
       }
     }
 
-    navigate(`/manifiestos/${scanResult}`);
+    navigate(`/manifiestos/${scanResult.value}`);
   };
 
   // -----------------------------------------------------------
@@ -152,13 +116,13 @@ const EscanerQRPage: React.FC = () => {
 
       {/* Result area */}
       <div className="flex-1 flex items-center justify-center px-6">
-        {phase === 'success' && (
+        {phase === 'success' && scanResult && (
           <div className="text-center animate-fade-in">
             <div className="w-20 h-20 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-green-600/30">
               <CheckCircle2 size={40} className="text-white" />
             </div>
-            <p className="text-white text-xl font-bold mb-1">{scanResult}</p>
-            <p className="text-white/60 text-sm">Manifiesto encontrado</p>
+            <p className="text-white text-xl font-bold mb-1 break-all">{scanResult.kind === 'inspection' ? 'QR de inspección' : scanResult.value}</p>
+            <p className="text-white/60 text-sm">{scanResult.kind === 'inspection' ? 'Código reconocido. Consultá SITREP para verificarlo.' : 'Manifiesto encontrado'}</p>
           </div>
         )}
 
@@ -180,7 +144,7 @@ const EscanerQRPage: React.FC = () => {
         {phase === 'success' ? (
           <>
             <Button fullWidth size="lg" onClick={handleViewManifiesto}>
-              Ver Manifiesto
+              {scanResult?.kind === 'inspection' ? 'Ver inspección' : 'Ver Manifiesto'}
             </Button>
             <Button
               variant="outline"

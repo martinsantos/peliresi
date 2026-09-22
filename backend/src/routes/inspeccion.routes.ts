@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
+import rateLimit from 'express-rate-limit';
 import { isAuthenticated, requireFullAccess } from '../middlewares/auth.middleware';
 import {
   actualizarInspeccion,
@@ -16,6 +17,7 @@ import {
   listarInspecciones,
   obtenerInspeccion,
   subirEvidencia,
+  verificarInspeccionPublica,
 } from '../controllers/inspeccion.controller';
 import {
   decidirIntercambioInspeccion,
@@ -34,6 +36,18 @@ const exchangeUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 25 * 1024 * 1024, files: 5, fields: 12 },
 });
+
+const inspectionTraceLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Demasiadas verificaciones, intente de nuevo en un momento' },
+});
+
+// Must remain before the authenticated router middleware: the QR landing page
+// is public, while the detailed trace remains protected below.
+router.get('/verificar/:token', inspectionTraceLimiter, verificarInspeccionPublica);
 
 router.use(isAuthenticated);
 router.use(requireFullAccess);

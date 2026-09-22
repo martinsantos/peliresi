@@ -29,6 +29,7 @@ import {
   ResetPasswordPage, ReclamarCuentaPage, UserSwitcherPage,
   DashboardPage, CentroControlPage, WarRoomPage,
   InspeccionesPage, InspeccionDetallePage,
+  VerificarInspeccionPage,
   InspeccionadoParticipacionPage,
   ManifiestosPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
   TransportePerfilPage, ViajeEnCursoTransportista,
@@ -309,6 +310,7 @@ function App() {
 
         {/* Verificación pública de manifiesto (QR) */}
         <Route path="/manifiestos/verificar/:numero" element={<VerificarManifiestoPage />} />
+        <Route path="/verificar/inspecciones/:token" element={<VerificarInspeccionPage />} />
 
         {/* Legacy /v6/ QR redirect — QR codes ya impresos apuntan a /v6/manifiestos/verificar/... */}
         <Route path="/v6/manifiestos/verificar/:numero" element={<V6VerificarRedirect />} />

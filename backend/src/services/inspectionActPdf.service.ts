@@ -12,6 +12,7 @@ import {
   loadInspectionPdfBranding,
   type InspectionPdfBranding,
 } from './inspectionPdfBranding.service';
+import { buildInspectionPdfQr, drawInspectionPdfQrCard } from './inspectionPdfQr.service';
 
 const C = {
   green: '#0D8A4F', darkGreen: '#1B5E3C', paleGreen: '#ECFDF5',
@@ -575,6 +576,7 @@ export async function streamInspectionTechnicalReportPdf(
 ): Promise<void> {
   const generatedAt = new Date();
   const fingerprint = buildInspectionDocumentFingerprint(inspection);
+  const traceQr = await buildInspectionPdfQr({ id: inspection.id, numero: inspection.numero, version: inspection.version, fingerprint });
   const readiness = inspectDossierReadiness(inspection);
   const state = documentState(inspection, readiness);
   const branding = await loadInspectionPdfBranding();
@@ -599,6 +601,7 @@ export async function streamInspectionTechnicalReportPdf(
   doc.pipe(res);
 
   header(doc, inspection, readiness, generatedAt, branding);
+  doc.y = drawInspectionPdfQrCard(doc, traceQr, fingerprint, { y: doc.y }) + 14;
   const technical = inspection.informeTecnico && typeof inspection.informeTecnico === 'object' ? inspection.informeTecnico : {};
   const actor = actorOf(inspection);
 
@@ -676,6 +679,15 @@ export async function streamInspectionTechnicalReportPdf(
     doc.font('Helvetica').fontSize(9.2).fillColor(C.ink).text(paragraph, 44, doc.y, { width: doc.page.width - 88, lineGap: 2.8 });
     doc.y += 8;
   });
+  // Keep the validation context with its signature fields. If the closure
+  // ends near the bottom, the new page must still carry explanatory content,
+  // never an isolated pair of signature lines.
+  ensureSpace(doc, 205);
+  section(doc, 'Validación profesional y revisión institucional', 'Espacios de firma y control de la versión exportada');
+  doc.roundedRect(44, doc.y, doc.page.width - 88, 42, 5).fill(C.soft);
+  doc.font('Helvetica').fontSize(8.2).fillColor(C.ink)
+    .text('La firma técnica y la revisión institucional deben incorporarse conforme al circuito aplicable. Su ausencia en esta exportación no se interpreta como aprobación ni reemplaza una firma digital.', 56, doc.y + 10, { width: doc.page.width - 112, lineGap: 1.5 });
+  doc.y += 56;
   ensureSpace(doc, 104);
   const signatureY = doc.y + 10;
   const half = (doc.page.width - 104) / 2;

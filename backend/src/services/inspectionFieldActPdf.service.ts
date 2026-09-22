@@ -1,6 +1,9 @@
 import type { Response } from 'express';
 import PDFDocument from 'pdfkit';
-import { buildInspectionFieldActFingerprint } from './inspectionDocumentIntegrity.service';
+import {
+  buildInspectionDocumentFingerprint,
+  buildInspectionFieldActFingerprint,
+} from './inspectionDocumentIntegrity.service';
 import { prepareInspectionPdfImages, type PreparedInspectionImage } from './inspectionPdfImage.service';
 import {
   drawMendozaMark,
@@ -8,6 +11,7 @@ import {
   loadInspectionPdfBranding,
   type InspectionPdfBranding,
 } from './inspectionPdfBranding.service';
+import { buildInspectionPdfQr, drawInspectionPdfQrCard } from './inspectionPdfQr.service';
 
 const COLORS = {
   green: '#1B5E3C',
@@ -535,9 +539,15 @@ function article44Section(
   actNumber: string,
   presentation: InspectionFieldActPresentation,
   branding: InspectionPdfBranding,
+  startNewPage = true,
 ) {
-  doc.addPage();
-  article44PageHeader(doc, actNumber, inspection.numero, presentation, branding);
+  if (startNewPage) {
+    doc.addPage();
+    article44PageHeader(doc, actNumber, inspection.numero, presentation, branding);
+  } else {
+    band(doc, 'Formalidades documentales del art. 44 · continuación del cierre');
+    doc.y += 7;
+  }
   const note = 'Esta sección reproduce únicamente datos consignados en el acta de campo. "No consignado" o "pendiente" no presume hechos, firmas, entrega de copias ni notificaciones. El control indicado es de completitud documental y no sustituye una valoración jurídica.';
   const noteHeight = Math.max(37, doc.heightOfString(note, { width: doc.page.width - 100 }) + 17);
   doc.roundedRect(40, doc.y, doc.page.width - 80, noteHeight, 4).fill(COLORS.soft);
@@ -578,13 +588,23 @@ function signatureBlock(
   act: ActData,
   branding: InspectionPdfBranding,
   actNumber: string,
-) {
+): boolean {
   const actor = actorOf(inspection);
   const y = doc.y + 18;
   const width = (doc.page.width - 92) / 2;
+  let movedToNewPage = false;
   if (y + 92 > doc.page.height - 56) {
+    movedToNewPage = true;
     doc.addPage();
     institutionalHeader(doc, actNumber, branding, `FIRMAS Y CONSTANCIAS · ${inspection.numero}`);
+    // Never leave a detached signature sheet: explain what is being signed
+    // before the signature fields when the block must move to a new page.
+    band(doc, 'Cierre documental y firmas');
+    doc.y += 9;
+    doc.roundedRect(40, doc.y, doc.page.width - 80, 42, 4).fill(COLORS.soft);
+    doc.font('Helvetica').fontSize(7.2).fillColor(COLORS.ink)
+      .text('Las constancias siguientes identifican a las personas intervinientes y el estado documental informado en el acta. Este PDF no incorpora una firma gráfica ni presume validación cuando el expediente la marca como pendiente.', 50, doc.y + 9, { width: doc.page.width - 100, lineGap: 1.2 });
+    doc.y += 51;
   }
   const actualY = doc.y + 18;
   const responsible = value(act.atendidoPor || act.titular || actor.representanteLegalNombre, 'Causante / responsable');
@@ -612,6 +632,7 @@ function signatureBlock(
     doc.font('Helvetica').fontSize(5.6).fillColor(COLORS.muted).text(status, x, actualY + 75, { width, align: 'center', height: 16, ellipsis: true });
   });
   doc.y = actualY + 96;
+  return movedToNewPage;
 }
 
 function observationsHeader(
@@ -691,7 +712,10 @@ function photoAnnex(
       doc.y += 7;
     }
     const y = doc.y;
-    const imageHeight = 245;
+    // Two evidence cards must fit below the institutional header and above the
+    // footer. Keeping the illustration at 205pt prevents PDFKit from creating
+    // an implicit overflow page for the second card.
+    const imageHeight = 205;
     doc.roundedRect(34, y, doc.page.width - 68, imageHeight, 4).fill(COLORS.soft);
     const prepared = preparedImages.get(photo.id);
     if (prepared?.buffer) doc.image(prepared.buffer, 38, y + 4, { fit: [doc.page.width - 76, imageHeight - 8], align: 'center', valign: 'center' });
@@ -723,6 +747,11 @@ export async function streamInspectionActPdf(
   const actNumber = value(inspection.numeroActa, inspection.numero);
   const started = dateParts(inspection.iniciadaAt || inspection.fechaProgramada || inspection.createdAt);
   const presentation = buildInspectionFieldActPresentation(inspection);
+  const fingerprint = buildInspectionFieldActFingerprint(inspection);
+  // The public QR verifies the complete current dossier, while the field-act
+  // footer intentionally preserves the frozen field-act fingerprint.
+  const traceFingerprint = buildInspectionDocumentFingerprint(inspection);
+  const traceQr = await buildInspectionPdfQr({ id: inspection.id, numero: inspection.numero, version: inspection.version, fingerprint: traceFingerprint });
   const branding = await loadInspectionPdfBranding();
   const fieldEvidence = (inspection.evidencias || []).filter((evidence: any) => !evidence.intercambioId);
   const preparedImages = await prepareInspectionPdfImages(fieldEvidence, resolveEvidence);
@@ -743,6 +772,7 @@ export async function streamInspectionActPdf(
 
   institutionalHeader(doc, actNumber, branding, `Expediente digital ${inspection.numero}`);
   statusBanner(doc, presentation);
+  doc.y = drawInspectionPdfQrCard(doc, traceQr, traceFingerprint, { y: doc.y, title: 'VERIFICAR TRAZABILIDAD DEL ACTA' }) + 8;
   row(doc, [
     { label: 'Fecha', value: started.date },
     { label: 'Hora', value: started.time },
@@ -799,9 +829,11 @@ export async function streamInspectionActPdf(
   doc.roundedRect(34, noticeY, doc.page.width - 68, 37, 4).fill(COLORS.soft);
   doc.font('Helvetica-Bold').fontSize(7.4).fillColor(COLORS.ink).text(notice, 44, noticeY + 9, { width: doc.page.width - 88, align: 'center' });
   doc.y = noticeY + 42;
-  signatureBlock(doc, inspection, act, branding, actNumber);
+  const signatureMovedToNewPage = signatureBlock(doc, inspection, act, branding, actNumber);
 
-  article44Section(doc, inspection, actNumber, presentation, branding);
+  // Keep the documentary section on the signature page when the cover page
+  // could not fit the signatures, avoiding a detached signature-only sheet.
+  article44Section(doc, inspection, actNumber, presentation, branding, !signatureMovedToNewPage);
 
   doc.addPage();
   observationsHeader(doc, actNumber, branding, act.actaAnterior ? `CONTINÚA / RELACIONADA CON ${act.actaAnterior}` : `Expediente digital ${inspection.numero}`);
@@ -829,12 +861,13 @@ export async function streamInspectionActPdf(
 
   photoAnnex(doc, inspection, preparedImages, actNumber, branding);
 
-  const fingerprint = buildInspectionFieldActFingerprint(inspection);
   const pages = doc.bufferedPageRange();
   for (let index = pages.start; index < pages.start + pages.count; index += 1) {
     doc.switchToPage(index);
     // Mantener el pie dentro del área imprimible. PDFKit crea una página nueva
     // si el texto cruza el margen inferior, incluso al editar páginas bufferizadas.
+    const flowBottomMargin = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
     const footerY = doc.page.height - 55;
     doc.moveTo(34, footerY - 5).lineTo(doc.page.width - 34, footerY - 5).lineWidth(0.5).strokeColor(COLORS.line).stroke();
     doc.font('Helvetica').fontSize(5.7).fillColor(COLORS.muted)
@@ -842,6 +875,7 @@ export async function streamInspectionActPdf(
     doc.fontSize(6.1)
       .text(`Gobierno de Mendoza · SITREP · ${inspection.numero} · ${presentation.statusLabel}`, 34, footerY + 9, { width: 410, lineBreak: false })
       .text(`Página ${index + 1} de ${pages.count}`, 466, footerY + 9, { width: 95, align: 'right', lineBreak: false });
+    doc.page.margins.bottom = flowBottomMargin;
   }
   doc.end();
 }

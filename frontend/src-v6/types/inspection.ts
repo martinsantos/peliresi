@@ -69,6 +69,15 @@ export interface InspectionTechnicalReport {
   recomendacion?: string;
 }
 
+export interface InspectionVerification {
+  url: string;
+  huella: string;
+  version: number;
+  estadoVerificacion?: 'VIGENTE' | 'HISTORICA_AUTENTICA';
+  versionActual?: number;
+  huellaActual?: string;
+}
+
 export interface InspectionItem {
   id: string;
   codigo: string;
@@ -210,6 +219,7 @@ export interface Inspection {
   version: number;
   createdAt: string;
   updatedAt: string;
+  verificacion?: InspectionVerification | null;
   items: InspectionItem[];
   comparaciones: InspectionComparison[];
   evidencias: InspectionEvidence[];

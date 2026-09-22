@@ -7,9 +7,24 @@ import type {
   InspectionState,
   InspectionActData,
   InspectionTechnicalReport,
+  InspectionVerification,
   InspectionExchangeTimeline,
   InspectionExchangeType,
 } from '../types/inspection';
+
+export interface PublicInspectionVerification {
+  valido?: boolean;
+  numero?: string;
+  numeroActa?: string | null;
+  estado?: InspectionState;
+  tipoActor?: InspectionActorType;
+  actor?: { razonSocial?: string; cuit?: string } | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+  authorizedPath: string;
+  accesoDetallado?: 'requiere_autorizacion' | string;
+  verificacion: InspectionVerification;
+}
 
 export interface PaginatedInspections {
   items: Inspection[];
@@ -36,6 +51,25 @@ export interface InspectionParticipationSummary {
 }
 
 export const inspeccionService = {
+  async verifyPublic(token: string): Promise<PublicInspectionVerification> {
+    const { data } = await api.get(`/inspecciones/verificar/${encodeURIComponent(token)}`);
+    const payload = data?.data ?? data;
+    const origin = typeof window === 'undefined' ? '' : window.location.origin;
+    return {
+      ...payload,
+      updatedAt: payload?.updatedAt ?? null,
+      authorizedPath: String(payload?.authorizedPath || '/login'),
+      verificacion: {
+        url: payload?.verificacion?.url || `${origin}/verificar/inspecciones/${encodeURIComponent(token)}`,
+        huella: String(payload?.verificacion?.huella || payload?.huella || ''),
+        version: Number(payload?.verificacion?.version ?? payload?.version ?? 0),
+        estadoVerificacion: payload?.verificacion?.estadoVerificacion,
+        versionActual: payload?.verificacion?.versionActual == null ? undefined : Number(payload.verificacion.versionActual),
+        huellaActual: payload?.verificacion?.huellaActual ? String(payload.verificacion.huellaActual) : undefined,
+      },
+    } as PublicInspectionVerification;
+  },
+
   async listParticipation(): Promise<InspectionParticipationSummary[]> {
     const { data } = await api.get('/inspecciones/participacion');
     return data.data;

@@ -29,7 +29,7 @@ const InspeccionadoParticipacionPage: React.FC = () => {
     return (
       <div className="mx-auto w-full max-w-6xl space-y-5 pb-24 lg:pb-8">
         <button type="button" onClick={() => navigate(`${prefix}/mis-inspecciones`)} className="inline-flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-100"><ArrowLeft size={18} />Volver a mis inspecciones</button>
-        <InspectionExchangePanel inspectionId={id} />
+        <div id="trazabilidad" className="scroll-mt-24"><InspectionExchangePanel inspectionId={id} /></div>
       </div>
     );
   }

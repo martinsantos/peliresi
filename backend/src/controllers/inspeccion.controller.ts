@@ -1,5 +1,5 @@
 import fs from 'fs';
-import type { NextFunction, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import {
   EstadoInspeccion,
   Prisma,
@@ -24,9 +24,10 @@ import {
 import { streamInspectionActPdf } from '../services/inspectionFieldActPdf.service';
 import { streamInspectionTechnicalReportPdf } from '../services/inspectionActPdf.service';
 import {
-  hashCanonicalPayload,
+  buildInspectionDocumentFingerprint, hashCanonicalPayload,
   inspectDossierReadiness,
 } from '../services/inspectionDocumentIntegrity.service';
+import { buildInspectionTracePresentation, buildInspectionTraceUrl, verifyInspectionTraceToken } from '../services/inspectionTraceToken.service';
 import { inspectionEvidenceMetadataSchema } from '../domain/inspectionEvidence';
 
 type ChecklistDefinition = { codigo: string; categoria: string; etiqueta: string; orden: number; obligatorio?: boolean };
@@ -424,7 +425,63 @@ export async function obtenerInspeccion(req: AuthRequest, res: Response, next: N
       await ensureInspectionDeclaredComparisons(prisma, inspection);
       inspection = await prisma.inspeccion.findUniqueOrThrow({ where: { id: req.params.id }, include: inspectionInclude });
     }
-    res.json({ success: true, data: inspection });
+    const fingerprint = buildInspectionDocumentFingerprint(inspection);
+    const trace = buildInspectionTracePresentation({ id: inspection.id, numero: inspection.numero, version: inspection.version, fingerprint });
+    res.json({
+      success: true,
+      data: {
+        ...inspection,
+        verificacion: {
+          url: trace.url,
+          huella: fingerprint,
+          version: inspection.version,
+        },
+      },
+    });
+  } catch (error) { next(error); }
+}
+
+/** Public QR landing data. Never return the inspection dossier or actor PII. */
+export async function verificarInspeccionPublica(req: Request, res: Response, next: NextFunction) {
+  try {
+    const claims = verifyInspectionTraceToken(String(req.params.token || ''));
+    if (!claims) throw new AppError('Código de verificación inválido', 404);
+    // Load the same canonical dossier used by the PDFs, but only project a
+    // minimal envelope below. This keeps the public hash identical to the
+    // hash printed on the official documents without leaking dossier fields.
+    const inspection = await prisma.inspeccion.findUnique({ where: { id: claims.inspectionId }, include: inspectionInclude });
+    if (!inspection || inspection.numero !== claims.numero) throw new AppError('Código de verificación inválido', 404);
+    const huellaActual = buildInspectionDocumentFingerprint(inspection);
+    const estadoVerificacion = claims.fingerprint === huellaActual && claims.recordVersion === inspection.version
+      ? 'VIGENTE'
+      : 'HISTORICA_AUTENTICA';
+    // Verification reflects a live administrative record. Do not let browsers,
+    // shared proxies or search engines persist a stale public result.
+    res.set('Cache-Control', 'no-store, max-age=0');
+    res.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+    res.json({
+      success: true,
+      valido: true,
+      data: {
+        numero: inspection.numero,
+        numeroActa: inspection.numeroActa,
+        tipoActor: inspection.tipoActor,
+        estado: inspection.estado,
+        version: inspection.version,
+        updatedAt: inspection.updatedAt,
+        createdAt: inspection.createdAt,
+        verificacion: {
+          url: buildInspectionTraceUrl(String(req.params.token)),
+          huella: claims.fingerprint,
+          version: claims.recordVersion,
+          estadoVerificacion,
+          versionActual: inspection.version,
+          huellaActual: huellaActual,
+        },
+        authorizedPath: `/inspecciones/${encodeURIComponent(inspection.id)}#trazabilidad`,
+        accesoDetallado: 'requiere_autorizacion',
+      },
+    });
   } catch (error) { next(error); }
 }
 

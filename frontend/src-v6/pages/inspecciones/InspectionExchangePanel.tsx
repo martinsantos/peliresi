@@ -17,7 +17,7 @@ import {
   WifiOff,
   X,
 } from 'lucide-react';
-import { Badge, type BadgeColor } from '../../components/ui/BadgeV2';
+import { Badge } from '../../components/ui/BadgeV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Card } from '../../components/ui/CardV2';
 import { toast } from '../../components/ui/Toast';
@@ -39,16 +39,6 @@ const TYPE_LABELS: Record<InspectionExchangeType, string> = {
   PRONUNCIAMIENTO: 'Pronunciamiento',
   CIERRE_CONFORME: 'Cierre conforme',
   DERIVACION_LEGALES: 'Derivación a Legales',
-};
-
-const TYPE_COLORS: Record<InspectionExchangeType, BadgeColor> = {
-  REQUERIMIENTO: 'warning',
-  RESPUESTA: 'info',
-  DESCARGO: 'info',
-  SUBSANACION: 'primary',
-  PRONUNCIAMIENTO: 'primary',
-  CIERRE_CONFORME: 'success',
-  DERIVACION_LEGALES: 'error',
 };
 
 const OPEN_STATES = new Set(['NOTIFICADA', 'EN_DESCARGO', 'REQUIERE_SUBSANACION']);
@@ -125,6 +115,120 @@ function groupExchangeCycles(entries: InspectionExchange[]): Array<{ root: Inspe
   return [...groups.entries()]
     .map(([rootId, grouped]) => ({ root: byId.get(rootId) || grouped[0], entries: grouped }))
     .sort((left, right) => left.root.secuencia - right.root.secuencia);
+}
+
+type ExchangeCycle = ReturnType<typeof groupExchangeCycles>[number];
+
+function ExchangeIntegrity({ entry }: { entry: InspectionExchange }) {
+  return (
+    <details data-testid={`exchange-integrity-${entry.id}`} className="min-w-0 flex-1 text-xs text-neutral-500">
+      <summary className="flex w-fit cursor-pointer list-none items-center gap-1.5 rounded-md py-1 font-semibold hover:text-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2">
+        <Hash size={14} aria-hidden="true" />
+        Integridad y versión
+      </summary>
+      <dl className="mt-2 grid min-w-0 gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3 font-mono text-[10px] leading-4 sm:grid-cols-2">
+        <div className="min-w-0 sm:col-span-2">
+          <dt className="font-sans font-bold uppercase tracking-wide text-neutral-500">Versión del expediente</dt>
+          <dd className="mt-0.5 text-neutral-800">{entry.versionExpediente}</dd>
+        </div>
+        <div className="min-w-0">
+          <dt className="font-sans font-bold uppercase tracking-wide text-neutral-500">Huella de contenido</dt>
+          <dd data-testid="exchange-content-hash" className="mt-0.5 max-w-full break-all text-neutral-700 [overflow-wrap:anywhere]">{entry.contenidoSha256}</dd>
+        </div>
+        <div className="min-w-0">
+          <dt className="font-sans font-bold uppercase tracking-wide text-neutral-500">Huella encadenada</dt>
+          <dd data-testid="exchange-chain-hash" className="mt-0.5 max-w-full break-all text-neutral-700 [overflow-wrap:anywhere]">{entry.hashCadena}</dd>
+        </div>
+      </dl>
+    </details>
+  );
+}
+
+function ExchangeLedger({
+  cycles,
+  parentById,
+  party,
+  open,
+  onDownload,
+  onReply,
+}: {
+  cycles: ExchangeCycle[];
+  parentById: Map<string, InspectionExchange>;
+  party: InspectionExchangeParty;
+  open: boolean;
+  onDownload: (entry: InspectionExchange, evidenceId: string, name: string) => void;
+  onReply: (entry: InspectionExchange) => void;
+}) {
+  return (
+    <section data-testid="inspection-exchange-ledger" aria-labelledby="inspection-exchange-ledger-title" className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+      <header className="flex flex-col gap-2 border-b border-neutral-200 bg-neutral-50 px-4 py-4 sm:flex-row sm:items-end sm:justify-between sm:px-6">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary-700">Libro de actuaciones</p>
+          <h4 id="inspection-exchange-ledger-title" className="mt-1 text-lg font-extrabold tracking-tight text-[#10213A]">Registro cronológico formal</h4>
+          <p className="mt-1 text-xs leading-relaxed text-neutral-600">Secuencia íntegra de requerimientos, respuestas y decisiones incorporadas al expediente.</p>
+        </div>
+        <p className="font-mono text-[11px] font-semibold text-neutral-500">{cycles.reduce((total, cycle) => total + cycle.entries.length, 0)} actuaciones · {cycles.length} {cycles.length === 1 ? 'ciclo' : 'ciclos'}</p>
+      </header>
+
+      <div className="divide-y divide-neutral-200">
+        {cycles.map((cycle, cycleIndex) => (
+          <section key={cycle.root.id} aria-label={`Ciclo ${cycleIndex + 1}: ${cycle.root.asunto}`}>
+            <header className="flex flex-col gap-1 border-b border-neutral-100 bg-[#FAFBFA] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+              <div className="flex min-w-0 items-baseline gap-2">
+                <span className="shrink-0 font-mono text-[10px] font-extrabold uppercase tracking-[0.14em] text-primary-700">Ciclo {String(cycleIndex + 1).padStart(2, '0')}</span>
+                <span className="truncate text-xs font-bold text-[#10213A]">Actuación inicial #{cycle.root.secuencia} · {TYPE_LABELS[cycle.root.tipo]}</span>
+              </div>
+              <p className="shrink-0 text-[11px] text-neutral-500">{cycle.entries.length} {cycle.entries.length === 1 ? 'actuación vinculada' : 'actuaciones vinculadas'}</p>
+            </header>
+
+            <ol className="relative before:absolute before:bottom-8 before:left-[1.12rem] before:top-8 before:w-px before:bg-neutral-200 sm:before:left-[1.5rem]" aria-label={`Actuaciones del ciclo ${cycleIndex + 1}`}>
+              {cycle.entries.map((entry) => {
+                const authority = entry.parte === 'AUTORIDAD';
+                const parent = entry.respondeAId ? parentById.get(entry.respondeAId) : undefined;
+                const mayReply = open && entry.parte !== party && !CLOSED_TYPES.has(entry.tipo);
+                return (
+                  <li key={entry.id} data-testid="inspection-exchange-row" className="relative grid min-w-0 grid-cols-[2.25rem_minmax(0,1fr)] sm:grid-cols-[3rem_minmax(0,1fr)]">
+                    <div className="relative z-10 flex justify-center pt-5" aria-hidden="true">
+                      <span className={`flex h-7 w-7 items-center justify-center rounded-full border-2 bg-white font-mono text-[10px] font-extrabold shadow-sm ${authority ? 'border-[#1B5E3C] text-[#1B5E3C]' : 'border-info-600 text-info-700'}`}>{entry.secuencia}</span>
+                    </div>
+                    <article className="min-w-0 border-b border-neutral-100 px-2 py-5 pr-4 last:border-b-0 sm:px-3 sm:pr-6">
+                      <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                            <Badge color={authority ? 'primary' : 'info'} variant="outline">{authority ? 'Organismo' : 'Inspeccionado'}</Badge>
+                            <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-neutral-600">{TYPE_LABELS[entry.tipo]}</span>
+                            {entry.presentadoFueraDePlazo && <Badge color="error">Fuera de plazo</Badge>}
+                          </div>
+                          <h5 className="mt-2 break-words text-[15px] font-extrabold leading-6 text-[#10213A]">{entry.asunto}</h5>
+                          {parent && <p className="mt-1 break-words text-xs font-semibold text-primary-700">Responde a actuación #{parent.secuencia} · {parent.asunto}</p>}
+                        </div>
+                        <dl className="grid shrink-0 grid-cols-2 gap-x-3 gap-y-1 text-[11px] leading-4 text-neutral-500 lg:block lg:text-right">
+                          <div className="contents lg:block"><dt className="sr-only">Fecha</dt><dd className="font-semibold text-neutral-700">{inspectionDate(entry.createdAt, true)}</dd></div>
+                          <div className="contents lg:block"><dt className="sr-only">Autor</dt><dd>{entry.autor.nombre} {entry.autor.apellido || ''}</dd></div>
+                          <div className="contents lg:block"><dt className="sr-only">Canal</dt><dd>Portal SITREP</dd></div>
+                        </dl>
+                      </div>
+
+                      <p className="mt-3 max-w-[76ch] whitespace-pre-wrap break-words text-sm leading-6 text-neutral-800">{entry.cuerpo}</p>
+
+                      {entry.plazoRespuestaAt && <div className="mt-3 flex w-fit max-w-full items-start gap-2 border-l-2 border-warning-500 bg-warning-50 px-3 py-2 text-xs font-semibold leading-5 text-warning-900"><Clock3 size={15} className="mt-0.5 shrink-0" aria-hidden="true" /><span>Plazo de respuesta: {inspectionDate(entry.plazoRespuestaAt, true)}</span></div>}
+
+                      {entry.adjuntos.length > 0 && <div className="mt-4 min-w-0"><p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-neutral-500">Adjuntos preservados</p><div className="grid min-w-0 gap-2 sm:grid-cols-2">{entry.adjuntos.map((file) => <button key={file.id} type="button" onClick={() => onDownload(entry, file.id, file.nombreOriginal)} className="flex min-w-0 items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-left text-xs font-semibold text-neutral-700 hover:border-primary-300 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"><Paperclip size={14} className="shrink-0" aria-hidden="true" /><span className="min-w-0 flex-1 truncate">{file.nombreOriginal}</span><span className="shrink-0 font-normal text-neutral-500">{formatBytes(file.bytes)}</span><Download size={13} className="shrink-0" aria-hidden="true" /></button>)}</div></div>}
+
+                      <div className="mt-4 flex min-w-0 flex-col gap-3 border-t border-neutral-100 pt-3 sm:flex-row sm:items-start sm:justify-between">
+                        <ExchangeIntegrity entry={entry} />
+                        {mayReply && <Button size="sm" variant="outline" leftIcon={<Reply size={15} />} onClick={() => onReply(entry)} className="w-full shrink-0 sm:w-auto">Responder esta actuación</Button>}
+                      </div>
+                    </article>
+                  </li>
+                );
+              })}
+            </ol>
+          </section>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 export interface InspectionExchangePanelProps {
@@ -344,16 +448,18 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
       {restoredAt && composeOpen && <div role="status" className="flex items-start gap-3 rounded-xl border border-info-200 bg-info-50 px-4 py-3 text-sm text-info-900"><FileCheck2 className="mt-0.5 shrink-0" size={18} /><div><p className="font-bold">Borrador local recuperado</p><p className="mt-0.5 leading-5">Guardado {inspectionDate(restoredAt, true)} con {files.length} {files.length === 1 ? 'adjunto' : 'adjuntos'}. Revíselo antes de presentar; todavía no integra el expediente.</p></div></div>}
       {deadlineExpired && open && <div className="flex items-start gap-3 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-900"><AlertTriangle className="mt-0.5 shrink-0" size={18} /><div><p className="font-bold">Plazo vencido</p><p className="mt-0.5">El sistema admite la presentación y la marcará como fuera de plazo; la valoración corresponde a la autoridad competente.</p></div></div>}
 
-      <div className="space-y-3">
-        {timeline.intercambios.length === 0 ? (
-          <Card className="py-10 text-center"><Files className="mx-auto text-neutral-300" size={36} /><p className="mt-3 font-bold text-[#10213A]">Todavía no hay presentaciones formales</p><p className="mx-auto mt-1 max-w-xl text-sm leading-6 text-neutral-600">La autoridad inicia el circuito con un requerimiento. El inspeccionado podrá responder sobre ese antecedente.</p></Card>
-        ) : exchangeCycles.map((cycle, cycleIndex) => <section key={cycle.root.id} aria-label={`Ciclo ${cycleIndex + 1}: ${cycle.root.asunto}`} className="rounded-xl border border-neutral-200 bg-neutral-50/60 p-2 sm:p-3"><header className="mb-2 flex flex-col gap-1 px-1 py-1 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-500">Ciclo {cycleIndex + 1}</p><p className="text-sm font-bold text-[#10213A]">Iniciado por #{cycle.root.secuencia} · {TYPE_LABELS[cycle.root.tipo]}</p></div><p className="text-xs text-neutral-500">{cycle.entries.length} {cycle.entries.length === 1 ? 'actuación' : 'actuaciones'} vinculadas</p></header><div className="space-y-2">{cycle.entries.map((entry) => {
-          const authority = entry.parte === 'AUTORIDAD';
-          const parent = entry.respondeAId ? parentById.get(entry.respondeAId) : undefined;
-          const mayReply = open && entry.parte !== party && !CLOSED_TYPES.has(entry.tipo);
-          return <article key={entry.id} className={`relative overflow-hidden rounded-xl border bg-white shadow-[0_1px_2px_rgba(0,0,0,.03)] ${authority ? 'border-primary-200' : 'border-info-200'}`}><div className={`absolute inset-y-0 left-0 w-1 ${authority ? 'bg-[#1B5E3C]' : 'bg-info-600'}`} /><div className="px-4 py-4 pl-5 sm:px-5 sm:pl-6"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="font-mono text-xs font-bold text-neutral-500">#{entry.secuencia}</span><Badge color={authority ? 'primary' : 'info'} variant="outline">{authority ? 'Organismo' : 'Inspeccionado'}</Badge><Badge color={TYPE_COLORS[entry.tipo]}>{TYPE_LABELS[entry.tipo]}</Badge>{entry.presentadoFueraDePlazo && <Badge color="error">Fuera de plazo</Badge>}</div><h4 className="mt-2 text-base font-extrabold leading-6 text-[#10213A]">{entry.asunto}</h4>{parent && <p className="mt-1 text-xs font-medium text-neutral-500">Responde a #{parent.secuencia}: {parent.asunto}</p>}</div><div className="shrink-0 text-left text-xs leading-5 text-neutral-500 sm:text-right"><p className="font-semibold text-neutral-700">{entry.autor.nombre} {entry.autor.apellido || ''}</p><p>{inspectionDate(entry.createdAt, true)}</p><p>Canal: Portal SITREP</p></div></div><p className="mt-4 max-w-[76ch] whitespace-pre-wrap text-sm leading-6 text-neutral-800">{entry.cuerpo}</p>{entry.plazoRespuestaAt && <div className="mt-4 flex w-fit items-center gap-2 rounded-lg border border-warning-200 bg-warning-50 px-3 py-2 text-xs font-semibold text-warning-900"><Clock3 size={15} />Responder hasta {inspectionDate(entry.plazoRespuestaAt, true)}</div>}{entry.adjuntos.length > 0 && <div className="mt-4 border-t border-neutral-100 pt-3"><p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-neutral-500">Adjuntos preservados</p><div className="flex flex-wrap gap-2">{entry.adjuntos.map((file) => <button key={file.id} type="button" onClick={() => void downloadAttachment(entry, file.id, file.nombreOriginal)} className="inline-flex max-w-full items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-left text-xs font-semibold text-neutral-700 hover:border-primary-300 hover:bg-primary-50"><Paperclip size={14} className="shrink-0" /><span className="truncate">{file.nombreOriginal}</span><span className="shrink-0 font-normal text-neutral-500">{formatBytes(file.bytes)}</span><Download size={13} className="shrink-0" /></button>)}</div></div>}<div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 pt-3"><details className="text-xs text-neutral-500"><summary className="flex cursor-pointer list-none items-center gap-1.5 font-semibold hover:text-neutral-800"><Hash size={14} />Integridad y versión</summary><dl className="mt-2 grid gap-1 font-mono text-[10px]"><div>Versión: {entry.versionExpediente}</div><div>Contenido: {entry.contenidoSha256}</div><div>Cadena: {entry.hashCadena}</div></dl></details>{mayReply && <Button size="sm" variant="outline" leftIcon={<Reply size={15} />} onClick={() => beginReply(entry)}>Responder esta actuación</Button>}</div></div></article>;
-        })}</div></section>)}
-      </div>
+      {timeline.intercambios.length === 0 ? (
+        <Card className="py-10 text-center"><Files className="mx-auto text-neutral-300" size={36} /><p className="mt-3 font-bold text-[#10213A]">Todavía no hay presentaciones formales</p><p className="mx-auto mt-1 max-w-xl text-sm leading-6 text-neutral-600">La autoridad inicia el circuito con un requerimiento. El inspeccionado podrá responder sobre ese antecedente.</p></Card>
+      ) : (
+        <ExchangeLedger
+          cycles={exchangeCycles}
+          parentById={parentById}
+          party={party}
+          open={open}
+          onDownload={(entry, evidenceId, name) => void downloadAttachment(entry, evidenceId, name)}
+          onReply={beginReply}
+        />
+      )}
 
       {open && !composeOpen && party === 'AUTORIDAD' && <Button leftIcon={<FileCheck2 size={17} />} onClick={beginNew}>Nuevo requerimiento</Button>}
       {open && !composeOpen && party === 'INSPECCIONADO' && timeline.intercambios.some((entry) => entry.parte === 'AUTORIDAD') && <p className="rounded-xl border border-info-200 bg-info-50 px-4 py-3 text-sm text-info-900">Para contestar, seleccione <strong>Responder esta actuación</strong> en el requerimiento correspondiente. Así la relación queda inequívoca.</p>}

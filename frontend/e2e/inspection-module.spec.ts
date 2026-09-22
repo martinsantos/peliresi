@@ -19,6 +19,11 @@ const inspection = {
   generador: null, operador: null, ubicacion: 'Ruta 7, Km 1056 — Luján de Cuyo', iniciadaAt: '2026-09-17T13:30:00.000Z',
   plazoRespuestaAt: null, observaciones: 'Se constata documentación y estado general del vehículo.',
   createdAt: '2026-09-17T13:20:00.000Z', updatedAt: '2026-09-17T13:40:00.000Z',
+  verificacion: {
+    url: 'https://sitrep.ultimamilla.com.ar/verificar/inspecciones/eyJ2IjoxfQ.signature',
+    huella: 'a'.repeat(64),
+    version: 3,
+  },
   items: [
     ['HAB-01', 'Habilitacion', 'Cuenta con habilitación vigente', 'CUMPLE'],
     ['HAB-02', 'Habilitacion', 'La actividad desarrollada coincide con la autorizada', 'CUMPLE'],
@@ -118,6 +123,7 @@ test('inspection field screen is usable on web and PWA layouts', async ({ page }
   await expect(page.getByRole('button', { name: 'Difiere' }).first()).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByRole('button', { name: 'Guardar borrador' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Enviar a revisión' })).toBeVisible();
+  await page.screenshot({ path: `/tmp/sitrep-inspection-first-viewport-${testInfo.project.name}.png`, fullPage: false });
   await expect(page.getByTestId('inspection-action-bar')).toHaveCSS('position', 'sticky');
   const actorLink = page.getByRole('link', { name: /Abrir actor inspeccionado: Transportes Andinos S\.A\./ });
   await expect(actorLink).toBeVisible();
@@ -350,6 +356,18 @@ test('closed inspection report reflows without horizontal scroll or an empty sti
   await expect(page.getByTestId('comparison-ledger')).toBeVisible();
   await expect(page.getByTestId('inspection-checklist-report')).toBeVisible();
   await expect(page.getByTestId('inspection-checklist-report').locator('[data-result="NO_CUMPLE"]')).toHaveCount(1);
+  await expect(page.locator('header img[alt="Gobierno de Mendoza"]')).toBeVisible();
+  const verification = page.getByTestId('inspection-verification');
+  await expect(verification).toBeVisible();
+  await expect(verification.getByRole('heading', { name: 'Trazabilidad pública de la inspección' })).toBeVisible();
+  const qr = verification.locator('div[aria-label="Código QR de verificación pública"]');
+  await expect(qr).toBeVisible();
+  await expect(qr.locator('svg')).toHaveCount(1);
+  await expect(verification.getByRole('link', { name: 'Abrir verificación pública' })).toHaveAttribute('href', /\/verificar\/inspecciones\/eyJ2IjoxfQ\.signature$/);
+  await expect(page.getByRole('link', { name: 'Trazabilidad' })).toHaveAttribute('href', '#trazabilidad');
+  await expect(page.locator('#trazabilidad')).toBeVisible();
+  await verification.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `/tmp/sitrep-inspection-verification-anchor-${testInfo.project.name}.png`, fullPage: false });
   await expect(findings.getByText('Declarado').nth(mobile ? 1 : 0)).toBeVisible();
   await expect(findings.getByText('Verificado').nth(mobile ? 1 : 0)).toBeVisible();
   await expect(findings.locator('table')).toHaveCount(0);

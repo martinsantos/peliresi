@@ -53,6 +53,13 @@ test('inspected actor can answer the exact authority action with audited attachm
   await expect(page.getByRole('heading', { name: 'Presentaciones y respuestas' })).toBeVisible();
   await expect(page.getByText('Acompañar constancia vigente')).toBeVisible();
   await expect(page.getByText(/no envía correos/i)).toBeVisible();
+  const ledger = page.getByTestId('inspection-exchange-ledger');
+  await expect(ledger.getByRole('heading', { name: 'Registro cronológico formal' })).toBeVisible();
+  await expect(ledger.getByTestId('inspection-exchange-row')).toHaveCount(1);
+  await ledger.getByText('Integridad y versión').click();
+  await expect(ledger.getByTestId('exchange-content-hash')).toHaveText('a'.repeat(64));
+  await expect(ledger.getByTestId('exchange-chain-hash')).toHaveText('b'.repeat(64));
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
   await page.getByRole('button', { name: 'Responder esta actuación' }).click();
   await expect(page.getByText(/Antecedente: presentación #1/i)).toBeVisible();
   await page.getByLabel('Contenido').fill('Se acompaña la constancia y la evidencia respaldatoria solicitada.');

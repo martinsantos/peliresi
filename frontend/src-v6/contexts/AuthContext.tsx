@@ -48,7 +48,7 @@ export interface AuthContextType {
   isAdminOperador: boolean;
   isAnyAdmin: boolean;
   canAccess: (permission: string) => boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
   logout: () => Promise<void>;
   isRestricted: boolean;
   solicitudId: string | null;
@@ -195,6 +195,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const isFirstSession = !localStorage.getItem(`sitrep_onboarding_${user.id}`);
       const isPostReset = localStorage.getItem('sitrep_post_reset') === '1';
       if (isFirstSession || isPostReset) setShowOnboarding(true);
+      return user;
     } catch (err: any) {
       clearTokens();
       const message = err.response?.data?.message || 'Credenciales incorrectas o API no disponible.';

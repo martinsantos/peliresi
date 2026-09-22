@@ -1,14 +1,30 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ post: vi.fn() }));
-vi.mock('../../services/api', () => ({ default: { post: mocks.post } }));
+const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
+vi.mock('../../services/api', () => ({ default: { get: mocks.get, post: mocks.post } }));
 
 import { inspeccionService } from '../../services/inspeccion.service';
 
 describe('inspeccionService evidence upload', () => {
   beforeEach(() => {
     mocks.post.mockReset();
+    mocks.get.mockReset();
     mocks.post.mockResolvedValue({ data: { data: { id: 'evidence-1' } } });
+  });
+
+  it('resolves a public inspection token to the canonical URL, version and fingerprint', async () => {
+    mocks.get.mockResolvedValue({ data: { success: true, data: {
+      numero: 'I-2026-000001',
+      authorizedPath: '/inspecciones/inspection-1#trazabilidad',
+      verificacion: { url: 'https://sitrep.ultimamilla.com.ar/verificar/inspecciones/token.signature', huella: 'a'.repeat(64), version: 3 },
+    } } });
+
+    const result = await inspeccionService.verifyPublic('token.signature');
+
+    expect(mocks.get).toHaveBeenCalledWith('/inspecciones/verificar/token.signature');
+    expect(result.numero).toBe('I-2026-000001');
+    expect(result.verificacion).toEqual(expect.objectContaining({ version: 3, huella: 'a'.repeat(64) }));
+    expect(result.authorizedPath).toBe('/inspecciones/inspection-1#trazabilidad');
   });
 
   it('sends the checklist item and comment context with the image', async () => {
