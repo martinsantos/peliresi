@@ -19,6 +19,8 @@ const VIEWPORTS = [
 const PAGES_WEB = [
   '/dashboard',
   '/manifiestos',
+  '/inspecciones',
+  '/inspecciones/cmu61kwhk009z1297m2qkoc7i',
   '/centro-control',
   '/reportes',
   '/admin/actores',

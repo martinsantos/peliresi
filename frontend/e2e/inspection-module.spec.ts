@@ -121,7 +121,7 @@ test('inspection field screen is usable on web and PWA layouts', async ({ page }
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(emergencyItem.getByLabel(/Adjuntar foto: Señalización y elementos de emergencia operativos/)).toBeAttached();
-  await expect(emergencyItem.getByText('La imagen también queda disponible en Evidencias del expediente.')).toBeVisible();
+  await expect(emergencyItem.getByText(/Máximo 25 MB; también quedará en Evidencias del expediente\./)).toBeVisible();
   await emergencyItem.scrollIntoViewIfNeeded();
   await page.screenshot({ path: `/tmp/sitrep-inspection-item-evidence-${testInfo.project.name}.png`, fullPage: false });
   await expect(page.locator('body')).not.toHaveCSS('overflow-x', 'scroll');

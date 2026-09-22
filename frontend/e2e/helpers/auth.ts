@@ -47,6 +47,18 @@ type LoginOptions = {
   clickLoginLink?: boolean;
 };
 
+type AdminLoginOptions = Pick<LoginOptions, 'startPath' | 'clickLoginLink'>;
+
+async function loginWithAccessToken(page: Page, accessToken: string, startPath = '/') {
+  await page.addInitScript((token) => {
+    localStorage.setItem('sitrep_access_token', token);
+    localStorage.setItem('sitrep_onboarding_ADMIN', 'true');
+  }, accessToken);
+  await page.goto(startPath, { waitUntil: 'domcontentloaded' });
+  await waitForAuthenticatedShell(page, 25000);
+  await dismissBlockingOnboarding(page);
+}
+
 export async function loginWithCredentials(page: Page, options: LoginOptions) {
   await page.addInitScript(() => {
     localStorage.setItem('sitrep_onboarding_ADMIN', 'true');
@@ -110,8 +122,19 @@ export async function loginWithCredentials(page: Page, options: LoginOptions) {
   throw new Error(`Login ${options.onboardingRole ?? options.email} rate-limited after retry window`);
 }
 
-export async function loginAsAdmin(page: Page) {
-  await loginWithCredentials(page, { email: ADMIN_EMAIL, password: ADMIN_PASS, onboardingRole: 'ADMIN' });
+export async function loginAsAdmin(page: Page, options: AdminLoginOptions = {}) {
+  const accessToken = process.env.SITREP_QA_ACCESS_TOKEN;
+  if (accessToken) {
+    await loginWithAccessToken(page, accessToken, options.startPath);
+    return;
+  }
+
+  await loginWithCredentials(page, {
+    email: ADMIN_EMAIL,
+    password: ADMIN_PASS,
+    onboardingRole: 'ADMIN',
+    ...options,
+  });
 }
 
 export async function loginAsGenerador(page: Page) {

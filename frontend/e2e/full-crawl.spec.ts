@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { ADMIN_EMAIL, ADMIN_PASS, loginAsAdmin, loginWithCredentials } from './helpers/auth';
+import { loginAsAdmin } from './helpers/auth';
 
 /**
  * Full crawler — visits every key route in both web and PWA builds,
@@ -14,6 +14,7 @@ const KNOWN = {
   transportistaId: 'cmm4a0u9r002nd8dy37h53j5t',
   operadorId: 'cmmpaa2b100edlvk7p577bmap',
   generadorId: 'cmmpaawor00a14kd0ogaieve9',
+  inspectionId: 'cmu61kwhk009z1297m2qkoc7i',
 };
 
 // Routes to crawl in both web and PWA
@@ -23,6 +24,8 @@ const ROUTES_WEB = [
   '/manifiestos',
   '/manifiestos/nuevo',
   `/manifiestos/${KNOWN.manifiestoId}`,
+  '/inspecciones',
+  `/inspecciones/${KNOWN.inspectionId}`,
   '/reportes',
   '/alertas',
   '/configuracion',
@@ -51,6 +54,8 @@ const ROUTES_PWA = [
   '/centro-control',
   '/manifiestos',
   `/manifiestos/${KNOWN.manifiestoId}`,
+  '/inspecciones',
+  `/inspecciones/${KNOWN.inspectionId}`,
   '/reportes',
   '/alertas',
   '/notificaciones',
@@ -77,10 +82,7 @@ async function loginWeb(page: import('@playwright/test').Page) {
 }
 
 async function loginPwa(page: import('@playwright/test').Page) {
-  await loginWithCredentials(page, {
-    email: ADMIN_EMAIL,
-    password: ADMIN_PASS,
-    onboardingRole: 'ADMIN',
+  await loginAsAdmin(page, {
     startPath: '/app/',
     clickLoginLink: false,
   });
