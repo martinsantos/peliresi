@@ -10,7 +10,7 @@ interface QueueConfig {
   type: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   endpoint: string;
   data?: unknown;
-  userId?: string | number;
+  userId: string | number;
 }
 
 /**

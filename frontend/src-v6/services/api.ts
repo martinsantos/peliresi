@@ -5,6 +5,7 @@
 
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import type { ApiErrorResponse, RefreshTokenResponse } from '../types/api';
+import { toast } from '../components/ui/Toast';
 
 const TOKEN_KEY = 'sitrep_access_token';
 const REFRESH_TOKEN_KEY = 'sitrep_refresh_token';
@@ -127,7 +128,6 @@ api.interceptors.response.use(
 
     // Rate limit — show user-friendly message
     if (error.response?.status === 429) {
-      const { toast } = await import('../components/ui/Toast');
       toast.warning('Demasiadas solicitudes', 'Espere unos segundos antes de intentar nuevamente.');
       return Promise.reject(error);
     }

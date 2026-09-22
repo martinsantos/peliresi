@@ -9,6 +9,7 @@ import React, { Suspense } from 'react';
 import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { MobileLayout } from './layouts/MobileLayout';
+import { canAccessMobilePath } from './utils/mobileAccess';
 
 // Pages — shared lazy imports (single source of truth with App.tsx)
 import {
@@ -16,7 +17,7 @@ import {
   MobileDashboardPage, CentroControlPage,
   InspeccionesPage, InspeccionDetallePage,
   ManifiestosPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
-  ViajeEnCursoPage, TransportePerfilPage, ViajeEnCursoTransportista,
+  TransportePerfilPage, ViajeEnCursoTransportista,
   ActoresPage, OperadoresPage, OperadorDetallePage, TransportistasPage, TransportistaDetallePage,
   ReportesPage, AlertasPage, NotificacionesPage, ConfiguracionPage,
   UsuariosPage, AdminGeneradoresPage, GeneradorDetallePage, NuevoGeneradorPage,
@@ -74,7 +75,7 @@ const ActiveTripGuard: React.FC = () => {
 
 /** Auth gate: single source of truth for public/private routing */
 const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, isLoading } = useAuth();
+  const { currentUser, isLoading, isRestricted } = useAuth();
   const location = useLocation();
 
   // Public routes that don't need auth
@@ -95,6 +96,15 @@ const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   // Private route without auth → redirect to login
   if (!currentUser) return <Navigate to="/login" replace />;
+
+  // Keep the standalone PWA aligned with ProtectedRoute in the web build.
+  if (isRestricted && !location.pathname.startsWith('/mi-solicitud')) {
+    return <Navigate to="/mi-solicitud" replace />;
+  }
+
+  if (!canAccessMobilePath(currentUser, location.pathname)) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return <>{children}</>;
 };

@@ -5,6 +5,14 @@
  * Stores: manifiestos, catalogos, sync_queue, inspection_evidence_queue
  */
 
+import {
+  isSupportedSyncMethod,
+  isSyncActionOwnedBy,
+  queuedDeliveryManifestId,
+  type SyncMethod,
+} from './syncQueuePolicy';
+import api from './api';
+
 const DB_NAME = 'sitrep_offline_db';
 const DB_VERSION = 3;
 const STORES = ['manifiestos', 'catalogos', 'sync_queue', 'inspection_evidence_queue', 'inspection_cases'] as const;
@@ -13,11 +21,11 @@ export type StoreName = (typeof STORES)[number];
 
 export interface SyncAction {
   id?: number;
-  type: string;
+  type: SyncMethod;
   endpoint: string;
   data: unknown;
   createdAt: string;
-  userId?: string | number;
+  userId: string | number;
 }
 
 const MAX_SYNC_QUEUE_SIZE = 500;
@@ -123,6 +131,7 @@ export async function removeOffline(store: StoreName, key: string | number): Pro
  * Enforces MAX_SYNC_QUEUE_SIZE to prevent unbounded growth.
  */
 export async function addToSyncQueue(action: Omit<SyncAction, 'id' | 'createdAt'>): Promise<void> {
+  if (action.userId == null) throw new Error('Offline actions require an owning user');
   // Check queue size before adding
   const queue = await getSyncQueue();
   if (queue.length >= MAX_SYNC_QUEUE_SIZE) {
@@ -167,23 +176,24 @@ export async function clearSyncQueue(): Promise<void> {
  * If currentUserId is provided, skips actions from other users.
  * Retorna la cantidad de acciones procesadas con éxito.
  */
-export async function processSyncQueue(currentUserId?: string | number): Promise<number> {
+export async function processSyncQueue(currentUserId: string | number): Promise<number> {
   const queue = await getSyncQueue();
   if (queue.length === 0) return 0;
 
-  // Importar api de forma dinámica para evitar dependencias circulares
-  const { default: api } = await import('./api');
   let processed = 0;
 
   for (const action of queue) {
     // Skip actions from other users (prevents cross-user data leakage)
-    if (currentUserId && action.userId && action.userId !== currentUserId) {
+    if (!isSyncActionOwnedBy(action.userId, currentUserId)) {
       continue;
     }
+
+    if (!isSupportedSyncMethod(action.type)) continue;
 
     try {
       switch (action.type) {
         case 'POST':
+          await flushGpsBeforeQueuedDelivery(api, action.endpoint);
           await api.post(action.endpoint, action.data);
           break;
         case 'PUT':
@@ -195,14 +205,18 @@ export async function processSyncQueue(currentUserId?: string | number): Promise
         case 'DELETE':
           await api.delete(action.endpoint);
           break;
-        default:
-          // Unknown action type - skip
+        default: {
+          const exhaustive: never = action.type;
+          void exhaustive;
+          continue;
+        }
       }
 
       // Eliminar la acción procesada individualmente
       if (action.id != null) {
         await removeOffline('sync_queue', action.id);
       }
+      cleanupAfterSuccessfulSync(action.endpoint);
       processed++;
     } catch {
       // Detenerse en el primer error para mantener el orden
@@ -211,4 +225,49 @@ export async function processSyncQueue(currentUserId?: string | number): Promise
   }
 
   return processed;
+}
+
+type ApiClient = { post: (endpoint: string, data?: unknown) => Promise<unknown> };
+
+async function flushGpsBeforeQueuedDelivery(api: ApiClient, endpoint: string): Promise<void> {
+  const manifiestoId = queuedDeliveryManifestId(endpoint);
+  if (!manifiestoId || typeof localStorage === 'undefined') return;
+
+  const key = `gps_pending_${manifiestoId}`;
+  const stored = localStorage.getItem(key);
+  if (!stored) return;
+
+  let points: Array<{ lat: number; lng: number; speed?: number; heading?: number }>;
+  try {
+    const parsed: unknown = JSON.parse(stored);
+    points = Array.isArray(parsed)
+      ? parsed.filter((point): point is { lat: number; lng: number; speed?: number; heading?: number } => {
+          if (!point || typeof point !== 'object') return false;
+          const candidate = point as { lat?: unknown; lng?: unknown };
+          return Number.isFinite(candidate.lat) && Number.isFinite(candidate.lng);
+        })
+      : [];
+  } catch {
+    points = [];
+  }
+  for (const point of points) {
+    await api.post(`/manifiestos/${manifiestoId}/ubicacion`, {
+      latitud: point.lat,
+      longitud: point.lng,
+      velocidad: point.speed,
+      direccion: point.heading,
+    });
+  }
+  localStorage.removeItem(key);
+}
+
+function cleanupAfterSuccessfulSync(endpoint: string): void {
+  const manifiestoId = queuedDeliveryManifestId(endpoint);
+  if (!manifiestoId || typeof localStorage === 'undefined') return;
+  localStorage.removeItem(`viaje_snapshot_${manifiestoId}`);
+  localStorage.removeItem(`viaje_status_${manifiestoId}`);
+  localStorage.removeItem(`gps_pending_${manifiestoId}`);
+  if (localStorage.getItem('sitrep_active_trip_id') === manifiestoId) {
+    localStorage.removeItem('sitrep_active_trip_id');
+  }
 }
