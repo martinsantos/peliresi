@@ -130,8 +130,9 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
 
   return <div ref={workspaceRef} data-testid="inspection-workspace" className="min-w-0 rounded-xl border border-neutral-200 bg-white lg:grid lg:grid-cols-[210px_minmax(0,1fr)] xl:grid-cols-[224px_minmax(0,1fr)]">
     <aside data-testid="inspection-navigation" className="sticky top-0 z-20 min-w-0 self-start border-b border-neutral-200 bg-white lg:static lg:self-stretch lg:border-b-0 lg:border-r lg:bg-neutral-50/50">
-      <button type="button" aria-label={`Ver todos los pasos · ${active.label}`} aria-expanded={indexOpen} aria-controls="inspection-step-index" onClick={() => setIndexOpen((open) => !open)} className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-2 text-left lg:hidden">
-        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-neutral-900">{guided && index >= 0 ? `Paso ${index + 1} de ${steps.length} · ` : ''}{active.label}</span><span data-testid="inspection-current-point" className="mt-0.5 block truncate text-xs text-neutral-600">{visibleAnchor ? `${visibleAnchor.group ? visibleAnchor.group + ' · ' : ''}${visibleAnchor.id} · ${visibleAnchor.detail || 'Sin revisar'}` : 'Inicio de la sección'}</span></span><span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-primary-800">Índice<ChevronDown size={17} className={`transition-transform ${indexOpen ? 'rotate-180' : ''}`} /></span>
+      <button type="button" aria-label={`Ver todos los pasos · ${active.label}`} aria-expanded={indexOpen} aria-controls="inspection-step-index" onClick={() => setIndexOpen((open) => !open)} className="relative flex min-h-14 w-full items-center justify-between gap-3 px-4 py-2 text-left lg:hidden">
+        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-neutral-900">{guided && index >= 0 ? `Paso ${index + 1} de ${steps.length} · ` : ''}{active.label}</span><span data-testid="inspection-current-point" className="mt-0.5 block truncate text-xs text-neutral-600">{visibleAnchor ? `${visibleAnchor.group ? visibleAnchor.group + ' · ' : ''}${visibleAnchor.id} · ${visibleAnchor.detail || 'Sin revisar'}` : active.detail || 'Abrir índice de pasos'}</span></span><span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-primary-800">Índice<ChevronDown size={17} className={`transition-transform ${indexOpen ? 'rotate-180' : ''}`} /></span>
+        {guided && index >= 0 && <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-0.5 bg-neutral-200"><span className="block h-full bg-primary-600" style={{ width: `${(index + 1) / steps.length * 100}%` }} /></span>}
       </button>
       <nav id="inspection-step-index" aria-label={guided ? 'Pasos de la inspección' : 'Secciones del expediente'} className={`${indexOpen ? 'block' : 'hidden'} max-h-[55dvh] overflow-y-auto overscroll-contain px-3 pb-4 lg:sticky lg:top-0 lg:block lg:max-h-[calc(100dvh-7rem)] lg:py-5`}>
         <p className="hidden px-3 pb-3 text-xs font-semibold text-neutral-500 lg:block">{guided ? 'Completar inspección' : 'Consultar expediente'}</p>
@@ -145,7 +146,7 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
       </nav>
     </aside>
     <div className="min-w-0">
-      <header data-testid="inspection-step-header" className="border-b border-neutral-200 bg-white px-4 py-3 sm:px-6 lg:sticky lg:top-0 lg:z-20">
+      <header data-testid="inspection-step-header" className="max-lg:sr-only border-b border-neutral-200 bg-white px-4 py-3 sm:px-6 lg:sticky lg:top-0 lg:z-20">
         <div className="flex min-w-0 items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5"><span className="shrink-0 text-xs font-semibold text-neutral-500">{guided && index >= 0 ? `Paso ${index + 1} de ${steps.length}` : 'Expediente'}</span><h2 ref={headingRef} id="inspection-step-heading" tabIndex={-1} className="min-w-0 text-lg font-extrabold leading-snug tracking-tight text-neutral-900 outline-none sm:text-xl">{active.title}</h2></div>
           {active.detail && <span className="hidden max-w-[38%] shrink-0 truncate text-right text-xs font-medium text-neutral-600 xl:block">{active.detail}</span>}
@@ -158,9 +159,12 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
       {all.map((step) => <section key={step.id} hidden={step.id !== active.id} aria-label={step.title} id={step.id === 'verificacion' ? undefined : step.id} data-testid={step.id === active.id ? 'inspection-step-content' : undefined} className="min-w-0 space-y-5 p-4 sm:p-6 [&>section]:shadow-none [&>div]:shadow-none">
         {step.content}
       </section>)}
-      {index >= 0 && <footer data-testid="inspection-action-bar" className="flex flex-col gap-3 border-t border-neutral-200 bg-neutral-50/60 p-4 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between sm:px-6">
-        <div className="flex min-w-0 gap-2 [&>button]:w-full min-[480px]:[&>button]:w-auto">{index > 0 ? <Button variant="outline" leftIcon={<ArrowLeft size={16} />} onClick={() => go(steps[index - 1])}>Anterior</Button> : saveAction}</div>
-        <div className="flex min-w-0 flex-col gap-2 min-[480px]:flex-row min-[480px]:flex-wrap min-[480px]:justify-end [&>button]:w-full min-[480px]:[&>button]:w-auto">{index > 0 && saveAction}{active.nextAction || (index < steps.length - 1 && <Button rightIcon={<ArrowRight size={16} />} onClick={() => go(steps[index + 1])}>Siguiente</Button>)}</div>
+      {index >= 0 && <footer data-testid="inspection-action-bar" className="border-t border-neutral-200 bg-neutral-50/60 p-4 sm:px-6">
+        {saveAction && <div className="mb-3 flex justify-end">{saveAction}</div>}
+        <div className="flex items-center justify-between gap-3">
+          {index > 0 ? <Button variant="outline" leftIcon={<ArrowLeft size={16} />} onClick={() => go(steps[index - 1])}>Anterior</Button> : <span />}
+          {active.nextAction || (index < steps.length - 1 && <Button rightIcon={<ArrowRight size={16} />} onClick={() => go(steps[index + 1])}>Siguiente</Button>)}
+        </div>
       </footer>}
     </div>
   </div>;

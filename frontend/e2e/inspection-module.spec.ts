@@ -128,6 +128,35 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test('field evidence step keeps one primary action and a clean navigation footer', async ({ page }, testInfo) => {
+  const prefix = testInfo.project.name === 'mobile' ? '/mobile' : '';
+  await page.goto(`${prefix}/inspecciones/inspection-qa#evidencias`);
+  const step = page.getByTestId('inspection-step-content');
+  const footer = page.getByTestId('inspection-action-bar');
+  await expect(step.getByRole('heading', { name: 'Evidencias' })).toHaveCount(0);
+  if (page.viewportSize()!.width < 1024) await expect(page.getByTestId('inspection-current-point')).toHaveText('2 archivos');
+  else await expect(step.getByText('2 archivos')).toBeVisible();
+  await expect(step.getByRole('button', { name: 'Tomar foto' })).toBeVisible();
+  await expect(step.getByRole('button', { name: 'Más opciones' })).toBeVisible();
+  await expect(footer.getByRole('button', { name: 'Guardar cambios' })).toHaveCount(0);
+  await expect(footer.getByRole('button', { name: 'Anterior' })).toBeVisible();
+  await expect(footer.getByRole('button', { name: 'Siguiente' })).toBeVisible();
+  await page.screenshot({ path: `/tmp/sitrep-evidence-simplified-${testInfo.project.name}.png`, fullPage: true });
+  await page.locator('main').evaluate((element) => { element.scrollTop = element.scrollHeight; });
+  for (const label of ['Anterior', 'Siguiente']) {
+    const button = footer.getByRole('button', { name: label });
+    await expect(button).toBeInViewport();
+    expect(await button.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      return element.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+    })).toBe(true);
+  }
+  await page.screenshot({ path: `/tmp/sitrep-evidence-footer-${testInfo.project.name}.png` });
+  await step.getByRole('button', { name: 'Más opciones' }).click();
+  await expect(step.getByText('Elegir archivo')).toBeVisible();
+  await expect(step.getByText('Grabar audio')).toBeVisible();
+});
+
 test('draft has one aligned start action and advances only after the server confirms', async ({ page }, testInfo) => {
   const state = { ...structuredClone(inspection), estado: 'BORRADOR' };
   let rejectStart = true;
@@ -255,7 +284,8 @@ test('compact step and intermediate group stay pinned; next advances in sequence
 
   await page.getByTestId('inspection-action-bar').getByRole('button', { name: 'Siguiente', exact: true }).click();
   await expect(page).toHaveURL(/#checklist$/);
-  await expect(page.getByRole('heading', { name: 'Checklist regulatorio' })).toBeInViewport();
+  if (page.viewportSize()!.width < 1024) await expect(page.getByRole('button', { name: /Ver todos los pasos · Checklist regulatorio/ })).toBeInViewport();
+  else await expect(page.getByRole('heading', { name: 'Checklist regulatorio' })).toBeInViewport();
   const landing = await page.evaluate(() => ({
     mainTop: document.querySelector('main')!.getBoundingClientRect().top,
     guideBottom: document.querySelector('[data-testid="inspection-navigation"]')!.getBoundingClientRect().bottom,
@@ -344,6 +374,7 @@ for (const layout of ['project layout', '390px web', '600px web', 'PWA'] as cons
   test(`inspection anchors scroll only the content and preserve the application header in ${layout}`, async ({ page }, testInfo) => {
     const mobileProject = testInfo.project.name === 'mobile';
     test.skip((layout.endsWith('web') && mobileProject) || (layout === 'PWA' && !mobileProject), 'Each additional layout runs in its matching browser project.');
+    test.skip(layout === 'PWA' && Boolean(process.env.PLAYWRIGHT_BASE_URL?.includes('127.0.0.1')), 'The local Vite server serves the web entry only; the PWA entry is validated in the built app.');
     if (layout.endsWith('web')) await page.setViewportSize({ width: layout === '390px web' ? 390 : 600, height: 844 });
     const originalViewport = page.viewportSize()!;
     const prefix = layout === 'PWA' ? '/app' : mobileProject ? '/mobile' : '';
@@ -456,7 +487,7 @@ test('saving beside a checklist comment confirms the whole draft and survives a 
   const observation = 'Se completó la señalización del kit y se documentó la corrección.';
   await item.getByRole('textbox', { name: /Observación:/ }).fill(observation);
   const itemSave = item.getByTestId('inspection-item-save-item-6');
-  await expect(itemSave.getByText(/borrador completo, incluido este comentario/)).toBeVisible();
+  await expect(itemSave.getByRole('status')).toContainText(/pendiente|dispositivo/i);
   await itemSave.getByRole('button', { name: 'Guardar cambios', exact: true }).click();
   await expect(itemSave.getByRole('status')).toHaveText('Sin cambios pendientes en el borrador del servidor.');
   expect(savedPaths).toEqual(['/api/inspecciones/inspection-qa/borrador']);
@@ -509,7 +540,7 @@ test('inspection field screen is usable on web and PWA layouts', async ({ page }
   await expect(page.getByRole('heading', { name: 'Preparar la inspección' })).toBeVisible();
   await expect(page.getByRole('progressbar', { name: 'Paso actual del recorrido' })).toHaveAttribute('aria-valuemax', '7');
   await expect(page.getByRole('heading', { name: 'Checklist regulatorio' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Guardar borrador' })).toBeVisible();
+  await expect(page.getByTestId('inspection-action-bar').getByRole('button', { name: 'Guardar cambios' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Enviar a revisión' })).toHaveCount(0);
   await page.screenshot({ path: `/tmp/sitrep-inspection-first-viewport-${testInfo.project.name}.png`, fullPage: false });
   await expect(page.getByTestId('inspection-action-bar')).toHaveCSS('position', 'static');
@@ -541,16 +572,17 @@ test('inspection field screen is usable on web and PWA layouts', async ({ page }
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(emergencyItem.getByLabel(/Adjuntar foto: Señalización y elementos de emergencia operativos/)).toBeAttached();
-  await expect(emergencyItem.getByText(/Máximo 25 MB; también quedará en Evidencias del expediente\./)).toBeVisible();
+  await expect(emergencyItem.getByText(/Máximo 25 MB\. La foto quedará vinculada a este control\./)).toBeVisible();
   await emergencyItem.scrollIntoViewIfNeeded();
   await page.screenshot({ path: `/tmp/sitrep-inspection-item-evidence-${testInfo.project.name}.png`, fullPage: false });
   await expect(page.locator('body')).not.toHaveCSS('overflow-x', 'scroll');
   expect(await page.locator('html').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   await page.screenshot({ path: `/tmp/sitrep-inspection-${mobile ? 'mobile' : 'desktop'}-qa.png`, fullPage: true });
-  await page.getByRole('heading', { name: 'Checklist regulatorio' }).scrollIntoViewIfNeeded();
+  if (!mobile) await page.getByRole('heading', { name: 'Checklist regulatorio' }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: `/tmp/sitrep-inspection-field-checklist-${testInfo.project.name}.png`, fullPage: false });
   await openSection(page, 'evidencias');
-  await expect(page.getByText('Evidencias (2)')).toBeVisible();
+  if (mobile) await expect(page.getByTestId('inspection-current-point')).toHaveText('2 archivos');
+  else await expect(page.getByTestId('inspection-step-content').getByText('2 archivos')).toBeVisible();
   await openSection(page, 'revision');
   await expect(page.getByRole('button', { name: 'Enviar a revisión' })).toBeVisible();
   const footer = page.getByTestId('inspection-action-bar');
@@ -713,7 +745,7 @@ test('review keeps the field act frozen while versioning the later technical rep
   await expect(page.getByRole('heading', { name: 'Informe técnico para Legales' }).first()).toBeVisible();
   await expect(page.getByLabel('1. Objetivo')).toBeEnabled();
   await page.getByLabel('3. Evaluación').fill('La evaluación contrasta el acta, el checklist y las evidencias preservadas.');
-  await page.getByRole('button', { name: 'Guardar informe técnico' }).click();
+  await page.getByRole('button', { name: 'Guardar informe' }).click();
 
   await expect.poll(() => savedBody).not.toBeNull();
   expect(savedBody).toEqual({
