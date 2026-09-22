@@ -99,7 +99,7 @@ export interface ActionModalsProps {
   onPesaje: (residuos: { id: string; cantidadRecibida: number }[], observaciones?: string) => void;
   onTratamiento: (metodo: string, observaciones?: string) => void;
   onRechazar: (motivo: string, descripcion?: string) => void;
-  onIncidente: (tipo: string, descripcion?: string) => void;
+  onIncidente: (tipo: string, descripcion: string) => void;
   onCancelar: () => void;
   onRevertir: (estadoNuevo: string, motivo?: string) => void;
   onFirmar: () => void;
@@ -226,7 +226,11 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
       toast.warning('Datos incompletos', 'Selecciona un tipo de incidente');
       return;
     }
-    onIncidente(incidenteTipo, incidenteDescripcion || undefined);
+    if (!incidenteDescripcion.trim()) {
+      toast.warning('Datos incompletos', 'Describe brevemente el incidente');
+      return;
+    }
+    onIncidente(incidenteTipo, incidenteDescripcion.trim());
     onCloseIncidente();
     setIncidenteTipo('');
     setIncidenteDescripcion('');
@@ -429,7 +433,7 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Descripcion</label>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Descripcion *</label>
                 <textarea
                   value={rechazarDescripcion}
                   onChange={(e) => setRechazarDescripcion(e.target.value)}

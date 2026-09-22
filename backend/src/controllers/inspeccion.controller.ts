@@ -22,6 +22,7 @@ import {
   ensureInspectionDeclaredComparisons,
 } from '../services/inspectionDeclaredSnapshot.service';
 import { streamInspectionActPdf } from '../services/inspectionActPdf.service';
+import { inspectionEvidenceMetadataSchema } from '../domain/inspectionEvidence';
 
 type ChecklistDefinition = { codigo: string; categoria: string; etiqueta: string; orden: number; obligatorio?: boolean };
 
@@ -530,15 +531,15 @@ export async function subirEvidencia(req: AuthRequest, res: Response, next: Next
   let storedKey: string | null = null;
   try {
     if (!req.file) throw new AppError('Seleccione un archivo de evidencia', 400);
+    const parsedMetadata = inspectionEvidenceMetadataSchema.safeParse(req.body || {});
+    if (!parsedMetadata.success) throw new AppError(parsedMetadata.error.issues[0].message, 400);
+    const metadata = parsedMetadata.data;
     const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, select: { inspectorId: true, estado: true } });
     if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
-    const eventoId = req.body.eventoId ? String(req.body.eventoId) : null;
-    const comparacionId = req.body.comparacionId ? String(req.body.comparacionId) : null;
-    const itemId = req.body.itemId ? String(req.body.itemId) : null;
-    const clienteId = req.body.clienteId ? String(req.body.clienteId).trim() : null;
-    if (clienteId && !/^[a-zA-Z0-9_-]{8,128}$/.test(clienteId)) {
-      throw new AppError('Identificador de captura inválido', 400);
-    }
+    const eventoId = metadata.eventoId || null;
+    const comparacionId = metadata.comparacionId || null;
+    const itemId = metadata.itemId || null;
+    const clienteId = metadata.clienteId || null;
     if (!hasSingleEvidenceTarget([eventoId, comparacionId, itemId])) {
       throw new AppError('La evidencia debe vincularse a un único comentario, comparación o evento', 400);
     }
@@ -573,25 +574,20 @@ export async function subirEvidencia(req: AuthRequest, res: Response, next: Next
     }
     const stored = await persistInspectionEvidence(req.file, req.params.id);
     storedKey = stored.storageKey;
-    const requestedType = String(req.body.tipo || '').toUpperCase();
     const inferredType: TipoEvidenciaInspeccion = stored.mimeType.startsWith('image/')
       ? 'FOTO' : stored.mimeType.startsWith('audio/') ? 'AUDIO' : 'DOCUMENTO';
-    const tipo = Object.values(TipoEvidenciaInspeccion).includes(requestedType as TipoEvidenciaInspeccion)
-      ? requestedType as TipoEvidenciaInspeccion : inferredType;
+    const tipo = metadata.tipo || inferredType;
     if ((tipo === 'FOTO' && !stored.mimeType.startsWith('image/')) || (tipo === 'AUDIO' && !stored.mimeType.startsWith('audio/'))) {
       throw new AppError('El tipo declarado no coincide con el contenido del archivo', 400);
     }
     if (itemId && !stored.mimeType.startsWith('image/')) {
       throw new AppError('Los comentarios del checklist admiten imágenes JPG, PNG o WEBP', 400);
     }
-    const clientHash = req.body.clienteSha256 ? String(req.body.clienteSha256).toLowerCase() : null;
-    if (clientHash && (!/^[a-f0-9]{64}$/.test(clientHash) || clientHash !== stored.sha256)) {
+    const clientHash = metadata.clienteSha256?.toLowerCase() || null;
+    if (clientHash && clientHash !== stored.sha256) {
       throw new AppError('La evidencia cambió durante la sincronización', 400);
     }
-    const requestedCaptureDate = req.body.capturadaAt ? new Date(String(req.body.capturadaAt)) : null;
-    if (requestedCaptureDate && Number.isNaN(requestedCaptureDate.getTime())) {
-      throw new AppError('Fecha de captura inválida', 400);
-    }
+    const requestedCaptureDate = metadata.capturadaAt || null;
     const duplicate = await prisma.evidenciaInspeccion.findFirst({ where: { inspeccionId: req.params.id, sha256: stored.sha256 } });
     if (duplicate) {
       await removeInspectionEvidence(stored.storageKey);
@@ -602,7 +598,7 @@ export async function subirEvidencia(req: AuthRequest, res: Response, next: Next
             where: { id: duplicate.id },
             data: {
               itemId,
-              descripcion: req.body.descripcion ? String(req.body.descripcion).slice(0, 2_000) : duplicate.descripcion,
+              descripcion: metadata.descripcion || duplicate.descripcion,
             },
           });
           await tx.eventoInspeccion.create({
@@ -639,11 +635,11 @@ export async function subirEvidencia(req: AuthRequest, res: Response, next: Next
           mimeDetectado: stored.mimeType,
           bytes: stored.bytes,
           sha256: stored.sha256,
-          descripcion: req.body.descripcion ? String(req.body.descripcion).slice(0, 2_000) : null,
-          transcripcion: req.body.transcripcion ? String(req.body.transcripcion).slice(0, 20_000) : null,
+          descripcion: metadata.descripcion || null,
+          transcripcion: metadata.transcripcion || null,
           capturadaAt: requestedCaptureDate || new Date(),
-          latitud: req.body.latitud ? Number(req.body.latitud) : null,
-          longitud: req.body.longitud ? Number(req.body.longitud) : null,
+          latitud: metadata.latitud ?? null,
+          longitud: metadata.longitud ?? null,
         },
       });
       await tx.eventoInspeccion.create({
