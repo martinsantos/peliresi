@@ -287,13 +287,15 @@ for (const layout of ['project viewport', '600px web'] as const) {
     await expect(page).toHaveTitle(/RP Trazar/);
     await expect(page.getByRole('heading', { name: 'Declarado vs. verificado' })).toBeVisible();
     await page.getByRole('textbox', { name: 'Valor verificado: Domicilio declarado', exact: true }).scrollIntoViewIfNeeded();
+    if (compact) await expect(page.getByTestId('inspection-current-point')).toContainText('DOM-01');
     // On desktop the compact step title is intentionally pinned; on narrow
     // screens the two-line mobile guide takes over that role.
     if (compact) await expect(page.getByRole('heading', { name: 'Declarado vs. verificado' })).not.toBeInViewport();
     else await expect(page.getByRole('heading', { name: 'Declarado vs. verificado' })).toBeInViewport();
 
     const toggle = page.getByRole('button', { name: /Ver todos los pasos/ });
-    const pointIndex = page.getByRole('combobox', { name: 'Ir a un punto de Declaración', exact: true });
+    const stepIndex = page.getByRole('navigation', { name: 'Pasos de la inspección' });
+    const groupIndex = stepIndex.getByRole('button', { name: 'Carga · 0 de 1 revisados', exact: true });
     if (compact) {
       // Visibility alone does not detect a sticky control hidden under the app header.
       await expect(toggle).toBeInViewport({ ratio: 1 });
@@ -304,8 +306,9 @@ for (const layout of ['project viewport', '600px web'] as const) {
       await page.screenshot({ path: `/tmp/sitrep-field-v2-sticky-index-${testInfo.project.name}-${layout.replaceAll(' ', '-')}.png` });
       await toggle.click();
     }
-    await expect(pointIndex).toBeInViewport({ ratio: 1 });
-    await pointIndex.selectOption('CAR-01');
+    await expect(stepIndex.getByRole('link', { name: /Declarado vs\. verificado/ })).toBeVisible();
+    await expect(groupIndex).toBeInViewport({ ratio: 1 });
+    await groupIndex.click();
     await expect(page).toHaveURL(/#declaracion\/CAR-01$/);
 
     const target = page.locator('[data-inspection-anchor="declaracion/CAR-01"]');
@@ -313,8 +316,9 @@ for (const layout of ['project viewport', '600px web'] as const) {
     for (const reloaded of [false, true]) {
       if (reloaded) await page.reload();
       await expect(page).toHaveURL(/#declaracion\/CAR-01$/);
-      await expect(page.getByRole('button', { name: /Carga.*revisados/ })).toHaveAttribute('aria-expanded', 'true');
-      await expect(page.getByRole('button', { name: /Carga.*revisados/ })).toBeInViewport();
+      const groupHeader = page.getByTestId('inspection-step-content').getByRole('button', { name: /Carga.*revisados/ });
+      await expect(groupHeader).toHaveAttribute('aria-expanded', 'true');
+      await expect(groupHeader).toBeInViewport();
       await expect(target.getByText('Identificación de la carga', { exact: true })).toBeInViewport({ ratio: 1 });
       await expect(verified).toBeInViewport({ ratio: 1 });
       expect(await verified.evaluate((element) => {
@@ -819,7 +823,7 @@ test('closed inspection report reflows without horizontal scroll or an empty sti
   await page.screenshot({ path: `/tmp/sitrep-inspection-verification-anchor-${testInfo.project.name}.png`, fullPage: false });
   await openSection(page, 'trazabilidad');
   await expect(page.locator('#trazabilidad')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Historial de la inspección' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Trazabilidad' })).toBeVisible();
   // Reference sections do not expose wizard/save actions for an unsent audit note.
   await expect(page.getByTestId('inspection-action-bar')).toHaveCount(0);
   expect(await page.locator('html').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);

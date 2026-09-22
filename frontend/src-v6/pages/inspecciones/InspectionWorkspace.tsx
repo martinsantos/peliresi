@@ -12,7 +12,7 @@ export interface InspectionWorkspaceStep {
   complete?: boolean;
   content: React.ReactNode;
   nextAction?: React.ReactNode;
-  anchors?: Array<{ id: string; label: string; detail?: string }>;
+  anchors?: Array<{ id: string; label: string; detail?: string; group?: string; reviewed?: boolean }>;
 }
 
 interface Props {
@@ -42,6 +42,8 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
   const selectedAnchor = active.anchors?.find((anchor) => anchor.id === hash.split('/').slice(1).join('/'));
   const visibleAnchor = visibleAnchorKey === null ? selectedAnchor : active.anchors?.find((anchor) => `${active.id}/${anchor.id}` === visibleAnchorKey);
   const anchorIds = active.anchors?.map((anchor) => anchor.id).join('|') || '';
+  const anchorGroups = Array.from(new Set(active.anchors?.map((anchor) => anchor.group).filter((group): group is string => Boolean(group)) || []));
+  const currentGroup = visibleAnchor?.group || selectedAnchor?.group || anchorGroups[0];
 
   // The application scrolls <main>, not window. Track the control as it enters
   // the readable area below the pinned guide, without interrupting typing.
@@ -61,8 +63,11 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
         workspaceRef.current?.style.setProperty('--inspection-anchor-offset', `${offset + 64}px`);
         previousOffset = offset;
       }
-      // Count the row immediately below the intermediate pinned group as current.
-      const threshold = main.getBoundingClientRect().top + offset + 72;
+      // Follow the field in the inspector's working area, not only the one
+      // touching the pinned group. Otherwise the mobile guide can still name
+      // the previous field while the next form is already being edited.
+      const workingDepth = Math.min(160, Math.max(72, (main.clientHeight - offset) * 0.25));
+      const threshold = main.getBoundingClientRect().top + offset + workingDepth;
       const markers = Array.from(workspaceRef.current?.querySelectorAll<HTMLElement>('[data-inspection-anchor]') || [])
         .filter((element) => element.getClientRects().length && element.dataset.inspectionAnchor?.startsWith(`${active.id}/`));
       let current = '';
@@ -126,18 +131,16 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
   return <div ref={workspaceRef} data-testid="inspection-workspace" className="min-w-0 rounded-xl border border-neutral-200 bg-white lg:grid lg:grid-cols-[210px_minmax(0,1fr)] xl:grid-cols-[224px_minmax(0,1fr)]">
     <aside data-testid="inspection-navigation" className="sticky top-0 z-20 min-w-0 self-start border-b border-neutral-200 bg-white lg:static lg:self-stretch lg:border-b-0 lg:border-r lg:bg-neutral-50/50">
       <button type="button" aria-label={`Ver todos los pasos · ${active.label}`} aria-expanded={indexOpen} aria-controls="inspection-step-index" onClick={() => setIndexOpen((open) => !open)} className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-2 text-left lg:hidden">
-        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-neutral-900">{guided && index >= 0 ? `Paso ${index + 1} de ${steps.length} · ` : ''}{active.label}</span><span data-testid="inspection-current-point" className="mt-0.5 block truncate text-xs text-neutral-600">{visibleAnchor ? `${visibleAnchor.id} · ${visibleAnchor.detail || 'Sin revisar'} · ${visibleAnchor.label}` : 'Inicio de la sección'}</span></span><span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-primary-800">Índice<ChevronDown size={17} className={`transition-transform ${indexOpen ? 'rotate-180' : ''}`} /></span>
+        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-neutral-900">{guided && index >= 0 ? `Paso ${index + 1} de ${steps.length} · ` : ''}{active.label}</span><span data-testid="inspection-current-point" className="mt-0.5 block truncate text-xs text-neutral-600">{visibleAnchor ? `${visibleAnchor.group ? visibleAnchor.group + ' · ' : ''}${visibleAnchor.id} · ${visibleAnchor.detail || 'Sin revisar'}` : 'Inicio de la sección'}</span></span><span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-primary-800">Índice<ChevronDown size={17} className={`transition-transform ${indexOpen ? 'rotate-180' : ''}`} /></span>
       </button>
       <nav id="inspection-step-index" aria-label={guided ? 'Pasos de la inspección' : 'Secciones del expediente'} className={`${indexOpen ? 'block' : 'hidden'} max-h-[55dvh] overflow-y-auto overscroll-contain px-3 pb-4 lg:sticky lg:top-0 lg:block lg:max-h-[calc(100dvh-7rem)] lg:py-5`}>
         <p className="hidden px-3 pb-3 text-xs font-semibold text-neutral-500 lg:block">{guided ? 'Completar inspección' : 'Consultar expediente'}</p>
-        {!!active.anchors?.length && <p data-testid="inspection-current-point-desktop" className="mb-3 hidden rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-xs leading-snug text-primary-900 lg:block"><span className="block font-bold">Ahora · {active.label}</span><span className="mt-1 block">{visibleAnchor ? `${visibleAnchor.id} · ${visibleAnchor.label}` : 'Inicio de la sección'}</span>{visibleAnchor?.detail && <span className="mt-1 block font-semibold">{visibleAnchor.detail}</span>}</p>}
-        {!!active.anchors?.length && <label className="mb-3 block px-1 text-xs font-semibold text-neutral-700">Ir a un punto de {active.label}
-          <select aria-label={`Ir a un punto de ${active.label}`} value={visibleAnchor?.id || ''} onChange={(event) => goToAnchor(event.target.value)} className="mt-2 min-h-11 w-full min-w-0 rounded-lg border border-neutral-300 bg-white px-2 text-sm font-normal text-neutral-900">
-            <option value="" disabled>Elegir control · {active.anchors.length} puntos</option>
-            {active.anchors.map((anchor, i) => <option key={anchor.id} value={anchor.id}>{i + 1}. {anchor.id} · {anchor.detail} · {anchor.label}</option>)}
-          </select>
-        </label>}
-        <ol className="space-y-1">{steps.map((step, i) => <li key={step.id}>{stepLink(step, guided ? i : undefined)}</li>)}</ol>
+        {!!active.anchors?.length && <p data-testid="inspection-current-point-desktop" className="mb-3 hidden rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-xs leading-snug text-primary-900 lg:block"><span className="block font-bold">Ahora · {active.label}</span><span className="mt-1 block">{currentGroup ? `${currentGroup} · ` : ''}{visibleAnchor ? `${visibleAnchor.id} · ${visibleAnchor.label}` : 'Inicio de la sección'}</span>{visibleAnchor?.detail && <span className="mt-1 block font-semibold">{visibleAnchor.detail}</span>}</p>}
+        <ol className="space-y-1">{steps.map((step, i) => <li key={step.id}>{stepLink(step, guided ? i : undefined)}{active.id === step.id && anchorGroups.length > 0 && <div aria-label={`Secciones de ${step.label}`} className="mb-2 ml-6 border-l border-neutral-200 pl-2"><p className="px-2 pb-1 pt-1 text-[11px] font-semibold text-neutral-500">Secciones · revisados</p>{anchorGroups.map((group) => {
+          const members = active.anchors?.filter((anchor) => anchor.group === group) || [];
+          const reviewed = members.filter((anchor) => anchor.reviewed).length;
+          return <button key={group} type="button" aria-label={`${group} · ${reviewed} de ${members.length} revisados`} aria-current={currentGroup === group ? 'location' : undefined} onClick={() => goToAnchor(members[0].id)} className={`flex min-h-10 w-full min-w-0 items-center justify-between gap-1 rounded-md px-2 py-1.5 text-left text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${currentGroup === group ? 'bg-primary-50 font-bold text-primary-900' : 'text-neutral-600 hover:bg-neutral-100'}`}><span className="min-w-0 truncate">{group}</span><span className="shrink-0 tabular-nums">{reviewed}/{members.length}</span></button>;
+        })}</div>}</li>)}</ol>
         {reference.length > 0 && <div className="mt-4 border-t border-neutral-200 pt-3"><p className="px-3 pb-1 text-xs font-semibold text-neutral-500">Seguimiento del expediente</p>{reference.map((step) => stepLink(step))}</div>}
       </nav>
     </aside>

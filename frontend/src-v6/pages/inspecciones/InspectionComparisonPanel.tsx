@@ -26,6 +26,7 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, editable,
   const location = useLocation();
   const navigate = useNavigate();
   const groups = useMemo(() => Array.from(new Set(comparisons.map((row) => row.categoria))), [comparisons]);
+  const orderedComparisons = useMemo(() => groups.flatMap((group) => comparisons.filter((row) => row.categoria === group)), [comparisons, groups]);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const initialHashRef = useRef(location.hash);
@@ -38,11 +39,11 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, editable,
   const linkedRow = location.hash.startsWith('#declaracion/') ? comparisons.find((row) => row.codigo === linkedCode) : undefined;
   const linkedRowId = linkedRow?.id;
   const activeGroup = linkedRow?.categoria || (expandedGroup && groups.includes(expandedGroup) ? expandedGroup : groups[0] || null);
-  const pending = comparisons.filter((row) => row.resultado === 'PENDIENTE');
+  const pending = orderedComparisons.filter((row) => row.resultado === 'PENDIENTE');
   const nextPendingAfter = (row: InspectionComparison) => {
-    const position = comparisons.indexOf(row);
-    return comparisons.slice(position + 1).find((entry) => entry.resultado === 'PENDIENTE')
-      || comparisons.slice(0, position).find((entry) => entry.resultado === 'PENDIENTE');
+    const position = orderedComparisons.indexOf(row);
+    return orderedComparisons.slice(position + 1).find((entry) => entry.resultado === 'PENDIENTE')
+      || orderedComparisons.slice(0, position).find((entry) => entry.resultado === 'PENDIENTE');
   };
   const openComparison = (row?: InspectionComparison) => {
     if (!row) return;
@@ -108,7 +109,7 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, editable,
                 <div className="mb-3 flex min-w-0 flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="min-w-0 text-sm font-extrabold text-[#10213A]">{row.etiqueta}</p>
-                    <p className="mt-1 text-xs font-medium text-neutral-600">Dato {comparisons.indexOf(row) + 1} de {comparisons.length} · {row.codigo}</p>
+                    <p className="mt-1 text-xs font-medium text-neutral-600">Dato {orderedComparisons.indexOf(row) + 1} de {comparisons.length} · {row.codigo}</p>
                   </div>
                   <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${row.resultado === 'PENDIENTE' ? 'bg-warning-50 text-warning-800' : row.resultado === 'DIFIERE' ? 'bg-error-50 text-error-800' : 'bg-neutral-100 text-neutral-700'}`}>{resultLabel(row)}</span>
                 </div>
