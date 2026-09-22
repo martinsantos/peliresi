@@ -298,6 +298,48 @@ test('compact step and intermediate group stay pinned; next advances in sequence
   await page.screenshot({ path: `/tmp/sitrep-inspection-next-${testInfo.project.name}.png` });
 });
 
+test('declared-data index stays compact, searchable and navigates to the exact field', async ({ page }, testInfo) => {
+  if (testInfo.project.name !== 'mobile') await page.setViewportSize({ width: 390, height: 844 });
+  const state = structuredClone(inspection);
+  state.comparaciones = Array.from({ length: 13 }, (_, index) => ({
+    id: `comparison-index-${index + 1}`,
+    codigo: `IDX-${String(index + 1).padStart(2, '0')}`,
+    categoria: index < 4 ? 'Documentación' : index < 8 ? 'Habilitación' : 'Residuos',
+    etiqueta: index === 9 ? 'Corriente Y9' : `Dato declarado de inspección ${index + 1}`,
+    valorDeclarado: `Valor ${index + 1}`,
+    valorObservado: '',
+    resultado: 'PENDIENTE' as const,
+    observacion: null,
+    evidencias: [],
+  }));
+  await page.route('**/api/inspecciones/inspection-qa', (route) => route.fulfill({ json: { success: true, data: state } }));
+  const prefix = testInfo.project.name === 'mobile' ? '/mobile' : '';
+  await page.goto(`${prefix}/inspecciones/inspection-qa#declaracion`);
+  const step = page.getByTestId('inspection-step-content');
+  const trigger = step.getByRole('button', { name: 'Ir a un dato declarado: Buscar dato' });
+  await expect(trigger).toBeVisible();
+  await trigger.click();
+  const index = step.getByRole('navigation', { name: 'Datos declarados' });
+  await expect(index.getByRole('button')).toHaveCount(13);
+  await expect(step.getByRole('searchbox', { name: 'Buscar dato declarado' })).toBeFocused();
+  expect(await index.evaluate((element) => element.getBoundingClientRect().height)).toBeLessThan(370);
+  expect(await page.locator('html').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await page.screenshot({ path: `/tmp/sitrep-comparison-index-open-${testInfo.project.name}.png` });
+
+  await page.getByRole('searchbox', { name: 'Buscar dato declarado' }).fill('y9');
+  await expect(index.getByRole('button')).toHaveCount(1);
+  await index.getByRole('button', { name: /Corriente Y9/ }).click();
+  await expect(page).toHaveURL(/#declaracion\/IDX-10$/);
+  await expect(index).toHaveCount(0);
+  await expect(step.getByRole('button', { name: 'Ir a un dato declarado: Corriente Y9' })).toBeVisible();
+  await expect(page.locator('[data-inspection-anchor="declaracion/IDX-10"]')).toBeInViewport();
+
+  await step.getByRole('button', { name: 'Ir a un dato declarado: Corriente Y9' }).click();
+  await page.keyboard.press('Escape');
+  await expect(index).toHaveCount(0);
+  await expect(step.getByRole('button', { name: 'Ir a un dato declarado: Corriente Y9' })).toBeFocused();
+});
+
 for (const layout of ['project viewport', '600px web'] as const) {
   test(`comparison index remains reachable after scrolling and restores an exact point at ${layout}`, async ({ page }, testInfo) => {
     test.skip(layout === '600px web' && testInfo.project.name === 'mobile', 'The narrow web layout is covered by the desktop browser project.');
