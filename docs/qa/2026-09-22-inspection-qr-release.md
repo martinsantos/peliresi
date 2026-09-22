@@ -113,34 +113,44 @@ Resultados vigentes informados para este corte:
 
 | Capa | Resultado | Estado |
 |---|---:|---|
-| Backend unitario/integración simulada | 28 archivos, 186 pruebas aprobadas | Completado |
+| Backend unitario/integración simulada | 29 archivos, 187 pruebas aprobadas | Completado |
 | Build backend | TypeScript y assets | Completado |
 | Frontend unitario | 33 archivos, 149 pruebas aprobadas | Completado |
 | Build frontend web | TypeScript + Vite | Completado |
 | Build frontend PWA | Vite `vite.config.app.ts` | Completado |
 | E2E focal Inspecciones | 22/22 en Chrome escritorio y Pixel 7; incluye web y build PWA real, QR válido/alterado, anclas, adjuntos y ledger | Completado |
 | Lint crítico Inspecciones | 0 errores / 0 advertencias | Completado |
-| Despliegue QA | No realizado | **Pendiente** |
-| Despliegue producción | No realizado | **Pendiente** |
-| Smoke post-deploy web/PWA/API/PDF | No realizado | **Pendiente** |
+| Despliegue SITREP de pruebas | Release `20260922-114236-qr`, código `2b92e7b` | Completado |
+| Despliegue VPS gubernamental | No realizado ni autorizado en esta iteración | Pendiente de promoción separada |
+| Smoke post-deploy web/PWA/API/PDF | 10/10 E2E de sólo lectura sobre la inspección demo publicada | Completado |
+| Integridad assets PWA | JS/CSS correctos; asset inexistente devuelve 404 | Completado |
+| Auditoría dependencias backend runtime | 0 vulnerabilidades reportadas | Completado |
 
 Los conteos anteriores reemplazan, para esta iteración, los conteos históricos de documentos previos. No deben interpretarse como cobertura total del producto ni como validación de producción.
 
-## Gate pendiente de release
+## Gate de release
 
 Antes de promover el cambio deben completarse y registrarse, como mínimo:
 
-- [ ] confirmar en el entorno destino `INSPECTION_TRACE_SECRET`, `FRONTEND_URL` y `DISABLE_EMAILS=true` para las pruebas;
-- [ ] ejecutar el E2E desde QR válido y QR alterado, incluyendo `VIGENTE` e `HISTORICA_AUTENTICA`;
-- [ ] comprobar que la landing pública no expone PII ni evidencias en respuesta, DOM, errores o logs;
-- [ ] comprobar en web y PWA el retorno post-login con path, query y hash;
-- [ ] validar el acceso por rol a la vista detallada y el rechazo de usuarios no autorizados;
-- [ ] generar acta e informe en el entorno desplegado, escanear ambos QR y contrastar número, versión y huella;
-- [ ] desplegar primero en QA y ejecutar smoke post-deploy;
+- [x] confirmar en SITREP `INSPECTION_TRACE_SECRET`, `FRONTEND_URL` y `DISABLE_EMAILS=true`;
+- [x] verificar QR válido/alterado en navegador y API; `VIGENTE` en SITREP e `HISTORICA_AUTENTICA` en regresiones backend;
+- [x] comprobar que la respuesta pública se limita a metadata y no devuelve PII ni evidencias;
+- [x] comprobar retorno post-login con path/query/hash en pruebas locales web/PWA y acceso al ancla en SITREP;
+- [x] probar autorización por rol localmente y exigir autenticación para descargar PDFs publicados;
+- [x] generar acta e informe en SITREP y contrastar versión/huella con la verificación pública;
+- [x] desplegar primero en SITREP de pruebas y ejecutar smoke post-deploy;
 - [ ] promover a producción sólo el artefacto ya validado y repetir el smoke de sólo lectura;
-- [ ] registrar versión desplegada, fecha, responsable, resultados y eventual rollback.
+- [x] registrar versión desplegada, resultados y eventual rollback.
 
-Hasta completar el smoke conectado, el estado de release es **validado localmente, pendiente de publicación y validación en SITREP**.
+Estado: **publicado y validado en SITREP de pruebas**. No se promovió al VPS gubernamental. Las pruebas conectadas de esta iteración fueron de sólo lectura; no se modificaron actas reales ni credenciales.
+
+### Incidencia de instalación limpia y recuperación
+
+El primer arranque falló porque el override global de `yaml` era incompatible con la API utilizada por `swagger-jsdoc`. El deploy restauró el backend anterior y no cambió el frontend. Se corrigió el override para respetar la dependencia de Swagger, se agregó una prueba de importación/generación de OpenAPI, y se comprobó una instalación limpia y un arranque aislado en el VPS. El segundo arranque pasó y se activaron web/PWA.
+
+Se conservaron backup PostgreSQL y versión anterior, junto con manual y assets previamente publicados. Se aplicaron únicamente las migraciones aditivas `20260922180000_add_inspection_document_drafts` y `20260922193000_add_auditable_inspection_exchanges`. No se reinició el sistema operativo: se reinició sólo el servicio `sitrep-backend` del entorno SITREP. Ambas instancias confirmaron correo deshabilitado.
+
+Inspección utilizada en las comprobaciones: `I-2026-000006`, acta `DEMO-INS-OPE-002`, id `cmu5o9ub5001u7k6eae8yak4g`. Acta e informe responden PDF válido y la huella publicada coincide con el expediente. El código adulterado retorna 404 y la descarga sin autenticación retorna 401.
 
 ## Referencias históricas y normativas
 
@@ -150,4 +160,4 @@ Hasta completar el smoke conectado, el estado de release es **validado localment
 
 ## Control de cambios
 
-Documento creado como handoff de QA. No se realizó commit ni despliegue durante esta subtarea documental.
+Código funcional: `0b6ec19`. Corrección de compatibilidad de instalación limpia: `2b92e7b`. Este registro se completa con la evidencia del despliegue del 22/09/2026.
