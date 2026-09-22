@@ -40,10 +40,16 @@ export interface InspectionEvidence {
   transcripcion?: string | null;
   capturadaAt: string;
   createdAt: string;
+  latitud?: number | null;
+  longitud?: number | null;
+  anuladaAt?: string | null;
+  anuladaPorId?: string | null;
+  motivoAnulacion?: string | null;
   comparacionId?: string | null;
   eventoId?: string | null;
   itemId?: string | null;
   creadoPor?: { id: string; nombre: string; apellido?: string | null };
+  anuladaPor?: { id: string; nombre: string; apellido?: string | null } | null;
 }
 
 export interface InspectionComparison {

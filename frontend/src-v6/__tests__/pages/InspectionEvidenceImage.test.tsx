@@ -31,4 +31,20 @@ describe('InspectionEvidenceImage', () => {
     view.unmount();
     await waitFor(() => expect(revoke).toHaveBeenCalledWith('blob:inspection-thumbnail'));
   });
+
+  it('opens an accessible full-screen preview and closes it with Escape', async () => {
+    vi.mocked(inspeccionService.evidenceObjectUrl).mockResolvedValue('blob:inspection-preview');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+
+    render(<InspectionEvidenceImage inspectionId="inspection-1" evidenceId="evidence-2" alt="Detalle del hallazgo" className="aspect-[4/3]" preview />);
+
+    const thumbnail = await screen.findByAltText('Detalle del hallazgo');
+    fireEvent.load(thumbnail);
+    fireEvent.click(screen.getByRole('button', { name: 'Ampliar evidencia: Detalle del hallazgo' }));
+    expect(screen.getByRole('dialog', { name: 'Vista ampliada: Detalle del hallazgo' })).toBeInTheDocument();
+    expect(screen.getAllByAltText('Detalle del hallazgo')).toHaveLength(2);
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Vista ampliada: Detalle del hallazgo' })).not.toBeInTheDocument();
+  });
 });

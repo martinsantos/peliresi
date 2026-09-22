@@ -116,6 +116,10 @@ test('inspection field screen is usable on web and PWA layouts', async ({ page }
   await expect(itemPhoto).toBeVisible();
   await expect(itemPhoto).toHaveAttribute('data-loaded', 'true');
   expect(await itemPhoto.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
+  await emergencyItem.getByRole('button', { name: 'Ampliar evidencia: Señalización de emergencia incompleta' }).click();
+  await expect(page.getByRole('dialog', { name: 'Vista ampliada: Señalización de emergencia incompleta' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(emergencyItem.getByLabel(/Adjuntar foto: Señalización y elementos de emergencia operativos/)).toBeAttached();
   await expect(emergencyItem.getByText('La imagen también queda disponible en Evidencias del expediente.')).toBeVisible();
   await emergencyItem.scrollIntoViewIfNeeded();
@@ -132,6 +136,7 @@ test('inspector can attach an image to one checklist comment without losing the 
   const mobile = testInfo.project.name === 'mobile';
   const state = structuredClone(inspection);
   let uploadBody = '';
+  let successfulUploads = 0;
   let allowUpload = false;
   let failDetailLoad = false;
 
@@ -163,6 +168,7 @@ test('inspector can attach an image to one checklist comment without losing the 
     }
     if (request.method() === 'POST' && url.pathname.endsWith('/evidencias')) {
       if (!allowUpload) return route.abort('internetdisconnected');
+      successfulUploads += 1;
       uploadBody = request.postData() || '';
       const evidence = { id: 'e-item-new', tipo: 'FOTO', nombreOriginal: 'senalizacion-nueva.png', mimeDetectado: 'image/png', bytes: 512, capturadaAt: new Date().toISOString(), createdAt: new Date().toISOString(), itemId: 'item-6', descripcion: 'Falta completar la señalización del kit de emergencia.' };
       state.evidencias.unshift(evidence);
@@ -200,6 +206,50 @@ test('inspector can attach an image to one checklist comment without losing the 
   expect(uploadBody).toContain('Falta completar la señalización del kit de emergencia.');
   expect(uploadBody).toContain('name="clienteId"');
   expect(uploadBody).toContain('name="clienteSha256"');
+  await page.evaluate(() => { window.dispatchEvent(new Event('online')); window.dispatchEvent(new Event('online')); });
+  await page.waitForTimeout(250);
+  expect(successfulUploads).toBe(1);
+});
+
+test('inspector annuls a mistaken photo with a mandatory reason while preserving its trace', async ({ page }, testInfo) => {
+  const mobile = testInfo.project.name === 'mobile';
+  const state: any = structuredClone(inspection);
+  let annulBody: { version: number; motivo: string } | null = null;
+
+  await page.route('**/api/inspecciones/inspection-qa**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const respond = (data: unknown) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data }) });
+    if (request.method() === 'GET' && url.pathname.endsWith('/evidencias/e-1')) {
+      return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480"><rect width="640" height="480" fill="#dff5e9"/></svg>' });
+    }
+    if (request.method() === 'GET' && url.pathname === '/api/inspecciones/inspection-qa') return respond(state);
+    if (request.method() === 'PATCH' && url.pathname.endsWith('/evidencias/e-1/anular')) {
+      annulBody = request.postDataJSON();
+      const patchEvidence = (evidence: typeof linkedChecklistPhoto) => ({
+        ...evidence,
+        anuladaAt: '2026-09-21T15:00:00.000Z',
+        anuladaPorId: user.id,
+        motivoAnulacion: annulBody?.motivo,
+      });
+      state.evidencias = state.evidencias.map((evidence) => evidence.id === 'e-1' ? patchEvidence(evidence as typeof linkedChecklistPhoto) : evidence);
+      state.items = state.items.map((item) => ({ ...item, evidencias: item.evidencias.map((evidence) => evidence.id === 'e-1' ? patchEvidence(evidence) : evidence) }));
+      state.version += 1;
+      return respond(state.evidencias.find((evidence) => evidence.id === 'e-1'));
+    }
+    return route.fallback();
+  });
+
+  await page.goto(mobile ? '/mobile/inspecciones/inspection-qa' : '/inspecciones/inspection-qa');
+  const emergencyItem = page.getByText('Señalización y elementos de emergencia operativos', { exact: true }).locator('xpath=ancestor::div[@data-result][1]');
+  await emergencyItem.getByRole('button', { name: 'Anular con motivo' }).click();
+  const reason = emergencyItem.getByRole('textbox', { name: /Motivo para anular vehiculo_frente.jpg/ });
+  await reason.fill('La fotografía quedó movida y se reemplazará por una toma legible.');
+  await emergencyItem.getByRole('button', { name: 'Confirmar anulación' }).click();
+
+  await expect(emergencyItem.getByText('Anulada', { exact: true })).toBeVisible();
+  await expect(emergencyItem.getByText(/fotografía quedó movida/)).toBeVisible();
+  expect(annulBody).toEqual({ version: 3, motivo: 'La fotografía quedó movida y se reemplazará por una toma legible.' });
 });
 
 test('inspection list uses one active destination for the whole row', async ({ page }, testInfo) => {

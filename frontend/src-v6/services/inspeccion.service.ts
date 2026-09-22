@@ -87,6 +87,11 @@ export const inspeccionService = {
     return data.data;
   },
 
+  async annulEvidence(id: string, evidenceId: string, version: number, motivo: string): Promise<Inspection['evidencias'][number]> {
+    const { data } = await api.patch(`/inspecciones/${id}/evidencias/${evidenceId}/anular`, { version, motivo });
+    return data.data;
+  },
+
   evidenceUrl(id: string, evidenceId: string): string {
     return `/api/inspecciones/${encodeURIComponent(id)}/evidencias/${encodeURIComponent(evidenceId)}`;
   },

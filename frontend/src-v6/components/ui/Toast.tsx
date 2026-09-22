@@ -122,7 +122,7 @@ const ToastItem: React.FC<ToastItemProps> = ({
   return (
     <div
       className={cn(
-        'w-full max-w-sm rounded-xl border p-4 shadow-3',
+        'w-full rounded-xl border p-3 shadow-3 sm:p-4',
         'animate-slide-in-right',
         toastStyles[type],
         isExiting && 'animate-fade-out'
@@ -132,9 +132,9 @@ const ToastItem: React.FC<ToastItemProps> = ({
       <div className="flex gap-3">
         <div className="shrink-0">{toastIcons[type]}</div>
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-neutral-900">{title}</p>
+          <p className="text-sm font-semibold text-neutral-900 sm:text-base">{title}</p>
           {message && (
-            <p className="mt-1 text-sm text-neutral-600">{message}</p>
+            <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-neutral-600 sm:text-sm">{message}</p>
           )}
         </div>
         <button
@@ -162,7 +162,7 @@ export const ToastContainer: React.FC = () => {
   }, []);
 
   const container = (
-    <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-3 pointer-events-none">
+    <div className="pointer-events-none fixed inset-x-3 top-3 z-[9999] flex flex-col gap-2 sm:left-auto sm:right-4 sm:top-4 sm:w-96 sm:gap-3">
       {activeToasts.map((t) => (
         <div key={t.id} className="pointer-events-auto">
           <ToastItem {...t} onRemove={toast.remove} />

@@ -5,6 +5,7 @@ import {
   actualizarInspeccion,
   actualizarItems,
   actualizarComparaciones,
+  anularEvidencia,
   agregarEventoInspeccion,
   cambiarEstadoInspeccion,
   crearInspeccion,
@@ -32,6 +33,7 @@ router.post('/:id/estado', cambiarEstadoInspeccion);
 router.post('/:id/eventos', agregarEventoInspeccion);
 router.get('/:id/acta.pdf', generarActaInspeccionPdf);
 router.post('/:id/evidencias', evidenceUpload.single('file'), subirEvidencia);
+router.patch('/:id/evidencias/:evidenciaId/anular', anularEvidencia);
 router.get('/:id/evidencias/:evidenciaId', descargarEvidencia);
 
 export default router;

@@ -9,6 +9,9 @@ const mocks = vi.hoisted(() => ({
   createEvidence: vi.fn(),
   createEvent: vi.fn(),
   updateInspection: vi.fn(),
+  updateInspectionMany: vi.fn(),
+  updateEvidenceMany: vi.fn(),
+  evidenceById: vi.fn(),
   transaction: vi.fn(),
   persist: vi.fn(),
   remove: vi.fn(),
@@ -19,7 +22,7 @@ vi.mock('../../lib/prisma', () => ({ default: {
   itemInspeccion: { findFirst: mocks.item },
   comparacionInspeccion: { count: mocks.comparisonCount },
   eventoInspeccion: { count: mocks.eventCount },
-  evidenciaInspeccion: { findFirst: mocks.duplicate },
+  evidenciaInspeccion: { findFirst: mocks.duplicate, findUniqueOrThrow: mocks.evidenceById },
   $transaction: mocks.transaction,
 } }));
 vi.mock('../../services/inspectionEvidence.service', () => ({
@@ -33,7 +36,7 @@ vi.mock('../../services/inspectionDeclaredSnapshot.service', () => ({
 }));
 vi.mock('../../services/inspectionActPdf.service', () => ({ streamInspectionActPdf: vi.fn() }));
 
-import { subirEvidencia } from '../../controllers/inspeccion.controller';
+import { anularEvidencia, subirEvidencia } from '../../controllers/inspeccion.controller';
 
 function response() {
   return { status: vi.fn().mockReturnThis(), json: vi.fn() };
@@ -56,11 +59,53 @@ describe('inspection checklist evidence', () => {
     mocks.duplicate.mockResolvedValue(null);
     mocks.persist.mockResolvedValue({ storageKey: 'inspecciones/inspection-1/evidence.png', mimeType: 'image/png', bytes: 9, sha256: 'sha-qa' });
     mocks.createEvidence.mockResolvedValue({ id: 'evidence-1', itemId: 'item-1', tipo: 'FOTO' });
+    mocks.updateInspectionMany.mockResolvedValue({ count: 1 });
+    mocks.updateEvidenceMany.mockResolvedValue({ count: 1 });
+    mocks.evidenceById.mockResolvedValue({
+      id: 'evidence-1',
+      nombreOriginal: 'hallazgo.png',
+      anuladaAt: new Date('2026-09-21T12:00:00Z'),
+      motivoAnulacion: 'La captura quedó movida y no representa el hallazgo.',
+      creadoPor: { id: 'inspector-1', nombre: 'Inspectora', apellido: 'QA' },
+      anuladaPor: { id: 'inspector-1', nombre: 'Inspectora', apellido: 'QA' },
+    });
     mocks.transaction.mockImplementation(async (callback) => callback({
       evidenciaInspeccion: { create: mocks.createEvidence },
       eventoInspeccion: { create: mocks.createEvent },
       inspeccion: { update: mocks.updateInspection },
     }));
+  });
+
+  it('annuls evidence without deleting the file and records the reason atomically', async () => {
+    const reason = 'La captura quedó movida y no representa el hallazgo.';
+    mocks.inspection.mockResolvedValueOnce({ id: 'inspection-1', inspectorId: 'inspector-1', estado: 'EN_CAMPO', version: 7 });
+    mocks.duplicate.mockResolvedValueOnce({ id: 'evidence-1', nombreOriginal: 'hallazgo.png', anuladaAt: null, motivoAnulacion: null });
+    mocks.transaction.mockImplementationOnce(async (callback) => callback({
+      inspeccion: { updateMany: mocks.updateInspectionMany },
+      evidenciaInspeccion: { updateMany: mocks.updateEvidenceMany },
+      eventoInspeccion: { create: mocks.createEvent },
+    }));
+    const req = {
+      params: { id: 'inspection-1', evidenciaId: 'evidence-1' },
+      body: { version: 7, motivo: reason },
+      user: { id: 'inspector-1', rol: 'INSPECTOR', esInspector: true },
+    } as any;
+    const res = response();
+    const next = vi.fn();
+
+    await anularEvidencia(req, res as any, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mocks.updateInspectionMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'inspection-1', version: 7 } }));
+    expect(mocks.updateEvidenceMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'evidence-1', inspeccionId: 'inspection-1', anuladaAt: null },
+      data: expect.objectContaining({ anuladaPorId: 'inspector-1', motivoAnulacion: reason }),
+    }));
+    expect(mocks.createEvent).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ tipo: 'EVIDENCIA_ANULADA', metadata: { evidenciaId: 'evidence-1', archivoPreservado: true } }),
+    }));
+    expect(mocks.remove).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('permanecen preservados') }));
   });
 
   it('persists an image against the selected checklist item and records traceability', async () => {
