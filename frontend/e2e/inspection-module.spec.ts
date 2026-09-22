@@ -128,6 +128,59 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test('draft has one aligned start action and advances only after the server confirms', async ({ page }, testInfo) => {
+  const state = { ...structuredClone(inspection), estado: 'BORRADOR' };
+  let rejectStart = true;
+  let starts = 0;
+  await page.route('**/api/inspecciones/inspection-qa**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path.endsWith('/estado')) {
+      starts++;
+      if (rejectStart) return route.fulfill({ status: 409, json: { success: false, message: 'El servidor no confirmó el inicio' } });
+      state.estado = 'EN_CAMPO'; state.version++;
+      return route.fulfill({ json: { success: true, data: state } });
+    }
+    if (request.method() === 'PATCH') { state.version++; return route.fulfill({ json: { success: true, data: state } }); }
+    if (path === '/api/inspecciones/inspection-qa') return route.fulfill({ json: { success: true, data: state } });
+    return route.fallback();
+  });
+  await page.goto((testInfo.project.name === 'mobile' ? '/mobile' : '') + '/inspecciones/inspection-qa');
+  const footer = page.getByTestId('inspection-action-bar');
+  const start = footer.getByRole('button', { name: 'Iniciar y continuar' });
+  await expect(start).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Iniciar inspección', exact: true })).toHaveCount(0);
+  await expect(footer.getByRole('button', { name: 'Siguiente', exact: true })).toHaveCount(0);
+  await footer.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: '/tmp/sitrep-wizard-start-footer-' + testInfo.project.name + '.png' });
+  await start.click();
+  await expect.poll(() => starts).toBe(1);
+  await expect(page.getByRole('heading', { name: 'Preparar la inspección' })).toBeVisible();
+  await expect(start).toBeEnabled();
+  rejectStart = false;
+  await start.click();
+  await expect(page).toHaveURL(/#declaracion$/);
+  await expect(page.getByRole('heading', { name: 'Declarado vs. verificado' })).toBeVisible();
+});
+
+test('closed controls state their result in words and deep anchors resume the exact item', async ({ page }, testInfo) => {
+  const path = (testInfo.project.name === 'mobile' ? '/mobile' : '') + '/inspecciones/inspection-qa';
+  await page.goto(path + '#checklist/DOC-02');
+  await expect(page.getByRole('heading', { name: 'Checklist regulatorio' })).toBeVisible();
+  const active = page.getByRole('button', { name: /Los registros se encuentran completos y actualizados/ });
+  await expect(active).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByTestId('inspection-item-status-item-4')).toHaveText('Pendiente');
+  await expect(page.getByTestId('inspection-item-status-item-0')).toHaveText('Revisado · Cumple');
+  await expect(page.getByTestId('inspection-item-status-item-6')).toHaveText('Revisado · No cumple');
+  await active.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: '/tmp/sitrep-wizard-orientation-' + testInfo.project.name + '.png' });
+  await page.getByRole('button', { name: 'Siguiente pendiente', exact: true }).click();
+  await expect(page).toHaveURL(/#checklist\/TRZ-01$/);
+  await page.reload();
+  await expect(page.getByRole('button', { name: /La documentación coincide con los registros de SITREP/ })).toHaveAttribute('aria-expanded', 'true');
+  expect(await page.locator('html').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+});
+
 test('inspection field screen is usable on web and PWA layouts', async ({ page }, testInfo) => {
   const mobile = testInfo.project.name === 'mobile';
   const runtimeErrors: string[] = [];

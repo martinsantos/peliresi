@@ -11,6 +11,7 @@ export interface InspectionWorkspaceStep {
   detail?: string;
   complete?: boolean;
   content: React.ReactNode;
+  nextAction?: React.ReactNode;
 }
 
 interface Props {
@@ -32,13 +33,15 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
   const all = [...steps, ...reference];
   let hash = location.hash.slice(1);
   try { hash = decodeURIComponent(hash); } catch { /* malformed links fall back to the first step */ }
-  const active = all.find((step) => step.id === hash)
+  const active = all.find((step) => step.id === hash.split('/')[0])
     || all.find((step) => step.id === defaultStep) || steps[0];
   const index = steps.findIndex((step) => step.id === active.id);
 
   useEffect(() => {
     if (previousHash.current === location.hash) return;
+    const previousSection = previousHash.current.split('/')[0];
     previousHash.current = location.hash;
+    if (previousSection === location.hash.split('/')[0]) return;
     headingRef.current?.focus({ preventScroll: true });
     headingRef.current?.scrollIntoView?.({ block: 'start', behavior: 'instant' });
   }, [location.hash]);
@@ -58,12 +61,12 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
     </a>;
   };
 
-  return <div data-testid="inspection-workspace" className="min-w-0 overflow-hidden rounded-xl border border-neutral-200 bg-white lg:grid lg:grid-cols-[210px_minmax(0,1fr)] xl:grid-cols-[224px_minmax(0,1fr)]">
+  return <div data-testid="inspection-workspace" className="min-w-0 overflow-clip rounded-xl border border-neutral-200 bg-white lg:grid lg:grid-cols-[210px_minmax(0,1fr)] xl:grid-cols-[224px_minmax(0,1fr)]">
     <aside className="min-w-0 border-b border-neutral-200 bg-neutral-50/50 lg:border-b-0 lg:border-r">
       <button type="button" aria-expanded={indexOpen} aria-controls="inspection-step-index" onClick={() => setIndexOpen((open) => !open)} className="flex min-h-16 w-full items-center justify-between gap-3 px-4 py-3 text-left lg:hidden">
         <span className="min-w-0 flex-1"><span className="block text-sm font-bold text-neutral-900">{guided && index >= 0 ? `Paso ${index + 1} de ${steps.length} · ` : ''}{active.label}</span><span className="mt-1 block text-xs text-neutral-600">{indexOpen ? 'Ocultar índice' : 'Ver todos los pasos'}</span></span><ChevronDown size={18} className={`shrink-0 transition-transform ${indexOpen ? 'rotate-180' : ''}`} />
       </button>
-      <nav id="inspection-step-index" aria-label={guided ? 'Pasos de la inspección' : 'Secciones del expediente'} className={`${indexOpen ? 'block' : 'hidden'} px-3 pb-4 lg:block lg:py-5`}>
+      <nav id="inspection-step-index" aria-label={guided ? 'Pasos de la inspección' : 'Secciones del expediente'} className={`${indexOpen ? 'block' : 'hidden'} px-3 pb-4 lg:sticky lg:top-0 lg:block lg:max-h-[calc(100dvh-7rem)] lg:overflow-y-auto lg:py-5`}>
         <p className="hidden px-3 pb-3 text-xs font-semibold text-neutral-500 lg:block">{guided ? 'Completar inspección' : 'Consultar expediente'}</p>
         <ol className="space-y-1">{steps.map((step, i) => <li key={step.id}>{stepLink(step, guided ? i : undefined)}</li>)}</ol>
         {reference.length > 0 && <div className="mt-4 border-t border-neutral-200 pt-3"><p className="px-3 pb-1 text-xs font-semibold text-neutral-500">Seguimiento del expediente</p>{reference.map((step) => stepLink(step))}</div>}
@@ -81,10 +84,10 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
       {all.map((step) => <section key={step.id} hidden={step.id !== active.id} aria-label={step.title} id={step.id === 'verificacion' ? undefined : step.id} data-testid={step.id === active.id ? 'inspection-step-content' : undefined} className="min-w-0 space-y-5 p-4 sm:p-6 [&>section]:shadow-none [&>div]:shadow-none">
         {step.content}
       </section>)}
-      <footer data-testid="inspection-action-bar" className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 bg-neutral-50/60 p-4 sm:px-6">
-        <div>{index > 0 && <Button variant="outline" leftIcon={<ArrowLeft size={16} />} onClick={() => go(steps[index - 1])}>Anterior</Button>}</div>
-        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">{index >= 0 && saveAction}{index >= 0 && index < steps.length - 1 && <Button rightIcon={<ArrowRight size={16} />} onClick={() => go(steps[index + 1])}>Siguiente</Button>}</div>
-      </footer>
+      {index >= 0 && <footer data-testid="inspection-action-bar" className="flex flex-col gap-3 border-t border-neutral-200 bg-neutral-50/60 p-4 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between sm:px-6">
+        <div className="flex min-w-0 gap-2 [&>button]:w-full min-[480px]:[&>button]:w-auto">{index > 0 ? <Button variant="outline" leftIcon={<ArrowLeft size={16} />} onClick={() => go(steps[index - 1])}>Anterior</Button> : saveAction}</div>
+        <div className="flex min-w-0 flex-col gap-2 min-[480px]:flex-row min-[480px]:flex-wrap min-[480px]:justify-end [&>button]:w-full min-[480px]:[&>button]:w-auto">{index > 0 && saveAction}{active.nextAction || (index < steps.length - 1 && <Button rightIcon={<ArrowRight size={16} />} onClick={() => go(steps[index + 1])}>Siguiente</Button>)}</div>
+      </footer>}
     </div>
   </div>;
 }
