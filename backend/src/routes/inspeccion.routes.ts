@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { isAuthenticated } from '../middlewares/auth.middleware';
+import { isAuthenticated, requireFullAccess } from '../middlewares/auth.middleware';
 import {
   actualizarInspeccion,
   actualizarItems,
@@ -23,6 +23,7 @@ const evidenceUpload = multer({
 });
 
 router.use(isAuthenticated);
+router.use(requireFullAccess);
 router.get('/', listarInspecciones);
 router.post('/', crearInspeccion);
 router.get('/:id', obtenerInspeccion);

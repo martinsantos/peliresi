@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { isAuthenticated, hasRole } from '../middlewares/auth.middleware';
+import { isAuthenticated, hasRole, requireFullAccess } from '../middlewares/auth.middleware';
 import {
     reporteManifiestosPorPeriodo,
     reporteResiduosTratados,
@@ -11,6 +11,7 @@ import {
 const router = Router();
 
 router.use(isAuthenticated);
+router.use(requireFullAccess);
 
 /**
  * @openapi

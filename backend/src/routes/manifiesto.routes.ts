@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { isAuthenticated, hasRole } from '../middlewares/auth.middleware';
+import { isAuthenticated, hasRole, requireFullAccess } from '../middlewares/auth.middleware';
 import {
     verificarManifiesto,
     getManifiestos,
@@ -65,6 +65,7 @@ router.get('/verificar/:numero', verificarManifiesto);
 
 // Todas las rutas siguientes requieren autenticacion
 router.use(isAuthenticated);
+router.use(requireFullAccess);
 
 /**
  * @openapi

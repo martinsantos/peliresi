@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Request, Response, NextFunction } from 'express';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { MulterError } from 'multer';
 
 // Mock the logger to avoid pino output during tests
 vi.mock('../../utils/logger', () => ({
@@ -111,6 +112,20 @@ describe('errorHandler middleware', () => {
         message: 'Recurso no encontrado',
       })
     );
+  });
+
+  it('returns 413 with a safe message when an upload exceeds its limit', () => {
+    const { req, res, next } = createMocks();
+    const err = new MulterError('LIMIT_FILE_SIZE');
+
+    errorHandler(err as unknown as AppError, req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(413);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      success: false,
+      status: 413,
+      message: 'El archivo supera el tamaño máximo permitido',
+    }));
   });
 
   it('hides internal details in production for 500 errors', () => {

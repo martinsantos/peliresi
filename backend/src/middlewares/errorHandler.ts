@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { MulterError } from 'multer';
 import logger from '../utils/logger';
 
 export class AppError extends Error {
@@ -51,6 +52,14 @@ export const errorHandler = (
       statusCode = 404;
       message = 'Recurso no encontrado';
     }
+  }
+
+  if (err instanceof MulterError) {
+    statusCode = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+    message = err.code === 'LIMIT_FILE_SIZE'
+      ? 'El archivo supera el tamaño máximo permitido'
+      : 'No se pudo procesar el archivo enviado';
+    details = undefined;
   }
 
   // In production, don't expose internal error details for 500 errors
