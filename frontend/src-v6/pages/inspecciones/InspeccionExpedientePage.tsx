@@ -143,10 +143,17 @@ const InspeccionExpedientePage: React.FC = () => {
         await saveMutation.mutateAsync(undefined);
         if (draftKey) localStorage.removeItem(draftKey);
       }
-      await uploadMutation.mutateAsync({ file, fields: { ...fields, clienteId: pending.id, capturadaAt: pending.capturedAt, clienteSha256: pending.sha256 || undefined } });
+      const evidenceAlreadyPresent = Boolean(inspection?.evidencias.some((evidence) => evidence.sha256 === pending?.sha256));
+      const uploadedEvidence = await uploadMutation.mutateAsync({ file, fields: { ...fields, clienteId: pending.id, capturadaAt: pending.capturedAt, clienteSha256: pending.sha256 || undefined } });
+      // Además de la invalidación central, esperamos explícitamente la lectura fresca:
+      // la miniatura y la versión del expediente deben quedar actualizadas antes de confirmar.
+      await query.refetch();
       await removePendingInspectionEvidence(pending.id);
       await refreshPendingEvidence();
-      toast.success(fields?.itemId ? 'Foto vinculada al control' : 'Evidencia incorporada', file.name);
+      toast.success(
+        evidenceAlreadyPresent ? 'La imagen ya estaba incorporada' : fields?.itemId ? 'Foto vinculada al control' : 'Evidencia incorporada',
+        uploadedEvidence.nombreOriginal,
+      );
     } catch (error: unknown) {
       const networkFailure = !navigator.onLine || (isAxiosError(error) && !error.response);
       if (pending && !networkFailure) {
