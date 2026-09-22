@@ -6,6 +6,12 @@ import {
   type InspectionDossierReadiness,
 } from './inspectionDocumentIntegrity.service';
 import { prepareInspectionPdfImages, type PreparedInspectionImage } from './inspectionPdfImage.service';
+import {
+  drawMendozaMark,
+  drawSitrepMark,
+  loadInspectionPdfBranding,
+  type InspectionPdfBranding,
+} from './inspectionPdfBranding.service';
 
 const C = {
   green: '#0D8A4F', darkGreen: '#1B5E3C', paleGreen: '#ECFDF5',
@@ -67,37 +73,51 @@ function documentState(inspection: any, readiness: InspectionDossierReadiness) {
   return { label: `ESTADO DEL EXPEDIENTE · ${stateLabel(String(inspection.estado))}`, fill: C.paleGreen, ink: C.darkGreen };
 }
 
-function runningHeader(doc: PDFKit.PDFDocument, inspection: any, state: string) {
-  doc.font('Helvetica-Bold').fontSize(7.4).fillColor(C.darkGreen)
-    .text('MINISTERIO DE ENERGÍA Y AMBIENTE · SUBSECRETARÍA DE AMBIENTE · DGFA', 44, 24, { width: 335, lineBreak: false });
-  doc.font('Helvetica-Bold').fontSize(7.2).fillColor(C.navy)
-    .text(`INFORME TÉCNICO · ${inspection.numero} · v${inspection.version}`, 378, 24, { width: 173, align: 'right', lineBreak: false });
-  doc.moveTo(44, 45).lineTo(doc.page.width - 44, 45).lineWidth(0.8).strokeColor(C.darkGreen).stroke();
-  doc.font('Helvetica').fontSize(6.6).fillColor(C.muted)
-    .text(state, 44, 49, { width: doc.page.width - 88, align: 'right', lineBreak: false });
+function runningHeader(
+  doc: PDFKit.PDFDocument,
+  inspection: any,
+  state: string,
+  branding: InspectionPdfBranding,
+) {
+  drawMendozaMark(doc, branding, 44, 13, 94, 30);
+  doc.font('Helvetica-Bold').fontSize(5.8).fillColor(C.darkGreen)
+    .text('MINISTERIO DE ENERGÍA Y AMBIENTE · DGFA', 147, 19, { width: 224, lineBreak: false });
+  doc.font('Helvetica').fontSize(5.5).fillColor(C.muted)
+    .text(`INFORME TÉCNICO · ${inspection.numero} · v${inspection.version}`, 147, 29, { width: 224, lineBreak: false });
+  drawSitrepMark(doc, 424, 16, { compact: true, width: 127 });
+  doc.moveTo(44, 47).lineTo(doc.page.width - 44, 47).lineWidth(0.9).strokeColor(C.darkGreen).stroke();
+  doc.font('Helvetica').fontSize(6.4).fillColor(C.muted)
+    .text(state, 44, 51, { width: doc.page.width - 88, align: 'right', lineBreak: false });
   doc.y = PAGE.top;
 }
 
-function header(doc: PDFKit.PDFDocument, inspection: any, readiness: InspectionDossierReadiness, generatedAt: Date) {
+function header(
+  doc: PDFKit.PDFDocument,
+  inspection: any,
+  readiness: InspectionDossierReadiness,
+  generatedAt: Date,
+  branding: InspectionPdfBranding,
+) {
   const actor = actorOf(inspection);
   const state = documentState(inspection, readiness);
-  doc.font('Helvetica-Bold').fontSize(9).fillColor(C.darkGreen).text('MINISTERIO DE ENERGÍA Y AMBIENTE', 44, 27, { width: 310 });
-  doc.fontSize(8).text('SUBSECRETARÍA DE AMBIENTE', 44, 41, { width: 310 });
-  doc.font('Helvetica').fontSize(7.5).fillColor(C.ink).text('DIRECCIÓN DE GESTIÓN Y FISCALIZACIÓN AMBIENTAL', 44, 54, { width: 330 });
-  doc.font('Helvetica-Bold').fontSize(8).fillColor(C.darkGreen).text('SITREP · EXPEDIENTE DIGITAL', 350, 30, { width: 201, align: 'right' });
-  doc.font('Helvetica').fontSize(7).fillColor(C.muted).text('Documento 2 de 2 · Complementa el acta de campo', 330, 45, { width: 221, align: 'right' });
-  doc.moveTo(44, 76).lineTo(doc.page.width - 44, 76).lineWidth(1.4).strokeColor(C.darkGreen).stroke();
+  drawMendozaMark(doc, branding, 44, 20, 154, 48);
+  drawSitrepMark(doc, 358, 23, { width: 193 });
+  doc.font('Helvetica-Bold').fontSize(6.5).fillColor(C.darkGreen)
+    .text('MINISTERIO DE ENERGÍA Y AMBIENTE · SUBSECRETARÍA DE AMBIENTE · DGFA', 44, 71, { width: 355, lineBreak: false });
+  doc.font('Helvetica').fontSize(6.2).fillColor(C.muted)
+    .text('Documento 2 de 2 · Complementa el acta de campo', 350, 71, { width: 201, align: 'right', lineBreak: false });
+  doc.moveTo(44, 86).lineTo(doc.page.width - 44, 86).lineWidth(1.5).strokeColor(C.darkGreen).stroke();
 
-  doc.font('Helvetica-Bold').fontSize(8).fillColor(C.darkGreen).text('INFORME TÉCNICO DE INSPECCIÓN', 44, 96, { characterSpacing: 0.45 });
-  doc.font('Helvetica-Bold').fontSize(23).fillColor(C.navy).text(inspection.numero, 44, 113, { width: 315 });
-  doc.font('Helvetica').fontSize(8.2).fillColor(C.muted).text(`Versión ${inspection.version} · Acta ${inspection.numeroActa || 'sin número asignado'}`, 44, 143, { width: 330 });
-  doc.font('Helvetica-Bold').fontSize(8).fillColor(C.navy).text('EXPEDIENTE DE INSPECCIÓN', 366, 102, { width: 185, align: 'right' });
-  doc.font('Helvetica').fontSize(7.6).fillColor(C.muted).text(`Estado: ${stateLabel(String(inspection.estado))}`, 366, 120, { width: 185, align: 'right' });
-  doc.text(`Emitido ${formatDate(generatedAt, true)} ART`, 366, 136, { width: 185, align: 'right' });
+  doc.font('Helvetica-Bold').fontSize(8).fillColor(C.darkGreen).text('INFORME TÉCNICO DE INSPECCIÓN', 44, 103, { characterSpacing: 0.45 });
+  doc.font('Helvetica-Bold').fontSize(23).fillColor(C.navy).text(inspection.numero, 44, 120, { width: 315 });
+  doc.font('Helvetica').fontSize(8.2).fillColor(C.muted).text(`Versión ${inspection.version} · Acta ${inspection.numeroActa || 'sin número asignado'}`, 44, 150, { width: 330 });
+  doc.font('Helvetica-Bold').fontSize(8).fillColor(C.navy).text('EXPEDIENTE DE INSPECCIÓN', 366, 109, { width: 185, align: 'right' });
+  doc.font('Helvetica').fontSize(7.6).fillColor(C.muted).text(`Estado: ${stateLabel(String(inspection.estado))}`, 366, 127, { width: 185, align: 'right' });
+  doc.text(`Emitido ${formatDate(generatedAt, true)} ART`, 366, 143, { width: 185, align: 'right' });
 
-  doc.roundedRect(44, 164, doc.page.width - 88, 31, 3).fill(state.fill);
-  doc.font('Helvetica-Bold').fontSize(8.2).fillColor(state.ink).text(state.label, 55, 174, { width: doc.page.width - 110, align: 'center' });
-  doc.y = 215;
+  doc.roundedRect(44, 171, doc.page.width - 88, 31, 3).fill(state.fill);
+  doc.font('Helvetica-Bold').fontSize(8.2).fillColor(state.ink).text(state.label, 55, 181, { width: doc.page.width - 110, align: 'center' });
+  doc.y = 222;
 
   doc.fillColor(C.navy).font('Helvetica-Bold').fontSize(17).text(actor.razonSocial || 'Actor inspeccionado', 44, doc.y, { width: doc.page.width - 88 });
   doc.font('Helvetica').fontSize(8.8).fillColor(C.muted).text(`${inspection.tipoActor} · CUIT ${actor.cuit || 's/d'} · Acta ${inspection.numeroActa || 'sin número asignado'}`, 44, doc.y + 23, { width: doc.page.width - 88 });
@@ -557,6 +577,7 @@ export async function streamInspectionTechnicalReportPdf(
   const fingerprint = buildInspectionDocumentFingerprint(inspection);
   const readiness = inspectDossierReadiness(inspection);
   const state = documentState(inspection, readiness);
+  const branding = await loadInspectionPdfBranding();
   const preparedImages = await prepareInspectionPdfImages(inspection.evidencias || [], resolveEvidence);
   const doc = new PDFDocument({
     size: 'A4',
@@ -577,7 +598,7 @@ export async function streamInspectionTechnicalReportPdf(
   res.setHeader('Content-Disposition', `attachment; filename=informe_tecnico_${inspection.numero}.pdf`);
   doc.pipe(res);
 
-  header(doc, inspection, readiness, generatedAt);
+  header(doc, inspection, readiness, generatedAt, branding);
   const technical = inspection.informeTecnico && typeof inspection.informeTecnico === 'object' ? inspection.informeTecnico : {};
   const actor = actorOf(inspection);
 
@@ -672,7 +693,7 @@ export async function streamInspectionTechnicalReportPdf(
     // Draw running furniture after pagination is final. Drawing it from a
     // pageAdded listener lets PDFKit's internal line wrapper reset the cursor
     // and can place continuation content over the header.
-    if (i > range.start) runningHeader(doc, inspection, state.label);
+    if (i > range.start) runningHeader(doc, inspection, state.label, branding);
     // El pie vive dentro del margen reservado. PDFKit puede crear páginas
     // fantasma al escribir allí si conserva el margen inferior de flujo.
     const flowBottomMargin = doc.page.margins.bottom;
@@ -683,7 +704,7 @@ export async function streamInspectionTechnicalReportPdf(
       .text(`Informe técnico · ${inspection.numero} · v${inspection.version}`, 44, footerY, { width: 205, lineBreak: false })
       .text(`Huella ${fingerprint.slice(0, 16)}…`, 224, footerY, { width: 170, align: 'center', lineBreak: false })
       .text(`Página ${i + 1} de ${range.count}`, 421, footerY, { width: 130, align: 'right', lineBreak: false });
-    doc.fontSize(6.1).text(`SITREP Mendoza · Generado ${formatDate(generatedAt, true)} ART`, 44, footerY + 13, { width: doc.page.width - 88, align: 'center', lineBreak: false });
+    doc.fontSize(6.1).text(`Gobierno de Mendoza · Ministerio de Energía y Ambiente · Documento oficial generado por SITREP · ${formatDate(generatedAt, true)} ART`, 44, footerY + 13, { width: doc.page.width - 88, align: 'center', lineBreak: false });
     doc.page.margins.bottom = flowBottomMargin;
   }
   doc.end();

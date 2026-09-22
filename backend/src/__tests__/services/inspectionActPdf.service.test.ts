@@ -1,6 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { spawnSync } from 'child_process';
 import { PassThrough } from 'stream';
 import { describe, expect, it } from 'vitest';
 import { streamInspectionTechnicalReportPdf } from '../../services/inspectionActPdf.service';
@@ -102,6 +103,17 @@ describe('inspection act PDF', () => {
     expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
     expect(pdf.length).toBeGreaterThan(10_000);
     expect((pdf.toString('latin1').match(/\/Type\s*\/Page\b/g) || []).length).toBeGreaterThanOrEqual(4);
+    const renderedPdf = path.join(tempDir, 'informe-tecnico.pdf');
+    fs.writeFileSync(renderedPdf, pdf);
+    const extracted = spawnSync('pdftotext', [renderedPdf, '-'], { encoding: 'utf8' });
+    if (!extracted.error) {
+      expect(extracted.status, extracted.stderr).toBe(0);
+      expect(extracted.stdout).toContain('TRAZABILIDAD DE RESIDUOS PELIGROSOS');
+      expect(extracted.stdout).toContain('Gobierno de Mendoza');
+      expect(extracted.stdout).toContain('Documento oficial generado por SITREP');
+    } else {
+      expect((extracted.error as NodeJS.ErrnoException).code).toBe('ENOENT');
+    }
     if (process.env.SITREP_PDF_QA_OUTPUT) {
       fs.mkdirSync(path.dirname(process.env.SITREP_PDF_QA_OUTPUT), { recursive: true });
       fs.writeFileSync(process.env.SITREP_PDF_QA_OUTPUT, pdf);

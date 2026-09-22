@@ -2,6 +2,12 @@ import type { Response } from 'express';
 import PDFDocument from 'pdfkit';
 import { buildInspectionFieldActFingerprint } from './inspectionDocumentIntegrity.service';
 import { prepareInspectionPdfImages, type PreparedInspectionImage } from './inspectionPdfImage.service';
+import {
+  drawMendozaMark,
+  drawSitrepMark,
+  loadInspectionPdfBranding,
+  type InspectionPdfBranding,
+} from './inspectionPdfBranding.service';
 
 const COLORS = {
   green: '#1B5E3C',
@@ -349,18 +355,28 @@ function dateParts(input: Date | string | null | undefined): { date: string; tim
   };
 }
 
-function institutionalHeader(doc: PDFKit.PDFDocument, actNumber: string, subtitle?: string) {
-  const top = 26;
-  doc.fillColor(COLORS.green).font('Helvetica-Bold').fontSize(9)
-    .text('MINISTERIO DE ENERGÍA Y AMBIENTE', 34, top, { width: 290 });
-  doc.fontSize(8).text('SUBSECRETARÍA DE AMBIENTE', 34, top + 13, { width: 290 });
-  doc.text('DIRECCIÓN DE GESTIÓN Y FISCALIZACIÓN AMBIENTAL', 34, top + 25, { width: 310 });
-  doc.font('Helvetica-Bold').fontSize(10).fillColor(COLORS.ink)
-    .text('ACTA DE INSPECCIÓN / CONSTATACIÓN N.º', 337, top + 2, { width: 224, align: 'right' });
-  doc.fontSize(16).fillColor(COLORS.green).text(actNumber, 337, top + 20, { width: 224, align: 'right' });
-  if (subtitle) doc.font('Helvetica').fontSize(7).fillColor(COLORS.muted).text(subtitle, 337, top + 40, { width: 224, align: 'right' });
-  doc.moveTo(34, 82).lineTo(doc.page.width - 34, 82).lineWidth(1.4).strokeColor(COLORS.green).stroke();
-  doc.y = 92;
+function institutionalHeader(
+  doc: PDFKit.PDFDocument,
+  actNumber: string,
+  branding: InspectionPdfBranding,
+  subtitle?: string,
+) {
+  drawMendozaMark(doc, branding, 34, 17, 152, 48);
+  drawSitrepMark(doc, 374, 21, { width: 187 });
+  doc.font('Helvetica-Bold').fontSize(6.3).fillColor(COLORS.green)
+    .text('MINISTERIO DE ENERGÍA Y AMBIENTE · SUBSECRETARÍA DE AMBIENTE · DGFA', 34, 69, { width: 365, lineBreak: false });
+  doc.font('Helvetica').fontSize(6).fillColor(COLORS.muted)
+    .text('DOCUMENTO OFICIAL GENERADO POR SITREP', 385, 69, { width: 176, align: 'right', lineBreak: false });
+  doc.moveTo(34, 84).lineTo(doc.page.width - 34, 84).lineWidth(1.5).strokeColor(COLORS.green).stroke();
+
+  doc.font('Helvetica-Bold').fontSize(9).fillColor(COLORS.ink)
+    .text('ACTA DE INSPECCIÓN / CONSTATACIÓN', 34, 97, { width: 310 });
+  doc.font('Helvetica-Bold').fontSize(15).fillColor(COLORS.green)
+    .text(`N.º ${actNumber}`, 337, 94, { width: 224, align: 'right' });
+  if (subtitle) doc.font('Helvetica').fontSize(6.8).fillColor(COLORS.muted)
+    .text(subtitle, 337, 115, { width: 224, align: 'right', height: 13, ellipsis: true });
+  doc.moveTo(34, 133).lineTo(doc.page.width - 34, 133).lineWidth(0.6).strokeColor(COLORS.line).stroke();
+  doc.y = 143;
 }
 
 function band(doc: PDFKit.PDFDocument, title: string) {
@@ -447,11 +463,13 @@ function article44PageHeader(
   actNumber: string,
   inspectionNumber: string,
   presentation: InspectionFieldActPresentation,
+  branding: InspectionPdfBranding,
   continuation = false,
 ) {
   institutionalHeader(
     doc,
     actNumber,
+    branding,
     `DECRETO 2625/99, ART. 44${continuation ? ' - CONTINUACIÓN' : ''} - ${inspectionNumber}`,
   );
   statusBanner(doc, presentation);
@@ -487,6 +505,7 @@ function writeFormalityDetail(
   actNumber: string,
   inspectionNumber: string,
   presentation: InspectionFieldActPresentation,
+  branding: InspectionPdfBranding,
 ) {
   doc.font('Helvetica-Bold').fontSize(6.4).fillColor(COLORS.muted);
   const detailLabel = formality.resolved ? 'CONSTANCIA REGISTRADA' : 'CONSTANCIA / PENDIENTE';
@@ -500,7 +519,7 @@ function writeFormalityDetail(
   for (const line of lines) {
     if (doc.y + 12 > doc.page.height - 82) {
       doc.addPage();
-      article44PageHeader(doc, actNumber, inspectionNumber, presentation, true);
+      article44PageHeader(doc, actNumber, inspectionNumber, presentation, branding, true);
       formalityHeading(doc, formality, true);
       doc.font('Helvetica').fontSize(8.2).fillColor(COLORS.ink);
     }
@@ -515,9 +534,10 @@ function article44Section(
   inspection: any,
   actNumber: string,
   presentation: InspectionFieldActPresentation,
+  branding: InspectionPdfBranding,
 ) {
   doc.addPage();
-  article44PageHeader(doc, actNumber, inspection.numero, presentation);
+  article44PageHeader(doc, actNumber, inspection.numero, presentation, branding);
   const note = 'Esta sección reproduce únicamente datos consignados en el acta de campo. "No consignado" o "pendiente" no presume hechos, firmas, entrega de copias ni notificaciones. El control indicado es de completitud documental y no sustituye una valoración jurídica.';
   const noteHeight = Math.max(37, doc.heightOfString(note, { width: doc.page.width - 100 }) + 17);
   doc.roundedRect(40, doc.y, doc.page.width - 80, noteHeight, 4).fill(COLORS.soft);
@@ -528,15 +548,15 @@ function article44Section(
   presentation.formalities.forEach((formality) => {
     if (doc.y + 70 > doc.page.height - 82) {
       doc.addPage();
-      article44PageHeader(doc, actNumber, inspection.numero, presentation, true);
+      article44PageHeader(doc, actNumber, inspection.numero, presentation, branding, true);
     }
     formalityHeading(doc, formality);
-    writeFormalityDetail(doc, formality, actNumber, inspection.numero, presentation);
+    writeFormalityDetail(doc, formality, actNumber, inspection.numero, presentation, branding);
   });
 
   if (doc.y + 52 > doc.page.height - 82) {
     doc.addPage();
-    article44PageHeader(doc, actNumber, inspection.numero, presentation, true);
+    article44PageHeader(doc, actNumber, inspection.numero, presentation, branding, true);
   }
   const summary = presentation.unresolved.length
     ? `Pendientes documentales: ${presentation.unresolved.map((entry) => entry.label).join('; ')}.`
@@ -552,11 +572,20 @@ function article44Section(
   doc.y += summaryHeight + 8;
 }
 
-function signatureBlock(doc: PDFKit.PDFDocument, inspection: any, act: ActData) {
+function signatureBlock(
+  doc: PDFKit.PDFDocument,
+  inspection: any,
+  act: ActData,
+  branding: InspectionPdfBranding,
+  actNumber: string,
+) {
   const actor = actorOf(inspection);
   const y = doc.y + 18;
   const width = (doc.page.width - 92) / 2;
-  if (y + 92 > doc.page.height - 56) doc.addPage();
+  if (y + 92 > doc.page.height - 56) {
+    doc.addPage();
+    institutionalHeader(doc, actNumber, branding, `FIRMAS Y CONSTANCIAS · ${inspection.numero}`);
+  }
   const actualY = doc.y + 18;
   const responsible = value(act.atendidoPor || act.titular || actor.representanteLegalNombre, 'Causante / responsable');
   const inspector = value(`${inspection.inspector?.nombre || ''} ${inspection.inspector?.apellido || ''}`);
@@ -585,13 +614,24 @@ function signatureBlock(doc: PDFKit.PDFDocument, inspection: any, act: ActData) 
   doc.y = actualY + 96;
 }
 
-function observationsHeader(doc: PDFKit.PDFDocument, actNumber: string, continuation?: string) {
-  institutionalHeader(doc, actNumber, continuation);
+function observationsHeader(
+  doc: PDFKit.PDFDocument,
+  actNumber: string,
+  branding: InspectionPdfBranding,
+  continuation?: string,
+) {
+  institutionalHeader(doc, actNumber, branding, continuation);
   band(doc, 'Observaciones generales');
   doc.y += 9;
 }
 
-function writePaginatedText(doc: PDFKit.PDFDocument, text: string, actNumber: string, continuation?: string) {
+function writePaginatedText(
+  doc: PDFKit.PDFDocument,
+  text: string,
+  actNumber: string,
+  branding: InspectionPdfBranding,
+  continuation?: string,
+) {
   const maxWidth = doc.page.width - 80;
   const lineHeight = 12;
   doc.font('Helvetica').fontSize(9).fillColor(COLORS.ink);
@@ -607,7 +647,7 @@ function writePaginatedText(doc: PDFKit.PDFDocument, text: string, actNumber: st
       if (!line) return;
       if (doc.y + lineHeight > doc.page.height - 130) {
         doc.addPage();
-        observationsHeader(doc, actNumber, continuation);
+        observationsHeader(doc, actNumber, branding, continuation);
         doc.font('Helvetica').fontSize(9).fillColor(COLORS.ink);
       }
       doc.text(line, 40, doc.y, { width: maxWidth, lineBreak: false });
@@ -636,12 +676,18 @@ function evidenceTarget(inspection: any, evidence: any): string {
   return evidence.descripcion || 'Evidencia general del expediente';
 }
 
-function photoAnnex(doc: PDFKit.PDFDocument, inspection: any, preparedImages: Map<string, PreparedInspectionImage>, actNumber: string) {
+function photoAnnex(
+  doc: PDFKit.PDFDocument,
+  inspection: any,
+  preparedImages: Map<string, PreparedInspectionImage>,
+  actNumber: string,
+  branding: InspectionPdfBranding,
+) {
   const photos = inspection.evidencias.filter((evidence: any) => evidence.tipo === 'FOTO' && !evidence.anuladaAt && !evidence.intercambioId);
   photos.forEach((photo: any, index: number) => {
     if (index % 2 === 0) {
       doc.addPage();
-      institutionalHeader(doc, actNumber, `ANEXO FOTOGRÁFICO · ${inspection.numero}`);
+      institutionalHeader(doc, actNumber, branding, `ANEXO FOTOGRÁFICO · ${inspection.numero}`);
       doc.y += 7;
     }
     const y = doc.y;
@@ -677,6 +723,7 @@ export async function streamInspectionActPdf(
   const actNumber = value(inspection.numeroActa, inspection.numero);
   const started = dateParts(inspection.iniciadaAt || inspection.fechaProgramada || inspection.createdAt);
   const presentation = buildInspectionFieldActPresentation(inspection);
+  const branding = await loadInspectionPdfBranding();
   const fieldEvidence = (inspection.evidencias || []).filter((evidence: any) => !evidence.intercambioId);
   const preparedImages = await prepareInspectionPdfImages(fieldEvidence, resolveEvidence);
   const doc = new PDFDocument({
@@ -694,7 +741,7 @@ export async function streamInspectionActPdf(
   res.setHeader('Content-Disposition', `attachment; filename=acta_inspeccion_${actNumber.replace(/[^a-zA-Z0-9_-]+/g, '_')}.pdf`);
   doc.pipe(res);
 
-  institutionalHeader(doc, actNumber, `Expediente digital ${inspection.numero}`);
+  institutionalHeader(doc, actNumber, branding, `Expediente digital ${inspection.numero}`);
   statusBanner(doc, presentation);
   row(doc, [
     { label: 'Fecha', value: started.date },
@@ -752,20 +799,20 @@ export async function streamInspectionActPdf(
   doc.roundedRect(34, noticeY, doc.page.width - 68, 37, 4).fill(COLORS.soft);
   doc.font('Helvetica-Bold').fontSize(7.4).fillColor(COLORS.ink).text(notice, 44, noticeY + 9, { width: doc.page.width - 88, align: 'center' });
   doc.y = noticeY + 42;
-  signatureBlock(doc, inspection, act);
+  signatureBlock(doc, inspection, act, branding, actNumber);
 
-  article44Section(doc, inspection, actNumber, presentation);
+  article44Section(doc, inspection, actNumber, presentation, branding);
 
   doc.addPage();
-  observationsHeader(doc, actNumber, act.actaAnterior ? `CONTINÚA / RELACIONADA CON ${act.actaAnterior}` : `Expediente digital ${inspection.numero}`);
-  writePaginatedText(doc, inspection.observaciones || '', actNumber, `Expediente digital ${inspection.numero}`);
+  observationsHeader(doc, actNumber, branding, act.actaAnterior ? `CONTINÚA / RELACIONADA CON ${act.actaAnterior}` : `Expediente digital ${inspection.numero}`);
+  writePaginatedText(doc, inspection.observaciones || '', actNumber, branding, `Expediente digital ${inspection.numero}`);
   doc.y += 6;
   const factualFindings = inspection.items.filter((item: any) => item.resultado === 'NO_CUMPLE');
   if (factualFindings.length) {
     doc.font('Helvetica-Bold').fontSize(8).fillColor(COLORS.green).text('CONTROLES NO CONFORMES REGISTRADOS', 40, doc.y, { width: doc.page.width - 80 });
     doc.y += 15;
     factualFindings.forEach((item: any) => {
-      writePaginatedText(doc, `- ${item.codigo} - ${item.etiqueta}${item.observacion ? `: ${item.observacion}` : ''}`, actNumber, `Expediente digital ${inspection.numero}`);
+      writePaginatedText(doc, `- ${item.codigo} - ${item.etiqueta}${item.observacion ? `: ${item.observacion}` : ''}`, actNumber, branding, `Expediente digital ${inspection.numero}`);
     });
   }
   const defenseNotice = typeof act.plazoDescargoDias === 'number'
@@ -773,14 +820,14 @@ export async function streamInspectionActPdf(
     : 'El plazo de descargo y su comunicación no fueron consignados. El documento no presume una notificación ni el inicio de un cómputo.';
   if (doc.y + 95 > doc.page.height - 60) {
     doc.addPage();
-    observationsHeader(doc, actNumber, `Expediente digital ${inspection.numero}`);
+    observationsHeader(doc, actNumber, branding, `Expediente digital ${inspection.numero}`);
   }
   doc.roundedRect(40, doc.y + 6, doc.page.width - 80, 43, 4).fill(COLORS.soft);
   doc.font('Helvetica-Bold').fontSize(7.2).fillColor(COLORS.ink).text(defenseNotice, 50, doc.y + 16, { width: doc.page.width - 100, align: 'center' });
   doc.y += 55;
-  signatureBlock(doc, inspection, act);
+  signatureBlock(doc, inspection, act, branding, actNumber);
 
-  photoAnnex(doc, inspection, preparedImages, actNumber);
+  photoAnnex(doc, inspection, preparedImages, actNumber, branding);
 
   const fingerprint = buildInspectionFieldActFingerprint(inspection);
   const pages = doc.bufferedPageRange();
@@ -793,7 +840,7 @@ export async function streamInspectionActPdf(
     doc.font('Helvetica').fontSize(5.7).fillColor(COLORS.muted)
       .text(`Huella estable del acta de campo (SHA-256): ${fingerprint}`, 34, footerY, { width: 527, lineBreak: false });
     doc.fontSize(6.1)
-      .text(`SITREP · ${inspection.numero} · ${presentation.statusLabel}`, 34, footerY + 9, { width: 410, lineBreak: false })
+      .text(`Gobierno de Mendoza · SITREP · ${inspection.numero} · ${presentation.statusLabel}`, 34, footerY + 9, { width: 410, lineBreak: false })
       .text(`Página ${index + 1} de ${pages.count}`, 466, footerY + 9, { width: 95, align: 'right', lineBreak: false });
   }
   doc.end();

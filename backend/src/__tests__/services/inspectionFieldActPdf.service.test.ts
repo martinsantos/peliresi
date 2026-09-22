@@ -159,6 +159,8 @@ describe('inspection field act PDF', () => {
       expect(extracted.stdout).toContain('Firma e intervinientes');
       expect(extracted.stdout).toContain('Entrega de copia del acta');
       expect(extracted.stdout).toContain('Notificación y domicilio legal');
+      expect(extracted.stdout).toContain('DOCUMENTO OFICIAL GENERADO POR SITREP');
+      expect(extracted.stdout).toContain('Gobierno de Mendoza');
       expect(extracted.stdout.replace(/\s/g, '')).toContain(buildInspectionFieldActFingerprint(inspection));
     } else {
       expect((extracted.error as NodeJS.ErrnoException).code).toBe('ENOENT');

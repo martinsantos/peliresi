@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon src/index.ts",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node -e \"const fs=require('fs');fs.cpSync('assets','dist/assets',{recursive:true})\"",
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
