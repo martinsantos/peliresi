@@ -11,7 +11,7 @@ const PRECACHE_URLS = [
 
 // Instalación del Service Worker
 self.addEventListener('install', (event) => {
-    console.log('[SW] Installing Service Worker v33...');
+    console.log('[SW] Installing Service Worker v51...');
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then((cache) => {
@@ -30,7 +30,7 @@ self.addEventListener('install', (event) => {
 
 // Activación del Service Worker
 self.addEventListener('activate', (event) => {
-    console.log('[SW] Activando Service Worker v33...');
+    console.log('[SW] Activando Service Worker v51...');
     event.waitUntil(
         caches.keys().then((cacheNames) => {
             const currentCaches = [CACHE_NAME, RUNTIME_CACHE];
@@ -143,7 +143,7 @@ self.addEventListener('push', (event) => {
     event.waitUntil(self.registration.showNotification(data.title || 'RP Trazar', options));
 });
 
-console.log('[SW] Service Worker v33 cargado');
+console.log('[SW] Service Worker v51 cargado');
 
 // ========================================
 // NOTIFICATION CLICK — abrir/enfocar la web
