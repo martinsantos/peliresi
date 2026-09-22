@@ -34,16 +34,24 @@ export function useInspection(id: string) {
   });
 }
 
-export function useInspectionMutation<TInput>(
-  mutationFn: (input: TInput) => Promise<unknown>,
+export function useInspectionMutation<TInput, TData = unknown>(
+  mutationFn: (input: TInput) => Promise<TData>,
   inspectionId?: string,
 ) {
+  const { currentUser } = useAuth();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn,
     onSuccess: async () => {
       const refreshes = [queryClient.invalidateQueries({ queryKey: ['inspecciones', 'list'] })];
-      if (inspectionId) refreshes.push(queryClient.invalidateQueries({ queryKey: ['inspecciones', 'detail', inspectionId] }));
+      if (inspectionId) {
+        // El detalle incluye el usuario para no mezclar datos al impersonar.
+        // La clave anterior omitía ese segmento y nunca refrescaba el expediente activo.
+        const detailKey = currentUser?.id
+          ? ['inspecciones', 'detail', currentUser.id, inspectionId]
+          : ['inspecciones', 'detail'];
+        refreshes.push(queryClient.invalidateQueries({ queryKey: detailKey }));
+      }
       await Promise.all(refreshes);
     },
   });

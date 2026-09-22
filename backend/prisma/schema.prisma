@@ -12,57 +12,58 @@ datasource db {
 }
 
 model Usuario {
-  id              String      @id @default(cuid())
-  email           String      @unique
-  password        String
-  rol             Rol
-  cuit            String?     @unique
-  nombre          String
-  apellido        String?
-  empresa         String?
-  telefono        String?
-  activo          Boolean     @default(true)
-  esInspector     Boolean     @default(false)
-  dosFaSecret     String?
-  dosFaVerificado Boolean     @default(false)
-  notifNuevoRegistro      Boolean   @default(true)
-  notifEmail              Boolean   @default(true)
-  notifWhatsapp           Boolean   @default(false)
-  notifTelegram           Boolean   @default(false)
-  telegramChatId          String?
-  whatsappPhone           String?
-  emailVerified           Boolean   @default(false)
-  emailVerificationToken  String?
-  passwordResetToken      String?
-  passwordResetExpires    DateTime?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id                     String    @id @default(cuid())
+  email                  String    @unique
+  password               String
+  rol                    Rol
+  cuit                   String?   @unique
+  nombre                 String
+  apellido               String?
+  empresa                String?
+  telefono               String?
+  activo                 Boolean   @default(true)
+  esInspector            Boolean   @default(false)
+  dosFaSecret            String?
+  dosFaVerificado        Boolean   @default(false)
+  notifNuevoRegistro     Boolean   @default(true)
+  notifEmail             Boolean   @default(true)
+  notifWhatsapp          Boolean   @default(false)
+  notifTelegram          Boolean   @default(false)
+  telegramChatId         String?
+  whatsappPhone          String?
+  emailVerified          Boolean   @default(false)
+  emailVerificationToken String?
+  passwordResetToken     String?
+  passwordResetExpires   DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
   // Relaciones
-  generador       Generador?
-  transportista   Transportista?
-  operador        Operador?
-  refreshTokens   RefreshToken[]
-  manifiestosCreados Manifiesto[]    @relation("UsuarioManifiestos")
-  eventos         EventoManifiesto[]
-  auditorias      Auditoria[]         @relation("UsuarioAuditorias")
-  notificaciones    Notificacion[]
-  reglasCreadas     ReglaAlerta[]       @relation("ReglasCreadas")
-  solicitudes       SolicitudInscripcion[]
-  pushSubscripciones PushSubscripcion[]
-  inspeccionesAsignadas      Inspeccion[]            @relation("InspectorInspecciones")
-  comparacionesVerificadas   ComparacionInspeccion[] @relation("UsuarioComparacionesInspeccion")
-  evidenciasInspeccion       EvidenciaInspeccion[]   @relation("UsuarioEvidenciasInspeccion")
-  eventosInspeccion          EventoInspeccion[]      @relation("UsuarioEventosInspeccion")
+  generador                    Generador?
+  transportista                Transportista?
+  operador                     Operador?
+  refreshTokens                RefreshToken[]
+  manifiestosCreados           Manifiesto[]            @relation("UsuarioManifiestos")
+  eventos                      EventoManifiesto[]
+  auditorias                   Auditoria[]             @relation("UsuarioAuditorias")
+  notificaciones               Notificacion[]
+  reglasCreadas                ReglaAlerta[]           @relation("ReglasCreadas")
+  solicitudes                  SolicitudInscripcion[]
+  pushSubscripciones           PushSubscripcion[]
+  inspeccionesAsignadas        Inspeccion[]            @relation("InspectorInspecciones")
+  comparacionesVerificadas     ComparacionInspeccion[] @relation("UsuarioComparacionesInspeccion")
+  evidenciasInspeccion         EvidenciaInspeccion[]   @relation("UsuarioEvidenciasInspeccion")
+  evidenciasAnuladasInspeccion EvidenciaInspeccion[]   @relation("UsuarioAnulacionEvidenciasInspeccion")
+  eventosInspeccion            EventoInspeccion[]      @relation("UsuarioEventosInspeccion")
 
   @@map("usuarios")
 }
 
 model Generador {
-  id                String      @id @default(cuid())
-  usuarioId         String      @unique
+  id                String   @id @default(cuid())
+  usuarioId         String   @unique
   razonSocial       String
-  cuit              String      @unique
+  cuit              String   @unique
   domicilio         String
   telefono          String
   email             String
@@ -73,9 +74,9 @@ model Generador {
   corrientesControl String?
   latitud           Float?
   longitud          Float?
-  activo            Boolean     @default(true)
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  activo            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   // Campos regulatorios DPA Mendoza
   expedienteInscripcion   String?
@@ -94,11 +95,11 @@ model Generador {
   tefInputs               Json?
 
   // Relaciones
-  usuario     Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  manifiestos Manifiesto[]
-  pagos       PagoTEF[]
-  ddjj        DeclaracionJurada[]
-  documentos  Documento[]
+  usuario      Usuario             @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  manifiestos  Manifiesto[]
+  pagos        PagoTEF[]
+  ddjj         DeclaracionJurada[]
+  documentos   Documento[]
   renovaciones Renovacion[]
   inspecciones Inspeccion[]
 
@@ -106,106 +107,106 @@ model Generador {
 }
 
 model Transportista {
-  id                  String    @id @default(cuid())
-  usuarioId           String    @unique
-  razonSocial         String
-  cuit                String    @unique
-  domicilio           String
-  telefono            String
-  email               String
-  numeroHabilitacion  String
-  latitud             Float?
-  longitud            Float?
-  activo              Boolean   @default(true)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  id                 String   @id @default(cuid())
+  usuarioId          String   @unique
+  razonSocial        String
+  cuit               String   @unique
+  domicilio          String
+  telefono           String
+  email              String
+  numeroHabilitacion String
+  latitud            Float?
+  longitud           Float?
+  activo             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   // Campos regulatorios DPA Mendoza (migración 2026-03-13)
-  localidad               String?    // Municipio/ciudad (LOC. del Excel)
-  vencimientoHabilitacion DateTime?  // VTO. del certificado CAA
-  corrientesAutorizadas   String?    // Corrientes Basilea raw: "Y4/Y8/Y9/..."
-  expedienteDPA           String?    // Expediente DPA (EXPTE. DPA)
-  resolucionDPA           String?    // Resolución DPA (ej: "0359/24")
-  resolucionSSP           String?    // Resolución SSP
-  actaInspeccion          String?    // Acta de Inspección (ej: "rp-g000040")
-  actaInspeccion2         String?    // Segunda Acta de Inspección
+  localidad               String? // Municipio/ciudad (LOC. del Excel)
+  vencimientoHabilitacion DateTime? // VTO. del certificado CAA
+  corrientesAutorizadas   String? // Corrientes Basilea raw: "Y4/Y8/Y9/..."
+  expedienteDPA           String? // Expediente DPA (EXPTE. DPA)
+  resolucionDPA           String? // Resolución DPA (ej: "0359/24")
+  resolucionSSP           String? // Resolución SSP
+  actaInspeccion          String? // Acta de Inspección (ej: "rp-g000040")
+  actaInspeccion2         String? // Segunda Acta de Inspección
 
   // Relaciones
-  usuario       Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  vehiculos     Vehiculo[]
-  choferes      Chofer[]
-  manifiestos   Manifiesto[]
-  inspecciones  Inspeccion[]
+  usuario      Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  vehiculos    Vehiculo[]
+  choferes     Chofer[]
+  manifiestos  Manifiesto[]
+  inspecciones Inspeccion[]
 
   @@map("transportistas")
 }
 
 model Operador {
-  id                  String    @id @default(cuid())
-  usuarioId           String    @unique
-  razonSocial         String
-  cuit                String    @unique
-  domicilio           String
-  telefono            String
-  email               String
-  numeroHabilitacion  String
-  categoria           String
-  tipoOperador        String?
-  tecnologia          String?
-  corrientesY         String?
-  modalidades         String[]  @default(["FIJO"])
-  latitud             Float?
-  longitud            Float?
-  activo              Boolean   @default(true)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  id                 String   @id @default(cuid())
+  usuarioId          String   @unique
+  razonSocial        String
+  cuit               String   @unique
+  domicilio          String
+  telefono           String
+  email              String
+  numeroHabilitacion String
+  categoria          String
+  tipoOperador       String?
+  tecnologia         String?
+  corrientesY        String?
+  modalidades        String[] @default(["FIJO"])
+  latitud            Float?
+  longitud           Float?
+  activo             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   // Campos enriquecidos DPA Mendoza
-  expedienteInscripcion       String?
-  certificadoNumero           String?
-  domicilioLegalCalle         String?
-  domicilioLegalLocalidad     String?
-  domicilioLegalDepto         String?
-  domicilioRealCalle          String?
-  domicilioRealLocalidad      String?
-  domicilioRealDepto          String?
-  representanteLegalNombre    String?
-  representanteLegalDNI       String?
-  representanteLegalTelefono  String?
-  representanteTecnicoNombre  String?
+  expedienteInscripcion         String?
+  certificadoNumero             String?
+  domicilioLegalCalle           String?
+  domicilioLegalLocalidad       String?
+  domicilioLegalDepto           String?
+  domicilioRealCalle            String?
+  domicilioRealLocalidad        String?
+  domicilioRealDepto            String?
+  representanteLegalNombre      String?
+  representanteLegalDNI         String?
+  representanteLegalTelefono    String?
+  representanteTecnicoNombre    String?
   representanteTecnicoMatricula String?
   representanteTecnicoTelefono  String?
-  vencimientoHabilitacion     DateTime?
-  resolucionDPA               String?
-  tefInputs                   Json?
+  vencimientoHabilitacion       DateTime?
+  resolucionDPA                 String?
+  tefInputs                     Json?
 
   // Relaciones
-  usuario       Usuario              @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  tratamientos  TratamientoAutorizado[]
-  manifiestos   Manifiesto[]
-  sedes         SedeOperador[]
-  documentos    Documento[]
-  pagos         PagoTEF[]
-  ddjj          DeclaracionJurada[]
-  renovaciones  Renovacion[]
-  inspecciones  Inspeccion[]
+  usuario      Usuario                 @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  tratamientos TratamientoAutorizado[]
+  manifiestos  Manifiesto[]
+  sedes        SedeOperador[]
+  documentos   Documento[]
+  pagos        PagoTEF[]
+  ddjj         DeclaracionJurada[]
+  renovaciones Renovacion[]
+  inspecciones Inspeccion[]
 
   @@map("operadores")
 }
 
 model Vehiculo {
-  id              String      @id @default(cuid())
-  transportistaId String
-  patente         String
-  marca           String
-  modelo          String
-  anio            Int
-  capacidad       Float
+  id                 String   @id @default(cuid())
+  transportistaId    String
+  patente            String
+  marca              String
+  modelo             String
+  anio               Int
+  capacidad          Float
   numeroHabilitacion String
-  vencimiento     DateTime
-  activo          Boolean     @default(true)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  vencimiento        DateTime
+  activo             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   // Relaciones
   transportista Transportista @relation(fields: [transportistaId], references: [id], onDelete: Cascade)
@@ -214,7 +215,7 @@ model Vehiculo {
 }
 
 model Chofer {
-  id              String      @id @default(cuid())
+  id              String   @id @default(cuid())
   transportistaId String
   nombre          String
   apellido        String
@@ -222,9 +223,9 @@ model Chofer {
   licencia        String
   vencimiento     DateTime
   telefono        String
-  activo          Boolean     @default(true)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  activo          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   // Relaciones
   transportista Transportista @relation(fields: [transportistaId], references: [id], onDelete: Cascade)
@@ -233,66 +234,66 @@ model Chofer {
 }
 
 model TipoResiduo {
-  id              String      @id @default(cuid())
-  codigo          String      @unique
+  id              String   @id @default(cuid())
+  codigo          String   @unique
   nombre          String
   descripcion     String?
   categoria       String
   caracteristicas String?
   peligrosidad    String
-  activo          Boolean     @default(true)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  activo          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   // Relaciones
-  manifiestos     ManifiestoResiduo[]
-  tratamientos    TratamientoAutorizado[]
+  manifiestos  ManifiestoResiduo[]
+  tratamientos TratamientoAutorizado[]
 
   @@map("tipos_residuos")
 }
 
 model Manifiesto {
-  id              String      @id @default(cuid())
-  numero          String      @unique
-  generadorId     String
-  transportistaId String?
-  operadorId      String
-  modalidad       String?   @default("FIJO")
-  tratamientoMetodo         String?
-  tratamientoAutorizadoId   String?
-  estado          EstadoManifiesto @default(BORRADOR)
-  observaciones   String?
-  fechaFirma      DateTime?
-  fechaEstimadaRetiro DateTime?
-  fechaRetiro     DateTime?
-  fechaEntrega    DateTime?
-  fechaRecepcion  DateTime?
-  fechaCierre     DateTime?
-  qrCode          String?
-  blockchainHash        String?
-  blockchainTxHash      String?
-  blockchainBlockNumber Int?
-  blockchainTimestamp   DateTime?
-  blockchainStatus      String?
-  blockchainRetries     Int       @default(0)
-  rollingHash           String?
-  isDemoData      Boolean     @default(false)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id                      String           @id @default(cuid())
+  numero                  String           @unique
+  generadorId             String
+  transportistaId         String?
+  operadorId              String
+  modalidad               String?          @default("FIJO")
+  tratamientoMetodo       String?
+  tratamientoAutorizadoId String?
+  estado                  EstadoManifiesto @default(BORRADOR)
+  observaciones           String?
+  fechaFirma              DateTime?
+  fechaEstimadaRetiro     DateTime?
+  fechaRetiro             DateTime?
+  fechaEntrega            DateTime?
+  fechaRecepcion          DateTime?
+  fechaCierre             DateTime?
+  qrCode                  String?
+  blockchainHash          String?
+  blockchainTxHash        String?
+  blockchainBlockNumber   Int?
+  blockchainTimestamp     DateTime?
+  blockchainStatus        String?
+  blockchainRetries       Int              @default(0)
+  rollingHash             String?
+  isDemoData              Boolean          @default(false)
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
 
   // Relaciones
-  generador       Generador           @relation(fields: [generadorId], references: [id])
-  transportista   Transportista?      @relation(fields: [transportistaId], references: [id])
-  operador        Operador            @relation(fields: [operadorId], references: [id])
-  creadoPor       Usuario             @relation("UsuarioManifiestos", fields: [creadoPorId], references: [id])
-  creadoPorId     String
-  residuos        ManifiestoResiduo[]
-  eventos         EventoManifiesto[]
-  tracking        TrackingGPS[]
-  auditorias      Auditoria[]
-  notificaciones  Notificacion[]
-  alertas         AlertaGenerada[]
-  anomalias       AnomaliaTransporte[]
+  generador        Generador            @relation(fields: [generadorId], references: [id])
+  transportista    Transportista?       @relation(fields: [transportistaId], references: [id])
+  operador         Operador             @relation(fields: [operadorId], references: [id])
+  creadoPor        Usuario              @relation("UsuarioManifiestos", fields: [creadoPorId], references: [id])
+  creadoPorId      String
+  residuos         ManifiestoResiduo[]
+  eventos          EventoManifiesto[]
+  tracking         TrackingGPS[]
+  auditorias       Auditoria[]
+  notificaciones   Notificacion[]
+  alertas          AlertaGenerada[]
+  anomalias        AnomaliaTransporte[]
   sellosBlockchain BlockchainSello[]
 
   @@index([generadorId])
@@ -307,21 +308,21 @@ model Manifiesto {
 }
 
 model ManifiestoResiduo {
-  id              String      @id @default(cuid())
-  manifiestoId    String
-  tipoResiduoId   String
-  cantidad        Float
-  unidad          String
+  id               String          @id @default(cuid())
+  manifiestoId     String
+  tipoResiduoId    String
+  cantidad         Float
+  unidad           String
   cantidadRecibida Float?
-  tipoDiferencia  TipoDiferencia?
-  observaciones   String?
-  descripcion     String?
-  estado          String
-  createdAt       DateTime    @default(now())
+  tipoDiferencia   TipoDiferencia?
+  observaciones    String?
+  descripcion      String?
+  estado           String
+  createdAt        DateTime        @default(now())
 
   // Relaciones
-  manifiesto    Manifiesto    @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
-  tipoResiduo   TipoResiduo   @relation(fields: [tipoResiduoId], references: [id])
+  manifiesto  Manifiesto  @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
+  tipoResiduo TipoResiduo @relation(fields: [tipoResiduoId], references: [id])
 
   @@index([manifiestoId])
   @@map("manifiestos_residuos")
@@ -334,21 +335,21 @@ enum TipoDiferencia {
 }
 
 model EventoManifiesto {
-  id              String      @id @default(cuid())
-  manifiestoId    String
-  tipo            String
-  descripcion     String
-  ubicacion       String?
-  latitud         Float?
-  longitud        Float?
-  usuarioId       String
-  integrityHash   String?
-  isDemoData      Boolean     @default(false)
-  createdAt       DateTime    @default(now())
+  id            String   @id @default(cuid())
+  manifiestoId  String
+  tipo          String
+  descripcion   String
+  ubicacion     String?
+  latitud       Float?
+  longitud      Float?
+  usuarioId     String
+  integrityHash String?
+  isDemoData    Boolean  @default(false)
+  createdAt     DateTime @default(now())
 
   // Relaciones
-  manifiesto    Manifiesto    @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
-  usuario       Usuario       @relation(fields: [usuarioId], references: [id])
+  manifiesto Manifiesto @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
+  usuario    Usuario    @relation(fields: [usuarioId], references: [id])
 
   @@index([manifiestoId])
   @@index([manifiestoId, tipo])
@@ -356,18 +357,18 @@ model EventoManifiesto {
 }
 
 model TrackingGPS {
-  id              String      @id @default(cuid())
-  manifiestoId    String
-  latitud         Float
-  longitud        Float
-  velocidad       Float?
-  direccion       Float?
-  precision       Float?
-  isDemoData      Boolean     @default(false)
-  timestamp       DateTime    @default(now())
+  id           String   @id @default(cuid())
+  manifiestoId String
+  latitud      Float
+  longitud     Float
+  velocidad    Float?
+  direccion    Float?
+  precision    Float?
+  isDemoData   Boolean  @default(false)
+  timestamp    DateTime @default(now())
 
   // Relaciones
-  manifiesto    Manifiesto    @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
+  manifiesto Manifiesto @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
 
   @@index([manifiestoId])
   @@index([manifiestoId, timestamp])
@@ -375,23 +376,23 @@ model TrackingGPS {
 }
 
 model TratamientoAutorizado {
-  id              String      @id @default(cuid())
-  operadorId      String
-  tipoResiduoId   String
-  metodo          String
-  descripcion     String?
-  capacidad       Float?
-  activo          Boolean     @default(true)
-  fechaAutorizacion    DateTime?
-  fechaVencimiento     DateTime?
-  numeroResolucion     String?
-  expediente           String?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id                String    @id @default(cuid())
+  operadorId        String
+  tipoResiduoId     String
+  metodo            String
+  descripcion       String?
+  capacidad         Float?
+  activo            Boolean   @default(true)
+  fechaAutorizacion DateTime?
+  fechaVencimiento  DateTime?
+  numeroResolucion  String?
+  expediente        String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   // Relaciones
-  operador      Operador      @relation(fields: [operadorId], references: [id], onDelete: Cascade)
-  tipoResiduo   TipoResiduo   @relation(fields: [tipoResiduoId], references: [id])
+  operador    Operador    @relation(fields: [operadorId], references: [id], onDelete: Cascade)
+  tipoResiduo TipoResiduo @relation(fields: [tipoResiduoId], references: [id])
 
   @@unique([operadorId, tipoResiduoId, metodo])
   @@map("tratamientos_autorizados")
@@ -413,7 +414,7 @@ model RefreshToken {
 }
 
 model Auditoria {
-  id              String      @id @default(cuid())
+  id              String   @id @default(cuid())
   accion          String
   modulo          String
   datosAntes      String?
@@ -425,11 +426,11 @@ model Auditoria {
   generadorId     String?
   operadorId      String?
   transportistaId String?
-  createdAt       DateTime    @default(now())
+  createdAt       DateTime @default(now())
 
   // Relaciones
-  usuario     Usuario?    @relation("UsuarioAuditorias", fields: [usuarioId], references: [id], onDelete: SetNull)
-  manifiesto  Manifiesto? @relation(fields: [manifiestoId], references: [id])
+  usuario    Usuario?    @relation("UsuarioAuditorias", fields: [usuarioId], references: [id], onDelete: SetNull)
+  manifiesto Manifiesto? @relation(fields: [manifiestoId], references: [id])
 
   @@index([manifiestoId])
   @@index([createdAt])
@@ -545,38 +546,43 @@ model ItemInspeccion {
 }
 
 model EvidenciaInspeccion {
-  id             String                  @id @default(cuid())
-  inspeccionId   String
-  clienteId      String?
-  tipo           TipoEvidenciaInspeccion
-  nombreOriginal String
-  storageKey     String                  @unique
-  mimeDetectado  String
-  bytes          Int
-  sha256         String
-  descripcion    String?
-  transcripcion  String?
-  creadoPorId    String
-  comparacionId  String?
-  eventoId       String?
-  itemId         String?
-  capturadaAt    DateTime                @default(now())
-  latitud        Float?
-  longitud       Float?
-  createdAt      DateTime                @default(now())
+  id              String                  @id @default(cuid())
+  inspeccionId    String
+  clienteId       String?
+  tipo            TipoEvidenciaInspeccion
+  nombreOriginal  String
+  storageKey      String                  @unique
+  mimeDetectado   String
+  bytes           Int
+  sha256          String
+  descripcion     String?
+  transcripcion   String?
+  creadoPorId     String
+  comparacionId   String?
+  eventoId        String?
+  itemId          String?
+  capturadaAt     DateTime                @default(now())
+  latitud         Float?
+  longitud        Float?
+  anuladaAt       DateTime?
+  anuladaPorId    String?
+  motivoAnulacion String?
+  createdAt       DateTime                @default(now())
 
   inspeccion  Inspeccion             @relation(fields: [inspeccionId], references: [id], onDelete: Cascade)
   creadoPor   Usuario                @relation("UsuarioEvidenciasInspeccion", fields: [creadoPorId], references: [id], onDelete: Restrict)
+  anuladaPor  Usuario?               @relation("UsuarioAnulacionEvidenciasInspeccion", fields: [anuladaPorId], references: [id], onDelete: Restrict)
   comparacion ComparacionInspeccion? @relation(fields: [comparacionId], references: [id], onDelete: SetNull)
   evento      EventoInspeccion?      @relation(fields: [eventoId], references: [id], onDelete: SetNull)
   item        ItemInspeccion?        @relation(fields: [itemId], references: [id], onDelete: SetNull)
 
+  @@unique([inspeccionId, clienteId])
   @@index([inspeccionId, createdAt])
   @@index([sha256])
-  @@unique([inspeccionId, clienteId])
   @@index([comparacionId])
   @@index([eventoId])
   @@index([itemId])
+  @@index([inspeccionId, anuladaAt])
   @@map("evidencias_inspeccion")
 }
 
@@ -674,59 +680,59 @@ enum TipoEvidenciaInspeccion {
 // ========== SISTEMA DE NOTIFICACIONES IN-APP ==========
 
 model Notificacion {
-  id              String              @id @default(cuid())
-  usuarioId       String
-  tipo            TipoNotificacion
-  titulo          String
-  mensaje         String
-  datos           String?             // JSON con datos adicionales
-  manifiestoId    String?
-  leida           Boolean             @default(false)
-  fechaLeida      DateTime?
-  prioridad       PrioridadNotificacion @default(NORMAL)
-  createdAt       DateTime            @default(now())
+  id           String                @id @default(cuid())
+  usuarioId    String
+  tipo         TipoNotificacion
+  titulo       String
+  mensaje      String
+  datos        String? // JSON con datos adicionales
+  manifiestoId String?
+  leida        Boolean               @default(false)
+  fechaLeida   DateTime?
+  prioridad    PrioridadNotificacion @default(NORMAL)
+  createdAt    DateTime              @default(now())
 
   // Relaciones
-  usuario         Usuario             @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  manifiesto      Manifiesto?         @relation(fields: [manifiestoId], references: [id])
+  usuario    Usuario     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  manifiesto Manifiesto? @relation(fields: [manifiestoId], references: [id])
 
   @@index([usuarioId, leida])
   @@map("notificaciones")
 }
 
 model ReglaAlerta {
-  id              String              @id @default(cuid())
-  nombre          String
-  descripcion     String?
-  evento          EventoAlerta
-  condicion       String              // JSON con condiciones
-  destinatarios   String              // JSON con roles/usuarios
-  activa          Boolean             @default(true)
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-  creadoPorId     String
+  id            String       @id @default(cuid())
+  nombre        String
+  descripcion   String?
+  evento        EventoAlerta
+  condicion     String // JSON con condiciones
+  destinatarios String // JSON con roles/usuarios
+  activa        Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  creadoPorId   String
 
   // Relaciones
-  creadoPor       Usuario             @relation("ReglasCreadas", fields: [creadoPorId], references: [id])
+  creadoPor        Usuario          @relation("ReglasCreadas", fields: [creadoPorId], references: [id])
   alertasGeneradas AlertaGenerada[]
 
   @@map("reglas_alertas")
 }
 
 model AlertaGenerada {
-  id              String              @id @default(cuid())
+  id              String       @id @default(cuid())
   reglaId         String
   manifiestoId    String?
-  datos           String              // JSON con datos del evento
-  estado          EstadoAlerta        @default(PENDIENTE)
+  datos           String // JSON con datos del evento
+  estado          EstadoAlerta @default(PENDIENTE)
   resueltaPor     String?
   fechaResolucion DateTime?
   notas           String?
-  createdAt       DateTime            @default(now())
+  createdAt       DateTime     @default(now())
 
   // Relaciones
-  regla           ReglaAlerta         @relation(fields: [reglaId], references: [id])
-  manifiesto      Manifiesto?         @relation(fields: [manifiestoId], references: [id])
+  regla      ReglaAlerta @relation(fields: [reglaId], references: [id])
+  manifiesto Manifiesto? @relation(fields: [manifiestoId], references: [id])
 
   @@index([manifiestoId])
   @@index([estado])
@@ -734,7 +740,7 @@ model AlertaGenerada {
 }
 
 model AnomaliaTransporte {
-  id              String              @id @default(cuid())
+  id              String            @id @default(cuid())
   manifiestoId    String
   tipo            TipoAnomalia
   descripcion     String
@@ -742,16 +748,16 @@ model AnomaliaTransporte {
   longitud        Float
   valorDetectado  Float?
   valorEsperado   Float?
-  severidad       SeveridadAnomalia   @default(MEDIA)
-  resuelta        Boolean             @default(false)
+  severidad       SeveridadAnomalia @default(MEDIA)
+  resuelta        Boolean           @default(false)
   resueltaPor     String?
   fechaResolucion DateTime?
   notas           String?
-  isDemoData      Boolean             @default(false)
-  createdAt       DateTime            @default(now())
+  isDemoData      Boolean           @default(false)
+  createdAt       DateTime          @default(now())
 
   // Relaciones
-  manifiesto      Manifiesto          @relation(fields: [manifiestoId], references: [id])
+  manifiesto Manifiesto @relation(fields: [manifiestoId], references: [id])
 
   @@index([manifiestoId])
   @@map("anomalias_transporte")
@@ -824,19 +830,19 @@ enum SeveridadAnomalia {
 // ========== ANALYTICS & LOGGING ==========
 
 model AnalyticsLog {
-  id              String      @id @default(cuid())
-  timestamp       DateTime    @default(now())
-  method          String
-  path            String
-  userAgent       String?
-  ipAddress       String?
-  userId          String?
-  userEmail       String?
-  statusCode      Int
-  responseTimeMs  Int
-  queryParams     String?
-  requestBody     String?
-  
+  id             String   @id @default(cuid())
+  timestamp      DateTime @default(now())
+  method         String
+  path           String
+  userAgent      String?
+  ipAddress      String?
+  userId         String?
+  userEmail      String?
+  statusCode     Int
+  responseTimeMs Int
+  queryParams    String?
+  requestBody    String?
+
   @@index([timestamp])
   @@index([userId])
   @@index([path])
@@ -846,22 +852,22 @@ model AnalyticsLog {
 // ========== BLOCKCHAIN SELLOS ==========
 
 model BlockchainSello {
-  id              String    @id @default(cuid())
-  manifiestoId    String
-  tipo            String    // "GENESIS" | "CIERRE"
-  hash            String
-  txHash          String?
-  blockNumber     Int?
-  blockTimestamp  DateTime?
-  status          String    @default("PENDIENTE") // PENDIENTE | CONFIRMADO | ERROR
-  retries         Int       @default(0)
-  createdAt       DateTime  @default(now())
-  manifiesto      Manifiesto @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
+  id             String     @id @default(cuid())
+  manifiestoId   String
+  tipo           String // "GENESIS" | "CIERRE"
+  hash           String
+  txHash         String?
+  blockNumber    Int?
+  blockTimestamp DateTime?
+  status         String     @default("PENDIENTE") // PENDIENTE | CONFIRMADO | ERROR
+  retries        Int        @default(0)
+  createdAt      DateTime   @default(now())
+  manifiesto     Manifiesto @relation(fields: [manifiestoId], references: [id], onDelete: Cascade)
 
+  @@unique([manifiestoId, tipo])
   @@index([manifiestoId])
   @@index([status])
   @@index([hash])
-  @@unique([manifiestoId, tipo])
   @@map("blockchain_sellos")
 }
 
@@ -948,14 +954,14 @@ model Documento {
 model Renovacion {
   id                String    @id @default(cuid())
   anio              Int
-  tipoActor         String    // "GENERADOR" | "OPERADOR"
+  tipoActor         String // "GENERADOR" | "OPERADOR"
   generadorId       String?
   operadorId        String?
-  modalidad         String    // "SIN_CAMBIOS" | "CON_CAMBIOS"
+  modalidad         String // "SIN_CAMBIOS" | "CON_CAMBIOS"
   estado            String    @default("PENDIENTE") // PENDIENTE | APROBADA | RECHAZADA
-  datosActuales     String?   // JSON snapshot
-  datosNuevos       String?   // JSON proposed (solo CON_CAMBIOS)
-  camposModificados String?   // JSON ["domicilio","corrientesY"]
+  datosActuales     String? // JSON snapshot
+  datosNuevos       String? // JSON proposed (solo CON_CAMBIOS)
+  camposModificados String? // JSON ["domicilio","corrientesY"]
   tefAnterior       Float?
   tefNuevo          Float?
   revisadoPor       String?
@@ -978,12 +984,12 @@ model Renovacion {
 // ========== DEMO ACCESS CONTROL ==========
 
 model DemoAccess {
-  id              String      @id @default(cuid())
-  sessionId       String      @unique
-  ipAddress       String?
-  userAgent       String?
-  accessGranted   DateTime    @default(now())
-  lastActivity    DateTime    @default(now())
+  id            String   @id @default(cuid())
+  sessionId     String   @unique
+  ipAddress     String?
+  userAgent     String?
+  accessGranted DateTime @default(now())
+  lastActivity  DateTime @default(now())
 
   @@index([sessionId])
   @@map("demo_access")
@@ -1001,28 +1007,28 @@ enum EstadoSolicitud {
 }
 
 model SolicitudInscripcion {
-  id                String            @id @default(cuid())
-  usuarioId         String
-  tipoActor         String            // "GENERADOR" | "OPERADOR" | "TRANSPORTISTA"
-  estado            EstadoSolicitud   @default(BORRADOR)
-  datosActor        String            // JSON completo del wizard
-  datosResiduos     String?           // JSON corrientes/residuos
-  datosTEF          String?           // JSON calculo TEF
-  datosRegulatorio  String?           // JSON expediente, resolucion, etc.
-  fechaEnvio        DateTime?
-  fechaRevision     DateTime?
-  revisadoPor       String?
-  motivoRechazo     String?
-  observaciones     String?
-  generadorId       String?   @unique // ID del actor creado al aprobar
-  operadorId        String?   @unique // ID del actor creado al aprobar
-  transportistaId   String?   @unique // ID del actor creado al aprobar
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  id               String          @id @default(cuid())
+  usuarioId        String
+  tipoActor        String // "GENERADOR" | "OPERADOR" | "TRANSPORTISTA"
+  estado           EstadoSolicitud @default(BORRADOR)
+  datosActor       String // JSON completo del wizard
+  datosResiduos    String? // JSON corrientes/residuos
+  datosTEF         String? // JSON calculo TEF
+  datosRegulatorio String? // JSON expediente, resolucion, etc.
+  fechaEnvio       DateTime?
+  fechaRevision    DateTime?
+  revisadoPor      String?
+  motivoRechazo    String?
+  observaciones    String?
+  generadorId      String?         @unique // ID del actor creado al aprobar
+  operadorId       String?         @unique // ID del actor creado al aprobar
+  transportistaId  String?         @unique // ID del actor creado al aprobar
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
-  usuario           Usuario           @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  documentos        DocumentoSolicitud[]
-  mensajes          MensajeSolicitud[]
+  usuario    Usuario              @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  documentos DocumentoSolicitud[]
+  mensajes   MensajeSolicitud[]
 
   @@index([usuarioId])
   @@index([estado])
@@ -1031,36 +1037,36 @@ model SolicitudInscripcion {
 }
 
 model DocumentoSolicitud {
-  id              String    @id @default(cuid())
-  solicitudId     String
-  tipo            String    // "MEMORIA_TECNICA", "CONSTANCIA_AFIP", etc.
-  nombre          String
-  path            String
-  mimeType        String
-  size            Int
-  estado          String    @default("PENDIENTE") // PENDIENTE | APROBADO | RECHAZADO
-  observaciones   String?
-  revisadoPor     String?
-  revisadoAt      DateTime?
-  createdAt       DateTime  @default(now())
+  id            String    @id @default(cuid())
+  solicitudId   String
+  tipo          String // "MEMORIA_TECNICA", "CONSTANCIA_AFIP", etc.
+  nombre        String
+  path          String
+  mimeType      String
+  size          Int
+  estado        String    @default("PENDIENTE") // PENDIENTE | APROBADO | RECHAZADO
+  observaciones String?
+  revisadoPor   String?
+  revisadoAt    DateTime?
+  createdAt     DateTime  @default(now())
 
-  solicitud       SolicitudInscripcion @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+  solicitud SolicitudInscripcion @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
 
   @@index([solicitudId])
   @@map("documentos_solicitud")
 }
 
 model MensajeSolicitud {
-  id              String    @id @default(cuid())
-  solicitudId     String
-  autorId         String
-  autorRol        String    // "ADMIN" | "CANDIDATO"
-  contenido       String
-  leido           Boolean   @default(false)
-  leidoAt         DateTime?
-  createdAt       DateTime  @default(now())
+  id          String    @id @default(cuid())
+  solicitudId String
+  autorId     String
+  autorRol    String // "ADMIN" | "CANDIDATO"
+  contenido   String
+  leido       Boolean   @default(false)
+  leidoAt     DateTime?
+  createdAt   DateTime  @default(now())
 
-  solicitud       SolicitudInscripcion @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+  solicitud SolicitudInscripcion @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
 
   @@index([solicitudId, createdAt])
   @@map("mensajes_solicitud")

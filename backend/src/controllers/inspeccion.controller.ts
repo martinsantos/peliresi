@@ -64,21 +64,24 @@ const inspectionInclude = {
   operador: { select: { id: true, razonSocial: true, cuit: true, domicilio: true, activo: true } },
   items: {
     orderBy: [{ categoria: 'asc' as const }, { orden: 'asc' as const }],
-    include: { evidencias: { orderBy: { createdAt: 'asc' as const } } },
+    include: { evidencias: { orderBy: { createdAt: 'asc' as const }, include: { anuladaPor: { select: { id: true, nombre: true, apellido: true } } } } },
   },
   comparaciones: {
     orderBy: [{ categoria: 'asc' as const }, { orden: 'asc' as const }],
-    include: { evidencias: { orderBy: { createdAt: 'asc' as const } } },
+    include: { evidencias: { orderBy: { createdAt: 'asc' as const }, include: { anuladaPor: { select: { id: true, nombre: true, apellido: true } } } } },
   },
   evidencias: {
     orderBy: { createdAt: 'desc' as const },
-    include: { creadoPor: { select: { id: true, nombre: true, apellido: true } } },
+    include: {
+      creadoPor: { select: { id: true, nombre: true, apellido: true } },
+      anuladaPor: { select: { id: true, nombre: true, apellido: true } },
+    },
   },
   eventos: {
     orderBy: { createdAt: 'asc' as const },
     include: {
       usuario: { select: { id: true, nombre: true, apellido: true } },
-      adjuntos: { orderBy: { createdAt: 'asc' as const } },
+      adjuntos: { orderBy: { createdAt: 'asc' as const }, include: { anuladaPor: { select: { id: true, nombre: true, apellido: true } } } },
     },
   },
 } satisfies Prisma.InspeccionInclude;
@@ -130,6 +133,11 @@ const transitionSchema = z.object({
   version: z.number().int().positive(),
   detalle: z.string().trim().max(5_000).optional().nullable(),
   plazoRespuestaAt: z.string().datetime().optional().nullable(),
+});
+
+const annulEvidenceSchema = z.object({
+  version: z.number().int().positive(),
+  motivo: z.string().trim().min(10, 'Explique el motivo de la anulación').max(1_000),
 });
 
 const ADMIN_ROLES = new Set(['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR']);
@@ -656,6 +664,71 @@ export async function subirEvidencia(req: AuthRequest, res: Response, next: Next
     if (storedKey) await removeInspectionEvidence(storedKey).catch(() => undefined);
     next(error);
   }
+}
+
+export async function anularEvidencia(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const input = annulEvidenceSchema.parse(req.body);
+    const inspection = await prisma.inspeccion.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, inspectorId: true, estado: true, version: true },
+    });
+    if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
+    assertCanEdit(req, inspection);
+    if (inspection.version !== input.version) {
+      throw new AppError('La inspeccion fue modificada en otro dispositivo. Actualice antes de continuar.', 409);
+    }
+
+    const evidence = await prisma.evidenciaInspeccion.findFirst({
+      where: { id: req.params.evidenciaId, inspeccionId: inspection.id },
+      select: { id: true, nombreOriginal: true, anuladaAt: true, motivoAnulacion: true },
+    });
+    if (!evidence) throw new AppError('Evidencia no encontrada', 404);
+    if (evidence.anuladaAt) {
+      const current = await prisma.evidenciaInspeccion.findUniqueOrThrow({
+        where: { id: evidence.id },
+        include: {
+          creadoPor: { select: { id: true, nombre: true, apellido: true } },
+          anuladaPor: { select: { id: true, nombre: true, apellido: true } },
+        },
+      });
+      return res.json({ success: true, data: current, message: 'La evidencia ya estaba anulada y permanece preservada.' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const inspectionUpdate = await tx.inspeccion.updateMany({
+        where: { id: inspection.id, version: input.version },
+        data: { version: { increment: 1 } },
+      });
+      if (inspectionUpdate.count !== 1) throw new AppError('La inspeccion cambio mientras se procesaba la accion', 409);
+
+      const evidenceUpdate = await tx.evidenciaInspeccion.updateMany({
+        where: { id: evidence.id, inspeccionId: inspection.id, anuladaAt: null },
+        data: { anuladaAt: new Date(), anuladaPorId: req.user.id, motivoAnulacion: input.motivo },
+      });
+      if (evidenceUpdate.count !== 1) throw new AppError('La evidencia ya fue modificada', 409);
+
+      await tx.eventoInspeccion.create({
+        data: {
+          inspeccionId: inspection.id,
+          usuarioId: req.user.id,
+          tipo: 'EVIDENCIA_ANULADA',
+          titulo: 'Evidencia anulada sin eliminar el archivo',
+          detalle: `${evidence.nombreOriginal} · Motivo: ${input.motivo}`,
+          metadata: { evidenciaId: evidence.id, archivoPreservado: true },
+        },
+      });
+    });
+
+    const updated = await prisma.evidenciaInspeccion.findUniqueOrThrow({
+      where: { id: evidence.id },
+      include: {
+        creadoPor: { select: { id: true, nombre: true, apellido: true } },
+        anuladaPor: { select: { id: true, nombre: true, apellido: true } },
+      },
+    });
+    res.json({ success: true, data: updated, message: 'Evidencia anulada. El archivo original y su huella permanecen preservados.' });
+  } catch (error) { next(error); }
 }
 
 export async function generarActaInspeccionPdf(req: AuthRequest, res: Response, next: NextFunction) {

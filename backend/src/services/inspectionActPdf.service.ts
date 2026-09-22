@@ -39,7 +39,16 @@ function inspectionFingerprint(inspection: any): string {
     observaciones: inspection.observaciones,
     comparaciones: inspection.comparaciones.map((row: any) => ({ id: row.id, resultado: row.resultado, valorDeclarado: row.valorDeclarado, valorObservado: row.valorObservado, observacion: row.observacion })),
     items: inspection.items.map((row: any) => ({ id: row.id, resultado: row.resultado, observacion: row.observacion, evidencias: (row.evidencias || []).map((item: any) => item.sha256) })),
-    evidencias: inspection.evidencias.map((item: any) => ({ id: item.id, sha256: item.sha256, capturadaAt: item.capturadaAt, createdAt: item.createdAt, creadoPorId: item.creadoPorId })),
+    evidencias: inspection.evidencias.map((item: any) => ({
+      id: item.id,
+      sha256: item.sha256,
+      capturadaAt: item.capturadaAt,
+      createdAt: item.createdAt,
+      creadoPorId: item.creadoPorId,
+      anuladaAt: item.anuladaAt,
+      anuladaPorId: item.anuladaPorId,
+      motivoAnulacion: item.motivoAnulacion,
+    })),
     eventos: inspection.eventos.map((event: any) => ({ id: event.id, tipo: event.tipo, detalle: event.detalle, usuarioId: event.usuarioId, createdAt: event.createdAt })),
   };
   return crypto.createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
@@ -159,7 +168,8 @@ function comparisonTable(doc: PDFKit.PDFDocument, rows: any[]) {
 
 function checklist(doc: PDFKit.PDFDocument, items: any[]) {
   items.forEach((item) => {
-    const evidenceNames = (item.evidencias || []).map((evidence: any) => evidence.nombreOriginal).join(' · ');
+    const evidenceNames = (item.evidencias || []).map((evidence: any) => `${evidence.anuladaAt ? '[ANULADA] ' : ''}${evidence.nombreOriginal}${evidence.anuladaAt && evidence.motivoAnulacion ? ` (${evidence.motivoAnulacion})` : ''}`).join(' · ');
+    doc.font('Helvetica').fontSize(7);
     const observationHeight = item.observacion ? Math.max(12, doc.heightOfString(item.observacion, { width: 465 })) : 0;
     const evidenceHeight = evidenceNames ? Math.max(12, doc.heightOfString(`Evidencia vinculada: ${evidenceNames}`, { width: 465 })) : 0;
     const rowHeight = 24 + observationHeight + evidenceHeight + (item.observacion && evidenceNames ? 4 : 0);
@@ -182,7 +192,7 @@ function checklist(doc: PDFKit.PDFDocument, items: any[]) {
 }
 
 function evidenceGallery(doc: PDFKit.PDFDocument, inspection: any, resolveEvidence: (key: string) => string) {
-  const photos = inspection.evidencias.filter((item: any) => item.tipo === 'FOTO').slice(0, 6);
+  const photos = inspection.evidencias.filter((item: any) => item.tipo === 'FOTO' && !item.anuladaAt);
   if (photos.length === 0) {
     doc.font('Helvetica').fontSize(8).fillColor(C.muted).text('No se incorporaron fotografías al expediente.');
     return;
@@ -200,16 +210,71 @@ function evidenceGallery(doc: PDFKit.PDFDocument, inspection: any, resolveEviden
         else doc.rect(x, y, width, 92).fill(C.soft);
       } catch { doc.rect(x, y, width, 92).fill(C.soft); }
       doc.font('Helvetica-Bold').fontSize(7.5).fillColor(C.navy).text(photo.nombreOriginal, x, y + 98, { width, height: 12, ellipsis: true });
-      doc.font('Helvetica').fontSize(7).fillColor(C.muted).text(photo.descripcion || `Capturada ${formatDate(photo.capturadaAt, true)}`, x, y + 112, { width, height: 24, ellipsis: true });
+      const target = evidenceTargetLabel(inspection, photo);
+      doc.font('Helvetica').fontSize(7).fillColor(C.muted).text(target || `Capturada ${formatDate(photo.capturadaAt, true)}`, x, y + 112, { width, height: 24, ellipsis: true });
     });
     doc.y = y + 142;
   }
 }
 
+function evidenceTargetLabel(inspection: any, evidence: any): string {
+  if (evidence.itemId) {
+    const item = inspection.items.find((row: any) => row.id === evidence.itemId);
+    return item ? `Checklist ${item.codigo || ''} · ${item.etiqueta}` : 'Checklist';
+  }
+  if (evidence.comparacionId) {
+    const comparison = inspection.comparaciones.find((row: any) => row.id === evidence.comparacionId);
+    return comparison ? `Comparación ${comparison.codigo || ''} · ${comparison.etiqueta}` : 'Comparación declarada';
+  }
+  if (evidence.eventoId) {
+    const event = inspection.eventos.find((row: any) => row.id === evidence.eventoId);
+    return event ? `Trazabilidad · ${event.titulo}` : 'Trazabilidad';
+  }
+  return 'Evidencia general del expediente';
+}
+
+function evidenceInventory(doc: PDFKit.PDFDocument, inspection: any) {
+  if (inspection.evidencias.length === 0) {
+    doc.font('Helvetica').fontSize(8).fillColor(C.muted).text('No se incorporaron archivos al expediente.');
+    return;
+  }
+  inspection.evidencias.forEach((evidence: any, index: number) => {
+    const target = evidenceTargetLabel(inspection, evidence);
+    const status = evidence.anuladaAt ? 'ANULADA - archivo preservado' : 'VIGENTE';
+    const metadata = [
+      `${evidence.tipo} · ${status}`,
+      target,
+      `Captura ${formatDate(evidence.capturadaAt, true)} · Recepción ${formatDate(evidence.createdAt, true)}`,
+      evidence.creadoPor ? `Incorporada por ${`${evidence.creadoPor.nombre} ${evidence.creadoPor.apellido || ''}`.trim()}` : 'Autor sin informar',
+      evidence.latitud != null && evidence.longitud != null ? `Coordenadas ${evidence.latitud}, ${evidence.longitud}` : '',
+    ].filter(Boolean).join(' · ');
+    const details = [
+      evidence.descripcion ? `Descripción: ${evidence.descripcion}` : '',
+      evidence.transcripcion ? `Transcripción: ${evidence.transcripcion}` : '',
+      evidence.anuladaAt ? `Anulación ${formatDate(evidence.anuladaAt, true)} por ${evidence.anuladaPor ? `${evidence.anuladaPor.nombre} ${evidence.anuladaPor.apellido || ''}`.trim() : 'usuario no informado'}. Motivo: ${evidence.motivoAnulacion || 'sin motivo informado'}` : '',
+    ].filter(Boolean).join('\n');
+    doc.font('Helvetica').fontSize(6.8);
+    const metadataHeight = Math.max(12, doc.heightOfString(metadata, { width: 475 }));
+    doc.font('Helvetica').fontSize(7.2);
+    const detailsHeight = details ? Math.max(12, doc.heightOfString(details, { width: 475 })) : 0;
+    const height = 34 + metadataHeight + detailsHeight;
+    ensureSpace(doc, height + 8);
+    const y = doc.y;
+    doc.roundedRect(44, y, doc.page.width - 88, height, 4).fill(evidence.anuladaAt ? C.soft : C.white).strokeColor(C.line).lineWidth(0.5).stroke();
+    doc.font('Helvetica-Bold').fontSize(8.2).fillColor(evidence.anuladaAt ? C.muted : C.navy).text(`${index + 1}. ${evidence.nombreOriginal}`, 56, y + 8, { width: 475 });
+    doc.font('Helvetica').fontSize(6.8).fillColor(C.muted).text(metadata, 56, y + 21, { width: 475 });
+    if (details) doc.font('Helvetica').fontSize(7.2).fillColor(C.navy).text(details, 56, y + 24 + metadataHeight, { width: 475 });
+    doc.y = y + height + 6;
+  });
+}
+
 function timeline(doc: PDFKit.PDFDocument, events: any[]) {
   events.forEach((event) => {
     const attachments = event.adjuntos || [];
-    const eventHeight = 40 + (event.detalle ? 18 : 0) + attachments.length * 13;
+    doc.font('Helvetica').fontSize(7.5);
+    const detailHeight = event.detalle ? Math.max(12, doc.heightOfString(event.detalle, { width: 480 })) : 0;
+    const emailHeight = event.canal === 'EMAIL' ? 14 : 0;
+    const eventHeight = 27 + detailHeight + emailHeight + attachments.length * 13;
     ensureSpace(doc, eventHeight);
     const y = doc.y;
     const color = event.estadoEntrega === 'NO_ENVIADO' ? C.amber : event.tipo === 'RESPUESTA_ACTOR' ? C.blue : C.green;
@@ -219,8 +284,8 @@ function timeline(doc: PDFKit.PDFDocument, events: any[]) {
     doc.font('Helvetica').fontSize(7).fillColor(C.muted).text(`${formatDate(event.createdAt, true)} · ${event.usuario.nombre} ${event.usuario.apellido || ''}`.trim(), 397, y + 2, { width: 150, align: 'right' });
     let cursor = y + 15;
     if (event.detalle) {
-      doc.font('Helvetica').fontSize(7.5).fillColor(C.navy).text(event.detalle, 63, cursor, { width: 480, height: 18, ellipsis: true });
-      cursor += 20;
+      doc.font('Helvetica').fontSize(7.5).fillColor(C.navy).text(event.detalle, 63, cursor, { width: 480 });
+      cursor += detailHeight + 4;
     }
     if (event.canal === 'EMAIL') {
       doc.font('Helvetica-Bold').fontSize(7).fillColor(color).text(`Correo: ${event.estadoEntrega === 'NO_ENVIADO' ? 'no enviado' : event.estadoEntrega || 'sin estado'}${event.destinatario ? ` · ${event.destinatario}` : ''}`, 63, cursor, { width: 480 });
@@ -242,12 +307,18 @@ function integrityLedger(doc: PDFKit.PDFDocument, inspection: any, fingerprint: 
   doc.font('Helvetica').fontSize(6.7).fillColor(C.muted).text(`Versión ${inspection.version} · SHA-256 · esta huella no sustituye una firma digital`, 56, startY + 39, { width: doc.page.width - 112 });
   doc.y = startY + 64;
   inspection.evidencias.forEach((evidence: any, index: number) => {
-    ensureSpace(doc, 39);
+    const lifecycle = evidence.anuladaAt ? `Captura ${formatDate(evidence.capturadaAt, true)} · Recepción ${formatDate(evidence.createdAt, true)} · ${evidence.creadoPor ? `${evidence.creadoPor.nombre} ${evidence.creadoPor.apellido || ''}`.trim() : 'Autor sin informar'} · ANULADA ${formatDate(evidence.anuladaAt, true)} · ${evidence.motivoAnulacion || 'sin motivo'}` : `Captura ${formatDate(evidence.capturadaAt, true)} · Recepción ${formatDate(evidence.createdAt, true)} · ${evidence.creadoPor ? `${evidence.creadoPor.nombre} ${evidence.creadoPor.apellido || ''}`.trim() : 'Autor sin informar'} · VIGENTE`;
+    doc.font('Helvetica-Bold').fontSize(7.5);
+    const nameHeight = Math.max(10, doc.heightOfString(`${index + 1}. ${evidence.nombreOriginal}`, { width: 495 }));
+    doc.font('Helvetica').fontSize(6.8);
+    const lifecycleHeight = Math.max(10, doc.heightOfString(lifecycle, { width: 495 }));
+    const rowHeight = nameHeight + lifecycleHeight + 21;
+    ensureSpace(doc, rowHeight);
     const y = doc.y;
-    doc.font('Helvetica-Bold').fontSize(7.5).fillColor(C.navy).text(`${index + 1}. ${evidence.nombreOriginal}`, 50, y, { width: 300, height: 12, ellipsis: true });
-    doc.font('Helvetica').fontSize(6.8).fillColor(C.muted).text(`Captura ${formatDate(evidence.capturadaAt, true)} · Recepción ${formatDate(evidence.createdAt, true)} · ${evidence.creadoPor ? `${evidence.creadoPor.nombre} ${evidence.creadoPor.apellido || ''}`.trim() : 'Autor sin informar'}`, 50, y + 13, { width: 495 });
-    doc.font('Courier').fontSize(6.2).fillColor(C.blue).text(evidence.sha256 || 'Huella no disponible', 50, y + 25, { width: 495 });
-    doc.y = y + 39;
+    doc.font('Helvetica-Bold').fontSize(7.5).fillColor(C.navy).text(`${index + 1}. ${evidence.nombreOriginal}`, 50, y, { width: 495 });
+    doc.font('Helvetica').fontSize(6.8).fillColor(C.muted).text(lifecycle, 50, y + nameHeight + 2, { width: 495 });
+    doc.font('Courier').fontSize(6.2).fillColor(C.blue).text(evidence.sha256 || 'Huella no disponible', 50, y + nameHeight + lifecycleHeight + 6, { width: 495 });
+    doc.y = y + rowHeight;
   });
 }
 
@@ -267,9 +338,11 @@ export async function streamInspectionActPdf(
   const nonCompliant = inspection.items.filter((row: any) => row.resultado === 'NO_CUMPLE').length;
   const synthesis = inspection.observaciones || `Se verificaron ${inspection.comparaciones.length} datos declarados y ${inspection.items.length} puntos de control. Se detectaron ${differs} diferencias declarativas y ${nonCompliant} incumplimientos en el checklist.`;
   const summaryY = doc.y;
-  doc.roundedRect(44, summaryY, doc.page.width - 88, 58, 5).fill(C.paleGreen);
-  doc.font('Helvetica').fontSize(9).fillColor(C.navy).text(synthesis, 57, summaryY + 11, { width: doc.page.width - 114, height: 40, ellipsis: true });
-  doc.y = summaryY + 65;
+  doc.font('Helvetica').fontSize(9);
+  const summaryHeight = Math.max(58, doc.heightOfString(synthesis, { width: doc.page.width - 114 }) + 24);
+  doc.roundedRect(44, summaryY, doc.page.width - 88, summaryHeight, 5).fill(C.paleGreen);
+  doc.font('Helvetica').fontSize(9).fillColor(C.navy).text(synthesis, 57, summaryY + 11, { width: doc.page.width - 114 });
+  doc.y = summaryY + summaryHeight + 7;
   metrics(doc, inspection);
 
   if (inspection.evidencias.some((item: any) => item.tipo === 'FOTO')) {
@@ -283,6 +356,9 @@ export async function streamInspectionActPdf(
   section(doc, 'Checklist del acta', 'Controles aplicados según el tipo de actor inspeccionado');
   checklist(doc, inspection.items);
 
+  section(doc, 'Inventario completo de evidencias', 'Archivos vigentes y anulados, vínculos, autores, tiempos, observaciones y transcripciones');
+  evidenceInventory(doc, inspection);
+
   section(doc, 'Trazabilidad del expediente', 'Comentarios, revisiones, comunicaciones, respuestas y documentos adjuntos');
   timeline(doc, inspection.eventos);
 
@@ -290,13 +366,13 @@ export async function streamInspectionActPdf(
   section(doc, 'Integridad y cadena de custodia', 'Identificadores técnicos para verificar que las evidencias y el contenido no fueron sustituidos');
   integrityLedger(doc, inspection, fingerprint);
 
-  ensureSpace(doc, 74);
+  ensureSpace(doc, 92);
   const closureY = doc.y + 8;
-  doc.roundedRect(44, closureY, doc.page.width - 88, 66, 5).fill(C.soft);
+  doc.roundedRect(44, closureY, doc.page.width - 88, 84, 5).fill(C.soft);
   doc.font('Helvetica-Bold').fontSize(10).fillColor(C.navy).text('Control documental', 56, closureY + 10);
   doc.font('Helvetica').fontSize(6.7).fillColor(C.muted).text('El documento reproduce la versión indicada del expediente SITREP. Las huellas SHA-256 permiten verificar integridad técnica, pero no sustituyen la firma de los intervinientes ni una firma digital emitida conforme al régimen aplicable.', 56, closureY + 25, { width: doc.page.width - 112 });
-  doc.font('Helvetica-Bold').fontSize(6.7).fillColor(C.navy).text('Marco de referencia: Ley Provincial 5.917 y Decreto Provincial 2.625/1999, art. 44.', 56, closureY + 52, { width: doc.page.width - 112 });
-  doc.y = closureY + 72;
+  doc.font('Helvetica-Bold').fontSize(6.7).fillColor(C.navy).text('Referencia normativa: Ley Provincial 5.917 (adhesión a la Ley Nacional 24.051) y Decreto Provincial 2.625/1999, arts. 44 y 45. La adecuación del acta y del circuito de notificación debe ser validada por el área legal competente.', 56, closureY + 52, { width: doc.page.width - 112 });
+  doc.y = closureY + 92;
 
   const range = doc.bufferedPageRange();
   for (let i = range.start; i < range.start + range.count; i += 1) {

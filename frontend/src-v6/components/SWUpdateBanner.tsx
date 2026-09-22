@@ -66,10 +66,10 @@ export const SWUpdateBanner: React.FC = () => {
   if (!showUpdate) return null;
 
   return (
-    <div className="fixed bottom-20 left-4 right-4 z-50 animate-fade-in-up">
+    <div className="relative z-30 border-b border-primary-800 bg-primary-700 px-3 py-2" role="status" aria-live="polite">
       <button
         onClick={handleUpdate}
-        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary-600 text-white text-sm font-medium shadow-lg active:scale-[0.98] transition-transform"
+        className="mx-auto flex min-h-10 w-full max-w-xl items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-primary-700"
       >
         <RefreshCw size={16} />
         Nueva versión disponible — Toca para actualizar
