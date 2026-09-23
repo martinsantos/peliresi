@@ -52,6 +52,46 @@ type DraftSaveStatus = { tone: 'neutral' | 'warning' | 'success' | 'error'; mess
 const draftFingerprint = (draft: Draft) => JSON.stringify({ observaciones: draft.observaciones, numeroActa: draft.numeroActa, ubicacion: draft.ubicacion, plazoRespuestaAt: draft.plazoRespuestaAt, datosActa: draft.datosActa, informeTecnico: draft.informeTecnico, items: draft.items.map(({ id, resultado, observacion }) => ({ id, resultado, observacion: observacion || null })), comparaciones: draft.comparaciones.map(({ id, resultado, valorObservado, observacion }) => ({ id, resultado, valorObservado: valorObservado || null, observacion: observacion || null })) });
 const localDate = (value?: string | null) => value ? new Date(new Date(value).getTime() - new Date(value).getTimezoneOffset() * 60_000).toISOString().slice(0, 16) : '';
 const draftFromInspection = (inspection: Inspection): Draft => ({ version: inspection.version, observaciones: inspection.observaciones || '', numeroActa: inspection.numeroActa || '', ubicacion: inspection.ubicacion || '', plazoRespuestaAt: localDate(inspection.plazoRespuestaAt), datosActa: inspection.datosActa || {}, informeTecnico: inspection.informeTecnico || {}, items: inspection.items, comparaciones: inspection.comparaciones || [] });
+const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
+const itemResults = new Set<InspectionItemResult>(['PENDIENTE', 'CUMPLE', 'NO_CUMPLE', 'NO_APLICA']);
+const comparisonResults = new Set<InspectionComparison['resultado']>(['PENDIENTE', 'COINCIDE', 'DIFIERE', 'NO_VERIFICADO', 'NO_APLICA']);
+
+// Older device drafts can lack checklist arrays. Keep their original localStorage
+// value untouched until the inspector explicitly recovers or discards it.
+function reconcileStoredDraft(value: unknown, server: Draft): { draft: Draft; compatible: boolean } {
+  const source = isRecord(value) ? value : {};
+  const itemOverrides = Array.isArray(source.items) ? source.items.filter((entry): entry is Record<string, unknown> => isRecord(entry) && typeof entry.id === 'string' && itemResults.has(entry.resultado as InspectionItemResult)) : [];
+  const comparisonOverrides = Array.isArray(source.comparaciones) ? source.comparaciones.filter((entry): entry is Record<string, unknown> => isRecord(entry) && typeof entry.id === 'string' && comparisonResults.has(entry.resultado as InspectionComparison['resultado'])) : [];
+  const serverItems = new Map(server.items.map((item) => [item.id, item]));
+  const serverComparisons = new Map(server.comparaciones.map((row) => [row.id, row]));
+  const items = itemOverrides.flatMap((entry) => {
+    const current = serverItems.get(entry.id as string);
+    return current ? [{ ...current, resultado: entry.resultado as InspectionItemResult, observacion: typeof entry.observacion === 'string' ? entry.observacion : null }] : [];
+  });
+  const comparaciones = comparisonOverrides.flatMap((entry) => {
+    const current = serverComparisons.get(entry.id as string);
+    return current ? [{ ...current, resultado: entry.resultado as InspectionComparison['resultado'], valorObservado: typeof entry.valorObservado === 'string' ? entry.valorObservado : null, observacion: typeof entry.observacion === 'string' ? entry.observacion : null }] : [];
+  });
+  const draft: Draft = {
+    version: typeof source.version === 'number' && Number.isInteger(source.version) ? source.version : server.version,
+    observaciones: typeof source.observaciones === 'string' ? source.observaciones : server.observaciones,
+    numeroActa: typeof source.numeroActa === 'string' ? source.numeroActa : server.numeroActa,
+    ubicacion: typeof source.ubicacion === 'string' ? source.ubicacion : server.ubicacion,
+    plazoRespuestaAt: typeof source.plazoRespuestaAt === 'string' ? source.plazoRespuestaAt : server.plazoRespuestaAt,
+    datosActa: isRecord(source.datosActa) ? source.datosActa as InspectionActData : server.datosActa,
+    informeTecnico: isRecord(source.informeTecnico) ? source.informeTecnico as InspectionTechnicalReport : server.informeTecnico,
+    items,
+    comparaciones,
+  };
+  const compatible = source.version === server.version
+    && ['observaciones', 'numeroActa', 'ubicacion', 'plazoRespuestaAt'].every((field) => typeof source[field] === 'string')
+    && isRecord(source.datosActa) && isRecord(source.informeTecnico)
+    && Array.isArray(source.items) && itemOverrides.length === server.items.length && items.length === server.items.length
+    && Array.isArray(source.comparaciones) && comparisonOverrides.length === server.comparaciones.length && comparaciones.length === server.comparaciones.length
+    && new Set(items.map((item) => item.id)).size === server.items.length
+    && new Set(comparaciones.map((row) => row.id)).size === server.comparaciones.length;
+  return { draft, compatible };
+}
 
 const InspeccionExpedientePage: React.FC = () => {
   const { id = '' } = useParams(); const navigate = useNavigate(); const location = useLocation(); const mobile = location.pathname.startsWith('/mobile'); const hasMobileNav = mobile || window.location.pathname.startsWith('/app/'); const { currentUser } = useAuth();
@@ -126,20 +166,18 @@ const InspeccionExpedientePage: React.FC = () => {
     setServerFingerprint(draftFingerprint(draft));
     setStaleDraft(null);
     if (draftKey) try {
-      const saved = JSON.parse(localStorage.getItem(draftKey) || 'null') as Draft | null;
-      if (saved?.version === inspection.version) {
-        recoveredDraftNeedsSyncRef.current = draftFingerprint(saved) !== draftFingerprint(draft);
-        const serverComparisonIds = new Set(draft.comparaciones.map((row) => row.id));
-        const savedComparisonsAreCurrent = saved.comparaciones.length === draft.comparaciones.length
-          && saved.comparaciones.every((row) => serverComparisonIds.has(row.id));
-        Object.assign(draft, saved, { comparaciones: savedComparisonsAreCurrent ? saved.comparaciones : draft.comparaciones });
-        setStaleDraft(null);
-      } else if (saved && typeof saved.version === 'number') {
-        // Never discard field work merely because another device advanced the
-        // server version. The user decides whether to recover or discard it.
-        setStaleDraft(saved);
+      const raw = localStorage.getItem(draftKey);
+      if (raw !== null) {
+        const stored = reconcileStoredDraft(JSON.parse(raw), draft);
+        if (stored.compatible) {
+          recoveredDraftNeedsSyncRef.current = draftFingerprint(stored.draft) !== draftFingerprint(draft);
+          Object.assign(draft, stored.draft);
+        } else {
+          // Incompatible/older shape stays available for explicit recovery.
+          setStaleDraft(stored.draft);
+        }
       }
-    } catch { setStaleDraft(null); setStorageFailed(true); }
+    } catch { setStaleDraft({ ...draft, items: [], comparaciones: [] }); setStorageFailed(true); }
     setItems(draft.items); setComparisons(draft.comparaciones); setObservaciones(draft.observaciones); setNumeroActa(draft.numeroActa); setUbicacion(draft.ubicacion); setPlazoRespuestaAt(draft.plazoRespuestaAt); setDatosActa(draft.datosActa); setInformeTecnico(draft.informeTecnico);
     // Ownership can move from checking to owned after the inspector starts
     // typing. That status change must never rehydrate stale server values over
@@ -152,13 +190,15 @@ const InspeccionExpedientePage: React.FC = () => {
     // A read-only tab may have loaded an older device copy while the owner
     // continued working. On first ownership, take the latest protected copy.
     try {
-      const saved = JSON.parse(localStorage.getItem(draftKey) || 'null') as Draft | null;
-      if (!saved || saved.version !== inspection.version) return;
-      setItems(saved.items); setComparisons(saved.comparaciones); setObservaciones(saved.observaciones);
-      setNumeroActa(saved.numeroActa); setUbicacion(saved.ubicacion); setPlazoRespuestaAt(saved.plazoRespuestaAt);
-      setDatosActa(saved.datosActa); setInformeTecnico(saved.informeTecnico);
-      setLocalFingerprint(draftFingerprint(saved));
-    } catch { setStorageFailed(true); }
+      const raw = localStorage.getItem(draftKey);
+      if (raw === null) return;
+      const saved = reconcileStoredDraft(JSON.parse(raw), draftFromInspection(inspection));
+      if (!saved.compatible) { setStaleDraft(saved.draft); return; }
+      setItems(saved.draft.items); setComparisons(saved.draft.comparaciones); setObservaciones(saved.draft.observaciones);
+      setNumeroActa(saved.draft.numeroActa); setUbicacion(saved.draft.ubicacion); setPlazoRespuestaAt(saved.draft.plazoRespuestaAt);
+      setDatosActa(saved.draft.datosActa); setInformeTecnico(saved.draft.informeTecnico);
+      setLocalFingerprint(draftFingerprint(saved.draft));
+    } catch { setStaleDraft({ ...draftFromInspection(inspection), items: [], comparaciones: [] }); setStorageFailed(true); }
   }, [draftOwnership.status, inspection, draftKey]);
   useEffect(() => {
     if (!draftKey || !inspection || !items.length || staleDraft || (!canEdit && !canEditReport)) return;
@@ -587,7 +627,7 @@ function StaleDraftNotice({ serverVersion, draftVersion, onRecover, onDiscard }:
       <History size={19} className="mt-0.5 shrink-0" />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-extrabold">Hay un borrador anterior sin conciliar</p>
-        <p className="mt-1 text-xs leading-relaxed">El dispositivo conserva cambios de la versión {draftVersion}; el servidor está en la versión {serverVersion}. No se descartó ni fusionó nada automáticamente.</p>
+        <p className="mt-1 text-xs leading-relaxed">{draftVersion === serverVersion ? 'El dispositivo conserva un borrador de formato anterior o incompleto.' : `El dispositivo conserva cambios de la versión ${draftVersion}; el servidor está en la versión ${serverVersion}.`} No se descartó ni fusionó nada automáticamente.</p>
         <p className="mt-1 text-xs font-semibold">Si lo recuperás, revisá los datos antes de guardar: la versión del servidor seguirá intacta hasta esa acción.</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button type="button" onClick={onRecover} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-amber-900 px-3 text-xs font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2"><RotateCcw size={15} />Recuperar borrador anterior</button>

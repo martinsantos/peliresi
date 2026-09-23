@@ -406,8 +406,8 @@
   background: linear-gradient(to right, #0D8A4F var(--progress, 0%), #374151 var(--progress, 0%));
 }
 
-.wr-cinema .leaflet-container {
-  filter: brightness(0.85) saturate(1.1);
+.wr-cinema .leaflet-tile {
+  filter: grayscale(1) invert(1) hue-rotate(180deg) brightness(0.75) contrast(1.1);
 }
 
 
