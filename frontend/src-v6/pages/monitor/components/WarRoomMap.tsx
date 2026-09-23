@@ -17,9 +17,10 @@ import {
 } from '../utils/war-room-icons';
 import { EVENT_COLORS } from '../utils/war-room-icons';
 
-const VOYAGER_TILES = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-const ATTRIBUTION = '&copy; OpenStreetMap &copy; CARTO';
+// Keep the Monitor on the same keyless base map already used by SITREP's
+// other map views. The former CARTO endpoint now paints API KEY REQUIRED.
+const MAP_TILES = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const ATTRIBUTION = '&copy; OpenStreetMap contributors';
 const MENDOZA_CENTER: [number, number] = [-32.9287, -68.8535];
 const MAX_GENERADORES = 50;
 
@@ -269,7 +270,6 @@ interface Props {
 }
 
 export const WarRoomMap: React.FC<Props> = ({ cinemaMode, actores, enTransito, mode, currentHour, playbackTrips, currentEvent, playbackEvents }) => {
-  const tiles = cinemaMode ? DARK_TILES : VOYAGER_TILES;
 
   // Overlay día/noche — sutil, máx opacity 0.12
   const dayOverlayColor = useMemo(() => {
@@ -301,7 +301,7 @@ export const WarRoomMap: React.FC<Props> = ({ cinemaMode, actores, enTransito, m
   return (
     <div className="relative w-full h-full">
     <MapContainer center={MENDOZA_CENTER} zoom={10} className="w-full h-full" zoomControl={false} attributionControl={false}>
-      <TileLayer url={tiles} attribution={ATTRIBUTION} />
+      <TileLayer url={MAP_TILES} attribution={ATTRIBUTION} />
 
       {/* PLAYBACK: camera + imperative trucks + event flashes */}
       {mode === 'PLAYBACK' && (

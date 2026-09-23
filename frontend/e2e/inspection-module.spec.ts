@@ -128,6 +128,27 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test('an incomplete legacy device draft does not crash a real inspection or silently overwrite it', async ({ page }, testInfo) => {
+  const draftKey = 'sitrep_inspection_draft_inspector-qa_inspection-qa';
+  const legacy = { version: 3, numeroActa: 'ACTA-RECUPERADA', observaciones: 'Observación escrita sin conexión' };
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.addInitScript(([key, value]) => localStorage.setItem(key, value), [draftKey, JSON.stringify(legacy)] as const);
+  const prefix = testInfo.project.name === 'mobile' ? '/mobile' : '';
+  await page.goto(`${prefix}/inspecciones/inspection-qa#resumen`);
+  await expect(page.getByText('I-2026-000001').first()).toBeVisible();
+  await expect(page.getByRole('alert').filter({ hasText: 'borrador anterior sin conciliar' })).toBeVisible();
+  expect(await page.evaluate((key) => localStorage.getItem(key), draftKey)).toBe(JSON.stringify(legacy));
+  expect(errors).toEqual([]);
+  await page.getByRole('button', { name: 'Recuperar borrador anterior' }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'borrador anterior sin conciliar' })).toHaveCount(0);
+  expect(await page.evaluate((key) => {
+    const recovered = JSON.parse(localStorage.getItem(key) || 'null');
+    return { numeroActa: recovered?.numeroActa, items: recovered?.items?.length, comparaciones: recovered?.comparaciones?.length };
+  }, draftKey)).toEqual({ numeroActa: 'ACTA-RECUPERADA', items: inspection.items.length, comparaciones: inspection.comparaciones.length });
+  expect(errors).toEqual([]);
+});
+
 test('field evidence step keeps one primary action and a clean navigation footer', async ({ page }, testInfo) => {
   const prefix = testInfo.project.name === 'mobile' ? '/mobile' : '';
   await page.goto(`${prefix}/inspecciones/inspection-qa#evidencias`);
