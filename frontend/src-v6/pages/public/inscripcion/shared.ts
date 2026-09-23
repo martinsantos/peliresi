@@ -88,6 +88,72 @@ export interface RegistrationData {
   cuit: string;
 }
 
+export function getReviewFixture(tipoActor: TipoActor): {
+  reg: RegistrationData;
+  form: Record<string, string>;
+} {
+  const reg: RegistrationData = {
+    nombre: 'Usuario QA de revision',
+    email: 'qa-alta@sitrep.local',
+    password: 'RevisionQA1',
+    confirmPassword: 'RevisionQA1',
+    cuit: '30-70987654-3',
+  };
+  const common = {
+    domicilio: 'Av. de Acceso 1234, Mendoza',
+    telefono: '0261-555-0147',
+    emailContacto: 'qa-empresa@sitrep.local',
+    domicilioLegalCalle: 'Av. de Acceso 1234',
+    domicilioLegalLocalidad: 'Mendoza',
+    domicilioLegalDepto: 'Capital',
+    domicilioRealCalle: 'Parque Industrial Lote 8',
+    domicilioRealLocalidad: 'Lujan de Cuyo',
+    domicilioRealDepto: 'Lujan de Cuyo',
+  };
+
+  if (tipoActor === 'GENERADOR') {
+    return { reg, form: {
+      ...common,
+      razonSocial: 'Generador QA Internacional S.A.',
+      actividad: 'Fabricacion de insumos quimicos',
+      rubro: 'Industria quimica',
+      numeroInscripcion: 'G-QA-2026-001',
+      categoria: 'Medianos Generadores',
+      expedienteInscripcion: 'EX-2026-00012345',
+      resolucionInscripcion: 'RES-DGFA-QA-001/26',
+      corrientesControl: 'Y8, Y12, Y48',
+      alcanceTratamiento: 'INTERNACIONAL',
+      categoriaIndividual: '1000-2000',
+      libroOperatoria: 'LIB-QA-001',
+      certificacionISO: '2027-06-30',
+      factorR: '1', montoMxR: '12500', tefPersonal: '24', tefSuperficie: '1800', tefPotencia: '450', tefZona: 'Industrial',
+    } };
+  }
+
+  if (tipoActor === 'OPERADOR') {
+    return { reg, form: {
+      ...common,
+      razonSocial: 'Operador QA Tratamiento Exterior S.A.',
+      tipoOperador: 'TRATAMIENTO', tecnologia: 'Tratamiento fisico-quimico',
+      numeroHabilitacion: 'HAB-QA-2026-001', categoria: 'Tratamiento y disposicion final',
+      expedienteInscripcion: 'EX-2026-00023456', certificadoNumero: 'CERT-QA-001', resolucionDPA: 'RES-DPA-QA-002/26',
+      representanteLegalNombre: 'Laura Revision', representanteLegalDNI: '28123456', representanteLegalTelefono: '0261-555-0148',
+      representanteTecnicoNombre: 'Martin Control', representanteTecnicoMatricula: 'MAT-QA-001', representanteTecnicoTelefono: '0261-555-0149',
+      corrientesY: 'Y8, Y12, Y48', factorR: '1', montoMxR: '18500', tefPersonal: '18', tefSuperficie: '2400', tefCapacidad: '800', tefZona: 'Industrial',
+    } };
+  }
+
+  return { reg, form: {
+    ...common,
+    razonSocial: 'Transporte QA Ambiental S.A.', localidad: 'Godoy Cruz, Mendoza', coordenadas: '-32.9275, -68.8440',
+    numeroHabilitacion: 'HAB-TR-QA-001', vencimientoHabilitacion: '2027-12-31', expedienteDPA: 'EX-DPA-QA-003',
+    resolucionDPA: '0359/26', resolucionSSP: 'SSP-QA-004', corrientesAutorizadas: 'Y4, Y8, Y9, Y48',
+    vehiculosJson: JSON.stringify([{ patente: 'QA123AB', marca: 'Mercedes-Benz', modelo: 'Atego', anio: '2026', capacidad: '10' }]),
+    choferesJson: JSON.stringify([{ nombre: 'Juan', apellido: 'Revision', dni: '20123456', licencia: 'LIC-QA-001', vencimiento: '2027-12-31' }]),
+  } };
+}
+
+
 export interface DocDef {
   tipo: string;
   nombre: string;

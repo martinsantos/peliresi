@@ -40,7 +40,16 @@ export const isAuthenticated = async (
     const token = authHeader.split(' ')[1];
     
     // Verificar el token
-    const decoded = jwt.verify(token, config.JWT_SECRET as string) as { id: string; restricted?: boolean };
+    const decoded = jwt.verify(token, config.JWT_SECRET as string) as { id: string; restricted?: boolean; registrationDraft?: string };
+
+    // Before email verification this token may only operate on its own draft.
+    // Do not grant access to another actor, inspection or admin endpoint.
+    if (decoded.registrationDraft) {
+      const draftPath = `/api/solicitudes/${decoded.registrationDraft}`;
+      if (!decoded.restricted || (req.originalUrl !== draftPath && !req.originalUrl.startsWith(`${draftPath}/`))) {
+        throw new AppError('La sesión de alta sólo permite editar su propia solicitud', 403);
+      }
+    }
 
     // Obtener el usuario de la base de datos
     const user = await prisma.usuario.findUnique({

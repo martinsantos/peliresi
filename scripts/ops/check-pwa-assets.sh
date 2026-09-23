@@ -102,6 +102,13 @@ else
   fail "missing /app/assets/*.js returned HTTP $missing_status instead of 404"
 fi
 
+assetlinks_status="$(curl_status_to_file '/.well-known/assetlinks.json' "$TMP_DIR/assetlinks.json")"
+if [[ "$assetlinks_status" == "200" ]] && grep -Fq 'delegate_permission/common.handle_all_urls' "$TMP_DIR/assetlinks.json" && grep -Fq '"package_name"' "$TMP_DIR/assetlinks.json"; then
+  pass "Android assetlinks.json returns the expected association"
+else
+  fail "Android assetlinks.json is missing or is not an association (HTTP $assetlinks_status)"
+fi
+
 if [[ "$FAIL" -gt 0 ]]; then
   echo "RESULT: FAIL ($FAIL)" >&2
   exit 1

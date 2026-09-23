@@ -17,6 +17,7 @@ import {
   labelCls,
 } from '../shared';
 import { FieldError } from '../FieldError';
+import { getApiErrorMessage } from '../../../../utils/api-error';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -28,19 +29,15 @@ interface StepCuentaProps {
   reg: RegistrationData;
   onRegChange: (field: string, value: string) => void;
   onPhase2: (solicitudId: string) => void;
-  /** Allow skipping to wizard (dev mode) */
-  onSkip: () => void;
 }
 
 export const StepCuenta: React.FC<StepCuentaProps> = ({
   tipoActor,
   isGenerador,
   isOperador,
-  isTransportista,
   reg,
   onRegChange,
   onPhase2,
-  onSkip,
 }) => {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
@@ -82,18 +79,16 @@ export const StepCuenta: React.FC<StepCuentaProps> = ({
       const data = res.data?.data || res.data;
       const solId = data.solicitudId || data.id;
 
-      // If the response includes a token, store it for Phase 2 API calls
-      if (data.token) {
-        localStorage.setItem('sitrep_access_token', data.token);
+      if (!solId || !data.tokens?.accessToken || !data.tokens?.refreshToken) {
+        throw new Error('La solicitud se creó, pero no se recibió una sesión para completar el formulario. Iniciá sesión para recuperarla.');
       }
-      if (data.refreshToken) {
-        localStorage.setItem('sitrep_refresh_token', data.refreshToken);
-      }
+      localStorage.setItem('sitrep_access_token', data.tokens.accessToken);
+      localStorage.setItem('sitrep_refresh_token', data.tokens.refreshToken);
+      localStorage.setItem('sitrep_pending_solicitud', JSON.stringify({ id: solId, tipoActor }));
 
       onPhase2(solId);
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'Error al crear la cuenta';
-      setRegError(msg);
+    } catch (err: unknown) {
+      setRegError(getApiErrorMessage(err, 'Error al crear la cuenta'));
     } finally {
       setRegSubmitting(false);
     }
@@ -123,7 +118,7 @@ export const StepCuenta: React.FC<StepCuentaProps> = ({
 
         {/* Registration Form */}
         <div className="bg-white rounded-2xl border border-neutral-200 shadow-lg p-6 space-y-4">
-          <h3 className="text-base font-semibold text-neutral-800">Paso 1: Crear cuenta</h3>
+          <h3 className="text-base font-semibold text-neutral-800">Crear cuenta</h3>
 
           <div>
             <label className={labelCls}>Nombre completo *</label>
@@ -205,13 +200,6 @@ export const StepCuenta: React.FC<StepCuentaProps> = ({
           >
             Crear cuenta y continuar
           </Button>
-
-          <button
-            onClick={onSkip}
-            className="w-full mt-2 py-2 text-sm text-neutral-400 hover:text-[#0D8A4F] transition-colors"
-          >
-            Saltar al formulario (modo prueba) &rarr;
-          </button>
 
           <p className="text-xs text-neutral-400 text-center mt-2">
             Ya tenes cuenta?{' '}

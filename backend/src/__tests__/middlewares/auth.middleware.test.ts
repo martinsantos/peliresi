@@ -188,6 +188,26 @@ describe('isAuthenticated middleware', () => {
       restricted: true,
     }));
   });
+
+  it('limits a new registration token to its own application', async () => {
+    const token = createToken({ id: 'user-456', restricted: true, registrationDraft: 'draft-123' });
+    mockFindUnique.mockResolvedValue({ id: 'user-456', rol: 'GENERADOR', activo: false });
+
+    const allowed = createMocks(`Bearer ${token}`);
+    allowed.req.originalUrl = '/api/solicitudes/draft-123/documentos';
+    await isAuthenticated(allowed.req, allowed.res, allowed.next);
+    expect(allowed.next).toHaveBeenCalledWith();
+
+    const otherDraft = createMocks(`Bearer ${token}`);
+    otherDraft.req.originalUrl = '/api/solicitudes/draft-999';
+    await isAuthenticated(otherDraft.req, otherDraft.res, otherDraft.next);
+    expect(otherDraft.next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }));
+
+    const inspections = createMocks(`Bearer ${token}`);
+    inspections.req.originalUrl = '/api/inspecciones';
+    await isAuthenticated(inspections.req, inspections.res, inspections.next);
+    expect(inspections.next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }));
+  });
 });
 
 describe('hasRole middleware', () => {
