@@ -74,6 +74,27 @@ const faqs = [
     ]
   },
   {
+    category: 'Inspecciones',
+    questions: [
+      {
+        q: '¿Dónde inicio una inspección?',
+        a: 'Las inspecciones se crean únicamente en Inspecciones. La pestaña Inspecciones de la ficha de un actor muestra sus expedientes relacionados, sin otro formulario de alta. La web y la app comparten el mismo expediente.'
+      },
+      {
+        q: '¿Cómo adjunto una foto a un hallazgo?',
+        a: 'Abrí el control del checklist o el dato declarado, indicá el resultado y usá Tomar foto o Elegir imagen dentro de ese control. Comprobá que aparezca la miniatura vinculada y que deje de figurar pendiente de sincronizar. Las fotos generales se agregan en Evidencias.'
+      },
+      {
+        q: '¿Cómo sé que mis cambios se guardaron?',
+        a: 'Usá Guardar cambios y esperá la confirmación del servidor. Recorrer pasos no guarda ni envía. Si falta señal, el borrador puede quedar en este dispositivo: al reconectar, verificá por separado el guardado del texto y de cada foto antes de enviar a revisión.'
+      },
+      {
+        q: '¿Qué documentos se exportan?',
+        a: 'Desde Exportar podés descargar el acta de campo y el informe técnico como documentos distintos. Revisá ambos antes de compartirlos. El QR permite verificar trazabilidad e integridad, pero no reemplaza una firma digital ni una notificación formal.'
+      }
+    ]
+  },
+  {
     category: 'Cuenta y Acceso',
     questions: [
       {
@@ -189,6 +210,7 @@ const AyudaPage: React.FC = () => {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {[
           { icon: BookOpen, label: 'Manual completo', color: 'bg-primary-50 text-primary-600', href: '/manual/' },
+          { icon: FileText, label: 'Guía de inspecciones', color: 'bg-success-50 text-success-600', href: '/manual/#inspecciones' },
           { icon: Video, label: 'Tutoriales', color: 'bg-secondary-50 text-secondary-600', href: undefined },
           { icon: MessageCircle, label: 'Chat de ayuda', color: 'bg-info-50 text-info-600', href: undefined },
           { icon: FileText, label: 'Guías PDF', color: 'bg-success-50 text-success-600', href: undefined },

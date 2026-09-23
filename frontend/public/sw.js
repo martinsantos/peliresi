@@ -1,7 +1,7 @@
 // Service Worker para modo Offline-First (CU-T09)
 // Scope: / (main site)
-const CACHE_NAME = 'trazabilidad-rrpp-v62';
-const RUNTIME_CACHE = 'runtime-cache-v62';
+const CACHE_NAME = 'trazabilidad-rrpp-v63';
+const RUNTIME_CACHE = 'runtime-cache-v63';
 
 // Recursos críticos para cachear en instalación
 const PRECACHE_URLS = [
@@ -29,23 +29,20 @@ const offlineResponse = () => new Response('<html><body><h1>Offline</h1><p>Sin c
     headers: { 'Content-Type': 'text/html; charset=utf-8' }
 });
 
-// Instalación del Service Worker
+// Installation is atomic: if any required shell resource is unavailable, keep
+// the currently active worker instead of activating an incomplete release.
 self.addEventListener('install', (event) => {
     console.log('[SW] Installing', CACHE_NAME);
     event.waitUntil(
         caches.open(CACHE_NAME)
-            .then((cache) => {
-                console.log('[SW] Caching static assets...');
-                return Promise.all(
-                    PRECACHE_URLS.map(url =>
-                        cache.add(url).catch(err => {
-                            console.warn('[SW] Failed to cache:', url, err);
-                        })
-                    )
-                );
-            })
-            .then(() => self.skipWaiting())
+            .then((cache) => cache.addAll(PRECACHE_URLS))
     );
+});
+
+// Updates wait for the user's explicit action (SWUpdateBanner), allowing open
+// drafts and pending field evidence to finish safely before switching versions.
+self.addEventListener('message', (event) => {
+    if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 // Activación del Service Worker

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RP Trazar — Manual del Sistema | v2026.12</title>
+<title>RP Trazar — Manual del Sistema | v2026.13</title>
 <meta name="description" content="Manual completo de RP Trazar - Sistema de Trazabilidad de Residuos Peligrosos de Mendoza">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -20,7 +20,7 @@
   </button>
   <img src="screenshots/escudo-mendoza-blanco.webp" alt="Gobierno de Mendoza" style="height:32px;width:auto;margin-right:6px;">
   <div class="logo">RP Trazar <span>Mendoza</span></div>
-  <span class="version">v2026.12</span>
+  <span class="version">v2026.13</span>
   <span class="doc-title">Manual del Sistema de Trazabilidad de Residuos Peligrosos</span>
   <div class="header-actions">
     <button class="header-action-btn" id="btnShare" onclick="shareManual()" aria-label="Compartir" title="Compartir">
@@ -254,6 +254,15 @@
     <a href="#cap-comandos" class="nav-link level-2" data-nav-role="admin">Comandos seguros</a>
     <a href="#cap-cierre" class="nav-link level-2" data-nav-role="admin">Cierre de sesion</a>
   </div>
+
+  <div class="nav-section-title" onclick="toggleNavGroup(this)">18. Inspecciones</div>
+  <div class="nav-group-items">
+    <a href="#inspecciones" class="nav-link" data-nav-role="admin">18.1 Recorrido de campo</a>
+    <a href="#inspecciones-evidencia" class="nav-link level-2" data-nav-role="admin">Fotos y guardado</a>
+    <a href="#inspecciones-informe" class="nav-link level-2" data-nav-role="admin">Acta e informe</a>
+    <a href="#inspecciones-trazabilidad" class="nav-link level-2" data-nav-role="admin">Respuesta y trazabilidad</a>
+    <a href="#inspecciones-contingencia" class="nav-link level-2" data-nav-role="admin">Sin conexión</a>
+  </div>
 </nav>
 
 <!-- Main Content -->
@@ -263,7 +272,7 @@
   <div class="print-logo">RP Trazar</div>
   <h1>Manual del Sistema de Trazabilidad<br>de Residuos Peligrosos</h1>
   <p class="print-subtitle">Provincia de Mendoza &mdash; Direccion General de Fiscalizacion Ambiental</p>
-  <p class="print-date">Version 2026.12 &mdash; Julio 2026</p>
+  <p class="print-date">Version 2026.13 &mdash; Septiembre 2026</p>
   <div style="margin-top:2rem;text-align:center;">
     <img src="screenshots/escudo-mendoza-color.webp" alt="Gobierno de Mendoza" style="height:72px;width:auto;">
   </div>
@@ -7963,21 +7972,21 @@ bash backend/tests/smoke-test.sh https://rptrazar.mendoza.gov.ar</pre>
   <div>
     <span class="training-eyebrow">Produccion Gobierno</span>
     <h3>Guion operativo para entrenar sin tocar datos reales</h3>
-    <p>Esta seccion complementa la capacitacion presencial y las corridas E2E sobre <code>https://rptrazar.mendoza.gov.ar/app/</code>. El objetivo es practicar el ciclo completo de manifiestos usando exclusivamente datos de capacitacion, identificados con el prefijo <code>CAP-20260702</code> y marcados en base como <code>isDemoData=true</code>.</p>
+    <p>Esta seccion complementa la capacitacion presencial y las corridas E2E sobre <code>https://rptrazar.mendoza.gov.ar/app/</code>. El recorrido historico usa manifiestos con prefijo <code>CAP-20260702</code> y marca <code>isDemoData=true</code>; confirmá su presencia y estado antes de iniciar cada ejercicio.</p>
   </div>
   <div class="training-status">
     <strong>Estado recomendado</strong>
-    <span>GO para piloto/capacitacion controlada</span>
-    <small>No usar suites destructivas sobre datos reales.</small>
+    <span>Dataset CAP pendiente de revalidacion</span>
+    <small>El 23/09/2026 los nueve codigos CAP respondieron 404 en el verificador publico. No iniciar el recorrido hasta restituir y comprobar el dataset.</small>
   </div>
 </div>
 
 <div class="callout callout-info">
-<strong>Regla principal:</strong> todos los ejercicios deben hacerse con usuarios de capacitacion y manifiestos <code>CAP-20260702-*</code>. Al finalizar cada bloque, resetear el dataset para volver a la matriz base.
+<strong>Regla principal:</strong> todos los ejercicios deben hacerse con usuarios de capacitacion y manifiestos sinteticos comprobados, nunca con registros reales. El conjunto <code>CAP-20260702-*</code> fue el historico de julio; actualmente no debe darse por disponible. Al finalizar cada bloque, resetear el dataset aislado para volver a la matriz base.
 </div>
 
 <h3 id="cap-dataset">17.1 Dataset CAP</h3>
-<p>Los siguientes manifiestos estan preparados para mostrar cada estado del workflow sin depender de usuarios finales ni registros reales:</p>
+<p>La siguiente es la matriz historica de nueve manifiestos. <strong>No demuestra que hoy existan en la base:</strong> verificar cada codigo y la marca <code>isDemoData=true</code> antes de operar.</p>
 
 <table class="training-table">
 <thead><tr><th>Manifiesto</th><th>Estado base</th><th>Uso recomendado</th></tr></thead>
@@ -7995,10 +8004,10 @@ bash backend/tests/smoke-test.sh https://rptrazar.mendoza.gov.ar</pre>
 </table>
 
 <div class="summary-grid training-summary">
-  <div class="summary-card"><div class="number">3</div><div class="label">Usuarios escuela</div></div>
-  <div class="summary-card"><div class="number">9</div><div class="label">Manifiestos demo</div></div>
-  <div class="summary-card"><div class="number">0</div><div class="label">Emails CAP al cierre</div></div>
-  <div class="summary-card"><div class="number">0</div><div class="label">Notificaciones CAP al cierre</div></div>
+  <div class="summary-card"><div class="number">3</div><div class="label">Usuarios escuela historicos: verificar acceso</div></div>
+  <div class="summary-card"><div class="number">9</div><div class="label">Manifiestos del guion: hoy no verificados</div></div>
+  <div class="summary-card"><div class="number">—</div><div class="label">Emails CAP: comprobar en el cierre</div></div>
+  <div class="summary-card"><div class="number">—</div><div class="label">Notificaciones CAP: comprobar en el cierre</div></div>
 </div>
 
 <h3 id="cap-recorrido">17.2 Recorrido guiado por rol</h3>
@@ -8076,6 +8085,56 @@ bash scripts/certification/run-certification-suite.sh production-smoke</code></p
 <div class="callout callout-warning">
 <strong>No ejecutar en produccion real:</strong> <code>certification</code>, <code>workflow-e2e</code>, <code>data-integrity</code>, <code>stress</code> ni pruebas que creen, aprueben, transporten, reciban, traten, rechacen, cancelen, borren o editen registros fuera de <code>CAP-20260702</code>.
 </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SECTION 18: INSPECCIONES                                     -->
+<!-- ============================================================ -->
+<section id="inspecciones" data-role="admin">
+<h2>18. Inspecciones: trabajo de campo y expediente</h2>
+
+<div class="callout callout-info">
+<strong>Una sola entrada de trabajo:</strong> la inspeccion se crea desde <a href="/inspecciones">Inspecciones en la web</a> o <a href="/app/inspecciones">Inspecciones en la app</a>, con una cuenta habilitada. La ficha del generador, transportista u operador permite consultar las inspecciones relacionadas; no abre un segundo formulario de alta. En la inspeccion, el nombre del actor abre su ficha.
+</div>
+
+<p>El inspector asignado prepara y documenta la visita. El formulario presenta un paso a la vez; la guia superior en movil y el indice lateral en escritorio indican el paso y el control actual. Los enlaces a un control concreto conservan el punto de trabajo al volver. <strong>Avanzar de paso no equivale a guardar ni a enviar el expediente.</strong></p>
+
+<div class="cu-screenshot-duo">
+  <div class="cu-screenshot"><a href="screenshots/desktop/inspection_comparison_qa.png" target="_blank"><img src="screenshots/desktop/inspection_comparison_qa.png" alt="Simulacion de inspeccion en escritorio: dato declarado frente a verificacion de campo" loading="lazy"></a><div class="cu-screenshot-caption">Simulacion de capacitacion: indice lateral y comparacion declarado vs. verificado.</div></div>
+  <div class="cu-screenshot-mobile"><a href="screenshots/mobile/inspection_wizard_qa.png" target="_blank"><img src="screenshots/mobile/inspection_wizard_qa.png" alt="Simulacion de inspeccion en movil: paso y guia de progreso" loading="lazy"></a><div class="cu-screenshot-mobile-caption">Simulacion en movil: paso actual e indice visible.</div></div>
+</div>
+
+<ol>
+<li><strong>Preparar la inspeccion:</strong> comprobar actor, ubicacion y numero de acta. Iniciar la etapa de campo cuando corresponda.</li>
+<li><strong>Declarado vs. verificado:</strong> contrastar los datos declarados con lo observado. Marcar Coincide, Difiere o No verificado y describir el hallazgo.</li>
+<li><strong>Checklist regulatorio:</strong> abrir cada control y elegir Cumple, No cumple o No aplica. Los controles pendientes y revisados se distinguen en el indice; un resultado adverso requiere una observacion clara.</li>
+<li><strong>Evidencias:</strong> revisar fotos, archivos y audio del expediente. Asociar la foto al control o comparacion desde ese mismo punto cuando sirve para probar un hallazgo.</li>
+<li><strong>Acta de campo:</strong> documentar hechos, intervinientes y circunstancias constatadas.</li>
+<li><strong>Informe tecnico:</strong> exponer objetivo, antecedentes, evaluacion, conclusion y recomendacion tecnica. No sustituye el acta.</li>
+<li><strong>Revisar y enviar:</strong> verificar pendientes, guardar cambios y solo entonces confirmar el cambio de etapa.</li>
+</ol>
+
+<h3 id="inspecciones-evidencia">18.1 Comentarios, fotos y guardado</h3>
+<p>Para vincular una imagen a una respuesta concreta, abrí el control, indicá el resultado, escribí la observacion y usá <strong>Tomar foto</strong> o <strong>Elegir imagen</strong> dentro de ese control. La miniatura debe aparecer junto al hallazgo y permanecer allí después de recargar. El paso general de Evidencias sirve para documentos o capturas del expediente que no pertenecen a un control particular.</p>
+<p>Usá <strong>Guardar cambios</strong> y esperá la confirmacion del servidor antes de cerrar, cambiar de dispositivo o enviar a revision. Una captura pendiente de sincronizar no es una evidencia incorporada al expediente. Si aparece un conflicto de version, detené el envio, revisá la version vigente y recuperá el borrador conservado en este dispositivo.</p>
+
+<div class="cu-screenshot-duo">
+  <div class="cu-screenshot"><a href="screenshots/desktop/inspection_checklist_qa.png" target="_blank"><img src="screenshots/desktop/inspection_checklist_qa.png" alt="Simulacion de checklist con resultado no cumple, comentario y evidencia vinculada" loading="lazy"></a><div class="cu-screenshot-caption">Simulacion: resultado, observacion, guardado y miniatura dentro del mismo control.</div></div>
+  <div class="cu-screenshot-mobile"><a href="screenshots/mobile/inspection_evidence_qa.png" target="_blank"><img src="screenshots/mobile/inspection_evidence_qa.png" alt="Simulacion movil de foto vinculada a un control de inspeccion" loading="lazy"></a><div class="cu-screenshot-mobile-caption">Simulacion movil del mismo hallazgo y su foto vinculada.</div></div>
+</div>
+
+<h3 id="inspecciones-informe">18.2 Acta, informe y PDF</h3>
+<p>El menu <strong>Exportar</strong> ofrece dos documentos distintos: <strong>Acta de inspeccion</strong> (constatacion de campo) e <strong>Informe tecnico</strong> (analisis para intervencion del area legal). Revisá que los datos del actor, el numero de acta, las observaciones, los resultados comparativos y las evidencias esten completos antes de exportar. El QR y la huella permiten consultar la version y trazabilidad del expediente; <strong>no son una firma digital ni acreditan por si solos una notificacion legal</strong>.</p>
+
+<div class="cu-screenshot"><a href="screenshots/desktop/inspection_report_qa.png" target="_blank"><img src="screenshots/desktop/inspection_report_qa.png" alt="Simulacion del resultado de una inspeccion cerrada con opciones de exportacion" loading="lazy"></a><div class="cu-screenshot-caption">Simulacion de capacitacion: resultado consolidado y acceso a los dos documentos. Los datos mostrados no son una inspeccion real.</div></div>
+
+<h3 id="inspecciones-trazabilidad">18.3 Comunicaciones, respuestas y cierre</h3>
+<p>Cuando la inspeccion llega a las etapas habilitadas, el expediente muestra las actuaciones de la autoridad y del inspeccionado en orden cronologico, con autor, fecha, version, respuesta relacionada y adjuntos. El interesado puede presentar descargo, respuesta o subsanacion segun la etapa; la autoridad puede formular requerimientos o pronunciarse. Cada intercambio se agrega al historial: no se reemplaza el acta original. El cierre conforme o la derivacion a Legales debe responder al estado y competencia aplicables. <strong>Un correo informativo no equivale automaticamente a notificacion fehaciente.</strong></p>
+
+<h3 id="inspecciones-contingencia">18.4 Trabajo con poca o ninguna conexion</h3>
+<p>Abrí el expediente en el dispositivo mientras haya señal para disponer de sus datos en campo. Si se corta la red, continuá con el borrador y las capturas locales; mantené la app abierta siempre que sea posible. Al volver la conexion, verificá por separado que el texto figure como <strong>confirmado en el servidor</strong> y que cada foto deje de figurar <strong>pendiente de sincronizar</strong>. No envíes a revision ni presupongas que una fotografia fue recibida hasta ver la confirmacion. Si el dispositivo se pierde o el almacenamiento local se borra antes de sincronizar, esa copia local puede perderse.</p>
+
+<div class="callout callout-warning"><strong>Alcance juridico:</strong> el inspector constata y documenta; el informe tecnico no es sancion ni decision definitiva. Legales y la autoridad competente intervienen en las etapas que correspondan. El procedimiento y la forma de notificacion deben validarse con el area juridica para cada tipo de actuacion.</div>
 </section>
 
 </main>

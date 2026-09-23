@@ -6,6 +6,7 @@ const origin = 'https://sitrep.test';
 type WorkerRequest = { url: string; method: string; mode: string };
 type WorkerEvent = {
   request: WorkerRequest;
+  data?: { type?: string };
   respondWith: (response: Promise<Response>) => void;
   waitUntil: (work: Promise<unknown>) => void;
 };
@@ -14,15 +15,18 @@ const html = (body: string) => new Response(body, { headers: { 'Content-Type': '
 function workerHarness(app = false) {
   const listeners = new Map<string, (event: WorkerEvent) => void>();
   const stores = new Map<string, Map<string, Response>>();
+  const cacheApis = new Map<string, { match: ReturnType<typeof vi.fn>; put: ReturnType<typeof vi.fn>; add: ReturnType<typeof vi.fn>; addAll: ReturnType<typeof vi.fn> }>();
   const keyOf = (key: string | WorkerRequest) => new URL(typeof key === 'string' ? key : key.url, origin).href;
   const cacheFor = (name: string) => {
     if (!stores.has(name)) stores.set(name, new Map());
     const store = stores.get(name)!;
-    return {
+    if (!cacheApis.has(name)) cacheApis.set(name, {
       match: vi.fn(async (key: string | WorkerRequest) => store.get(keyOf(key))?.clone()),
       put: vi.fn(async (key: string | WorkerRequest, response: Response) => { store.set(keyOf(key), response.clone()); }),
       add: vi.fn(async () => undefined),
-    };
+      addAll: vi.fn(async () => undefined),
+    });
+    return cacheApis.get(name)!;
   };
   const fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
   const caches = {
@@ -31,15 +35,22 @@ function workerHarness(app = false) {
     delete: vi.fn(async (name: string) => stores.delete(name)),
   };
   const source = readFileSync(`public/${app ? 'sw-app.js' : 'sw.js'}`, 'utf8').replaceAll('__SW_VERSION__', 'test');
+  const skipWaiting = vi.fn();
   vm.runInNewContext(source, {
-    self: { location: { origin }, addEventListener: (name: string, listener: (event: WorkerEvent) => void) => listeners.set(name, listener), clients: { claim: vi.fn() } },
+    self: { location: { origin }, addEventListener: (name: string, listener: (event: WorkerEvent) => void) => listeners.set(name, listener), clients: { claim: vi.fn() }, skipWaiting },
     caches, fetch, URL, Response, console: { log: vi.fn(), warn: vi.fn() },
     importScripts: vi.fn(),
   });
   const precacheName = app ? 'sitrep-app-test' : /const CACHE_NAME = '([^']+)'/.exec(source)![1];
   const runtimeName = app ? 'sitrep-app-runtime-test' : /const RUNTIME_CACHE = '([^']+)'/.exec(source)![1];
   return {
-    fetch, caches, stores, cacheFor, precacheName, runtimeName,
+    fetch, caches, stores, cacheFor, precacheName, runtimeName, skipWaiting,
+    async install() {
+      let work: Promise<unknown> | undefined;
+      listeners.get('install')!({ request: {} as WorkerRequest, respondWith: () => undefined, waitUntil: pending => { work = pending; } });
+      await work;
+    },
+    message(data: { type: string }) { listeners.get('message')?.({ request: {} as WorkerRequest, data, respondWith: () => undefined, waitUntil: () => undefined }); },
     async request(path: string, mode = 'navigate', method = 'GET') {
       let handled: Promise<Response> | undefined;
       listeners.get('fetch')!({ request: { url: new URL(path, origin).href, mode, method }, respondWith: response => { handled = response; }, waitUntil: () => undefined });
@@ -61,6 +72,22 @@ describe.each([false, true])('service worker scope/app=%s', (app) => {
     await worker.cacheFor(worker.precacheName).put(`${base}/index.html`, html('SAVED SHELL'));
     const response = await worker.request(`${base}/inspecciones/case-1`);
     expect(await response?.text()).toBe('SAVED SHELL');
+  });
+
+  it('waits for explicit user approval after a complete precache', async () => {
+    const worker = workerHarness(app);
+    await worker.install();
+    expect(worker.cacheFor(worker.precacheName).addAll).toHaveBeenCalled();
+    expect(worker.skipWaiting).not.toHaveBeenCalled();
+    worker.message({ type: 'SKIP_WAITING' });
+    expect(worker.skipWaiting).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not activate if an essential shell file cannot be precached', async () => {
+    const worker = workerHarness(app);
+    worker.cacheFor(worker.precacheName).addAll.mockRejectedValueOnce(new TypeError('Failed to precache shell'));
+    await expect(worker.install()).rejects.toThrow('Failed to precache shell');
+    expect(worker.skipWaiting).not.toHaveBeenCalled();
   });
 
   it.each(['/manual/', '/public/notice.html', '/archivo.pdf'])('does not substitute the SPA shell for %s', async (path) => {

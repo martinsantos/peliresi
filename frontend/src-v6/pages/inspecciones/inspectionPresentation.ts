@@ -28,6 +28,10 @@ export const INSPECTION_ACTOR_LABELS: Record<InspectionActorType, string> = {
   GENERADOR: 'Generador', TRANSPORTISTA: 'Transportista', OPERADOR: 'Operador',
 };
 
+/** Training fixtures are identified only by an explicit act-number marker. */
+export const isTrainingActNumber = (value?: string | null) => /^ARP-?DEMO(?:[-/]|$)/i.test(value?.trim() || '')
+  || /^DEMO(?:[-/]|$)/i.test(value?.trim() || '');
+
 export const inspectionActorRoute = (type: InspectionActorType, actorId: string, mobile = false) => {
   const segment = type === 'GENERADOR' ? 'generadores' : type === 'TRANSPORTISTA' ? 'transportistas' : 'operadores';
   return `${mobile ? '/mobile' : ''}/admin/actores/${segment}/${actorId}`;
