@@ -10,6 +10,7 @@ import logger from '../utils/logger';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { emailService } from '../services/email.service';
+import { generateTokens } from './auth.controller';
 
 // ── CUIT normalization (same pattern as auth.controller) ────────────
 function normalizeCuit(raw: string): string | null {
@@ -127,6 +128,9 @@ export const iniciarSolicitud = async (req: Request, res: Response, next: NextFu
       return { usuario, solicitud };
     });
 
+    // Limited to this draft by isAuthenticated; it is not a full user login.
+    const tokens = generateTokens(result.usuario.id, true, result.solicitud.id);
+
     // Send email verification (fire-and-forget, don't block)
     emailService.sendEmailVerification(email, nombre, rawToken).catch((err) => {
       logger.error({ err }, 'Error enviando email de verificacion de solicitud');
@@ -134,7 +138,7 @@ export const iniciarSolicitud = async (req: Request, res: Response, next: NextFu
 
     res.status(201).json({
       success: true,
-      data: { solicitudId: result.solicitud.id },
+      data: { solicitudId: result.solicitud.id, tokens },
       message: 'Solicitud creada. Revisa tu email para verificar tu cuenta.',
     });
   } catch (error) {
@@ -324,6 +328,10 @@ export const uploadDocumento = async (req: AuthRequest, res: Response, next: Nex
 
     const solicitud = await prisma.solicitudInscripcion.findUnique({ where: { id } });
     if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
+
+    if (!['BORRADOR', 'OBSERVADA'].includes(solicitud.estado)) {
+      throw new AppError('No se pueden agregar archivos a una solicitud enviada o cerrada', 400);
+    }
 
     if (solicitud.usuarioId !== req.user!.id && !isAdmin(req.user!.rol)) {
       throw new AppError('No tiene permisos para subir documentos a esta solicitud', 403);

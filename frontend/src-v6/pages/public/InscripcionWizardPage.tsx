@@ -11,8 +11,8 @@
  * Step UI is delegated to components in ./inscripcion/steps/.
  */
 
-import React, { useState, useCallback, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, ArrowRight, Send, Check,
   Factory, FlaskConical, AlertCircle, Loader2, Truck,
@@ -28,6 +28,7 @@ import {
   DOCS_GENERADOR,
   DOCS_OPERADOR,
   DOCS_TRANSPORTISTA,
+  getReviewFixture,
   type RegistrationData,
   type TipoActor,
 } from './inscripcion/shared';
@@ -38,6 +39,7 @@ import { StepEmpresa } from './inscripcion/steps/StepEmpresa';
 import { StepDocumentos } from './inscripcion/steps/StepDocumentos';
 import { StepTEF, type StepTEFHandle } from './inscripcion/steps/StepTEF';
 import { StepResumen } from './inscripcion/steps/StepResumen';
+import { getApiErrorMessage } from '../../utils/api-error';
 
 // ========================================
 // COMPONENT
@@ -46,28 +48,36 @@ import { StepResumen } from './inscripcion/steps/StepResumen';
 const InscripcionWizardPage: React.FC = () => {
   const { tipo } = useParams<{ tipo: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const isGenerador = tipo === 'generador';
   const isOperador = tipo === 'operador';
   const isTransportista = tipo === 'transportista';
   const tipoActor: TipoActor = isGenerador ? 'GENERADOR' : isOperador ? 'OPERADOR' : 'TRANSPORTISTA';
+  const isReviewMode = searchParams.get('modo') === 'revision';
+  const reviewFixture = isReviewMode ? getReviewFixture(tipoActor) : null;
   const steps = isGenerador ? STEPS_GENERADOR : isOperador ? STEPS_OPERADOR : STEPS_TRANSPORTISTA;
   const totalSteps = steps.length;
 
   // Phase tracking
-  const [phase, setPhase] = useState<1 | 2>(1);
+  const [phase, setPhase] = useState<1 | 2>(isReviewMode ? 2 : 1);
   const [solicitudId, setSolicitudId] = useState<string | null>(null);
 
   // Phase 1 - Registration
-  const [reg, setReg] = useState<RegistrationData>({
+  const [reg, setReg] = useState<RegistrationData>(reviewFixture?.reg || {
     nombre: '', email: '', password: '', confirmPassword: '', cuit: '',
   });
 
   // Phase 2 - Wizard
   const [step, setStep] = useState(1);
   const [attempted, setAttempted] = useState<Set<number>>(new Set());
-  const [form, setForm] = useState<Record<string, string>>({});
+  const [form, setForm] = useState<Record<string, string>>(reviewFixture?.form || {});
   const [adjuntos, setAdjuntos] = useState<Record<string, File>>({});
   const [saving, setSaving] = useState(false);
+  const saveInFlight = useRef(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [resumeStatus, setResumeStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
+  const [resumeAttempt, setResumeAttempt] = useState(0);
+  const [dirty, setDirty] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [regError, setRegError] = useState<string | null>(null);
@@ -76,6 +86,7 @@ const InscripcionWizardPage: React.FC = () => {
   const tefRef = useRef<StepTEFHandle>(null);
 
   const up = useCallback((field: string, value: string) => {
+    setDirty(true);
     setForm(prev => ({ ...prev, [field]: value }));
   }, []);
 
@@ -83,14 +94,56 @@ const InscripcionWizardPage: React.FC = () => {
     setReg(prev => ({ ...prev, [field]: value }));
   }, []);
 
+  useEffect(() => {
+    if (isReviewMode) return undefined;
+    const raw = localStorage.getItem('sitrep_pending_solicitud');
+    if (!raw) return undefined;
+    let pending: { id?: string; tipoActor?: TipoActor; step?: number };
+    try { pending = JSON.parse(raw); } catch { return undefined; }
+    if (!pending.id || pending.tipoActor !== tipoActor) return undefined;
+
+    let cancelled = false;
+    setResumeStatus('loading');
+    api.get(`/solicitudes/${pending.id}`).then(response => {
+      if (cancelled) return;
+      const solicitud = response.data?.data?.solicitud;
+      if (!solicitud || solicitud.tipoActor !== tipoActor) throw new Error('Solicitud incompatible');
+      if (!['BORRADOR', 'OBSERVADA'].includes(solicitud.estado)) {
+        localStorage.removeItem('sitrep_pending_solicitud');
+        setResumeStatus('idle');
+        return;
+      }
+      let persistedForm: Record<string, string> = {};
+      try { persistedForm = JSON.parse(solicitud.datosActor || '{}'); } catch { /* keep blank fields */ }
+      setForm(persistedForm);
+      setReg(previous => ({ ...previous, nombre: solicitud.usuario?.nombre || '', email: solicitud.usuario?.email || '', cuit: solicitud.usuario?.cuit || '' }));
+      setSolicitudId(pending.id!);
+      setStep(Math.min(totalSteps, Math.max(1, Number(pending.step) || 1)));
+      setPhase(2);
+      setResumeStatus('loaded');
+    }).catch(() => {
+      if (!cancelled) setResumeStatus('error');
+    });
+    return () => { cancelled = true; };
+  }, [tipoActor, isReviewMode, resumeAttempt, totalSteps]);
+
+  useEffect(() => {
+    if (isReviewMode || submitSuccess || (!dirty && Object.keys(adjuntos).length === 0)) return undefined;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty, adjuntos, isReviewMode, submitSuccess]);
+
   // ========================================
   // PHASE 2 - Wizard navigation
   // ========================================
 
   const getStepErrors = (s: number): string[] => {
+    if (isReviewMode) return [];
     const errs: string[] = [];
     if (s === 1) {
       if (!form.razonSocial?.trim()) errs.push('Razon Social es obligatoria');
+      if (!form.domicilio?.trim()) errs.push('Domicilio es obligatorio');
     }
     return errs;
   };
@@ -99,42 +152,56 @@ const InscripcionWizardPage: React.FC = () => {
 
   const tefStepNumber = isGenerador ? 5 : isOperador ? 6 : -1;
 
-  const snapshotTEF = useCallback(() => {
-    if (!tefRef.current) return;
+  const snapshotTEF = useCallback((): Record<string, string> => {
+    if (!tefRef.current) return {};
     const tefValues = tefRef.current.snapshotTEF();
     setForm(prev => ({ ...prev, ...tefValues }));
+    return tefValues;
   }, []);
 
-  const leaveStep = () => {
-    if (step === tefStepNumber) snapshotTEF();
+  const leaveStep = (): Record<string, string> => {
+    if (step !== tefStepNumber) return form;
+    return { ...form, ...snapshotTEF() };
   };
 
-  const goNext = () => {
+  const goStep = async (target: number) => {
+    if (target === step || saveInFlight.current || submitting) return;
     setAttempted(prev => new Set(prev).add(step));
-    leaveStep();
-    if (step < totalSteps) setStep(step + 1);
-
-    // Save progress in background (fire-and-forget)
-    if (solicitudId) {
-      setSaving(true);
-      api.put(`/solicitudes/${solicitudId}`, { datosFormulario: form })
-        .catch(() => {})
-        .finally(() => setSaving(false));
+    if (target > step && getStepErrors(step).length > 0) {
+      setSaveError(getStepErrors(step).join('. '));
+      return;
+    }
+    const currentForm = leaveStep();
+    if (isReviewMode) {
+      setStep(target);
+      return;
+    }
+    if (!solicitudId) {
+      setSaveError('No hay una solicitud activa. Volvé al inicio del alta para crearla.');
+      return;
+    }
+    saveInFlight.current = true;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await api.put(`/solicitudes/${solicitudId}`, { datosActor: { ...currentForm, nombre: reg.nombre, cuit: reg.cuit, email: reg.email } });
+      localStorage.setItem('sitrep_pending_solicitud', JSON.stringify({ id: solicitudId, tipoActor, step: target }));
+      setDirty(false);
+      setStep(target);
+    } catch (error: unknown) {
+      setSaveError(`No se guardó este paso. Los datos siguen en pantalla. ${getApiErrorMessage(error, 'Revisá la conexión e intentá de nuevo.')}`);
+    } finally {
+      saveInFlight.current = false;
+      setSaving(false);
     }
   };
 
-  const goPrev = () => { leaveStep(); if (step > 1) setStep(step - 1); };
-
-  const goStep = (s: number) => {
-    if (s !== step) {
-      setAttempted(prev => new Set(prev).add(step));
-      leaveStep();
-    }
-    setStep(s);
-  };
+  const goNext = () => { if (step < totalSteps) void goStep(step + 1); };
+  const goPrev = () => { if (step > 1) void goStep(step - 1); };
 
   // File handling
   const handleAddFile = useCallback((tipo: string, file: File) => {
+    setDirty(true);
     setAdjuntos(prev => ({ ...prev, [tipo]: file }));
   }, []);
 
@@ -144,8 +211,13 @@ const InscripcionWizardPage: React.FC = () => {
 
   // Submit
   const handleSubmit = async () => {
+    if (saveInFlight.current || submitting) return;
+    if (isReviewMode) {
+      setSubmitSuccess(true);
+      return;
+    }
     // Snapshot TEF if currently on TEF step
-    snapshotTEF();
+    const submitForm = { ...form, ...snapshotTEF() };
     // Validate required steps
     for (let s = 1; s <= totalSteps; s++) {
       const errs = getStepErrors(s);
@@ -156,17 +228,20 @@ const InscripcionWizardPage: React.FC = () => {
       }
     }
 
-    if (!solicitudId) return;
+    if (!solicitudId) {
+      setRegError('No hay una solicitud activa para enviar.');
+      return;
+    }
     setSubmitting(true);
 
     try {
       // Save final form data
-      await api.put(`/solicitudes/${solicitudId}`, { datosFormulario: form });
+      await api.put(`/solicitudes/${solicitudId}`, { datosActor: { ...submitForm, nombre: reg.nombre, cuit: reg.cuit, email: reg.email } });
 
       // Upload documents
       for (const [tipo, file] of Object.entries(adjuntos)) {
         const fd = new FormData();
-        fd.append('archivo', file);
+        fd.append('file', file);
         fd.append('tipo', tipo);
         await api.post(`/solicitudes/${solicitudId}/documentos`, fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
@@ -175,10 +250,10 @@ const InscripcionWizardPage: React.FC = () => {
 
       // Submit solicitud
       await api.post(`/solicitudes/${solicitudId}/enviar`);
+      localStorage.removeItem('sitrep_pending_solicitud');
       setSubmitSuccess(true);
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || 'Error al enviar la solicitud';
-      setRegError(msg);
+    } catch (err: unknown) {
+      setRegError(getApiErrorMessage(err, 'Error al enviar la solicitud'));
     } finally {
       setSubmitting(false);
     }
@@ -247,12 +322,13 @@ const InscripcionWizardPage: React.FC = () => {
           <div className="w-16 h-16 bg-[#0D8A4F]/10 rounded-full flex items-center justify-center mx-auto mb-4">
             <Check size={32} className="text-[#0D8A4F]" />
           </div>
-          <h2 className="text-2xl font-bold text-neutral-900 mb-2">Solicitud enviada</h2>
+          <h2 className="text-2xl font-bold text-neutral-900 mb-2">{isReviewMode ? 'Revisión finalizada' : 'Solicitud enviada'}</h2>
           <p className="text-neutral-600 mb-6">
-            Tu solicitud de inscripcion como {isGenerador ? 'Generador' : isOperador ? 'Operador' : 'Transportista'} ha sido enviada exitosamente.
-            Recibiras un email cuando el equipo de la DGFA la revise.
+            {isReviewMode
+              ? 'Recorriste el formulario de prueba. No se creó ninguna cuenta, no se subieron archivos y no se envió ningún correo.'
+              : `Tu solicitud de inscripción como ${isGenerador ? 'Generador' : isOperador ? 'Operador' : 'Transportista'} fue enviada. Podrás consultar el estado al iniciar sesión.`}
           </p>
-          <Button variant="primary" onClick={() => navigate('/login')}>Ir al login</Button>
+          <Button variant="primary" onClick={() => navigate(isReviewMode ? '/' : '/login')}>{isReviewMode ? 'Volver al inicio' : 'Ir al login'}</Button>
         </div>
       </div>
     );
@@ -263,6 +339,15 @@ const InscripcionWizardPage: React.FC = () => {
   // ========================================
 
   if (phase === 1) {
+    if (resumeStatus === 'loading' || resumeStatus === 'error') {
+      return <div className="flex min-h-[60vh] items-center justify-center p-4">
+        <div className="w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-6 text-center shadow-sm" role={resumeStatus === 'error' ? 'alert' : 'status'}>
+          <h2 className="text-lg font-bold">{resumeStatus === 'loading' ? 'Recuperando tu solicitud' : 'No se pudo recuperar tu solicitud'}</h2>
+          <p className="mt-2 text-sm text-neutral-600">{resumeStatus === 'loading' ? 'Estamos leyendo el borrador guardado.' : 'No se perdió el borrador. Revisá la conexión o iniciá sesión con la cuenta creada.'}</p>
+          {resumeStatus === 'error' && <Button variant="outline" className="mt-4" onClick={() => setResumeAttempt(value => value + 1)}>Reintentar</Button>}
+        </div>
+      </div>;
+    }
     return (
       <StepCuenta
         tipoActor={tipoActor}
@@ -272,7 +357,6 @@ const InscripcionWizardPage: React.FC = () => {
         reg={reg}
         onRegChange={upReg}
         onPhase2={(solId) => { setSolicitudId(solId); setPhase(2); }}
-        onSkip={() => setPhase(2)}
       />
     );
   }
@@ -284,11 +368,11 @@ const InscripcionWizardPage: React.FC = () => {
   const isLastStep = step === totalSteps;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100 py-8 px-4">
-      <div className="max-w-5xl mx-auto space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100 px-3 py-5 sm:px-4 sm:py-8">
+      <div className="mx-auto w-full max-w-6xl space-y-5 sm:space-y-6" data-testid="registration-wizard">
         {/* Header */}
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="p-2 rounded-xl bg-white border border-neutral-200 hover:bg-neutral-50 transition-colors">
+          <button type="button" onClick={() => navigate(-1)} aria-label="Volver a la pantalla anterior" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white border border-neutral-200 hover:bg-neutral-50 transition-colors">
             <ArrowLeft size={18} className="text-neutral-600" />
           </button>
           <div className="flex items-center gap-3">
@@ -301,16 +385,16 @@ const InscripcionWizardPage: React.FC = () => {
             </div>
             <div>
               <h2 className="text-xl font-bold text-neutral-900">
-                Inscripcion como {isGenerador ? 'Generador' : isOperador ? 'Operador' : 'Transportista'}
+                Inscripción como {isGenerador ? 'Generador' : isOperador ? 'Operador' : 'Transportista'}
               </h2>
-              <p className="text-xs text-neutral-500">Paso {step} de {totalSteps}</p>
+              <p className="text-xs text-neutral-500">Paso {step} de {totalSteps} · {steps[step - 1]?.label}</p>
             </div>
           </div>
         </div>
 
         {/* Stepper */}
-        <div className="bg-white rounded-2xl border border-neutral-200 p-4 shadow-sm">
-          <div className="flex items-center justify-between">
+        <div className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white p-3 shadow-sm [scrollbar-width:thin] sm:p-4" aria-label="Etapas de la inscripción" data-testid="registration-stepper">
+          <div className="flex min-w-max items-start justify-center">
             {steps.map((s, i) => {
               const Icon = s.icon;
               const isActive = step === s.id;
@@ -318,7 +402,7 @@ const InscripcionWizardPage: React.FC = () => {
               const hasErr = attempted.has(s.id) && stepHasErrors(s.id);
               return (
                 <React.Fragment key={s.id}>
-                  <button onClick={() => goStep(s.id)} className={`flex flex-col items-center gap-1.5 group transition-all ${isActive ? 'scale-105' : ''}`}>
+                  <button type="button" onClick={() => void goStep(s.id)} disabled={saving || submitting} aria-current={isActive ? 'step' : undefined} aria-label={`Paso ${s.id} de ${totalSteps}: ${s.label}`} className={`group flex min-h-11 w-14 shrink-0 flex-col items-center justify-start gap-1.5 rounded-lg px-1 transition-all sm:w-[76px] lg:w-[84px] ${isActive ? 'scale-[1.03]' : ''}`}>
                     <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
                       hasErr ? 'bg-error-100 text-error-600 ring-2 ring-error-300' :
                       isActive ? 'bg-[#0D8A4F] text-white shadow-lg shadow-[#0D8A4F]/20' :
@@ -327,12 +411,12 @@ const InscripcionWizardPage: React.FC = () => {
                     }`}>
                       {hasErr ? <AlertCircle size={16} /> : isDone ? <Check size={16} /> : <Icon size={16} />}
                     </div>
-                    <span className={`text-[10px] font-medium text-center leading-tight max-w-[64px] hidden sm:block ${
+                    <span className={`hidden max-w-full text-center text-[10px] font-medium leading-tight sm:block ${
                       hasErr ? 'text-error-600' : isActive ? 'text-[#0D8A4F]' : isDone ? 'text-[#0D8A4F]' : 'text-neutral-400'
                     }`}>{s.label}</span>
                   </button>
                   {i < steps.length - 1 && (
-                    <div className={`flex-1 h-0.5 mx-1 rounded ${step > s.id ? 'bg-[#0D8A4F]/40' : 'bg-neutral-200'}`} />
+                    <div className={`mx-0.5 mt-[18px] h-0.5 w-3 shrink-0 rounded sm:mx-1 sm:w-4 lg:flex-1 ${step > s.id ? 'bg-[#0D8A4F]/40' : 'bg-neutral-200'}`} />
                   )}
                 </React.Fragment>
               );
@@ -341,17 +425,20 @@ const InscripcionWizardPage: React.FC = () => {
         </div>
 
         {/* Step Content */}
-        <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6 min-h-[320px]">
+        <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4 sm:p-6 min-h-[320px]">
+          {isReviewMode && <div role="status" className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900"><strong>Modo revisión de alta.</strong> Podés recorrer todos los pasos sin completar campos. Nada se envía al servidor.</div>}
+          {resumeStatus === 'loaded' && <p role="status" className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Borrador recuperado. Continuá desde el último paso guardado.</p>}
+          {saveError && <p role="alert" className="mb-4 rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-700">{saveError}</p>}
           {renderStepContent()}
         </div>
 
         {/* Navigation Buttons */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2 rounded-xl border border-neutral-200 bg-white p-3 shadow-sm">
           <Button
             variant="outline"
             leftIcon={<ArrowLeft size={16} />}
             onClick={goPrev}
-            disabled={step === 1}
+            disabled={step === 1 || saving || submitting}
           >
             Anterior
           </Button>
@@ -366,17 +453,19 @@ const InscripcionWizardPage: React.FC = () => {
             {isLastStep ? (
               <Button
                 variant="primary"
-                leftIcon={<Send size={16} />}
+                leftIcon={isReviewMode ? <Check size={16} /> : <Send size={16} />}
                 onClick={handleSubmit}
                 isLoading={submitting}
+                disabled={saving}
               >
-                Enviar solicitud
+                {isReviewMode ? 'Finalizar revisión' : 'Enviar solicitud'}
               </Button>
             ) : (
               <Button
                 variant="primary"
                 rightIcon={<ArrowRight size={16} />}
                 onClick={goNext}
+                disabled={saving || submitting}
               >
                 Siguiente
               </Button>

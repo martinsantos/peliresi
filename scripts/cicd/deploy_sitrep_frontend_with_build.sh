@@ -44,10 +44,17 @@ mkdir -p "$RELEASE_DIR"
 mkdir -p "$RELEASE_DIR/app"
 
 echo "Copying main frontend..."
-cp -r dist/* "$RELEASE_DIR/"
+cp -a dist/. "$RELEASE_DIR/"
 
 echo "Copying PWA app..."
-cp -r dist-app/* "$RELEASE_DIR/app/"
+cp -a dist-app/. "$RELEASE_DIR/app/"
+
+# Android App Links live in a hidden directory. A glob such as dist/* silently
+# omitted this file while every visible frontend health check still passed.
+if [ ! -s "$RELEASE_DIR/.well-known/assetlinks.json" ]; then
+  echo "Missing Android assetlinks.json in release; refusing to switch symlink" >&2
+  exit 1
+fi
 
 if [ -d "$BUILD_DIR/docs/manual" ]; then
   echo "Deploying manual from source..."

@@ -44,11 +44,12 @@ function validatePasswordStrength(password: string): string | null {
 }
 
 // Generar tokens JWT
-export const generateTokens = (userId: string) => {
+export const generateTokens = (userId: string, restricted = false, registrationDraft?: string) => {
+  const payload = { id: userId, ...(restricted ? { restricted: true } : {}), ...(registrationDraft ? { registrationDraft } : {}) };
   const options: SignOptions = { expiresIn: config.JWT_EXPIRES_IN as StringValue };
-  const accessToken = jwt.sign({ id: userId }, config.JWT_SECRET as string, options);
+  const accessToken = jwt.sign(payload, config.JWT_SECRET as string, options);
   const refreshOptions: SignOptions = { expiresIn: '7d' as StringValue };
-  const refreshToken = jwt.sign({ id: userId }, config.JWT_SECRET as string, refreshOptions);
+  const refreshToken = jwt.sign(payload, config.JWT_SECRET as string, refreshOptions);
   return { accessToken, refreshToken };
 };
 
@@ -447,9 +448,9 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
     const { refreshToken: token } = req.body;
     if (!token) throw new AppError('Refresh token es requerido', 400);
 
-    let decoded: { id: string; restricted?: boolean };
+    let decoded: { id: string; restricted?: boolean; registrationDraft?: string };
     try {
-      decoded = jwt.verify(token, config.JWT_SECRET as string) as { id: string; restricted?: boolean };
+      decoded = jwt.verify(token, config.JWT_SECRET as string) as { id: string; restricted?: boolean; registrationDraft?: string };
     } catch {
       throw new AppError('Refresh token inválido o expirado', 401);
     }
@@ -463,12 +464,7 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
     }
 
     if (decoded.restricted) {
-      // Re-issue restricted tokens
-      const options: SignOptions = { expiresIn: config.JWT_EXPIRES_IN as StringValue };
-      const accessToken = jwt.sign({ id: user.id, restricted: true }, config.JWT_SECRET as string, options);
-      const refreshOptions: SignOptions = { expiresIn: '7d' as StringValue };
-      const refreshToken = jwt.sign({ id: user.id, restricted: true }, config.JWT_SECRET as string, refreshOptions);
-      return res.json({ success: true, data: { accessToken, refreshToken } });
+      return res.json({ success: true, data: generateTokens(user.id, true, decoded.registrationDraft) });
     }
 
     res.json({ success: true, data: generateTokens(user.id) });
