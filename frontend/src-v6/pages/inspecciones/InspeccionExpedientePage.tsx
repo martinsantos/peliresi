@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isAxiosError } from 'axios';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ArchiveX, ArrowLeft, Camera, Check, ChevronDown, ChevronUp, CircleMinus, ClipboardCheck, CloudOff, CloudUpload, Download, FileAudio, FileText, History, Loader2, Mic, Paperclip, RotateCcw, Save, Send, ShieldCheck, Square, Trash2, UserRound, XCircle } from 'lucide-react';
+import { AlertTriangle, ArchiveX, ArrowLeft, Camera, Check, ChevronDown, ChevronUp, CircleMinus, ClipboardCheck, CloudOff, CloudUpload, Download, FileAudio, FileText, History, Loader2, Mic, Paperclip, RotateCcw, Save, Search, Send, ShieldCheck, Square, Trash2, UserRound, XCircle } from 'lucide-react';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge, type BadgeColor } from '../../components/ui/BadgeV2';
 import { Card } from '../../components/ui/CardV2';
@@ -682,6 +682,43 @@ function DraftSaveFeedback({ status }: { status: DraftSaveStatus }) {
   return <p role="status" aria-live="polite" className={'text-xs leading-relaxed ' + color}>{status.message}</p>;
 }
 
+function ChecklistJumpIndex({ items, activeId, onSelect }: { items: InspectionItem[]; activeId?: string; onSelect: (item: InspectionItem) => void }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const active = items.find((item) => item.id === activeId);
+  const matches = items.filter((item) => `${item.etiqueta} ${item.codigo} ${item.categoria}`.toLocaleLowerCase('es').includes(query.trim().toLocaleLowerCase('es')));
+  useEffect(() => {
+    if (!open) return;
+    searchRef.current?.focus();
+    const closeOutside = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) { setOpen(false); setQuery(''); }
+    };
+    const closeEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setOpen(false);
+      setQuery('');
+      triggerRef.current?.focus();
+    };
+    document.addEventListener('pointerdown', closeOutside);
+    document.addEventListener('keydown', closeEscape);
+    return () => { document.removeEventListener('pointerdown', closeOutside); document.removeEventListener('keydown', closeEscape); };
+  }, [open]);
+  const select = (item: InspectionItem) => { setOpen(false); setQuery(''); onSelect(item); };
+  const status = (item: InspectionItem) => item.resultado === 'PENDIENTE' ? 'Pendiente' : item.resultado === 'CUMPLE' ? 'Cumple' : item.resultado === 'NO_CUMPLE' ? 'No cumple' : 'No aplica';
+  return <div ref={containerRef} className="min-w-0 flex-1">
+    <button ref={triggerRef} type="button" aria-label={`Ir a un control: ${active?.etiqueta || 'Buscar control'}`} aria-expanded={open} aria-controls="checklist-jump-index" onClick={() => { if (open) setQuery(''); setOpen((value) => !value); }} className="flex min-h-11 w-full min-w-0 items-center justify-between gap-2 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-left text-sm font-semibold text-[#10213A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600">
+      <span className="flex min-w-0 items-center gap-2"><Search size={17} className="shrink-0 text-primary-700" aria-hidden="true" /><span className="truncate">{active?.etiqueta || 'Ir a un control'}</span></span>{open ? <ChevronUp size={17} className="shrink-0 text-neutral-500" /> : <ChevronDown size={17} className="shrink-0 text-neutral-500" />}
+    </button>
+    <div id="checklist-jump-index" hidden={!open} className="mt-2 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+      {open && <><label className="flex min-h-11 items-center gap-2 border-b border-neutral-200 px-3"><Search size={17} className="shrink-0 text-neutral-500" aria-hidden="true" /><span className="sr-only">Buscar control</span><input ref={searchRef} type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nombre o código" className="min-h-11 w-full min-w-0 bg-transparent text-sm text-[#10213A] outline-none placeholder:text-neutral-500" /></label>
+        <nav aria-label="Índice de controles" className="max-h-[min(50dvh,22rem)] overflow-y-auto overscroll-contain py-1">{matches.length ? matches.map((item) => <button key={item.id} type="button" aria-current={activeId === item.id ? 'location' : undefined} onClick={() => select(item)} className={`flex min-h-12 w-full min-w-0 items-center gap-3 px-3 py-2 text-left hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-600 ${activeId === item.id ? 'bg-primary-50' : ''}`}><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold text-neutral-600">{items.indexOf(item) + 1}</span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold leading-snug text-[#10213A]">{item.etiqueta}</span><span className="block text-xs text-neutral-600">{item.categoria} · {item.codigo}</span></span><span className={`shrink-0 text-xs font-semibold ${item.resultado === 'NO_CUMPLE' ? 'text-error-700' : item.resultado === 'CUMPLE' ? 'text-success-800' : 'text-neutral-600'}`}>{status(item)}</span></button>) : <p className="px-4 py-4 text-sm text-neutral-600">No hay controles con ese nombre.</p>}</nav></>}
+    </div>
+  </div>;
+}
+
 function Checklist({ inspectionId, groups, items, completed, editable, setItems, uploadingItemId, pendingEvidence, onEvidence, onAnnul, onSave, saving, saveStatus, saveDisabled }: { inspectionId: string; groups: string[]; items: InspectionItem[]; completed: number; editable: boolean; setItems: React.Dispatch<React.SetStateAction<InspectionItem[]>>; uploadingItemId: string | null; pendingEvidence: PendingInspectionEvidence[]; onEvidence: (file: File, item: InspectionItem) => void; onAnnul: (evidenceId: string, reason: string) => Promise<void>; onSave: () => Promise<boolean>; saving: boolean; saveStatus: DraftSaveStatus; saveDisabled: boolean }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -721,7 +758,7 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
       </div>
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-neutral-200"><span className="block h-full rounded-full bg-primary-600 transition-[width] duration-200" style={{ width: `${Math.round((completed / Math.max(1, items.length)) * 100)}%` }} /></div>
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-        <label className="min-w-0 flex-1 text-xs font-semibold text-neutral-700">Ir a un control<select aria-label="Ir a un control" value={activeItem || ''} onChange={(event) => openControl(items.find((item) => item.id === event.target.value))} className="mt-1.5 h-11 w-full min-w-0 rounded-lg border border-neutral-300 bg-white px-2 text-sm font-normal"><option value="">Índice de controles</option>{groups.map((group) => <optgroup key={group} label={group}>{items.filter((item) => item.categoria === group).map((item) => <option key={item.id} value={item.id}>{orderedItems.indexOf(item) + 1}. {item.codigo} · {itemStatus(item)} · {item.etiqueta}</option>)}</optgroup>)}</select></label>
+        <ChecklistJumpIndex items={orderedItems} activeId={activeItem} onSelect={openControl} />
         <Button variant="outline" disabled={!nextPendingAfter(items.find((item) => item.id === activeItem))} onClick={() => openControl(nextPendingAfter(items.find((item) => item.id === activeItem)))}>{nextPendingAfter(items.find((item) => item.id === activeItem)) ? 'Ir al siguiente pendiente (' + remaining.length + ')' : remaining.length ? 'Último control pendiente' : 'Todos revisados'}</Button>
       </div>
     </div>
@@ -732,7 +769,7 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
       return <div key={group} className="border-b border-neutral-200 last:border-0">
         <div style={{ top: 'var(--inspection-middle-top, 0px)' }} className="sticky z-10 flex min-h-11 items-center justify-between gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-2 sm:px-6">
           <p className="font-bold text-[#10213A]">{group}</p>
-          <div className="text-right text-xs font-semibold text-neutral-600"><span>{groupCompleted}/{groupItems.length} revisados</span><span className={groupCompleted === groupItems.length ? 'text-success-800' : 'text-warning-800'}> · {groupItems.length - groupCompleted} pendientes</span>{groupFails > 0 && <span className="text-error-800"> · {groupFails} {groupFails === 1 ? 'no cumple' : 'no cumplen'}</span>}</div>
+          <div className="text-right text-xs font-semibold text-neutral-600"><span>{groupCompleted}/{groupItems.length} revisados</span>{groupCompleted < groupItems.length && <span className="text-warning-800"> · {groupItems.length - groupCompleted} pendientes</span>}{groupFails > 0 && <span className="text-error-800"> · {groupFails} {groupFails === 1 ? 'no cumple' : 'no cumplen'}</span>}</div>
         </div>
         {groupItems.map((item) => {
           const isFail = item.resultado === 'NO_CUMPLE';
@@ -742,7 +779,7 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
           const pendingItemEvidence = pendingEvidence.filter((evidence) => evidence.fields.itemId === item.id);
           const showObservation = isFail || Boolean(item.observacion) || itemEvidence.length > 0 || pendingItemEvidence.length > 0 || expandedNotes.includes(item.id);
           const expanded = activeItem === item.id;
-          const inlineSave = editable && <div data-testid={'inspection-item-save-' + item.id} className="mt-3 space-y-2"><div className="flex flex-wrap items-center justify-between gap-2"><DraftSaveFeedback status={saveStatus} /><Button leftIcon={<Save size={16} />} isLoading={saving} disabled={saveDisabled} onClick={() => { void onSave(); }}>Guardar cambios</Button></div>{pendingItemEvidence.length > 0 && <p className="text-xs font-semibold text-warning-900">{pendingItemEvidence.length} {pendingItemEvidence.length === 1 ? 'foto pendiente' : 'fotos pendientes'} de sincronizar.</p>}</div>;
+          const inlineSave = editable && <div data-testid={'inspection-item-save-' + item.id} className="mt-3 border-t border-neutral-200 pt-3"><div className="flex min-h-12 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><DraftSaveFeedback status={saveStatus} />{pendingItemEvidence.length > 0 && <p className="mt-1 text-xs font-semibold text-warning-900">{pendingItemEvidence.length} {pendingItemEvidence.length === 1 ? 'foto pendiente' : 'fotos pendientes'} de sincronizar.</p>}</div><Button leftIcon={<Save size={16} />} isLoading={saving} disabled={saveDisabled} onClick={() => { void onSave(); }}>Guardar cambios</Button></div></div>;
           return <div key={item.id} id={'control-' + item.id} data-inspection-anchor={'checklist/' + item.codigo} data-result={item.resultado} style={{ scrollMarginTop: 'var(--inspection-anchor-offset, 8rem)' }} className={`border-t border-neutral-100 px-3 py-1 first:border-0 sm:px-5 ${isFail ? 'border-l-[3px] border-l-error-500 bg-error-50/30' : ''}`}>
             <button type="button" aria-expanded={expanded} aria-controls={'control-detail-' + item.id} onClick={() => openControl(expanded ? undefined : item)} className="flex min-h-16 w-full items-start gap-3 rounded-lg py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
               <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${item.resultado === 'CUMPLE' ? 'bg-success-100 text-success-700' : isFail ? 'bg-error-100 text-error-700' : item.resultado === 'NO_APLICA' ? 'bg-neutral-200 text-neutral-700' : 'border border-neutral-300 bg-white text-neutral-600'}`}>{item.resultado === 'CUMPLE' ? <Check size={16} /> : isFail ? <XCircle size={16} /> : item.resultado === 'NO_APLICA' ? <CircleMinus size={16} /> : <span className="text-xs font-bold">{orderedItems.indexOf(item) + 1}</span>}</div>
@@ -750,16 +787,15 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
               {expanded ? <ChevronUp size={17} className="mt-1 shrink-0 text-neutral-500" /> : <ChevronDown size={17} className="mt-1 shrink-0 text-neutral-500" />}
             </button>
             {expanded && <div id={'control-detail-' + item.id} className="pb-5 pl-0 sm:pl-10">
-              <div role="group" aria-label={`Validación: ${item.etiqueta}`} className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-3">
-                {RESULTS.map((option) => {
+              <div role="group" aria-label={`Validación: ${item.etiqueta}`} className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-3">
+                {RESULTS.map((option, index) => {
                   const selected = item.resultado === option.value;
-                  return <button key={option.value} type="button" disabled={!editable} aria-pressed={selected} onClick={() => updateItem(item.id, { resultado: option.value })} className={`flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg border px-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${selected ? option.active : 'border-neutral-300 bg-white text-neutral-700 hover:border-neutral-400 hover:bg-neutral-50'}`}>{option.icon}<span>{option.label}</span></button>;
+                  return <button key={option.value} type="button" disabled={!editable} aria-pressed={selected} onClick={() => updateItem(item.id, { resultado: option.value })} className={`flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg border px-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 sm:text-sm ${index === RESULTS.length - 1 ? 'col-span-2 min-[420px]:col-span-1' : ''} ${selected ? option.active : 'border-neutral-300 bg-white text-neutral-700 hover:border-neutral-400 hover:bg-neutral-50'}`}>{option.icon}<span>{option.label}</span></button>;
                 })}
               </div>
               {!showObservation && editable && <button type="button" onClick={() => setExpandedNotes((ids) => [...ids, item.id])} className="mt-2 min-h-11 rounded-md px-2 text-sm font-semibold text-primary-700 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">Agregar observación o foto</button>}
               {showObservation && <div className={`mt-3 border-l-2 pl-3 ${isFail ? 'border-error-300' : 'border-neutral-300'}`}>
                 <label><span className={`mb-1 block text-xs font-bold ${isFail ? 'text-error-800' : 'text-neutral-700'}`}>{isFail ? 'Hallazgo y acción requerida' : 'Observación registrada'}</span><textarea disabled={!editable} aria-label={`Observación: ${item.etiqueta}`} value={item.observacion || ''} onChange={(event) => updateItem(item.id, { observacion: event.target.value })} rows={2} placeholder={isFail ? 'Describa qué no cumple, la evidencia y qué debe corregirse' : 'Observación del control'} className={`w-full resize-y rounded-xl border bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 ${isFail ? 'border-error-200 focus:border-error-500 focus:ring-error-100' : 'border-neutral-300 focus:border-primary-600 focus:ring-primary-100'}`} /></label>
-                {inlineSave}
                 {itemEvidence.length > 0 && <div className="mt-3"><div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{visibleItemEvidence.map((evidence) => <EvidenceTile key={evidence.id} inspectionId={inspectionId} evidence={evidence} editable={editable} onAnnul={onAnnul} />)}</div>{itemEvidence.length > 4 && <button type="button" onClick={() => setExpandedEvidence((ids) => itemEvidenceExpanded ? ids.filter((id) => id !== item.id) : [...ids, item.id])} className="mt-2 inline-flex min-h-9 items-center gap-1 rounded-lg px-2 text-xs font-bold text-primary-800 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{itemEvidenceExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}{itemEvidenceExpanded ? 'Mostrar menos' : `Ver las ${itemEvidence.length} evidencias`}</button>}</div>}
                 {pendingItemEvidence.length > 0 && <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">{pendingItemEvidence.map((evidence) => <PendingEvidenceThumbnail key={evidence.id} evidence={evidence} />)}</div>}
                 {editable && <div className="mt-3 flex flex-wrap gap-2">
@@ -776,7 +812,7 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
                 </div>}
                 {editable && <p className="mt-1.5 text-xs leading-relaxed text-neutral-500">Máximo 25 MB. La foto quedará vinculada a este control.</p>}
               </div>}
-              {!showObservation && inlineSave}
+              {inlineSave}
               <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 pt-3"><a href="#checklist" onClick={(event) => { event.preventDefault(); document.getElementById('checklist')?.scrollIntoView({ block: 'start' }); }} className="rounded-md px-2 py-2 text-xs font-semibold text-neutral-600 !no-underline hover:bg-neutral-100">Volver al índice de controles</a><button type="button" disabled={!nextPendingAfter(item)} onClick={() => openControl(nextPendingAfter(item))} className="min-h-11 rounded-lg border border-primary-200 bg-primary-50 px-3 text-xs font-bold text-primary-800 disabled:bg-neutral-50 disabled:text-neutral-500">{nextPendingAfter(item) ? 'Siguiente pendiente' : remaining.length ? 'Último control pendiente' : 'Checklist revisado'}</button></div>
             </div>}
           </div>;
