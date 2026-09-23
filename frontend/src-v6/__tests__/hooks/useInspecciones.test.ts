@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AxiosError } from 'axios';
+import { renderHook } from '@testing-library/react';
 
 const invalidateQueries = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const useMutationMock = vi.hoisted(() => vi.fn((options: unknown) => options));
@@ -29,7 +30,7 @@ import { useInspection, useInspectionMutation } from '../../hooks/useInspeccione
 
 describe('useInspection connectivity fallback', () => {
   const cached = { id: 'inspection-9', numero: 'DEMO' };
-  const query = () => useInspection('inspection-9') as unknown as { queryFn: () => Promise<unknown> };
+  const query = () => renderHook(() => useInspection('inspection-9')).result.current as unknown as { queryFn: () => Promise<unknown> };
   beforeEach(() => {
     vi.clearAllMocks();
     saveOfflineMock.mockResolvedValue(undefined);
