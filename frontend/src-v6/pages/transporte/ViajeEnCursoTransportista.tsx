@@ -493,7 +493,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
                       style={{ height: '100%', width: '100%', zIndex: 0 }}
                       className="z-0"
                     >
-                      <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                      <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
                       {trackPoints.length > 1 && <Polyline positions={trackPoints} color="#0D8A4F" weight={4} opacity={0.8} />}
                       {currentPosition && <Marker position={currentPosition} icon={ACTOR_ICONS.enTransito}><Popup>Tu posición actual</Popup></Marker>}
                       <RecenterMap position={currentPosition} onUserInteract={handleMapInteract} followUser={followUser} />

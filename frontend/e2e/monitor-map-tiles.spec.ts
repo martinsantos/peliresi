@@ -24,10 +24,12 @@ test('Monitor loads the same keyless map as the rest of SITREP in regular and ci
   });
 
   await page.goto('/monitor');
-  await expect(page.locator('.leaflet-tile').first()).toHaveAttribute('src', /tile\.openstreetmap\.org/);
+  await expect(page.locator('.leaflet-tile').first()).toHaveAttribute('src', /^https:\/\/tile\.openstreetmap\.org\//);
+  await expect(page.locator('.leaflet-control-attribution')).toBeVisible();
+  await expect(page.locator('.leaflet-control-attribution')).toContainText('OpenStreetMap contributors');
   await page.locator('button[title="Cinema mode (C)"]').click();
   await expect(page.locator('.wr-cinema .leaflet-tile').first()).toBeVisible();
-  await expect(page.locator('.leaflet-tile').first()).toHaveAttribute('src', /tile\.openstreetmap\.org/);
+  await expect(page.locator('.leaflet-tile').first()).toHaveAttribute('src', /^https:\/\/tile\.openstreetmap\.org\//);
   expect(requestedTiles.some((url) => url.includes('tile.openstreetmap.org'))).toBe(true);
   expect(requestedTiles.some((url) => url.includes('cartocdn'))).toBe(false);
 });

@@ -265,7 +265,7 @@ export default function MapaActoresTab({
               style={{ height: '100%', width: '100%', zIndex: 0 }}
               className="z-0"
             >
-              <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
               <FlyToTarget target={flyTarget} zoom={12} />
 
               {/* Generadores */}
