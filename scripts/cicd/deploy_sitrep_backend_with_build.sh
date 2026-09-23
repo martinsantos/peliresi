@@ -6,7 +6,7 @@ RELEASE_DIR=/var/www/sitrep-backend-releases/$RELEASE_NAME
 CURRENT_LINK=/var/www/sitrep-backend
 SOURCE_TARBALL=/tmp/sitrep-backend-source.tar.gz
 BUILD_DIR=/tmp/sitrep-backend-build-$RELEASE_NAME
-HEALTH_URL=${SITREP_BACKEND_HEALTH_URL:-http://localhost:3010/api/health}
+HEALTH_URL=${SITREP_BACKEND_HEALTH_URL:-http://localhost:3002/api/health}
 
 echo "Deploy SITREP Backend (with build on VPS): $RELEASE_NAME"
 

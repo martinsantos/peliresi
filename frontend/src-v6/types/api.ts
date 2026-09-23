@@ -4,9 +4,7 @@
  */
 
 import type {
-  Usuario, Manifiesto, Generador, Transportista, Operador,
-  Vehiculo, Chofer, TipoResiduo, Notificacion, ReglaAlerta,
-  AlertaGenerada, AnomaliaTransporte, Auditoria, Rol, EstadoManifiesto,
+  Usuario, Manifiesto, TipoResiduo, Rol, EstadoManifiesto,
 } from './models';
 
 // ========================================
@@ -285,7 +283,7 @@ export interface CreateRenovacionRequest {
   generadorId?: string;
   operadorId?: string;
   modalidad: 'SIN_CAMBIOS' | 'CON_CAMBIOS';
-  datosNuevos?: any;
+  datosNuevos?: Record<string, unknown>;
   camposModificados?: string[];
   tefAnterior?: number;
   tefNuevo?: number;

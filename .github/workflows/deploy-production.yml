@@ -36,7 +36,7 @@ jobs:
 
       - name: Package Frontend Source
         run: |
-          tar czf /tmp/sitrep-frontend-source.tar.gz frontend/ docs/manual/ docs/screenshots/desktop/ docs/screenshots/mobile/
+          tar czf /tmp/sitrep-frontend-source.tar.gz frontend/ docs/manual/ docs/screenshots/desktop/ docs/screenshots/mobile/ scripts/ops/check-pwa-assets.sh
 
       - name: Setup SSH Key
         run: |

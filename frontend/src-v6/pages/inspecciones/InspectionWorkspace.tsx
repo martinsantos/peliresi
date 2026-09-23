@@ -46,14 +46,16 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
   const anchorIds = active.anchors?.map((anchor) => anchor.id).join('|') || '';
   const anchorGroups = Array.from(new Set(active.anchors?.map((anchor) => anchor.group).filter((group): group is string => Boolean(group)) || []));
   const currentGroup = visibleAnchor?.group || selectedAnchor?.group || anchorGroups[0];
+  const resumeUserId = resumeIdentity?.userId;
+  const resumeInspectionId = resumeIdentity?.inspectionId;
+  const resumeAnchor = visibleAnchor || selectedAnchor;
+  const resumeHash = resumeAnchor ? `#${active.id}/${encodeURIComponent(resumeAnchor.id)}` : `#${active.id}`;
+  const resumeLabel = resumeAnchor ? `${active.label} · ${resumeAnchor.label}` : active.label;
 
   useEffect(() => {
-    if (!resumeIdentity) return;
-    const anchor = visibleAnchor || selectedAnchor;
-    const hash = anchor ? `#${active.id}/${encodeURIComponent(anchor.id)}` : `#${active.id}`;
-    const label = anchor ? `${active.label} · ${anchor.label}` : active.label;
-    saveInspectionResume(resumeIdentity.userId, resumeIdentity.inspectionId, hash, label);
-  }, [active.id, active.label, selectedAnchor?.id, visibleAnchor?.id, resumeIdentity?.userId, resumeIdentity?.inspectionId]);
+    if (!resumeUserId || !resumeInspectionId) return;
+    saveInspectionResume(resumeUserId, resumeInspectionId, resumeHash, resumeLabel);
+  }, [resumeUserId, resumeInspectionId, resumeHash, resumeLabel]);
 
   // The application scrolls <main>, not window. Track the control as it enters
   // the readable area below the pinned guide, without interrupting typing.

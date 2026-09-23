@@ -906,7 +906,7 @@ test('closed inspection report reflows without horizontal scroll or an empty sti
 test('two real tabs allow one draft editor and recover the latest comment after ownership is released', async ({ page, context }, testInfo) => {
   const state = structuredClone(inspection);
   const draftKey = 'sitrep_inspection_draft_inspector-qa_inspection-qa';
-  let secondPage: Page | undefined;
+  let secondPage: Page | undefined = undefined;
   let blockedPhase = true;
   let blockedTabWrites = 0;
   const errors: string[] = [];
