@@ -85,7 +85,7 @@ test.describe('public inspection QR traceability', () => {
     await expect(cta).toHaveAttribute('href', '/inspecciones/inspection-qa#trazabilidad');
     await cta.click();
     await expect(page).toHaveURL(/\/inspecciones\/inspection-qa#trazabilidad$/);
-    await expect(page.getByRole('heading', { name: 'Historial de la inspección' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Trazabilidad', level: 2 })).toBeVisible();
     await expect(page.getByText('Cierre conforme documentado', { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Resultado de la inspección' })).toHaveCount(0);
     await expect(page.getByTestId('inspection-action-bar')).toHaveCount(0);
