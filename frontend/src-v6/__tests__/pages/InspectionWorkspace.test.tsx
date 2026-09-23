@@ -1,16 +1,17 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionWorkspace } from '../../pages/inspecciones/InspectionWorkspace';
+import { readInspectionResume } from '../../services/inspectionResume';
 
 function setup(hash = '') {
   const onBeforeNavigate = vi.fn();
   render(<MemoryRouter initialEntries={['/inspecciones/qa' + hash]}>
-    <InspectionWorkspace guided defaultStep="contexto" onBeforeNavigate={onBeforeNavigate}
+    <InspectionWorkspace guided defaultStep="contexto" onBeforeNavigate={onBeforeNavigate} resumeIdentity={{ userId: 'inspector-1', inspectionId: 'qa' }}
       saveAction={<button>Guardar borrador</button>}
       steps={[
         { id: 'contexto', label: 'Contexto', title: 'Preparar visita', description: 'Datos generales', content: <input aria-label="Ubicación QA" defaultValue="" /> },
-        { id: 'checklist', label: 'Checklist', title: 'Controles', description: 'Verificación', anchors: [{ id: 'DOC-01', label: 'Documento', detail: 'Pendiente' }], content: <p>Control de prueba</p> },
+        { id: 'checklist', label: 'Checklist', title: 'Controles', description: 'Verificación', anchors: [{ id: 'DOC-01', label: 'Documento', detail: 'Pendiente', group: 'Documentación', reviewed: false }], content: <p>Control de prueba</p> },
       ]}
       reference={[{ id: 'trazabilidad', label: 'Trazabilidad', title: 'Registro', description: 'Notas', content: <textarea aria-label="Nota sin enviar" /> }]} />
   </MemoryRouter>);
@@ -18,6 +19,8 @@ function setup(hash = '') {
 }
 
 describe('InspectionWorkspace navigation contract', () => {
+  beforeEach(() => localStorage.clear());
+
   it('shows exactly one task, advances without submitting and flushes the draft', () => {
     const { onBeforeNavigate } = setup();
     expect(screen.getByRole('heading', { name: 'Preparar visita' })).toBeVisible();
@@ -52,8 +55,15 @@ describe('InspectionWorkspace navigation contract', () => {
   it('keeps a mobile navigation landmark and exposes direct links to field points', () => {
     setup('#checklist/DOC-01');
     expect(screen.getByTestId('inspection-navigation')).toHaveClass('sticky', 'top-0');
-    expect(screen.getByRole('combobox', { name: 'Ir a un punto de Checklist' })).toHaveValue('DOC-01');
-    expect(screen.getByRole('option', { name: /DOC-01 · Pendiente · Documento/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Documentación · 0 de 1 revisados' })).toBeInTheDocument();
+    expect(screen.getByTestId('inspection-current-point')).toHaveTextContent('Documentación · DOC-01 · Pendiente');
     expect(screen.getByRole('heading', { name: 'Controles' })).toBeVisible();
+  });
+
+  it('remembers the exact selected control for the next visit', () => {
+    setup();
+    fireEvent.click(screen.getByRole('link', { name: 'Checklist' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Documentación · 0 de 1 revisados' }));
+    expect(readInspectionResume('inspector-1', 'qa')).toMatchObject({ hash: '#checklist/DOC-01', label: 'Checklist · Documento' });
   });
 });

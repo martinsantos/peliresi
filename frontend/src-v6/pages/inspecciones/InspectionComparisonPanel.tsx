@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { AlertTriangle, ArrowRight, Camera, Check, CheckCircle2, ChevronDown, ChevronUp, CircleMinus, FileSearch, Paperclip } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Camera, Check, CheckCircle2, ChevronDown, ChevronUp, CircleMinus, FileSearch, Paperclip, Search } from 'lucide-react';
 import type { InspectionComparison, InspectionComparisonResult } from '../../types/inspection';
 import { InspectionEvidenceImage } from './InspectionEvidenceImage';
 import { INSPECTION_PHOTO_ACCEPT } from '../../services/inspectionOfflineEvidence';
@@ -26,7 +26,13 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, editable,
   const location = useLocation();
   const navigate = useNavigate();
   const groups = useMemo(() => Array.from(new Set(comparisons.map((row) => row.categoria))), [comparisons]);
+  const orderedComparisons = useMemo(() => groups.flatMap((group) => comparisons.filter((row) => row.categoria === group)), [comparisons, groups]);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+  const [indexOpen, setIndexOpen] = useState(false);
+  const [indexQuery, setIndexQuery] = useState('');
+  const indexRef = useRef<HTMLDivElement | null>(null);
+  const indexTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const indexSearchRef = useRef<HTMLInputElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const initialHashRef = useRef(location.hash);
   const alignedInitialAnchorRef = useRef(false);
@@ -38,22 +44,44 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, editable,
   const linkedRow = location.hash.startsWith('#declaracion/') ? comparisons.find((row) => row.codigo === linkedCode) : undefined;
   const linkedRowId = linkedRow?.id;
   const activeGroup = linkedRow?.categoria || (expandedGroup && groups.includes(expandedGroup) ? expandedGroup : groups[0] || null);
-  const pending = comparisons.filter((row) => row.resultado === 'PENDIENTE');
+  const pending = orderedComparisons.filter((row) => row.resultado === 'PENDIENTE');
+  const matchingComparisons = orderedComparisons.filter((row) => `${row.etiqueta} ${row.categoria} ${row.codigo}`.toLocaleLowerCase('es').includes(indexQuery.trim().toLocaleLowerCase('es')));
   const nextPendingAfter = (row: InspectionComparison) => {
-    const position = comparisons.indexOf(row);
-    return comparisons.slice(position + 1).find((entry) => entry.resultado === 'PENDIENTE')
-      || comparisons.slice(0, position).find((entry) => entry.resultado === 'PENDIENTE');
+    const position = orderedComparisons.indexOf(row);
+    return orderedComparisons.slice(position + 1).find((entry) => entry.resultado === 'PENDIENTE')
+      || orderedComparisons.slice(0, position).find((entry) => entry.resultado === 'PENDIENTE');
   };
   const openComparison = (row?: InspectionComparison) => {
     if (!row) return;
+    setIndexOpen(false);
+    setIndexQuery('');
     setExpandedGroup(row.categoria);
     const hash = '#declaracion/' + encodeURIComponent(row.codigo);
     const align = () => document.getElementById('comparison-' + row.id)?.scrollIntoView?.({ block: 'start', behavior: 'instant' });
     navigate({ pathname: location.pathname, search: location.search, hash }, { replace: true });
     requestAnimationFrame(align);
-    // Selecting a native <select> may restore focus/scroll after React commits.
+    // A browser may restore its scroll position after React commits.
     window.setTimeout(() => { if (window.location.hash === hash) align(); }, 120);
   };
+  useEffect(() => {
+    if (!indexOpen) return;
+    indexSearchRef.current?.focus();
+    const closeOnOutside = (event: PointerEvent) => {
+      if (!indexRef.current?.contains(event.target as Node)) { setIndexOpen(false); setIndexQuery(''); }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setIndexOpen(false);
+      setIndexQuery('');
+      indexTriggerRef.current?.focus();
+    };
+    document.addEventListener('pointerdown', closeOnOutside);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutside);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [indexOpen]);
   useEffect(() => {
     if (!linkedRowId) return;
     const align = () => document.getElementById('comparison-' + linkedRowId)?.scrollIntoView?.({ block: 'start', behavior: 'instant' });
@@ -85,14 +113,31 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, editable,
         <div className="mt-4 h-2 overflow-hidden rounded-full bg-neutral-200"><span className="block h-full rounded-full bg-primary-600 transition-[width] duration-200" style={{ width: `${Math.round((completed / Math.max(1, comparisons.length)) * 100)}%` }} /></div>
       </div>}
 
-      <div className="border-b border-neutral-200 p-4 sm:px-6">
-        <label className="block text-sm font-semibold text-neutral-700">Ir a un dato declarado
-          <select aria-label="Ir a un dato declarado" value={linkedRow?.id || ''} onChange={(event) => openComparison(comparisons.find((row) => row.id === event.target.value))} className="mt-2 min-h-11 w-full min-w-0 rounded-lg border border-neutral-300 bg-white px-3 text-sm font-normal">
-            <option value="" disabled>Elegir entre {comparisons.length} datos</option>
-            {groups.map((group) => <optgroup key={group} label={group}>{comparisons.filter((row) => row.categoria === group).map((row) => <option key={row.id} value={row.id}>{row.codigo} · {resultLabel(row)} · {row.etiqueta}</option>)}</optgroup>)}
-          </select>
-        </label>
-        <p className="mt-2 text-xs text-neutral-600">{completed}/{comparisons.length} revisados · {pending.length} pendientes</p>
+      <div ref={indexRef} className="border-b border-neutral-200 p-4 sm:px-6">
+        <button ref={indexTriggerRef} type="button" aria-label={`Ir a un dato declarado: ${linkedRow?.etiqueta || 'Buscar dato'}`} aria-expanded={indexOpen} aria-controls="comparison-jump-index" onClick={() => { if (indexOpen) setIndexQuery(''); setIndexOpen((open) => !open); }} className="flex min-h-11 w-full min-w-0 items-center justify-between gap-3 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-left text-sm font-semibold text-[#10213A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600">
+          <span className="flex min-w-0 items-center gap-2"><Search size={17} className="shrink-0 text-primary-700" aria-hidden="true" /><span className="truncate">{linkedRow?.etiqueta || 'Ir a un dato declarado'}</span></span>
+          {indexOpen ? <ChevronUp size={18} className="shrink-0 text-neutral-500" aria-hidden="true" /> : <ChevronDown size={18} className="shrink-0 text-neutral-500" aria-hidden="true" />}
+        </button>
+        <div id="comparison-jump-index" hidden={!indexOpen} className="mt-2 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+          {indexOpen && <>
+          <label className="flex min-h-11 items-center gap-2 border-b border-neutral-200 px-3">
+            <Search size={17} className="shrink-0 text-neutral-500" aria-hidden="true" />
+            <span className="sr-only">Buscar dato declarado</span>
+            <input ref={indexSearchRef} type="search" value={indexQuery} onChange={(event) => setIndexQuery(event.target.value)} placeholder="Nombre, categoría o código" className="min-h-11 w-full min-w-0 bg-transparent text-sm text-[#10213A] outline-none placeholder:text-neutral-500" />
+          </label>
+          <nav aria-label="Datos declarados" className="max-h-[min(50dvh,22rem)] overflow-y-auto overscroll-contain py-1">
+            {matchingComparisons.length ? matchingComparisons.map((row) => {
+              const position = orderedComparisons.indexOf(row) + 1;
+              const status = row.resultado === 'PENDIENTE' ? 'Pendiente' : row.resultado === 'COINCIDE' ? 'Coincide' : row.resultado === 'DIFIERE' ? 'Difiere' : 'No verificado';
+              return <button key={row.id} type="button" aria-current={linkedRow?.id === row.id ? 'location' : undefined} onClick={() => openComparison(row)} className={`flex min-h-12 w-full min-w-0 items-center gap-3 px-3 py-2 text-left hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-600 ${linkedRow?.id === row.id ? 'bg-primary-50' : ''}`}>
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold text-neutral-600">{position}</span>
+                <span className="min-w-0 flex-1"><span className="block text-sm font-semibold leading-snug text-[#10213A]">{row.etiqueta}</span><span className="block text-xs text-neutral-600">{row.categoria}</span></span>
+                <span className={`shrink-0 text-xs font-semibold ${row.resultado === 'DIFIERE' ? 'text-error-700' : row.resultado === 'COINCIDE' ? 'text-primary-700' : 'text-neutral-600'}`}>{status}</span>
+              </button>;
+            }) : <p className="px-4 py-4 text-sm text-neutral-600">No hay datos con ese nombre.</p>}
+          </nav>
+          </>}
+        </div>
       </div>
       {groups.map((group) => {
         const rows = comparisons.filter((row) => row.categoria === group);
@@ -108,7 +153,7 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, editable,
                 <div className="mb-3 flex min-w-0 flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="min-w-0 text-sm font-extrabold text-[#10213A]">{row.etiqueta}</p>
-                    <p className="mt-1 text-xs font-medium text-neutral-600">Dato {comparisons.indexOf(row) + 1} de {comparisons.length} · {row.codigo}</p>
+                    <p className="mt-1 text-xs font-medium text-neutral-600">Dato {orderedComparisons.indexOf(row) + 1} de {comparisons.length} · {row.codigo}</p>
                   </div>
                   <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${row.resultado === 'PENDIENTE' ? 'bg-warning-50 text-warning-800' : row.resultado === 'DIFIERE' ? 'bg-error-50 text-error-800' : 'bg-neutral-100 text-neutral-700'}`}>{resultLabel(row)}</span>
                 </div>

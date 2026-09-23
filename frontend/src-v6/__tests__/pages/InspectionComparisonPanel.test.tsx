@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { InspectionComparisonPanel } from '../../pages/inspecciones/InspectionComparisonPanel';
@@ -52,5 +52,20 @@ describe('InspectionComparisonPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Siguiente dato pendiente' }));
     expect(screen.getByTestId('hash')).toHaveTextContent('#declaracion/ACT-0');
     expect(screen.getByRole('textbox', { name: 'Valor verificado: Dato 0' })).toBeVisible();
+  });
+
+  it('advances through the same grouped order shown in the form, even when source rows are interleaved', () => {
+    function Hash() { return <output data-testid="hash">{useLocation().hash}</output>; }
+    const comparisons = [
+      { codigo: 'A-01', categoria: 'Documentación', etiqueta: 'Primer documento' },
+      { codigo: 'B-01', categoria: 'Actividad', etiqueta: 'Actividad declarada' },
+      { codigo: 'A-02', categoria: 'Documentación', etiqueta: 'Segundo documento' },
+    ].map((row, index) => ({ ...row, id: `comparison-${index}`, origen: 'actor', valorDeclarado: 'Declarado', valorObservado: null, resultado: 'PENDIENTE' as const, observacion: null, orden: index, evidencias: [] }));
+    render(<MemoryRouter initialEntries={['/inspecciones/qa#declaracion/A-01']}><Hash /><InspectionComparisonPanel inspectionId="inspection-1" editable onChange={vi.fn()} onEvidence={vi.fn()} comparisons={comparisons} /></MemoryRouter>);
+    const first = document.querySelector('[data-inspection-anchor="declaracion/A-01"]')!;
+    expect(first).toHaveTextContent('Dato 1 de 3');
+    fireEvent.click(within(first as HTMLElement).getByRole('button', { name: 'Siguiente dato pendiente' }));
+    expect(screen.getByTestId('hash')).toHaveTextContent('#declaracion/A-02');
+    expect(screen.getByRole('textbox', { name: 'Valor verificado: Segundo documento' })).toBeVisible();
   });
 });

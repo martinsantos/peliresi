@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, ChevronDown } from 'lucide-react';
 import { Button } from '../../components/ui/ButtonV2';
+import { saveInspectionResume } from '../../services/inspectionResume';
 
 export interface InspectionWorkspaceStep {
   id: string;
@@ -12,7 +13,7 @@ export interface InspectionWorkspaceStep {
   complete?: boolean;
   content: React.ReactNode;
   nextAction?: React.ReactNode;
-  anchors?: Array<{ id: string; label: string; detail?: string }>;
+  anchors?: Array<{ id: string; label: string; detail?: string; group?: string; reviewed?: boolean }>;
 }
 
 interface Props {
@@ -22,10 +23,11 @@ interface Props {
   defaultStep: string;
   saveAction?: React.ReactNode;
   onBeforeNavigate: () => void;
+  resumeIdentity?: { userId: string | number; inspectionId: string };
 }
 
 /** One section at a time. The hash is the source of truth, including browser back/forward. */
-export function InspectionWorkspace({ steps, reference, guided, defaultStep, saveAction, onBeforeNavigate }: Props) {
+export function InspectionWorkspace({ steps, reference, guided, defaultStep, saveAction, onBeforeNavigate, resumeIdentity }: Props) {
   const location = useLocation();
   const navigate = useNavigate();
   const [indexOpen, setIndexOpen] = useState(false);
@@ -42,6 +44,16 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
   const selectedAnchor = active.anchors?.find((anchor) => anchor.id === hash.split('/').slice(1).join('/'));
   const visibleAnchor = visibleAnchorKey === null ? selectedAnchor : active.anchors?.find((anchor) => `${active.id}/${anchor.id}` === visibleAnchorKey);
   const anchorIds = active.anchors?.map((anchor) => anchor.id).join('|') || '';
+  const anchorGroups = Array.from(new Set(active.anchors?.map((anchor) => anchor.group).filter((group): group is string => Boolean(group)) || []));
+  const currentGroup = visibleAnchor?.group || selectedAnchor?.group || anchorGroups[0];
+
+  useEffect(() => {
+    if (!resumeIdentity) return;
+    const anchor = visibleAnchor || selectedAnchor;
+    const hash = anchor ? `#${active.id}/${encodeURIComponent(anchor.id)}` : `#${active.id}`;
+    const label = anchor ? `${active.label} · ${anchor.label}` : active.label;
+    saveInspectionResume(resumeIdentity.userId, resumeIdentity.inspectionId, hash, label);
+  }, [active.id, active.label, selectedAnchor?.id, visibleAnchor?.id, resumeIdentity?.userId, resumeIdentity?.inspectionId]);
 
   // The application scrolls <main>, not window. Track the control as it enters
   // the readable area below the pinned guide, without interrupting typing.
@@ -61,8 +73,11 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
         workspaceRef.current?.style.setProperty('--inspection-anchor-offset', `${offset + 64}px`);
         previousOffset = offset;
       }
-      // Count the row immediately below the intermediate pinned group as current.
-      const threshold = main.getBoundingClientRect().top + offset + 72;
+      // Follow the field in the inspector's working area, not only the one
+      // touching the pinned group. Otherwise the mobile guide can still name
+      // the previous field while the next form is already being edited.
+      const workingDepth = Math.min(160, Math.max(72, (main.clientHeight - offset) * 0.25));
+      const threshold = main.getBoundingClientRect().top + offset + workingDepth;
       const markers = Array.from(workspaceRef.current?.querySelectorAll<HTMLElement>('[data-inspection-anchor]') || [])
         .filter((element) => element.getClientRects().length && element.dataset.inspectionAnchor?.startsWith(`${active.id}/`));
       let current = '';
@@ -99,12 +114,17 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
   const go = (step: InspectionWorkspaceStep) => {
     onBeforeNavigate();
     setIndexOpen(false);
+    if (resumeIdentity) saveInspectionResume(resumeIdentity.userId, resumeIdentity.inspectionId, `#${step.id}`, step.label);
     navigate({ pathname: location.pathname, search: location.search, hash: `#${step.id}` });
   };
   const goToAnchor = (code: string) => {
     if (!active.anchors?.some((anchor) => anchor.id === code)) return;
     onBeforeNavigate();
     setIndexOpen(false);
+    if (resumeIdentity) {
+      const anchor = active.anchors?.find((item) => item.id === code);
+      saveInspectionResume(resumeIdentity.userId, resumeIdentity.inspectionId, `#${active.id}/${encodeURIComponent(code)}`, `${active.label} · ${anchor?.label || code}`);
+    }
     navigate({ pathname: location.pathname, search: location.search, hash: `#${active.id}/${encodeURIComponent(code)}` }, { replace: true });
     // Also return to a selected point when its hash is already the current URL.
     requestAnimationFrame(() => {
@@ -125,24 +145,23 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
 
   return <div ref={workspaceRef} data-testid="inspection-workspace" className="min-w-0 rounded-xl border border-neutral-200 bg-white lg:grid lg:grid-cols-[210px_minmax(0,1fr)] xl:grid-cols-[224px_minmax(0,1fr)]">
     <aside data-testid="inspection-navigation" className="sticky top-0 z-20 min-w-0 self-start border-b border-neutral-200 bg-white lg:static lg:self-stretch lg:border-b-0 lg:border-r lg:bg-neutral-50/50">
-      <button type="button" aria-label={`Ver todos los pasos · ${active.label}`} aria-expanded={indexOpen} aria-controls="inspection-step-index" onClick={() => setIndexOpen((open) => !open)} className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-2 text-left lg:hidden">
-        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-neutral-900">{guided && index >= 0 ? `Paso ${index + 1} de ${steps.length} · ` : ''}{active.label}</span><span data-testid="inspection-current-point" className="mt-0.5 block truncate text-xs text-neutral-600">{visibleAnchor ? `${visibleAnchor.id} · ${visibleAnchor.detail || 'Sin revisar'} · ${visibleAnchor.label}` : 'Inicio de la sección'}</span></span><span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-primary-800">Índice<ChevronDown size={17} className={`transition-transform ${indexOpen ? 'rotate-180' : ''}`} /></span>
+      <button type="button" aria-label={`Ver todos los pasos · ${active.label}`} aria-expanded={indexOpen} aria-controls="inspection-step-index" onClick={() => setIndexOpen((open) => !open)} className="relative flex min-h-14 w-full items-center justify-between gap-3 px-4 py-2 text-left lg:hidden">
+        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-neutral-900">{guided && index >= 0 ? `Paso ${index + 1} de ${steps.length} · ` : ''}{active.label}</span><span data-testid="inspection-current-point" className="mt-0.5 block truncate text-xs text-neutral-600">{visibleAnchor ? `${visibleAnchor.group ? visibleAnchor.group + ' · ' : ''}${visibleAnchor.id} · ${visibleAnchor.detail || 'Sin revisar'}` : active.detail || 'Abrir índice de pasos'}</span></span><span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-primary-800">Índice<ChevronDown size={17} className={`transition-transform ${indexOpen ? 'rotate-180' : ''}`} /></span>
+        {guided && index >= 0 && <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-0.5 bg-neutral-200"><span className="block h-full bg-primary-600" style={{ width: `${(index + 1) / steps.length * 100}%` }} /></span>}
       </button>
       <nav id="inspection-step-index" aria-label={guided ? 'Pasos de la inspección' : 'Secciones del expediente'} className={`${indexOpen ? 'block' : 'hidden'} max-h-[55dvh] overflow-y-auto overscroll-contain px-3 pb-4 lg:sticky lg:top-0 lg:block lg:max-h-[calc(100dvh-7rem)] lg:py-5`}>
         <p className="hidden px-3 pb-3 text-xs font-semibold text-neutral-500 lg:block">{guided ? 'Completar inspección' : 'Consultar expediente'}</p>
-        {!!active.anchors?.length && <p data-testid="inspection-current-point-desktop" className="mb-3 hidden rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-xs leading-snug text-primary-900 lg:block"><span className="block font-bold">Ahora · {active.label}</span><span className="mt-1 block">{visibleAnchor ? `${visibleAnchor.id} · ${visibleAnchor.label}` : 'Inicio de la sección'}</span>{visibleAnchor?.detail && <span className="mt-1 block font-semibold">{visibleAnchor.detail}</span>}</p>}
-        {!!active.anchors?.length && <label className="mb-3 block px-1 text-xs font-semibold text-neutral-700">Ir a un punto de {active.label}
-          <select aria-label={`Ir a un punto de ${active.label}`} value={visibleAnchor?.id || ''} onChange={(event) => goToAnchor(event.target.value)} className="mt-2 min-h-11 w-full min-w-0 rounded-lg border border-neutral-300 bg-white px-2 text-sm font-normal text-neutral-900">
-            <option value="" disabled>Elegir control · {active.anchors.length} puntos</option>
-            {active.anchors.map((anchor, i) => <option key={anchor.id} value={anchor.id}>{i + 1}. {anchor.id} · {anchor.detail} · {anchor.label}</option>)}
-          </select>
-        </label>}
-        <ol className="space-y-1">{steps.map((step, i) => <li key={step.id}>{stepLink(step, guided ? i : undefined)}</li>)}</ol>
+        {!!active.anchors?.length && <p data-testid="inspection-current-point-desktop" className="mb-3 hidden rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-xs leading-snug text-primary-900 lg:block"><span className="block font-bold">Ahora · {active.label}</span><span className="mt-1 block">{currentGroup ? `${currentGroup} · ` : ''}{visibleAnchor ? `${visibleAnchor.id} · ${visibleAnchor.label}` : 'Inicio de la sección'}</span>{visibleAnchor?.detail && <span className="mt-1 block font-semibold">{visibleAnchor.detail}</span>}</p>}
+        <ol className="space-y-1">{steps.map((step, i) => <li key={step.id}>{stepLink(step, guided ? i : undefined)}{active.id === step.id && anchorGroups.length > 0 && <div aria-label={`Secciones de ${step.label}`} className="mb-2 ml-6 border-l border-neutral-200 pl-2"><p className="px-2 pb-1 pt-1 text-[11px] font-semibold text-neutral-500">Secciones · revisados</p>{anchorGroups.map((group) => {
+          const members = active.anchors?.filter((anchor) => anchor.group === group) || [];
+          const reviewed = members.filter((anchor) => anchor.reviewed).length;
+          return <button key={group} type="button" aria-label={`${group} · ${reviewed} de ${members.length} revisados`} aria-current={currentGroup === group ? 'location' : undefined} onClick={() => goToAnchor(members[0].id)} className={`flex min-h-10 w-full min-w-0 items-center justify-between gap-1 rounded-md px-2 py-1.5 text-left text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${currentGroup === group ? 'bg-primary-50 font-bold text-primary-900' : 'text-neutral-600 hover:bg-neutral-100'}`}><span className="min-w-0 truncate">{group}</span><span className="shrink-0 tabular-nums">{reviewed}/{members.length}</span></button>;
+        })}</div>}</li>)}</ol>
         {reference.length > 0 && <div className="mt-4 border-t border-neutral-200 pt-3"><p className="px-3 pb-1 text-xs font-semibold text-neutral-500">Seguimiento del expediente</p>{reference.map((step) => stepLink(step))}</div>}
       </nav>
     </aside>
     <div className="min-w-0">
-      <header data-testid="inspection-step-header" className="border-b border-neutral-200 bg-white px-4 py-3 sm:px-6 lg:sticky lg:top-0 lg:z-20">
+      <header data-testid="inspection-step-header" className="max-lg:sr-only border-b border-neutral-200 bg-white px-4 py-3 sm:px-6 lg:sticky lg:top-0 lg:z-20">
         <div className="flex min-w-0 items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5"><span className="shrink-0 text-xs font-semibold text-neutral-500">{guided && index >= 0 ? `Paso ${index + 1} de ${steps.length}` : 'Expediente'}</span><h2 ref={headingRef} id="inspection-step-heading" tabIndex={-1} className="min-w-0 text-lg font-extrabold leading-snug tracking-tight text-neutral-900 outline-none sm:text-xl">{active.title}</h2></div>
           {active.detail && <span className="hidden max-w-[38%] shrink-0 truncate text-right text-xs font-medium text-neutral-600 xl:block">{active.detail}</span>}
@@ -155,9 +174,12 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
       {all.map((step) => <section key={step.id} hidden={step.id !== active.id} aria-label={step.title} id={step.id === 'verificacion' ? undefined : step.id} data-testid={step.id === active.id ? 'inspection-step-content' : undefined} className="min-w-0 space-y-5 p-4 sm:p-6 [&>section]:shadow-none [&>div]:shadow-none">
         {step.content}
       </section>)}
-      {index >= 0 && <footer data-testid="inspection-action-bar" className="flex flex-col gap-3 border-t border-neutral-200 bg-neutral-50/60 p-4 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between sm:px-6">
-        <div className="flex min-w-0 gap-2 [&>button]:w-full min-[480px]:[&>button]:w-auto">{index > 0 ? <Button variant="outline" leftIcon={<ArrowLeft size={16} />} onClick={() => go(steps[index - 1])}>Anterior</Button> : saveAction}</div>
-        <div className="flex min-w-0 flex-col gap-2 min-[480px]:flex-row min-[480px]:flex-wrap min-[480px]:justify-end [&>button]:w-full min-[480px]:[&>button]:w-auto">{index > 0 && saveAction}{active.nextAction || (index < steps.length - 1 && <Button rightIcon={<ArrowRight size={16} />} onClick={() => go(steps[index + 1])}>Siguiente</Button>)}</div>
+      {index >= 0 && <footer data-testid="inspection-action-bar" className="border-t border-neutral-200 bg-neutral-50/60 p-4 sm:px-6">
+        {saveAction && <div className="mb-3 flex justify-end">{saveAction}</div>}
+        <div className="flex items-center justify-between gap-3">
+          {index > 0 ? <Button variant="outline" leftIcon={<ArrowLeft size={16} />} onClick={() => go(steps[index - 1])}>Anterior</Button> : <span />}
+          {active.nextAction || (index < steps.length - 1 && <Button rightIcon={<ArrowRight size={16} />} onClick={() => go(steps[index + 1])}>Siguiente</Button>)}
+        </div>
       </footer>}
     </div>
   </div>;

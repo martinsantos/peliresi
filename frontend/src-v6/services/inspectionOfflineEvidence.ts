@@ -34,6 +34,7 @@ const STORE = 'inspection_evidence_queue' as const;
 export const INSPECTION_PHOTO_ACCEPT = 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp';
 export const INSPECTION_EVIDENCE_ACCEPT = `${INSPECTION_PHOTO_ACCEPT},application/pdf,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/x-wav,audio/webm,.pdf,.mp3,.m4a,.ogg,.wav,.webm`;
 const FORMAT_MESSAGE = 'Formato no permitido. Use JPG, PNG, WEBP, PDF, MP3, M4A, OGG, WAV o WEBM. Las fotos GIF, HEIC y HEIF deben convertirse a JPG, PNG o WEBP.';
+const CAMERA_FORMAT_MESSAGE = 'La foto HEIC, HEIF o AVIF no se puede incorporar como evidencia sin una conversión verificable. Conservá el archivo original y exportá una copia JPG, PNG o WEBP; después adjuntá esa copia.';
 const MAX_AUTO_ATTEMPTS = 3;
 const runningSyncs = new Map<string, Promise<InspectionEvidenceSyncResult>>();
 const pendingChanges = new Map<string, Promise<unknown>>();
@@ -61,7 +62,7 @@ export async function validateInspectionEvidence(file: Blob, fields: PendingInsp
   else if (bytes.length >= 12 && ascii(4, 8) === 'ftyp') {
     // HEIF images share the MP4 container header, but are not supported photos.
     const brands = ascii(8, 64);
-    if (/(heic|heix|hevc|hevx|heim|heis|mif1|msf1|avif|avis)/.test(brands) || file.type.startsWith('image/')) throw new InspectionEvidenceValidationError(FORMAT_MESSAGE);
+    if (/(heic|heix|hevc|hevx|heim|heis|mif1|msf1|avif|avis)/.test(brands) || file.type.startsWith('image/')) throw new InspectionEvidenceValidationError(CAMERA_FORMAT_MESSAGE);
     mime = 'audio/mp4';
   } else if (ascii(0, 4) === 'OggS') mime = 'audio/ogg';
   else if (ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WAVE') mime = 'audio/wav';

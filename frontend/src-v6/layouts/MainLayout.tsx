@@ -45,6 +45,7 @@ import { NotificationBell } from '../components/NotificationBell';
 import { NotificacionesPoller } from '../components/NotificacionesPoller';
 import { ToastContainer } from '../components/ui/Toast';
 import { ConnectivityIndicator } from '../components/ConnectivityIndicator';
+import { SWUpdateBanner } from '../components/SWUpdateBanner';
 import { OnboardingTour, resetOnboardingTour } from '../components/OnboardingTour';
 import { DemoAppOnboarding } from '../components/DemoAppOnboarding';
 import { useAuth } from '../contexts/AuthContext';
@@ -485,6 +486,8 @@ export const MainLayout: React.FC = () => {
             <UserSwitcher variant="dropdown" onSwitch={() => navigate('/dashboard')} />
           </div>
         </header>
+
+        <SWUpdateBanner />
 
         {/* Keep absolutely positioned field controls inside this scroll container. */}
         <main className="relative flex-1 px-4 lg:px-8 pb-4 lg:pb-8 overflow-auto bg-[#FAFAF8]">
