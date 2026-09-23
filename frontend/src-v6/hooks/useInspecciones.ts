@@ -2,14 +2,48 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { inspeccionService } from '../services/inspeccion.service';
-import { getOffline, saveOffline } from '../services/indexeddb';
-import type { Inspection } from '../types/inspection';
+import { getAllOffline, getOffline, saveOffline } from '../services/indexeddb';
+import { isOfflineNetworkError } from '../services/offlineSession';
+import type { PaginatedInspections } from '../services/inspeccion.service';
+import { inspectionActor, type Inspection } from '../types/inspection';
 import type { InspectionActorType, InspectionState } from '../types/inspection';
 
-export function useInspections(params?: { estado?: InspectionState; tipoActor?: InspectionActorType; actorId?: string; search?: string; page?: number; limit?: number }) {
+export interface InspectionListResult extends PaginatedInspections { offline?: true }
+
+type InspectionListParams = { estado?: InspectionState; tipoActor?: InspectionActorType; actorId?: string; search?: string; page?: number; limit?: number };
+
+export function filterCachedInspections(inspections: Inspection[], params?: InspectionListParams): InspectionListResult {
+  const search = params?.search?.trim().toLocaleLowerCase('es-AR') || '';
+  const filtered = inspections.filter((inspection) => {
+    const actor = inspectionActor(inspection);
+    return (!params?.estado || inspection.estado === params.estado)
+      && (!params?.tipoActor || inspection.tipoActor === params.tipoActor)
+      && (!params?.actorId || actor?.id === params.actorId)
+      && (!search || [inspection.numero, inspection.numeroActa, actor?.razonSocial, actor?.cuit]
+        .some((value) => value?.toLocaleLowerCase('es-AR').includes(search)));
+  }).sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
+  const page = Math.max(1, params?.page || 1);
+  const limit = Math.max(1, params?.limit || 25);
+  return { items: filtered.slice((page - 1) * limit, page * limit), total: filtered.length, page, limit, totalPages: Math.max(1, Math.ceil(filtered.length / limit)), offline: true };
+}
+
+export function useInspections(params?: InspectionListParams) {
+  const { currentUser } = useAuth();
   return useQuery({
-    queryKey: ['inspecciones', 'list', params],
-    queryFn: () => inspeccionService.list(params),
+    queryKey: ['inspecciones', 'list', currentUser?.id, params],
+    networkMode: 'always',
+    enabled: Boolean(currentUser?.id),
+    retry: 1,
+    queryFn: async (): Promise<InspectionListResult> => {
+      try { return await inspeccionService.list(params); }
+      catch (error) {
+        if (!currentUser?.id || !isOfflineNetworkError(error)) throw error;
+        const cached = await getAllOffline<{ id: string; inspection: Inspection }>('inspection_cases').catch(() => null);
+        if (!cached) throw error;
+        const scope = `${currentUser.id}:`;
+        return filterCachedInspections(cached.filter((entry) => entry.id.startsWith(scope) && entry.inspection?.id === entry.id.slice(scope.length)).map((entry) => entry.inspection), params);
+      }
+    },
     staleTime: 30_000,
   });
 }

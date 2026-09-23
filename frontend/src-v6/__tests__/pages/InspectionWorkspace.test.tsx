@@ -1,12 +1,13 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionWorkspace } from '../../pages/inspecciones/InspectionWorkspace';
+import { readInspectionResume } from '../../services/inspectionResume';
 
 function setup(hash = '') {
   const onBeforeNavigate = vi.fn();
   render(<MemoryRouter initialEntries={['/inspecciones/qa' + hash]}>
-    <InspectionWorkspace guided defaultStep="contexto" onBeforeNavigate={onBeforeNavigate}
+    <InspectionWorkspace guided defaultStep="contexto" onBeforeNavigate={onBeforeNavigate} resumeIdentity={{ userId: 'inspector-1', inspectionId: 'qa' }}
       saveAction={<button>Guardar borrador</button>}
       steps={[
         { id: 'contexto', label: 'Contexto', title: 'Preparar visita', description: 'Datos generales', content: <input aria-label="Ubicación QA" defaultValue="" /> },
@@ -18,6 +19,8 @@ function setup(hash = '') {
 }
 
 describe('InspectionWorkspace navigation contract', () => {
+  beforeEach(() => localStorage.clear());
+
   it('shows exactly one task, advances without submitting and flushes the draft', () => {
     const { onBeforeNavigate } = setup();
     expect(screen.getByRole('heading', { name: 'Preparar visita' })).toBeVisible();
@@ -55,5 +58,12 @@ describe('InspectionWorkspace navigation contract', () => {
     expect(screen.getByRole('button', { name: 'Documentación · 0 de 1 revisados' })).toBeInTheDocument();
     expect(screen.getByTestId('inspection-current-point')).toHaveTextContent('Documentación · DOC-01 · Pendiente');
     expect(screen.getByRole('heading', { name: 'Controles' })).toBeVisible();
+  });
+
+  it('remembers the exact selected control for the next visit', () => {
+    setup();
+    fireEvent.click(screen.getByRole('link', { name: 'Checklist' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Documentación · 0 de 1 revisados' }));
+    expect(readInspectionResume('inspector-1', 'qa')).toMatchObject({ hash: '#checklist/DOC-01', label: 'Checklist · Documento' });
   });
 });

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, ChevronDown } from 'lucide-react';
 import { Button } from '../../components/ui/ButtonV2';
+import { saveInspectionResume } from '../../services/inspectionResume';
 
 export interface InspectionWorkspaceStep {
   id: string;
@@ -22,10 +23,11 @@ interface Props {
   defaultStep: string;
   saveAction?: React.ReactNode;
   onBeforeNavigate: () => void;
+  resumeIdentity?: { userId: string | number; inspectionId: string };
 }
 
 /** One section at a time. The hash is the source of truth, including browser back/forward. */
-export function InspectionWorkspace({ steps, reference, guided, defaultStep, saveAction, onBeforeNavigate }: Props) {
+export function InspectionWorkspace({ steps, reference, guided, defaultStep, saveAction, onBeforeNavigate, resumeIdentity }: Props) {
   const location = useLocation();
   const navigate = useNavigate();
   const [indexOpen, setIndexOpen] = useState(false);
@@ -44,6 +46,14 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
   const anchorIds = active.anchors?.map((anchor) => anchor.id).join('|') || '';
   const anchorGroups = Array.from(new Set(active.anchors?.map((anchor) => anchor.group).filter((group): group is string => Boolean(group)) || []));
   const currentGroup = visibleAnchor?.group || selectedAnchor?.group || anchorGroups[0];
+
+  useEffect(() => {
+    if (!resumeIdentity) return;
+    const anchor = visibleAnchor || selectedAnchor;
+    const hash = anchor ? `#${active.id}/${encodeURIComponent(anchor.id)}` : `#${active.id}`;
+    const label = anchor ? `${active.label} · ${anchor.label}` : active.label;
+    saveInspectionResume(resumeIdentity.userId, resumeIdentity.inspectionId, hash, label);
+  }, [active.id, active.label, selectedAnchor?.id, visibleAnchor?.id, resumeIdentity?.userId, resumeIdentity?.inspectionId]);
 
   // The application scrolls <main>, not window. Track the control as it enters
   // the readable area below the pinned guide, without interrupting typing.
@@ -104,12 +114,17 @@ export function InspectionWorkspace({ steps, reference, guided, defaultStep, sav
   const go = (step: InspectionWorkspaceStep) => {
     onBeforeNavigate();
     setIndexOpen(false);
+    if (resumeIdentity) saveInspectionResume(resumeIdentity.userId, resumeIdentity.inspectionId, `#${step.id}`, step.label);
     navigate({ pathname: location.pathname, search: location.search, hash: `#${step.id}` });
   };
   const goToAnchor = (code: string) => {
     if (!active.anchors?.some((anchor) => anchor.id === code)) return;
     onBeforeNavigate();
     setIndexOpen(false);
+    if (resumeIdentity) {
+      const anchor = active.anchors?.find((item) => item.id === code);
+      saveInspectionResume(resumeIdentity.userId, resumeIdentity.inspectionId, `#${active.id}/${encodeURIComponent(code)}`, `${active.label} · ${anchor?.label || code}`);
+    }
     navigate({ pathname: location.pathname, search: location.search, hash: `#${active.id}/${encodeURIComponent(code)}` }, { replace: true });
     // Also return to a selected point when its hash is already the current URL.
     requestAnimationFrame(() => {

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { isAxiosError } from 'axios';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AlertTriangle, ArchiveX, ArrowLeft, Camera, Check, ChevronDown, ChevronUp, CircleMinus, ClipboardCheck, CloudOff, CloudUpload, Download, FileAudio, FileText, History, Loader2, Mic, Paperclip, RotateCcw, Save, Send, ShieldCheck, Square, Trash2, UserRound, XCircle } from 'lucide-react';
 import { Button } from '../../components/ui/ButtonV2';
@@ -10,6 +11,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useInspection, useInspectionMutation } from '../../hooks/useInspecciones';
 import { useInspectionDraftOwnership } from '../../hooks/useInspectionDraftOwnership';
 import { inspeccionService } from '../../services/inspeccion.service';
+import { isOfflineNetworkError } from '../../services/offlineSession';
 import {
   listPendingInspectionEvidence,
   INSPECTION_EVIDENCE_ACCEPT,
@@ -170,6 +172,24 @@ const InspeccionExpedientePage: React.FC = () => {
     document.addEventListener('visibilitychange', onHidden);
     return () => { window.removeEventListener('pagehide', flush); document.removeEventListener('visibilitychange', onHidden); };
   }, [canEdit, canEditReport, staleDraft, storeDraft]);
+  useEffect(() => {
+    const protectUpdate = (event: Event) => {
+      if (!inspection || !(fieldEditAllowed || reportEditAllowed)) return;
+      const update = event as CustomEvent<{ reason?: string }>;
+      const dirty = Boolean(serverFingerprint && currentFingerprint !== serverFingerprint);
+      const pendingFiles = pendingEvidence.length > 0 || uploadingItemId !== null || syncingEvidence;
+      if (!dirty && !pendingFiles && !recording && !storageFailed && !staleDraft && !pendingEvidenceReadFailed && !savingDraft && !changingStage) return;
+      if (dirty && !staleDraft && currentDraftRef.current && canWriteDraft()) storeDraft(currentDraftRef.current);
+      event.preventDefault();
+      update.detail.reason = recording ? 'Detené y guardá el audio antes de actualizar.'
+        : storageFailed ? 'No hay copia local confirmada. Guardá con conexión antes de actualizar.'
+          : pendingFiles || pendingEvidenceReadFailed ? 'Hay capturas por confirmar. Sincronizalas o resolvé su estado antes de actualizar.'
+            : staleDraft ? 'Resolvé el conflicto entre versiones antes de actualizar.'
+              : 'Guardá los cambios en el servidor antes de actualizar.';
+    };
+    window.addEventListener('sitrep:before-app-update', protectUpdate);
+    return () => window.removeEventListener('sitrep:before-app-update', protectUpdate);
+  }, [inspection, fieldEditAllowed, reportEditAllowed, serverFingerprint, currentFingerprint, pendingEvidence.length, uploadingItemId, syncingEvidence, recording, storageFailed, staleDraft, pendingEvidenceReadFailed, savingDraft, changingStage, canWriteDraft, storeDraft]);
 
   const refreshPendingEvidence = useCallback(async () => {
     if (!id || !currentUser?.id) return;
@@ -453,6 +473,13 @@ const InspeccionExpedientePage: React.FC = () => {
   };
 
   if (query.isLoading) return <p className="p-8 text-center text-sm text-neutral-500">Cargando expediente…</p>;
+  if (query.isError) {
+    const status = isAxiosError(query.error) ? query.error.response?.status : undefined;
+    const offlineMissing = isOfflineNetworkError(query.error);
+    const title = status === 404 ? 'Expediente no encontrado' : status === 403 ? 'Sin acceso a este expediente' : offlineMissing ? 'Sin conexión y sin copia local' : 'No se pudo abrir el expediente';
+    const detail = status === 404 ? 'Comprobá el enlace o regresá al listado.' : status === 403 ? 'Tu cuenta no tiene permiso para consultar esta inspección.' : offlineMissing ? 'Para usarlo sin conexión, primero abrí el expediente en este dispositivo mientras tengas red.' : 'No se pudo recuperar la información. El trabajo guardado en este dispositivo no fue eliminado.';
+    return <Card role="alert" className="mx-auto max-w-xl p-6"><h2 className="text-lg font-bold text-neutral-900">{title}</h2><p className="mt-2 text-sm text-neutral-600">{detail}</p><div className="mt-5 flex flex-wrap gap-2"><Button onClick={() => void query.refetch()}>Reintentar</Button><Button variant="outline" onClick={() => navigate((mobile ? '/mobile' : '') + '/inspecciones')}>Volver al listado</Button></div></Card>;
+  }
   if (!inspection) return <Card><p className="font-semibold text-neutral-900">Inspección no encontrada</p></Card>;
   const actor = inspectionActor(inspection);
   const actorRoute = actor ? inspectionActorRoute(inspection.tipoActor, actor.id, mobile) : '';
@@ -545,7 +572,7 @@ const InspeccionExpedientePage: React.FC = () => {
     {(!isOnline || pendingEvidence.length > 0 || storageFailed) && <div role="status" className="flex flex-col gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 sm:flex-row sm:items-center sm:justify-between"><span className="flex items-center gap-2">{isOnline ? <CloudUpload size={18} className="shrink-0" /> : <CloudOff size={18} className="shrink-0" />}{storageFailed ? 'No hay copia local confirmada; no cierres esta pantalla. Guardá en el servidor con conexión.' : !isOnline ? 'Sin conexión · revisá la confirmación de guardado local junto a cada comentario. Las capturas pendientes se muestran por separado.' : pendingEvidence.length + ' capturas pendientes de sincronización'}</span>{isOnline && pendingEvidence.length > 0 && <button type="button" onClick={() => void syncEvidence(true)} disabled={syncingEvidence || !canWriteDraft()} className="min-h-11 w-fit rounded-lg border border-amber-400 bg-white px-3 text-xs font-bold disabled:opacity-60">{syncingEvidence ? 'Sincronizando…' : 'Sincronizar ahora'}</button>}</div>}
     {recording && <div role="status" className="flex items-center justify-between gap-3 rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-800"><span>Grabando audio de campo</span><Button variant="danger" size="sm" onClick={toggleRecording} leftIcon={<Square size={14} />}>Detener grabación</Button></div>}
     {staleDraft && <StaleDraftNotice serverVersion={inspection.version} draftVersion={staleDraft.version} onRecover={recoverStaleDraft} onDiscard={discardStaleDraft} />}
-    <fieldset disabled={savingDraft || syncingEvidence || changingStage} className="min-w-0"><InspectionWorkspace steps={steps} reference={reference} guided={guided} defaultStep={canEditReport && !canEdit ? 'informe-tecnico' : 'resumen'} onBeforeNavigate={flushDraft} saveAction={guided && saveStatus.tone !== 'success' ? <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-2"><DraftSaveFeedback status={saveStatus} /><Button variant="outline" leftIcon={<Save size={16} />} isLoading={savingDraft} disabled={saveDisabled} onClick={() => { void save(); }}>{canEdit ? 'Guardar cambios' : 'Guardar informe'}</Button></div> : undefined} /></fieldset>
+    <fieldset disabled={savingDraft || syncingEvidence || changingStage} className="min-w-0"><InspectionWorkspace steps={steps} reference={reference} guided={guided} defaultStep={canEditReport && !canEdit ? 'informe-tecnico' : 'resumen'} resumeIdentity={currentUser?.id ? { userId: currentUser.id, inspectionId: inspection.id } : undefined} onBeforeNavigate={flushDraft} saveAction={guided && saveStatus.tone !== 'success' ? <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-2"><DraftSaveFeedback status={saveStatus} /><Button variant="outline" leftIcon={<Save size={16} />} isLoading={savingDraft} disabled={saveDisabled} onClick={() => { void save(); }}>{canEdit ? 'Guardar cambios' : 'Guardar informe'}</Button></div> : undefined} /></fieldset>
     <input ref={cameraRef} aria-label="Tomar foto general" type="file" accept={INSPECTION_PHOTO_ACCEPT} capture="environment" className="hidden" onChange={uploadFromInput} />
     <input ref={fileRef} aria-label="Adjuntar archivo general" type="file" accept={INSPECTION_EVIDENCE_ACCEPT} className="hidden" onChange={uploadFromInput} />
   </div>;

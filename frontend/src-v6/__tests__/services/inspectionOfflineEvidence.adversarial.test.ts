@@ -127,11 +127,11 @@ describe('inspection offline evidence queue adversarial invariants', () => {
   });
 
   it.each([
-    ['animada.gif', 'image/gif', new TextEncoder().encode('GIF89a')],
-    ['disfrazada.jpg', 'image/jpeg', new TextEncoder().encode('GIF89a')],
-    ['captura.heic', 'image/heic', new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112, 104, 101, 105, 99])],
-  ])('rejects unsupported content %s before persistence', async (name, type, bytes) => {
-    await expect(queueInspectionEvidence('inspection-1', 'inspector-1', new File([bytes], name, { type }))).rejects.toThrow('Formato no permitido');
+    ['animada.gif', 'image/gif', new TextEncoder().encode('GIF89a'), 'Formato no permitido'],
+    ['disfrazada.jpg', 'image/jpeg', new TextEncoder().encode('GIF89a'), 'Formato no permitido'],
+    ['captura.heic', 'image/heic', new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112, 104, 101, 105, 99]), 'Conservá el archivo original'],
+  ])('rejects unsupported content %s before persistence', async (name, type, bytes, message) => {
+    await expect(queueInspectionEvidence('inspection-1', 'inspector-1', new File([bytes], name, { type }))).rejects.toThrow(message);
     expect(indexedDbMocks.saveOffline).not.toHaveBeenCalled();
   });
 

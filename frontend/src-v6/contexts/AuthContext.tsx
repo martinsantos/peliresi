@@ -340,6 +340,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     ++authGeneration.current;
     setIsLoading(true);
     setAuthError(null);
+    if (currentUser) void clearUserOfflineData(currentUser.id);
     clearTokens();
     clearOfflineSession();
     setOfflineExpiresAt(null);
@@ -354,7 +355,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setIsLoading(false);
     }
-  }, [login, qc]);
+  }, [currentUser, login, qc]);
 
   const getUsersByRole = useCallback((role: UserRole) => {
     return Object.values(DEMO_CREDENTIALS)

@@ -76,6 +76,23 @@ describe('explicit save next to an inspection comment', () => {
     expect(JSON.parse(localStorage.getItem(key) || '{}').items[0].observacion).toBe('Comentario sin señal.');
   });
 
+  it('blocks an app update while a field comment is still unsent', async () => {
+    render(page());
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Observación: Documentación vigente' }), { target: { value: 'Trabajo pendiente antes de actualizar.' } });
+    const event = new CustomEvent<{ reason?: string }>('sitrep:before-app-update', { cancelable: true, detail: {} });
+    window.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(event.detail.reason).toMatch(/Guardá los cambios en el servidor/);
+    expect(JSON.parse(localStorage.getItem(key) || '{}').items[0].observacion).toBe('Trabajo pendiente antes de actualizar.');
+  });
+
+  it('distinguishes an offline uncached case from a nonexistent case', () => {
+    queryMock.mockReturnValue({ data: undefined, isLoading: false, isError: true, error: Object.assign(new Error('Network Error'), { isAxiosError: true, code: 'ERR_NETWORK' }), refetch: vi.fn() });
+    render(page());
+    expect(screen.getByRole('alert')).toHaveTextContent('Sin conexión y sin copia local');
+    expect(screen.queryByText('Inspección no encontrada')).not.toBeInTheDocument();
+  });
+
   it('does not advertise an offline save when local storage is unavailable', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
     render(page());

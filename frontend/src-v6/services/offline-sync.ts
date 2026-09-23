@@ -5,7 +5,7 @@
  * Data is scoped per user (key: `user_{userId}`) for multi-user isolation.
  */
 
-import { saveOffline, getOffline, removeOffline } from './indexeddb';
+import { saveOffline, getOffline, getAllOffline, removeOffline } from './indexeddb';
 import { manifiestoService } from './manifiesto.service';
 import type { Manifiesto } from '../types/models';
 
@@ -55,9 +55,14 @@ export async function getLastSyncTime(userId: string | number): Promise<number |
 }
 
 /**
- * Clear all offline data for a specific user (called on logout).
+ * Remove re-downloadable local copies on logout. Unsent inspection drafts and
+ * evidence remain user-scoped for recovery after the same person signs in again;
+ * silently deleting unpublished field work would be unsafe.
  */
 export async function clearUserOfflineData(userId: string | number): Promise<void> {
   await removeOffline('manifiestos', `user_${userId}`).catch(() => {});
   await removeOffline('catalogos', `user_${userId}`).catch(() => {});
+  const prefix = `${userId}:`;
+  const cases = await getAllOffline<{ id: string }>('inspection_cases').catch(() => []);
+  await Promise.all(cases.filter((entry) => entry.id.startsWith(prefix)).map((entry) => removeOffline('inspection_cases', entry.id).catch(() => {})));
 }
