@@ -311,7 +311,7 @@ const ViajeEnCursoPage: React.FC = () => {
                 style={{ height: '100%', width: '100%', zIndex: 0 }}
                 className="z-0"
               >
-                <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
                 {/* Fit all markers on mount and when fitKey changes */}
                 <FitBounds key={fitKey} points={allPoints} />

@@ -145,7 +145,7 @@ export const ControlMap: React.FC<ControlMapProps> = ({
               style={{ height: '100%', width: '100%', zIndex: 0 }}
               className="z-0"
             >
-              <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
               <ZoomTracker onZoom={onZoomChange} />
               {/* Fly to selected active trip (all points) */}
               {activeTripFlyPoints.length > 0 && (
