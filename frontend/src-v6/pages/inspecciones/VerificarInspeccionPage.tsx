@@ -7,6 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { inspeccionService, type PublicInspectionVerification } from '../../services/inspeccion.service';
 import type { InspectionState } from '../../types/inspection';
 import { InspectionInstitutionalMasthead } from './InspectionInstitutionalMasthead';
+import { isTrainingActNumber } from './inspectionPresentation';
 import InspectionVerificationBlock from './InspectionVerificationBlock';
 
 const STATE_LABELS: Partial<Record<InspectionState, string>> = {
@@ -53,13 +54,14 @@ const VerificarInspeccionPage: React.FC = () => {
     ? authorizedPath.replace(/^\/inspecciones\//, '/mis-inspecciones/')
     : authorizedPath;
   const isHistorical = result.verificacion.estadoVerificacion === 'HISTORICA_AUTENTICA';
-  const verificationStatusLabel = isHistorical ? 'Versión histórica auténtica' : result.verificacion.estadoVerificacion === 'VIGENTE' ? 'Documento vigente' : 'Documento validado';
+  const isTraining = isTrainingActNumber(result.numeroActa);
+  const verificationStatusLabel = isTraining ? 'Registro de capacitación' : isHistorical ? 'Versión histórica auténtica' : result.verificacion.estadoVerificacion === 'VIGENTE' ? 'Documento vigente' : 'Documento validado';
   return (
     <main className="min-h-screen bg-[#F4F7F4] px-3 py-5 sm:px-6 sm:py-10">
       <div className="mx-auto max-w-4xl overflow-hidden rounded-2xl border border-[#DCE7DF] bg-white shadow-[0_12px_32px_rgba(16,33,58,0.07)]">
         <InspectionInstitutionalMasthead inspectionNumber={result.numero || 'Inspección'} actNumber={result.numeroActa} state={state} version={result.verificacion.version} />
         <div className="border-b border-neutral-200 px-4 py-5 sm:px-8 sm:py-7">
-          <div className="flex items-start gap-3"><span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isHistorical ? 'bg-amber-100 text-amber-800' : 'bg-success-100 text-success-800'}`}>{isHistorical ? <AlertTriangle size={22} /> : <CheckCircle2 size={22} />}</span><div><p className={`text-[11px] font-extrabold uppercase tracking-[0.14em] ${isHistorical ? 'text-amber-800' : 'text-success-800'}`}>{verificationStatusLabel}</p><h1 className="mt-1 text-2xl font-extrabold tracking-tight text-[#10213A] sm:text-3xl">Inspección registrada en SITREP</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-600">{isHistorical ? <>El código corresponde auténticamente a la versión <strong>{result.verificacion.version}</strong> emitida por SITREP. La versión actual del expediente es la <strong>{result.verificacion.versionActual ?? 'más reciente'}</strong>.</> : 'El código corresponde a una versión emitida por el Sistema de Trazabilidad de Residuos Peligrosos.'}</p></div></div>
+          <div className="flex items-start gap-3"><span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isHistorical || isTraining ? 'bg-amber-100 text-amber-800' : 'bg-success-100 text-success-800'}`}>{isHistorical || isTraining ? <AlertTriangle size={22} /> : <CheckCircle2 size={22} />}</span><div><p className={`text-[11px] font-extrabold uppercase tracking-[0.14em] ${isHistorical || isTraining ? 'text-amber-800' : 'text-success-800'}`}>{verificationStatusLabel}</p><h1 className="mt-1 text-2xl font-extrabold tracking-tight text-[#10213A] sm:text-3xl">Inspección registrada en SITREP</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-600">{isTraining ? 'Este expediente usa datos sintéticos para capacitación. Su verificación confirma el registro de prueba, no una inspección real.' : isHistorical ? <>El código corresponde auténticamente a la versión <strong>{result.verificacion.version}</strong> emitida por SITREP. La versión actual del expediente es la <strong>{result.verificacion.versionActual ?? 'más reciente'}</strong>.</> : 'El código corresponde a una versión emitida por el Sistema de Trazabilidad de Residuos Peligrosos.'}</p></div></div>
         </div>
         <div className="grid gap-0 border-b border-neutral-200 sm:grid-cols-3 sm:divide-x sm:divide-neutral-200">
           <div className="border-b border-neutral-200 px-4 py-4 sm:border-0 sm:px-6"><p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-neutral-500">Expediente</p><p className="mt-1 break-all font-mono text-sm font-extrabold text-[#10213A]">{result.numero || 'No informado'}</p></div>

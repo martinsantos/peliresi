@@ -54,6 +54,7 @@ coverage/
 .nyc_output/
 test-results*/
 reports/test-runs/
+frontend/playwright-report/
 
 # Temporary files
 tmp/

@@ -50,22 +50,14 @@ try {
 }
 
 // ========================================
-// INSTALL — precache app shell
+// INSTALL — precache app shell as one release. If a required file is missing,
+// do not activate an incomplete worker; the current worker remains in control.
 // ========================================
 self.addEventListener('install', (event) => {
   console.log(`[SW-App] Installing ${CACHE_NAME}...`);
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => {
-        return Promise.all(
-          PRECACHE_URLS.map(url =>
-            cache.add(url).catch(err => {
-              console.warn('[SW-App] Failed to precache:', url, err.message);
-            })
-          )
-        );
-      })
-      .then(() => self.skipWaiting())
+      .then((cache) => cache.addAll(PRECACHE_URLS))
   );
 });
 

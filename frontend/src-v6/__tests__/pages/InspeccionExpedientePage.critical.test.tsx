@@ -7,7 +7,8 @@ import InspeccionExpedientePage from '../../pages/inspecciones/InspeccionExpedie
 const useInspectionMock = vi.hoisted(() => vi.fn());
 const listPendingEvidenceMock = vi.hoisted(() => vi.fn());
 const transitionMock = vi.hoisted(() => vi.fn());
-vi.mock('../../hooks/useInspectionDraftOwnership', () => ({ useInspectionDraftOwnership: () => ({ status: 'owned', canWrite: () => true, retry: vi.fn() }) }));
+const draftOwnershipMock = vi.hoisted(() => vi.fn());
+vi.mock('../../hooks/useInspectionDraftOwnership', () => ({ useInspectionDraftOwnership: () => draftOwnershipMock() }));
 
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ currentUser: { id: 'admin-1', rol: 'ADMIN', nombre: 'Admin' } }),
@@ -146,6 +147,7 @@ describe('InspeccionExpedientePage critical review UX', () => {
     vi.clearAllMocks();
     localStorage.clear();
     listPendingEvidenceMock.mockResolvedValue([]);
+    draftOwnershipMock.mockReturnValue({ status: 'owned', canWrite: () => true, retry: vi.fn() });
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
   });
 
@@ -191,6 +193,17 @@ describe('InspeccionExpedientePage critical review UX', () => {
     expect(approve).toBeDisabled();
     fireEvent.click(approve);
     expect(transitionMock).not.toHaveBeenCalled();
+  });
+
+  it('shows a clear read-only state and hides save and transition actions when another tab owns the draft', async () => {
+    draftOwnershipMock.mockReturnValue({ status: 'blocked', canWrite: () => false, retry: vi.fn() });
+    renderPage(inspectionFixture());
+
+    expect(await screen.findByText('Otra pestaña está editando este expediente')).toBeInTheDocument();
+    expect(screen.getByText(/Solo consulta: otra pestaña tiene el borrador/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /aprobar expediente/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /devolver a campo/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /guardar informe/i })).not.toBeInTheDocument();
   });
 
   it('preserves an older local draft and lets the reviewer recover it explicitly', async () => {
