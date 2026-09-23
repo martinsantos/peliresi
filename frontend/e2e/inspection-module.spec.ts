@@ -217,7 +217,7 @@ test('closed controls state their result in words and deep anchors resume the ex
   const path = (testInfo.project.name === 'mobile' ? '/mobile' : '') + '/inspecciones/inspection-qa';
   await page.goto(path + '#checklist/DOC-02');
   await expect(page.getByRole('heading', { name: 'Checklist regulatorio' })).toBeVisible();
-  const active = page.getByRole('button', { name: /Los registros se encuentran completos y actualizados/ });
+  const active = page.locator('#control-item-4 button[aria-controls="control-detail-item-4"]');
   await expect(active).toHaveAttribute('aria-expanded', 'true');
   await expect(page.getByTestId('inspection-item-status-item-4')).toHaveText('Pendiente');
   await expect(page.getByTestId('inspection-item-status-item-0')).toHaveText('Revisado · Cumple');
@@ -227,7 +227,7 @@ test('closed controls state their result in words and deep anchors resume the ex
   await page.getByRole('button', { name: 'Siguiente pendiente', exact: true }).click();
   await expect(page).toHaveURL(/#checklist\/TRZ-01$/);
   await page.reload();
-  await expect(page.getByRole('button', { name: /La documentación coincide con los registros de SITREP/ })).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('#control-item-7 button[aria-controls="control-detail-item-7"]')).toHaveAttribute('aria-expanded', 'true');
   expect(await page.locator('html').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
 });
 
@@ -361,6 +361,63 @@ test('declared-data index stays compact, searchable and navigates to the exact f
   await expect(step.getByRole('button', { name: 'Ir a un dato declarado: Corriente Y9' })).toBeFocused();
 });
 
+test('authorized treatments stay readable while each Y decision remains independent', async ({ page }, testInfo) => {
+  const state = structuredClone(inspection);
+  state.comparaciones = [
+    { id: 'technology', codigo: 'ACT-TECNOLOGIA', categoria: 'Operación', etiqueta: 'Tecnología declarada', valorDeclarado: 'Tratamiento físico', valorObservado: '', resultado: 'PENDIENTE' as const, observacion: null, evidencias: [] },
+    { id: 'treatments', codigo: 'ACT-TRATAMIENTOS', categoria: 'Operación', etiqueta: 'Tratamientos autorizados', valorDeclarado: 'Y8 · Acopio y almacenamiento temporal de residuos peligrosos\nY9 · Lavado de envases y piezas metálicas contaminadas\nY11 · Filtrado y separación física', valorObservado: '', resultado: 'PENDIENTE' as const, observacion: null, evidencias: [] },
+    ...['Y8', 'Y9', 'Y11'].map((code) => ({ id: `stream-${code}`, codigo: `RES-${code}`, categoria: 'Residuos', etiqueta: `Corriente ${code}`, valorDeclarado: code, valorObservado: '', resultado: 'PENDIENTE' as const, observacion: null, evidencias: [] })),
+  ];
+  await page.route('**/api/inspecciones/inspection-qa', (route) => route.fulfill({ json: { success: true, data: state } }));
+  const prefix = testInfo.project.name === 'mobile' ? '/mobile' : '';
+  await page.goto(`${prefix}/inspecciones/inspection-qa#declaracion/ACT-TRATAMIENTOS`);
+  const treatment = page.locator('[data-inspection-anchor="declaracion/ACT-TRATAMIENTOS"]');
+  await expect(treatment).toContainText('3 tratamientos declarados · Y8, Y9, Y11');
+  await expect(treatment.getByText('Acopio y almacenamiento temporal de residuos peligrosos')).toBeVisible();
+  expect(await page.locator('html').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await page.screenshot({ path: `/tmp/sitrep-treatment-readable-${testInfo.project.name}.png` });
+  await page.getByRole('button', { name: /Residuos\s*0\/3/ }).click();
+  const y8 = page.locator('[data-inspection-anchor="declaracion/RES-Y8"]');
+  const y9 = page.locator('[data-inspection-anchor="declaracion/RES-Y9"]');
+  await y8.getByRole('button', { name: 'Coincide' }).click();
+  await expect(y8.getByRole('button', { name: 'Coincide' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(y9.getByRole('button', { name: 'Coincide' })).toHaveAttribute('aria-pressed', 'false');
+  await y9.getByRole('button', { name: 'Difiere' }).click();
+  await expect(y9.getByRole('textbox', { name: 'Hallazgo: Corriente Y9' })).toBeVisible();
+  await expect(y8.getByRole('textbox', { name: 'Hallazgo: Corriente Y8' })).toHaveCount(0);
+});
+
+test('checklist index is searchable and the save action keeps its position across results', async ({ page }, testInfo) => {
+  const prefix = testInfo.project.name === 'mobile' ? '/mobile' : '';
+  await page.goto(`${prefix}/inspecciones/inspection-qa#checklist/DOC-02`);
+  const trigger = page.getByRole('button', { name: /Ir a un control:/ });
+  await trigger.click();
+  const index = page.getByRole('navigation', { name: 'Índice de controles' });
+  await expect(index.getByRole('button')).toHaveCount(10);
+  await page.getByRole('searchbox', { name: 'Buscar control' }).fill('emergencia');
+  await expect(index.getByRole('button')).toHaveCount(1);
+  await index.getByRole('button', { name: /Señalización y elementos de emergencia/ }).click();
+  await expect(page).toHaveURL(/#checklist\/SEG-02$/);
+  await expect(index).toHaveCount(0);
+  const item = page.locator('[data-inspection-anchor="checklist/SEG-02"]');
+  const save = item.getByTestId('inspection-item-save-item-6').getByRole('button', { name: 'Guardar cambios' });
+  const before = await save.boundingBox();
+  await item.getByRole('button', { name: 'Cumple', exact: true }).click();
+  const compliant = await save.boundingBox();
+  await item.getByRole('button', { name: 'No cumple', exact: true }).click();
+  const nonCompliant = await save.boundingBox();
+  expect(before && compliant && nonCompliant).toBeTruthy();
+  expect(Math.abs(before!.x - compliant!.x)).toBeLessThan(4);
+  expect(Math.abs(compliant!.x - nonCompliant!.x)).toBeLessThan(4);
+  await save.scrollIntoViewIfNeeded();
+  await expect(save).toBeInViewport();
+  expect(await save.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return element.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+  })).toBe(true);
+  await page.screenshot({ path: `/tmp/sitrep-checklist-stable-actions-${testInfo.project.name}.png` });
+});
+
 for (const layout of ['project viewport', '600px web'] as const) {
   test(`comparison index remains reachable after scrolling and restores an exact point at ${layout}`, async ({ page }, testInfo) => {
     test.skip(layout === '600px web' && testInfo.project.name === 'mobile', 'The narrow web layout is covered by the desktop browser project.');
@@ -379,6 +436,7 @@ for (const layout of ['project viewport', '600px web'] as const) {
     await page.goto(`${prefix}/inspecciones/inspection-qa#declaracion`);
     await expect(page).toHaveTitle(/RP Trazar/);
     await expect(page.getByRole('heading', { name: 'Declarado vs. verificado' })).toBeVisible();
+    await page.locator('[data-inspection-anchor="declaracion/DOM-01"]').getByRole('button', { name: 'Ver detalle y evidencia' }).click();
     await page.getByRole('textbox', { name: 'Valor verificado: Domicilio declarado', exact: true }).scrollIntoViewIfNeeded();
     if (compact) await expect(page.getByTestId('inspection-current-point')).toContainText('DOM-01');
     // On desktop the compact step title is intentionally pinned; on narrow
