@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RP Trazar — Manual del Sistema | v2026.13</title>
+<title>RP Trazar — Manual del Sistema | v2026.15</title>
 <meta name="description" content="Manual completo de RP Trazar - Sistema de Trazabilidad de Residuos Peligrosos de Mendoza">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -20,7 +20,7 @@
   </button>
   <img src="screenshots/escudo-mendoza-blanco.webp" alt="Gobierno de Mendoza" style="height:32px;width:auto;margin-right:6px;">
   <div class="logo">RP Trazar <span>Mendoza</span></div>
-  <span class="version">v2026.13</span>
+  <span class="version">v2026.15</span>
   <span class="doc-title">Manual del Sistema de Trazabilidad de Residuos Peligrosos</span>
   <div class="header-actions">
     <button class="header-action-btn" id="btnShare" onclick="shareManual()" aria-label="Compartir" title="Compartir">
@@ -272,7 +272,7 @@
   <div class="print-logo">RP Trazar</div>
   <h1>Manual del Sistema de Trazabilidad<br>de Residuos Peligrosos</h1>
   <p class="print-subtitle">Provincia de Mendoza &mdash; Direccion General de Fiscalizacion Ambiental</p>
-  <p class="print-date">Version 2026.13 &mdash; Septiembre 2026</p>
+  <p class="print-date">Version 2026.15 &mdash; Septiembre 2026</p>
   <div style="margin-top:2rem;text-align:center;">
     <img src="screenshots/escudo-mendoza-color.webp" alt="Gobierno de Mendoza" style="height:72px;width:auto;">
   </div>
@@ -7972,41 +7972,41 @@ bash backend/tests/smoke-test.sh https://rptrazar.mendoza.gov.ar</pre>
   <div>
     <span class="training-eyebrow">Produccion Gobierno</span>
     <h3>Guion operativo para entrenar sin tocar datos reales</h3>
-    <p>Esta seccion complementa la capacitacion presencial y las corridas E2E sobre <code>https://rptrazar.mendoza.gov.ar/app/</code>. El recorrido historico usa manifiestos con prefijo <code>CAP-20260702</code> y marca <code>isDemoData=true</code>; confirmá su presencia y estado antes de iniciar cada ejercicio.</p>
+    <p>Esta seccion complementa la capacitacion presencial y las corridas E2E sobre <code>https://rptrazar.mendoza.gov.ar/app/</code>. El recorrido vigente usa manifiestos con prefijo <code>CAP-20260923</code> y marca <code>isDemoData=true</code>; confirmá su presencia y estado antes de iniciar cada ejercicio.</p>
   </div>
   <div class="training-status">
     <strong>Estado recomendado</strong>
-    <span>Dataset CAP pendiente de revalidacion</span>
-    <small>El 23/09/2026 los nueve codigos CAP respondieron 404 en el verificador publico. No iniciar el recorrido hasta restituir y comprobar el dataset.</small>
+    <span>Dataset CAP-20260923 verificado</span>
+    <small>El 23/09/2026 se comprobaron 9/9 manifiestos sinteticos en Gobierno, tres cuentas escuela con login valido y cero correos CAP en cola. Revalidar antes de cada curso.</small>
   </div>
 </div>
 
 <div class="callout callout-info">
-<strong>Regla principal:</strong> todos los ejercicios deben hacerse con usuarios de capacitacion y manifiestos sinteticos comprobados, nunca con registros reales. El conjunto <code>CAP-20260702-*</code> fue el historico de julio; actualmente no debe darse por disponible. Al finalizar cada bloque, resetear el dataset aislado para volver a la matriz base.
+<strong>Regla principal:</strong> todos los ejercicios deben hacerse con usuarios de capacitacion y manifiestos sinteticos comprobados, nunca con registros reales. Usar exclusivamente el conjunto <code>CAP-20260923-*</code>, marcado <code>isDemoData=true</code>. El conjunto <code>CAP-20260702-*</code> fue historico y no debe darse por disponible. Al finalizar cada bloque, resetear el dataset aislado para volver a la matriz base.
 </div>
 
 <h3 id="cap-dataset">17.1 Dataset CAP</h3>
-<p>La siguiente es la matriz historica de nueve manifiestos. <strong>No demuestra que hoy existan en la base:</strong> verificar cada codigo y la marca <code>isDemoData=true</code> antes de operar.</p>
+<p>La siguiente matriz se creó y verificó en la base Gobierno el 23/09/2026. <strong>Antes de operar:</strong> confirmar otra vez cada codigo, estado y marca <code>isDemoData=true</code>, porque los ejercicios cambian los estados.</p>
 
 <table class="training-table">
 <thead><tr><th>Manifiesto</th><th>Estado base</th><th>Uso recomendado</th></tr></thead>
 <tbody>
-<tr><td><code>CAP-20260702-0001</code></td><td><span class="workflow-state ws-borrador">BORRADOR</span></td><td>Ejercicio completo guiado: firma, retiro, GPS, entrega, recepcion, tratamiento y cierre.</td></tr>
-<tr><td><code>CAP-20260702-0002</code></td><td><span class="workflow-state ws-aprobado">APROBADO</span></td><td>Practica de transportista: tomar viaje y confirmar retiro.</td></tr>
-<tr><td><code>CAP-20260702-0003</code></td><td><span class="workflow-state ws-transito">EN_TRANSITO</span></td><td>Centro de Control, GPS, viaje activo, PDF, QR y smoke seguro.</td></tr>
-<tr><td><code>CAP-20260702-0004</code></td><td><span class="workflow-state ws-entregado">ENTREGADO</span></td><td>Practica operador: recepcion o rechazo controlado.</td></tr>
-<tr><td><code>CAP-20260702-0005</code></td><td><span class="workflow-state ws-recibido">RECIBIDO</span></td><td>Pesaje y registro de tratamiento.</td></tr>
-<tr><td><code>CAP-20260702-0006</code></td><td><span class="workflow-state ws-tratamiento">EN_TRATAMIENTO</span></td><td>Cierre y emision de certificado.</td></tr>
-<tr><td><code>CAP-20260702-0007</code></td><td><span class="workflow-state ws-tratado">TRATADO</span></td><td>Descarga de certificado y consulta historica.</td></tr>
-<tr><td><code>CAP-20260702-0008</code></td><td><span class="workflow-state ws-rechazado">RECHAZADO</span></td><td>Revision de casos rechazados.</td></tr>
-<tr><td><code>CAP-20260702-0009</code></td><td><span class="workflow-state ws-cancelado">CANCELADO</span></td><td>Revision de casos cancelados.</td></tr>
+<tr><td><code>CAP-20260923-0001</code></td><td><span class="workflow-state ws-borrador">BORRADOR</span></td><td>Ejercicio completo guiado: firma, retiro, GPS, entrega, recepcion, tratamiento y cierre.</td></tr>
+<tr><td><code>CAP-20260923-0002</code></td><td><span class="workflow-state ws-aprobado">APROBADO</span></td><td>Practica de transportista: tomar viaje y confirmar retiro.</td></tr>
+<tr><td><code>CAP-20260923-0003</code></td><td><span class="workflow-state ws-transito">EN_TRANSITO</span></td><td>Centro de Control, GPS, viaje activo, PDF, QR y smoke seguro.</td></tr>
+<tr><td><code>CAP-20260923-0004</code></td><td><span class="workflow-state ws-entregado">ENTREGADO</span></td><td>Practica operador: recepcion o rechazo controlado.</td></tr>
+<tr><td><code>CAP-20260923-0005</code></td><td><span class="workflow-state ws-recibido">RECIBIDO</span></td><td>Pesaje y registro de tratamiento.</td></tr>
+<tr><td><code>CAP-20260923-0006</code></td><td><span class="workflow-state ws-tratamiento">EN_TRATAMIENTO</span></td><td>Cierre y emision de certificado.</td></tr>
+<tr><td><code>CAP-20260923-0007</code></td><td><span class="workflow-state ws-tratado">TRATADO</span></td><td>Descarga de certificado y consulta historica.</td></tr>
+<tr><td><code>CAP-20260923-0008</code></td><td><span class="workflow-state ws-rechazado">RECHAZADO</span></td><td>Revision de casos rechazados.</td></tr>
+<tr><td><code>CAP-20260923-0009</code></td><td><span class="workflow-state ws-cancelado">CANCELADO</span></td><td>Revision de casos cancelados.</td></tr>
 </tbody>
 </table>
 
 <div class="summary-grid training-summary">
-  <div class="summary-card"><div class="number">3</div><div class="label">Usuarios escuela historicos: verificar acceso</div></div>
-  <div class="summary-card"><div class="number">9</div><div class="label">Manifiestos del guion: hoy no verificados</div></div>
-  <div class="summary-card"><div class="number">—</div><div class="label">Emails CAP: comprobar en el cierre</div></div>
+  <div class="summary-card"><div class="number">3</div><div class="label">Usuarios escuela: login verificado el 23/09</div></div>
+  <div class="summary-card"><div class="number">9</div><div class="label">Manifiestos sinteticos verificados</div></div>
+  <div class="summary-card"><div class="number">0</div><div class="label">Emails CAP en cola al preparar el curso</div></div>
   <div class="summary-card"><div class="number">—</div><div class="label">Notificaciones CAP: comprobar en el cierre</div></div>
 </div>
 
@@ -8017,14 +8017,14 @@ bash backend/tests/smoke-test.sh https://rptrazar.mendoza.gov.ar</pre>
     <div class="training-step-num">1</div>
     <div>
       <h4>Administrador</h4>
-      <p>Ingresar a la web, abrir Dashboard, Centro de Control, Reportes y Busqueda. Usar el filtro <code>CAP-20260702</code> para no mezclar datos reales con datos escuela.</p>
+      <p>Ingresar a la web, abrir Dashboard, Centro de Control, Reportes y Busqueda. Usar el filtro <code>CAP-20260923</code> para no mezclar datos reales con datos escuela.</p>
     </div>
   </div>
   <div class="training-step">
     <div class="training-step-num">2</div>
     <div>
       <h4>Generador</h4>
-      <p>Entrar por <code>/app/</code>, revisar sus manifiestos y firmar <code>CAP-20260702-0001</code> solo durante el ejercicio guiado.</p>
+      <p>Entrar por <code>/app/</code>, revisar sus manifiestos y firmar <code>CAP-20260923-0001</code> solo durante el ejercicio guiado.</p>
     </div>
   </div>
   <div class="training-step">
@@ -8038,7 +8038,7 @@ bash backend/tests/smoke-test.sh https://rptrazar.mendoza.gov.ar</pre>
     <div class="training-step-num">4</div>
     <div>
       <h4>Operador</h4>
-      <p>Confirmar recepcion, registrar tratamiento, cerrar manifiesto y descargar certificado. Para rechazo, usar <code>CAP-20260702-0004</code> y resetear al finalizar.</p>
+      <p>Confirmar recepcion, registrar tratamiento, cerrar manifiesto y descargar certificado. Para rechazo, usar <code>CAP-20260923-0004</code> y resetear al finalizar.</p>
     </div>
   </div>
   <div class="training-step">
@@ -8083,7 +8083,7 @@ bash scripts/certification/run-certification-suite.sh production-smoke</code></p
 <p>El reset final del dataset CAP se ejecuta desde el runbook interno de QA/DevOps.</p>
 
 <div class="callout callout-warning">
-<strong>No ejecutar en produccion real:</strong> <code>certification</code>, <code>workflow-e2e</code>, <code>data-integrity</code>, <code>stress</code> ni pruebas que creen, aprueben, transporten, reciban, traten, rechacen, cancelen, borren o editen registros fuera de <code>CAP-20260702</code>.
+<strong>No ejecutar en produccion real:</strong> <code>certification</code>, <code>workflow-e2e</code>, <code>data-integrity</code>, <code>stress</code> ni pruebas que creen, aprueben, transporten, reciban, traten, rechacen, cancelen, borren o editen registros fuera de <code>CAP-20260923</code>.
 </div>
 </section>
 
@@ -8096,6 +8096,12 @@ bash scripts/certification/run-certification-suite.sh production-smoke</code></p
 <div class="callout callout-info">
 <strong>Una sola entrada de trabajo:</strong> la inspeccion se crea desde <a href="/inspecciones">Inspecciones en la web</a> o <a href="/app/inspecciones">Inspecciones en la app</a>, con una cuenta habilitada. La ficha del generador, transportista u operador permite consultar las inspecciones relacionadas; no abre un segundo formulario de alta. En la inspeccion, el nombre del actor abre su ficha.
 </div>
+
+<p><strong>Expedientes escuela disponibles en Gobierno (requieren cuenta administrativa habilitada):</strong>
+<a href="https://rptrazar.mendoza.gov.ar/inspecciones/cmuegqikz00023gdmfzbocir2">generador con comentario y foto de prueba</a>,
+<a href="https://rptrazar.mendoza.gov.ar/inspecciones/cmuegqimd000t3gdme27wkpzx">transportista</a> y
+<a href="https://rptrazar.mendoza.gov.ar/inspecciones/cmuegqina001k3gdmolxh5p0k">operador</a>.
+En la app, anteponé <code>/app</code> a la ruta de cada expediente. Todos tienen acta <code>DEMO-INS-…-20260923</code>; no son inspecciones reales.</p>
 
 <p>El inspector asignado prepara y documenta la visita. El formulario presenta un paso a la vez; la guia superior en movil y el indice lateral en escritorio indican el paso y el control actual. Los enlaces a un control concreto conservan el punto de trabajo al volver. <strong>Avanzar de paso no equivale a guardar ni a enviar el expediente.</strong></p>
 
