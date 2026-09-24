@@ -545,14 +545,14 @@ const InspeccionExpedientePage: React.FC = () => {
     : staleDraft
       ? { tone: 'error', message: 'Hay versiones en conflicto. Revisá el borrador anterior antes de guardar.' }
       : currentFingerprint === serverFingerprint
-        ? { tone: 'success', message: 'Sin cambios pendientes en el borrador del servidor.' }
+        ? { tone: 'success', message: 'Guardado en servidor.' }
         : storageFailed
           ? { tone: 'error', message: 'No hay copia local confirmada. No cierres esta pantalla; guardá con conexión.' }
           : saveFailed
-            ? { tone: 'error', message: 'No se confirmó el guardado en el servidor. Reintentá. Los cambios siguen en este dispositivo.' }
+            ? { tone: 'error', message: 'No se confirmó el guardado. Reintentá; la copia local sigue disponible.' }
             : localFingerprint === currentFingerprint
-              ? { tone: 'warning', message: 'Guardado solo en este dispositivo. Pendiente de confirmar en el servidor.' }
-              : { tone: 'warning', message: 'Cambios pendientes de guardar.' };
+              ? { tone: 'warning', message: 'Solo en este dispositivo · falta guardar en servidor.' }
+              : { tone: 'warning', message: 'Falta guardar en servidor.' };
   const saveDisabled = !canWriteDraft() || Boolean(staleDraft) || syncingEvidence || changingStage;
   const draftInspection = { ...inspection, items, comparaciones: comparisons, informeTecnico, datosActa, numeroActa, ubicacion, observaciones };
   const context = <div className="space-y-6">
@@ -679,7 +679,7 @@ function DossierReadinessPanel({ readiness }: { readiness: InspectionDossierRead
 function Meta({ icon, label, value, detail, to }: { icon: React.ReactNode; label: string; value: string; detail?: string; to?: string }) { return <div className="flex gap-3"><span className="mt-0.5 shrink-0 text-neutral-500 [&>svg]:h-[19px] [&>svg]:w-[19px]">{icon}</span><div className="min-w-0"><p className="text-xs text-neutral-500">{label}</p>{to ? <Link to={to} className="rounded-sm font-bold text-[#10213A] transition-colors hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" aria-label={`Abrir ${label.toLowerCase()}: ${value}`}>{value}</Link> : <p className="font-bold text-[#10213A]">{value}</p>}{detail && <p className="text-xs text-neutral-500">{detail}</p>}</div></div>; }
 function DraftSaveFeedback({ status }: { status: DraftSaveStatus }) {
   const color = status.tone === 'error' ? 'text-error-800' : status.tone === 'warning' ? 'text-warning-900' : status.tone === 'success' ? 'text-success-800' : 'text-neutral-600';
-  return <p role="status" aria-live="polite" className={'text-xs leading-relaxed ' + color}>{status.message}</p>;
+  return <p role="status" aria-live="polite" className={'text-sm leading-snug ' + color}>{status.message}</p>;
 }
 
 function ChecklistJumpIndex({ items, activeId, onSelect }: { items: InspectionItem[]; activeId?: string; onSelect: (item: InspectionItem) => void }) {
@@ -779,7 +779,7 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
           const pendingItemEvidence = pendingEvidence.filter((evidence) => evidence.fields.itemId === item.id);
           const showObservation = isFail || Boolean(item.observacion) || itemEvidence.length > 0 || pendingItemEvidence.length > 0 || expandedNotes.includes(item.id);
           const expanded = activeItem === item.id;
-          const inlineSave = editable && <div data-testid={'inspection-item-save-' + item.id} className="mt-3 border-t border-neutral-200 pt-3"><div className="flex min-h-12 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><DraftSaveFeedback status={saveStatus} />{pendingItemEvidence.length > 0 && <p className="mt-1 text-xs font-semibold text-warning-900">{pendingItemEvidence.length} {pendingItemEvidence.length === 1 ? 'foto pendiente' : 'fotos pendientes'} de sincronizar.</p>}</div><Button leftIcon={<Save size={16} />} isLoading={saving} disabled={saveDisabled} onClick={() => { void onSave(); }}>Guardar cambios</Button></div></div>;
+          const inlineSave = editable && <div data-testid={'inspection-item-save-' + item.id} className="mt-3 border-t border-neutral-200 pt-3"><DraftSaveFeedback status={saveStatus} />{pendingItemEvidence.length > 0 && <p className="mt-1 text-sm font-semibold text-warning-900">{pendingItemEvidence.length} {pendingItemEvidence.length === 1 ? 'foto pendiente' : 'fotos pendientes'} de sincronizar.</p>}<div className="mt-2 flex justify-end"><Button className="w-full sm:w-auto" leftIcon={<Save size={16} />} isLoading={saving} disabled={saveDisabled} onClick={() => { void onSave(); }}>Guardar cambios</Button></div></div>;
           return <div key={item.id} id={'control-' + item.id} data-inspection-anchor={'checklist/' + item.codigo} data-result={item.resultado} style={{ scrollMarginTop: 'var(--inspection-anchor-offset, 8rem)' }} className={`border-t border-neutral-100 px-3 py-1 first:border-0 sm:px-5 ${isFail ? 'border-l-[3px] border-l-error-500 bg-error-50/30' : ''}`}>
             <button type="button" aria-expanded={expanded} aria-controls={'control-detail-' + item.id} onClick={() => openControl(expanded ? undefined : item)} className="flex min-h-16 w-full items-start gap-3 rounded-lg py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
               <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${item.resultado === 'CUMPLE' ? 'bg-success-100 text-success-700' : isFail ? 'bg-error-100 text-error-700' : item.resultado === 'NO_APLICA' ? 'bg-neutral-200 text-neutral-700' : 'border border-neutral-300 bg-white text-neutral-600'}`}>{item.resultado === 'CUMPLE' ? <Check size={16} /> : isFail ? <XCircle size={16} /> : item.resultado === 'NO_APLICA' ? <CircleMinus size={16} /> : <span className="text-xs font-bold">{orderedItems.indexOf(item) + 1}</span>}</div>

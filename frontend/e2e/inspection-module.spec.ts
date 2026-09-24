@@ -299,7 +299,7 @@ test('compact step and intermediate group stay pinned; next advances in sequence
   await page.screenshot({ path: `/tmp/sitrep-inspection-compact-${testInfo.project.name}.png` });
 
   const fourth = page.locator('[data-inspection-anchor="declaracion/CAR-04"]');
-  await fourth.getByRole('button', { name: 'Siguiente dato pendiente' }).click();
+  await fourth.getByRole('button', { name: 'Siguiente pendiente' }).click();
   await expect(page).toHaveURL(/#declaracion\/CAR-05$/);
   await expect(page.locator('[data-inspection-anchor="declaracion/CAR-05"]')).toBeInViewport();
 
@@ -385,6 +385,70 @@ test('authorized treatments stay readable while each Y decision remains independ
   await y9.getByRole('button', { name: 'Difiere' }).click();
   await expect(y9.getByRole('textbox', { name: 'Hallazgo: Corriente Y9' })).toBeVisible();
   await expect(y8.getByRole('textbox', { name: 'Hallazgo: Corriente Y8' })).toHaveCount(0);
+});
+
+test('comparison decisions stay in place while the inspector changes the result', async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
+  const state = structuredClone(inspection);
+  state.comparaciones = [{
+    id: 'comparison-stable', codigo: 'RES-Y12', categoria: 'Residuos', etiqueta: 'Corriente Y12',
+    valorDeclarado: 'Y12', valorObservado: '', resultado: 'PENDIENTE', observacion: null, evidencias: [],
+  }];
+  await page.route('**/api/inspecciones/inspection-qa', (route) => route.fulfill({ json: { success: true, data: state } }));
+  const prefix = testInfo.project.name === 'mobile' ? '/mobile' : '';
+  await page.goto(`${prefix}/inspecciones/inspection-qa#declaracion/RES-Y12`);
+  const row = page.locator('[data-inspection-anchor="declaracion/RES-Y12"]');
+  const decisions = row.getByTestId('comparison-decisions-comparison-stable');
+  const save = row.getByRole('button', { name: 'Guardar cambios' });
+  const labels = ['Coincide', 'Difiere', 'No verificado'];
+  const positions = async () => Promise.all(labels.map(async (label) => {
+    const box = await decisions.getByRole('button', { name: label }).boundingBox();
+    expect(box).not.toBeNull();
+    return { x: box!.x, y: box!.y, width: box!.width, height: box!.height };
+  }));
+  await decisions.scrollIntoViewIfNeeded();
+  const before = await positions();
+  const saveBefore = await save.boundingBox();
+  expect(saveBefore).not.toBeNull();
+  for (const label of labels) {
+    await decisions.getByRole('button', { name: label }).click();
+    await expect(decisions.getByRole('button', { name: label })).toHaveAttribute('aria-pressed', 'true');
+    if (label === 'Difiere') await expect(row.getByRole('textbox', { name: 'Hallazgo: Corriente Y12' })).toBeVisible();
+    const after = await positions();
+    after.forEach((box, index) => {
+      expect(Math.abs(box.x - before[index].x)).toBeLessThan(2);
+      expect(Math.abs(box.y - before[index].y)).toBeLessThan(2);
+      expect(Math.abs(box.width - before[index].width)).toBeLessThan(2);
+    });
+    const saveAfter = await save.boundingBox();
+    expect(saveAfter).not.toBeNull();
+    expect(Math.abs(saveAfter!.x - saveBefore!.x)).toBeLessThan(2);
+    expect(await page.locator('html').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  }
+  await expect(row.getByRole('button', { name: 'Datos revisados' })).toHaveCount(0);
+  await save.scrollIntoViewIfNeeded();
+  expect(await save.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return element.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+  })).toBe(true);
+  await page.screenshot({ path: `/tmp/sitrep-comparison-stable-${testInfo.project.name}.png`, fullPage: false });
+  if (testInfo.project.name !== 'mobile') {
+    for (const width of [600, 820]) {
+      await page.setViewportSize({ width, height: 850 });
+      await page.waitForTimeout(350); // Let the site sidebar finish its responsive slide.
+      await decisions.scrollIntoViewIfNeeded();
+      const baseline = await positions();
+      await decisions.getByRole('button', { name: 'Difiere' }).click();
+      await expect(decisions.getByRole('button', { name: 'Difiere' })).toHaveAttribute('aria-pressed', 'true');
+      const changed = await positions();
+      changed.forEach((box, index) => {
+        expect(Math.abs(box.x - baseline[index].x)).toBeLessThan(2);
+        expect(Math.abs(box.y - baseline[index].y)).toBeLessThan(2);
+      });
+      expect(await page.locator('html').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+      await page.screenshot({ path: `/tmp/sitrep-comparison-stable-${width}px.png`, fullPage: false });
+    }
+  }
 });
 
 test('checklist index is searchable and the save action keeps its position across results', async ({ page }, testInfo) => {
@@ -602,6 +666,7 @@ test('saving beside a checklist comment confirms the whole draft and survives a 
   await page.goto(`${prefix}/inspecciones/inspection-qa`);
   await page.getByRole('textbox', { name: 'Número de acta', exact: true }).fill('ACTA-QA-GUARDADA');
   await openSection(page, 'declaracion');
+  await page.locator('[data-inspection-anchor="declaracion/HAB-01"]').getByRole('button', { name: 'Agregar detalle' }).click();
   await page.getByRole('textbox', { name: 'Valor verificado: Número de habilitación', exact: true }).fill('T-000105 verificada en campo');
   await openSection(page, 'checklist');
   const item = await openEmergencyControl(page);
@@ -610,7 +675,7 @@ test('saving beside a checklist comment confirms the whole draft and survives a 
   const itemSave = item.getByTestId('inspection-item-save-item-6');
   await expect(itemSave.getByRole('status')).toContainText(/pendiente|dispositivo/i);
   await itemSave.getByRole('button', { name: 'Guardar cambios', exact: true }).click();
-  await expect(itemSave.getByRole('status')).toHaveText('Sin cambios pendientes en el borrador del servidor.');
+  await expect(itemSave.getByRole('status')).toHaveText('Guardado en servidor.');
   expect(savedPaths).toEqual(['/api/inspecciones/inspection-qa/borrador']);
   expect(state.numeroActa).toBe('ACTA-QA-GUARDADA');
   expect(state.items.find((entry) => entry.id === 'item-6')?.observacion).toBe(observation);
@@ -624,8 +689,9 @@ test('saving beside a checklist comment confirms the whole draft and survives a 
   await page.reload();
   const restoredItem = await openEmergencyControl(page);
   await expect(restoredItem.getByRole('textbox', { name: /Observación:/ })).toHaveValue(observation);
-  await expect(restoredItem.getByTestId('inspection-item-save-item-6').getByRole('status')).toHaveText('Sin cambios pendientes en el borrador del servidor.');
+  await expect(restoredItem.getByTestId('inspection-item-save-item-6').getByRole('status')).toHaveText('Guardado en servidor.');
   await openSection(page, 'declaracion');
+  await page.locator('[data-inspection-anchor="declaracion/HAB-01"]').getByRole('button', { name: 'Ver detalle y evidencia' }).click();
   await expect(page.getByRole('textbox', { name: 'Valor verificado: Número de habilitación', exact: true })).toHaveValue('T-000105 verificada en campo');
   await openSection(page, 'resumen');
   await expect(page.getByRole('textbox', { name: 'Número de acta', exact: true })).toHaveValue('ACTA-QA-GUARDADA');
@@ -642,7 +708,7 @@ test('saving a checklist comment offline reports device-only protection without 
   await item.getByRole('textbox', { name: /Observación:/ }).fill(observation);
   const itemSave = item.getByTestId('inspection-item-save-item-6');
   await itemSave.getByRole('button', { name: 'Guardar cambios', exact: true }).click();
-  await expect(itemSave.getByRole('status')).toHaveText('Guardado solo en este dispositivo. Pendiente de confirmar en el servidor.');
+  await expect(itemSave.getByRole('status')).toHaveText('Solo en este dispositivo · falta guardar en servidor.');
   expect(await page.evaluate(() => {
     const saved = JSON.parse(localStorage.getItem('sitrep_inspection_draft_inspector-qa_inspection-qa') || 'null');
     return saved?.items.find((entry: { id: string }) => entry.id === 'item-6')?.observacion;
