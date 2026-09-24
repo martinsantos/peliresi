@@ -85,6 +85,37 @@ PY
   fi
 }
 
+manual_asset_check() {
+  local html css_ref js_ref data_ref css js data directory directory_css
+  html="$(curl -L -fsS --max-time 10 "$TARGET_URL/manual/" 2>/dev/null || true)"
+  css_ref="$(printf '%s' "$html" | grep -oE 'href="manual\.css\?v=[^"]+"' | head -1 | cut -d '"' -f2)"
+  js_ref="$(printf '%s' "$html" | grep -oE 'src="manual\.js\?v=[^"]+"' | head -1 | cut -d '"' -f2)"
+  data_ref="$(printf '%s' "$html" | grep -oE 'src="help-data\.js\?v=[^"]+"' | head -1 | cut -d '"' -f2)"
+
+  if [ -z "$css_ref" ] || [ -z "$js_ref" ] || [ -z "$data_ref" ]; then
+    fail "help center uses versioned CSS, JS and guide data"
+    return
+  fi
+  pass "help center uses versioned CSS, JS and guide data"
+
+  css="$(curl -L -fsS --max-time 10 "$TARGET_URL/manual/$css_ref" 2>/dev/null || true)"
+  js="$(curl -L -fsS --max-time 10 "$TARGET_URL/manual/$js_ref" 2>/dev/null || true)"
+  data="$(curl -L -fsS --max-time 10 "$TARGET_URL/manual/$data_ref" 2>/dev/null || true)"
+
+  if [[ "$html" == *'id="profileList"'* ]] && [[ "$css" == *'.profile-list'* ]] && [[ "$js" == *'profileList'* ]] && [[ "$data" == *'profiles:'* ]] && [[ "$data" == *'steps:'* ]]; then
+    pass "role-based help center has its published styles and numbered guides"
+  else
+    fail "role-based help center is missing styles, behavior or guides"
+  fi
+  directory="$(curl -L -fsS --max-time 10 "$TARGET_URL/manual/directorio.html" 2>/dev/null || true)"
+  directory_css="$(curl -L -fsS --max-time 10 "$TARGET_URL/manual/directorio.css?v=2026.15.1" 2>/dev/null || true)"
+  if [[ "$directory" == *'id="roleTabs"'* ]] && [[ "$directory" == *'id="inspecciones"'* ]] && [[ "$directory_css" == *'.training-hero'* ]]; then
+    pass "updated technical directory and inspection guide remain available"
+  else
+    fail "updated technical directory or inspection guide is incomplete"
+  fi
+}
+
 echo "SITREP frontend surface checks"
 echo "Target: $TARGET_URL"
 
@@ -101,6 +132,7 @@ json_manifest_check "/manifest-app.json" "app manifest is valid JSON with icons"
 json_assetlinks_check
 body_contains "/" "<title|id=\"root\"|SITREP" "landing page has app shell markers"
 body_contains "/manual/" "SITREP|Manual|manual" "manual has expected content"
+manual_asset_check
 
 if [ "$FAIL" -gt 0 ]; then
   echo "RESULT: FAIL ($FAIL)"
