@@ -3,25 +3,34 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RP Trazar — Manual del Sistema | v2026.15</title>
-<meta name="description" content="Manual completo de RP Trazar - Sistema de Trazabilidad de Residuos Peligrosos de Mendoza">
+<title>SITREP Mendoza — Directorio completo del manual</title>
+<meta name="description" content="Directorio completo del manual SITREP Mendoza: temas, recorridos, capturas y referencia de inspecciones.">
+<meta name="theme-color" content="#1B5E3C">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
 <link rel="icon" href="screenshots/escudo-mendoza-color.webp" type="image/webp">
-<link rel="stylesheet" href="directorio.css?v=2026.15.1">
+<link rel="stylesheet" href="directorio.css?v=2026.15.2">
 </head>
-<body>
+<body data-page="directory">
+
+<a class="skip-link" href="#mainContent">Saltar al contenido</a>
 
 <!-- Header -->
 <header class="site-header">
-  <button class="hamburger" id="hamburgerBtn" aria-label="Menu">
+  <button class="hamburger" id="hamburgerBtn" aria-label="Abrir índice del manual" aria-controls="sidebar" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
-  <img src="screenshots/escudo-mendoza-blanco.webp" alt="Gobierno de Mendoza" style="height:32px;width:auto;margin-right:6px;">
-  <div class="logo">RP Trazar <span>Mendoza</span></div>
-  <span class="version">v2026.15</span>
-  <span class="doc-title">Manual del Sistema de Trazabilidad de Residuos Peligrosos</span>
+  <a class="directory-brand" href="./" aria-label="SITREP Mendoza, Centro de Ayuda">
+    <img src="screenshots/escudo-mendoza-blanco.webp" width="42" height="42" alt="">
+    <span class="directory-brand-name">SITREP <strong>Mendoza</strong></span>
+    <span class="directory-brand-divider" aria-hidden="true"></span>
+    <span class="directory-brand-product">Centro de Ayuda</span>
+  </a>
+  <nav class="directory-header-nav" aria-label="Recorridos del manual">
+    <a href="./" class="directory-header-link">Guía por roles</a>
+    <a href="directorio.html" class="directory-header-link current" aria-current="page">Directorio completo</a>
+  </nav>
   <div class="header-actions">
     <button class="header-action-btn" id="btnShare" onclick="shareManual()" aria-label="Compartir" title="Compartir">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
@@ -29,7 +38,6 @@
     <button class="header-action-btn" id="btnPdf" onclick="exportPDF()" aria-label="Descargar PDF" title="Descargar PDF">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/></svg>
     </button>
-    <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" aria-label="Cambiar tema">&#127769;</button>
   </div>
 </header>
 
@@ -40,8 +48,10 @@
 
 <!-- Sidebar -->
 <nav class="sidebar" id="sidebar">
+  <div class="directory-sidebar-heading">Directorio completo <span>Índice de temas</span></div>
   <div class="sidebar-search">
-    <input type="text" id="searchInput" placeholder="Buscar en el manual...">
+    <label class="sr-only" for="searchInput">Buscar en el directorio</label>
+    <input type="search" id="searchInput" placeholder="Buscar un tema...">
   </div>
 
   <div class="nav-section-title active-parent" onclick="toggleNavGroup(this)">0. INSTALACION</div>
@@ -231,19 +241,16 @@
     <a href="#devops-perf" class="nav-link level-2" data-nav-role="admin">15.10 Performance</a>
     <a href="#devops-mejoras" class="nav-link level-2" data-nav-role="admin">15.11 Mejoras Propuestas</a>
     <a href="#devops-instalacion" class="nav-link level-2" data-nav-role="admin">15.12 Operacion restringida</a>
-    <a href="#inst-troubleshooting" class="nav-link level-3" data-nav-role="admin">Troubleshooting</a>
-    <a href="#inst-restauracion" class="nav-link level-3" data-nav-role="admin">Restauracion</a>
-
     <a href="#changelog-v2026-10" class="nav-link" data-nav-role="all">16. Novedades v2026.11</a>
-    <a href="#changelog-v2026-10" class="nav-link level-2" data-nav-role="all">16.1-16.4 UI/UX</a>
-    <a href="#changelog-v2026-10" class="nav-link level-2" data-nav-role="all">16.5 Mobile Responsive</a>
-    <a href="#changelog-v2026-10" class="nav-link level-2" data-nav-role="all">16.6 Assets y Screenshots</a>
-    <a href="#changelog-v2026-10" class="nav-link level-2" data-nav-role="all">16.7 Performance</a>
-    <a href="#changelog-v2026-10" class="nav-link level-2" data-nav-role="all">16.8 Testing Integral</a>
-    <a href="#changelog-v2026-10" class="nav-link level-2" data-nav-role="all">16.9 Date Validation</a>
-    <a href="#changelog-v2026-10" class="nav-link level-2" data-nav-role="all">16.10 Charts</a>
-    <a href="#changelog-v2026-10" class="nav-link level-2" data-nav-role="all">16.11 PWA Routing</a>
-    <a href="#changelog-v2026-10" class="nav-link level-2" data-nav-role="all">16.12 Operaciones</a>
+    <a href="#changelog-ui" class="nav-link level-2" data-nav-role="all">16.1-16.4 UI/UX</a>
+    <a href="#changelog-mobile" class="nav-link level-2" data-nav-role="all">16.5 Mobile Responsive</a>
+    <a href="#changelog-assets" class="nav-link level-2" data-nav-role="all">16.6 Assets y Screenshots</a>
+    <a href="#changelog-performance" class="nav-link level-2" data-nav-role="all">16.7 Performance</a>
+    <a href="#changelog-testing" class="nav-link level-2" data-nav-role="all">16.8 Testing Integral</a>
+    <a href="#changelog-validation" class="nav-link level-2" data-nav-role="all">16.9 Date Validation</a>
+    <a href="#changelog-charts" class="nav-link level-2" data-nav-role="all">16.10 Charts</a>
+    <a href="#changelog-pwa" class="nav-link level-2" data-nav-role="all">16.11 PWA Routing</a>
+    <a href="#changelog-operations" class="nav-link level-2" data-nav-role="all">16.12 Operaciones</a>
   </div>
 
   <div class="nav-section-title" onclick="toggleNavGroup(this)">17. Capacitacion y QA</div>
@@ -278,60 +285,20 @@
   </div>
 </div>
 
-<!-- Hero Section — Apple Keynote Style -->
+<!-- La misma entrada visual que el Centro de Ayuda; el índice técnico conserva sus anclas. -->
 <section class="hero" id="hero">
-  <div class="hero-bg"></div>
   <div class="hero-content">
     <div class="hero-text">
-      <h1 class="hero-title">
-        <span class="hero-logo">RP Trazar</span>
-        <span class="hero-accent">Mendoza</span>
-      </h1>
-      <p class="hero-subtitle">Sistema de Trazabilidad de Residuos Peligrosos</p>
-      <p class="hero-tagline">Capacitacion guiada. Trazabilidad completa. Control en tiempo real.</p>
-      <div class="hero-badges">
-        <span class="hero-badge">Dataset CAP</span>
-        <span class="hero-badge">Ley 24.051</span>
-        <span class="hero-badge">GPS en Vivo</span>
-        <span class="hero-badge">PWA Mobile</span>
-      </div>
-    </div>
-    <div class="hero-devices">
-      <div class="device-desktop">
-        <div class="device-frame">
-          <div class="device-notch">
-            <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
-          </div>
-          <div class="device-screen">
-            <img class="hero-slide active" src="screenshots/desktop/04_dashboard_admin.png" alt="Dashboard">
-            <img class="hero-slide" src="screenshots/desktop/05_centro_control.png" alt="Centro de Control">
-            <img class="hero-slide" src="screenshots/desktop/07_manifiestos_lista.png" alt="Manifiestos">
-            <img class="hero-slide" src="screenshots/desktop/17_reportes_manifiestos.png" alt="Reportes">
-            <img class="hero-slide" src="screenshots/desktop/19_reportes_departamentos_mapa.png" alt="Mapa Departamentos">
-            <img class="hero-slide" src="screenshots/desktop/23_admin_usuarios.png" alt="Usuarios">
-            <img class="hero-slide" src="screenshots/desktop/25_busqueda_global_cmd_k.png" alt="Busqueda Global">
-            <img class="hero-slide" src="screenshots/desktop/36_carga_masiva.png" alt="Carga Masiva">
-            <div class="hero-cursor" id="heroCursor"></div>
-          </div>
-        </div>
-      </div>
-      <div class="device-mobile">
-        <div class="device-frame-mobile">
-          <div class="device-island"></div>
-          <div class="device-screen-mobile">
-            <img class="hero-slide-mobile active" src="screenshots/mobile/M02_dashboard_admin_mobile.png" alt="Dashboard Mobile">
-            <img class="hero-slide-mobile" src="screenshots/mobile/M10_dashboard_transportista_mobile.png" alt="Transportista Mobile">
-            <img class="hero-slide-mobile" src="screenshots/mobile/M15_escaner_qr_mobile.png" alt="QR Scanner">
-            <img class="hero-slide-mobile" src="screenshots/mobile/M04_reportes_mobile.png" alt="Reportes Mobile">
-          </div>
-        </div>
+      <p class="directory-eyebrow">Todos los temas · un solo manual</p>
+      <h1 class="hero-title">Directorio completo</h1>
+      <p class="hero-subtitle">Encontrá cada procedimiento, módulo y captura. Para aprender por tareas, volvé a la guía por roles.</p>
+      <div class="directory-hero-actions">
+        <a href="#roleTabs" class="directory-button directory-button-primary">Explorar temas <span aria-hidden="true">↓</span></a>
+        <a href="./" class="directory-button directory-button-secondary">Guía por roles</a>
+        <a href="#inspecciones" class="directory-quiet-link">Ir a Inspecciones <span aria-hidden="true">→</span></a>
       </div>
     </div>
   </div>
-  <a href="#roleTabs" class="hero-scroll-cta">
-    <span>Explorar Manual</span>
-    <div class="scroll-arrow"></div>
-  </a>
 </section>
 
 <!-- Role Filter Tabs -->
@@ -7542,15 +7509,18 @@ find $BACKUP_DIR -name "env-*.bak" -mtime +30 -delete
 
 <!-- ============================================================ -->
 <!-- SECTION 15.12: OPERACION RESTRINGIDA -->
-<h3 id="devops-instalacion">15.12 Operacion restringida</h3>
+<section id="devops-instalacion" data-role="admin">
+<h2>15.12 Operacion restringida</h2>
 <div class="callout callout-warning">
 <strong>Contenido restringido:</strong> la guia detallada de instalacion, despliegue, backups, restauracion y comandos de servidor fue retirada del manual publico. Ese material contiene procedimientos operativos que deben circular solo por canales internos de DevOps/Gobierno.
 </div>
 <p>Para capacitacion, usar las secciones funcionales del manual y el apartado <a href="#capacitacion-qa">17. Capacitacion y QA Controlada</a>. Para operar servidores, usar los runbooks internos del repositorio y credenciales entregadas por canal seguro.</p>
+</section>
 
+<section id="changelog-v2026-10" data-role="all">
 <h2>16. Novedades v2026.10 — v2026.11 (29 marzo - 9 abril 2026)</h2>
 
-<h3>16.1 Manifiestos — Infinite Scroll con Sticky Headers</h3>
+<h3 id="changelog-ui">16.1 Manifiestos — Infinite Scroll con Sticky Headers</h3>
 <p>El listado de manifiestos (<code>/manifiestos</code>) fue rediseñado completamente:</p>
 <ul>
 <li><strong>Infinite scroll:</strong> ya no hay botones Anterior/Siguiente. Al scrollear hacia abajo, las siguientes paginas se cargan automaticamente via IntersectionObserver.</li>
@@ -7597,7 +7567,7 @@ find $BACKUP_DIR -name "env-*.bak" -mtime +30 -delete
 <li><strong><code>tipoResiduoId</code></strong>: nuevo filtro en <code>GET /api/manifiestos</code> — filtra manifiestos que contengan un tipo de residuo especifico (via <code>residuos.some</code>).</li>
 </ul>
 
-<h3>16.5 Mobile Responsive — Correccion Integral</h3>
+<h3 id="changelog-mobile">16.5 Mobile Responsive — Correccion Integral</h3>
 <p>Revision completa de todas las vistas en viewport mobile (375px). Correcciones aplicadas:</p>
 <ul>
 <li><strong>Botones Imprimir/CSV/PDF:</strong> ocultos en mobile (<code>hidden sm:flex</code>) en 13 paginas. Ocupaban todo el ancho y empujaban el contenido fuera de pantalla. Los botones de accion principal (Nuevo, Nueva Autorizacion) permanecen visibles.</li>
@@ -7607,14 +7577,14 @@ find $BACKUP_DIR -name "env-*.bak" -mtime +30 -delete
 <li><strong>Selector de ordenamiento mobile:</strong> agregado dentro del panel de filtros expandible — dropdown (Fecha/Numero/Estado/Generador/Operador) + boton Asc/Desc. En desktop el sort se controla via click en headers de columna.</li>
 </ul>
 
-<h3>16.6 Assets y Screenshots del Manual</h3>
+<h3 id="changelog-assets">16.6 Assets y Screenshots del Manual</h3>
 <ul>
 <li><strong>Animaciones WebP:</strong> 8 archivos de animacion para la pagina de Ayuda (<code>/ayuda</code>) desplegados en <code>/manual/screenshots/animations/</code>. Previamente faltaban en produccion y mostraban imagen rota.</li>
 <li><strong>Screenshots del manual:</strong> 135 capturas desktop + 48 capturas mobile desplegadas en <code>/manual/screenshots/desktop/</code> y <code>/manual/screenshots/mobile/</code>. El manual HTML referencia 124 imagenes — todas verificadas 200 OK.</li>
 <li><strong>Total de assets verificados:</strong> 201 imagenes/iconos/animaciones — 100% resolviendo correctamente en produccion.</li>
 </ul>
 
-<h3>16.7 Optimizacion de Performance — Backend y Bundle</h3>
+<h3 id="changelog-performance">16.7 Optimizacion de Performance — Backend y Bundle</h3>
 <p>Refactoring profundo de los puntos calientes del backend y reduccion del bundle inicial.</p>
 
 <h4>Backend hot paths</h4>
@@ -7658,7 +7628,7 @@ find $BACKUP_DIR -name "env-*.bak" -mtime +30 -delete
 <!-- ============================================================
      16.8 — Testing Integral
      ============================================================ -->
-<h3>16.8 Testing Integral — Vitest + Playwright + Stress</h3>
+<h3 id="changelog-testing">16.8 Testing Integral — Vitest + Playwright + Stress</h3>
 <p>Infraestructura de testing creada desde cero. Pre-2026.10 el sistema solo tenia tests bash/curl. Ahora hay tres capas:</p>
 
 <h4>Capa 1 — Unit tests (Vitest)</h4>
@@ -7727,7 +7697,7 @@ PLAYWRIGHT_BASE_URL=https://rptrazar.mendoza.gov.ar \
 <!-- ============================================================
      16.9 — Date Validation y Error Handling
      ============================================================ -->
-<h3>16.9 Date Validation y Error Handling — Eliminacion de 500s</h3>
+<h3 id="changelog-validation">16.9 Date Validation y Error Handling — Eliminacion de 500s</h3>
 <p>Auditoria F1-F6 (abril 2026) detecto que varios endpoints devolvian <strong>500 Internal Server Error</strong> cuando recibian fechas invalidas como query params:</p>
 <pre>GET /api/reportes/manifiestos?fechaInicio=BAD&amp;fechaFin=ALSOBAD
 &rarr; 500 (causado por <code>new Date('BAD')</code> &rarr; Invalid Date &rarr; Prisma rechaza)</pre>
@@ -7797,7 +7767,7 @@ if (dateFilter) where.createdAt = dateFilter;</pre>
 <!-- ============================================================
      16.10 — Charts: Pie a Bar Horizontal
      ============================================================ -->
-<h3>16.10 Charts — De Pie/Donut a Horizontal Bar</h3>
+<h3 id="changelog-charts">16.10 Charts — De Pie/Donut a Horizontal Bar</h3>
 <p>Los pie/donut charts no escalan bien con multiples categorias y labels largos. En la pestana <strong>Reportes &rarr; Manifiestos</strong>, el donut "Distribucion por Tipo de Residuo" mostraba 18 categorias con labels que se solapaban entre si y con el grafico.</p>
 
 <h4>Solucion</h4>
@@ -7838,7 +7808,7 @@ if (dateFilter) where.createdAt = dateFilter;</pre>
 <!-- ============================================================
      16.11 — PWA Routing Canonico
      ============================================================ -->
-<h3>16.11 PWA Routing — Paths Canonicos /admin/actores/*</h3>
+<h3 id="changelog-pwa">16.11 PWA Routing — Paths Canonicos /admin/actores/*</h3>
 <p>Bug reportado: al visitar <code>/app/admin/actores/transportistas/:id</code> en la PWA, aparecia la pagina <strong>404 Pagina no encontrada</strong>.</p>
 
 <h4>Causa raiz</h4>
@@ -7882,7 +7852,7 @@ if (dateFilter) where.createdAt = dateFilter;</pre>
 <!-- ============================================================
      16.12 — Operaciones e Incident Recovery
      ============================================================ -->
-<h3>16.12 Operaciones — Incident Recovery + Migration Runbook</h3>
+<h3 id="changelog-operations">16.12 Operaciones — Incident Recovery + Migration Runbook</h3>
 
 <h4>Incidente del 8 abril 2026 — OpenLiteSpeed conflict</h4>
 <p>Tras un reinicio del VPS, el sitio dejo de responder. SSH entraba lento (banner timeout), HTTPS quedaba colgado tras el handshake.</p>
@@ -8147,6 +8117,6 @@ En la app, anteponé <code>/app</code> a la ruta de cada expediente. Todos tiene
 
 <button class="back-to-top" id="backToTop" aria-label="Volver arriba">&uarr;</button>
 
-<script src="directorio.js?v=2026.15.1"></script>
+<script src="directorio.js?v=2026.15.2"></script>
 </body>
 </html>
