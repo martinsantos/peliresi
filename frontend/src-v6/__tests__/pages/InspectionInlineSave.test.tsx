@@ -55,12 +55,12 @@ describe('explicit save next to an inspection comment', () => {
   it('saves the entire draft atomically and confirms only after the server responds', async () => {
     render(page());
     fireEvent.change(await screen.findByRole('textbox', { name: 'Observación: Documentación vigente' }), { target: { value: 'Falta habilitación vigente.' } });
-    expect(inline().getByText('Cambios pendientes de guardar.')).toBeInTheDocument();
+    expect(inline().getByText('Falta guardar en servidor.')).toBeInTheDocument();
     expect(inspeccionService.saveDraft).not.toHaveBeenCalled();
     fireEvent.click(inline().getByRole('button', { name: 'Guardar cambios' }));
     await waitFor(() => expect(inspeccionService.saveDraft).toHaveBeenCalledWith('inspection-1', expect.objectContaining({ version: 1, items: [{ id: 'item-1', resultado: 'NO_CUMPLE', observacion: 'Falta habilitación vigente.' }], comparaciones: [] })));
     expect(inspeccionService.saveDraft).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(inline().getByText('Sin cambios pendientes en el borrador del servidor.')).toBeInTheDocument());
+    await waitFor(() => expect(inline().getByText('Guardado en servidor.')).toBeInTheDocument());
     expect(toast.success).toHaveBeenCalledWith('Cambios confirmados en el servidor', expect.stringContaining('borrador completo'));
     expect(JSON.parse(localStorage.getItem(key) || '{}')).toMatchObject({ version: 2, items: [{ observacion: 'Falta habilitación vigente.' }] });
   });
@@ -70,7 +70,7 @@ describe('explicit save next to an inspection comment', () => {
     render(page());
     fireEvent.change(await screen.findByRole('textbox', { name: 'Observación: Documentación vigente' }), { target: { value: 'Comentario sin señal.' } });
     fireEvent.click(inline().getByRole('button', { name: 'Guardar cambios' }));
-    expect(inline().getByText(/Guardado solo en este dispositivo/)).toBeInTheDocument();
+    expect(inline().getByText(/Solo en este dispositivo/)).toBeInTheDocument();
     expect(inspeccionService.saveDraft).not.toHaveBeenCalled();
     expect(toast.success).not.toHaveBeenCalled();
     expect(JSON.parse(localStorage.getItem(key) || '{}').items[0].observacion).toBe('Comentario sin señal.');
@@ -111,7 +111,7 @@ describe('explicit save next to an inspection comment', () => {
     render(page());
     fireEvent.change(await screen.findByRole('textbox', { name: 'Observación: Documentación vigente' }), { target: { value: 'Comentario conservado.' } });
     fireEvent.click(inline().getByRole('button', { name: 'Guardar cambios' }));
-    await waitFor(() => expect(inline().getByText(/No se confirmó el guardado en el servidor/)).toBeInTheDocument());
+    await waitFor(() => expect(inline().getByText(/No se confirmó el guardado/)).toBeInTheDocument());
     expect(editor()).toHaveValue('Comentario conservado.');
     expect(toast.success).not.toHaveBeenCalled();
     expect(JSON.parse(localStorage.getItem(key) || '{}').items[0].observacion).toBe('Comentario conservado.');
@@ -154,8 +154,8 @@ describe('explicit save next to an inspection comment', () => {
     expect(editor()).toHaveValue('Trabajo posterior.');
     await act(async () => resolveSave({ version: 4 } as Inspection));
     expect(editor()).toHaveValue('Trabajo posterior.');
-    expect(inline().queryByText('Sin cambios pendientes en el borrador del servidor.')).not.toBeInTheDocument();
-    expect(inline().getByText(/Guardado solo en este dispositivo/)).toBeInTheDocument();
+    expect(inline().queryByText('Guardado en servidor.')).not.toBeInTheDocument();
+    expect(inline().getByText(/Solo en este dispositivo/)).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem(key) || '{}')).toMatchObject({ version: 4, items: [{ observacion: 'Trabajo posterior.' }] });
   });
 });

@@ -13,6 +13,7 @@ describe('InspectionComparisonPanel', () => {
     }]} /></MemoryRouter>);
 
     expect(screen.getByText('Declarado vs. verificado')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Ver detalle y evidencia' }));
     expect(screen.getAllByText('T-000005')).toHaveLength(2);
     expect(screen.getByDisplayValue('T-000008')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Difiere' })).toHaveAttribute('aria-pressed', 'false');
@@ -49,7 +50,7 @@ describe('InspectionComparisonPanel', () => {
     render(<MemoryRouter initialEntries={['/inspecciones/qa#declaracion/ACT-1']}><Hash /><InspectionComparisonPanel inspectionId="inspection-1" editable onChange={vi.fn()} onEvidence={vi.fn()} comparisons={comparisons} /></MemoryRouter>);
     expect(screen.getByRole('textbox', { name: 'Valor verificado: Dato 1' })).toBeVisible();
     expect(screen.queryByRole('textbox', { name: 'Valor verificado: Dato 0' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Siguiente dato pendiente' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente pendiente' }));
     expect(screen.getByTestId('hash')).toHaveTextContent('#declaracion/ACT-0');
     expect(screen.getByRole('textbox', { name: 'Valor verificado: Dato 0' })).toBeVisible();
   });
@@ -64,7 +65,7 @@ describe('InspectionComparisonPanel', () => {
     render(<MemoryRouter initialEntries={['/inspecciones/qa#declaracion/A-01']}><Hash /><InspectionComparisonPanel inspectionId="inspection-1" editable onChange={vi.fn()} onEvidence={vi.fn()} comparisons={comparisons} /></MemoryRouter>);
     const first = document.querySelector('[data-inspection-anchor="declaracion/A-01"]')!;
     expect(first).toHaveTextContent('1/3');
-    fireEvent.click(within(first as HTMLElement).getByRole('button', { name: 'Siguiente dato pendiente' }));
+    fireEvent.click(within(first as HTMLElement).getByRole('button', { name: 'Siguiente pendiente' }));
     expect(screen.getByTestId('hash')).toHaveTextContent('#declaracion/A-02');
     expect(screen.getByRole('textbox', { name: 'Valor verificado: Segundo documento' })).toBeVisible();
   });
@@ -95,5 +96,28 @@ describe('InspectionComparisonPanel', () => {
     expect(within(row).getByText('Y8')).toBeVisible();
     expect(within(row).getByText('Y9')).toBeVisible();
     expect(within(row).getByText('Filtrado autorizado')).toBeVisible();
+  });
+
+  it('summarizes a long treatment declaration before revealing all 22 details', () => {
+    const values = Array.from({ length: 22 }, (_, index) => `Y${index + 1} · Tratamiento ${index + 1}`);
+    render(<MemoryRouter><InspectionComparisonPanel inspectionId="inspection-1" editable onChange={vi.fn()} onEvidence={vi.fn()} comparisons={[{
+      id: 'treatments', codigo: 'ACT-TRATAMIENTOS', categoria: 'Operación', etiqueta: 'Tratamientos autorizados',
+      origen: 'operador.tratamientos', valorDeclarado: values.join('\n'), valorObservado: null,
+      resultado: 'PENDIENTE', observacion: null, orden: 1, evidencias: [],
+    }]} /></MemoryRouter>);
+    const row = document.querySelector('[data-inspection-anchor="declaracion/ACT-TRATAMIENTOS"]') as HTMLElement;
+    expect(row).toHaveTextContent('22 tratamientos declarados · Y1, Y2, Y3 y 19 más');
+    expect(row).not.toHaveTextContent('Tratamiento 22');
+    fireEvent.click(within(row).getByRole('button', { name: 'Agregar detalle' }));
+    expect(row).toHaveTextContent('Tratamiento 22');
+  });
+
+  it('asks for the reason instead of an observed value when a field could not be verified', () => {
+    render(<MemoryRouter initialEntries={['/inspecciones/qa#declaracion/RES-Y12']}><InspectionComparisonPanel inspectionId="inspection-1" editable onChange={vi.fn()} onEvidence={vi.fn()} comparisons={[{
+      id: 'stream', codigo: 'RES-Y12', categoria: 'Residuos', etiqueta: 'Corriente Y12',
+      origen: 'operador.corrientes', valorDeclarado: 'Y12', valorObservado: null,
+      resultado: 'NO_VERIFICADO', observacion: null, orden: 1, evidencias: [],
+    }]} /></MemoryRouter>);
+    expect(screen.getByRole('textbox', { name: 'Motivo de no verificación: Corriente Y12' })).toHaveAttribute('placeholder', 'Contá por qué no pudiste verificarlo');
   });
 });
