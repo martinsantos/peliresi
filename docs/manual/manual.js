@@ -1,466 +1,407 @@
-// ── v2026.6: Auth guard — solo usuarios autenticados ──
-(function checkAuth() {
-  var token = localStorage.getItem('sitrep_access_token');
-  if (token) return;
+(function () {
+  'use strict';
 
-  var wall = document.createElement('div');
-  wall.className = 'auth-wall';
+  var data = window.SITREP_HELP || { profiles: [], guides: [] };
+  var page = document.body.getAttribute('data-page');
+  var params = new URLSearchParams(window.location.search);
+  var storageKey = 'sitrep_help_progress_v1';
 
-  var logo = document.createElement('div');
-  logo.className = 'auth-logo';
-  logo.textContent = 'RP Trazar ';
-  var logoSpan = document.createElement('span');
-  logoSpan.textContent = 'Mendoza';
-  logo.appendChild(logoSpan);
+  function escapeHTML(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
 
-  var p1 = document.createElement('p');
-  p1.textContent = 'Este manual es exclusivo para usuarios registrados de RP Trazar.';
+  function slugify(value) {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+  }
 
-  var p2 = document.createElement('p');
-  p2.textContent = 'Inicia sesion en la app para acceder a la documentacion completa y al guion de capacitacion.';
+  function profileById(id) {
+    return data.profiles.find(function (profile) { return profile.id === id; });
+  }
 
-  var btn = document.createElement('button');
-  btn.className = 'auth-btn';
-  btn.textContent = 'Iniciar Sesion';
-  btn.addEventListener('click', function() {
-    window.location.href = '/app/';
-  });
+  function guideById(id) {
+    return data.guides.find(function (guide) { return guide.id === id; });
+  }
 
-  wall.appendChild(logo);
-  wall.appendChild(p1);
-  wall.appendChild(p2);
-  wall.appendChild(btn);
-  document.body.appendChild(wall);
-  document.body.style.overflow = 'hidden';
+  function readProgress() {
+    try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); }
+    catch (_error) { return {}; }
+  }
 
-  window.addEventListener('storage', function(e) {
-    if (e.key === 'sitrep_access_token' && e.newValue) {
-      wall.remove();
-      document.body.style.overflow = '';
+  function writeProgress(guide, index) {
+    var progress = readProgress();
+    progress[guide.id] = {
+      step: index,
+      total: guide.steps.length,
+      title: guide.title,
+      profile: guide.profile,
+      updatedAt: Date.now()
+    };
+    localStorage.setItem(storageKey, JSON.stringify(progress));
+  }
+
+  function latestProgress() {
+    var entries = Object.keys(readProgress()).map(function (key) {
+      var item = readProgress()[key];
+      item.guideId = key;
+      return item;
+    });
+    return entries.sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); })[0];
+  }
+
+  function showToast(message) {
+    var toast = document.getElementById('toast');
+    if (!toast) return;
+    toast.textContent = message;
+    toast.classList.add('visible');
+    window.clearTimeout(showToast.timer);
+    showToast.timer = window.setTimeout(function () { toast.classList.remove('visible'); }, 2600);
+  }
+
+  function handleDirectoryHash() {
+    if (page !== 'home' || !window.location.hash) return;
+    var hash = window.location.hash.slice(1);
+    var nativeHashes = ['perfiles', 'frecuentes', 'tutoriales', 'main'];
+    if (nativeHashes.indexOf(hash) >= 0) return;
+    var mapped = {
+      capacitacion: 'index.html#tutoriales',
+      'ft-5': 'tutorial.html?guide=transportista-confirmar-retiro#paso-3-confirmar-el-retiro',
+      'ft-9': 'tutorial.html?guide=transportista-confirmar-entrega#paso-3-confirmar-la-entrega',
+      'fg-3': 'tutorial.html?guide=generador-crear-manifiesto#paso-1-iniciar-un-manifiesto',
+      'fg-7': 'tutorial.html?guide=generador-seguir-manifiesto#paso-3-consultar-el-viaje',
+      'fo-4': 'tutorial.html?guide=operador-recibir-pesar#paso-3-confirmar-la-recepcion',
+      'fo-5': 'tutorial.html?guide=operador-recibir-pesar#paso-4-registrar-el-pesaje',
+      'fo-7': 'tutorial.html?guide=operador-tratar-cerrar#paso-2-registrar-el-tratamiento',
+      'fa-4': 'tutorial.html?guide=administrador-impersonar-volver#paso-2-elegir-el-usuario'
+    };
+    window.location.replace(mapped[hash] || ('directorio.html#' + encodeURIComponent(hash)));
+  }
+
+  function tutorialURL(guide, stepIndex) {
+    var url = 'tutorial.html?guide=' + encodeURIComponent(guide.id);
+    if (typeof stepIndex === 'number' && guide.steps[stepIndex]) {
+      url += '#paso-' + (stepIndex + 1) + '-' + slugify(guide.steps[stepIndex].title);
     }
-  });
-})();
+    return url;
+  }
 
-// ── v2026.6: Share manual ──
-function shareManual() {
-  var shareData = {
-    title: 'RP Trazar - Manual del Sistema',
-    text: 'Manual y guia de capacitacion de Trazabilidad de Residuos Peligrosos - Provincia de Mendoza',
-    url: window.location.href
-  };
-
-  if (navigator.share) {
-    navigator.share(shareData).catch(function() {});
-  } else {
-    navigator.clipboard.writeText(window.location.href).then(function() {
-      showToast('Enlace copiado al portapapeles');
-    }).catch(function() {
-      var input = document.createElement('input');
-      input.value = window.location.href;
-      document.body.appendChild(input);
-      input.select();
-      document.execCommand('copy');
-      document.body.removeChild(input);
-      showToast('Enlace copiado al portapapeles');
+  function renderHome() {
+    var profileList = document.getElementById('profileList');
+    data.profiles.forEach(function (profile) {
+      var link = document.createElement('a');
+      link.className = 'profile-row';
+      link.href = 'search.html?profile=' + encodeURIComponent(profile.id);
+      link.innerHTML = '<span class="profile-icon"><span class="material-symbols-rounded" aria-hidden="true">' + escapeHTML(profile.icon) + '</span></span>' +
+        '<span class="profile-copy"><span class="profile-title">' + escapeHTML(profile.label) + '</span><span class="profile-description">' + escapeHTML(profile.description) + '</span></span>' +
+        '<span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>';
+      profileList.appendChild(link);
     });
-  }
-}
 
-function showToast(msg) {
-  var existing = document.querySelector('.share-toast');
-  if (existing) existing.remove();
-  var toast = document.createElement('div');
-  toast.className = 'share-toast';
-  toast.textContent = msg;
-  document.body.appendChild(toast);
-  setTimeout(function() { toast.remove(); }, 3000);
-}
+    var popularIds = [
+      'generador-crear-manifiesto',
+      'transportista-confirmar-retiro',
+      'operador-recibir-pesar',
+      'operador-tratar-cerrar',
+      'administrador-impersonar-volver'
+    ];
+    var popularList = document.getElementById('popularList');
+    popularIds.forEach(function (id) {
+      var guide = guideById(id);
+      if (!guide) return;
+      var item = document.createElement('li');
+      item.innerHTML = '<a href="' + tutorialURL(guide) + '"><span>' + escapeHTML(guide.title) + '</span><span class="material-symbols-rounded" aria-hidden="true">chevron_right</span></a>';
+      popularList.appendChild(item);
+    });
 
-// ── v2026.6: Export PDF (print) ──
-function exportPDF() {
-  window.print();
-}
+    var tutorialGrid = document.getElementById('tutorialGrid');
+    data.guides.slice(0, 9).forEach(function (guide) {
+      var profile = profileById(guide.profile);
+      var link = document.createElement('a');
+      link.className = 'tutorial-card';
+      link.href = tutorialURL(guide);
+      link.innerHTML = '<span class="tutorial-card-icon"><span class="material-symbols-rounded" aria-hidden="true">' + escapeHTML(guide.icon) + '</span></span>' +
+        '<h3>' + escapeHTML(guide.title) + '</h3><p>' + escapeHTML(guide.summary) + '</p>' +
+        '<span class="tutorial-card-meta"><span>' + escapeHTML(profile ? profile.label : guide.profile) + '</span><span><span class="material-symbols-rounded" aria-hidden="true">format_list_numbered</span>' + guide.steps.length + ' pasos</span><span><span class="material-symbols-rounded" aria-hidden="true">schedule</span>' + escapeHTML(guide.duration) + '</span></span>';
+      tutorialGrid.appendChild(link);
+    });
 
-// ── v2026.5: Theme toggle ──
-function initTheme() {
-  var saved = localStorage.getItem('sitrep-manual-theme');
-  if (saved) {
-    document.documentElement.setAttribute('data-theme', saved);
-  }
-}
-initTheme(); // Run immediately to avoid flash
-
-function toggleTheme() {
-  var current = document.documentElement.getAttribute('data-theme');
-  var next = current === 'dark' ? 'light' : (current === 'light' ? 'dark' :
-    (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'dark'));
-  document.documentElement.setAttribute('data-theme', next);
-  localStorage.setItem('sitrep-manual-theme', next);
-  var btn = document.getElementById('themeToggle');
-  if (btn) btn.textContent = next === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
-}
-
-// ── v2026.5: Reading progress bar ──
-function updateProgress() {
-  var bar = document.getElementById('progressBar');
-  if (!bar) return;
-  var scrollTop = window.scrollY;
-  var docHeight = document.documentElement.scrollHeight - window.innerHeight;
-  var pct = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
-  bar.style.width = pct + '%';
-}
-
-// v2026.4: accordion toggle for sidebar nav groups
-function toggleNavGroup(title) {
-  var items = title.nextElementSibling;
-  if (!items || !items.classList.contains('nav-group-items')) return;
-  var collapsed = items.classList.toggle('collapsed');
-  title.classList.toggle('collapsed', collapsed);
-}
-
-// Collapsible toggle (global, for FAQ etc.)
-function toggleCollapsible(el) {
-  el.classList.toggle('open');
-  var body = el.nextElementSibling;
-  if (body && body.classList.contains('collapsible-body')) {
-    body.classList.toggle('open');
-  }
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-  var sections = document.querySelectorAll('section[id]');
-  var navLinks = document.querySelectorAll('.nav-link');
-  var searchInput = document.getElementById('searchInput');
-  var roleTabs = document.querySelectorAll('.role-tab');
-  var backToTop = document.getElementById('backToTop');
-  var hamburger = document.getElementById('hamburgerBtn');
-  var sidebar = document.getElementById('sidebar');
-  var overlay = document.getElementById('overlay');
-  var currentRole = 'all';
-
-  // Abrir todos los collapsibles (FAQ) por defecto
-  document.querySelectorAll('.collapsible-header').forEach(function(h) {
-    h.classList.add('open');
-    var body = h.nextElementSibling;
-    if (body && body.classList.contains('collapsible-body')) {
-      body.classList.add('open');
+    var recent = latestProgress();
+    var continuePanel = document.getElementById('continuePanel');
+    if (recent && guideById(recent.guideId)) {
+      var guide = guideById(recent.guideId);
+      var profile = profileById(guide.profile);
+      var nextStep = Math.min(recent.step || 0, guide.steps.length - 1);
+      var percent = Math.round(((nextStep + 1) / guide.steps.length) * 100);
+      document.getElementById('continueDescription').textContent = (profile ? profile.label + ' · ' : '') + guide.title + ' · Paso ' + (nextStep + 1) + ' de ' + guide.steps.length;
+      document.getElementById('continueProgress').style.width = percent + '%';
+      document.getElementById('continueLink').href = tutorialURL(guide, nextStep);
+      continuePanel.hidden = false;
     }
-  });
 
-  // v2026.4: Scroll-spy — detecta seccion activa incluyendo anclas en-pagina (proc-*, gal-*, flujo-*)
-  function updateActiveNav() {
-    var scrollTop = window.scrollY + 120;
-    var current = '';
-
-    // Considerar secciones
-    sections.forEach(function(s) {
-      if (s.offsetTop > 0 && s.style.display !== 'none' && s.offsetTop <= scrollTop) {
-        current = s.id;
-      }
-    });
-
-    // Considerar anclas en-pagina dentro de secciones (proc-*, gal-*, flujo-*, fa-*, fg-*, ft-*, fo-*)
-    document.querySelectorAll('[id^="proc-"], [id^="gal-"], [id^="flujo-"], [id^="fa-"], [id^="fg-"], [id^="ft-"], [id^="fo-"]').forEach(function(el) {
-      var rect = el.getBoundingClientRect();
-      if (rect.top <= 120) current = el.id;
-    });
-
-    // Limpiar active-parent
-    document.querySelectorAll('.nav-section-title').forEach(function(t) {
-      t.classList.remove('active-parent');
-    });
-
-    navLinks.forEach(function(link) {
-      var isActive = link.getAttribute('href') === '#' + current;
-      link.classList.toggle('active', isActive);
-      if (isActive) {
-        link.scrollIntoView({ block: 'nearest' });
-        // Auto-expandir grupo padre si esta colapsado
-        var group = link.closest('.nav-group-items');
-        if (group && group.classList.contains('collapsed')) {
-          group.classList.remove('collapsed');
-          var title = group.previousElementSibling;
-          if (title) title.classList.remove('collapsed');
-        }
-        // Marcar section-title padre como active-parent
-        var parentGroup = link.closest('.nav-group-items');
-        if (parentGroup) {
-          var parentTitle = parentGroup.previousElementSibling;
-          if (parentTitle && parentTitle.classList.contains('nav-section-title')) {
-            parentTitle.classList.add('active-parent');
-          }
-        }
+    document.addEventListener('keydown', function (event) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        document.getElementById('homeSearch').focus();
       }
     });
   }
-  window.addEventListener('scroll', function() {
-    updateActiveNav();
-    updateProgress();
-  }, { passive: true });
-  updateActiveNav();
-  updateProgress();
 
-  // Search — v2026.4: busca dentro de nav-group-items
-  searchInput.addEventListener('input', function() {
-    var q = this.value.toLowerCase();
-    navLinks.forEach(function(link) {
-      var text = link.textContent.toLowerCase();
-      link.style.display = text.includes(q) || q === '' ? '' : 'none';
+  function scoreGuide(guide, query) {
+    if (!query) return 1;
+    var words = query.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/\s+/).filter(Boolean);
+    var title = guide.title.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    var summary = guide.summary.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    var keywords = guide.keywords.join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    var steps = guide.steps.map(function (step) { return step.title + ' ' + step.body.join(' '); }).join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    var profile = (profileById(guide.profile) || {}).label || guide.profile;
+    var searchable = [title, summary, keywords, steps, profile.toLowerCase()].join(' ');
+    if (!words.every(function (word) { return searchable.indexOf(word) >= 0; })) return 0;
+    return words.reduce(function (score, word) {
+      if (title.indexOf(word) >= 0) score += 12;
+      if (keywords.indexOf(word) >= 0) score += 7;
+      if (summary.indexOf(word) >= 0) score += 4;
+      if (steps.indexOf(word) >= 0) score += 2;
+      return score;
+    }, 0);
+  }
+
+  function renderSearch() {
+    var queryInput = document.getElementById('searchQuery');
+    var query = params.get('q') || '';
+    var activeProfile = params.get('profile') || 'all';
+    var selectedId = null;
+    var previewMedia = window.matchMedia('(min-width: 1101px)');
+    queryInput.value = query;
+
+    var filters = document.getElementById('searchProfileFilters');
+    data.profiles.forEach(function (profile) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'category-filter';
+      button.setAttribute('data-profile', profile.id);
+      button.innerHTML = '<span class="material-symbols-rounded" aria-hidden="true">' + escapeHTML(profile.icon) + '</span>' + escapeHTML(profile.label);
+      filters.appendChild(button);
     });
-    document.querySelectorAll('.nav-section-title').forEach(function(t) {
-      var items = t.nextElementSibling;
-      var hasVisible = false;
-      if (items && items.classList.contains('nav-group-items')) {
-        items.querySelectorAll('.nav-link').forEach(function(link) {
-          if (link.style.display !== 'none') hasVisible = true;
-        });
-        // Auto-expand when searching
-        if (q !== '' && hasVisible) {
-          items.classList.remove('collapsed');
-          t.classList.remove('collapsed');
-        }
-      }
-      t.style.display = hasVisible || q === '' ? '' : 'none';
-    });
-  });
 
-  // Role filter tabs — v2026.4: SOLO filtra contenido, NUNCA oculta nav links
-  roleTabs.forEach(function(tab) {
-    tab.addEventListener('click', function() {
-      roleTabs.forEach(function(t) { t.classList.remove('active'); });
-      this.classList.add('active');
-      currentRole = this.getAttribute('data-role');
+    function updateURL() {
+      var current = new URL(window.location.href);
+      if (query) current.searchParams.set('q', query); else current.searchParams.delete('q');
+      if (activeProfile !== 'all') current.searchParams.set('profile', activeProfile); else current.searchParams.delete('profile');
+      window.history.replaceState(null, '', current.pathname + current.search);
+    }
 
-      // Mostrar/ocultar secciones segun rol
-      var firstVisible = null;
-      sections.forEach(function(sec) {
-        var r = sec.getAttribute('data-role');
-        var visible = (currentRole === 'all' || r === 'all' || r === currentRole);
-        sec.style.display = visible ? '' : 'none';
-        if (visible && !firstVisible && r === currentRole) firstVisible = sec;
+    function selectGuide(guide) {
+      selectedId = guide.id;
+      document.querySelectorAll('.search-result').forEach(function (item) {
+        var selected = item.getAttribute('data-guide') === guide.id;
+        item.classList.toggle('selected', selected);
+        if (selected) item.setAttribute('aria-current', 'true');
+        else item.removeAttribute('aria-current');
       });
-
-      // Restaurar TODOS los nav links (nunca ocultar sidebar)
-      navLinks.forEach(function(link) { link.style.display = ''; });
-
-      // Scroll a la primera seccion del rol seleccionado
-      if (firstVisible && currentRole !== 'all') {
-        setTimeout(function() {
-          firstVisible.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 50);
-      }
-
-      setTimeout(updateActiveNav, 300);
-    });
-  });
-
-  // Back to top
-  window.addEventListener('scroll', function() {
-    backToTop.classList.toggle('visible', window.scrollY > 400);
-  });
-  backToTop.addEventListener('click', function() {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  });
-
-  // Hamburger (mobile)
-  hamburger.addEventListener('click', function() {
-    sidebar.classList.toggle('open');
-    overlay.classList.toggle('open');
-  });
-  overlay.addEventListener('click', function() {
-    sidebar.classList.remove('open');
-    overlay.classList.remove('open');
-  });
-  navLinks.forEach(function(link) {
-    link.addEventListener('click', function() {
-      if (window.innerWidth <= 900) {
-        sidebar.classList.remove('open');
-        overlay.classList.remove('open');
-      }
-    });
-  });
-
-  // ── v2026.6: Hero carousel ──
-  (function initHeroCarousel() {
-    var slides = document.querySelectorAll('.hero-slide');
-    var mobileSlides = document.querySelectorAll('.hero-slide-mobile');
-    if (!slides.length) return;
-
-    var current = 0, mCurrent = 0;
-
-    setInterval(function() {
-      slides[current].classList.remove('active');
-      current = (current + 1) % slides.length;
-      slides[current].classList.add('active');
-    }, 4000);
-
-    if (mobileSlides.length) {
-      setInterval(function() {
-        mobileSlides[mCurrent].classList.remove('active');
-        mCurrent = (mCurrent + 1) % mobileSlides.length;
-        mobileSlides[mCurrent].classList.add('active');
-      }, 8000);
+      var profile = profileById(guide.profile);
+      var preview = document.getElementById('searchPreview');
+      preview.innerHTML = '<p class="preview-profile">' + escapeHTML(profile ? profile.label : guide.profile) + '</p>' +
+        '<h2>' + escapeHTML(guide.title) + '</h2>' +
+        '<div class="preview-meta"><span><span class="material-symbols-rounded" aria-hidden="true">menu_book</span>Tutorial</span><span><span class="material-symbols-rounded" aria-hidden="true">format_list_numbered</span>' + guide.steps.length + ' pasos</span><span><span class="material-symbols-rounded" aria-hidden="true">schedule</span>' + escapeHTML(guide.duration) + '</span></div>' +
+        '<p class="preview-summary">' + escapeHTML(guide.summary) + '</p>' +
+        '<div class="preview-note"><span class="material-symbols-rounded" aria-hidden="true">info</span><span>Leer este tutorial no modifica ningún dato en SITREP.</span></div>' +
+        '<ol class="preview-steps">' + guide.steps.map(function (step, index) { return '<li><span class="preview-step-number">' + (index + 1) + '</span><span>' + escapeHTML(step.title) + '</span></li>'; }).join('') + '</ol>' +
+        '<div class="preview-actions"><a class="button button-primary" href="' + tutorialURL(guide) + '"><span class="material-symbols-rounded" aria-hidden="true">play_circle</span>Comenzar tutorial</a><div class="preview-secondary"><a class="quiet-link" href="' + tutorialURL(guide) + '"><span class="material-symbols-rounded" aria-hidden="true">menu_book</span>Abrir guía</a><button type="button" id="copyGuide"><span class="material-symbols-rounded" aria-hidden="true">link</span>Copiar enlace</button></div></div>';
+      var copy = document.getElementById('copyGuide');
+      copy.addEventListener('click', function () {
+        navigator.clipboard.writeText(new URL(tutorialURL(guide), window.location.href).href).then(function () { showToast('Enlace copiado'); });
+      });
     }
-  })();
 
-  // ── v2026.6: Hero parallax on mouse move (desktop only) ──
-  (function initHeroParallax() {
-    var hero = document.getElementById('hero');
-    var desktop = document.querySelector('.device-desktop');
-    var mobile = document.querySelector('.device-mobile');
-    if (!hero || !desktop || window.innerWidth <= 900) return;
-
-    hero.addEventListener('mousemove', function(e) {
-      var rect = hero.getBoundingClientRect();
-      var x = (e.clientX - rect.left) / rect.width - 0.5;
-      var y = (e.clientY - rect.top) / rect.height - 0.5;
-      desktop.style.transform = 'rotateY(' + (x * -8 - 5) + 'deg) rotateX(' + (y * 5 + 2) + 'deg)';
-      if (mobile) mobile.style.transform = 'rotateY(' + (x * 5 + 5) + 'deg) rotateX(' + (y * -3) + 'deg)';
-    });
-
-    hero.addEventListener('mouseleave', function() {
-      desktop.style.transform = '';
-      if (mobile) mobile.style.transform = '';
-    });
-  })();
-
-  // ── v2026.6: Sticky section breadcrumb ──
-  (function stickyBreadcrumb() {
-    var bar = document.createElement('div');
-    bar.className = 'section-breadcrumb';
-
-    var sbSection = document.createElement('span');
-    sbSection.className = 'sb-section';
-    var sbSep = document.createElement('span');
-    sbSep.className = 'sb-sep';
-    sbSep.textContent = '\u203A'; // ›
-    var sbSub = document.createElement('span');
-    sbSub.className = 'sb-sub';
-    var sbSep2 = document.createElement('span');
-    sbSep2.className = 'sb-sep';
-    sbSep2.textContent = '\u203A';
-    var sbCU = document.createElement('span');
-    sbCU.className = 'sb-cu';
-
-    bar.appendChild(sbSection);
-    bar.appendChild(sbSep);
-    bar.appendChild(sbSub);
-    bar.appendChild(sbSep2);
-    bar.appendChild(sbCU);
-    document.body.appendChild(bar);
-
-    var headings = document.querySelectorAll('section h2, section h3');
-    var collapsibles = document.querySelectorAll('.collapsible-header');
-    var currentH2 = '';
-    var currentH3 = '';
-    var currentCU = '';
-    var currentH2El = null;
-    var currentH3El = null;
-    var currentCUEl = null;
-    var heroEl = document.getElementById('hero');
-    var heroBottom = heroEl ? heroEl.offsetTop + heroEl.offsetHeight : 0;
-    var headerHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--header-height')) || 64;
-    var breadcrumbHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--breadcrumb-height')) || 32;
-
-    // Click handlers — scroll to the heading's section
-    sbSection.addEventListener('click', function() {
-      if (currentH2El) currentH2El.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-    sbSub.addEventListener('click', function() {
-      if (currentH3El) currentH3El.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-    sbCU.addEventListener('click', function() {
-      if (currentCUEl) currentCUEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-
-    var ticking = false;
-    window.addEventListener('scroll', function() {
-      if (!ticking) {
-        requestAnimationFrame(function() {
-          updateBreadcrumb();
-          ticking = false;
+    function drawResults() {
+      var ranked = data.guides.map(function (guide) { return { guide: guide, score: scoreGuide(guide, query) }; })
+        .filter(function (item) { return item.score > 0 && (activeProfile === 'all' || item.guide.profile === activeProfile); })
+        .sort(function (a, b) { return b.score - a.score || a.guide.title.localeCompare(b.guide.title); });
+      var results = document.getElementById('searchResults');
+      results.innerHTML = '';
+      document.getElementById('searchEmpty').hidden = ranked.length > 0;
+      document.getElementById('searchResultCount').textContent = ranked.length + (ranked.length === 1 ? ' resultado' : ' resultados');
+      document.getElementById('searchResultsTitle').textContent = query ? 'Resultados para “' + query + '”' : (activeProfile === 'all' ? 'Todas las guías' : 'Guías para ' + (profileById(activeProfile) || {}).label);
+      ranked.forEach(function (item, index) {
+        var guide = item.guide;
+        var profile = profileById(guide.profile);
+        var result = document.createElement('a');
+        result.className = 'search-result';
+        result.href = tutorialURL(guide);
+        result.setAttribute('data-guide', guide.id);
+        result.innerHTML = '<span class="result-number">' + (index + 1) + '</span><span><h2>' + escapeHTML(guide.title) + '</h2><p>' + escapeHTML(guide.summary) + '</p><span class="result-meta"><span>' + escapeHTML(profile ? profile.label : guide.profile) + '</span><span><span class="material-symbols-rounded" aria-hidden="true">menu_book</span>Tutorial</span><span><span class="material-symbols-rounded" aria-hidden="true">schedule</span>' + escapeHTML(guide.duration) + '</span></span></span><span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>';
+        result.addEventListener('click', function (event) {
+          var modifiedClick = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+          var keyboardActivation = event.detail === 0;
+          if (!previewMedia.matches || modifiedClick || keyboardActivation) return;
+          event.preventDefault();
+          selectGuide(guide);
         });
-        ticking = true;
-      }
+        result.addEventListener('dblclick', function () { window.location.href = tutorialURL(guide); });
+        results.appendChild(result);
+      });
+      if (ranked.length && previewMedia.matches) selectGuide(ranked[0].guide);
+    }
+
+    document.querySelectorAll('.category-filter[data-profile]').forEach(function (button) {
+      var isActive = button.getAttribute('data-profile') === activeProfile;
+      button.classList.toggle('active', isActive);
+      button.addEventListener('click', function () {
+        activeProfile = button.getAttribute('data-profile');
+        document.querySelectorAll('.category-filter[data-profile]').forEach(function (item) { item.classList.toggle('active', item === button); });
+        updateURL();
+        drawResults();
+      });
+    });
+    document.getElementById('searchPageForm').addEventListener('submit', function (event) {
+      event.preventDefault();
+      query = queryInput.value.trim();
+      updateURL();
+      drawResults();
+    });
+    drawResults();
+  }
+
+  function renderTutorial() {
+    var guide = guideById(params.get('guide')) || guideById('transportista-confirmar-retiro') || data.guides[0];
+    if (!guide) return;
+    var profile = profileById(guide.profile) || { label: guide.profile, icon: guide.icon };
+    document.title = guide.title + ' — Centro de Ayuda SITREP';
+    document.getElementById('sidebarProfile').textContent = profile.label;
+    document.getElementById('sidebarProfileIcon').textContent = profile.icon;
+    document.getElementById('breadcrumbProfile').textContent = profile.label;
+    document.getElementById('breadcrumbProfile').href = 'search.html?profile=' + encodeURIComponent(profile.id || guide.profile);
+    document.getElementById('breadcrumbTitle').textContent = guide.title;
+    document.getElementById('tutorialProfile').textContent = profile.label;
+    document.getElementById('tutorialTitle').textContent = guide.title;
+    document.getElementById('tutorialSummary').textContent = guide.summary;
+    document.getElementById('stepCount').textContent = guide.steps.length + ' pasos';
+    document.getElementById('tutorialDuration').textContent = guide.duration;
+    document.querySelector('#safetyNote p').textContent = guide.safety || 'Leé todos los pasos antes de realizar acciones en el sistema.';
+
+    var indexList = document.getElementById('tutorialIndex');
+    var stepsRoot = document.getElementById('tutorialSteps');
+    var activeIndex = 0;
+    var stepSections = [];
+    var stepLinks = [];
+
+    guide.steps.forEach(function (step, index) {
+      var id = 'paso-' + (index + 1) + '-' + slugify(step.title);
+      var listItem = document.createElement('li');
+      var link = document.createElement('a');
+      link.href = '#' + id;
+      link.innerHTML = '<span class="index-marker">' + (index + 1) + '</span><span>' + escapeHTML(step.title) + '</span>';
+      link.addEventListener('click', function () {
+        updateActive(index, true);
+        if (window.innerWidth <= 820) setMobileIndex(false);
+      });
+      listItem.appendChild(link);
+      indexList.appendChild(listItem);
+      stepLinks.push(link);
+
+      var section = document.createElement('section');
+      section.className = 'guide-step';
+      section.id = id;
+      section.setAttribute('data-step', String(index));
+      section.innerHTML = '<p class="step-kicker">Paso ' + (index + 1) + ' de ' + guide.steps.length + '</p>' +
+        '<div class="step-title-row"><h2>' + escapeHTML(step.title) + '</h2><button class="copy-step-link" type="button" data-copy-step="' + index + '"><span class="material-symbols-rounded" aria-hidden="true">link</span>Copiar enlace a este paso</button></div>' +
+        '<ol class="step-instructions">' + step.body.map(function (instruction) { return '<li><span>' + escapeHTML(instruction) + '</span></li>'; }).join('') + '</ol>' +
+        (step.image ? '<figure class="guide-image-wrap' + (step.image.indexOf('/mobile/') >= 0 ? ' is-mobile-capture' : ' is-desktop-capture') + '"><a class="guide-image-link" href="' + escapeHTML(step.image) + '" target="_blank" rel="noopener" aria-label="Abrir captura a tamaño completo"><img class="guide-image" src="' + escapeHTML(step.image) + '" width="1600" height="900" loading="lazy" alt="' + escapeHTML(step.alt) + '"></a><figcaption class="guide-image-caption">Captura real de SITREP · Tocá para verla completa. En móvil, también podés deslizar horizontalmente.</figcaption></figure>' : '') +
+        '<div class="expected-result"><span class="material-symbols-rounded" aria-hidden="true">check</span><div><strong>Resultado esperado</strong><p>' + escapeHTML(step.expected) + '</p></div></div>';
+      stepsRoot.appendChild(section);
+      stepSections.push(section);
     });
 
-    function updateBreadcrumb() {
-      var scrollY = window.scrollY;
-      var threshold = headerHeight + breadcrumbHeight + 20;
-
-      if (scrollY < heroBottom - headerHeight) {
-        bar.classList.remove('visible');
-        return;
-      }
-
-      var newH2 = '';
-      var newH3 = '';
-      var newCU = '';
-      var newH2El = null;
-      var newH3El = null;
-      var newCUEl = null;
-
-      for (var i = 0; i < headings.length; i++) {
-        var h = headings[i];
-        var top = h.getBoundingClientRect().top;
-        if (top <= threshold) {
-          if (h.tagName === 'H2') {
-            newH2 = h.textContent.trim();
-            newH2El = h;
-            newH3 = '';
-            newH3El = null;
-          } else {
-            newH3 = h.textContent.trim();
-            newH3El = h;
-          }
-        }
-      }
-
-      // Find current open collapsible header above threshold — scoped to current section only
-      var currentSection = newH3El ? newH3El.closest('section') : (newH2El ? newH2El.closest('section') : null);
-      if (currentSection) {
-        var sectionCollapsibles = currentSection.querySelectorAll('.collapsible-header');
-        for (var j = 0; j < sectionCollapsibles.length; j++) {
-          var c = sectionCollapsibles[j];
-          if (!c.classList.contains('open')) continue;
-          var cTop = c.getBoundingClientRect().top;
-          if (cTop <= threshold) {
-            newCU = c.textContent.trim();
-            newCUEl = c;
-          }
-        }
-      }
-
-      if (!newH2 && !newH3) {
-        bar.classList.remove('visible');
-        return;
-      }
-
-      if (newH2 !== currentH2 || newH3 !== currentH3 || newCU !== currentCU) {
-        currentH2 = newH2;
-        currentH3 = newH3;
-        currentCU = newCU;
-        currentH2El = newH2El;
-        currentH3El = newH3El;
-        currentCUEl = newCUEl;
-        sbSection.textContent = currentH2;
-        if (currentH3) {
-          sbSep.style.display = '';
-          sbSub.textContent = currentH3;
-        } else {
-          sbSep.style.display = 'none';
-          sbSub.textContent = '';
-        }
-        if (currentCU) {
-          sbSep2.style.display = '';
-          sbCU.textContent = currentCU;
-        } else {
-          sbSep2.style.display = 'none';
-          sbCU.textContent = '';
-        }
-      }
-
-      bar.classList.add('visible');
+    function updateActive(index, replaceHash) {
+      activeIndex = Math.max(0, Math.min(index, guide.steps.length - 1));
+      var percent = Math.round(((activeIndex + 1) / guide.steps.length) * 100);
+      stepLinks.forEach(function (link, linkIndex) {
+        link.classList.toggle('active', linkIndex === activeIndex);
+        link.classList.toggle('complete', linkIndex < activeIndex);
+        if (linkIndex === activeIndex) link.setAttribute('aria-current', 'step'); else link.removeAttribute('aria-current');
+        var marker = link.querySelector('.index-marker');
+        marker.textContent = linkIndex < activeIndex ? '✓' : String(linkIndex + 1);
+      });
+      document.getElementById('progressLabel').textContent = 'Paso ' + (activeIndex + 1) + ' de ' + guide.steps.length;
+      document.getElementById('progressPercent').textContent = percent + '%';
+      document.getElementById('tutorialProgressBar').style.width = percent + '%';
+      document.getElementById('footerProgress').textContent = (activeIndex + 1) + ' de ' + guide.steps.length;
+      document.getElementById('mobileIndexStatus').textContent = 'Paso ' + (activeIndex + 1) + ' de ' + guide.steps.length;
+      document.getElementById('previousStep').disabled = activeIndex === 0;
+      var next = document.getElementById('nextStep');
+      next.querySelector('span:first-child').textContent = activeIndex === guide.steps.length - 1 ? 'Finalizar' : 'Siguiente paso';
+      writeProgress(guide, activeIndex);
+      if (replaceHash) window.history.replaceState(null, '', '#' + stepSections[activeIndex].id);
     }
-  })();
-});
+
+    function goToStep(index) {
+      var target = Math.max(0, Math.min(index, guide.steps.length - 1));
+      if (index >= guide.steps.length) {
+        writeProgress(guide, guide.steps.length - 1);
+        showToast('Tutorial completado');
+        window.location.href = './';
+        return;
+      }
+      stepSections[target].scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+      updateActive(target, true);
+    }
+
+    document.getElementById('previousStep').addEventListener('click', function () { goToStep(activeIndex - 1); });
+    document.getElementById('nextStep').addEventListener('click', function () { goToStep(activeIndex + 1); });
+    document.querySelectorAll('[data-copy-step]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        var index = Number(button.getAttribute('data-copy-step'));
+        var url = new URL(window.location.href);
+        url.hash = stepSections[index].id;
+        navigator.clipboard.writeText(url.href).then(function () { showToast('Enlace al paso copiado'); });
+      });
+    });
+
+    var scrollTicking = false;
+    function syncStepFromScroll() {
+      var readingLine = window.innerWidth <= 820 ? 240 : 170;
+      var current = 0;
+      stepSections.forEach(function (section, index) {
+        if (section.getBoundingClientRect().top <= readingLine) current = index;
+      });
+      if (current !== activeIndex) updateActive(current, true);
+    }
+    window.addEventListener('scroll', function () {
+      if (scrollTicking) return;
+      scrollTicking = true;
+      window.requestAnimationFrame(function () {
+        syncStepFromScroll();
+        scrollTicking = false;
+      });
+    }, { passive: true });
+
+    var hashIndex = stepSections.findIndex(function (section) { return '#' + section.id === window.location.hash; });
+    var saved = readProgress()[guide.id];
+    var initial = hashIndex >= 0 ? hashIndex : (saved ? Math.min(saved.step || 0, guide.steps.length - 1) : 0);
+    updateActive(initial, false);
+    if (hashIndex >= 0) window.setTimeout(function () { stepSections[hashIndex].scrollIntoView({ block: 'start' }); }, 60);
+
+    var mobileToggle = document.getElementById('mobileIndexToggle');
+    var sidebar = document.getElementById('tutorialSidebar');
+    function setMobileIndex(open) {
+      sidebar.classList.toggle('open', open);
+      mobileToggle.setAttribute('aria-expanded', String(open));
+    }
+    mobileToggle.addEventListener('click', function () { setMobileIndex(mobileToggle.getAttribute('aria-expanded') !== 'true'); });
+    document.addEventListener('keydown', function (event) { if (event.key === 'Escape') setMobileIndex(false); });
+  }
+
+  handleDirectoryHash();
+  if (page === 'home') renderHome();
+  if (page === 'search') renderSearch();
+  if (page === 'tutorial') renderTutorial();
+})();
