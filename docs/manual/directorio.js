@@ -8,20 +8,20 @@
 
   var logo = document.createElement('div');
   logo.className = 'auth-logo';
-  logo.textContent = 'RP Trazar ';
+  logo.textContent = 'SITREP ';
   var logoSpan = document.createElement('span');
   logoSpan.textContent = 'Mendoza';
   logo.appendChild(logoSpan);
 
   var p1 = document.createElement('p');
-  p1.textContent = 'Este manual es exclusivo para usuarios registrados de RP Trazar.';
+  p1.textContent = 'El directorio completo requiere iniciar sesión en SITREP.';
 
   var p2 = document.createElement('p');
-  p2.textContent = 'Inicia sesion en la app para acceder a la documentacion completa y al guion de capacitacion.';
+  p2.textContent = 'La guía por roles sigue disponible sin iniciar sesión.';
 
   var btn = document.createElement('button');
   btn.className = 'auth-btn';
-  btn.textContent = 'Iniciar Sesion';
+  btn.textContent = 'Iniciar sesión';
   btn.addEventListener('click', function() {
     window.location.href = '/app/';
   });
@@ -30,6 +30,11 @@
   wall.appendChild(p1);
   wall.appendChild(p2);
   wall.appendChild(btn);
+  var back = document.createElement('a');
+  back.className = 'auth-back';
+  back.href = './';
+  back.textContent = 'Volver a la guía por roles';
+  wall.appendChild(back);
   document.body.appendChild(wall);
   document.body.style.overflow = 'hidden';
 
@@ -44,7 +49,7 @@
 // ── v2026.6: Share manual ──
 function shareManual() {
   var shareData = {
-    title: 'RP Trazar - Manual del Sistema',
+    title: 'SITREP Mendoza - Directorio completo',
     text: 'Manual y guia de capacitacion de Trazabilidad de Residuos Peligrosos - Provincia de Mendoza',
     url: window.location.href
   };
@@ -83,12 +88,10 @@ function exportPDF() {
 
 // ── v2026.5: Theme toggle ──
 function initTheme() {
-  var saved = localStorage.getItem('sitrep-manual-theme');
-  if (saved) {
-    document.documentElement.setAttribute('data-theme', saved);
-  }
+  // El directorio comparte la apariencia clara y consistente del Centro de Ayuda.
+  document.documentElement.setAttribute('data-theme', 'light');
 }
-initTheme(); // Run immediately to avoid flash
+initTheme();
 
 function toggleTheme() {
   var current = document.documentElement.getAttribute('data-theme');
@@ -138,6 +141,26 @@ document.addEventListener('DOMContentLoaded', function() {
   var overlay = document.getElementById('overlay');
   var currentRole = 'all';
 
+  // En un documento extenso con capturas lazy, el salto nativo puede quedar
+  // desplazado cuando cargan imágenes y fuentes. Reanclar tras la carga.
+  function alignHashTarget() {
+    var id = decodeURIComponent(window.location.hash.slice(1));
+    if (!id) return;
+    var target = document.getElementById(id);
+    if (!target) return;
+    var offset = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--scroll-offset'), 10);
+    if (!Number.isFinite(offset)) offset = 122;
+    window.scrollTo({ top: Math.max(0, target.getBoundingClientRect().top + window.scrollY - offset), behavior: 'instant' });
+  }
+  function settleHashTarget() {
+    alignHashTarget();
+    setTimeout(alignHashTarget, 180);
+    setTimeout(alignHashTarget, 750);
+  }
+  window.addEventListener('hashchange', settleHashTarget);
+  window.addEventListener('load', settleHashTarget, { once: true });
+  if (window.location.hash) requestAnimationFrame(settleHashTarget);
+
   // Abrir todos los collapsibles (FAQ) por defecto
   document.querySelectorAll('.collapsible-header').forEach(function(h) {
     h.classList.add('open');
@@ -149,21 +172,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // v2026.4: Scroll-spy — detecta seccion activa incluyendo anclas en-pagina (proc-*, gal-*, flujo-*)
   function updateActiveNav() {
-    var scrollTop = window.scrollY + 120;
+    var scrollTop = window.scrollY + 144;
     var current = '';
+    var currentSection = null;
 
     // Considerar secciones
     sections.forEach(function(s) {
       if (s.offsetTop > 0 && s.style.display !== 'none' && s.offsetTop <= scrollTop) {
         current = s.id;
+        currentSection = s;
       }
     });
 
-    // Considerar anclas en-pagina dentro de secciones (proc-*, gal-*, flujo-*, fa-*, fg-*, ft-*, fo-*)
-    document.querySelectorAll('[id^="proc-"], [id^="gal-"], [id^="flujo-"], [id^="fa-"], [id^="fg-"], [id^="ft-"], [id^="fo-"]').forEach(function(el) {
-      var rect = el.getBoundingClientRect();
-      if (rect.top <= 120) current = el.id;
-    });
+    // Sólo el subtema de la sección visible puede reemplazar su indicador.
+    // Antes, un ancla de un capítulo anterior sobrescribía Inspecciones.
+    if (currentSection) {
+      currentSection.querySelectorAll('h3[id], h4[id], [id^="proc-"], [id^="gal-"], [id^="flujo-"], [id^="fa-"], [id^="fg-"], [id^="ft-"], [id^="fo-"]').forEach(function(el) {
+        if (el.getBoundingClientRect().top <= 144) current = el.id;
+      });
+    }
 
     // Limpiar active-parent
     document.querySelectorAll('.nav-section-title').forEach(function(t) {
@@ -266,16 +293,19 @@ document.addEventListener('DOMContentLoaded', function() {
   hamburger.addEventListener('click', function() {
     sidebar.classList.toggle('open');
     overlay.classList.toggle('open');
+    hamburger.setAttribute('aria-expanded', sidebar.classList.contains('open') ? 'true' : 'false');
   });
   overlay.addEventListener('click', function() {
     sidebar.classList.remove('open');
     overlay.classList.remove('open');
+    hamburger.setAttribute('aria-expanded', 'false');
   });
   navLinks.forEach(function(link) {
     link.addEventListener('click', function() {
       if (window.innerWidth <= 900) {
         sidebar.classList.remove('open');
         overlay.classList.remove('open');
+        hamburger.setAttribute('aria-expanded', 'false');
       }
     });
   });

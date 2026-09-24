@@ -9,10 +9,30 @@
       { id: 'generador', label: 'Generador', icon: 'factory', description: 'Creación, firma y seguimiento de manifiestos.' },
       { id: 'transportista', label: 'Transportista', icon: 'local_shipping', description: 'Retiros, GPS, incidentes y entregas.' },
       { id: 'operador', label: 'Operador', icon: 'science', description: 'Recepción, pesaje, tratamiento y cierre.' },
+      { id: 'inspector', label: 'Inspector', icon: 'fact_check', description: 'Visita, controles, fotos, acta e informe técnico.' },
       { id: 'auditor', label: 'Auditor', icon: 'policy', description: 'Consulta de actividad, evidencia y trazabilidad.' }
     ],
 
     guides: [
+      {
+        id: 'inspector-completar-inspeccion',
+        profile: 'inspector',
+        title: 'Completar una inspección en campo',
+        summary: 'Seguí los siete pasos, documentá cada hallazgo y verificá el guardado de fotos y comentarios.',
+        duration: '8 min',
+        icon: 'fact_check',
+        keywords: ['inspección', 'inspector', 'checklist', 'acta', 'informe técnico', 'foto', 'evidencia', 'sin conexión', 'descargo'],
+        safety: 'Avanzar entre pasos no guarda ni envía por sí solo. No cierres ni envíes el expediente hasta confirmar el texto y cada foto en el servidor.',
+        steps: [
+          { title: 'Preparar el expediente', body: ['Abrí Inspecciones y verificá actor, ubicación, inspector asignado y número de acta.', 'Iniciá la etapa de campo cuando estés en el lugar. La ficha del actor se abre desde su nombre dentro del expediente.'], image: S + 'mobile/inspection_wizard_qa.png', alt: 'Simulación móvil del asistente de inspección con el paso actual visible', expected: 'El expediente correcto y el paso actual están identificados.' },
+          { title: 'Contrastar lo declarado', body: ['En Declarado vs. verificado, revisá cada dato y marcá Coincide, Difiere o No verificado.', 'Si difiere, describí qué constataste y qué debe corregirse; evitá marcar en bloque sin revisar.'], image: S + 'desktop/inspection_comparison_qa.png', alt: 'Simulación de datos declarados frente a la verificación en campo', expected: 'Cada dato tiene un resultado explícito y los desacuerdos están documentados.' },
+          { title: 'Completar el checklist', body: ['Abrí cada control y elegí Cumple, No cumple o No aplica.', 'Ante un incumplimiento, escribí el hallazgo y la acción requerida dentro de ese control.'], image: S + 'desktop/inspection_checklist_qa.png', alt: 'Simulación de checklist con resultado, observación y guardado', expected: 'El índice distingue controles pendientes y revisados; cada resultado adverso conserva su observación.' },
+          { title: 'Adjuntar la foto al hallazgo', body: ['Dentro del mismo control, usá Tomar foto o Elegir imagen; no confundas esa foto con un archivo general del expediente.', 'Comprobá que aparezca la miniatura vinculada. Guardá y esperá la confirmación del servidor.'], image: S + 'mobile/inspection_evidence_qa.png', alt: 'Simulación móvil de evidencia fotográfica vinculada a un control', expected: 'La miniatura sigue asociada al control incluso después de recargar.' },
+          { title: 'Redactar el acta de campo', body: ['Registrá hechos observados, personas intervinientes y circunstancias de la visita.', 'Diferenciá lo constatado de declaraciones de terceros y de las inferencias técnicas.'], image: S + 'mobile/inspection_wizard_qa.png', alt: 'Asistente móvil de inspección utilizado para llegar al acta de campo', expected: 'El acta conserva una descripción de campo verificable.' },
+          { title: 'Revisar el informe técnico', body: ['Exponé objetivo, antecedentes, evaluación, conclusión y recomendación técnica.', 'El acta constata; el informe analiza. Revisá ambos PDF y el QR de trazabilidad antes de derivar.'], image: S + 'desktop/inspection_report_qa.png', alt: 'Simulación del informe de inspección y acceso a sus exportaciones', expected: 'Acta e informe son documentos distintos y reflejan el expediente guardado.' },
+          { title: 'Confirmar y enviar cuando corresponda', body: ['Repasá pendientes, intercambios, adjuntos y estado de sincronización.', 'Con mala conexión, conservá el borrador y no des por recibida una foto pendiente; enviá solo cuando todo figure confirmado.'], image: S + 'desktop/inspection_report_qa.png', alt: 'Resultado consolidado del expediente de inspección', expected: 'El expediente queda trazable y listo para la etapa autorizada, sin confundir correo informativo con notificación legal.' }
+        ]
+      },
       {
         id: 'transportista-confirmar-retiro',
         profile: 'transportista',
