@@ -5,7 +5,8 @@
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { currentNavigationItem } from '../utils/navigationSelection';
 import { GlobalSearchPanel } from '../components/GlobalSearchPanel';
 import {
   LayoutDashboard,
@@ -190,9 +191,9 @@ export const MainLayout: React.FC = () => {
     return items;
   })();
 
-  // Get current page title
-  const currentPage = navItems.find(item => item.path === location.pathname)?.label || 
-    adminItems.find(item => item.path === location.pathname)?.label || 'SITREP';
+  // One current section, including detail routes; hidden role items never compete.
+  const currentItem = currentNavigationItem(location.pathname, [...navItems, ...adminItems]);
+  const currentPage = currentItem?.label || 'SITREP';
 
   return (
     <div data-app-shell className={`h-dvh bg-[#F8F8F6] flex flex-col overflow-hidden ${impersonationData ? 'pt-12' : ''}`}>
@@ -238,19 +239,19 @@ export const MainLayout: React.FC = () => {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto sidebar-scrollbar">
+        <nav aria-label="Navegación principal" className="flex-1 py-4 px-3 space-y-1 overflow-y-auto sidebar-scrollbar">
           {navItems.map((item) => {
             const Icon = item.icon;
-            // Custom isActive: match path prefix (for /actores/operadores/:id to highlight Actores)
-            const isItemActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+            const isItemActive = currentItem?.path === item.path;
             return (
-              <NavLink
+              <Link
                 key={item.path}
                 to={item.path}
+                aria-current={isItemActive ? 'page' : undefined}
                 onClick={() => setSidebarOpen(false)}
                 className={`
-                  flex items-center gap-3 px-3 py-2.5 rounded-xl
-                  font-medium text-sm transition-all duration-200
+                  flex min-h-11 items-center gap-3 px-3 py-2.5 rounded-xl
+                  font-medium text-sm transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white
                   ${isItemActive
                     ? 'bg-white/20 text-white'
                     : 'text-white/70 hover:bg-white/10 hover:text-white'
@@ -259,7 +260,7 @@ export const MainLayout: React.FC = () => {
               >
                 <Icon size={20} />
                 {item.label}
-              </NavLink>
+              </Link>
             );
           })}
           
@@ -271,16 +272,16 @@ export const MainLayout: React.FC = () => {
               </p>
               {adminItems.map((item) => {
                 const Icon = item.icon;
-                // Custom isActive check: match path prefix for admin routes (to handle /admin/operadores/:id)
-                const isItemActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+                const isItemActive = currentItem?.path === item.path;
                 return (
-                  <NavLink
+                  <Link
                     key={item.path}
                     to={item.path}
+                    aria-current={isItemActive ? 'page' : undefined}
                     onClick={() => setSidebarOpen(false)}
                     className={`
-                      flex items-center gap-3 px-3 py-2.5 rounded-xl
-                      font-medium text-sm transition-all duration-200
+                      flex min-h-11 items-center gap-3 px-3 py-2.5 rounded-xl
+                      font-medium text-sm transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white
                       ${isItemActive
                         ? 'bg-white/20 text-white'
                         : 'text-white/70 hover:bg-white/10 hover:text-white'
@@ -289,7 +290,7 @@ export const MainLayout: React.FC = () => {
                   >
                     <Icon size={20} />
                     {item.label}
-                  </NavLink>
+                  </Link>
                 );
               })}
             </div>

@@ -11,3 +11,11 @@ Modelo de voz español: `frontend/public/voice/vosk-small-es-0.42.tar.gz` es un 
 Login azul institucional, sistema verde y marca conservados. No se modifican datos reales, correos, push, expedientes, cuentas o servidor del Gobierno. QA nativo sólo en base sintética local, con un worker y cierre comprobado.
 
 Siguen pendientes uniformidad global de hover/active/tablas/íconos y bandeja de notificaciones; teléfonos físicos, Safari, PWA instalada, batería y revisión legal PDF. No afirmar software perfecto/100%.
+
+## Siguiente lote: navegación web/app
+
+Sobre esa fuente se corrige la selección simultánea del padre Actores y su categoría; los encabezados conservan la categoría en fichas. En la app, los accesos de generadores/operadores usan las rutas canónicas y señalan su categoría al abrir una ficha. Menú principal/drawer con objetivos mínimos de 44px, foco visible y transiciones de color sin animar geometría. Permisos, marca, login azul y sistema verde se conservan; SW web v79, política de caché sin cambios.
+
+Verificación local de este candidato: 540 unit frontend, typecheck y builds web/app aprobados; lint de los archivos cambiados sin errores, 11 advertencias heredadas. 30 ejecuciones E2E aprobadas sobre los mismos builds en Chrome escritorio1440×900, Pixel7 responsive y ruta /app: seis navegación, doce Control/Monitor, doce inspecciones/manifiestos. Datos y sesiones reales únicamente de PostgreSQL sintético loopback, sin interceptar API de negocio. La publicación manual prevista es `20261001-navigation-ui-r1`, con rollback y backend anterior sin restart; hacer push no activa la producción.
+
+No es cobertura global nueva. La rama previa de QA y otros 30 deltas backend siguen separados: no promoverlos ni descartarlos por esta conciliación.

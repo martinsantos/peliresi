@@ -88,6 +88,7 @@ function renderMobileLayout(initialPath = '/dashboard') {
         <Route path="/" element={<MobileLayout />}>
           <Route path="dashboard" element={<div data-testid="dashboard-content">Dashboard</div>} />
           <Route path="transporte/viaje/:id" element={<div data-testid="trip-content">Trip</div>} />
+          <Route path="admin/actores/generadores/:id" element={<div>Ficha del generador</div>} />
         </Route>
       </Routes>
     </MemoryRouter>
@@ -107,6 +108,23 @@ describe('MobileLayout Android shell', () => {
 
     expect(screen.getByText('Viajes')).toBeInTheDocument();
     expect(screen.queryByText('Mis Viajes')).not.toBeInTheDocument();
+  });
+
+  it('keeps menu destinations at least 44px with visible keyboard focus', () => {
+    renderMobileLayout('/dashboard');
+    fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));
+    const link = screen.getByRole('link', { name: 'Todos los Manifiestos', exact: true });
+    expect(link).toHaveClass('min-h-11', 'focus-visible:outline-2', 'transition-colors');
+  });
+
+  it('identifies the generator category on its canonical detail route', () => {
+    authState.currentUser = { ...authState.currentUser, rol: 'ADMIN' };
+    renderMobileLayout('/admin/actores/generadores/qa-generator');
+    expect(screen.getByRole('banner')).toHaveTextContent('Generadores');
+    fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));
+    const link = screen.getByRole('link', { name: 'Generadores', exact: true });
+    expect(link).toHaveAttribute('href', '/admin/actores/generadores');
+    expect(link).toHaveAttribute('aria-current', 'page');
   });
 
   it('shows an accessible active trip return surface outside trip mode', async () => {

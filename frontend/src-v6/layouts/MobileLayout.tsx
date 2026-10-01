@@ -236,8 +236,8 @@ export const MobileLayout: React.FC = () => {
     // Admin section
     if (isAdmin) {
       items.push({ to: mp('/admin/usuarios'), icon: <User size={20} />, label: 'Usuarios', section: 'admin' });
-      items.push({ to: mp('/admin/generadores'), icon: <Factory size={20} />, label: 'Generadores', section: 'admin' });
-      items.push({ to: mp('/admin/operadores'), icon: <FlaskConical size={20} />, label: 'Operadores', section: 'admin' });
+      items.push({ to: mp('/admin/actores/generadores'), icon: <Factory size={20} />, label: 'Generadores', section: 'admin' });
+      items.push({ to: mp('/admin/actores/operadores'), icon: <FlaskConical size={20} />, label: 'Operadores', section: 'admin' });
       items.push({ to: mp('/admin/vehiculos'), icon: <Truck size={20} />, label: 'Vehículos', section: 'admin' });
       items.push({ to: mp('/admin/residuos'), icon: <Database size={20} />, label: 'Catálogo Residuos', section: 'admin' });
       items.push({ to: mp('/admin/auditoria'), icon: <Shield size={20} />, label: 'Auditoría', section: 'admin' });
@@ -278,6 +278,9 @@ export const MobileLayout: React.FC = () => {
     if (path.includes('/transporte/perfil')) return 'Mis Viajes';
     if (path.includes('/transporte/viaje')) return 'Viaje en Curso';
     if (path.includes('/tracking')) return 'Tracking';
+    if (path.includes('/admin/actores/generadores')) return 'Generadores';
+    if (path.includes('/admin/actores/operadores')) return 'Operadores';
+    if (path.includes('/admin/actores/transportistas')) return 'Transportistas';
     if (path.includes('/actores')) return 'Actores';
     if (path.includes('/reportes')) return 'Reportes';
     if (path.includes('/alertas')) return 'Alertas';
@@ -460,6 +463,8 @@ export const MobileLayout: React.FC = () => {
 
             {/* Drawer Menu Items — scrollable on mobile */}
             <div
+              role="navigation"
+              aria-label="Menú de la aplicación"
               className="flex-1 overflow-y-auto p-2"
               style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
             >
@@ -600,7 +605,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ to, icon, label, badge, onClick, ac
       to={to}
       onClick={onClick}
       className={({ isActive }) => cn(
-        'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors',
+        'flex min-h-11 items-center gap-3 px-3 py-2.5 rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700',
         isActive 
           ? `${activeColor.replace('text-', 'bg-').replace('600', '50')} ${activeColor}` 
           : 'text-neutral-600 hover:bg-neutral-100'
