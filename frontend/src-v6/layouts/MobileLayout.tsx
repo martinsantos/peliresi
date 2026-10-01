@@ -477,7 +477,6 @@ export const MobileLayout: React.FC = () => {
                     label={item.label} 
                     badge={item.badge}
                     onClick={() => setIsMenuOpen(false)}
-                    activeColor={config.color}
                   />
                 ))}
               </div>
@@ -496,7 +495,6 @@ export const MobileLayout: React.FC = () => {
                         icon={item.icon} 
                         label={item.label}
                         onClick={() => setIsMenuOpen(false)}
-                        activeColor={config.color}
                       />
                     ))}
                   </div>
@@ -517,7 +515,6 @@ export const MobileLayout: React.FC = () => {
                         icon={item.icon}
                         label={item.label}
                         onClick={() => setIsMenuOpen(false)}
-                        activeColor={config.color}
                       />
                     ))}
                     <a
@@ -554,14 +551,12 @@ export const MobileLayout: React.FC = () => {
                   icon={<Settings size={20} />}
                   label="Configuración"
                   onClick={() => setIsMenuOpen(false)}
-                  activeColor={config.color}
                 />
                 <MenuItem
                   to={mp('/mi-perfil')}
                   icon={<User size={20} />}
                   label="Mi Perfil"
                   onClick={() => setIsMenuOpen(false)}
-                  activeColor={config.color}
                 />
               </div>
             </div>
@@ -596,10 +591,9 @@ interface MenuItemProps {
   label: string;
   badge?: number;
   onClick?: () => void;
-  activeColor?: string;
 }
 
-const MenuItem: React.FC<MenuItemProps> = ({ to, icon, label, badge, onClick, activeColor = 'text-primary-600' }) => {
+const MenuItem: React.FC<MenuItemProps> = ({ to, icon, label, badge, onClick }) => {
   return (
     <NavLink
       to={to}
@@ -607,7 +601,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ to, icon, label, badge, onClick, ac
       className={({ isActive }) => cn(
         'flex min-h-11 items-center gap-3 px-3 py-2.5 rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700',
         isActive 
-          ? `${activeColor.replace('text-', 'bg-').replace('600', '50')} ${activeColor}` 
+          ? 'bg-primary-50 text-primary-900'
           : 'text-neutral-600 hover:bg-neutral-100'
       )}
     >

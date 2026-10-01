@@ -16,6 +16,8 @@ Siguen pendientes uniformidad global de hover/active/tablas/íconos y bandeja de
 
 Sobre esa fuente se corrige la selección simultánea del padre Actores y su categoría; los encabezados conservan la categoría en fichas. En la app, los accesos de generadores/operadores usan las rutas canónicas y señalan su categoría al abrir una ficha. Menú principal/drawer con objetivos mínimos de 44px, foco visible y transiciones de color sin animar geometría. Permisos, marca, login azul y sistema verde se conservan; SW web v79, política de caché sin cambios.
 
+La revisión de capturas detuvo la publicación del primer candidato: el activo del menú app convertía `text-primary-700` a `bg-primary-700`, ocultando texto e ícono. Se sustituye por fondo verde claro y texto verde oscuro explícitos; el E2E mide un contraste mínimo de 4.5:1 sobre los colores renderizados, además de verificar foco/activo/tamaño y capturas. No certificar todo el sistema por esa medición acotada.
+
 Verificación local de este candidato: 540 unit frontend, typecheck y builds web/app aprobados; lint de los archivos cambiados sin errores, 11 advertencias heredadas. 30 ejecuciones E2E aprobadas sobre los mismos builds en Chrome escritorio1440×900, Pixel7 responsive y ruta /app: seis navegación, doce Control/Monitor, doce inspecciones/manifiestos. Datos y sesiones reales únicamente de PostgreSQL sintético loopback, sin interceptar API de negocio. La publicación manual prevista es `20261001-navigation-ui-r1`, con rollback y backend anterior sin restart; hacer push no activa la producción.
 
 No es cobertura global nueva. La rama previa de QA y otros 30 deltas backend siguen separados: no promoverlos ni descartarlos por esta conciliación.

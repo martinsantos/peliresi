@@ -125,6 +125,7 @@ describe('MobileLayout Android shell', () => {
     const link = screen.getByRole('link', { name: 'Generadores', exact: true });
     expect(link).toHaveAttribute('href', '/admin/actores/generadores');
     expect(link).toHaveAttribute('aria-current', 'page');
+    expect(link).toHaveClass('bg-primary-50', 'text-primary-900');
   });
 
   it('shows an accessible active trip return surface outside trip mode', async () => {
