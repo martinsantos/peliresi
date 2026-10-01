@@ -8,6 +8,7 @@ import { domainEvents } from '../services/domainEvent.service';
 import { computeRollingHash, computeClosureHash, hashManifiesto, registrarSello } from '../services/blockchain.service';
 import { invalidateGpsCache } from './manifiesto-gps.controller';
 import { assertCanAccessManifiesto } from '../utils/roleFilter';
+import { prepareManifiestoSignature } from '../domain/manifiestoSignature';
 import {
   cancelarManifiestoSchema,
   canRevertManifest,
@@ -75,6 +76,7 @@ export const firmarManifiesto = async (req: AuthRequest, res: Response, next: Ne
     const { id } = req.params;
     await assertCanAccessManifiesto(prisma, req.user, id);
     const userId = req.user.id;
+    const firma = await prepareManifiestoSignature(req.body?.firma);
 
     // Generate QR before transaction (async, no DB write)
     // We need manifiesto.numero first — fetch outside tx to avoid holding tx open during QR generation
@@ -133,8 +135,11 @@ export const firmarManifiesto = async (req: AuthRequest, res: Response, next: Ne
         data: {
           manifiestoId: id,
           tipo: 'FIRMA',
-          descripcion: 'Manifiesto firmado digitalmente por el generador',
-          usuarioId: userId
+          descripcion: firma
+            ? 'Manifiesto aprobado por la cuenta autenticada con firma manuscrita adjunta'
+            : 'Manifiesto aprobado por la cuenta autenticada, sin firma manuscrita adjunta',
+          usuarioId: userId,
+          ...(firma ? { firmaImagen: firma.imagen, firmaSha256: firma.sha256 } : {}),
         }
       });
 
@@ -976,6 +981,7 @@ export const registrarPesaje = async (req: AuthRequest, res: Response, next: Nex
         pesoDeclarado: result.pesoDeclaradoTotal,
         pesoReal: result.pesoRealTotal,
         delta: `${result.porcentajeDif.toFixed(2)}%`,
+        deltaPorcentaje: result.porcentajeDif,
         userId,
       });
     }

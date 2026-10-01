@@ -15,6 +15,7 @@ import { getAccessToken } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import type { Notificacion } from '../types/models';
 import { TipoNotificacion } from '../types/models';
+import { resolveNotificationPath } from '../utils/notificationNavigation';
 
 // ========================================
 // HELPERS
@@ -92,9 +93,10 @@ function formatTimeAgo(dateStr: string): string {
 interface NotificationBellProps {
   /** Base path for navigation (e.g. '' for desktop, '/mobile' for mobile) */
   basePath?: string;
+  inverse?: boolean;
 }
 
-export const NotificationBell: React.FC<NotificationBellProps> = React.memo(function NotificationBell({ basePath = '' }) {
+export const NotificationBell: React.FC<NotificationBellProps> = React.memo(function NotificationBell({ basePath = '', inverse = false }) {
   const [isOpen, setIsOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -105,8 +107,8 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
   const hasToken = !!getAccessToken();
 
   // Fetch últimas 5 sin filtrar por leída; badge usa noLeidas del response
-  const { data } = useQuery({
-    queryKey: ['notificaciones', 'bell'],
+  const { data, isPending, isError, refetch } = useQuery({
+    queryKey: ['notificaciones', 'bell', currentUser?.id],
     queryFn: () => notificacionService.list({ limit: 5 }),
     refetchInterval: hasToken ? 30_000 : false,
     staleTime: 15_000,
@@ -145,31 +147,25 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
   }, [isOpen]);
 
   const handleBellClick = useCallback(() => {
+    if (!isOpen) void refetch();
     setIsOpen((prev) => !prev);
-  }, []);
+  }, [isOpen, refetch]);
 
   const handleNotificationClick = useCallback(
     (notif: Notificacion) => {
-      notificacionService.marcarLeida(notif.id).catch(() => {});
-      queryClient.invalidateQueries({ queryKey: ['notificaciones'] });
+      void notificacionService.marcarLeida(notif.id)
+        .then(() => queryClient.invalidateQueries({ queryKey: ['notificaciones'] }))
+        .catch(() => { /* Keep the notice unread if acknowledgement was not confirmed. */ });
       setIsOpen(false);
 
-      // Notificaciones de nuevo registro → ir a gestión de usuarios
-      const datos = notif.datos ? (() => { try { return JSON.parse(notif.datos!); } catch { return null; } })() : null;
-      if (datos?.tipo === 'nuevo_registro') {
-        navigate(`${basePath}/admin/usuarios`);
-      } else if (notif.manifiestoId) {
-        navigate(`${basePath}/manifiestos/${notif.manifiestoId}`);
-      } else {
-        navigate(`${basePath}/alertas`);
-      }
+      navigate(resolveNotificationPath(notif, basePath));
     },
     [navigate, queryClient, basePath]
   );
 
   const handleViewAll = useCallback(() => {
     setIsOpen(false);
-    navigate(`${basePath}/alertas`);
+    navigate(resolveNotificationPath({ manifiestoId: null, datos: null } as Notificacion, basePath));
   }, [navigate, basePath]);
 
   return (
@@ -178,10 +174,11 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
       <button
         ref={buttonRef}
         onClick={handleBellClick}
-        className="relative flex min-h-11 min-w-11 items-center justify-center rounded-xl hover:bg-neutral-100 transition-colors"
+        className={'relative flex min-h-11 min-w-11 items-center justify-center rounded-lg transition-colors ' + (inverse ? 'text-white hover:bg-white/15 focus-visible:outline-white' : 'text-neutral-700 hover:bg-neutral-100')}
+        aria-expanded={isOpen}
         aria-label={`Notificaciones${unreadCount > 0 ? ` (${unreadCount} sin leer)` : ''}`}
       >
-        <Bell size={20} className="text-neutral-600" />
+        <Bell size={20} />
         {unreadCount > 0 && (
           <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-error-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
             {unreadCount > 9 ? '9+' : unreadCount}
@@ -193,7 +190,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
       {isOpen && (
         <div
           ref={panelRef}
-          className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white border border-neutral-200 rounded-2xl shadow-xl z-50 animate-scale-in overflow-hidden"
+          className="absolute right-0 top-full mt-2 w-[min(24rem,calc(100vw-2rem))] bg-white text-neutral-900 border border-neutral-200 rounded-xl shadow-xl z-50 overflow-hidden"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-100">
@@ -207,7 +204,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
             </div>
             <button
               onClick={() => setIsOpen(false)}
-              className="p-1 rounded-lg hover:bg-neutral-100 text-neutral-400 transition-colors"
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-lg hover:bg-neutral-100 text-neutral-600 transition-colors"
               aria-label="Cerrar notificaciones"
             >
               <X size={16} />
@@ -216,10 +213,11 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
 
           {/* Notifications List */}
           <div className="max-h-80 overflow-y-auto">
-            {items.length === 0 ? (
+            {isError && <div role="alert" className="border-b border-neutral-200 px-4 py-3 text-sm text-error-800">No se pudieron actualizar los avisos.{items.length > 0 && ' Se muestran los últimos disponibles.'}<button type="button" onClick={() => void refetch()} className="mt-2 block min-h-11 rounded-lg border border-neutral-400 px-3 font-semibold text-neutral-900">Reintentar</button></div>}
+            {isPending ? <p role="status" className="px-4 py-6 text-sm text-neutral-700">Cargando avisos…</p> : items.length === 0 && !isError ? (
               <div className="py-10 text-center">
                 <Bell size={32} className="mx-auto text-neutral-300 mb-2" />
-                <p className="text-sm text-neutral-500">No hay notificaciones pendientes</p>
+                <p className="text-sm text-neutral-700">Todavía no hay avisos.</p>
               </div>
             ) : (
               <div className="divide-y divide-neutral-50">
@@ -242,14 +240,14 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
-                            <p className={`text-sm leading-tight truncate ${isUnread ? 'font-semibold text-neutral-900' : 'font-medium text-neutral-700'}`}>
+                            <p className={`text-sm leading-snug break-words ${isUnread ? 'font-semibold text-neutral-900' : 'font-medium text-neutral-700'}`}>
                               {notif.titulo}
                             </p>
                             {isUnread && (
                               <span className="w-2 h-2 bg-primary-500 rounded-full shrink-0 mt-1.5" />
                             )}
                           </div>
-                          <p className="text-xs text-neutral-500 mt-0.5 line-clamp-2">
+                          <p className="text-sm text-neutral-700 mt-1 line-clamp-2">
                             {notif.mensaje}
                           </p>
                           {(() => {
@@ -265,7 +263,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
                               );
                             } catch { return null; }
                           })()}
-                          <p className="text-[11px] text-neutral-400 mt-1">
+                          <p className="text-xs text-neutral-600 mt-1">
                             {formatTimeAgo(notif.createdAt)}
                           </p>
                         </div>
@@ -283,7 +281,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
               onClick={handleViewAll}
               className="w-full py-2 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-xl transition-colors"
             >
-              Ver todas las alertas
+              Ver todas las notificaciones
             </button>
           </div>
         </div>

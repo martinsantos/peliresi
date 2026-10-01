@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
+import { formatActorCalendarDate } from '../../utils/actorCalendarDate';
 import type { Transportista, Vehiculo, Chofer } from '../../types/models';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -146,15 +147,18 @@ const TransportistaDetallePage: React.FC = () => {
     return choferSort.direction === 'asc' ? <ChevronUp size={12} className="ml-1 text-primary-600 inline" /> : <ChevronDown size={12} className="ml-1 text-primary-600 inline" />;
   };
 
-  const backPath = '/admin/actores/transportistas';
+  const returnTo = (location.state as { inspectionReturn?: string } | null)?.inspectionReturn;
+  const backPath = returnTo?.startsWith('/') && !returnTo.startsWith('//') ? returnTo : '/admin/actores/transportistas';
 
   const openCreateVehiculo = () => {
+    if (!isAdmin) return;
     setEditingVehiculo(null);
     setVehiculoForm(EMPTY_VEHICULO);
     setShowVehiculoModal(true);
   };
 
   const openEditVehiculo = (v: Vehiculo) => {
+    if (!isAdmin) return;
     setEditingVehiculo(v);
     setVehiculoForm({
       patente: v.patente || '',
@@ -169,12 +173,14 @@ const TransportistaDetallePage: React.FC = () => {
   };
 
   const openCreateChofer = () => {
+    if (!isAdmin) return;
     setEditingChofer(null);
     setChoferForm(EMPTY_CHOFER);
     setShowChoferModal(true);
   };
 
   const openEditChofer = (c: Chofer) => {
+    if (!isAdmin) return;
     setEditingChofer(c);
     setChoferForm({
       nombre: c.nombre || '',
@@ -188,6 +194,7 @@ const TransportistaDetallePage: React.FC = () => {
   };
 
   const handleSaveVehiculo = () => {
+    if (!isAdmin) return;
     if (!id || !vehiculoForm.patente || !vehiculoForm.marca || !vehiculoForm.modelo || !vehiculoForm.vencimiento) {
       toast.error('Campos requeridos', 'Completar patente, marca, modelo y vencimiento');
       return;
@@ -224,6 +231,7 @@ const TransportistaDetallePage: React.FC = () => {
   };
 
   const handleDeleteVehiculo = () => {
+    if (!isAdmin) return;
     if (!id || !deleteVehiculoItem) return;
     deleteVehiculo.mutate(
       { transportistaId: id, vehiculoId: deleteVehiculoItem.id },
@@ -238,6 +246,7 @@ const TransportistaDetallePage: React.FC = () => {
   };
 
   const handleSaveChofer = () => {
+    if (!isAdmin) return;
     if (!id || !choferForm.nombre || !choferForm.dni || !choferForm.licencia || !choferForm.vencimiento) {
       toast.error('Campos requeridos', 'Completar nombre, DNI, licencia y vencimiento');
       return;
@@ -272,6 +281,7 @@ const TransportistaDetallePage: React.FC = () => {
   };
 
   const handleDeleteChofer = () => {
+    if (!isAdmin) return;
     if (!id || !deleteChoferItem) return;
     deleteChofer.mutate(
       { transportistaId: id, choferId: deleteChoferItem.id },
@@ -467,7 +477,7 @@ const TransportistaDetallePage: React.FC = () => {
                       <p className="text-neutral-500 text-xs">Vencimiento habilitación</p>
                       {vtoHab ? (
                         <div className="flex items-center gap-2">
-                          <p className="font-medium">{vtoHab.toLocaleDateString('es-AR')}</p>
+                          <p className="font-medium">{formatActorCalendarDate(vtoHab)}</p>
                           {vtoStatus === 'vencida' && (
                             <Badge variant="soft" color="error" className="text-xs">VENCIDA</Badge>
                           )}
@@ -582,14 +592,14 @@ const TransportistaDetallePage: React.FC = () => {
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase cursor-pointer select-none hover:text-primary-600" style={{ width: '10%' }} onClick={() => toggleFlotaSort('estado')}>Estado{flotaSortIcon('estado')}</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden lg:table-cell" style={{ width: '13%' }}>Habilitación</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden lg:table-cell cursor-pointer select-none hover:text-primary-600" style={{ width: '12%' }} onClick={() => toggleFlotaSort('vencimiento')}>Vencimiento{flotaSortIcon('vencimiento')}</th>
-                        {isAdmin && <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase" style={{ width: '18%' }}>Acciones</th>}
+                        {isAdmin && <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase w-[25%] lg:w-[18%]">Acciones</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-100">
                       {sortedFlota.map((v: Vehiculo) => (
                         <tr key={v.patente || v.id} className="hover:bg-neutral-50 transition-colors">
-                          <td className="px-3 py-2.5 font-mono font-semibold text-neutral-900">{v.patente}</td>
-                          <td className="px-3 py-2.5 text-neutral-700">{v.marca} {v.modelo}</td>
+                          <td className="px-3 py-2.5 font-mono font-semibold text-neutral-900 break-all">{v.patente}</td>
+                          <td className="px-3 py-2.5 text-neutral-700 break-words">{v.marca} {v.modelo}</td>
                           <td className="px-3 py-2.5 text-neutral-700 hidden lg:table-cell">{typeof v.capacidad === 'number' ? `${v.capacidad.toLocaleString()} kg` : v.capacidad || '-'}</td>
                           <td className="px-3 py-2.5">
                             <Badge variant="soft" color={v.activo !== false ? 'success' : 'warning'}>
@@ -597,27 +607,30 @@ const TransportistaDetallePage: React.FC = () => {
                             </Badge>
                           </td>
                           <td className="px-3 py-2.5 text-neutral-600 hidden lg:table-cell">{v.numeroHabilitacion || '-'}</td>
-                          <td className="px-3 py-2.5 text-neutral-600 hidden lg:table-cell">{v.vencimiento ? new Date(v.vencimiento).toLocaleDateString('es-AR') : '-'}</td>
+                          <td className="px-3 py-2.5 text-neutral-600 hidden lg:table-cell">{formatActorCalendarDate(v.vencimiento)}</td>
                           {isAdmin && (
                             <td className="px-3 py-2.5">
-                              <div className="flex items-center justify-end gap-2">
+                              <div className="flex flex-col items-end justify-end gap-2 lg:flex-row">
                                 <Button
                                   size="sm"
                                   variant="outline"
+                                  aria-label={`Editar vehículo ${v.patente}`}
+                                  className="h-11 w-11 shrink-0 p-0 lg:w-auto lg:px-3"
                                   leftIcon={<Pencil size={14} />}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     openEditVehiculo(v);
                                   }}
                                 >
-                                  Editar
+                                  <span className="hidden lg:inline">Editar</span>
                                 </Button>
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setDeleteVehiculoItem(v);
                                   }}
-                                  className="p-2 rounded-lg hover:bg-red-50 text-neutral-400 hover:text-red-600 transition-colors"
+                                  aria-label={`Eliminar vehículo ${v.patente}`}
+                                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-error-700 hover:bg-error-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-error-700 transition-colors"
                                   title="Eliminar"
                                 >
                                   <Trash2 size={16} />
@@ -651,37 +664,40 @@ const TransportistaDetallePage: React.FC = () => {
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase" style={{ width: '15%' }}>Licencia</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden lg:table-cell" style={{ width: '14%' }}>Teléfono</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 uppercase hidden lg:table-cell cursor-pointer select-none hover:text-primary-600" style={{ width: '16%' }} onClick={() => toggleChoferSort('vencimiento')}>Vto. Licencia{choferSortIcon('vencimiento')}</th>
-                        {isAdmin && <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase" style={{ width: '18%' }}>Acciones</th>}
+                        {isAdmin && <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600 uppercase w-[25%] lg:w-[18%]">Acciones</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-100">
                       {sortedChoferes.map((c: Chofer) => (
                         <tr key={c.dni || c.id} className="hover:bg-neutral-50 transition-colors">
-                          <td className="px-3 py-2.5 font-medium text-neutral-900">{c.nombre} {c.apellido || ''}</td>
-                          <td className="px-3 py-2.5 font-mono text-neutral-700">{c.dni || '-'}</td>
+                          <td className="px-3 py-2.5 font-medium text-neutral-900 break-words">{c.nombre} {c.apellido || ''}</td>
+                          <td className="px-3 py-2.5 font-mono text-neutral-700 break-all">{c.dni || '-'}</td>
                           <td className="px-3 py-2.5 text-neutral-700">{c.licencia || '-'}</td>
                           <td className="px-3 py-2.5 text-neutral-700 hidden lg:table-cell">{c.telefono || '-'}</td>
-                          <td className="px-3 py-2.5 text-neutral-600 hidden lg:table-cell">{c.vencimiento ? new Date(c.vencimiento).toLocaleDateString('es-AR') : '-'}</td>
+                          <td className="px-3 py-2.5 text-neutral-600 hidden lg:table-cell">{formatActorCalendarDate(c.vencimiento)}</td>
                           {isAdmin && (
                             <td className="px-3 py-2.5">
-                              <div className="flex items-center justify-end gap-2">
+                              <div className="flex flex-col items-end justify-end gap-2 lg:flex-row">
                                 <Button
                                   size="sm"
                                   variant="outline"
+                                  aria-label={`Editar conductor ${c.nombre}`}
+                                  className="h-11 w-11 shrink-0 p-0 lg:w-auto lg:px-3"
                                   leftIcon={<Pencil size={14} />}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     openEditChofer(c);
                                   }}
                                 >
-                                  Editar
+                                  <span className="hidden lg:inline">Editar</span>
                                 </Button>
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setDeleteChoferItem(c);
                                   }}
-                                  className="p-2 rounded-lg hover:bg-red-50 text-neutral-400 hover:text-red-600 transition-colors"
+                                  aria-label={`Eliminar conductor ${c.nombre}`}
+                                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-error-700 hover:bg-error-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-error-700 transition-colors"
                                   title="Eliminar"
                                 >
                                   <Trash2 size={16} />

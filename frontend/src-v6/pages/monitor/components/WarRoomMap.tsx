@@ -4,6 +4,8 @@
  * PLAYBACK mode: HIDES static actors, shows only event action (trips, flashes, camera follows)
  */
 
+import { InspectionMapLayer } from '../../inspecciones/InspectionMapLayer';
+import type { InspectionOperation } from '../../../services/inspectionOperations.service';
 import React, { useMemo, useEffect, useRef, memo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -258,6 +260,7 @@ function EventFlash({ events }: { events: Array<{ lat: number; lng: number; tipo
 // ─── Main component ──────────────────────────────────────────────────────────
 
 interface Props {
+  inspections?: InspectionOperation[];
   cinemaMode: boolean;
   actores: { generadores: ActorPosition[]; transportistas: ActorPosition[]; operadores: ActorPosition[] } | null;
   enTransito: EnTransitoItem[];
@@ -269,7 +272,7 @@ interface Props {
   playbackEvents?: Array<{ id: string; tipo: string; lat: number; lng: number; numero?: string }>;
 }
 
-export const WarRoomMap: React.FC<Props> = ({ cinemaMode, actores, enTransito, mode, currentHour, playbackTrips, currentEvent, playbackEvents }) => {
+export const WarRoomMap: React.FC<Props> = ({ inspections = [], cinemaMode, actores, enTransito, mode, currentHour, playbackTrips, currentEvent, playbackEvents }) => {
 
   // Overlay día/noche — sutil, máx opacity 0.12
   const dayOverlayColor = useMemo(() => {
@@ -301,6 +304,7 @@ export const WarRoomMap: React.FC<Props> = ({ cinemaMode, actores, enTransito, m
   return (
     <div className="relative w-full h-full">
     <MapContainer center={MENDOZA_CENTER} zoom={10} className="w-full h-full" zoomControl={false}>
+      {mode === 'LIVE' && <InspectionMapLayer items={inspections} />}
       <TileLayer url={MAP_TILES} attribution={ATTRIBUTION} />
 
       {/* PLAYBACK: camera + imperative trucks + event flashes */}

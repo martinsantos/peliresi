@@ -36,6 +36,7 @@ interface ToastItemProps extends Toast {
 // ========================================
 let toastListeners: ((toasts: Toast[]) => void)[] = [];
 let toasts: Toast[] = [];
+const expiryTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 const notifyListeners = () => {
   toastListeners.forEach((listener) => listener([...toasts]));
@@ -43,20 +44,23 @@ const notifyListeners = () => {
 
 export const toast = {
   add: (t: Omit<Toast, 'id'>) => {
-    const id = Math.random().toString(36).substr(2, 9);
-    toasts = [...toasts, { ...t, id }];
+    const existing = toasts.find(item => item.type === t.type && item.title === t.title && item.message === t.message);
+    const id = existing?.id ?? Math.random().toString(36).slice(2, 11);
+    if (existing) toasts = toasts.map(item => item.id === id ? { ...t, id } : item);
+    else toasts = [...toasts, { ...t, id }];
     notifyListeners();
-
-    // Auto remove
-    const duration = t.duration || 5000;
-    setTimeout(() => {
-      toast.remove(id);
-    }, duration);
+    clearTimeout(expiryTimers.get(id));
+    expiryTimers.delete(id);
+    // An explicit zero keeps an actionable notice until the user dismisses it.
+    const duration = t.duration ?? 5000;
+    if (duration > 0) expiryTimers.set(id, setTimeout(() => toast.remove(id), duration));
 
     return id;
   },
   
   remove: (id: string) => {
+    clearTimeout(expiryTimers.get(id));
+    expiryTimers.delete(id);
     toasts = toasts.filter((t) => t.id !== id);
     notifyListeners();
   },
@@ -79,6 +83,7 @@ export const toast = {
   
   subscribe: (listener: (toasts: Toast[]) => void) => {
     toastListeners.push(listener);
+    listener([...toasts]);
     return () => {
       toastListeners = toastListeners.filter((l) => l !== listener);
     };
@@ -112,34 +117,27 @@ const ToastItem: React.FC<ToastItemProps> = ({
   message,
   onRemove,
 }) => {
-  const [isExiting, setIsExiting] = useState(false);
-
-  const handleRemove = () => {
-    setIsExiting(true);
-    setTimeout(() => onRemove(id), 300);
-  };
-
   return (
     <div
       className={cn(
-        'w-full rounded-xl border p-3 shadow-3 sm:p-4',
-        'animate-slide-in-right',
-        toastStyles[type],
-        isExiting && 'animate-fade-out'
+        'w-full rounded-xl border p-3 shadow-3',
+        toastStyles[type]
       )}
-      role="alert"
+      role={type === 'error' || type === 'warning' ? 'alert' : 'status'}
+      aria-atomic="true"
     >
       <div className="flex gap-3">
         <div className="shrink-0">{toastIcons[type]}</div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-neutral-900 sm:text-base">{title}</p>
           {message && (
-            <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-neutral-600 sm:text-sm">{message}</p>
+            <p className="mt-1 break-words text-sm leading-relaxed text-neutral-700">{message}</p>
           )}
         </div>
         <button
-          onClick={handleRemove}
-          className="shrink-0 text-neutral-400 hover:text-neutral-600 transition-colors"
+          type="button"
+          onClick={() => onRemove(id)}
+          className="flex min-h-11 min-w-11 shrink-0 items-center justify-center self-start rounded-lg text-neutral-600 hover:bg-white/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
           aria-label="Cerrar notificación"
         >
           <X size={16} />
@@ -162,7 +160,7 @@ export const ToastContainer: React.FC = () => {
   }, []);
 
   const container = (
-    <div className="pointer-events-none fixed inset-x-3 top-3 z-[9999] flex flex-col gap-2 sm:left-auto sm:right-4 sm:top-4 sm:w-96 sm:gap-3">
+    <div aria-label="Avisos del sistema" role="region" className="pointer-events-none fixed inset-x-3 top-[calc(env(safe-area-inset-top,0px)+4.5rem)] z-[9999] flex max-h-[60dvh] flex-col gap-2 overflow-y-auto sm:left-auto sm:right-4 sm:w-96">
       {activeToasts.map((t) => (
         <div key={t.id} className="pointer-events-auto">
           <ToastItem {...t} onRemove={toast.remove} />

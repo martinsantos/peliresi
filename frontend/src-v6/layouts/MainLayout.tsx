@@ -18,7 +18,6 @@ import {
   User,
   ChevronDown,
   LogOut,
-  Leaf,
   Command,
   Users,
   BarChart3,
@@ -42,6 +41,7 @@ import { Button } from '../components/ui/ButtonV2';
 import { Badge } from '../components/ui/BadgeV2';
 import { UserSwitcher } from '../components/ui/UserSwitcher';
 import { NotificationBell } from '../components/NotificationBell';
+import { SitrepMark } from '../components/SitrepMark';
 import { NotificacionesPoller } from '../components/NotificacionesPoller';
 import { ToastContainer } from '../components/ui/Toast';
 import { ConnectivityIndicator } from '../components/ConnectivityIndicator';
@@ -195,7 +195,7 @@ export const MainLayout: React.FC = () => {
     adminItems.find(item => item.path === location.pathname)?.label || 'SITREP';
 
   return (
-    <div className={`h-screen bg-[#F8F8F6] flex flex-col overflow-hidden ${impersonationData ? 'pt-10' : ''}`}>
+    <div data-app-shell className={`h-dvh bg-[#F8F8F6] flex flex-col overflow-hidden ${impersonationData ? 'pt-12' : ''}`}>
       <NotificacionesPoller />
       <ToastContainer />
       {/* Impersonation banner — amber bar above everything */}
@@ -222,7 +222,7 @@ export const MainLayout: React.FC = () => {
       <aside
         className={`
           fixed lg:sticky top-0 left-0 z-50
-          w-64 h-screen sidebar-polished border-r border-[#164D32]
+          w-64 h-full shrink-0 sidebar-polished border-r border-[#164D32]
           flex flex-col
           transition-transform duration-300 ease-out
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
@@ -230,9 +230,7 @@ export const MainLayout: React.FC = () => {
       >
         {/* Logo */}
         <div className="h-16 flex items-center px-6 border-b border-white/15">
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center text-[#1B5E3C] bg-white mr-3">
-            <Leaf size={20} />
-          </div>
+          <SitrepMark size={36} className="mr-3" />
           <div>
             <span className="font-bold text-lg text-white">SITREP</span>
             <span className="text-xs font-medium ml-1 text-white/60">{currentUser.rol}</span>
@@ -297,8 +295,8 @@ export const MainLayout: React.FC = () => {
             </div>
           )}
           
-          {/* User Switcher en Sidebar */}
-          <div className="mt-6 pt-6 border-t border-white/15">
+          {/* Only ADMIN can request a temporary view of another user. */}
+          {isAdmin && <div className="mt-6 pt-6 border-t border-white/15">
             <p className="px-3 text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">
               Acceso Rápido
             </p>
@@ -315,9 +313,9 @@ export const MainLayout: React.FC = () => {
               `}
             >
               <SwitchCamera size={20} />
-              Cambiar Usuario
+              Ver como otro usuario
             </NavLink>
-          </div>
+          </div>}
           
           {/* Configuración y Ayuda al final */}
           <div className="mt-2">
@@ -401,10 +399,10 @@ export const MainLayout: React.FC = () => {
                   <User size={16} />
                   Mi Perfil
                 </NavLink>
-                <NavLink to="/switch-user" className="w-full flex items-center gap-2 px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50">
+                {isAdmin && <NavLink to="/switch-user" className="w-full flex items-center gap-2 px-4 py-2 text-sm text-primary-800 hover:bg-primary-50">
                   <SwitchCamera size={16} />
-                  Cambiar Usuario
-                </NavLink>
+                  Ver como otro usuario
+                </NavLink>}
                 <button
                   onClick={() => { navigate('/configuracion'); setUserMenuOpen(false); }}
                   className="w-full flex items-center gap-2 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
@@ -427,7 +425,7 @@ export const MainLayout: React.FC = () => {
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-h-0 min-w-0">
         {/* Header */}
         <header className="h-16 header-polished flex items-center justify-between px-4 lg:px-8 sticky top-0 z-30">
           <div className="flex items-center gap-4">
@@ -435,6 +433,8 @@ export const MainLayout: React.FC = () => {
               variant="ghost"
               size="sm"
               className="lg:hidden"
+              aria-label="Abrir menú"
+              aria-expanded={sidebarOpen}
               onClick={() => setSidebarOpen(true)}
             >
               <Menu size={20} />
@@ -490,12 +490,12 @@ export const MainLayout: React.FC = () => {
         <SWUpdateBanner />
 
         {/* Keep absolutely positioned field controls inside this scroll container. */}
-        <main className="relative flex-1 px-4 lg:px-8 pb-4 lg:pb-8 overflow-auto bg-[#FAFAF8]">
+        <main className={'relative min-h-0 min-w-0 flex-1 bg-[#FAFAF8] ' + (/\/inspecciones\/[^/]+/.test(location.pathname) ? 'overflow-clip px-3 py-3 lg:px-8 lg:py-4' : 'overflow-auto px-4 pb-4 lg:px-8 lg:pb-8')}>
           <Outlet />
         </main>
 
         {/* Footer */}
-        <footer className="border-t border-neutral-100 bg-white px-4 py-2.5 flex items-center justify-center gap-3 shrink-0">
+        <footer className={'border-t border-neutral-100 bg-white px-4 py-2.5 items-center justify-center gap-3 shrink-0 ' + (/\/inspecciones\/[^/]+/.test(location.pathname) ? 'hidden' : 'flex')}>
           <img src="/logo-mendoza.webp" alt="Gobierno de Mendoza" className="h-6 w-auto opacity-60" />
           <span className="text-xs text-neutral-400">Provincia de Mendoza — SITREP v6</span>
         </footer>

@@ -4,10 +4,10 @@
  * Tabla avanzada con ordenamiento, selección y paginación
  */
 
-import React, { useState, useMemo, forwardRef } from 'react';
+import React, { useState } from 'react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { ChevronDown, ChevronUp, ArrowUpDown, MoreHorizontal, Search } from 'lucide-react';
+import { ChevronDown, ChevronUp, ArrowUpDown, Search } from 'lucide-react';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -22,7 +22,7 @@ export interface Column<T> {
   width?: string;
   align?: 'left' | 'center' | 'right';
   sortable?: boolean;
-  hiddenBelow?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  hiddenBelow?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
   truncate?: boolean;
   render?: (row: T) => React.ReactNode;
 }
@@ -86,10 +86,12 @@ export function Table<T extends Record<string, any>>({
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!onSelectionChange) return;
+    const pageKeys = safeData.map(keyExtractor);
     if (e.target.checked) {
-      onSelectionChange(safeData.map(keyExtractor));
+      onSelectionChange(Array.from(new Set([...selectedKeys, ...pageKeys])));
     } else {
-      onSelectionChange([]);
+      const pageKeySet = new Set(pageKeys);
+      onSelectionChange(selectedKeys.filter((key) => !pageKeySet.has(key)));
     }
   };
 
@@ -104,8 +106,9 @@ export function Table<T extends Record<string, any>>({
 
   const safeData = Array.isArray(data) ? data : [];
 
-  const allSelected = safeData.length > 0 && selectedKeys.length === safeData.length;
-  const someSelected = selectedKeys.length > 0 && selectedKeys.length < safeData.length;
+  const selectedOnPage = safeData.filter((row) => selectedKeys.includes(keyExtractor(row))).length;
+  const allSelected = safeData.length > 0 && selectedOnPage === safeData.length;
+  const someSelected = selectedOnPage > 0 && selectedOnPage < safeData.length;
 
   const cellPadding = compact ? 'px-3 py-2' : 'px-3 py-2.5';
   const headerPadding = compact ? 'px-3 py-2' : 'px-3 py-2.5';
@@ -117,18 +120,21 @@ export function Table<T extends Record<string, any>>({
     if (col.hiddenBelow === 'lg') return 'hidden lg:table-cell';
     if (col.hiddenBelow === 'xl') return 'hidden xl:table-cell';
     if (col.hiddenBelow === '2xl') return 'hidden 2xl:table-cell';
+    if (col.hiddenBelow === '3xl') return 'hidden min-[1920px]:table-cell';
     return '';
   };
 
   return (
     <div className={cn('overflow-x-auto rounded-xl border border-neutral-200 bg-white', stickyHeader && 'max-h-[70vh] overflow-y-auto', className)}>
-        <table className={cn("w-full text-left", fixedLayout && "table-fixed")}>
+        <table aria-busy={loading || undefined} className={cn("w-full text-left", fixedLayout && "table-fixed")}>
           <thead className={cn('bg-neutral-50 border-b border-neutral-200', stickyHeader && 'sticky top-0 z-10')}>
             <tr>
               {selectable && (
-                <th className={cn(headerPadding, 'w-px whitespace-nowrap')}>
+                <th className={cn(headerPadding, 'w-12 whitespace-nowrap')}>
                   <input
                     type="checkbox"
+                    aria-label="Seleccionar todos los registros de esta página"
+                    disabled={loading || safeData.length === 0}
                     checked={allSelected}
                     ref={(el) => { if (el) el.indeterminate = someSelected; }}
                     onChange={handleSelectAll}
@@ -142,6 +148,8 @@ export function Table<T extends Record<string, any>>({
                 return (
                 <th
                   key={column.key}
+                  scope="col"
+                  aria-sort={column.sortable && sortable ? (sortConfig?.key === column.key ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none') : undefined}
                   className={cn(
                     headerPadding,
                     'text-xs font-semibold text-neutral-600 uppercase tracking-wider',
@@ -152,19 +160,20 @@ export function Table<T extends Record<string, any>>({
                     isStickyRight && 'sticky right-0 bg-neutral-50 z-[5] shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)]'
                   )}
                   style={{ width: column.width }}
-                  onClick={() => column.sortable && handleSort(column.key)}
                 >
                   <div className={cn('flex items-center gap-1', column.align === 'center' && 'justify-center', column.align === 'right' && 'justify-end')}>
-                    {column.header}
-                    {column.sortable && sortable && (
-                      <span className="text-neutral-400">
+                    {column.sortable && sortable ? (
+                      <button type="button" aria-label={typeof column.header === 'string' ? `Ordenar por ${column.header}` : undefined} onClick={() => handleSort(column.key)} className="flex min-h-11 items-center gap-1 rounded text-left uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
+                        <span className="sr-only">Ordenar por</span><span>{column.header}</span>
+                        <span aria-hidden="true" className="text-neutral-600">
                         {sortConfig?.key === column.key ? (
                           sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
                         ) : (
                           <ArrowUpDown size={14} />
                         )}
-                      </span>
-                    )}
+                        </span>
+                      </button>
+                    ) : column.header}
                   </div>
                 </th>
                 );
@@ -177,7 +186,7 @@ export function Table<T extends Record<string, any>>({
                 <tr key={i} className="animate-pulse">
                   {selectable && <td className={cellPadding}><div className="w-4 h-4 bg-neutral-200 rounded" /></td>}
                   {columns.map((col, j) => (
-                    <td key={j} className={cellPadding}>
+                    <td key={j} className={cn(cellPadding, hiddenClass(col))}>
                       <div className="h-4 bg-neutral-200 rounded w-3/4" />
                     </td>
                   ))}
@@ -204,18 +213,28 @@ export function Table<T extends Record<string, any>>({
                   <React.Fragment key={rowKey}>
                   <tr
                     className={cn(
-                      'transition-colors',
+                      'group transition-colors hover:bg-neutral-50 focus-within:bg-neutral-50',
                       striped && index % 2 === 1 && 'bg-neutral-50/50',
                       isSelected && 'bg-primary-50/50',
-                      onRowClick && 'cursor-pointer hover:bg-neutral-50',
+                      onRowClick && 'cursor-pointer',
+                      onRowClick && 'focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-700',
                       bordered && 'border-b border-neutral-100 last:border-0'
                     )}
-                    onClick={() => onRowClick?.(row)}
+                    tabIndex={onRowClick ? 0 : undefined}
+                    onClick={(event) => {
+                      if (!(event.target as HTMLElement).closest('a, button, input, select, textarea, summary, [role="button"], [role="checkbox"], [role="switch"]')) onRowClick?.(row);
+                    }}
+                    onKeyDown={(event) => {
+                      if (onRowClick && event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+                        event.preventDefault(); onRowClick(row);
+                      }
+                    }}
                   >
                     {selectable && (
                       <td className={cn(cellPadding, 'whitespace-nowrap')} onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
+                          aria-label={`Seleccionar registro ${index + 1}`}
                           checked={isSelected}
                           onChange={() => handleSelectRow(rowKey)}
                           className="w-4 h-4 rounded border-neutral-300 text-primary-500 focus:ring-primary-500"
@@ -235,7 +254,7 @@ export function Table<T extends Record<string, any>>({
                           column.align === 'right' && 'text-right',
                           column.truncate && 'truncate max-w-0',
                           hiddenClass(column),
-                          isStickyRight && 'sticky right-0 bg-white z-[5] shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)]'
+                          isStickyRight && 'sticky right-0 bg-white group-hover:bg-neutral-50 group-focus-within:bg-neutral-50 z-[5] shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)]'
                         )}
                       >
                         {column.render ? column.render(row) : row[column.key]}
@@ -282,7 +301,7 @@ export function Pagination({
   onItemsPerPageChange,
   itemsPerPageOptions = [10, 25, 50, 100],
 }: PaginationProps) {
-  const startItem = (currentPage - 1) * itemsPerPage + 1;
+  const startItem = totalItems === 0 ? 0 : Math.min((currentPage - 1) * itemsPerPage + 1, totalItems);
   const endItem = Math.min(currentPage * itemsPerPage, totalItems);
 
   const getVisiblePages = () => {
@@ -313,7 +332,7 @@ export function Pagination({
 
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-3 sm:px-4 py-3 border-t border-neutral-200 bg-white max-w-full overflow-hidden">
-      <div className="flex items-center gap-4 text-sm text-neutral-600">
+      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm text-neutral-600">
         <span>
           Mostrando <strong className="text-neutral-900">{startItem}-{endItem}</strong> de{' '}
           <strong className="text-neutral-900">{totalItems}</strong>
@@ -322,9 +341,10 @@ export function Pagination({
           <div className="flex items-center gap-2">
             <span>/</span>
             <select
+              aria-label="Registros por página"
               value={itemsPerPage}
               onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
-              className="text-sm border-neutral-200 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+              className="min-h-11 px-2 text-base sm:text-sm border border-neutral-400 rounded-lg focus:ring-primary-500 focus:border-primary-500"
             >
               {itemsPerPageOptions.map((opt) => (
                 <option key={opt} value={opt}>
@@ -339,9 +359,10 @@ export function Pagination({
 
       <div className="flex items-center gap-1 flex-wrap justify-center max-w-full">
         <button
+          type="button"
           onClick={() => onPageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-          className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          disabled={currentPage <= 1 || totalItems === 0}
+          className="min-h-11 px-2 sm:px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           Anterior
         </button>
@@ -352,11 +373,14 @@ export function Pagination({
               <span className="px-2 text-neutral-400">...</span>
             ) : (
               <button
+                type="button"
+                aria-label={`Página ${page}`}
+                aria-current={currentPage === page ? 'page' : undefined}
                 onClick={() => onPageChange(page as number)}
                 className={cn(
-                  'min-w-[32px] px-3 py-1.5 text-sm font-medium rounded-lg transition-colors',
+                  'min-h-11 min-w-11 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors',
                   currentPage === page
-                    ? 'bg-primary-500 text-white'
+                    ? 'bg-[#1B5E3C] text-white'
                     : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
                 )}
               >
@@ -367,9 +391,10 @@ export function Pagination({
         ))}
 
         <button
+          type="button"
           onClick={() => onPageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}
-          className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          disabled={currentPage >= totalPages || totalItems === 0}
+          className="min-h-11 px-2 sm:px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           Siguiente
         </button>

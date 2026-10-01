@@ -5,6 +5,7 @@ import type { Inspection } from '../../types/inspection';
 import InspeccionExpedientePage from '../../pages/inspecciones/InspeccionExpedientePage';
 import { inspeccionService } from '../../services/inspeccion.service';
 import { toast } from '../../components/ui/Toast';
+import { startLocalDictation } from '../../services/localDictation';
 
 const queryMock = vi.hoisted(() => vi.fn());
 vi.mock('../../hooks/useInspectionDraftOwnership', () => ({ useInspectionDraftOwnership: () => ({ status: 'owned', canWrite: () => true, retry: vi.fn() }) }));
@@ -19,6 +20,7 @@ vi.mock('../../services/inspeccion.service', () => ({ inspeccionService: {
 } }));
 vi.mock('../../services/inspectionOfflineEvidence', async (importOriginal) => ({ ...await importOriginal<typeof import('../../services/inspectionOfflineEvidence')>(), listPendingInspectionEvidence: vi.fn().mockResolvedValue([]) }));
 vi.mock('../../components/ui/Toast', () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() } }));
+vi.mock('../../services/localDictation', () => ({ startLocalDictation: vi.fn() }));
 vi.mock('../../pages/inspecciones/InspectionComparisonPanel', () => ({ InspectionComparisonPanel: () => <div /> }));
 vi.mock('../../pages/inspecciones/InspectionTimeline', () => ({ InspectionTimeline: () => <div /> }));
 vi.mock('../../pages/inspecciones/InspectionVerificationBlock', () => ({ InspectionVerificationBlock: () => <div /> }));
@@ -40,9 +42,9 @@ function page() {
   return <MemoryRouter initialEntries={['/inspecciones/inspection-1#checklist/DOC-01']}><Routes><Route path="/inspecciones/:id" element={<InspeccionExpedientePage />} /></Routes></MemoryRouter>;
 }
 const editor = () => screen.getByRole('textbox', { name: 'Observación: Documentación vigente' });
-const inline = () => within(screen.getByTestId('inspection-item-save-item-1'));
+const inline = () => within(screen.getByTestId('inspection-field-save-bar'));
 
-describe('explicit save next to an inspection comment', () => {
+describe('shared explicit save for the complete inspection draft', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
@@ -51,6 +53,23 @@ describe('explicit save next to an inspection comment', () => {
     vi.mocked(inspeccionService.saveDraft).mockResolvedValue({ version: 2 } as Inspection);
   });
   afterEach(() => vi.restoreAllMocks());
+
+  it('keeps voice dictation visible and stores the recognized comment only on this device until server save', async () => {
+    let recognized!: (text: string) => void;
+    vi.mocked(startLocalDictation).mockImplementation(async (events) => {
+      recognized = events.onText;
+      events.onPhase('listening');
+      return { stop: async () => undefined, cancel: () => undefined };
+    });
+    render(page());
+    expect(await screen.findByRole('textbox', { name: 'Observación: Documentación vigente' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Dictar observación' }));
+    expect(await screen.findByRole('button', { name: 'Detener dictado' })).toBeVisible();
+    act(() => recognized('Falta habilitación vigente en campo.'));
+    expect(editor()).toHaveValue('Falta habilitación vigente en campo.');
+    expect(JSON.parse(localStorage.getItem(key) || '{}').items[0].observacion).toBe('Falta habilitación vigente en campo.');
+    expect(inspeccionService.saveDraft).not.toHaveBeenCalled();
+  });
 
   it('saves the entire draft atomically and confirms only after the server responds', async () => {
     render(page());
@@ -136,7 +155,8 @@ describe('explicit save next to an inspection comment', () => {
     expect(inline().getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
     expect(editor()).toHaveValue('Comentario de una versión anterior.');
     expect(toast.success).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: /recuperar borrador anterior/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /aplicar selección \(0\)/i })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /Control · Documentación vigente/i })).toBeInTheDocument();
   });
 
   it('does not lose a later edit to save invalidation or mark it synchronized', async () => {
@@ -146,8 +166,8 @@ describe('explicit save next to an inspection comment', () => {
     fireEvent.change(await screen.findByRole('textbox', { name: 'Observación: Documentación vigente' }), { target: { value: 'Primera versión.' } });
     fireEvent.click(inline().getByRole('button', { name: 'Guardar cambios' }));
     await waitFor(() => expect(inspeccionService.saveDraft).toHaveBeenCalled());
-    expect(editor()).toBeDisabled();
-    // Programmatic input models a queued input event landing during the save.
+    expect(editor()).toBeEnabled();
+    // A slow request must not stop the inspector from recording the next fact.
     fireEvent.change(editor(), { target: { value: 'Trabajo posterior.' } });
     queryMock.mockReturnValue({ data: { ...fixture, version: 4, items: [{ ...fixture.items[0], observacion: 'Primera versión.' }] }, isLoading: false, refetch: vi.fn() });
     view.rerender(page());

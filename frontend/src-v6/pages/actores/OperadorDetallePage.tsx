@@ -33,6 +33,7 @@ import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Tabs, TabList, Tab, TabPanel } from '../../components/ui/Tabs';
+import { useAuth } from '../../contexts/AuthContext';
 import { useOperador } from '../../hooks/useActores';
 
 import type { OperadorEnriched } from '../../data/operadores-enrichment';
@@ -85,6 +86,8 @@ function parseTecnologias(tecnologia: string): { metodo: string; corrientes: str
 const OperadorDetallePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
+  const canViewCatalog = currentUser?.rol === 'ADMIN' || currentUser?.rol === 'ADMIN_OPERADOR';
   const location = useLocation();
   // Removed isMobile — React Router handles basename
 
@@ -115,7 +118,8 @@ const OperadorDetallePage: React.FC = () => {
 
   // Determine back path based on where we came from (admin vs actores)
   const isFromAdmin = location.pathname.includes('/admin/');
-  const backPath = isFromAdmin ? '/admin/actores/operadores' : '/actores/operadores';
+  const returnTo = (location.state as { inspectionReturn?: string } | null)?.inspectionReturn;
+  const backPath = returnTo?.startsWith('/') && !returnTo.startsWith('//') ? returnTo : isFromAdmin ? '/admin/actores/operadores' : '/actores/operadores';
 
   if (isLoading) {
     return (
@@ -462,7 +466,7 @@ const OperadorDetallePage: React.FC = () => {
             )}
 
             {/* Link al catálogo de tratamientos */}
-            <div className="flex justify-end">
+            {canViewCatalog && <div className="flex justify-end">
               <Button
                 variant="outline"
                 size="sm"
@@ -471,7 +475,7 @@ const OperadorDetallePage: React.FC = () => {
               >
                 Ver catálogo completo de tratamientos
               </Button>
-            </div>
+            </div>}
           </div>
         </TabPanel>
 

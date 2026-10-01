@@ -9,7 +9,6 @@ import OnboardingWizard from '../components/OnboardingWizard';
 import { authService } from '../services/auth.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { clearUserOfflineData } from '../services/offline-sync';
-import { clearSyncQueue } from '../services/indexeddb';
 import { useSessionTimeout } from '../hooks/useSessionTimeout';
 import { getAccessToken, clearTokens } from '../services/api';
 import { clearOfflineSession, isOfflineNetworkError, readOfflineSession, saveOfflineSession } from '../services/offlineSession';
@@ -320,11 +319,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
       keysToClean.forEach(k => localStorage.removeItem(k));
-      // Clear IndexedDB offline data and sync queue for this user
+      // Re-downloadable snapshots can go. Pending actions remain scoped to
+      // their owner, so the same user can resume after signing in again.
       if (currentUser) {
         clearUserOfflineData(currentUser.id).catch(() => {});
       }
-      clearSyncQueue().catch(() => {});
       qc.clear();
       setCurrentUser(null);
       sessionChanging.current = false;
@@ -425,6 +424,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       {showOnboarding && currentUser && (
         <OnboardingWizard
           rol={currentUser.rol}
+          esInspector={currentUser.esInspector}
           userId={currentUser.id}
           onDismiss={dismissOnboarding}
         />

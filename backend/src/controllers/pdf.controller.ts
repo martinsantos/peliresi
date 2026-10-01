@@ -151,7 +151,7 @@ export const generarPDFManifiesto = async (req: AuthRequest, res: Response, next
                 transportista: { include: { vehiculos: true, choferes: true } },
                 operador: true,
                 residuos: { include: { tipoResiduo: true } },
-                eventos: { orderBy: { createdAt: 'asc' } },
+                eventos: { orderBy: { createdAt: 'asc' }, include: { usuario: { select: { nombre: true, apellido: true } } } },
             },
         });
 
@@ -312,6 +312,29 @@ export const generarPDFManifiesto = async (req: AuthRequest, res: Response, next
             drawField(doc, label, new Date(val).toLocaleDateString('es-AR'), 58 + col * fColW, fY + row * 28, fColW - 10);
         });
         doc.y = fY + (Math.ceil(dates.length / 4)) * 28 + 8;
+
+        // Use the latest approval event; a reverted draft must never display an old signature.
+        if (manifiesto.fechaFirma) {
+            const firma = [...manifiesto.eventos].reverse().find(evento => evento.tipo === 'FIRMA');
+            if (firma?.firmaImagen) {
+                if (doc.y > 630) {
+                    doc.addPage();
+                    drawSectionTitle(doc, '06', `FIRMA ADJUNTA - MANIFIESTO ${manifiesto.numero}`);
+                }
+                const signatureY = doc.y;
+                doc.image(firma.firmaImagen, 58, signatureY, { fit: [200, 90] });
+                doc.y = signatureY + 96;
+                doc.font('Helvetica').fontSize(8).fillColor(COLORS.dark)
+                   .text(`Firma manuscrita adjunta - ${[firma.usuario.nombre, firma.usuario.apellido].filter(Boolean).join(' ')}`, 58, doc.y, { width: doc.page.width - 116 });
+                doc.fontSize(7).fillColor(COLORS.gray)
+                   .text(`Registro: ${firma.createdAt.toLocaleString('es-AR')} | SHA-256: ${firma.firmaSha256}`, 58, doc.y, { width: doc.page.width - 116 });
+                doc.moveDown(0.7);
+            } else {
+                doc.font('Helvetica').fontSize(8).fillColor(COLORS.gray)
+                   .text('Aprobacion registrada en SITREP. Sin firma manuscrita adjunta.', 58, doc.y, { width: doc.page.width - 116 });
+                doc.moveDown(0.7);
+            }
+        }
 
         // ── QR + Blockchain side by side ──
         if (manifiesto.qrCode || (manifiesto.blockchainStatus === 'CONFIRMADO' && manifiesto.blockchainHash)) {

@@ -5,11 +5,13 @@ import React from 'react';
 import { Check } from 'lucide-react';
 import { SectionTitle } from '../SectionTitle';
 import type { RegistrationData, TipoActor } from '../shared';
+import type { DocumentoSolicitud } from '../../../../types/api';
 
 interface StepResumenProps {
   reg: RegistrationData;
   form: Record<string, string>;
   adjuntos: Record<string, File>;
+  uploadedDocs: Record<string, DocumentoSolicitud>;
   tipoActor: TipoActor;
   isGenerador: boolean;
   isOperador: boolean;
@@ -21,6 +23,7 @@ export const StepResumen: React.FC<StepResumenProps> = ({
   reg,
   form,
   adjuntos,
+  uploadedDocs,
   tipoActor,
   isGenerador,
   isOperador,
@@ -163,13 +166,18 @@ export const StepResumen: React.FC<StepResumenProps> = ({
   }
 
   // Documents
-  const docEntries = Object.entries(adjuntos);
+  const docEntries = [
+    ...Object.entries(uploadedDocs).map(([tipo, document]) => [tipo, { name: document.nombre, size: document.size, saved: true }] as const),
+    ...Object.entries(adjuntos)
+      .filter(([tipo]) => !uploadedDocs[tipo])
+      .map(([tipo, file]) => [tipo, { name: file.name, size: file.size, saved: false }] as const),
+  ];
   if (docEntries.length > 0) {
     sections.push({
       label: 'Documentos adjuntos',
       fields: docEntries.map(([tipo, file]) => ({
         label: tipo.replace(/_/g, ' '),
-        value: `${file.name} (${(file.size / 1024).toFixed(0)} KB)`,
+        value: `${file.name} (${(file.size / 1024).toFixed(0)} KB)${file.saved ? ' · Guardado' : ' · Pendiente'}`,
       })),
     });
   }

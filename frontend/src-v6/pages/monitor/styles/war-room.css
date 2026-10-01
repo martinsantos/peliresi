@@ -51,6 +51,51 @@
 .wr-layout-map     { grid-area: map; min-height: 0; position: relative; }
 .wr-layout-bottom  { grid-area: bottom; z-index: 10; }
 
+/* A phone cannot fit the desktop's 320px sidebar and its single-row toolbar.
+   Keep the same data and controls, with a full-width map and scrollable panels. */
+@media (max-width: 767px) {
+  .wr-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 240px 360px auto;
+    grid-template-areas: "header" "map" "sidebar" "bottom";
+    height: 100dvh;
+    width: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .wr-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  .wr-mode-selector {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    min-width: 0;
+  }
+
+  .wr-mode-selector > button {
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    justify-content: center;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .wr-header-tools { gap: 4px; }
+  .wr-header-tools > button { min-width: 44px; min-height: 44px; }
+  .wr-clock { display: none; }
+  .wr-layout-bottom > .wr-panel { flex-wrap: wrap; gap: 12px; padding: 12px; }
+  .wr-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .wr-summary > div { min-width: 0; }
+  .wr-summary-separator { display: none; }
+  .wr-timeline-actions { flex-wrap: wrap; flex-basis: 100%; gap: 8px; }
+}
+
 .wr-panel {
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(24px);

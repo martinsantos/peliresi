@@ -2,6 +2,7 @@ import api from './api';
 import type {
   Inspection,
   InspectionActorType,
+  InspectionType,
   InspectionItemResult,
   InspectionComparisonResult,
   InspectionState,
@@ -75,7 +76,7 @@ export const inspeccionService = {
     return data.data;
   },
 
-  async list(params?: { estado?: InspectionState; tipoActor?: InspectionActorType; actorId?: string; search?: string; page?: number; limit?: number }): Promise<PaginatedInspections> {
+  async list(params?: { estado?: InspectionState; tipoInspeccion?: InspectionType; tipoActor?: InspectionActorType; actorId?: string; search?: string; page?: number; limit?: number }): Promise<PaginatedInspections> {
     const { data } = await api.get('/inspecciones', { params });
     return data.data;
   },
@@ -86,8 +87,13 @@ export const inspeccionService = {
   },
 
   async create(input: {
-    tipoActor: InspectionActorType;
-    actorId: string;
+    tipoInspeccion?: InspectionType;
+    tipoActor?: InspectionActorType | null;
+    actorId?: string | null;
+    clienteId?: string;
+    inspectorId?: string;
+    latitud?: number;
+    longitud?: number;
     numeroActa?: string;
     ubicacion?: string;
     fechaProgramada?: string;
@@ -233,12 +239,25 @@ export const inspeccionService = {
     return URL.createObjectURL(response.data);
   },
 
-  async downloadPdf(id: string, numero: string, kind: 'acta' | 'informe-tecnico'): Promise<void> {
+  async downloadDeclaredDocument(documentId: string, filename: string): Promise<void> {
+    const response = await api.get(`/actores/documentos/${encodeURIComponent(documentId)}/download`, { responseType: 'blob' });
+    const url = URL.createObjectURL(response.data);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename || 'documento-regulatorio';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  },
+
+  async downloadPdf(id: string, numero: string, kind: 'acta' | 'informe-tecnico' | 'expediente'): Promise<void> {
     const response = await api.get(`/inspecciones/${id}/${kind}.pdf`, { responseType: 'blob' });
     const url = URL.createObjectURL(response.data);
     const link = document.createElement('a');
     link.href = url;
-    link.download = kind === 'acta' ? `acta_inspeccion_${numero}.pdf` : `informe_tecnico_${numero}.pdf`;
+    const prefix = { acta: 'acta_inspeccion', 'informe-tecnico': 'informe_tecnico', expediente: 'expediente_inspeccion' }[kind];
+    link.download = `${prefix}_${numero.replace(/[^a-zA-Z0-9_-]+/g, '_')}.pdf`;
     document.body.appendChild(link);
     link.click();
     link.remove();

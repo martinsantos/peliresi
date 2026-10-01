@@ -15,7 +15,7 @@ import { postLoginDestination } from './utils/authRedirect';
 // Pages — shared lazy imports (single source of truth with App.tsx)
 import {
   LoginPage, ReclamarCuentaPage, RegistroPage, ForgotPasswordPage, ResetPasswordPage, UserSwitcherPage,
-  MobileDashboardPage, CentroControlPage,
+  MobileDashboardPage, CentroControlPage, WarRoomPage,
   InspeccionesPage, InspeccionDetallePage,
   InspeccionadoParticipacionPage,
   ManifiestosPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
@@ -130,6 +130,9 @@ function AppMobile() {
           <Route path="/registro" element={<RegistroPage />} />
           <Route path="/recuperar" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+
+          {/* Same authenticated, full-screen Monitor as the web, without a second mobile shell. */}
+          <Route path="/monitor" element={<WarRoomPage />} />
 
           {/* Mobile Routes - MobileLayout (auth handled by AuthGate above) */}
           <Route element={<MobileLayout />}>

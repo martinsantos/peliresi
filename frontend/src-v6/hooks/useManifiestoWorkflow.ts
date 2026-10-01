@@ -21,9 +21,14 @@ const KEYS = {
   detail: (id: string) => [...KEYS.all, 'detail', id] as const,
 };
 
+// These explicit actions are not a persistent offline queue. Always attempt once
+// and return failure to the open form, instead of silently waiting for reconnect.
+const WORKFLOW_OPTIONS = { networkMode: 'always', retry: false } as const;
+
 export function useCreateManifiesto() {
   const qc = useQueryClient();
   return useMutation({
+    ...WORKFLOW_OPTIONS,
     mutationFn: (req: CreateManifiestoRequest) => manifiestoService.create(req),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.lists() }),
   });
@@ -32,6 +37,7 @@ export function useCreateManifiesto() {
 export function useUpdateManifiesto() {
   const qc = useQueryClient();
   return useMutation({
+    ...WORKFLOW_OPTIONS,
     mutationFn: ({ id, ...req }: { id: string } & Partial<CreateManifiestoRequest>) =>
       manifiestoService.update(id, req),
     onSuccess: (_, { id }) => {
@@ -44,6 +50,7 @@ export function useUpdateManifiesto() {
 export function useFirmarManifiesto() {
   const qc = useQueryClient();
   return useMutation({
+    ...WORKFLOW_OPTIONS,
     mutationFn: ({ id, ...req }: { id: string } & FirmarManifiestoRequest) =>
       manifiestoService.firmar(id, req),
     onSuccess: (_, { id }) => {
@@ -56,6 +63,7 @@ export function useFirmarManifiesto() {
 export function useConfirmarRetiro() {
   const qc = useQueryClient();
   return useMutation({
+    ...WORKFLOW_OPTIONS,
     mutationFn: ({ id, ...req }: { id: string } & ConfirmarRetiroRequest) =>
       manifiestoService.confirmarRetiro(id, req),
     onSuccess: (_, { id }) => {
@@ -68,6 +76,7 @@ export function useConfirmarRetiro() {
 export function useConfirmarEntrega() {
   const qc = useQueryClient();
   return useMutation({
+    ...WORKFLOW_OPTIONS,
     mutationFn: ({ id, ...req }: { id: string } & ConfirmarEntregaRequest) =>
       manifiestoService.confirmarEntrega(id, req),
     onSuccess: (_, { id }) => {
@@ -80,6 +89,7 @@ export function useConfirmarEntrega() {
 export function usePesaje() {
   const qc = useQueryClient();
   return useMutation({
+    ...WORKFLOW_OPTIONS,
     mutationFn: ({ id, ...req }: { id: string } & PesajeRequest) =>
       manifiestoService.pesaje(id, req),
     onSuccess: (_, { id }) => {
@@ -91,6 +101,7 @@ export function usePesaje() {
 export function useConfirmarRecepcion() {
   const qc = useQueryClient();
   return useMutation({
+    ...WORKFLOW_OPTIONS,
     mutationFn: ({ id, ...req }: { id: string } & ConfirmarRecepcionRequest) =>
       manifiestoService.confirmarRecepcion(id, req),
     onSuccess: (_, { id }) => {
@@ -103,6 +114,7 @@ export function useConfirmarRecepcion() {
 export function useConfirmarRecepcionInSitu() {
   const qc = useQueryClient();
   return useMutation({
+    ...WORKFLOW_OPTIONS,
     mutationFn: ({ id }: { id: string }) =>
       manifiestoService.confirmarRecepcionInSitu(id),
     onSuccess: (_, { id }) => {
@@ -115,6 +127,7 @@ export function useConfirmarRecepcionInSitu() {
 export function useRegistrarTratamiento() {
   const qc = useQueryClient();
   return useMutation({
+    ...WORKFLOW_OPTIONS,
     mutationFn: ({ id, ...req }: { id: string } & RegistrarTratamientoRequest) =>
       manifiestoService.registrarTratamiento(id, req),
     onSuccess: (_, { id }) => {
@@ -127,6 +140,7 @@ export function useRegistrarTratamiento() {
 export function useRechazarManifiesto() {
   const qc = useQueryClient();
   return useMutation({
+    ...WORKFLOW_OPTIONS,
     mutationFn: ({ id, ...req }: { id: string } & RechazarManifiestoRequest) =>
       manifiestoService.rechazar(id, req),
     onSuccess: (_, { id }) => {
@@ -139,6 +153,7 @@ export function useRechazarManifiesto() {
 export function useRegistrarIncidente() {
   const qc = useQueryClient();
   return useMutation({
+    ...WORKFLOW_OPTIONS,
     mutationFn: ({ id, ...req }: { id: string } & RegistrarIncidenteRequest) =>
       manifiestoService.registrarIncidente(id, req),
     onSuccess: (_, { id }) => {
@@ -151,6 +166,7 @@ export function useRegistrarIncidente() {
 export function useCerrarManifiesto() {
   const qc = useQueryClient();
   return useMutation({
+    ...WORKFLOW_OPTIONS,
     mutationFn: (id: string) => manifiestoService.cerrar(id),
     onSuccess: (_, id) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
@@ -162,6 +178,7 @@ export function useCerrarManifiesto() {
 export function useCancelarManifiesto() {
   const qc = useQueryClient();
   return useMutation({
+    ...WORKFLOW_OPTIONS,
     mutationFn: ({ id, motivo }: { id: string; motivo?: string }) =>
       manifiestoService.cancelar(id, motivo),
     onSuccess: (_, { id }) => {
@@ -174,6 +191,7 @@ export function useCancelarManifiesto() {
 export function useRevertirEstado() {
   const qc = useQueryClient();
   return useMutation({
+    ...WORKFLOW_OPTIONS,
     mutationFn: ({ id, estadoNuevo, motivo }: { id: string; estadoNuevo: string; motivo?: string }) =>
       manifiestoService.revertirEstado(id, estadoNuevo, motivo),
     onSuccess: (_, { id }) => {
@@ -185,6 +203,7 @@ export function useRevertirEstado() {
 
 export function useValidarQR() {
   return useMutation({
+    ...WORKFLOW_OPTIONS,
     mutationFn: (code: string) => manifiestoService.validarQR(code),
   });
 }

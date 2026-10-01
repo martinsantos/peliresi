@@ -4,7 +4,7 @@
  * Navegación por pestañas con variantes
  */
 
-import React, { useState, forwardRef, createContext, useContext } from 'react';
+import React, { useState, useId, createContext, useContext } from 'react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -19,6 +19,7 @@ interface TabsContextType {
   activeTab: string;
   setActiveTab: (id: string) => void;
   variant: TabsVariant;
+  instanceId: string;
 }
 
 const TabsContext = createContext<TabsContextType | undefined>(undefined);
@@ -75,6 +76,7 @@ export function Tabs({
   className,
 }: TabsProps) {
   const [activeTabState, setActiveTabState] = useState(defaultTab || '');
+  const instanceId = useId();
   
   const isControlled = controlledActiveTab !== undefined;
   const activeTab = isControlled ? controlledActiveTab : activeTabState;
@@ -87,7 +89,7 @@ export function Tabs({
   };
 
   return (
-    <TabsContext.Provider value={{ activeTab, setActiveTab, variant }}>
+    <TabsContext.Provider value={{ activeTab, setActiveTab, variant, instanceId }}>
       <div className={cn('w-full', className)}>{children}</div>
     </TabsContext.Provider>
   );
@@ -117,7 +119,7 @@ export function TabList({ children, className }: TabListProps) {
 // TAB
 // ========================================
 export function Tab({ id, children, disabled, icon, badge }: TabProps) {
-  const { activeTab, setActiveTab, variant } = useTabs();
+  const { activeTab, setActiveTab, variant, instanceId } = useTabs();
   const isActive = activeTab === id;
 
   const handleClick = () => {
@@ -128,40 +130,53 @@ export function Tab({ id, children, disabled, icon, badge }: TabProps) {
 
   const variantStyles = {
     default: cn(
-      'px-2.5 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-medium border-b-2 transition-all whitespace-nowrap shrink-0',
+      'px-2.5 sm:px-4 py-2 sm:py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap shrink-0',
       isActive
-        ? 'border-primary-500 text-primary-600'
+        ? 'border-primary-500 text-primary-700'
         : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
     ),
     pills: cn(
-      'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-lg transition-all whitespace-nowrap shrink-0',
+      'px-3 sm:px-4 py-1.5 sm:py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap shrink-0',
       isActive
-        ? 'bg-white text-primary-600 shadow-sm'
+        ? 'bg-white text-primary-700 shadow-sm'
         : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200/50'
     ),
     underline: cn(
-      'px-1 py-2 sm:py-2.5 text-xs sm:text-sm font-medium border-b-2 transition-all -mb-px whitespace-nowrap shrink-0',
+      'px-1 py-2 sm:py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap shrink-0',
       isActive
-        ? 'border-primary-500 text-primary-600'
+        ? 'border-primary-500 text-primary-700'
         : 'border-transparent text-neutral-500 hover:text-neutral-700'
     ),
     bordered: cn(
-      'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-md transition-all flex-1 text-center whitespace-nowrap',
+      'px-3 sm:px-4 py-1.5 sm:py-2 text-sm font-medium rounded-md transition-colors flex-1 text-center whitespace-nowrap',
       isActive
-        ? 'bg-white text-primary-600 shadow-sm border border-neutral-200'
+        ? 'bg-white text-primary-700 shadow-sm border border-neutral-200'
         : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
     ),
   };
 
   return (
     <button
+      type="button"
+      id={`${instanceId}-tab-${id}`}
       role="tab"
+      aria-controls={`${instanceId}-panel-${id}`}
       aria-selected={isActive}
       aria-disabled={disabled}
+      tabIndex={isActive ? 0 : -1}
       disabled={disabled}
       onClick={handleClick}
+      onKeyDown={(event) => {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+        event.preventDefault();
+        const tabs = Array.from(event.currentTarget.closest('[role="tablist"]')?.querySelectorAll<HTMLButtonElement>('[role="tab"]:not(:disabled)') || []);
+        const index = tabs.indexOf(event.currentTarget);
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+        tabs[next]?.focus({ preventScroll: true });
+        tabs[next]?.click();
+      }}
       className={cn(
-        'flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20',
+        'flex min-h-11 items-center justify-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-700',
         variantStyles[variant],
         disabled && 'opacity-50 cursor-not-allowed'
       )}
@@ -177,7 +192,7 @@ export function Tab({ id, children, disabled, icon, badge }: TabProps) {
 // TAB PANEL
 // ========================================
 export function TabPanel({ id, children }: TabPanelProps) {
-  const { activeTab } = useTabs();
+  const { activeTab, instanceId } = useTabs();
   const isActive = activeTab === id;
 
   if (!isActive) return null;
@@ -185,7 +200,10 @@ export function TabPanel({ id, children }: TabPanelProps) {
   return (
     <div
       role="tabpanel"
-      className="py-4 animate-in fade-in slide-in-from-bottom-2 duration-200"
+      id={`${instanceId}-panel-${id}`}
+      aria-labelledby={`${instanceId}-tab-${id}`}
+      tabIndex={0}
+      className="py-4"
     >
       {children}
     </div>

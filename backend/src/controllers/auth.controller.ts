@@ -323,6 +323,23 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
 };
 
 // ── FORGOT PASSWORD (público) ──────────────────────────────────────
+// Seeded placeholder mailboxes are not evidence of account ownership.
+function canRecoverByEmail(email: string): boolean {
+  if (!z.string().email().safeParse(email).success) return false;
+  const domain = email.split('@')[1].toLowerCase();
+  return domain !== 'sitrep.local' && domain !== 'placeholder.com';
+}
+
+async function issuePasswordRecovery(user: { id: string; email: string; nombre: string }) {
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+  await prisma.usuario.update({
+    where: { id: user.id },
+    data: { passwordResetToken: hashedToken, passwordResetExpires: new Date(Date.now() + 60 * 60 * 1000) },
+  });
+  await emailService.sendPasswordResetEmail(user.email, user.nombre, rawToken);
+}
+
 export const forgotPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, cuit } = req.body;
@@ -334,20 +351,11 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
     });
 
     // Responder 200 siempre (no revelar existencia)
-    if (!user) {
+    if (!user || !canRecoverByEmail(user.email)) {
       return res.json({ success: true, message: 'Si el email/CUIT existe, recibirás un enlace.' });
     }
 
-    const rawToken = crypto.randomBytes(32).toString('hex');
-    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
-    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
-
-    await prisma.usuario.update({
-      where: { id: user.id },
-      data: { passwordResetToken: hashedToken, passwordResetExpires: expires },
-    });
-
-    await emailService.sendPasswordResetEmail(user.email, user.nombre, rawToken);
+    await issuePasswordRecovery(user);
 
     res.json({ success: true, message: 'Si el email/CUIT existe, recibirás un enlace.' });
   } catch (error) {
@@ -359,7 +367,9 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
 export const resetPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { token, newPassword } = req.body;
-    if (!token || !newPassword) throw new AppError('Token y nueva contraseña son requeridos', 400);
+    if (typeof token !== 'string' || !token || typeof newPassword !== 'string' || !newPassword) {
+      throw new AppError('Token y nueva contraseña son requeridos', 400);
+    }
 
     const passwordError = validatePasswordStrength(newPassword);
     if (passwordError) throw new AppError(passwordError, 400);
@@ -378,10 +388,12 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-    await prisma.usuario.update({
-      where: { id: user.id },
+    // Lookup alone cannot consume a proof: a second request may have read it.
+    const consumed = await prisma.usuario.updateMany({
+      where: { id: user.id, passwordResetToken: hashedToken, passwordResetExpires: { gt: new Date() } },
       data: { password: hashedPassword, passwordResetToken: null, passwordResetExpires: null },
     });
+    if (consumed.count !== 1) throw new AppError('El enlace de recuperación es inválido o expiró', 400);
 
     res.json({ success: true, message: 'Contraseña restablecida correctamente.' });
   } catch (error) {
@@ -477,8 +489,6 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
 const claimSchema = z.object({
   cuit: z.string().min(8, 'CUIT es requerido'),
   razonSocial: z.string().min(2, 'Razón Social es requerida'),
-  nuevoEmail: z.string().email('Email inválido'),
-  password: z.string().min(1, 'Contraseña es requerida'),
 });
 
 export const claimAccount = async (req: Request, res: Response, next: NextFunction) => {
@@ -486,11 +496,10 @@ export const claimAccount = async (req: Request, res: Response, next: NextFuncti
     const parsed = claimSchema.safeParse(req.body);
     if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
 
-    const { cuit, razonSocial, nuevoEmail, password } = parsed.data;
-    const genericMsg = 'Si los datos coinciden con un registro existente, recibirás un email de verificación.';
-
-    const passwordError = validatePasswordStrength(password);
-    if (passwordError) throw new AppError(passwordError, 400);
+    // Legacy clients may still submit nuevoEmail/password. Zod strips those
+    // fields: public identity data must never authorize credential replacement.
+    const { cuit, razonSocial } = parsed.data;
+    const genericMsg = 'Si los datos coinciden, recibirás un enlace en el correo ya registrado. Si no tenés acceso a ese correo, contactá al administrador.';
 
     const normalizedCuit = normalizeCuit(cuit) || cuit;
 
@@ -500,7 +509,7 @@ export const claimAccount = async (req: Request, res: Response, next: NextFuncti
     });
 
     // Don't reveal whether the CUIT exists
-    if (!user) {
+    if (!user || !canRecoverByEmail(user.email)) {
       return res.json({ success: true, message: genericMsg });
     }
 
@@ -515,67 +524,18 @@ export const claimAccount = async (req: Request, res: Response, next: NextFuncti
       return res.json({ success: true, message: genericMsg });
     }
 
-    // Verify nuevoEmail is not used by another user
-    const existingEmail = await prisma.usuario.findUnique({ where: { email: nuevoEmail } });
-    if (existingEmail && existingEmail.id !== user.id) {
-      throw new AppError('El email ya está en uso por otro usuario', 400);
-    }
-
-    // Update user: new email, new password, deactivate until verified
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-    const rawToken = crypto.randomBytes(32).toString('hex');
-    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
-
-    await prisma.usuario.update({
-      where: { id: user.id },
-      data: {
-        email: nuevoEmail,
-        password: hashedPassword,
-        emailVerified: false,
-        activo: false,
-        emailVerificationToken: hashedToken,
-      },
-    });
-
-    // Send verification email
-    await emailService.sendEmailVerification(nuevoEmail, user.nombre, rawToken);
-
-    // Notify admins via in-app notification
-    const admins = await prisma.usuario.findMany({
-      where: { rol: 'ADMIN', activo: true },
-      select: { id: true },
-    });
-    await Promise.all(admins.map(admin =>
-      prisma.notificacion.create({
-        data: {
-          usuarioId: admin.id,
-          tipo: 'ALERTA_SISTEMA',
-          titulo: 'Cuenta reclamada',
-          mensaje: `${user.nombre} (${user.rol}) reclamó su cuenta con el email ${nuevoEmail}.`,
-          prioridad: 'ALTA',
-          datos: JSON.stringify({
-            tipo: 'cuenta_reclamada',
-            usuarioId: user.id,
-            nombre: user.nombre,
-            cuit: normalizedCuit,
-            nuevoEmail,
-            rol: user.rol,
-          }),
-        },
-      })
-    ));
+    await issuePasswordRecovery(user);
 
     // Audit log
     try {
       await prisma.auditoria.create({
         data: {
           usuarioId: user.id,
-          accion: 'CLAIM_ACCOUNT',
+          accion: 'SOLICITUD_RECUPERACION_CUENTA',
           modulo: 'AUTH',
           ip: req.ip || req.headers['x-forwarded-for']?.toString() || 'unknown',
           userAgent: req.headers['user-agent'] || 'unknown',
-          datosDespues: JSON.stringify({ cuit: normalizedCuit, nuevoEmail, rol: user.rol, timestamp: new Date().toISOString() }),
+          datosDespues: JSON.stringify({ cuit: normalizedCuit, rol: user.rol, timestamp: new Date().toISOString() }),
         },
       });
     } catch { /* ignore audit errors */ }

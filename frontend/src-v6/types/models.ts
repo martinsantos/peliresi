@@ -143,7 +143,20 @@ export interface Generador {
   categoriaIndividual?: string;
   libroOperatoria?: boolean;
   tefInputs?: Record<string, unknown>;
+  ultimaActividad?: string | null;
+  pagos?: Array<{ anio: number; fechaPago?: string | null; habilitado?: boolean | null }>;
+  ddjj?: Array<{ anio: number; presentada: boolean }>;
+  situacionFiscal?: SituacionFiscalGenerador;
   usuario?: Usuario;
+}
+
+export interface SituacionFiscalGenerador {
+  anio: number;
+  tef: 'PAGADO' | 'SIN_PAGO' | 'SIN_REGISTRO';
+  ddjj: 'PRESENTADA' | 'PENDIENTE' | 'SIN_REGISTRO';
+  habilitacion: 'HABILITADO' | 'NO_HABILITADO' | 'SIN_DATO';
+  resumen: 'AL_DIA' | 'REQUIERE_REVISION' | 'SIN_DATOS';
+  pendientes: string[];
 }
 
 export interface Transportista {

@@ -17,6 +17,7 @@ export interface LayerState {
   transportistas: boolean;
   operadores: boolean;
   transito: boolean;
+  inspecciones?: boolean;
 }
 
 interface ControlFiltersProps {
@@ -45,7 +46,7 @@ export const ControlFilters: React.FC<ControlFiltersProps> = ({
   onToggleLayer,
 }) => {
   return (
-    <div className="sticky top-0 z-20 bg-[#FAFAF8] -mx-4 lg:-mx-8 px-4 lg:px-8 pt-2 pb-2">
+    <div className="relative lg:sticky lg:top-0 z-20 bg-[#FAFAF8] -mx-4 lg:-mx-8 px-4 lg:px-8 pt-2 pb-2">
       {/* Row 1: Date presets + LIVE badge + layers + period */}
       <div className="flex flex-wrap items-center gap-3 p-3 bg-white rounded-2xl border border-neutral-100 shadow-sm">
         {/* LIVE badge + refresh */}
@@ -57,8 +58,8 @@ export const ControlFilters: React.FC<ControlFiltersProps> = ({
           <span className="text-xs font-semibold text-red-600">LIVE</span>
         </span>
         <span className="text-xs text-neutral-400 tabular-nums w-6 text-right">{countdown}s</span>
-        <button onClick={onManualRefresh} className="p-1 hover:bg-neutral-100 rounded transition-colors text-neutral-400" title="Actualizar ahora">
-          <RefreshCw size={13} />
+        <button type="button" onClick={onManualRefresh} className="min-h-11 min-w-11 flex items-center justify-center hover:bg-neutral-100 active:bg-neutral-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 rounded transition-colors text-neutral-600" title="Actualizar ahora">
+          <RefreshCw size={18} />
         </button>
 
         <div className="h-5 w-px bg-neutral-200 hidden sm:block" />
@@ -68,9 +69,11 @@ export const ControlFilters: React.FC<ControlFiltersProps> = ({
           <Calendar size={16} className="text-neutral-400" />
           {DATE_PRESETS.filter(p => p.days > 0).map(p => (
             <button
+              type="button"
               key={p.days}
+              aria-pressed={datePreset === p.days}
               onClick={() => onDatePreset(p.days)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              className={`min-h-11 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors active:brightness-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 ${
                 datePreset === p.days
                   ? 'bg-primary-50 text-primary-700 border border-primary-200'
                   : 'text-neutral-500 hover:bg-neutral-50 border border-transparent'
@@ -99,25 +102,29 @@ export const ControlFilters: React.FC<ControlFiltersProps> = ({
         <div className="h-5 w-px bg-neutral-200 hidden sm:block" />
 
         {/* Layer toggles */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <Layers size={16} className="text-neutral-400" />
           {([
             { key: 'generadores' as const, label: 'Generadores', color: 'bg-purple-500' },
             { key: 'transportistas' as const, label: 'Transportistas', color: 'bg-orange-500' },
             { key: 'operadores' as const, label: 'Operadores', color: 'bg-blue-500' },
+            ...(layers.inspecciones !== undefined ? [{ key: 'inspecciones' as const, label: 'Inspecciones', color: 'bg-teal-600' }] : []),
             { key: 'transito' as const, label: 'En Tránsito', color: 'bg-red-500' },
           ]).map(l => (
             <button
+              type="button"
               key={l.key}
+              aria-label={l.label}
+              aria-pressed={Boolean(layers[l.key])}
               onClick={() => onToggleLayer(l.key)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+              className={`min-h-11 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors active:bg-neutral-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 border ${
                 layers[l.key]
                   ? 'bg-white border-neutral-200 text-neutral-700 shadow-sm'
                   : 'bg-neutral-50 border-transparent text-neutral-400'
               }`}
             >
               <span className={`w-2 h-2 rounded-full ${layers[l.key] ? l.color : 'bg-neutral-300'}`} />
-              <span className="hidden sm:inline">{l.label}</span>
+              <span>{l.label}</span>
               {layers[l.key] ? <Eye size={12} /> : <EyeOff size={12} />}
             </button>
           ))}

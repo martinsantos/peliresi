@@ -1,5 +1,6 @@
 import type { Response } from 'express';
 import PDFDocument from 'pdfkit';
+import { buildInspectionFieldActPresentation } from './inspectionFieldActPdf.service';
 import {
   buildInspectionDocumentFingerprint,
   inspectDossierReadiness,
@@ -80,12 +81,13 @@ function runningHeader(
   inspection: any,
   state: string,
   branding: InspectionPdfBranding,
+  unified = false,
 ) {
   drawMendozaMark(doc, branding, 44, 13, 94, 30);
   doc.font('Helvetica-Bold').fontSize(5.8).fillColor(C.darkGreen)
     .text('MINISTERIO DE ENERGÍA Y AMBIENTE · DGFA', 147, 19, { width: 224, lineBreak: false });
   doc.font('Helvetica').fontSize(5.5).fillColor(C.muted)
-    .text(`INFORME TÉCNICO · ${inspection.numero} · v${inspection.version}`, 147, 29, { width: 224, lineBreak: false });
+    .text(`${unified ? 'EXPEDIENTE' : 'INFORME TÉCNICO'} · ${inspection.numero} · v${inspection.version}`, 147, 29, { width: 224, lineBreak: false });
   drawSitrepMark(doc, 424, 16, { compact: true, width: 127 });
   doc.moveTo(44, 47).lineTo(doc.page.width - 44, 47).lineWidth(0.9).strokeColor(C.darkGreen).stroke();
   doc.font('Helvetica').fontSize(6.4).fillColor(C.muted)
@@ -99,6 +101,7 @@ function header(
   readiness: InspectionDossierReadiness,
   generatedAt: Date,
   branding: InspectionPdfBranding,
+  unified = false,
 ) {
   const actor = actorOf(inspection);
   const state = documentState(inspection, readiness);
@@ -107,10 +110,10 @@ function header(
   doc.font('Helvetica-Bold').fontSize(6.5).fillColor(C.darkGreen)
     .text('MINISTERIO DE ENERGÍA Y AMBIENTE · SUBSECRETARÍA DE AMBIENTE · DGFA', 44, 71, { width: 355, lineBreak: false });
   doc.font('Helvetica').fontSize(6.2).fillColor(C.muted)
-    .text('Documento 2 de 2 · Complementa el acta de campo', 350, 71, { width: 201, align: 'right', lineBreak: false });
+    .text(unified ? 'Acta · Evaluación · Evidencias' : 'Documento 2 de 2 · Complementa el acta de campo', 350, 71, { width: 201, align: 'right', lineBreak: false });
   doc.moveTo(44, 86).lineTo(doc.page.width - 44, 86).lineWidth(1.5).strokeColor(C.darkGreen).stroke();
 
-  doc.font('Helvetica-Bold').fontSize(8).fillColor(C.darkGreen).text('INFORME TÉCNICO DE INSPECCIÓN', 44, 103, { characterSpacing: 0.45 });
+  doc.font('Helvetica-Bold').fontSize(8).fillColor(C.darkGreen).text(unified ? 'EXPEDIENTE DE INSPECCIÓN' : 'INFORME TÉCNICO DE INSPECCIÓN', 44, 103, { characterSpacing: 0.45 });
   doc.font('Helvetica-Bold').fontSize(23).fillColor(C.navy).text(inspection.numero, 44, 120, { width: 315 });
   doc.font('Helvetica').fontSize(8.2).fillColor(C.muted).text(`Versión ${inspection.version} · Acta ${inspection.numeroActa || 'sin número asignado'}`, 44, 150, { width: 330 });
   doc.font('Helvetica-Bold').fontSize(8).fillColor(C.navy).text('EXPEDIENTE DE INSPECCIÓN', 366, 109, { width: 185, align: 'right' });
@@ -121,9 +124,12 @@ function header(
   doc.font('Helvetica-Bold').fontSize(8.2).fillColor(state.ink).text(state.label, 55, 181, { width: doc.page.width - 110, align: 'center' });
   doc.y = 222;
 
-  doc.fillColor(C.navy).font('Helvetica-Bold').fontSize(17).text(actor.razonSocial || 'Actor inspeccionado', 44, doc.y, { width: doc.page.width - 88 });
-  doc.font('Helvetica').fontSize(8.8).fillColor(C.muted).text(`${inspection.tipoActor} · CUIT ${actor.cuit || 's/d'} · Acta ${inspection.numeroActa || 'sin número asignado'}`, 44, doc.y + 23, { width: doc.page.width - 88 });
-  doc.y += 52;
+  doc.fillColor(C.navy).font('Helvetica-Bold').fontSize(17).text(actor.razonSocial || (unified ? 'Responsable por identificar' : 'Actor inspeccionado'), 44, doc.y, { width: doc.page.width - 88 });
+  const actorMeta = unified
+    ? [inspection.tipoActor, actor.cuit ? `CUIT ${actor.cuit}` : '', inspection.numeroActa ? `Acta ${inspection.numeroActa}` : ''].filter(Boolean).join(' · ')
+    : `${inspection.tipoActor || 'Responsable por identificar'} · CUIT ${actor.cuit || 's/d'} · Acta ${inspection.numeroActa || 'sin número asignado'}`;
+  if (actorMeta) doc.font('Helvetica').fontSize(8.8).fillColor(C.muted).text(actorMeta, 44, doc.y + 8, { width: doc.page.width - 88 });
+  doc.y += 18;
 
   const y = doc.y;
   const cells = [
@@ -370,7 +376,7 @@ function evidenceTargetLabel(inspection: any, evidence: any): string {
   return 'Evidencia general del expediente';
 }
 
-function evidenceInventory(doc: PDFKit.PDFDocument, inspection: any) {
+function evidenceInventory(doc: PDFKit.PDFDocument, inspection: any, unified = false) {
   if (inspection.evidencias.length === 0) {
     section(doc, 'Inventario de evidencias', 'Archivos vigentes y anulados, vínculos, autores, tiempos, observaciones y transcripciones');
     doc.font('Helvetica').fontSize(8).fillColor(C.muted).text('No se incorporaron archivos al expediente.');
@@ -387,7 +393,7 @@ function evidenceInventory(doc: PDFKit.PDFDocument, inspection: any) {
       evidence.latitud != null && evidence.longitud != null ? `Coordenadas ${evidence.latitud}, ${evidence.longitud}` : '',
     ].filter(Boolean).join(' · ');
     const details = [
-      evidence.descripcion ? `Descripción: ${evidence.descripcion}` : '',
+      evidence.descripcion && !(unified && evidence.tipo === 'FOTO' && !evidence.anuladaAt && !evidence.intercambioId) ? `Descripción: ${evidence.descripcion}` : '',
       evidence.transcripcion ? `Transcripción: ${evidence.transcripcion}` : '',
       evidence.anuladaAt ? `Anulación ${formatDate(evidence.anuladaAt, true)} por ${evidence.anuladaPor ? `${evidence.anuladaPor.nombre} ${evidence.anuladaPor.apellido || ''}`.trim() : 'usuario no informado'}. Motivo: ${evidence.motivoAnulacion || 'sin motivo informado'}` : '',
     ].filter(Boolean).join('\n');
@@ -395,6 +401,7 @@ function evidenceInventory(doc: PDFKit.PDFDocument, inspection: any) {
       { text: inspectionEvidenceReference(evidence), font: 'Helvetica-Bold', size: 8.2, color: evidence.anuladaAt ? C.muted : C.navy },
       { text: metadata, size: 6.8, color: C.muted },
       ...(details ? [{ text: details, size: 7.2, color: C.navy }] : []),
+      ...(unified ? [{ text: `SHA-256 ${evidence.sha256 || 'no disponible'}`, font: 'Courier', size: 6.2, color: C.blue }] : []),
     ];
     const height = 16 + measureInspectionPdfBlocks(doc, blocks, 475);
     const reserve = Math.min(height + 8, 160);
@@ -556,13 +563,14 @@ function formalExchange(doc: PDFKit.PDFDocument, inspection: any) {
   });
 }
 
-function integrityLedger(doc: PDFKit.PDFDocument, inspection: any, fingerprint: string) {
+function integrityLedger(doc: PDFKit.PDFDocument, inspection: any, fingerprint: string, unified = false) {
   doc.roundedRect(44, doc.y, doc.page.width - 88, 55, 5).fill(C.soft);
   const startY = doc.y;
   doc.font('Helvetica-Bold').fontSize(8).fillColor(C.navy).text('Huella técnica del expediente', 56, startY + 9);
   doc.font('Courier').fontSize(6.6).fillColor(C.blue).text(fingerprint, 56, startY + 23, { width: doc.page.width - 112 });
   doc.font('Helvetica').fontSize(6.7).fillColor(C.muted).text(`Versión ${inspection.version} · SHA-256 · esta huella no sustituye una firma digital`, 56, startY + 39, { width: doc.page.width - 112 });
   doc.y = startY + 64;
+  if (unified) return; // Per-file identities and hashes already appear in the inventory.
   inspection.evidencias.forEach((evidence: any) => {
     const lifecycle = evidence.anuladaAt ? `Captura ${formatDate(evidence.capturadaAt, true)} · Recepción ${formatDate(evidence.createdAt, true)} · ${evidence.creadoPor ? `${evidence.creadoPor.nombre} ${evidence.creadoPor.apellido || ''}`.trim() : 'Autor sin informar'} · ANULADA ${formatDate(evidence.anuladaAt, true)} · ${evidence.motivoAnulacion || 'sin motivo'}` : `Captura ${formatDate(evidence.capturadaAt, true)} · Recepción ${formatDate(evidence.createdAt, true)} · ${evidence.creadoPor ? `${evidence.creadoPor.nombre} ${evidence.creadoPor.apellido || ''}`.trim() : 'Autor sin informar'} · VIGENTE`;
     doc.font('Helvetica-Bold').fontSize(7.5);
@@ -611,10 +619,55 @@ function priorityFindings(doc: PDFKit.PDFDocument, inspection: any) {
   });
 }
 
+function unifiedFieldAct(doc: PDFKit.PDFDocument, inspection: any) {
+  const act = inspection.datosActa || {};
+  const actor = actorOf(inspection);
+  const presentation = buildInspectionFieldActPresentation(inspection);
+  section(doc, 'Acta de campo', presentation.statusLabel);
+  narrativeBox(doc, presentation.statusExplanation);
+  const fields = [
+    ['Código postal', act.codigoPostal], ['Departamento', act.departamento],
+    ['Domicilio constatado', [act.calle || inspection.ubicacion || actor.domicilio, act.numeroDomicilio].filter(Boolean).join(' ')],
+    ['Coordenadas', inspection.latitud != null && inspection.longitud != null ? `${inspection.latitud}, ${inspection.longitud}` : ''],
+    ['Titular', act.titular || actor.representanteLegalNombre], ['DNI del titular', act.dniTitular || actor.representanteLegalDNI],
+    ['Teléfono', actor.telefono], ['Correo', actor.email],
+    ['Atendido por', act.atendidoPor], ['DNI del interviniente', act.dniAtendido], ['Cargo', act.cargoAtendido],
+    ['Área', act.area], ['Lugar de afectación', act.lugarAfectacion], ['Motivo', act.motivoInspeccion],
+    ['Infraestructura', act.infraestructura ? stateLabel(act.infraestructura) : ''],
+    ['Detalle de infraestructura', act.detalleInfraestructura], ['Estado de infraestructura', act.estadoInfraestructura],
+    ['Generación / corrientes observadas', act.generacion], ['Acta antecedente', act.actaAnterior],
+    ['Requerimientos consignados', act.requerimientos], ['Observaciones de campo', inspection.observaciones],
+  ];
+  const write = (blocks: InspectionPdfTextBlock[]) => drawInspectionPdfBlocks(doc, blocks, {
+    x: 44, width: doc.page.width - 88, bottom: doc.page.height - PAGE.bottom,
+    newPage: () => { doc.addPage(); doc.y = PAGE.top; }, continuation: 'Acta de campo - continuación',
+  });
+  fields.forEach(([label, body]) => {
+    if (!String(body ?? '').trim()) return;
+    ensureSpace(doc, 30);
+    write([{ text: `${label}: ${body}`, size: 9, color: C.ink, gap: 8 }]);
+  });
+  section(doc, 'Constancias del procedimiento', 'Estados registrados; no sustituyen la firma ni la notificación formal');
+  presentation.formalities.forEach((entry) => {
+    ensureSpace(doc, 58);
+    write([
+      { text: `${entry.label} · ${entry.state}`, font: 'Helvetica-Bold', size: 8.6, color: entry.resolved ? C.navy : C.amber },
+      { text: entry.detail, size: 8, color: C.ink },
+      ...(entry.unresolvedReason ? [{ text: `Pendiente: ${entry.unresolvedReason}`, size: 7.6, color: C.amber }] : []),
+    ]);
+    doc.y += 8;
+  });
+}
+
+export async function streamInspectionDossierPdf(res: Response, inspection: any, resolveEvidence: (key: string) => string): Promise<void> {
+  return streamInspectionTechnicalReportPdf(res, inspection, resolveEvidence, true);
+}
+
 export async function streamInspectionTechnicalReportPdf(
   res: Response,
   inspection: any,
   resolveEvidence: (key: string) => string,
+  unified = false,
 ): Promise<void> {
   const generatedAt = new Date();
   const fingerprint = buildInspectionDocumentFingerprint(inspection);
@@ -628,7 +681,7 @@ export async function streamInspectionTechnicalReportPdf(
     margins: { top: PAGE.top, right: PAGE.right, bottom: PAGE.bottom, left: PAGE.left },
     bufferPages: true,
     info: {
-      Title: `Informe técnico de inspección ${inspection.numero}`,
+      Title: `${unified ? 'Expediente de inspección' : 'Informe técnico de inspección'} ${inspection.numero}`,
       Author: 'Ministerio de Energía y Ambiente · DGFA · SITREP Mendoza',
       Subject: `Expediente ${inspection.numero} · Acta ${inspection.numeroActa || 'sin número'}`,
       Keywords: 'SITREP, inspección ambiental, trazabilidad, evidencia, Mendoza',
@@ -639,14 +692,16 @@ export async function streamInspectionTechnicalReportPdf(
     },
   });
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename=informe_tecnico_${inspection.numero}.pdf`);
+  res.setHeader('Content-Disposition', `attachment; filename=${unified ? 'expediente_inspeccion' : 'informe_tecnico'}_${String(inspection.numero).replace(/[^a-zA-Z0-9_-]+/g, '_')}.pdf`);
   doc.pipe(res);
 
-  header(doc, inspection, readiness, generatedAt, branding);
+  header(doc, inspection, readiness, generatedAt, branding, unified);
   doc.y = drawInspectionPdfQrCard(doc, traceQr, fingerprint, { y: doc.y }) + 14;
   const technical = inspection.informeTecnico && typeof inspection.informeTecnico === 'object' ? inspection.informeTecnico : {};
   const actor = actorOf(inspection);
 
+  if (unified) unifiedFieldAct(doc, inspection);
+  if (!unified) {
   section(doc, 'Resumen ejecutivo', 'Lectura inicial del alcance, el resultado y el respaldo documental', 68);
   metrics(doc, inspection);
   const recordedConclusion = String(technical.conclusion || '').trim();
@@ -660,54 +715,83 @@ export async function streamInspectionTechnicalReportPdf(
   ensureSpace(doc, 160);
   section(doc, 'Hallazgos prioritarios', 'Diferencias declarativas y controles no conformes que requieren lectura inmediata');
   priorityFindings(doc, inspection);
+  }
 
-  const technicalSections = [
+  const recordedConclusion = String(technical.conclusion || '').trim();
+  const technicalSections = unified ? [
+    ['Objetivo', technical.objetivo],
+    ['Antecedentes y referencias', [technical.expedienteElectronico ? `Expediente electrónico: ${technical.expedienteElectronico}` : '', technical.antecedentes, technical.referencias].filter(Boolean).join('\n\n')],
+    ['Evaluación técnica', technical.evaluacion],
+    ['Conclusión técnica', recordedConclusion],
+    ['Recomendación técnica', technical.recomendacion],
+  ].filter(([, body]) => String(body || '').trim()) : [
     ['1. Objetivo', technical.objetivo || `No se registró un objetivo técnico específico para ${actor.razonSocial || 'la entidad inspeccionada'}. Esta ausencia se explicita para evitar que el sistema complete el criterio profesional del inspector.`],
     ['2. Antecedentes y referencias', technical.antecedentes || [technical.expedienteElectronico ? `Expediente electrónico: ${technical.expedienteElectronico}.` : '', technical.referencias || '', `Inspección SITREP ${inspection.numero}${inspection.numeroActa ? `, acta ${inspection.numeroActa}` : ''}.`].filter(Boolean).join('\n\n')],
     ['3. Evaluación técnica', technical.evaluacion || inspection.observaciones || 'No se incorporó una evaluación narrativa adicional. Los resultados verificables se detallan en las comparativas, el checklist y las evidencias de este informe.'],
     ['4. Conclusión técnica', recordedConclusion || 'No se registró una conclusión técnica específica. Esta ausencia se explicita para evitar inferencias automáticas sobre los hallazgos.'],
     ['5. Recomendación técnica', technical.recomendacion || 'No se registró una recomendación técnica específica. Toda medida o derivación deberá ser consignada y validada por el área competente.'],
   ];
+  if (unified && !technicalSections.length) {
+    section(doc, 'Evaluación técnica pendiente');
+    narrativeBox(doc, 'No se incorporó una evaluación profesional. Las observaciones de campo no constituyen una conclusión técnica.');
+  }
   technicalSections.forEach(([title, body]) => {
     section(doc, title);
     doc.font('Helvetica').fontSize(10.1).fillColor(C.ink).text(String(body), 44, doc.y, { width: doc.page.width - 88, lineGap: 3.2 });
     doc.y += 9;
   });
 
+  if (!unified) {
   section(doc, 'Marco normativo y alcance', 'Referencia general prudente; la calificación jurídica corresponde al área legal competente');
   doc.font('Helvetica').fontSize(10).fillColor(C.ink).text('El expediente se documenta en el marco general de la Ley Provincial 5.917, el Decreto Provincial 2.625/1999 y la Ley Nacional 24.051, según resulte aplicable. Los hallazgos son constataciones y evaluaciones técnicas. La determinación de obligaciones concretas, artículos aplicables, infracciones, sanciones y efectos jurídicos requiere revisión legal y no es inferida automáticamente por SITREP.', 44, doc.y, { width: doc.page.width - 88, lineGap: 3.2 });
   doc.y += 10;
 
-  section(doc, 'Anexo técnico de constatación', 'Matrices, controles, evidencias y trazabilidad que sustentan la evaluación profesional', 208);
+  }
+  if (!unified) section(doc, 'Anexo técnico de constatación', 'Matrices, controles, evidencias y trazabilidad que sustentan la evaluación profesional', 208);
 
+  if (!unified || inspection.comparaciones.length) {
   ensureSpace(doc, 150);
   section(doc, 'Declarado y verificado', 'Datos declarados al abrir la inspección y resultado constatado en campo');
   comparisonTable(doc, inspection.comparaciones);
+  }
 
-  section(doc, 'Checklist de inspección', 'Controles aplicados según el tipo de actor y evidencia vinculada a cada punto');
+  if (!unified || inspection.items.length) {
+  section(doc, 'Checklist de inspección', 'Controles aplicados según el tipo de actor y evidencia vinculada a cada punto', unified ? 140 : 32);
   checklist(doc, inspection.items);
+  }
 
   if (inspection.evidencias.some((item: any) => item.tipo === 'FOTO' && !item.anuladaAt && !item.intercambioId)) {
     evidenceGallery(doc, inspection, preparedImages);
   }
 
-  evidenceInventory(doc, inspection);
+  if (!unified || inspection.evidencias.length) evidenceInventory(doc, inspection, unified);
 
+  const automaticEvents = new Set(['CREADA', 'BORRADOR_ACTUALIZADO', 'CHECKLIST_ACTUALIZADO', 'COMPARACION_ACTUALIZADA', 'INFORME_TECNICO_ACTUALIZADO', 'EVIDENCIA_AGREGADA', 'EVIDENCIA_VINCULADA']);
+  const journal = unified ? { ...inspection, eventos: (inspection.eventos || []).filter((event: any) => !automaticEvents.has(event.tipo)) } : inspection;
+  if (!unified || journal.eventos.length) {
   section(doc, 'Trazabilidad operativa', 'Bitácora de estados, actuaciones, comunicaciones preparadas y eventos internos del expediente');
-  timeline(doc, inspection);
+  timeline(doc, journal);
+  }
 
+  if (!unified || inspection.intercambios?.length) {
   section(doc, 'Intercambio formal y contradicción', 'Presentaciones inmutables del organismo y del inspeccionado, con plazos, adjuntos y encadenamiento criptográfico', inspection.intercambios?.length ? 108 : 32);
   formalExchange(doc, inspection);
+  }
 
+  if (!unified) {
   section(doc, 'Integridad y cadena de custodia', 'Identificadores técnicos para detectar sustituciones en los datos fuente y en las evidencias', 64);
-  integrityLedger(doc, inspection, fingerprint);
+  integrityLedger(doc, inspection, fingerprint, unified);
 
+  }
   section(doc, 'Control documental y remisión', 'Condición de la versión exportada y responsabilidad profesional');
   const readinessText = readiness.ready
     ? `Integridad formal: ${readiness.completed}/${readiness.total} controles documentales completos.`
     : `Integridad formal: ${readiness.completed}/${readiness.total}. Pendiente: ${readiness.missing.join('; ')}.`;
-  const closureParagraphs = [
-    `Este informe técnico complementa el acta de inspección ${inspection.numeroActa || 'sin número asignado'}. Ambas piezas pertenecen al expediente ${inspection.numero} y deben conservarse y remitirse conjuntamente cuando corresponda la intervención del área legal.`,
+  const closureParagraphs = unified ? [
+    `Expediente ${inspection.numero}, versión ${inspection.version}. Copia del registro de campo, evaluación y evidencias. La descarga no aprueba, cierra ni notifica. La huella identifica la versión, no sustituye una firma digital. El QR permite consultar su verificación. La bitácora completa permanece en SITREP.`,
+    readinessText,
+  ] : [
+    unified ? `Copia unificada del expediente ${inspection.numero}, versión ${inspection.version}: acta de campo, evaluación técnica y evidencias disponibles al momento de exportar. La descarga no cierra, aprueba ni notifica el expediente.` : `Este informe técnico complementa el acta de inspección ${inspection.numeroActa || 'sin número asignado'}. Ambas piezas pertenecen al expediente ${inspection.numero} y deben conservarse y remitirse conjuntamente cuando corresponda la intervención del área legal.`,
     'Antecedente técnico para intervención legal; no es sanción ni acto final. SITREP no presume el dictamen ni reemplaza su contenido.',
     readinessText,
     'La huella SHA-256 identifica los datos fuente de esta versión y permite detectar cambios posteriores. No reemplaza la firma de los intervinientes ni una firma digital emitida conforme al régimen aplicable.',
@@ -719,12 +803,14 @@ export async function streamInspectionTechnicalReportPdf(
   // Keep the validation context with its signature fields. If the closure
   // ends near the bottom, the new page must still carry explanatory content,
   // never an isolated pair of signature lines.
-  section(doc, 'Validación profesional y revisión institucional', 'Espacios de firma y control de la versión exportada', 160);
+  section(doc, 'Validación profesional y revisión institucional', 'Espacios de firma y control de la versión exportada', unified ? 104 : 160);
   const validationY = doc.y;
+  if (!unified) {
   doc.roundedRect(44, validationY, doc.page.width - 88, 42, 5).fill(C.soft);
   doc.font('Helvetica').fontSize(8.2).fillColor(C.ink)
     .text('La firma técnica y la revisión institucional deben incorporarse conforme al circuito aplicable. Su ausencia en esta exportación no se interpreta como aprobación ni reemplaza una firma digital.', 56, validationY + 10, { width: doc.page.width - 112, lineGap: 1.5 });
   doc.y = validationY + 56;
+  }
   ensureSpace(doc, 104);
   const signatureY = doc.y + 10;
   const half = (doc.page.width - 104) / 2;
@@ -742,7 +828,7 @@ export async function streamInspectionTechnicalReportPdf(
     // Draw running furniture after pagination is final. Drawing it from a
     // pageAdded listener lets PDFKit's internal line wrapper reset the cursor
     // and can place continuation content over the header.
-    if (i > range.start) runningHeader(doc, inspection, state.label, branding);
+    if (i > range.start) runningHeader(doc, inspection, state.label, branding, unified);
     // El pie vive dentro del margen reservado. PDFKit puede crear páginas
     // fantasma al escribir allí si conserva el margen inferior de flujo.
     const flowBottomMargin = doc.page.margins.bottom;
@@ -750,7 +836,7 @@ export async function streamInspectionTechnicalReportPdf(
     const footerY = doc.page.height - 55;
     doc.moveTo(44, footerY - 8).lineTo(doc.page.width - 44, footerY - 8).lineWidth(0.5).strokeColor(C.line).stroke();
     doc.font('Helvetica').fontSize(6.8).fillColor(C.muted)
-      .text(`Informe técnico · ${inspection.numero} · v${inspection.version}`, 44, footerY, { width: 205, lineBreak: false })
+      .text(`${unified ? 'Expediente' : 'Informe técnico'} · ${inspection.numero} · v${inspection.version}`, 44, footerY, { width: 205, lineBreak: false })
       .text(`Huella ${fingerprint.slice(0, 16)}…`, 224, footerY, { width: 170, align: 'center', lineBreak: false })
       .text(`Página ${i + 1} de ${range.count}`, 421, footerY, { width: 130, align: 'right', lineBreak: false });
     doc.fontSize(6.1).text(`Gobierno de Mendoza · Ministerio de Energía y Ambiente · Documento oficial generado por SITREP · ${formatDate(generatedAt, true)} ART`, 44, footerY + 13, { width: doc.page.width - 88, align: 'center', lineBreak: false });

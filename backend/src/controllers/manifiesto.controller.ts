@@ -151,11 +151,14 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
       }
     }
 
-    // Generar numero de manifiesto
-    const numero = await generarNumeroManifiesto();
+    // Reserve the number and insert record/event under one database lock.
+    // A process-local mutex would not protect both production PM2 workers.
+    const manifiesto = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(836272)::text AS "lock"`;
+      const numero = await generarNumeroManifiesto(tx);
 
     // Crear manifiesto con residuos
-    const manifiesto = await prisma.manifiesto.create({
+    const created = await tx.manifiesto.create({
       data: {
         numero,
         generadorId,
@@ -189,13 +192,16 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
     });
 
     // Registrar evento
-    await prisma.eventoManifiesto.create({
+    await tx.eventoManifiesto.create({
       data: {
-        manifiestoId: manifiesto.id,
+        manifiestoId: created.id,
         tipo: 'CREACION',
         descripcion: 'Manifiesto creado',
         usuarioId: userId
       }
+    });
+
+      return created;
     });
 
     res.status(201).json({

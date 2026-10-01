@@ -18,6 +18,12 @@ const hasRole = (user: User, roles: UserRole[]) => roles.includes(user.rol);
  * screens from being rendered and issuing doomed/forbidden API requests.
  */
 export function canAccessMobilePath(user: User, path: string): boolean {
+  // Never render the administrator's user list or switcher for a sector user.
+  // The API also enforces this, but the PWA must not issue a doomed request.
+  if (path === '/switch-user' || path.startsWith('/switch-user/')) {
+    return user.rol === 'ADMIN';
+  }
+
   if (path === '/mis-inspecciones' || path.startsWith('/mis-inspecciones/')) {
     return hasRole(user, ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR']);
   }

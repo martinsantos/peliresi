@@ -33,6 +33,10 @@ export function applyRoleFilter(
     where.transportistaId = user.transportista.id;
   } else if (user.rol === 'OPERADOR' && user.operador) {
     where.operadorId = user.operador.id;
+  } else {
+    // A missing actor association is not permission to list every actor's data.
+    // Keep the same deny-by-default policy as canAccessManifiesto().
+    where.id = { in: [] };
   }
 }
 

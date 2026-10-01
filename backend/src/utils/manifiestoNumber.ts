@@ -1,14 +1,14 @@
-import prisma from '../lib/prisma';
+import type { Prisma } from '@prisma/client';
 
 /**
  * Generate a unique manifiesto number in format YYYY-NNNNNN.
  *
- * Uses findFirst + ORDER BY DESC instead of loading all manifiestos of the year.
- * O(1) vs O(n) — critical as the table grows.
+ * Call within the creation transaction after acquiring its advisory lock.
+ * Keep the lock held until the corresponding manifest is inserted.
  */
-export async function generarNumeroManifiesto(): Promise<string> {
+export async function generarNumeroManifiesto(tx: Pick<Prisma.TransactionClient, 'manifiesto'>): Promise<string> {
   const año = new Date().getFullYear();
-  const latest = await prisma.manifiesto.findFirst({
+  const latest = await tx.manifiesto.findFirst({
     where: { numero: { startsWith: `${año}-` } },
     orderBy: { numero: 'desc' },
     select: { numero: true },

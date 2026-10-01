@@ -206,12 +206,15 @@ function ExchangeLedger({
                           <div className="contents lg:block"><dt className="sr-only">Fecha</dt><dd className="font-semibold text-neutral-700">{inspectionDate(entry.createdAt, true)}</dd></div>
                           <div className="contents lg:block"><dt className="sr-only">Autor</dt><dd>{entry.autor.nombre} {entry.autor.apellido || ''}</dd></div>
                           <div className="contents lg:block"><dt className="sr-only">Canal</dt><dd>Portal SITREP</dd></div>
+                          <div className="contents lg:block"><dt className="sr-only">Destinatario</dt><dd>Para: {entry.destinatario === 'INSPECCIONADO' ? 'Inspeccionado' : 'Organismo'}</dd></div>
                         </dl>
                       </div>
 
                       <p className="mt-3 max-w-[76ch] whitespace-pre-wrap break-words text-sm leading-6 text-neutral-800">{entry.cuerpo}</p>
 
                       {entry.plazoRespuestaAt && <div className="mt-3 flex w-fit max-w-full items-start gap-2 border-l-2 border-warning-500 bg-warning-50 px-3 py-2 text-xs font-semibold leading-5 text-warning-900"><Clock3 size={15} className="mt-0.5 shrink-0" aria-hidden="true" /><span>Plazo de respuesta: {inspectionDate(entry.plazoRespuestaAt, true)}</span></div>}
+
+                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-neutral-600"><span>Puesta a disposición: {inspectionDate(entry.puestaDisposicionAt || entry.createdAt, true)}</span><span className={entry.vistaPorDestinatarioAt ? 'font-semibold text-success-800' : 'font-semibold text-warning-800'}>{entry.vistaPorDestinatarioAt ? `Vista por el destinatario: ${inspectionDate(entry.vistaPorDestinatarioAt, true)}` : 'Aún no abierta por el destinatario'}</span></div>
 
                       {entry.adjuntos.length > 0 && <div className="mt-4 min-w-0"><p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-neutral-500">Adjuntos preservados</p><div className="grid min-w-0 gap-2 sm:grid-cols-2">{entry.adjuntos.map((file) => <button key={file.id} type="button" onClick={() => onDownload(entry, file.id, file.nombreOriginal)} className="flex min-w-0 items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-left text-xs font-semibold text-neutral-700 hover:border-primary-300 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"><Paperclip size={14} className="shrink-0" aria-hidden="true" /><span className="min-w-0 flex-1 truncate">{file.nombreOriginal}</span><span className="shrink-0 font-normal text-neutral-500">{formatBytes(file.bytes)}</span><Download size={13} className="shrink-0" aria-hidden="true" /></button>)}</div></div>}
 
@@ -428,7 +431,7 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#1B5E3C]">Instancia contradictoria</p>
                 <h3 id="inspection-exchange-title" className="mt-1 text-xl font-extrabold tracking-tight text-[#10213A]">Presentaciones y respuestas</h3>
-                <p className="mt-1 max-w-3xl text-sm leading-6 text-neutral-600">Cada actuación queda fechada, atribuida, vinculada a sus adjuntos y encadenada por huellas SHA-256. Este canal registra en SITREP; no envía correos.</p>
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-neutral-600">Cada actuación identifica autor y destinatario, registra puesta a disposición y primera apertura, vincula sus adjuntos y encadena huellas SHA-256. Este canal registra en SITREP; no envía correos.</p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 lg:justify-end">

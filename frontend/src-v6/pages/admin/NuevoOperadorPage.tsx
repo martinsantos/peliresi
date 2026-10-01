@@ -20,6 +20,8 @@ import {
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
+import { MobileFormSteps } from '../../components/MobileFormSteps';
+import { initialPasswordError } from '../../utils/actorCreationValidation';
 import { Select } from '../../components/ui/Select';
 import { Badge } from '../../components/ui/BadgeV2';
 import { toast } from '../../components/ui/Toast';
@@ -178,7 +180,8 @@ const NuevoOperadorPage: React.FC = () => {
       if (!form.email.trim()) errs.push('Email es obligatorio');
     }
     if (s === 6 && !isEdit) {
-      if (!form.password.trim()) errs.push('Password inicial es obligatorio');
+      const error = initialPasswordError(form.password, form.cuit);
+      if (error) errs.push(error);
     }
     return errs;
   };
@@ -189,7 +192,7 @@ const NuevoOperadorPage: React.FC = () => {
     if (field === 'razonSocial') return attempted.has(1) && !form.razonSocial.trim();
     if (field === 'cuit') return attempted.has(1) && !form.cuit.trim();
     if (field === 'email') return attempted.has(1) && !form.email.trim();
-    if (field === 'password') return attempted.has(6) && !isEdit && !form.password.trim();
+    if (field === 'password') return attempted.has(6) && !isEdit && !!initialPasswordError(form.password, form.cuit);
     return false;
   };
 
@@ -197,7 +200,6 @@ const NuevoOperadorPage: React.FC = () => {
     setAttempted(prev => new Set(prev).add(step));
     const errs = getStepErrors(step);
     if (errs.length > 0) {
-      toast.error('Campos obligatorios', errs.join('. '));
       return;
     }
     if (step < TOTAL_STEPS) setStep(step + 1);
@@ -209,7 +211,7 @@ const NuevoOperadorPage: React.FC = () => {
     if (s < step) { setStep(s); return; }
     setAttempted(prev => new Set(prev).add(step));
     const errs = getStepErrors(step);
-    if (errs.length > 0) { toast.error('Campos obligatorios', errs.join('. ')); return; }
+    if (errs.length > 0) return;
     setStep(s);
   };
 
@@ -227,7 +229,6 @@ const NuevoOperadorPage: React.FC = () => {
       const errs = getStepErrors(s);
       if (errs.length > 0) {
         setAttempted(prev => new Set(prev).add(s));
-        toast.error('Campos obligatorios', errs.join('. '));
         setStep(s);
         return;
       }
@@ -350,12 +351,12 @@ const NuevoOperadorPage: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto pb-8">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>Volver</Button>
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-100 rounded-xl"><FlaskConical size={22} className="text-blue-600" /></div>
-          <div>
-            <h2 className="text-2xl font-bold text-neutral-900">{isEdit ? 'Editar Operador' : 'Registro Provincial de Operadores de RRPP'}</h2>
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4">
+        <Button variant="outline" size="sm" className="shrink-0" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>Volver</Button>
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="shrink-0 p-2 bg-blue-100 rounded-xl"><FlaskConical size={22} className="text-blue-600" /></div>
+          <div className="min-w-0">
+            <h2 className="text-xl sm:text-2xl font-bold text-neutral-900">{isEdit ? 'Editar Operador' : 'Registro Provincial de Operadores de RRPP'}</h2>
             <p className="text-sm text-neutral-500">Ley 24.051, Ley Provincial 5917, Decreto 2625/99</p>
           </div>
         </div>
@@ -363,7 +364,8 @@ const NuevoOperadorPage: React.FC = () => {
 
       {/* Stepper */}
       <div className="bg-white rounded-2xl border border-neutral-200 p-4 shadow-sm">
-        <div className="flex items-center justify-between">
+        <MobileFormSteps steps={STEPS} currentStep={step} onSelect={goStep} />
+        <div className="hidden items-center justify-between md:flex">
           {STEPS.map((s, i) => {
             const Icon = s.icon;
             const isActive = step === s.id;
@@ -371,7 +373,7 @@ const NuevoOperadorPage: React.FC = () => {
             const hasErr = attempted.has(s.id) && stepHasErrors(s.id);
             return (
               <React.Fragment key={s.id}>
-                <button onClick={() => goStep(s.id)} className={`flex flex-col items-center gap-1.5 group transition-all ${isActive ? 'scale-105' : ''}`}>
+                <button type="button" aria-label={`${s.id}. ${s.label}`} aria-current={isActive ? 'step' : undefined} onClick={() => goStep(s.id)} className="flex flex-col items-center gap-1.5 group transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 rounded-lg">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
                     hasErr ? 'bg-error-100 text-error-600 ring-2 ring-error-300' :
                     isActive ? 'bg-primary-600 text-white shadow-lg shadow-primary-200' :
@@ -675,9 +677,9 @@ const NuevoOperadorPage: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Input label="Nombre del Responsable" value={form.nombre} onChange={e => up('nombre', e.target.value)} placeholder="Juan Perez" />
                     <div>
-                      <Input label="Password Inicial *" type="password" value={form.password} onChange={e => up('password', e.target.value)} placeholder="Minimo 8 caracteres"
-                        className={showError('password') ? 'border-error-400 bg-error-50' : ''} />
-                      <FieldError show={showError('password')} msg="El password es obligatorio para crear el operador" />
+                      <Input label="Password Inicial *" type="password" autoComplete="new-password" value={form.password} onChange={e => up('password', e.target.value)} placeholder="Minimo 8 caracteres"
+                        helperText="Al menos 8 caracteres. No uses el CUIT."
+                        errorMessage={showError('password') ? initialPasswordError(form.password, form.cuit) : undefined} />
                     </div>
                   </div>
                   <p className="text-xs text-neutral-500">El responsable podra cambiar su contrasena desde su perfil al ingresar.</p>

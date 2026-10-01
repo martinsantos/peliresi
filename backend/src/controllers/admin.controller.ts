@@ -39,7 +39,7 @@ const updateUsuarioSchema = z.object({
 
 export const getUsuarios = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { search, rol, activo, page = 1, limit = 10, sortBy, sortOrder } = req.query;
+    const { search, rol, roles, activo, emailVerified, page = 1, limit = 10, sortBy, sortOrder } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
     const order: 'asc' | 'desc' = sortOrder === 'desc' ? 'desc' : 'asc';
     const USR_SORT: Record<string, any> = {
@@ -51,15 +51,30 @@ export const getUsuarios = async (req: AuthRequest, res: Response, next: NextFun
     const orderBy = USR_SORT[sortBy as string] ?? { createdAt: 'desc' };
 
     const where: any = {};
-    if (search) {
-      where.OR = [
-        { nombre: { contains: search as string, mode: 'insensitive' } },
-        { email: { contains: search as string, mode: 'insensitive' } },
-        { empresa: { contains: search as string, mode: 'insensitive' } },
-      ];
+    if (search !== undefined) {
+      if (typeof search !== 'string') throw new AppError('Búsqueda inválida', 400);
+      const terms = search.trim().split(/\s+/).filter(Boolean);
+      if (terms.length) where.AND = terms.map(term => ({ OR: [
+        { nombre: { contains: term, mode: 'insensitive' } },
+        { apellido: { contains: term, mode: 'insensitive' } },
+        { email: { contains: term, mode: 'insensitive' } },
+        { empresa: { contains: term, mode: 'insensitive' } },
+      ] }));
     }
     if (rol) where.rol = rol;
+    if (roles !== undefined) {
+      if (typeof roles !== 'string') throw new AppError('Filtro de roles inválido', 400);
+      const selectedRoles = roles.split(',');
+      if (!selectedRoles.length || selectedRoles.some(value => !createUsuarioSchema.shape.rol.safeParse(value).success)) {
+        throw new AppError('Filtro de roles inválido', 400);
+      }
+      where.rol = { in: selectedRoles };
+    }
     if (activo !== undefined) where.activo = activo === 'true';
+    if (emailVerified !== undefined) {
+      if (emailVerified !== 'true' && emailVerified !== 'false') throw new AppError('Filtro de verificación inválido', 400);
+      where.emailVerified = emailVerified === 'true';
+    }
 
     const [usuarios, total] = await Promise.all([
       prisma.usuario.findMany({

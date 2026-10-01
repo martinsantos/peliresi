@@ -7,10 +7,16 @@ import type {
   IniciarSolicitudRequest,
   UpdateSolicitudRequest,
   PaginatedData,
+  SolicitudRequirements,
 } from '../types/api';
 
 export const solicitudService = {
   // ── Public ──
+  async getRequirements(tipoActor: string): Promise<SolicitudRequirements> {
+    const { data } = await api.get(`/solicitudes/requisitos/${tipoActor}`);
+    return data.data;
+  },
+
   async iniciar(req: IniciarSolicitudRequest): Promise<{ solicitudId: string; message: string }> {
     const { data } = await api.post('/solicitudes/iniciar', req);
     return data.data;

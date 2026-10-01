@@ -13,6 +13,33 @@
 @import 'tailwindcss/components';
 @import 'tailwindcss/utilities';
 
+/* Data rows have the same reading/interaction feedback across modules.
+   Static rows keep the default cursor; only actual links/actions are clickable. */
+@media (hover: hover) {
+  :where(table tbody tr:has(td):not(:has(td[colspan]))):hover {
+    background-color: var(--color-neutral-50);
+  }
+}
+:where(table tbody tr):focus-within {
+  background-color: var(--color-primary-50);
+}
+
+/* Keep field controls usable in landscape and a reduced visual viewport. */
+@media (max-height: 500px) {
+  .inspection-case { gap: 6px; }
+  .inspection-case > header a[aria-label^='Abrir actor'],
+  .inspection-case > header p,
+  [data-testid='inspection-field-save-bar'] p + p { display: none; }
+  .inspection-case [data-inspection-scroll] { scroll-padding-block: 8px; }
+  .inspection-case [data-inspection-scroll] .sticky { position: static; }
+}
+@media (max-height: 500px) and (min-width: 640px) {
+  [data-testid='inspection-navigation'] { display: flex; }
+  [data-testid='inspection-navigation'] > nav { flex: 1; padding: 0; }
+  [data-testid='inspection-navigation'] > nav + nav { max-width: 50%; border-left: 1px solid #E0E0DC; }
+  [data-testid='inspection-navigation'] > nav > a { min-height: 44px; padding-inline: 8px; }
+}
+
 /* ========================================
    CSS VARIABLES - Design System v6
    ======================================== */
@@ -106,7 +133,7 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
-    scroll-behavior: smooth;
+    scroll-behavior: auto;
   }
 
   body {
@@ -188,6 +215,15 @@
 
   a:hover {
     color: var(--color-primary-800);
+  }
+
+  /* Field work: native input focus must not zoom the whole iPhone viewport. */
+  @media (max-width: 639px) {
+    [data-app-shell] input:not([type='checkbox']):not([type='radio']):not([type='range']),
+    [data-app-shell] select,
+    [data-app-shell] textarea {
+      font-size: 16px;
+    }
   }
 
   code, pre, .font-mono {

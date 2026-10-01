@@ -20,9 +20,10 @@ import {
   User,
   Settings,
   LogOut,
-  QrCode,
   Plus,
   SwitchCamera,
+  Eye,
+  ArrowLeft,
   BarChart3,
   AlertTriangle,
   Truck,
@@ -39,20 +40,24 @@ import {
   Navigation,
   ClipboardCheck,
   Scale,
+  Radio,
 } from 'lucide-react';
 import { Badge } from '../components/ui/BadgeV2';
 import { NotificationBell } from '../components/NotificationBell';
+import { SitrepMark } from '../components/SitrepMark';
 import { ConnectivityIndicator } from '../components/ConnectivityIndicator';
 import { SWUpdateBanner } from '../components/SWUpdateBanner';
 import { InstallPWAButton } from '../components/InstallPWAButton';
 import { InstallPWAModal } from '../components/InstallPWAModal';
 import { useAuth } from '../contexts/AuthContext';
+import { useImpersonation } from '../contexts/ImpersonationContext';
 import type { UserRole } from '../contexts/AuthContext';
 import { useMobilePrefix } from '../hooks/useMobilePrefix';
 import { useActiveTripRecovery } from '../hooks/useActiveTripRecovery';
 import { useOfflineSync } from '../hooks/useOfflineSync';
 import { NotificacionesPoller } from '../components/NotificacionesPoller';
 import { ToastContainer, toast } from '../components/ui/Toast';
+import { useNotificacionesNoLeidas } from '../hooks/useNotificaciones';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -62,14 +67,14 @@ function cn(...inputs: ClassValue[]) {
 // ROLE CONFIG
 // ========================================
 const roleConfig: Record<UserRole, { label: string; color: string; bgColor: string }> = {
-  ADMIN: { label: 'Admin', color: 'text-primary-600', bgColor: 'bg-primary-500' },
-  GENERADOR: { label: 'Generador', color: 'text-purple-600', bgColor: 'bg-purple-500' },
-  TRANSPORTISTA: { label: 'Transportista', color: 'text-orange-600', bgColor: 'bg-orange-500' },
-  OPERADOR: { label: 'Operador', color: 'text-blue-600', bgColor: 'bg-blue-500' },
-  AUDITOR: { label: 'Auditor', color: 'text-info-600', bgColor: 'bg-info-500' },
+  ADMIN: { label: 'Admin', color: 'text-primary-800', bgColor: 'bg-primary-700' },
+  GENERADOR: { label: 'Generador', color: 'text-purple-700', bgColor: 'bg-purple-700' },
+  TRANSPORTISTA: { label: 'Transportista', color: 'text-orange-800', bgColor: 'bg-orange-700' },
+  OPERADOR: { label: 'Operador', color: 'text-blue-700', bgColor: 'bg-blue-700' },
+  AUDITOR: { label: 'Auditor', color: 'text-info-700', bgColor: 'bg-info-700' },
   ADMIN_TRANSPORTISTA: { label: 'Adm. Transportistas', color: 'text-slate-600', bgColor: 'bg-slate-500' },
   ADMIN_GENERADOR: { label: 'Adm. Generadores', color: 'text-green-600', bgColor: 'bg-green-600' },
-  ADMIN_OPERADOR: { label: 'Adm. Operadores', color: 'text-teal-600', bgColor: 'bg-teal-500' },
+  ADMIN_OPERADOR: { label: 'Adm. Operadores', color: 'text-teal-700', bgColor: 'bg-teal-700' },
 };
 
 // ========================================
@@ -89,10 +94,10 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, isActive, rol
     <NavLink
       to={to}
       className={({ isActive: active }) => cn(
-        'flex flex-col items-center justify-center gap-0.5 py-2 px-3 min-w-[64px] min-h-[48px] transition-colors',
+        'flex flex-1 flex-col items-center justify-center gap-1 border-t-2 py-2 px-1 min-w-0 min-h-14 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700',
         active || isActive
-          ? roleColor
-          : 'text-neutral-400'
+          ? roleColor + ' border-current bg-neutral-50'
+          : 'border-transparent text-neutral-600 hover:bg-neutral-50'
       )}
     >
       <div className="relative">
@@ -103,7 +108,7 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, isActive, rol
           </span>
         ) : null}
       </div>
-      <span className="text-[10px] font-medium">{label}</span>
+      <span className="text-xs font-semibold">{label}</span>
     </NavLink>
   );
 };
@@ -115,16 +120,20 @@ export const MobileLayout: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentUser, users, switchUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isLoading, isDemo } = useAuth();
+  const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isLoading, isDemo } = useAuth();
+  const { impersonationData, exitImpersonation } = useImpersonation();
   const mp = useMobilePrefix();
   const isInspector = Boolean(currentUser?.esInspector);
+  const isInspectionRoute = /\/inspecciones(?:\/|$)/.test(location.pathname);
+  const isInspectionCase = /\/inspecciones\/[^/]+/.test(location.pathname);
   const canInspect = Boolean(isInspector || currentUser?.rol === 'ADMIN' || currentUser?.rol.startsWith('ADMIN_'));
+  const { data: unreadNotificationCount = 0 } = useNotificacionesNoLeidas();
 
   // Recover active trip from API after reinstall/crash
   useActiveTripRecovery();
 
   // Auto-sync data to IndexedDB for offline use
-  useOfflineSync();
+  const offlineSync = useOfflineSync({ downloadManifests: !isInspectionRoute });
 
   // Bienvenida al cambiar de perfil (solo PWA)
   const prevUserIdRef = React.useRef<string | null>(null);
@@ -178,11 +187,11 @@ export const MobileLayout: React.FC = () => {
     if (isAdmin) {
       items.push({ to: mp('/actores'), icon: <Users size={22} />, label: 'Actores' });
     } else {
-      items.push({ to: mp('/alertas'), icon: <Bell size={22} />, label: 'Alertas', badge: 3 });
+      items.push({ to: mp('/notificaciones'), icon: <Bell size={22} />, label: 'Avisos', badge: unreadNotificationCount });
     }
 
     return items;
-  }, [currentUser?.rol, currentUser?.esInspector, isInspector, isTransportista, isAdmin, mp]);
+  }, [currentUser?.rol, currentUser?.esInspector, isInspector, isTransportista, isAdmin, mp, unreadNotificationCount]);
 
   // Menu items según rol
   const menuItems = useMemo(() => {
@@ -214,11 +223,15 @@ export const MobileLayout: React.FC = () => {
     }
 
     if (isAdmin) {
+      items.push({ to: mp('/monitor'), icon: <Radio size={20} />, label: 'Monitor', section: 'main' });
       items.push({ to: mp('/actores'), icon: <Users size={20} />, label: 'Actores', section: 'main' });
     }
 
     items.push({ to: mp('/reportes'), icon: <BarChart3 size={20} />, label: 'Reportes', section: 'main' });
-    items.push({ to: mp('/alertas'), icon: <Bell size={20} />, label: 'Alertas', badge: 3, section: 'main' });
+    items.push({ to: mp('/notificaciones'), icon: <Bell size={20} />, label: 'Avisos', badge: unreadNotificationCount, section: 'main' });
+    if (isAdmin) {
+      items.push({ to: mp('/alertas'), icon: <AlertTriangle size={20} />, label: 'Alertas operativas', section: 'main' });
+    }
 
     // Admin section
     if (isAdmin) {
@@ -242,7 +255,7 @@ export const MobileLayout: React.FC = () => {
     items.push({ to: mp('/ayuda'), icon: <HelpCircle size={20} />, label: 'Ayuda', section: 'tools' });
 
     return items;
-  }, [currentUser?.rol, currentUser?.esInspector, canInspect, isAdmin, isTransportista, mp, activeTripId]);
+  }, [currentUser?.rol, currentUser?.esInspector, canInspect, isAdmin, isTransportista, mp, activeTripId, unreadNotificationCount]);
 
   // Separar items por sección
   const mainItems = menuItems.filter(i => i.section === 'main');
@@ -253,7 +266,7 @@ export const MobileLayout: React.FC = () => {
   // Returns null while loading or if no user (AuthGate will redirect to /login).
   if (isLoading || !currentUser) return null;
 
-  const config = roleConfig[currentUser.rol];
+  const config = currentUser.esInspector && location.pathname.includes('/inspecciones') ? { label: 'Inspector', color: 'text-teal-700', bgColor: 'bg-teal-700' } : roleConfig[currentUser.rol];
 
   // Título según la ruta actual
   const getPageTitle = () => {
@@ -274,7 +287,7 @@ export const MobileLayout: React.FC = () => {
     if (path.includes('/estadisticas')) return 'Estadísticas';
     if (path.includes('/escaner-qr')) return 'Escanear QR';
     if (path.includes('/ayuda')) return 'Ayuda';
-    if (path.includes('/switch-user')) return 'Cambiar Usuario';
+    if (path.includes('/switch-user')) return 'Cuenta';
     if (path.includes('/centro-control')) return 'Centro de Control';
     if (path.includes('/admin/usuarios')) return 'Usuarios';
     if (path.includes('/admin/generadores')) return 'Generadores';
@@ -290,34 +303,47 @@ export const MobileLayout: React.FC = () => {
   const showFab = location.pathname.includes('/manifiestos') && !location.pathname.includes('/nuevo') && (isAdmin || isGenerador);
   const isFieldTripRoute = location.pathname.includes('/transporte/viaje/');
 
-  const handleSwitchUser = (userId: number | string) => {
-    if (userId === currentUser.id) return;
-    switchUser(Number(userId));
-    // Brief delay so the user sees the menu update before it closes
-    setTimeout(() => setIsMenuOpen(false), 200);
-  };
-
   return (
-    <div className="h-screen overflow-hidden bg-[#F8F8F6] flex flex-col tap-transparent">
+    <div data-app-shell className="h-dvh overflow-hidden bg-[#F8F8F6] flex flex-col tap-transparent">
       <NotificacionesPoller />
       <ToastContainer />
       {/* Demo mode banner */}
       {isDemo && (
-        <div className="bg-amber-500 text-white text-center text-xs sm:text-sm py-1 font-medium sticky top-0 z-50">
+        <div className="shrink-0 bg-amber-100 text-amber-950 text-center text-xs sm:text-sm py-1 font-medium sticky top-0 z-50">
           Modo Demo — Los datos no son reales
         </div>
       )}
 
       {/* Connectivity indicator - always visible at top */}
-      <ConnectivityIndicator />
+      {!isInspectionCase && <ConnectivityIndicator />}
+
+      {(offlineSync.terminal > 0 || offlineSync.auth > 0 || offlineSync.retryable > 0) && (
+        <div role="status" className={`flex items-center justify-between gap-3 border-b px-4 py-2 text-xs ${offlineSync.terminal > 0 || offlineSync.auth > 0 ? 'border-error-200 bg-error-50 text-error-900' : 'border-amber-200 bg-amber-50 text-amber-950'}`}>
+          <span className="flex min-w-0 items-center gap-2"><AlertTriangle size={16} className="shrink-0" /><span className="min-w-0"><strong>{offlineSync.auth > 0 ? 'La sesión debe renovarse' : offlineSync.terminal > 0 ? 'Hay cambios que requieren revisión' : 'Hay cambios esperando reintento'}</strong><span className="ml-1">· {offlineSync.pending} pendientes</span>{offlineSync.lastError && <span className="block truncate opacity-80">{offlineSync.lastError}</span>}</span></span>
+          <button type="button" disabled={offlineSync.syncing} onClick={() => void offlineSync.retry()} className="min-h-9 shrink-0 rounded-md border border-current bg-white px-2 font-bold disabled:opacity-50">{offlineSync.syncing ? 'Reintentando…' : 'Reintentar'}</button>
+        </div>
+      )}
 
       {/* SW update banner - shown when new version available */}
       <SWUpdateBanner />
 
+      {impersonationData && (
+        <div data-testid="impersonation-banner" className="flex shrink-0 items-center gap-2 border-b border-amber-300 bg-amber-100 px-3 py-2 text-amber-950">
+          <Eye size={18} className="shrink-0" aria-hidden="true" />
+          <span className="min-w-0 flex-1 text-sm font-semibold leading-tight">
+            <span className="block">Vista temporal</span>
+            <span className="block truncate text-xs font-medium">{impersonationData.impersonatedUser.nombre}</span>
+          </span>
+          <button type="button" data-testid="exit-impersonation" onClick={exitImpersonation} className="flex min-h-11 shrink-0 items-center gap-1 rounded-lg border border-amber-700 bg-white px-3 text-sm font-bold text-amber-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-900">
+            <ArrowLeft size={16} aria-hidden="true" /> Volver a mi cuenta
+          </button>
+        </div>
+      )}
+
       {/* Header */}
-      <header className="sticky top-0 z-40 sidebar-polished safe-area-top">
+      <header className="sticky top-0 z-40 shrink-0 sidebar-polished safe-area-top">
         <div className="flex items-center justify-between h-14 px-4 safe-top">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
             <button
               onClick={() => setIsMenuOpen(true)}
               className="p-2 -ml-2 text-white/80 hover:bg-white/10 rounded-xl transition-colors touch-target"
@@ -325,21 +351,22 @@ export const MobileLayout: React.FC = () => {
             >
               <Menu size={24} />
             </button>
-            <h1 className="text-lg font-bold text-white">{getPageTitle()}</h1>
+            <SitrepMark size={24} />
+            <h1 className="min-w-0 truncate text-lg font-bold text-white">{getPageTitle()}</h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             {/* Badge de rol */}
             <span className="text-xs font-medium px-2 py-1 rounded-full bg-white/20 text-white">
               {config.label}
             </span>
-            <NotificationBell basePath={mp('')} />
+            <NotificationBell basePath={mp('')} inverse />
           </div>
         </div>
       </header>
 
       {/* Keep absolutely positioned field controls inside this scroll container. */}
-      <main className="relative flex-1 overflow-y-auto">
-        <div className={cn('p-4', isFieldTripRoute ? 'pb-6' : 'pb-28')}>
+      <main className={cn('relative min-h-0 min-w-0 flex-1', isInspectionCase ? 'overflow-clip' : 'overflow-y-auto')}>
+        <div className={cn(isInspectionCase ? 'h-full min-h-0 p-3' : 'p-4', isInspectionCase ? '' : isFieldTripRoute ? 'pb-6' : 'pb-28')}>
           <Outlet />
         </div>
       </main>
@@ -348,7 +375,7 @@ export const MobileLayout: React.FC = () => {
       {showFab && (
         <button
           onClick={() => navigate(mp('/manifiestos/nuevo'))}
-          className={`fixed right-4 bottom-24 w-14 h-14 ${config.bgColor} text-white rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-all z-30 hover-glow animate-scale-in-bounce`}
+          className="fixed right-4 bottom-24 w-14 h-14 bg-primary-700 text-white rounded-full shadow-lg flex items-center justify-center transition-colors z-30 hover:bg-primary-800"
           aria-label="Nuevo manifiesto"
         >
           <Plus size={28} />
@@ -371,7 +398,7 @@ export const MobileLayout: React.FC = () => {
       )}
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bottom-nav-polished safe-area-bottom z-40">
+      {!isInspectionCase && <nav className="fixed bottom-0 left-0 right-0 bottom-nav-polished safe-area-bottom z-40">
         <div className="flex items-center justify-around safe-bottom">
           {bottomNavItems.map((item) => (
             <NavItem 
@@ -384,10 +411,10 @@ export const MobileLayout: React.FC = () => {
             />
           ))}
         </div>
-      </nav>
+      </nav>}
 
       {/* PWA Install Modal (appears after 45s of use) */}
-      <InstallPWAModal />
+      {!isInspectionRoute && <InstallPWAModal />}
 
       {/* Side Menu Drawer */}
       {isMenuOpen && (
@@ -404,9 +431,7 @@ export const MobileLayout: React.FC = () => {
             <div className={`p-4 border-b ${config.bgColor} bg-opacity-10`}>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 ${config.bgColor} rounded-xl flex items-center justify-center`}>
-                    <QrCode size={20} className="text-white" />
-                  </div>
+                  <SitrepMark size={40} />
                   <div>
                     <h2 className="font-bold text-neutral-900">SITREP</h2>
                     <p className={`text-xs ${config.color} font-medium`}>{config.label}</p>
@@ -502,48 +527,20 @@ export const MobileLayout: React.FC = () => {
                 </>
               )}
 
-              {/* User Switcher en Menu */}
-              <div className="border-t border-neutral-100 my-2" />
-              <p className="px-3 py-2 text-xs font-semibold text-neutral-400 uppercase">
-                Cambiar Usuario
-              </p>
-              <div className="space-y-1 px-2">
-                {users.slice(0, 5).map((user) => {
-                  const userConfig = roleConfig[user.rol];
-                  const isCurrent = user.id === currentUser.id;
-                  return (
-                    <button
-                      key={user.id}
-                      onClick={() => handleSwitchUser(user.id)}
-                      disabled={isCurrent}
-                      className={cn(
-                        'w-full flex items-center gap-2 px-2 py-2 rounded-lg transition-colors text-left',
-                        isCurrent
-                          ? `${userConfig.bgColor} bg-opacity-20`
-                          : 'hover:bg-neutral-100'
-                      )}
-                    >
-                      <div className={`w-8 h-8 ${userConfig.bgColor} rounded-lg flex items-center justify-center text-white text-xs font-bold`}>
-                        {user.avatar}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium truncate ${isCurrent ? userConfig.color : 'text-neutral-700'}`}>
-                          {user.nombre}
-                        </p>
-                      </div>
-                      {isCurrent && <div className={`w-2 h-2 ${userConfig.bgColor} rounded-full`} />}
-                    </button>
-                  );
-                })}
+              {/* Switching is an ADMIN tool, never a role selector for an actor. */}
+              {isAdmin && <>
+                <div className="border-t border-neutral-100 my-2" />
+                <div className="px-2">
                 <NavLink
                   to={mp('/switch-user')}
                   onClick={() => setIsMenuOpen(false)}
-                  className="flex items-center gap-2 px-2 py-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                  className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-primary-800 hover:bg-primary-50"
                 >
                   <SwitchCamera size={18} />
-                  <span className="text-sm font-medium">Ver todos los usuarios</span>
+                  <span>Ver como otro usuario</span>
                 </NavLink>
-              </div>
+                </div>
+              </>}
 
               <div className="border-t border-neutral-100 my-2" />
               <div className="space-y-1">

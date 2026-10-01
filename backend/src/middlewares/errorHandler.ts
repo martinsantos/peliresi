@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { MulterError } from 'multer';
+import { ZodError } from 'zod';
 import logger from '../utils/logger';
 
 export class AppError extends Error {
@@ -36,6 +37,13 @@ export const errorHandler = (
   let statusCode = err.statusCode || 500;
   let message = err.message || 'Error interno del servidor';
   let details = err.details;
+
+  // Match safeParse() controllers without exposing the serialized issue tree.
+  if (err instanceof ZodError) {
+    statusCode = 400;
+    message = err.issues[0]?.message || 'Revise los datos enviados';
+    details = undefined;
+  }
 
   // Manejar errores de Prisma
   if (err instanceof PrismaClientKnownRequestError) {

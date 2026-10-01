@@ -4,9 +4,11 @@
  * Dashboard adaptativo según el rol del usuario
  */
 
+import { useInspectionOperations } from '../../hooks/useInspectionOperations';
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
+  ClipboardCheck,
   FileText,
   TrendingUp,
   AlertCircle,
@@ -34,6 +36,8 @@ import { useManifiestos } from '../../hooks/useManifiestos';
 import { EstadoManifiesto } from '../../types/models';
 import { formatRelativeTime } from '../../utils/formatters';
 
+const knownCount = (value: number | null | undefined): string => value == null ? '—' : String(value);
+
 // ========================================
 // ADMIN DASHBOARD
 // ========================================
@@ -42,20 +46,23 @@ const AdminDashboard: React.FC = () => {
   const location = useLocation();
   const route = (path: string) => path;
 
+  const inspections = useInspectionOperations({ limit: 1 });
+
   // Try real API data
   const { data: dashStats, isLoading: loadingStats, isError: errorStats } = useDashboardStats();
   const { data: recentManifiestos, isLoading: loadingRecent } = useManifiestos({ limit: 4 });
 
   const est = dashStats?.estadisticas;
-  const totalM = est?.total ?? 0;
-  const enTransitoM = est?.enTransito ?? 0;
-  const tratadosM = est?.tratados ?? 0;
-  const complianceRate = totalM > 0 ? `${((tratadosM / totalM) * 100).toFixed(1)}%` : '-';
+  const totalM = est?.total;
+  const enTransitoM = est?.enTransito;
+  const tratadosM = est?.tratados;
+  const complianceRate = totalM != null && totalM > 0 && tratadosM != null ? `${((tratadosM / totalM) * 100).toFixed(1)}%` : '—';
 
   const stats: { id: number; label: string; value: string; icon: typeof FileText; color: string; href: string; change?: string }[] = [
-    { id: 1, label: 'Manifiestos Total', value: String(totalM), icon: FileText, color: 'primary', href: '/manifiestos' },
-    { id: 2, label: 'En Tránsito', value: String(enTransitoM), icon: Truck, color: 'info', href: '/manifiestos?estado=EN_TRANSITO' },
-    { id: 3, label: 'Tratados', value: String(tratadosM), icon: AlertCircle, color: 'warning', href: '/reportes' },
+    { id: 1, label: 'Manifiestos Total', value: knownCount(totalM), icon: FileText, color: 'primary', href: '/manifiestos' },
+    { id: 2, label: 'En Tránsito', value: knownCount(enTransitoM), icon: Truck, color: 'info', href: '/manifiestos?estado=EN_TRANSITO' },
+    { id: 3, label: 'Tratados', value: knownCount(tratadosM), icon: AlertCircle, color: 'warning', href: '/reportes' },
+    { id: 5, label: 'Inspecciones activas', value: inspections.isError || !inspections.data ? '—' : String(inspections.data.total), icon: ClipboardCheck, color: 'success', href: '/inspecciones' },
     { id: 4, label: 'Tasa Cumplimiento', value: complianceRate, icon: CheckCircle2, color: 'success', href: '/reportes' },
   ];
 
@@ -125,7 +132,7 @@ const AdminDashboard: React.FC = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 xl:gap-6 stagger-children">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 xl:gap-6 stagger-children">
         {stats.map((stat) => {
           const Icon = stat.icon;
           const accentVar = stat.color === 'primary' ? '--color-primary-500' :
@@ -236,10 +243,10 @@ const GeneradorDashboard: React.FC = () => {
 
   const est = dashStats?.estadisticas;
   const stats = [
-    { id: 1, label: 'Mis Manifiestos', value: String(est?.total ?? 0), icon: FileText, color: 'purple', href: '/manifiestos' },
-    { id: 2, label: 'En Tránsito', value: String(est?.enTransito ?? 0), icon: Truck, color: 'info', href: '/manifiestos?estado=EN_TRANSITO' },
-    { id: 3, label: 'Pendientes', value: String(est?.borradores ?? 0), icon: Clock, color: 'warning', href: '/manifiestos?estado=BORRADOR' },
-    { id: 4, label: 'Tratados', value: String(est?.tratados ?? 0), icon: Factory, color: 'success', href: '/manifiestos?estado=TRATADO' },
+    { id: 1, label: 'Mis Manifiestos', value: knownCount(est?.total), icon: FileText, color: 'purple', href: '/manifiestos' },
+    { id: 2, label: 'En Tránsito', value: knownCount(est?.enTransito), icon: Truck, color: 'info', href: '/manifiestos?estado=EN_TRANSITO' },
+    { id: 3, label: 'Pendientes', value: knownCount(est?.borradores), icon: Clock, color: 'warning', href: '/manifiestos?estado=BORRADOR' },
+    { id: 4, label: 'Tratados', value: knownCount(est?.tratados), icon: Factory, color: 'success', href: '/manifiestos?estado=TRATADO' },
   ];
 
   return (
@@ -251,7 +258,7 @@ const GeneradorDashboard: React.FC = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
@@ -354,10 +361,10 @@ const TransportistaDashboard: React.FC = () => {
 
   const est = dashStats?.estadisticas;
   const stats = [
-    { id: 1, label: 'Entregados', value: String(est?.entregados ?? 0), icon: CheckCircle2, color: 'orange', href: '/manifiestos?estado=ENTREGADO' },
-    { id: 2, label: 'En Camino', value: String(est?.enTransito ?? 0), icon: Truck, color: 'info', href: '/manifiestos?estado=EN_TRANSITO' },
-    { id: 3, label: 'Pendientes', value: String(est?.aprobados ?? 0), icon: Clock, color: 'warning', href: '/manifiestos?estado=APROBADO' },
-    { id: 4, label: 'Recibidos', value: String(est?.recibidos ?? 0), icon: MapPin, color: 'success', href: '/manifiestos?estado=RECIBIDO' },
+    { id: 1, label: 'Entregados', value: knownCount(est?.entregados), icon: CheckCircle2, color: 'orange', href: '/manifiestos?estado=ENTREGADO' },
+    { id: 2, label: 'En Camino', value: knownCount(est?.enTransito), icon: Truck, color: 'info', href: '/manifiestos?estado=EN_TRANSITO' },
+    { id: 3, label: 'Pendientes', value: knownCount(est?.aprobados), icon: Clock, color: 'warning', href: '/manifiestos?estado=APROBADO' },
+    { id: 4, label: 'Recibidos', value: knownCount(est?.recibidos), icon: MapPin, color: 'success', href: '/manifiestos?estado=RECIBIDO' },
   ];
 
   return (
@@ -439,7 +446,7 @@ const TransportistaDashboard: React.FC = () => {
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
@@ -534,10 +541,10 @@ const OperadorDashboard: React.FC = () => {
 
   const est = dashStats?.estadisticas;
   const stats = [
-    { id: 1, label: 'Recibidos', value: String(est?.recibidos ?? 0), icon: FlaskConical, color: 'blue', href: '/manifiestos?estado=RECIBIDO' },
-    { id: 2, label: 'En Tránsito', value: String(est?.enTransito ?? 0), icon: Factory, color: 'info', href: '/manifiestos?estado=EN_TRANSITO' },
-    { id: 3, label: 'Pendientes', value: String(est?.entregados ?? 0), icon: Clock, color: 'warning', href: '/manifiestos?estado=ENTREGADO' },
-    { id: 4, label: 'Tratados', value: String(est?.tratados ?? 0), icon: CheckCircle2, color: 'success', href: '/manifiestos?estado=TRATADO' },
+    { id: 1, label: 'Recibidos', value: knownCount(est?.recibidos), icon: FlaskConical, color: 'blue', href: '/manifiestos?estado=RECIBIDO' },
+    { id: 2, label: 'En Tránsito', value: knownCount(est?.enTransito), icon: Factory, color: 'info', href: '/manifiestos?estado=EN_TRANSITO' },
+    { id: 3, label: 'Pendientes', value: knownCount(est?.entregados), icon: Clock, color: 'warning', href: '/manifiestos?estado=ENTREGADO' },
+    { id: 4, label: 'Tratados', value: knownCount(est?.tratados), icon: CheckCircle2, color: 'success', href: '/manifiestos?estado=TRATADO' },
   ];
 
   return (
@@ -549,7 +556,7 @@ const OperadorDashboard: React.FC = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
@@ -636,13 +643,8 @@ const OperadorDashboard: React.FC = () => {
 export const DashboardPage: React.FC = () => {
   const { isAdmin, isGenerador, isTransportista, isOperador } = useAuth();
 
-  if (isAdmin) return <AdminDashboard />;
-  if (isGenerador) return <GeneradorDashboard />;
-  if (isTransportista) return <TransportistaDashboard />;
-  if (isOperador) return <OperadorDashboard />;
-
-  // Default fallback
-  return <AdminDashboard />;
+  const dashboard = isAdmin ? <AdminDashboard /> : isGenerador ? <GeneradorDashboard /> : isTransportista ? <TransportistaDashboard /> : isOperador ? <OperadorDashboard /> : <AdminDashboard />;
+  return dashboard;
 };
 
 export default DashboardPage;

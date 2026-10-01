@@ -222,15 +222,15 @@ describe('applyRoleFilter', () => {
     expect(where).toEqual({ operadorId: 'oper-1' });
   });
 
-  it('does not add filter when GENERADOR has no associated generador', () => {
-    const where: Record<string, unknown> = {};
+  it.each(['GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'UNKNOWN'])('fails closed for %s without an actor, preserving other filters', (rol) => {
+    const where: Record<string, unknown> = { estado: 'APROBADO' };
     applyRoleFilter(where, {
-      rol: 'GENERADOR',
+      rol,
       generador: null,
       transportista: null,
       operador: null,
     });
-    expect(where).toEqual({});
+    expect(where).toEqual({ estado: 'APROBADO', id: { in: [] } });
   });
 
   it('preserves existing where conditions', () => {

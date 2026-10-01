@@ -25,10 +25,8 @@ import {
   STEPS_GENERADOR,
   STEPS_OPERADOR,
   STEPS_TRANSPORTISTA,
-  DOCS_GENERADOR,
-  DOCS_OPERADOR,
-  DOCS_TRANSPORTISTA,
   getReviewFixture,
+  type DocDef,
   type RegistrationData,
   type TipoActor,
 } from './inscripcion/shared';
@@ -40,6 +38,8 @@ import { StepDocumentos } from './inscripcion/steps/StepDocumentos';
 import { StepTEF, type StepTEFHandle } from './inscripcion/steps/StepTEF';
 import { StepResumen } from './inscripcion/steps/StepResumen';
 import { getApiErrorMessage } from '../../utils/api-error';
+import { solicitudService } from '../../services/solicitud.service';
+import type { DocumentoSolicitud } from '../../types/api';
 
 // ========================================
 // COMPONENT
@@ -72,6 +72,13 @@ const InscripcionWizardPage: React.FC = () => {
   const [attempted, setAttempted] = useState<Set<number>>(new Set());
   const [form, setForm] = useState<Record<string, string>>(reviewFixture?.form || {});
   const [adjuntos, setAdjuntos] = useState<Record<string, File>>({});
+  const [uploadedDocs, setUploadedDocs] = useState<Record<string, DocumentoSolicitud>>({});
+  const [uploadStates, setUploadStates] = useState<Record<string, 'uploading' | 'deleting' | 'error' | undefined>>({});
+  const [uploadErrors, setUploadErrors] = useState<Record<string, string | undefined>>({});
+  const [requirements, setRequirements] = useState<DocDef[]>([]);
+  const [requirementsStatus, setRequirementsStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
+  const [requirementsMaxBytes, setRequirementsMaxBytes] = useState(10 * 1024 * 1024);
+  const [requirementsAttempt, setRequirementsAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
   const saveInFlight = useRef(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -95,6 +102,20 @@ const InscripcionWizardPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    setRequirementsStatus('loading');
+    solicitudService.getRequirements(tipoActor).then((result) => {
+      if (cancelled) return;
+      setRequirements(result.documentos);
+      setRequirementsMaxBytes(result.maxBytes);
+      setRequirementsStatus('loaded');
+    }).catch(() => {
+      if (!cancelled) setRequirementsStatus('error');
+    });
+    return () => { cancelled = true; };
+  }, [tipoActor, requirementsAttempt]);
+
+  useEffect(() => {
     if (isReviewMode) return undefined;
     const raw = localStorage.getItem('sitrep_pending_solicitud');
     if (!raw) return undefined;
@@ -116,6 +137,9 @@ const InscripcionWizardPage: React.FC = () => {
       let persistedForm: Record<string, string> = {};
       try { persistedForm = JSON.parse(solicitud.datosActor || '{}'); } catch { /* keep blank fields */ }
       setForm(persistedForm);
+      setUploadedDocs(Object.fromEntries(
+        (solicitud.documentos || []).map((documento: DocumentoSolicitud) => [documento.tipo, documento]),
+      ));
       setReg(previous => ({ ...previous, nombre: solicitud.usuario?.nombre || '', email: solicitud.usuario?.email || '', cuit: solicitud.usuario?.cuit || '' }));
       setSolicitudId(pending.id!);
       setStep(Math.min(totalSteps, Math.max(1, Number(pending.step) || 1)));
@@ -138,12 +162,22 @@ const InscripcionWizardPage: React.FC = () => {
   // PHASE 2 - Wizard navigation
   // ========================================
 
+  const docStepNumber = isGenerador ? 6 : isOperador ? 7 : 4;
+
   const getStepErrors = (s: number): string[] => {
     if (isReviewMode) return [];
     const errs: string[] = [];
     if (s === 1) {
       if (!form.razonSocial?.trim()) errs.push('Razon Social es obligatoria');
       if (!form.domicilio?.trim()) errs.push('Domicilio es obligatorio');
+    }
+    if (s === docStepNumber) {
+      if (requirementsStatus !== 'loaded') {
+        errs.push('No se pudieron verificar los requisitos documentales vigentes');
+      } else {
+        const missing = requirements.filter((requirement) => requirement.required && !uploadedDocs[requirement.tipo] && !adjuntos[requirement.tipo]);
+        if (missing.length > 0) errs.push(`Faltan documentos obligatorios: ${missing.map((item) => item.nombre).join(', ')}`);
+      }
     }
     return errs;
   };
@@ -200,14 +234,53 @@ const InscripcionWizardPage: React.FC = () => {
   const goPrev = () => { if (step > 1) void goStep(step - 1); };
 
   // File handling
-  const handleAddFile = useCallback((tipo: string, file: File) => {
-    setDirty(true);
-    setAdjuntos(prev => ({ ...prev, [tipo]: file }));
-  }, []);
+  const handleAddFile = useCallback(async (tipo: string, file: File) => {
+    setUploadErrors(previous => ({ ...previous, [tipo]: undefined }));
+    if (file.size > requirementsMaxBytes) {
+      setUploadStates(previous => ({ ...previous, [tipo]: 'error' }));
+      setUploadErrors(previous => ({ ...previous, [tipo]: `El archivo supera el maximo de ${(requirementsMaxBytes / 1024 / 1024).toFixed(0)} MB.` }));
+      return;
+    }
+    setAdjuntos(previous => ({ ...previous, [tipo]: file }));
+    if (isReviewMode) return;
+    if (!solicitudId) {
+      setUploadStates(previous => ({ ...previous, [tipo]: 'error' }));
+      setUploadErrors(previous => ({ ...previous, [tipo]: 'No hay una solicitud activa para guardar este archivo.' }));
+      return;
+    }
 
-  const handleRemoveFile = useCallback((tipo: string) => {
-    setAdjuntos(prev => { const n = { ...prev }; delete n[tipo]; return n; });
-  }, []);
+    setUploadStates(previous => ({ ...previous, [tipo]: 'uploading' }));
+    try {
+      const document = await solicitudService.uploadDocumento(solicitudId, file, tipo);
+      setUploadedDocs(previous => ({ ...previous, [tipo]: document }));
+      setAdjuntos(previous => { const next = { ...previous }; delete next[tipo]; return next; });
+      setUploadStates(previous => ({ ...previous, [tipo]: undefined }));
+    } catch (error) {
+      setUploadStates(previous => ({ ...previous, [tipo]: 'error' }));
+      setUploadErrors(previous => ({ ...previous, [tipo]: getApiErrorMessage(error, 'No se pudo guardar el archivo. Volve a seleccionarlo o reintenta al enviar.') }));
+    }
+  }, [isReviewMode, requirementsMaxBytes, solicitudId]);
+
+  const handleRemoveFile = useCallback(async (tipo: string) => {
+    setUploadErrors(previous => ({ ...previous, [tipo]: undefined }));
+    const uploaded = uploadedDocs[tipo];
+    if (!uploaded || isReviewMode || !solicitudId) {
+      setAdjuntos(previous => { const next = { ...previous }; delete next[tipo]; return next; });
+      setUploadedDocs(previous => { const next = { ...previous }; delete next[tipo]; return next; });
+      setUploadStates(previous => ({ ...previous, [tipo]: undefined }));
+      return;
+    }
+
+    setUploadStates(previous => ({ ...previous, [tipo]: 'deleting' }));
+    try {
+      await solicitudService.deleteDocumento(solicitudId, uploaded.id);
+      setUploadedDocs(previous => { const next = { ...previous }; delete next[tipo]; return next; });
+      setUploadStates(previous => ({ ...previous, [tipo]: undefined }));
+    } catch (error) {
+      setUploadStates(previous => ({ ...previous, [tipo]: 'error' }));
+      setUploadErrors(previous => ({ ...previous, [tipo]: getApiErrorMessage(error, 'No se pudo eliminar el archivo guardado.') }));
+    }
+  }, [isReviewMode, solicitudId, uploadedDocs]);
 
   // Submit
   const handleSubmit = async () => {
@@ -238,14 +311,10 @@ const InscripcionWizardPage: React.FC = () => {
       // Save final form data
       await api.put(`/solicitudes/${solicitudId}`, { datosActor: { ...submitForm, nombre: reg.nombre, cuit: reg.cuit, email: reg.email } });
 
-      // Upload documents
+      // Retry only documents that could not be persisted immediately.
       for (const [tipo, file] of Object.entries(adjuntos)) {
-        const fd = new FormData();
-        fd.append('file', file);
-        fd.append('tipo', tipo);
-        await api.post(`/solicitudes/${solicitudId}/documentos`, fd, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
+        const document = await solicitudService.uploadDocumento(solicitudId, file, tipo);
+        setUploadedDocs(previous => ({ ...previous, [tipo]: document }));
       }
 
       // Submit solicitud
@@ -263,11 +332,18 @@ const InscripcionWizardPage: React.FC = () => {
   // Determine which step content to render
   // ========================================
 
-  const getDocsForType = () => {
-    if (isGenerador) return DOCS_GENERADOR;
-    if (isOperador) return DOCS_OPERADOR;
-    return DOCS_TRANSPORTISTA;
-  };
+  const documentStep = <StepDocumentos
+    docs={requirements}
+    adjuntos={adjuntos}
+    uploadedDocs={uploadedDocs}
+    uploadStates={uploadStates}
+    uploadErrors={uploadErrors}
+    requirementsStatus={requirementsStatus}
+    maxBytes={requirementsMaxBytes}
+    onRetryRequirements={() => setRequirementsAttempt(value => value + 1)}
+    onAddFile={handleAddFile}
+    onRemoveFile={handleRemoveFile}
+  />;
 
   /** Maps the current wizard step to the corresponding step component */
   const renderStepContent = () => {
@@ -279,17 +355,17 @@ const InscripcionWizardPage: React.FC = () => {
     if (isGenerador) {
       if (step <= 4) return <StepEmpresa step={step} form={form} up={up} attempted={attempted} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} />;
       if (step === 5) return <StepTEF ref={tefRef} form={form} isGenerador={isGenerador} isOperador={isOperador} />;
-      if (step === 6) return <StepDocumentos docs={getDocsForType()} adjuntos={adjuntos} onAddFile={handleAddFile} onRemoveFile={handleRemoveFile} />;
-      if (step === 7) return <StepResumen reg={reg} form={form} adjuntos={adjuntos} tipoActor={tipoActor} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} regError={regError} />;
+      if (step === 6) return documentStep;
+      if (step === 7) return <StepResumen reg={reg} form={form} adjuntos={adjuntos} uploadedDocs={uploadedDocs} tipoActor={tipoActor} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} regError={regError} />;
     } else if (isOperador) {
       if (step <= 5) return <StepEmpresa step={step} form={form} up={up} attempted={attempted} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} />;
       if (step === 6) return <StepTEF ref={tefRef} form={form} isGenerador={isGenerador} isOperador={isOperador} />;
-      if (step === 7) return <StepDocumentos docs={getDocsForType()} adjuntos={adjuntos} onAddFile={handleAddFile} onRemoveFile={handleRemoveFile} />;
-      if (step === 8) return <StepResumen reg={reg} form={form} adjuntos={adjuntos} tipoActor={tipoActor} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} regError={regError} />;
+      if (step === 7) return documentStep;
+      if (step === 8) return <StepResumen reg={reg} form={form} adjuntos={adjuntos} uploadedDocs={uploadedDocs} tipoActor={tipoActor} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} regError={regError} />;
     } else if (isTransportista) {
       if (step <= 3) return <StepEmpresa step={step} form={form} up={up} attempted={attempted} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} />;
-      if (step === 4) return <StepDocumentos docs={getDocsForType()} adjuntos={adjuntos} onAddFile={handleAddFile} onRemoveFile={handleRemoveFile} />;
-      if (step === 5) return <StepResumen reg={reg} form={form} adjuntos={adjuntos} tipoActor={tipoActor} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} regError={regError} />;
+      if (step === 4) return documentStep;
+      if (step === 5) return <StepResumen reg={reg} form={form} adjuntos={adjuntos} uploadedDocs={uploadedDocs} tipoActor={tipoActor} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} regError={regError} />;
     }
     return null;
   };

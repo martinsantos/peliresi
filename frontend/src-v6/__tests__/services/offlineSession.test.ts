@@ -38,7 +38,7 @@ describe('bounded offline session', () => {
     expect(localStorage.getItem(OFFLINE_SESSION_KEY)).toBeNull();
   });
 
-  it('does not renew its eight-hour window on offline reads', () => {
+  it('does not renew its bounded window on offline reads', () => {
     const token = tokenFor();
     saveOfflineSession(user, token, now);
     expect(readOfflineSession(token, now + MAX_OFFLINE_SESSION_MS - 1)).not.toBeNull();

@@ -12,11 +12,27 @@ export interface DeclaredComparisonSeed {
 }
 
 export interface DeclaredInspectionSnapshot {
-  schemaVersion: 2;
+  schemaVersion: 4;
   capturedAt: string;
   actorType: TipoActorInspeccion;
   actorId: string;
   fields: DeclaredComparisonSeed[];
+  documents: DeclaredRegulatoryDocument[];
+}
+
+export interface DeclaredRegulatoryDocument {
+  id: string;
+  tipo: string;
+  nombre: string;
+  anio: number | null;
+  estado: string;
+  createdAt: string;
+}
+
+export function declaredSnapshotSchemaVersion(value: Prisma.JsonValue | null | undefined): number {
+  if (!value || Array.isArray(value) || typeof value !== 'object') return 0;
+  const version = (value as Record<string, unknown>).schemaVersion;
+  return typeof version === 'number' && Number.isFinite(version) ? version : 0;
 }
 
 const date = (value?: Date | null) => value ? value.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Mendoza' }) : null;
@@ -74,12 +90,14 @@ export async function buildDeclaredInspectionSnapshot(
   actorId: string,
 ): Promise<DeclaredInspectionSnapshot> {
   let fields: DeclaredComparisonSeed[];
+  let documents: DeclaredRegulatoryDocument[] = [];
 
   if (tipoActor === 'GENERADOR') {
     const actor = await db.generador.findUniqueOrThrow({
       where: { id: actorId },
-      include: { documentos: { select: { estado: true } } },
+      include: { documentos: { orderBy: { createdAt: 'desc' }, select: { id: true, tipo: true, nombre: true, anio: true, estado: true, createdAt: true } } },
     });
+    documents = actor.documentos.map((document) => ({ ...document, createdAt: document.createdAt.toISOString() }));
     fields = [
       field('ID-RAZON', 'Identidad', 'Razón social', 'generador.razonSocial', actor.razonSocial, 10),
       field('ID-CUIT', 'Identidad', 'CUIT', 'generador.cuit', actor.cuit, 20),
@@ -91,7 +109,7 @@ export async function buildDeclaredInspectionSnapshot(
       field('ACT-ACTIVIDAD', 'Actividad', 'Actividad declarada', 'generador.actividad', actor.actividad, 80),
       field('ACT-RUBRO', 'Actividad', 'Rubro', 'generador.rubro', actor.rubro, 90),
       ...wasteStreamFields(actor.corrientesControl, 'generador.corrientesControl', 100, 'Corrientes declaradas'),
-      field('DOC-VIGENTES', 'Documentación', 'Documentos regulatorios aprobados', 'generador.documentos', actor.documentos.filter((d) => d.estado === 'APROBADO').length, 110),
+      field('DOC-VIGENTES', 'Documentación', 'Documentación regulatoria declarada', 'generador.documentos', actor.documentos.map((document) => `${document.nombre} · ${document.tipo}${document.anio ? ` · ${document.anio}` : ''} · ${document.estado}`).join('\n'), 110),
     ];
   } else if (tipoActor === 'TRANSPORTISTA') {
     const actor = await db.transportista.findUniqueOrThrow({
@@ -123,9 +141,19 @@ export async function buildDeclaredInspectionSnapshot(
       include: {
         tratamientos: { where: { activo: true }, include: { tipoResiduo: { select: { codigo: true, nombre: true } } } },
         sedes: { where: { activo: true }, orderBy: { nombre: 'asc' } },
-        documentos: { select: { estado: true } },
+        documentos: { orderBy: { createdAt: 'desc' }, select: { id: true, tipo: true, nombre: true, anio: true, estado: true, createdAt: true } },
       },
     });
+    documents = actor.documentos.map((document) => ({ ...document, createdAt: document.createdAt.toISOString() }));
+    const treatmentFields = [...actor.tratamientos]
+      .sort((left, right) => left.tipoResiduo.codigo.localeCompare(right.tipoResiduo.codigo, 'es', { numeric: true })
+        || left.metodo.localeCompare(right.metodo, 'es') || left.id.localeCompare(right.id))
+      .map((treatment) => field(
+        `ACT-TRATAMIENTO-${treatment.id}`, 'Tratamientos', `${treatment.tipoResiduo.codigo} · ${treatment.metodo}`,
+        `operador.tratamientos:${treatment.id}`,
+        `${treatment.tipoResiduo.nombre} · ${treatment.metodo}${treatment.numeroResolucion ? ` · Res. ${treatment.numeroResolucion}` : ''}`,
+        0,
+      ));
     fields = [
       field('ID-RAZON', 'Identidad', 'Razón social', 'operador.razonSocial', actor.razonSocial, 10),
       field('ID-CUIT', 'Identidad', 'CUIT', 'operador.cuit', actor.cuit, 20),
@@ -136,30 +164,32 @@ export async function buildDeclaredInspectionSnapshot(
       field('REG-RESOLUCION', 'Habilitación', 'Resolución DPA', 'operador.resolucionDPA', actor.resolucionDPA, 70),
       field('ACT-TECNOLOGIA', 'Operación', 'Tecnología declarada', 'operador.tecnologia', actor.tecnologia, 80),
       ...wasteStreamFields(actor.corrientesY, 'operador.corrientesY', 90, 'Corrientes Y autorizadas'),
-      field('ACT-TRATAMIENTOS', 'Operación', 'Tratamientos autorizados', 'operador.tratamientos', actor.tratamientos.map((t) => `${t.tipoResiduo.codigo} · ${t.metodo}${t.numeroResolucion ? ` · Res. ${t.numeroResolucion}` : ''}`).join('\n'), 100),
+      ...(treatmentFields.length ? treatmentFields : [field('ACT-TRATAMIENTOS', 'Tratamientos', 'Tratamientos autorizados', 'operador.tratamientos', null, 0)]),
       field('EST-SEDES', 'Establecimiento', 'Sedes operativas', 'operador.sedes', actor.sedes.map((s) => `${s.nombre} · ${s.tipo} · ${s.domicilio}`).join('\n'), 110),
-      field('DOC-VIGENTES', 'Documentación', 'Documentos regulatorios aprobados', 'operador.documentos', actor.documentos.filter((d) => d.estado === 'APROBADO').length, 120),
+      field('DOC-VIGENTES', 'Documentación', 'Documentación regulatoria declarada', 'operador.documentos', actor.documentos.map((document) => `${document.nombre} · ${document.tipo}${document.anio ? ` · ${document.anio}` : ''} · ${document.estado}`).join('\n'), 120),
     ];
   }
 
   return {
-    schemaVersion: 2,
+    schemaVersion: 4,
     capturedAt: new Date().toISOString(),
     actorType: tipoActor,
     actorId,
-    fields,
+    fields: fields.map((row, index) => ({ ...row, orden: (index + 1) * 10 })),
+    documents,
   };
 }
 
 export async function ensureInspectionDeclaredComparisons(db: DbClient, inspection: {
   id: string;
   estado: EstadoInspeccion;
-  tipoActor: TipoActorInspeccion;
+  tipoActor: TipoActorInspeccion | null;
   generadorId: string | null;
   transportistaId: string | null;
   operadorId: string | null;
   declaradoSnapshot: Prisma.JsonValue | null;
 }): Promise<void> {
+  if (!inspection.tipoActor) return;
   const existing = await db.comparacionInspeccion.findMany({
     where: { inspeccionId: inspection.id },
     include: { _count: { select: { evidencias: true } } },
@@ -250,7 +280,22 @@ export async function ensureInspectionDeclaredComparisons(db: DbClient, inspecti
     }
   }
 
-  if (existing.length > 0 && inspection.declaradoSnapshot) return;
+  if (existing.length > 0 && inspection.declaradoSnapshot) {
+    if (editable && declaredSnapshotSchemaVersion(inspection.declaradoSnapshot) < 3) {
+      const actorId = inspection.generadorId || inspection.transportistaId || inspection.operadorId;
+      if (!actorId) return;
+      const snapshot = await buildDeclaredInspectionSnapshot(db, inspection.tipoActor, actorId);
+      const documentField = snapshot.fields.find((row) => row.codigo === 'DOC-VIGENTES');
+      await db.inspeccion.update({ where: { id: inspection.id }, data: { declaradoSnapshot: snapshot as unknown as Prisma.InputJsonValue } });
+      if (documentField) {
+        await db.comparacionInspeccion.updateMany({
+          where: { inspeccionId: inspection.id, codigo: 'DOC-VIGENTES', resultado: 'PENDIENTE' },
+          data: { etiqueta: documentField.etiqueta, valorDeclarado: documentField.valorDeclarado },
+        });
+      }
+    }
+    return;
+  }
   const actorId = inspection.generadorId || inspection.transportistaId || inspection.operadorId;
   if (!actorId) return;
   const snapshot = await buildDeclaredInspectionSnapshot(db, inspection.tipoActor, actorId);

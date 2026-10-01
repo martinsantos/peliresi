@@ -4,6 +4,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  ClipboardCheck,
   Truck,
   Search,
   ChevronDown,
@@ -13,6 +14,8 @@ import {
 import { Card } from '../../../components/ui/CardV2';
 import { Badge } from '../../../components/ui/BadgeV2';
 import { formatDateTime } from '../../../utils/formatters';
+import { hasInspectionCoordinates, operationSubject, type InspectionOperation } from '../../../services/inspectionOperations.service';
+import { INSPECTION_STATE_LABELS, inspectionDate } from '../../inspecciones/inspectionPresentation';
 import type { EnTransitoItem } from '../../../hooks/useCentroControl';
 
 interface ViajeRealizado {
@@ -28,12 +31,18 @@ interface ViajeRealizado {
 }
 
 interface ViajesPanelProps {
+  inspections?: InspectionOperation[];
+  inspectionTotal?: number;
+  inspectionError?: boolean;
+  inspectionLoading?: boolean;
+  selectedInspectionId?: string | null;
+  onSelectInspection?: (id: string) => void;
   filteredEnTransito: EnTransitoItem[];
   viajesRealizados: ViajeRealizado[];
   tripFilter: string;
   onTripFilterChange: (val: string) => void;
-  tripPanel: 'activos' | 'realizados';
-  onTripPanelChange: (panel: 'activos' | 'realizados') => void;
+  tripPanel: 'activos' | 'realizados' | 'inspecciones';
+  onTripPanelChange: (panel: 'activos' | 'realizados' | 'inspecciones') => void;
   selectedTripId: string | null;
   onSelectTrip: (id: string | null) => void;
   selectedRealizadoId: string | null;
@@ -42,6 +51,7 @@ interface ViajesPanelProps {
 }
 
 export const ViajesPanel: React.FC<ViajesPanelProps> = ({
+  inspections, inspectionTotal, inspectionError, inspectionLoading, selectedInspectionId, onSelectInspection,
   filteredEnTransito,
   viajesRealizados,
   tripFilter,
@@ -58,6 +68,21 @@ export const ViajesPanel: React.FC<ViajesPanelProps> = ({
 
   return (
     <div ref={viajesRef} className="flex flex-col gap-0 lg:sticky lg:top-[6.5rem] lg:self-start max-h-[calc(100vh-8.5rem)] overflow-hidden lg:z-10">
+      {inspections && <Card padding="none" className={`flex flex-col ${tripPanel === 'inspecciones' ? 'flex-1 min-h-0' : ''}`}>
+        <button aria-expanded={tripPanel === 'inspecciones'} onClick={() => onTripPanelChange('inspecciones')} className="flex w-full items-center justify-between border-b border-neutral-100 p-4 text-left hover:bg-neutral-50">
+          <span className="flex items-center gap-2"><ClipboardCheck size={18} className="text-teal-700" /><span className="font-semibold text-neutral-900">Inspecciones</span><Badge variant="soft" color="neutral">{inspectionError || inspectionLoading ? '—' : inspectionTotal ?? inspections.length}</Badge></span>
+          <ChevronDown size={18} className={tripPanel === 'inspecciones' ? 'rotate-180 text-neutral-400' : 'text-neutral-400'} />
+        </button>
+        {tripPanel === 'inspecciones' && <div className="min-h-0 flex-1 divide-y divide-neutral-100 overflow-y-auto">
+          <p className="px-4 py-2 text-xs text-neutral-500">Agenda activa · lugares de visita, no ubicación del inspector</p>
+          {inspectionError && <p role="status" className="p-3 text-sm text-amber-800">No se pudo actualizar la agenda.</p>}
+          {inspectionLoading ? <p className="p-4 text-sm text-neutral-500">Cargando agenda…</p> : inspections.length === 0 && !inspectionError ? <p className="p-4 text-sm text-neutral-500">Sin inspecciones activas</p> : inspections.map((row) => <div key={row.id} className={selectedInspectionId === row.id ? 'bg-teal-50 p-3' : 'p-3 hover:bg-neutral-50'}>
+            <button onClick={() => onSelectInspection?.(row.id)} className="w-full text-left"><span className="block font-mono text-sm font-semibold">{row.numero}</span><span className="mt-1 block text-sm">{operationSubject(row)}</span><span className="mt-1 block text-xs text-neutral-600">{INSPECTION_STATE_LABELS[row.estado]} · {row.inspector.nombre} {row.inspector.apellido || ''}</span><span className="mt-1 block text-xs text-neutral-500">{row.fechaProgramada ? inspectionDate(row.fechaProgramada, true) + ' · ' : ''}{hasInspectionCoordinates(row) ? row.ubicacion || 'Ubicación registrada' : 'Sin coordenadas'}</span></button>
+            {selectedInspectionId === row.id && <button onClick={() => navigate('/inspecciones/' + row.id)} className="mt-2 min-h-11 w-full rounded-lg bg-teal-100 text-sm font-semibold text-teal-800">Abrir expediente</button>}
+          </div>)}
+          {!!inspectionTotal && inspectionTotal > inspections.length && <button className="min-h-11 w-full text-sm font-semibold text-primary-800" onClick={() => navigate('/inspecciones')}>Ver las {inspectionTotal} inspecciones</button>}
+        </div>}
+      </Card>}
       {/* Viajes Activos accordion */}
       <Card padding="none" className={`flex flex-col ${tripPanel === 'activos' ? 'flex-1 min-h-0' : ''}`}>
         <button

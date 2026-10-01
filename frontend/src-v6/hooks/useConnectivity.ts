@@ -42,15 +42,21 @@ export function useConnectivity(options: UseConnectivityOptions = {}): Connectiv
   });
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingState = useRef<Partial<ConnectivityState>>({});
+  const pingVersion = useRef(0);
   const wasOffline = useRef(!navigator.onLine);
 
   // Debounced state update to avoid flickering
   const updateState = useCallback(
     (partial: Partial<ConnectivityState>) => {
+      pendingState.current = { ...pendingState.current, ...partial };
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       debounceTimer.current = setTimeout(() => {
+        const pending = pendingState.current;
+        pendingState.current = {};
+        debounceTimer.current = null;
         setState((prev) => {
-          const next = { ...prev, ...partial };
+          const next = { ...prev, ...pending };
           // Update lastOnline when coming back online
           if (next.isOnline && !prev.isOnline) {
             next.lastOnline = new Date();
@@ -65,6 +71,7 @@ export function useConnectivity(options: UseConnectivityOptions = {}): Connectiv
   // Ping the API health endpoint
   const checkApi = useCallback(async () => {
     if (!enablePing || !navigator.onLine) return;
+    const version = ++pingVersion.current;
     try {
       const baseUrl = import.meta.env.VITE_API_URL || '/api';
       const url = healthEndpoint.startsWith('http')
@@ -75,9 +82,9 @@ export function useConnectivity(options: UseConnectivityOptions = {}): Connectiv
         cache: 'no-store',
         signal: AbortSignal.timeout(5_000),
       });
-      updateState({ isApiReachable: res.ok });
+      if (version === pingVersion.current && navigator.onLine) updateState({ isApiReachable: res.ok });
     } catch {
-      updateState({ isApiReachable: false });
+      if (version === pingVersion.current && navigator.onLine) updateState({ isApiReachable: false });
     }
   }, [enablePing, healthEndpoint, updateState]);
 
@@ -94,6 +101,7 @@ export function useConnectivity(options: UseConnectivityOptions = {}): Connectiv
     };
 
     const handleOffline = () => {
+      ++pingVersion.current;
       wasOffline.current = true;
       updateState({ isOnline: false, isApiReachable: false });
     };
@@ -105,6 +113,9 @@ export function useConnectivity(options: UseConnectivityOptions = {}): Connectiv
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      debounceTimer.current = null;
+      pendingState.current = {};
+      ++pingVersion.current;
     };
   }, [updateState, checkApi]);
 
@@ -114,7 +125,10 @@ export function useConnectivity(options: UseConnectivityOptions = {}): Connectiv
 
     checkApi(); // initial check
     const id = setInterval(checkApi, pingInterval);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      ++pingVersion.current;
+    };
   }, [enablePing, pingInterval, checkApi]);
 
   return state;

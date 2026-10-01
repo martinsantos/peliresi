@@ -4,6 +4,21 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import { InspectionComparisonPanel } from '../../pages/inspecciones/InspectionComparisonPanel';
 
 describe('InspectionComparisonPanel', () => {
+  it('opens groups independently and really collapses the selected group without losing decisions', () => {
+    const comparisons = ['Documentos', 'Residuos'].map((categoria, index) => ({ id: `row-${index}`, codigo: `QA-${index}`, categoria, etiqueta: `Dato ${index}`, origen: 'actor', valorDeclarado: 'Declarado', valorObservado: 'Observado', resultado: 'DIFIERE' as const, observacion: 'Hallazgo', orden: index, evidencias: [] }));
+    render(<MemoryRouter><InspectionComparisonPanel inspectionId="qa" comparisons={comparisons} editable onChange={vi.fn()} onEvidence={vi.fn()} /></MemoryRouter>);
+    const documents = screen.getByRole('button', { name: /^Documentos\s*1\/1/ });
+    const wastes = screen.getByRole('button', { name: /^Residuos\s*1\/1/ });
+    fireEvent.click(wastes);
+    expect(documents).toHaveAttribute('aria-expanded', 'true');
+    expect(wastes).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('Dato 0')).toBeVisible();
+    fireEvent.click(wastes);
+    expect(wastes).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Dato 1')).toBeNull();
+    fireEvent.click(wastes);
+    expect(document.getElementById('comparison-row-1')).toHaveAttribute('data-result', 'DIFIERE');
+  });
   it('presents declared and field values and records a discrepancy', () => {
     const onChange = vi.fn();
     render(<MemoryRouter><InspectionComparisonPanel inspectionId="inspection-1" editable onChange={onChange} onEvidence={vi.fn()} comparisons={[{
@@ -12,9 +27,10 @@ describe('InspectionComparisonPanel', () => {
       resultado: 'PENDIENTE', observacion: null, orden: 10, evidencias: [],
     }]} /></MemoryRouter>);
 
-    expect(screen.getByText('Declarado vs. verificado')).toBeInTheDocument();
+    expect(screen.getByText('Lo informado y lo encontrado')).toBeInTheDocument();
+    expect(screen.getByText('En campo, ¿coincide?')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Ver detalle y evidencia' }));
-    expect(screen.getAllByText('T-000005')).toHaveLength(2);
+    expect(screen.getAllByText('T-000005')).toHaveLength(1);
     expect(screen.getByDisplayValue('T-000008')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Difiere' })).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(screen.getByRole('button', { name: 'Difiere' }));
@@ -79,7 +95,7 @@ describe('InspectionComparisonPanel', () => {
     const row = document.querySelector('[data-inspection-anchor="declaracion/ACT-TRATAMIENTOS"]') as HTMLElement;
     expect(row).toHaveTextContent('3 tratamientos declarados · Y8, Y9, Y11');
     expect(within(row).queryByText('Acopio y almacenamiento temporal de residuos peligrosos')).toBeNull();
-    fireEvent.click(within(row).getByRole('button', { name: 'Agregar detalle' }));
+    fireEvent.click(within(row).getByRole('button', { name: 'Anotar lo encontrado' }));
     expect(within(row).getByText('Acopio y almacenamiento temporal de residuos peligrosos')).toBeVisible();
     expect(within(row).getByRole('textbox', { name: 'Valor verificado: Tratamientos autorizados' })).toBeVisible();
   });
@@ -91,7 +107,7 @@ describe('InspectionComparisonPanel', () => {
     ];
     render(<MemoryRouter><InspectionComparisonPanel inspectionId="inspection-1" editable onChange={vi.fn()} onEvidence={vi.fn()} comparisons={comparisons} /></MemoryRouter>);
     const row = document.querySelector('[data-inspection-anchor="declaracion/ACT-TRATAMIENTOS"]') as HTMLElement;
-    fireEvent.click(within(row).getByRole('button', { name: 'Agregar detalle' }));
+    fireEvent.click(within(row).getByRole('button', { name: 'Anotar lo encontrado' }));
     expect(within(row).getAllByText('Acopio autorizado')).toHaveLength(1);
     expect(within(row).getByText('Y8')).toBeVisible();
     expect(within(row).getByText('Y9')).toBeVisible();
@@ -108,7 +124,7 @@ describe('InspectionComparisonPanel', () => {
     const row = document.querySelector('[data-inspection-anchor="declaracion/ACT-TRATAMIENTOS"]') as HTMLElement;
     expect(row).toHaveTextContent('22 tratamientos declarados · Y1, Y2, Y3 y 19 más');
     expect(row).not.toHaveTextContent('Tratamiento 22');
-    fireEvent.click(within(row).getByRole('button', { name: 'Agregar detalle' }));
+    fireEvent.click(within(row).getByRole('button', { name: 'Anotar lo encontrado' }));
     expect(row).toHaveTextContent('Tratamiento 22');
   });
 
@@ -119,5 +135,50 @@ describe('InspectionComparisonPanel', () => {
       resultado: 'NO_VERIFICADO', observacion: null, orden: 1, evidencias: [],
     }]} /></MemoryRouter>);
     expect(screen.getByRole('textbox', { name: 'Motivo de no verificación: Corriente Y12' })).toHaveAttribute('placeholder', 'Contá por qué no pudiste verificarlo');
+  });
+
+  it('shows long current lists in six-item blocks and opens an indexed current in its block', () => {
+    const comparisons = Array.from({ length: 13 }, (_, index) => ({
+      id: `current-${index + 1}`, codigo: `RES-Y${index + 1}`, categoria: 'Residuos', etiqueta: `Corriente Y${index + 1}`,
+      origen: 'generador.corrientesControl', valorDeclarado: `Y${index + 1}`, valorObservado: null,
+      resultado: 'PENDIENTE' as const, observacion: null, orden: index, evidencias: [],
+    }));
+    render(<MemoryRouter><InspectionComparisonPanel inspectionId="inspection-1" editable onChange={vi.fn()} onEvidence={vi.fn()} comparisons={comparisons} /></MemoryRouter>);
+
+    expect(screen.getByText('Mostrando 1–6 de 13')).toBeInTheDocument();
+    expect(document.querySelectorAll('[data-inspection-anchor^="declaracion/RES-Y"]')).toHaveLength(6);
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente bloque' }));
+    expect(screen.getByText('Mostrando 7–12 de 13')).toBeInTheDocument();
+    expect(document.querySelector('[data-inspection-anchor="declaracion/RES-Y1"]')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Ir a un dato declarado: Buscar dato' }));
+    fireEvent.click(screen.getByRole('button', { name: /Corriente Y13/ }));
+    expect(screen.getByText('Mostrando 13–13 de 13')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Valor verificado: Corriente Y13' })).toBeVisible();
+  });
+
+  it('previews the exact visible pending currents before applying a batch result', () => {
+    const onChange = vi.fn();
+    const comparisons = Array.from({ length: 8 }, (_, index) => ({
+      id: `current-${index + 1}`, codigo: `RES-Y${index + 1}`, categoria: 'Residuos', etiqueta: `Corriente Y${index + 1}`,
+      origen: 'operador.corrientesY', valorDeclarado: `Y${index + 1}`, valorObservado: null,
+      resultado: index === 0 ? 'DIFIERE' as const : 'PENDIENTE' as const,
+      observacion: index === 0 ? 'Diferencia verificada' : null, orden: index, evidencias: [],
+    }));
+    render(<MemoryRouter><InspectionComparisonPanel inspectionId="inspection-1" editable onChange={onChange} onEvidence={vi.fn()} comparisons={comparisons} /></MemoryRouter>);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Selección múltiple' }));
+    fireEvent.click(screen.getByLabelText('Seleccionar pendientes de este bloque'));
+    expect(screen.getByText('5 seleccionados')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar coincidencias' }));
+    expect(screen.getByRole('heading', { name: 'Confirmar 5 coincidencias' })).toBeInTheDocument();
+    expect(screen.getByText('Corriente Y2 · RES-Y2')).toBeInTheDocument();
+    expect(screen.queryByText('Corriente Y7 · RES-Y7')).toBeNull();
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar a 5 datos' }));
+    expect(onChange).toHaveBeenCalledTimes(5);
+    expect(onChange).not.toHaveBeenCalledWith('current-1', expect.anything());
+    expect(onChange).not.toHaveBeenCalledWith('current-7', expect.anything());
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente bloque' }));
+    expect(screen.getByText('0 seleccionados')).toBeInTheDocument();
   });
 });

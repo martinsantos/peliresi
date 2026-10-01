@@ -27,8 +27,6 @@ const variantStyles: Record<CardVariant, string> = {
     'bg-white',
     'border border-[#E0E0DC]',
     'shadow-[0_1px_2px_rgba(0,0,0,0.03)]',
-    'hover:shadow-[0_4px_8px_-2px_rgba(0,0,0,0.06),0_2px_4px_-2px_rgba(0,0,0,0.04)]',
-    'hover:border-[#D4D4D0]',
   ].join(' '),
 
   // Elevación pronunciada
@@ -53,8 +51,7 @@ const variantStyles: Record<CardVariant, string> = {
     'cursor-pointer',
     'hover:shadow-[0_12px_24px_-4px_rgba(0,0,0,0.08),0_4px_8px_-4px_rgba(0,0,0,0.03)]',
     'hover:border-[rgba(27,94,60,0.2)]',
-    'hover:-translate-y-0.5',
-    'active:translate-y-0 active:shadow-[0_1px_3px_rgba(0,0,0,0.06)]',
+    'active:shadow-[0_1px_3px_rgba(0,0,0,0.06)]',
   ].join(' '),
 };
 
@@ -72,7 +69,7 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
         ref={ref}
         className={cn(
           'rounded-[12px]',
-          'transition-all duration-200',
+          'transition-[border-color,box-shadow] duration-150',
           variantStyles[variant],
           paddingStyles[padding],
           className

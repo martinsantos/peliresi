@@ -24,6 +24,7 @@ const SVG_FLASK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" s
 
 // ── Actor colors (system consistent) ──
 export const ACTOR_COLORS = {
+  inspeccion: '#0f766e',
   generador: '#7c3aed',   // purple (matches system)
   transportista: '#ea580c', // orange
   operador: '#2563eb',     // blue
@@ -35,6 +36,11 @@ export const ACTOR_COLORS = {
 // ── Actor marker icons ──
 
 export const ACTOR_ICONS = {
+  inspeccion: L.divIcon({
+    className: '',
+    html: '<div style="width:28px;height:28px;border-radius:6px;background:#0f766e;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg></div>',
+    iconSize: [28, 28], iconAnchor: [14, 14],
+  }),
   // Generador: purple rounded-square with Factory icon
   generador: L.divIcon({
     className: '',
@@ -97,6 +103,7 @@ export function createClusterIcon(count: number, color: string): L.DivIcon {
 
 // ── Legend HTML snippets (for inline SVG legends) ──
 export const LEGEND_ITEMS = {
+  inspeccion: { shape: 'rounded-square', color: ACTOR_COLORS.inspeccion, label: 'Inspección' },
   generador: { shape: 'rounded-square', color: ACTOR_COLORS.generador, label: 'Generador' },
   transportista: { shape: 'diamond', color: ACTOR_COLORS.transportista, label: 'Transportista' },
   operador: { shape: 'rounded-square', color: ACTOR_COLORS.operador, label: 'Operador' },

@@ -59,7 +59,7 @@ export const ConnectivityIndicator: React.FC = React.memo(function ConnectivityI
       {isOffline ? (
         <>
           <WifiOff size={16} className="shrink-0" />
-          <span>Sin conexion - Los cambios se guardaran localmente</span>
+          <span>Sin conexión · comprobá el estado de guardado</span>
         </>
       ) : (
         <>

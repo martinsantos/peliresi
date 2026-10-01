@@ -4,6 +4,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { Button } from './ButtonV2';
 
 interface SignaturePadProps {
   onConfirm: (dataUrl: string) => void;
@@ -147,26 +148,27 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
         />
         {!hasContent && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="text-neutral-400 text-sm">Firme aquí</span>
+            <span className="text-neutral-600 text-sm">Firme aquí</span>
           </div>
         )}
       </div>
       <div className="flex gap-2">
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={handleClear}
-          className="flex-1 px-3 py-2 text-sm font-medium rounded-lg border border-neutral-200 text-neutral-600 hover:bg-neutral-50 transition-colors"
+          className="flex-1"
         >
           Limpiar
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           onClick={handleConfirm}
           disabled={!hasContent}
-          className="flex-1 px-3 py-2 text-sm font-medium rounded-lg bg-primary-600 text-white hover:bg-primary-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex-1"
         >
           Confirmar Firma
-        </button>
+        </Button>
       </div>
     </div>
   );

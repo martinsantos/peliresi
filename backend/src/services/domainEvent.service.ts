@@ -32,6 +32,7 @@ export type DomainEvent =
       pesoDeclarado: number;
       pesoReal: number;
       delta: string;
+      deltaPorcentaje: number;
       userId: string;
     }
   | {

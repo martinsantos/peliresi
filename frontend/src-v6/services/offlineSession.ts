@@ -1,7 +1,10 @@
 import type { User } from '../contexts/AuthContext';
 
 export const OFFLINE_SESSION_KEY = 'sitrep_offline_session_v1';
-export const MAX_OFFLINE_SESSION_MS = 8 * 60 * 60 * 1000;
+// Matches the server's default access-token lifetime. This lets an inspector
+// reopen the field app on the next shift without extending authorization past
+// the signed JWT or silently renewing it while offline.
+export const MAX_OFFLINE_SESSION_MS = 24 * 60 * 60 * 1000;
 
 interface OfflineSession {
   version: 1;

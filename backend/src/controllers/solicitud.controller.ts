@@ -11,6 +11,13 @@ import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { emailService } from '../services/email.service';
 import { generateTokens } from './auth.controller';
+import {
+  getMissingRequiredDocumentTypes,
+  getSolicitudRequirements,
+  isSolicitudActorType,
+  SOLICITUD_DOCUMENT_ACCEPT,
+  SOLICITUD_DOCUMENT_MAX_BYTES,
+} from '../services/solicitudRequirements.service';
 
 // ── CUIT normalization (same pattern as auth.controller) ────────────
 function normalizeCuit(raw: string): string | null {
@@ -35,10 +42,10 @@ const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadDir),
   filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
 });
-const SOLICITUD_DOCUMENT_MIMES = new Set(['application/pdf', 'image/jpeg', 'image/png']);
+const SOLICITUD_DOCUMENT_MIMES = new Set<string>(SOLICITUD_DOCUMENT_ACCEPT);
 export const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+  limits: { fileSize: SOLICITUD_DOCUMENT_MAX_BYTES, files: 1 },
   fileFilter: (_req, file, callback) => {
     if (SOLICITUD_DOCUMENT_MIMES.has(file.mimetype)) callback(null, true);
     else callback(new AppError('Tipo de archivo no permitido. Solo PDF, JPG o PNG.', 400));
@@ -54,6 +61,31 @@ function isAdmin(rol: string): boolean {
 // =====================================================================
 // PUBLIC (no auth)
 // =====================================================================
+
+/**
+ * GET /solicitudes/requisitos/:tipoActor
+ * Canonical document requirements consumed by both the UI and submit validation.
+ */
+export const getRequisitosSolicitud = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tipoActor = String(req.params.tipoActor || '').toUpperCase();
+    if (!isSolicitudActorType(tipoActor)) {
+      throw new AppError('tipoActor debe ser GENERADOR, OPERADOR o TRANSPORTISTA', 400);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        tipoActor,
+        documentos: getSolicitudRequirements(tipoActor),
+        acceptedMimeTypes: [...SOLICITUD_DOCUMENT_ACCEPT],
+        maxBytes: SOLICITUD_DOCUMENT_MAX_BYTES,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 /**
  * POST /solicitudes/iniciar
@@ -249,7 +281,10 @@ export const enviarSolicitud = async (req: AuthRequest, res: Response, next: Nex
 
     const solicitud = await prisma.solicitudInscripcion.findUnique({
       where: { id },
-      include: { usuario: { select: { email: true, nombre: true } } },
+      include: {
+        usuario: { select: { email: true, nombre: true } },
+        documentos: { select: { tipo: true } },
+      },
     });
     if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
 
@@ -275,6 +310,16 @@ export const enviarSolicitud = async (req: AuthRequest, res: Response, next: Nex
     }
     if (!datosActor.domicilio) {
       throw new AppError('El domicilio es obligatorio', 400);
+    }
+
+    const missingTypes = getMissingRequiredDocumentTypes(
+      solicitud.tipoActor,
+      solicitud.documentos.map((documento) => documento.tipo),
+    );
+    if (missingTypes.length > 0) {
+      const namesByType = new Map(getSolicitudRequirements(solicitud.tipoActor).map((item) => [item.tipo, item.nombre]));
+      const missingNames = missingTypes.map((type) => namesByType.get(type) || type).join(', ');
+      throw new AppError(`Faltan documentos obligatorios: ${missingNames}`, 400);
     }
 
     const updated = await prisma.solicitudInscripcion.update({
@@ -337,20 +382,44 @@ export const uploadDocumento = async (req: AuthRequest, res: Response, next: Nex
       throw new AppError('No tiene permisos para subir documentos a esta solicitud', 403);
     }
 
-    const documento = await prisma.documentoSolicitud.create({
-      data: {
-        solicitudId: id,
-        tipo,
-        nombre: req.file.originalname,
-        path: req.file.path,
-        mimeType: req.file.mimetype,
-        size: req.file.size,
-        estado: 'PENDIENTE',
-      },
+    const requirement = getSolicitudRequirements(solicitud.tipoActor).find((item) => item.tipo === tipo);
+    if (!requirement) {
+      throw new AppError('El tipo de documento no corresponde a esta inscripcion', 400);
+    }
+
+    const previous = await prisma.documentoSolicitud.findMany({
+      where: { solicitudId: id, tipo },
+      select: { id: true, path: true },
     });
+    const documento = await prisma.$transaction(async (tx) => {
+      await tx.documentoSolicitud.deleteMany({ where: { solicitudId: id, tipo } });
+      return tx.documentoSolicitud.create({
+        data: {
+          solicitudId: id,
+          tipo,
+          nombre: req.file!.originalname,
+          path: req.file!.path,
+          mimeType: req.file!.mimetype,
+          size: req.file!.size,
+          estado: 'PENDIENTE',
+        },
+      });
+    });
+    for (const oldDocument of previous) {
+      if (oldDocument.path !== documento.path && fs.existsSync(oldDocument.path)) {
+        try { fs.unlinkSync(oldDocument.path); } catch (error) {
+          logger.warn({ error, path: oldDocument.path }, 'No se pudo eliminar el archivo reemplazado de solicitud');
+        }
+      }
+    }
 
     res.status(201).json({ success: true, data: { documento } });
   } catch (error) {
+    if (req.file?.path && fs.existsSync(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch (cleanupError) {
+        logger.warn({ cleanupError, path: req.file.path }, 'No se pudo limpiar un archivo de solicitud rechazado');
+      }
+    }
     next(error);
   }
 };
@@ -368,6 +437,10 @@ export const deleteDocumento = async (req: AuthRequest, res: Response, next: Nex
 
     if (solicitud.usuarioId !== req.user!.id && !isAdmin(req.user!.rol)) {
       throw new AppError('No tiene permisos para eliminar documentos de esta solicitud', 403);
+    }
+
+    if (!['BORRADOR', 'OBSERVADA'].includes(solicitud.estado)) {
+      throw new AppError('No se pueden eliminar archivos de una solicitud enviada o cerrada', 400);
     }
 
     const documento = await prisma.documentoSolicitud.findUnique({ where: { id: docId } });

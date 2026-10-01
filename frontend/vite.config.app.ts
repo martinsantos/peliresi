@@ -2,6 +2,7 @@ import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import fs from 'fs'
+import { inspectionExportCssLast } from './vite.inspectionExportCss'
 
 /**
  * Vite Config para PWA Mobile (/app)
@@ -12,10 +13,11 @@ import fs from 'fs'
 
 // Plugin para renombrar app.html -> index.html en el output
 function renameAppHtml(): Plugin {
+  let outDir = '';
   return {
     name: 'rename-app-html',
+    configResolved(config) { outDir = path.resolve(config.root, config.build.outDir); },
     closeBundle() {
-      const outDir = path.resolve(__dirname, 'dist-app')
       const appHtml = path.join(outDir, 'app.html')
       const indexHtml = path.join(outDir, 'index.html')
       if (fs.existsSync(appHtml)) {
@@ -27,10 +29,11 @@ function renameAppHtml(): Plugin {
 
 // Plugin para generar precache manifest y versionar el SW
 function pwaPrecachePlugin(): Plugin {
+  let outDir = '';
   return {
     name: 'pwa-precache',
+    configResolved(config) { outDir = path.resolve(config.root, config.build.outDir); },
     closeBundle() {
-      const outDir = path.resolve(__dirname, 'dist-app')
       const assetsDir = path.join(outDir, 'assets')
 
       // Build version from timestamp
@@ -54,7 +57,7 @@ function pwaPrecachePlugin(): Plugin {
       }
 
       // Add icon files if they exist
-      for (const icon of ['icon-192.png', 'icon-512.png']) {
+      for (const icon of ['favicon.svg', 'icon-192.png', 'icon-512.png']) {
         if (fs.existsSync(path.join(outDir, icon))) {
           precacheUrls.push(`/app/${icon}`)
         }
@@ -79,7 +82,7 @@ function pwaPrecachePlugin(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), renameAppHtml(), pwaPrecachePlugin()],
+  plugins: [react(), inspectionExportCssLast(), renameAppHtml(), pwaPrecachePlugin()],
 
   base: '/app/',
 

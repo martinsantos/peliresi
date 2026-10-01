@@ -5,6 +5,8 @@
  */
 
 import React, { useState } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, Factory, MapPin, Phone, Mail, Calendar, Download,
@@ -136,6 +138,9 @@ const GeneradorDetallePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const mp = useMobilePrefix();
+  const { currentUser } = useAuth();
+  const canEdit = currentUser?.rol === 'ADMIN' || currentUser?.rol === 'ADMIN_GENERADOR';
   // Removed isMobile — React Router handles basename
 
   const [pagoModal, setPagoModal] = useState<{ open: boolean; editing?: PagoTEF }>({ open: false });
@@ -166,7 +171,8 @@ const GeneradorDetallePage: React.FC = () => {
     fechaAlta: apiGenerador.createdAt ? new Date(apiGenerador.createdAt).toISOString().split('T')[0] : '-',
   } : null;
 
-  const backPath = '/admin/actores/generadores';
+  const returnTo = (location.state as { inspectionReturn?: string } | null)?.inspectionReturn;
+  const backPath = returnTo?.startsWith('/') && !returnTo.startsWith('//') ? returnTo : mp(canEdit ? '/admin/actores/generadores' : '/inspecciones');
 
   if (isLoading) {
     return (
@@ -201,6 +207,7 @@ const GeneradorDetallePage: React.FC = () => {
 
   // Pago handlers
   const handleSavePago = async (data: any) => {
+    if (!canEdit) return;
     try {
       if (pagoModal.editing) {
         await updatePago.mutateAsync({ generadorId: id!, pagoId: pagoModal.editing.id, data });
@@ -216,6 +223,7 @@ const GeneradorDetallePage: React.FC = () => {
   };
 
   const handleDeletePago = async (pagoId: string) => {
+    if (!canEdit) return;
     if (!confirm('Eliminar este pago?')) return;
     try {
       await deletePago.mutateAsync({ generadorId: id!, pagoId });
@@ -225,6 +233,7 @@ const GeneradorDetallePage: React.FC = () => {
 
   // DDJJ handlers
   const handleSaveDDJJ = async (data: any) => {
+    if (!canEdit) return;
     try {
       if (ddjjModal.editing) {
         await updateDDJJ.mutateAsync({ generadorId: id!, ddjjId: ddjjModal.editing.id, data });
@@ -240,6 +249,7 @@ const GeneradorDetallePage: React.FC = () => {
   };
 
   const handleDeleteDDJJ = async (ddjjId: string) => {
+    if (!canEdit) return;
     if (!confirm('Eliminar esta DDJJ?')) return;
     try {
       await deleteDDJJ.mutateAsync({ generadorId: id!, ddjjId });
@@ -249,6 +259,7 @@ const GeneradorDetallePage: React.FC = () => {
 
   // Doc handlers
   const handleUploadDoc = async (file: File, tipo: string, anio?: number) => {
+    if (!canEdit) return;
     try {
       await uploadDoc.mutateAsync({ generadorId: id!, file, tipo, anio });
       toast.success('Documento subido');
@@ -262,6 +273,7 @@ const GeneradorDetallePage: React.FC = () => {
   };
 
   const handleRevisarDoc = async (docId: string, estado: 'APROBADO' | 'RECHAZADO') => {
+    if (!canEdit) return;
     try {
       await revisarDoc.mutateAsync({ docId, estado, generadorId: id! });
       toast.success(estado === 'APROBADO' ? 'Documento aprobado' : 'Documento rechazado');
@@ -269,6 +281,7 @@ const GeneradorDetallePage: React.FC = () => {
   };
 
   const handleDeleteDoc = async (docId: string) => {
+    if (!canEdit) return;
     if (!confirm('Eliminar documento?')) return;
     try {
       await deleteDoc.mutateAsync({ docId, generadorId: id! });
@@ -476,11 +489,9 @@ const GeneradorDetallePage: React.FC = () => {
 
             {/* CRUD Table */}
             <Card>
-              <CardHeader title="Registro de Pagos TEF" icon={<DollarSign size={20} />}>
-                <Button size="sm" leftIcon={<Plus size={14} />} onClick={() => setPagoModal({ open: true })}>
+              <CardHeader title="Registro de Pagos TEF" icon={<DollarSign size={20} />} action={canEdit ? <Button size="sm" leftIcon={<Plus size={14} />} onClick={() => setPagoModal({ open: true })}>
                   Registrar Pago
-                </Button>
-              </CardHeader>
+                </Button> : undefined} />
               <CardContent>
                 {pagos.length > 0 ? (
                   <div className="overflow-x-auto">
@@ -493,7 +504,7 @@ const GeneradorDetallePage: React.FC = () => {
                           <th className="px-3 py-2.5 text-center text-xs font-semibold text-neutral-600">Notif.</th>
                           <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 hidden md:table-cell">F. Pago</th>
                           <th className="px-3 py-2.5 text-center text-xs font-semibold text-neutral-600">Hab.</th>
-                          <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600">Acciones</th>
+                          {canEdit && <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600">Acciones</th>}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-neutral-100">
@@ -513,10 +524,10 @@ const GeneradorDetallePage: React.FC = () => {
                                 </Badge>
                               )}
                             </td>
-                            <td className="px-3 py-2.5 text-right">
+                            {canEdit && <td className="px-3 py-2.5 text-right">
                               <button onClick={() => setPagoModal({ open: true, editing: p })} className="p-1 rounded hover:bg-neutral-100 text-neutral-400 hover:text-primary-600"><Pencil size={14} /></button>
                               <button onClick={() => handleDeletePago(p.id)} className="p-1 rounded hover:bg-error-50 text-neutral-400 hover:text-error-600 ml-1"><Trash2 size={14} /></button>
-                            </td>
+                            </td>}
                           </tr>
                         ))}
                       </tbody>
@@ -562,11 +573,9 @@ const GeneradorDetallePage: React.FC = () => {
           <div className="space-y-8">
             {/* DDJJ Table */}
             <Card>
-              <CardHeader title="Declaraciones Juradas" icon={<ClipboardList size={20} />}>
-                <Button size="sm" leftIcon={<Plus size={14} />} onClick={() => setDdjjModal({ open: true })}>
+              <CardHeader title="Declaraciones Juradas" icon={<ClipboardList size={20} />} action={canEdit ? <Button size="sm" leftIcon={<Plus size={14} />} onClick={() => setDdjjModal({ open: true })}>
                   Registrar DDJJ
-                </Button>
-              </CardHeader>
+                </Button> : undefined} />
               <CardContent>
                 {ddjjList.length > 0 ? (
                   <div className="overflow-x-auto">
@@ -578,7 +587,7 @@ const GeneradorDetallePage: React.FC = () => {
                           <th className="px-3 py-2.5 text-center text-xs font-semibold text-neutral-600">Presentada</th>
                           <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 hidden md:table-cell">Fecha</th>
                           <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 hidden md:table-cell">Obs.</th>
-                          <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600">Acciones</th>
+                          {canEdit && <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600">Acciones</th>}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-neutral-100">
@@ -593,10 +602,10 @@ const GeneradorDetallePage: React.FC = () => {
                             </td>
                             <td className="px-3 py-2.5 text-neutral-600 hidden md:table-cell">{fmtDate(d.fechaPresentacion)}</td>
                             <td className="px-3 py-2.5 text-neutral-500 text-xs hidden md:table-cell truncate max-w-[150px]" title={d.observaciones || '-'}>{d.observaciones || '-'}</td>
-                            <td className="px-3 py-2.5 text-right">
+                            {canEdit && <td className="px-3 py-2.5 text-right">
                               <button onClick={() => setDdjjModal({ open: true, editing: d })} className="p-1 rounded hover:bg-neutral-100 text-neutral-400 hover:text-primary-600"><Pencil size={14} /></button>
                               <button onClick={() => handleDeleteDDJJ(d.id)} className="p-1 rounded hover:bg-error-50 text-neutral-400 hover:text-error-600 ml-1"><Trash2 size={14} /></button>
-                            </td>
+                            </td>}
                           </tr>
                         ))}
                       </tbody>
@@ -618,7 +627,8 @@ const GeneradorDetallePage: React.FC = () => {
                   onDownload={handleDownloadDoc}
                   onRevisar={handleRevisarDoc}
                   onDelete={handleDeleteDoc}
-                  isAdmin={true}
+                  isAdmin={canEdit}
+                  readOnly={!canEdit}
                   isPending={uploadDoc.isPending}
                 />
               </CardContent>
@@ -641,14 +651,14 @@ const GeneradorDetallePage: React.FC = () => {
       </Tabs>
 
       {/* Pago Modal */}
-      {pagoModal.open && (
+      {canEdit && pagoModal.open && (
         <CrudModal title={pagoModal.editing ? 'Editar Pago TEF' : 'Registrar Pago TEF'} onClose={() => setPagoModal({ open: false })}>
           <PagoForm initial={pagoModal.editing} onSave={handleSavePago} onCancel={() => setPagoModal({ open: false })} isPending={createPago.isPending || updatePago.isPending} />
         </CrudModal>
       )}
 
       {/* DDJJ Modal */}
-      {ddjjModal.open && (
+      {canEdit && ddjjModal.open && (
         <CrudModal title={ddjjModal.editing ? 'Editar DDJJ' : 'Registrar DDJJ'} onClose={() => setDdjjModal({ open: false })}>
           <DDJJForm initial={ddjjModal.editing} onSave={handleSaveDDJJ} onCancel={() => setDdjjModal({ open: false })} isPending={createDDJJ.isPending || updateDDJJ.isPending} />
         </CrudModal>

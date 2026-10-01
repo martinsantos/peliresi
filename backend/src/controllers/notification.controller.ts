@@ -3,6 +3,24 @@ import { EventoAlerta, EstadoAlerta, TipoAnomalia, SeveridadAnomalia } from '@pr
 import prisma from '../lib/prisma';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { domainEvents } from '../services/domainEvent.service';
+import { AppError } from '../middlewares/errorHandler';
+import { normalizeAlertCondition } from '../services/alertRuleCondition.service';
+
+const ALERT_RECIPIENT_ROLES = new Set(['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR']);
+function normalizeAlertRecipients(raw: unknown): string {
+    let parsed = raw;
+    if (typeof raw === 'string') {
+        try { parsed = JSON.parse(raw); } catch { throw new AppError('Los destinatarios no contienen JSON válido', 400); }
+    }
+    if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > 30) throw new AppError('Seleccione al menos un destinatario válido', 400);
+    const recipients = Array.from(new Set(parsed.map(String)));
+    for (const recipient of recipients) {
+        if (ALERT_RECIPIENT_ROLES.has(recipient)) continue;
+        if (recipient.startsWith('email:') && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient.slice(6))) continue;
+        throw new AppError(`Destinatario no permitido: ${recipient}`, 400);
+    }
+    return JSON.stringify(recipients);
+}
 
 // Re-export notificationService so existing imports continue to work
 export { notificationService } from '../services/notification-dispatcher.service';
@@ -125,9 +143,10 @@ export const crearReglaAlerta = async (req: Request, res: Response, next: NextFu
         const usuarioId = (req as AuthRequest).user!.id;
         const { nombre, descripcion, evento, condicion, destinatarios } = req.body;
 
-        // Frontend already sends condicion and destinatarios as JSON strings — do NOT re-stringify
-        const condicionStr = typeof condicion === 'string' ? condicion : JSON.stringify(condicion);
-        const destinatariosStr = typeof destinatarios === 'string' ? destinatarios : JSON.stringify(destinatarios);
+        let condicionStr: string;
+        try { condicionStr = normalizeAlertCondition(condicion); }
+        catch (error) { throw new AppError(error instanceof Error ? error.message : 'Condición inválida', 400); }
+        const destinatariosStr = normalizeAlertRecipients(destinatarios);
 
         const regla = await prisma.reglaAlerta.create({
             data: {
@@ -153,12 +172,12 @@ export const actualizarReglaAlerta = async (req: Request, res: Response, next: N
         const { nombre, descripcion, evento, condicion, destinatarios, activa } = req.body;
 
         // Frontend already sends condicion and destinatarios as JSON strings — do NOT re-stringify
-        const condicionStr = condicion
-            ? (typeof condicion === 'string' ? condicion : JSON.stringify(condicion))
-            : undefined;
-        const destinatariosStr = destinatarios
-            ? (typeof destinatarios === 'string' ? destinatarios : JSON.stringify(destinatarios))
-            : undefined;
+        let condicionStr: string | undefined;
+        if (condicion !== undefined) {
+            try { condicionStr = normalizeAlertCondition(condicion); }
+            catch (error) { throw new AppError(error instanceof Error ? error.message : 'Condición inválida', 400); }
+        }
+        const destinatariosStr = destinatarios === undefined ? undefined : normalizeAlertRecipients(destinatarios);
 
         const regla = await prisma.reglaAlerta.update({
             where: { id },

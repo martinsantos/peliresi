@@ -67,6 +67,8 @@ export interface EstadisticasCentroControl {
   operadoresActivos: number;
   toneladasPeriodo: number;
   porEstado: Record<string, number>;
+  /** Created-in-period cohort; stage activity in porEstado uses event dates. */
+  distribucionPorEstado?: Record<string, number>;
   manifiestosPorDia: Array<{ fecha: string; cantidad: number }>;
 }
 
@@ -96,12 +98,13 @@ async function fetchActividad(params: CentroControlParams): Promise<CentroContro
   return data.data;
 }
 
-export function useCentroControl(params: CentroControlParams = {}, refreshInterval = 30000) {
+export function useCentroControl(params: CentroControlParams = {}, refreshInterval: number | false = 30000, enabled = true) {
   return useQuery<CentroControlData>({
     queryKey: ['centro-control', 'actividad', params.fechaDesde, params.fechaHasta, params.capas?.join(','), params.incluirTodos],
     queryFn: () => fetchActividad(params),
     staleTime: 15000,
     refetchInterval: refreshInterval,
+    enabled,
     retry: 1,
   });
 }

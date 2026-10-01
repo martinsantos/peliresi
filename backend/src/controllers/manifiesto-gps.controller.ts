@@ -5,8 +5,8 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 import prisma from '../lib/prisma';
 import { anomaliaDetector } from './notification.controller';
 import { domainEvents } from '../services/domainEvent.service';
-import { distanciaPuntoSegmento } from '../utils/geo';
 import { canAccessManifiesto } from '../utils/roleFilter';
+import { assessGeographicCorridor } from '../services/gpsCorridor.service';
 
 // Zod schema for GPS update validation
 const actualizarUbicacionSchema = z.object({
@@ -120,25 +120,30 @@ export const actualizarUbicacion = async (req: AuthRequest, res: Response, next:
       }
     }
 
-    // Deteccion DESVIO_RUTA: >50 km del corredor generador<->operador
+    // Geographic anomaly only after 3 consecutive samples. This is not called a
+    // route deviation because SITREP does not store an authorised road geometry.
     if (
       cacheEntry.genLat !== null && cacheEntry.genLon !== null &&
       cacheEntry.opLat !== null && cacheEntry.opLon !== null
     ) {
-      const distKm = distanciaPuntoSegmento(
-        latitud, longitud,
-        cacheEntry.genLat, cacheEntry.genLon,
-        cacheEntry.opLat, cacheEntry.opLon,
-      );
-      if (distKm > 50) {
+      const recentPoints = await prisma.trackingGPS.findMany({
+        where: { manifiestoId: id },
+        orderBy: { timestamp: 'desc' },
+        take: 3,
+        select: { latitud: true, longitud: true },
+      });
+      const corridorAssessment = assessGeographicCorridor(recentPoints, {
+        origin: { latitud: cacheEntry.genLat, longitud: cacheEntry.genLon },
+        destination: { latitud: cacheEntry.opLat, longitud: cacheEntry.opLon },
+      });
+      if (corridorAssessment) {
         domainEvents.emit({
-          type: 'DESVIO_RUTA',
+          type: 'ANOMALIA_GPS',
           manifiestoId: id,
-          distanciaKm: distKm,
-          numero: cacheEntry.numero,
+          tipoAnomalia: 'FUERA_CORREDOR_GEOGRAFICO',
+          descripcion: `Tres posiciones consecutivas se mantuvieron a más de 50 km del corredor geográfico estimado entre origen y destino (mínimo ${corridorAssessment.minimumDistanceKm.toFixed(1)} km). No se compara una ruta vial autorizada; requiere revisión operativa.`,
+          severidad: 'ALTA',
           userId,
-          latActual: latitud,
-          lonActual: longitud,
         });
       }
     }

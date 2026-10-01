@@ -373,7 +373,7 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
       {/* Filters + Actions */}
       <Card padding="base" className="shadow-sm">
         <div className="flex flex-col md:flex-row flex-wrap gap-3">
-          <div className="flex-1">
+          <div className="min-w-0 flex-1 md:basis-[18rem]">
             <Input
               placeholder="Buscar por operador, residuo o método..."
               value={searchTerm}
@@ -451,7 +451,7 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
                 <button
                   type="button"
                   onClick={() => setExpandedOperadorId(isExpanded ? null : group.operadorId)}
-                  className="w-full p-4 flex items-center justify-between hover:bg-neutral-50 transition-colors text-left"
+                  className="w-full p-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between hover:bg-neutral-50 transition-colors text-left"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
@@ -462,7 +462,7 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
                       <p className="text-xs text-neutral-400 font-mono">{group.operador?.cuit || ''}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
                     <Badge variant="soft" color="primary" className="text-xs">
                       {group.tratamientos.length} {group.tratamientos.length === 1 ? 'autorización' : 'autorizaciones'}
                     </Badge>
@@ -901,7 +901,7 @@ const CatalogoTab: React.FC<{
       {/* Filters */}
       <Card padding="base">
         <div className="flex flex-col md:flex-row flex-wrap gap-3">
-          <div className="flex-1">
+          <div className="min-w-0 flex-1 md:basis-[18rem]">
             <Input
               placeholder="Buscar método, descripción u operador..."
               value={searchTerm}

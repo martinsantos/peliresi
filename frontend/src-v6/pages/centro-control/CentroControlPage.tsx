@@ -16,6 +16,8 @@ import { EstadoManifiesto } from '../../types/models';
 import { formatRelativeTime } from '../../utils/formatters';
 import { computeDateRange } from '../../utils/date-presets';
 
+import { useInspectionOperations } from '../../hooks/useInspectionOperations';
+import { canUseInspectionOperations } from '../../services/inspectionOperations.service';
 import { ControlFilters, type LayerState } from './components/ControlFilters';
 import { ControlStats } from './components/ControlStats';
 import { ControlMap } from './components/ControlMap';
@@ -33,7 +35,7 @@ export const CentroControlPage: React.FC = () => {
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [selectedRealizadoId, setSelectedRealizadoId] = useState<string | null>(null);
   const [tripFilter, setTripFilter] = useState('');
-  const [tripPanel, setTripPanel] = useState<'activos' | 'realizados'>('activos');
+  const [tripPanel, setTripPanel] = useState<'activos' | 'realizados' | 'inspecciones'>('activos');
 
   // ── Layer toggles ──
   const [layers, setLayers] = useState<LayerState>({
@@ -41,6 +43,7 @@ export const CentroControlPage: React.FC = () => {
     transportistas: true,
     operadores: true,
     transito: true,
+    ...(canUseInspectionOperations(currentUser) ? { inspecciones: true } : {}),
   });
 
   // ── Date range (default: 30 días) ──
@@ -53,12 +56,16 @@ export const CentroControlPage: React.FC = () => {
   // ── Map zoom ──
   const [mapZoom, setMapZoom] = useState(10);
 
+  const inspections = useInspectionOperations({ limit: 100 });
+  const [selectedInspectionId, setSelectedInspectionId] = useState<string | null>(null);
+  const selectInspection = (id: string) => { setSelectedInspectionId(id); setTripPanel('inspecciones'); setLayers((previous) => ({ ...previous, inspecciones: true })); };
+
   // ── API Hooks ──
   const { refetch: refetchStats } = useDashboardStats();
   const { data: ccData, refetch: refetchCC } = useCentroControl({
     fechaDesde,
     fechaHasta,
-    capas: Object.entries(layers).filter(([, v]) => v).map(([k]) => k),
+    capas: Object.entries(layers).filter(([k, v]) => v && k !== 'inspecciones').map(([k]) => k),
   });
   // Only fetch alertas for ADMIN — TRANSPORTISTA gets 403
   const { data: alertasData } = useAlertas({ limit: 10 }, isAdmin);
@@ -98,8 +105,9 @@ export const CentroControlPage: React.FC = () => {
   const handleManualRefresh = useCallback(() => {
     refetchStats();
     refetchCC();
+    if (canUseInspectionOperations(currentUser)) void inspections.refetch();
     setCountdown(POLL_INTERVAL);
-  }, [refetchStats, refetchCC]);
+  }, [refetchStats, refetchCC, inspections.refetch, currentUser]);
 
   const handleDatePreset = useCallback((days: number) => {
     setDatePreset(days);
@@ -205,8 +213,12 @@ export const CentroControlPage: React.FC = () => {
     return pts;
   }, [selectedRealizadoId, viajesRealizados]);
 
+  // Choose an initial panel only; polling must not override the user's selection.
+  const panelInitialized = useRef(false);
   // Auto-switch to realizados if no active trips
   useEffect(() => {
+    if (!cc || panelInitialized.current) return;
+    panelInitialized.current = true;
     if (cc && filteredEnTransito.length === 0 && viajesRealizados.length > 0) {
       setTripPanel('realizados');
     } else if (cc && filteredEnTransito.length > 0) {
@@ -244,7 +256,10 @@ export const CentroControlPage: React.FC = () => {
         cc={cc}
         alertas={alertas}
         datePreset={datePreset}
-      />
+        inspectionCount={canUseInspectionOperations(currentUser) ? inspections.isError || !inspections.data ? null : inspections.data.total : undefined}
+      >
+
+
 
       {/* ══════ Mapa de Actividad + Viajes Activos ══════ */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -263,6 +278,9 @@ export const CentroControlPage: React.FC = () => {
           panelBoundsPoints={panelBoundsPoints}
           realizadoFlyPoints={realizadoFlyPoints}
           mapColRef={mapColRef}
+          inspections={inspections.data?.items || []}
+          selectedInspectionId={tripPanel === 'inspecciones' ? selectedInspectionId : null}
+          onSelectInspection={selectInspection}
         />
 
         <ViajesPanel
@@ -277,9 +295,15 @@ export const CentroControlPage: React.FC = () => {
           selectedRealizadoId={selectedRealizadoId}
           onSelectRealizado={setSelectedRealizadoId}
           viajesRef={viajesRef}
+          inspections={canUseInspectionOperations(currentUser) ? inspections.data?.items || [] : undefined}
+          inspectionTotal={inspections.data?.total}
+          inspectionError={inspections.isError}
+          inspectionLoading={inspections.isPending}
+          selectedInspectionId={selectedInspectionId}
+          onSelectInspection={selectInspection}
         />
       </div>
-
+      </ControlStats>
       </div>
     </>
   );

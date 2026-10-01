@@ -3,10 +3,11 @@
  */
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Leaf, Factory, Truck, FlaskConical, Shield, ShieldCheck, ShieldPlus, Smartphone, Monitor, ArrowRight, LogIn, UserPlus, PlayCircle } from 'lucide-react';
+import { Factory, Truck, FlaskConical, Shield, ShieldCheck, ShieldPlus, Smartphone, Monitor, ArrowRight, LogIn, UserPlus, PlayCircle } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../../contexts/AuthContext';
 import { MendozaBrand } from '../../components/MendozaBrand';
+import { SitrepMark } from '../../components/SitrepMark';
 import './institutional.css';
 
 const PERFILES = [
@@ -34,9 +35,7 @@ const LandingPage: React.FC = () => {
       <header className="bg-white border-b border-neutral-200 sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="brand-icon w-9 h-9 rounded-xl flex items-center justify-center">
-              <Leaf size={20} className="text-white" />
-            </div>
+            <SitrepMark size={36} />
             <span className="brand-link font-bold text-lg" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
               SITREP
             </span>

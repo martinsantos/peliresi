@@ -44,7 +44,7 @@ export const reporteService = {
     return data.data;
   },
 
-  async auditoria(filters?: ReporteFilters & { page?: number; limit?: number; accion?: string; usuarioId?: string; sortBy?: string; sortOrder?: string }): Promise<ReporteData> {
+  async auditoria(filters?: ReporteFilters & { page?: number; limit?: number; accion?: string; usuarioId?: string; sortBy?: string; sortOrder?: string; fuente?: 'manifiestos' | 'inspecciones' }): Promise<ReporteData> {
     const mapped = mapFilters(filters);
     const params: Record<string, string | number | undefined> = {
       ...mapped,
@@ -54,6 +54,7 @@ export const reporteService = {
       usuarioId: filters?.usuarioId,
       sortBy: filters?.sortBy,
       sortOrder: filters?.sortOrder,
+      fuente: filters?.fuente,
     };
     const { data } = await api.get('/reportes/auditoria', { params });
     return data.data;

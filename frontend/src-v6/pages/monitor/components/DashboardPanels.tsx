@@ -6,11 +6,14 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  Factory, FlaskConical, Package, Beaker, Droplets,
+  ClipboardCheck, Factory, FlaskConical, Package, Beaker, Droplets,
   ChevronUp, ChevronDown, X, Truck, GitBranch, Radio,
   FileText, ArrowRight, Users, GripHorizontal,
   MapPin, CheckCircle, Clock,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { hasInspectionCoordinates, operationSubject, type InspectionOperation } from '../../../services/inspectionOperations.service';
+import { INSPECTION_STATE_LABELS } from '../../inspecciones/inspectionPresentation';
 import type { MonitorMode } from '../WarRoomPage';
 import type { MonitorLiveResponse, ForecastResponse, TimelineResponse, EnTransitoItem } from '../api/monitor-api';
 import { formatNumber, formatTimeShort } from '../utils/formatters';
@@ -61,13 +64,14 @@ const ESTADO_LABELS: Record<string, string> = {
 
 // ─── Widget system ────────────────────────────────────────────────────────────
 
-type WId = 'pipeline' | 'viajes' | 'actores' | 'residuos' | 'tratamiento' | 'manifiesto' | 'eventos';
+type WId = 'inspecciones' | 'pipeline' | 'viajes' | 'actores' | 'residuos' | 'tratamiento' | 'manifiesto' | 'eventos';
 type WState = 'visible' | 'minimized' | 'closed';
 
 const STORAGE_KEY = 'wr-widget-states-v2';
 const DIVIDER_KEY = 'wr-divider-pct-v1';
 
 const DEFAULTS: Record<WId, WState> = {
+  inspecciones: 'visible',
   pipeline:    'visible',
   viajes:      'visible',
   manifiesto:  'visible',
@@ -78,6 +82,7 @@ const DEFAULTS: Record<WId, WState> = {
 };
 
 const WIDGET_CONFIGS: { id: WId; label: string; icon: React.ElementType }[] = [
+  { id: 'inspecciones', label: 'Inspecciones', icon: ClipboardCheck },
   { id: 'pipeline',    label: 'Pipeline',    icon: GitBranch },
   { id: 'viajes',      label: 'Viajes',      icon: Truck },
   { id: 'manifiesto',  label: 'Manifiesto',  icon: FileText },
@@ -223,6 +228,10 @@ const ManifiestoCard: React.FC<{
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
+  inspections?: InspectionOperation[];
+  inspectionTotal?: number;
+  inspectionError?: boolean;
+  inspectionLoading?: boolean;
   mode: MonitorMode;
   liveData: MonitorLiveResponse | null;
   forecastData: ForecastResponse | null;
@@ -252,6 +261,7 @@ interface Props {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export const DashboardPanels: React.FC<Props> = ({
+  inspections, inspectionTotal, inspectionError, inspectionLoading,
   mode, liveData, forecastData, timelineData, playbackCounters, playbackEvents,
   currentEventId, enTransito = [], currentEvent, currentEventIndex = 0,
   totalEventCount = 0, onTripClick, onEventOpen, onViajeOpen,
@@ -272,7 +282,7 @@ export const DashboardPanels: React.FC<Props> = ({
   const minimize = (id: WId) => setWs(p => ({ ...p, [id]: p[id] === 'minimized' ? 'visible' : 'minimized' }));
   const close    = (id: WId) => setWs(p => ({ ...p, [id]: 'closed' }));
   const restore  = (id: WId) => setWs(p => ({ ...p, [id]: 'visible' }));
-  const closedWidgets = WIDGET_CONFIGS.filter(w => ws[w.id] === 'closed');
+  const closedWidgets = WIDGET_CONFIGS.filter(w => ws[w.id] === 'closed' && (w.id !== 'inspecciones' || inspections !== undefined));
 
   // ── Drag divider ──
   const containerRef = useRef<HTMLDivElement>(null);
@@ -406,6 +416,14 @@ export const DashboardPanels: React.FC<Props> = ({
           </WidgetShell>
         )}
 
+        {inspections && ws.inspecciones !== 'closed' && <WidgetShell title={`Inspecciones · ${inspectionError || inspectionLoading ? '—' : inspectionTotal ?? inspections.length}`} icon={ClipboardCheck} state={ws.inspecciones} onMin={() => minimize('inspecciones')} onClose={() => close('inspecciones')}>
+          <p className="mb-2 text-[11px] text-neutral-500">Agenda activa · lugares de visita</p>
+          {inspectionError ? <p className="text-xs text-amber-700">Agenda sin actualizar</p> : inspectionLoading ? <p className="text-xs text-neutral-500">Cargando…</p> : !inspections.length ? <p className="text-xs text-neutral-500">Sin inspecciones activas</p> : inspections.map((row) => <div key={row.id} className="border-t border-neutral-100 py-2">
+            <button disabled={!hasInspectionCoordinates(row)} onClick={() => onTripClick?.(row.latitud!, row.longitud!)} className="min-h-10 w-full text-left"><span className="block text-xs font-semibold text-neutral-800">{row.numero} · {operationSubject(row)}</span><span className="block text-[11px] text-neutral-500">{INSPECTION_STATE_LABELS[row.estado]} · {row.inspector.nombre}{!hasInspectionCoordinates(row) ? ' · sin coordenadas' : ''}</span></button>
+            <Link className="inline-flex min-h-8 items-center text-xs font-semibold text-primary-700" to={'/inspecciones/' + row.id}>Abrir expediente</Link>
+          </div>)}
+          {!!inspectionTotal && inspectionTotal > inspections.length && <Link className="text-xs text-primary-700" to="/inspecciones">Ver agenda completa ({inspectionTotal})</Link>}
+        </WidgetShell>}
         {/* Widget: Viajes */}
         {ws.viajes !== 'closed' && (
           <WidgetShell title="Viajes" icon={Truck}

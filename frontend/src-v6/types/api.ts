@@ -4,7 +4,7 @@
  */
 
 import type {
-  Usuario, Manifiesto, TipoResiduo, Rol, EstadoManifiesto,
+  Usuario, Manifiesto, TipoResiduo, Rol, EstadoManifiesto, Generador,
 } from './models';
 
 // ========================================
@@ -250,7 +250,7 @@ export interface CreateOperadorRequest {
 export interface Renovacion {
   id: string;
   anio: number;
-  tipoActor: 'GENERADOR' | 'OPERADOR';
+  tipoActor: 'GENERADOR' | 'OPERADOR' | 'TRANSPORTISTA';
   generadorId?: string;
   operadorId?: string;
   modalidad: 'SIN_CAMBIOS' | 'CON_CAMBIOS';
@@ -335,6 +335,13 @@ export interface DocumentoSolicitud {
   createdAt: string;
 }
 
+export interface SolicitudRequirements {
+  tipoActor: 'GENERADOR' | 'OPERADOR' | 'TRANSPORTISTA';
+  documentos: Array<{ tipo: string; nombre: string; required: boolean }>;
+  acceptedMimeTypes: string[];
+  maxBytes: number;
+}
+
 export interface MensajeSolicitud {
   id: string;
   solicitudId: string;
@@ -386,10 +393,27 @@ export interface AuditoriaEntry {
 export interface ActorFilters {
   search?: string;
   activo?: boolean;
+  categoria?: string;
+  rubro?: string;
+  fiscalStatus?: 'AL_DIA' | 'TEF_SIN_PAGO' | 'TEF_SIN_REGISTRO' | 'DDJJ_PENDIENTE' | 'DDJJ_SIN_REGISTRO' | 'NO_HABILITADO' | 'SIN_DATOS';
+  fiscalYear?: number;
   page?: number;
   limit?: number;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+}
+
+export interface GeneradorListData extends PaginatedData<Generador> {
+  fiscalYear: number;
+  stats: {
+    total: number;
+    activos: number;
+    alDia: number;
+    requierenRevision: number;
+    tefSinPago: number;
+    ddjjPendiente: number;
+    sinDatos: number;
+  };
 }
 
 // ========================================
@@ -477,7 +501,9 @@ export interface UpdateUsuarioRequest {
 
 export interface UsuarioFilters {
   rol?: Rol;
+  roles?: Array<Rol | 'ADMIN_GENERADOR' | 'ADMIN_TRANSPORTISTA' | 'ADMIN_OPERADOR'>;
   activo?: boolean;
+  emailVerified?: boolean;
   search?: string;
   page?: number;
   limit?: number;
@@ -497,7 +523,10 @@ export interface DashboardStats {
     enTransito: number;
     entregados: number;
     recibidos: number;
+    enTratamiento?: number;
     tratados: number;
+    rechazados?: number;
+    cancelados?: number;
     total: number;
   };
   recientes?: Manifiesto[];

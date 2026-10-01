@@ -21,15 +21,15 @@ function setup(hash = '') {
 describe('InspectionWorkspace navigation contract', () => {
   beforeEach(() => localStorage.clear());
 
-  it('shows exactly one task, advances without submitting and flushes the draft', () => {
+  it('opens a section directly without submitting and flushes the draft', () => {
     const { onBeforeNavigate } = setup();
-    expect(screen.getByRole('heading', { name: 'Preparar visita' })).toBeVisible();
-    expect(screen.queryByText('Control de prueba')).not.toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
-    expect(screen.getByRole('heading', { name: 'Controles' })).toBeVisible();
-    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '2');
+    expect(screen.getByRole('region', { name: 'Preparar visita' })).toBeVisible();
+    expect(screen.queryByText('Control de prueba')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('link', { name: 'Controles', exact: true }));
+    expect(screen.getByRole('region', { name: 'Controles' })).toBeVisible();
+    expect(screen.queryByRole('progressbar')).toBeNull();
     expect(onBeforeNavigate).toHaveBeenCalledOnce();
-    expect(screen.getByRole('link', { name: 'Checklist' })).toHaveAttribute('aria-current', 'step');
+    expect(screen.getByRole('link', { name: 'Controles', exact: true })).toHaveAttribute('aria-current', 'page');
   });
 
   it('preserves a child note when leaving and returning, and never offers generic save for it', () => {
@@ -37,33 +37,38 @@ describe('InspectionWorkspace navigation contract', () => {
     const note = screen.getByRole('textbox', { name: 'Nota sin enviar' });
     fireEvent.change(note, { target: { value: 'Observación pendiente de registrar' } });
     expect(screen.queryByRole('button', { name: 'Guardar borrador' })).toBeNull();
-    fireEvent.click(screen.getByRole('link', { name: 'Contexto' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Visita', exact: true }));
     expect(note).not.toBeVisible();
-    fireEvent.click(screen.getByRole('link', { name: 'Trazabilidad' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Expediente', exact: true }));
     expect(screen.getByRole('textbox', { name: 'Nota sin enviar' })).toHaveValue('Observación pendiente de registrar');
   });
 
   it('keeps document anchors and safe fallback for malformed hashes', () => {
     setup('#%E0%A4%A');
-    expect(screen.getByRole('heading', { name: 'Preparar visita' })).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Checklist' })).toHaveAttribute('href', '#checklist');
+    expect(screen.getByRole('region', { name: 'Preparar visita' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Controles', exact: true })).toHaveAttribute('href', '#checklist');
     const bar = screen.getByTestId('inspection-action-bar');
     expect(bar.className).not.toMatch(/\b(sticky|fixed|absolute)\b/);
-    expect(within(bar).getByRole('button', { name: 'Siguiente' })).toBeVisible();
+    expect(within(bar).getByRole('button', { name: 'Guardar borrador' })).toBeVisible();
   });
 
   it('keeps a mobile navigation landmark and exposes direct links to field points', () => {
     setup('#checklist/DOC-01');
     expect(screen.getByTestId('inspection-navigation')).toHaveClass('sticky', 'top-0');
-    expect(screen.getByRole('button', { name: 'Documentación · 0 de 1 revisados' })).toBeInTheDocument();
-    expect(screen.getByTestId('inspection-current-point')).toHaveTextContent('Documentación · DOC-01 · Pendiente');
-    expect(screen.getByRole('heading', { name: 'Controles' })).toBeVisible();
+    expect(readInspectionResume('inspector-1', 'qa')).toMatchObject({ hash: '#checklist/DOC-01', label: 'Checklist · Documento' });
+    expect(screen.getByRole('region', { name: 'Controles' })).toBeVisible();
   });
 
   it('remembers the exact selected control for the next visit', () => {
-    setup();
-    fireEvent.click(screen.getByRole('link', { name: 'Checklist' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Documentación · 0 de 1 revisados' }));
+    setup('#checklist/DOC-01');
     expect(readInspectionResume('inspector-1', 'qa')).toMatchObject({ hash: '#checklist/DOC-01', label: 'Checklist · Documento' });
+  });
+
+  it('does not leave the current section when protecting the draft fails', () => {
+    const { onBeforeNavigate } = setup();
+    onBeforeNavigate.mockReturnValue(false);
+    fireEvent.click(screen.getByRole('link', { name: 'Controles', exact: true }));
+    expect(screen.getByRole('region', { name: 'Preparar visita' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Visita', exact: true })).toHaveAttribute('aria-current', 'page');
   });
 });

@@ -8,7 +8,7 @@
  * and closes on parent scroll.
  */
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Check, Search, X } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
@@ -49,9 +49,9 @@ interface SelectProps {
 // SIZE STYLES
 // ========================================
 const sizeStyles: Record<SelectSize, string> = {
-  sm: 'h-9 px-3 text-xs sm:text-sm',
-  base: 'h-10 sm:h-11 px-3 sm:px-4 text-sm',
-  lg: 'h-11 sm:h-14 px-4 sm:px-5 text-sm sm:text-base',
+  sm: 'min-h-11 sm:min-h-9 px-3 text-base sm:text-sm',
+  base: 'min-h-11 px-3 sm:px-4 text-base sm:text-sm',
+  lg: 'min-h-12 px-4 sm:px-5 text-base',
 };
 
 // ========================================
@@ -74,12 +74,13 @@ export const Select: React.FC<SelectProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const selectId = useId();
+  const searchRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  // Store position in ref to avoid flash at 0,0 on first render
-  const positionRef = useRef<React.CSSProperties>({});
-  const [positionVersion, setPositionVersion] = useState(0);
+  // Calculate before opening so the first painted frame is already positioned.
+  const [position, setPosition] = useState<React.CSSProperties>({});
 
   const selectedOption = options.find((o) => o.value === value);
   const hasError = !!errorMessage;
@@ -88,29 +89,33 @@ export const Select: React.FC<SelectProps> = ({
   const calcPosition = useCallback((): React.CSSProperties => {
     if (!triggerRef.current) return {};
     const rect = triggerRef.current.getBoundingClientRect();
-    const viewportH = window.innerHeight;
-    const spaceBelow = viewportH - rect.bottom;
-    const spaceAbove = rect.top;
+    const viewport = window.visualViewport;
+    const viewportTop = viewport?.offsetTop || 0;
+    const viewportLeft = viewport?.offsetLeft || 0;
+    const viewportH = viewport?.height || window.innerHeight;
+    const viewportW = viewport?.width || window.innerWidth;
+    const spaceBelow = viewportTop + viewportH - rect.bottom;
+    const spaceAbove = rect.top - viewportTop;
     const dropdownMaxH = 320; // max-h-60 (240px) + search bar + count ≈ 320px
 
     // Open upward if not enough space below and more space above
     const openUpward = spaceBelow < dropdownMaxH && spaceAbove > spaceBelow;
 
-    const viewportW = window.innerWidth;
     const isMobile = viewportW < 640;
     // On mobile, use nearly full viewport width for readability
-    const dropdownW = isMobile ? Math.min(viewportW - 32, 400) : rect.width;
+    const dropdownW = Math.min(isMobile ? 400 : rect.width, viewportW - 32);
     const dropdownLeft = isMobile
-      ? Math.max(16, (viewportW - dropdownW) / 2)
-      : Math.min(rect.left, Math.max(0, viewportW - rect.width - 8));
+      ? viewportLeft + (viewportW - dropdownW) / 2
+      : Math.max(viewportLeft + 8, Math.min(rect.left, viewportLeft + viewportW - dropdownW - 8));
 
     return {
       position: 'fixed' as const,
       left: dropdownLeft,
       width: dropdownW,
       zIndex: 9999,
+      maxHeight: Math.max(0, Math.min(dropdownMaxH, (openUpward ? spaceAbove : spaceBelow) - 12)),
       ...(openUpward
-        ? { bottom: viewportH - rect.top + 4 }
+        ? { bottom: window.innerHeight - rect.top + 4 }
         : { top: rect.bottom + 4 }),
     };
   }, []);
@@ -119,24 +124,32 @@ export const Select: React.FC<SelectProps> = ({
   const handleToggle = useCallback(() => {
     if (disabled) return;
     if (!isOpen) {
-      positionRef.current = calcPosition();
-      setPositionVersion((v) => v + 1);
+      setPosition(calcPosition());
     }
     setIsOpen((prev) => !prev);
   }, [disabled, isOpen, calcPosition]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (searchable) searchRef.current?.focus({ preventScroll: true });
+    else (dropdownRef.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]:not(:disabled)') || dropdownRef.current?.querySelector<HTMLButtonElement>('[role="option"]:not(:disabled)'))?.focus({ preventScroll: true });
+  }, [isOpen, searchable]);
 
   // Recalculate position on scroll/resize while open
   useEffect(() => {
     if (!isOpen) return;
     const reposition = () => {
-      positionRef.current = calcPosition();
-      setPositionVersion((v) => v + 1);
+      setPosition(calcPosition());
     };
     window.addEventListener('scroll', reposition, true);
     window.addEventListener('resize', reposition);
+    window.visualViewport?.addEventListener('resize', reposition);
+    window.visualViewport?.addEventListener('scroll', reposition);
     return () => {
       window.removeEventListener('scroll', reposition, true);
       window.removeEventListener('resize', reposition);
+      window.visualViewport?.removeEventListener('resize', reposition);
+      window.visualViewport?.removeEventListener('scroll', reposition);
     };
   }, [isOpen, calcPosition]);
 
@@ -159,15 +172,11 @@ export const Select: React.FC<SelectProps> = ({
     };
   }, [isOpen]);
 
-  // Close on Escape key
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsOpen(false);
-    };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [isOpen]);
+  const dismiss = () => {
+    setIsOpen(false);
+    setSearchTerm('');
+    triggerRef.current?.focus({ preventScroll: true });
+  };
 
   // Filter options if searchable
   const filteredOptions = searchable
@@ -180,36 +189,53 @@ export const Select: React.FC<SelectProps> = ({
     onChange(optionValue);
     setIsOpen(false);
     setSearchTerm('');
+    triggerRef.current?.focus({ preventScroll: true });
   };
 
   const handleClear = (e: React.MouseEvent) => {
     e.stopPropagation();
     onChange('');
     setSearchTerm('');
+    triggerRef.current?.focus({ preventScroll: true });
   };
 
   // Render portal dropdown
   const dropdownContent = isOpen ? createPortal(
     <div
       ref={dropdownRef}
-      className="bg-white border border-neutral-200 rounded-xl shadow-lg overflow-hidden animate-in fade-in zoom-in-95 duration-100"
-      style={positionRef.current}
+      className="flex flex-col bg-white text-neutral-900 border border-neutral-300 rounded-lg shadow-lg overflow-hidden"
+      style={position}
+      onKeyDown={(event) => {
+        // Consume this before the parent dialog sees it. One Escape, one layer.
+        if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); dismiss(); return; }
+        if (event.key === 'Tab') { setIsOpen(false); triggerRef.current?.focus({ preventScroll: true }); return; }
+        if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+        if (event.target === searchRef.current && (event.key === 'Home' || event.key === 'End')) return;
+        event.preventDefault();
+        const entries = Array.from(dropdownRef.current?.querySelectorAll<HTMLButtonElement>('[role="option"]:not(:disabled)') || []);
+        const index = entries.indexOf(document.activeElement as HTMLButtonElement);
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? entries.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + entries.length) % entries.length;
+        entries[next]?.focus({ preventScroll: true });
+        entries[next]?.scrollIntoView?.({ block: 'nearest' });
+      }}
     >
       {/* Search */}
       {searchable && (
-        <div className="p-2 border-b border-neutral-100">
+        <div className="shrink-0 p-2 border-b border-neutral-100">
           <div className="relative">
             <Search
               size={16}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
             />
             <input
+              ref={searchRef}
+              aria-label={'Buscar ' + (label || 'opción')}
+              aria-controls={`${selectId}-options`}
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Buscar..."
-              className="w-full pl-9 pr-3 py-2 text-sm bg-neutral-50 rounded-lg border-none focus:outline-none focus:ring-2 focus:ring-primary-500/20"
-              autoFocus
+              className="min-h-11 w-full pl-9 pr-3 py-2 text-base sm:text-sm bg-neutral-50 rounded-lg border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-primary-700/30"
               onClick={(e) => e.stopPropagation()}
             />
           </div>
@@ -217,7 +243,7 @@ export const Select: React.FC<SelectProps> = ({
       )}
 
       {/* Options */}
-      <div className="max-h-72 sm:max-h-60 overflow-auto py-1 overscroll-contain">
+      <div id={`${selectId}-options`} role="listbox" aria-label={label || placeholder} className="min-h-0 max-h-72 sm:max-h-60 overflow-auto py-1 overscroll-contain">
         {filteredOptions.length === 0 ? (
           <div className="px-4 py-3 text-sm text-neutral-500 text-center">
             No se encontraron opciones
@@ -227,10 +253,13 @@ export const Select: React.FC<SelectProps> = ({
             <button
               key={option.value}
               type="button"
+              role="option"
+              aria-selected={value === option.value}
+              tabIndex={-1}
               onClick={() => handleSelect(option.value)}
               disabled={option.disabled}
               className={cn(
-                'w-full flex items-center justify-between px-4 py-3 sm:py-2.5 text-sm text-left',
+                'min-h-11 w-full flex items-center justify-between px-4 py-3 sm:py-2.5 text-sm text-left focus-visible:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-700',
                 'hover:bg-neutral-50 active:bg-neutral-100 transition-colors',
                 option.disabled && 'opacity-50 cursor-not-allowed',
                 value === option.value && 'bg-primary-50 text-primary-600 font-medium'
@@ -239,7 +268,7 @@ export const Select: React.FC<SelectProps> = ({
               {renderOption ? (
                 <span className="flex-1 min-w-0">{renderOption(option, value === option.value)}</span>
               ) : (
-                <span className="truncate">{option.label}</span>
+                <span className="min-w-0 whitespace-normal">{option.label}</span>
               )}
               {value === option.value && !renderOption && (
                 <Check size={16} className="text-primary-500 flex-shrink-0 ml-2" />
@@ -251,7 +280,7 @@ export const Select: React.FC<SelectProps> = ({
 
       {/* Count */}
       {searchable && (
-        <div className="px-3 py-1.5 border-t border-neutral-100 text-xs text-neutral-400">
+        <div className="shrink-0 px-3 py-1.5 border-t border-neutral-100 text-xs text-neutral-600">
           {filteredOptions.length} de {options.length} opciones
         </div>
       )}
@@ -260,50 +289,55 @@ export const Select: React.FC<SelectProps> = ({
   ) : null;
 
   return (
-    <div className={cn('relative', isFullWidth && 'w-full')} ref={containerRef}>
+    <div className={cn('relative min-w-0', isFullWidth && 'w-full')} ref={containerRef}>
       {/* Label */}
       {label && (
-        <label className="block text-sm font-medium text-neutral-700 mb-1.5">
+        <label htmlFor={selectId} className="block text-sm font-medium text-neutral-700 mb-1.5">
           {label}
         </label>
       )}
 
       {/* Select trigger */}
+      <div className="relative">
       <button
+        id={selectId}
         ref={triggerRef}
         type="button"
+        aria-label={label ? undefined : placeholder}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-controls={isOpen ? `${selectId}-options` : undefined}
+        aria-invalid={hasError || undefined}
+        aria-describedby={`${selectId}-value${helperText || errorMessage ? ` ${selectId}-help` : ''}`}
         onClick={handleToggle}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape' && isOpen) { event.preventDefault(); event.stopPropagation(); dismiss(); }
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); if (!isOpen) handleToggle(); }
+        }}
         disabled={disabled}
         className={cn(
-          'w-full flex items-center justify-between rounded-xl border-2 bg-white',
-          'transition-all duration-200',
-          'focus:outline-none focus:ring-4 focus:ring-primary-500/10',
+          'w-full min-w-0 flex items-center justify-between gap-2 rounded-lg border bg-white text-neutral-900',
+          'transition-colors duration-150',
+          'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700',
           sizeStyles[size],
           hasError
             ? 'border-error-500 bg-error-50/30'
-            : 'border-neutral-200 hover:border-neutral-300 focus:border-primary-500',
+            : 'border-neutral-400 hover:border-neutral-500 focus:border-primary-600',
           disabled && 'bg-neutral-100 border-neutral-200 text-neutral-400 cursor-not-allowed',
-          isOpen && 'border-primary-500 ring-4 ring-primary-500/10'
+          isOpen && 'border-primary-600',
+          clearable && value !== '' && selectedOption && !disabled && 'pr-14'
         )}
       >
         <span
+          id={`${selectId}-value`}
           className={cn(
             'truncate',
-            !selectedOption && 'text-neutral-400'
+            !selectedOption && 'text-neutral-600'
           )}
         >
           {selectedOption?.label || placeholder}
         </span>
         <div className="flex items-center gap-1 flex-shrink-0">
-          {clearable && selectedOption && !disabled && (
-            <span
-              role="button"
-              onClick={handleClear}
-              className="p-0.5 hover:bg-neutral-100 rounded-full"
-            >
-              <X size={14} className="text-neutral-400" />
-            </span>
-          )}
           <ChevronDown
             size={18}
             className={cn(
@@ -313,6 +347,8 @@ export const Select: React.FC<SelectProps> = ({
           />
         </div>
       </button>
+      {clearable && value !== '' && selectedOption && !disabled && <button type="button" aria-label={'Limpiar ' + (label || 'selección')} onClick={handleClear} className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-neutral-600 hover:bg-neutral-100"><X size={16} /></button>}
+      </div>
 
       {/* Portal dropdown */}
       {dropdownContent}
@@ -320,9 +356,10 @@ export const Select: React.FC<SelectProps> = ({
       {/* Helper/Error text */}
       {(helperText || errorMessage) && (
         <p
+          id={`${selectId}-help`}
           className={cn(
             'mt-1.5 text-sm',
-            hasError ? 'text-error-500' : 'text-neutral-500'
+            hasError ? 'text-error-700' : 'text-neutral-600'
           )}
         >
           {errorMessage || helperText}

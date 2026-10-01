@@ -27,6 +27,7 @@ interface DocumentUploadProps {
   onDelete?: (docId: string) => void;
   isAdmin: boolean;
   isPending?: boolean;
+  readOnly?: boolean;
 }
 
 function formatSize(bytes: number): string {
@@ -36,7 +37,7 @@ function formatSize(bytes: number): string {
 }
 
 const DocumentUpload: React.FC<DocumentUploadProps> = ({
-  documentos, onUpload, onDownload, onRevisar, onDelete, isAdmin, isPending
+  documentos, onUpload, onDownload, onRevisar, onDelete, isAdmin, isPending, readOnly = false
 }) => {
   const fileRef = useRef<HTMLInputElement>(null);
   const [tipo, setTipo] = useState('CERTIFICADO_AMBIENTAL');
@@ -44,7 +45,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
   const [dragOver, setDragOver] = useState(false);
 
   const handleFiles = (files: FileList | null) => {
-    if (!files?.length) return;
+    if (readOnly || !files?.length) return;
     const file = files[0];
     const allowed = ['application/pdf', 'image/jpeg', 'image/png'];
     if (!allowed.includes(file.type)) {
@@ -61,6 +62,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
   return (
     <div className="space-y-6">
       {/* Upload zone */}
+      {!readOnly && <>
       <div className="flex flex-col sm:flex-row gap-3 items-end">
         <div className="flex-1 grid grid-cols-2 gap-3">
           <div>
@@ -112,6 +114,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         />
       </div>
 
+      </>}
       {/* Documents list */}
       {documentos.length > 0 && (
         <div className="space-y-2">
@@ -143,7 +146,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                     >
                       <Download size={15} />
                     </button>
-                    {isAdmin && doc.estado === 'PENDIENTE' && onRevisar && (
+                    {!readOnly && isAdmin && doc.estado === 'PENDIENTE' && onRevisar && (
                       <>
                         <button
                           onClick={() => onRevisar(doc.id, 'APROBADO')}
@@ -161,7 +164,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                         </button>
                       </>
                     )}
-                    {isAdmin && onDelete && (
+                    {!readOnly && isAdmin && onDelete && (
                       <button
                         onClick={() => onDelete(doc.id)}
                         className="p-1.5 rounded-lg hover:bg-error-50 text-neutral-400 hover:text-error-600"

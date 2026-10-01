@@ -55,5 +55,8 @@ describe('canAccessMobilePath', () => {
     expect(canAccessMobilePath(user('ADMIN'), '/admin/usuarios')).toBe(true);
     expect(canAccessMobilePath(user('ADMIN_GENERADOR'), '/admin/usuarios')).toBe(false);
     expect(canAccessMobilePath(user('GENERADOR'), '/admin/unknown')).toBe(false);
+    expect(canAccessMobilePath(user('ADMIN'), '/switch-user')).toBe(true);
+    expect(canAccessMobilePath(user('OPERADOR'), '/switch-user')).toBe(false);
+    expect(canAccessMobilePath(user('ADMIN_OPERADOR'), '/switch-user')).toBe(false);
   });
 });

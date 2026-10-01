@@ -21,24 +21,6 @@ export const DEPARTAMENTOS_MENDOZA = [
 
 export const CATEGORIAS_GENERADOR = ['Grandes Generadores', 'Medianos Generadores', 'Pequenos Generadores'];
 
-export const DOCS_GENERADOR = [
-  { tipo: 'CONSTANCIA_AFIP', nombre: 'Constancia AFIP' },
-  { tipo: 'MEMORIA_TECNICA', nombre: 'Memoria Tecnica' },
-  { tipo: 'CERTIFICADO_HABILITACION', nombre: 'Certificado de Habilitacion' },
-];
-
-export const DOCS_OPERADOR = [
-  { tipo: 'CONSTANCIA_AFIP', nombre: 'Constancia AFIP' },
-  { tipo: 'CERTIFICADO_HABILITACION', nombre: 'Certificado de Habilitacion' },
-  { tipo: 'RESOLUCION_DPA', nombre: 'Resolucion DPA' },
-];
-
-export const DOCS_TRANSPORTISTA = [
-  { tipo: 'CONSTANCIA_AFIP', nombre: 'Constancia AFIP' },
-  { tipo: 'CERTIFICADO_HABILITACION', nombre: 'Habilitacion de Transporte' },
-  { tipo: 'SEGURO_AMBIENTAL', nombre: 'Seguro Ambiental' },
-];
-
 export interface StepDef {
   id: number;
   label: string;
@@ -157,6 +139,7 @@ export function getReviewFixture(tipoActor: TipoActor): {
 export interface DocDef {
   tipo: string;
   nombre: string;
+  required: boolean;
 }
 
 // ========================================

@@ -3,12 +3,12 @@
  */
 
 import api from './api';
-import type { ActorFilters, CreateGeneradorRequest, CreateTransportistaRequest, CreateOperadorRequest, PaginatedData, AuditoriaEntry } from '../types/api';
+import type { ActorFilters, CreateGeneradorRequest, CreateTransportistaRequest, CreateOperadorRequest, PaginatedData, AuditoriaEntry, GeneradorListData } from '../types/api';
 import type { Generador, Transportista, Operador, Vehiculo, Chofer } from '../types/models';
 
 export const actoresService = {
   // Generadores
-  async listGeneradores(filters?: ActorFilters): Promise<PaginatedData<Generador>> {
+  async listGeneradores(filters?: ActorFilters): Promise<GeneradorListData> {
     const { data } = await api.get('/actores/generadores', { params: filters });
     const raw = data.data;
     return {
@@ -17,6 +17,16 @@ export const actoresService = {
       page: raw.pagination?.page || 1,
       limit: raw.pagination?.limit || 10,
       totalPages: raw.pagination?.pages || 1,
+      fiscalYear: raw.fiscalYear || filters?.fiscalYear || new Date().getFullYear(),
+      stats: raw.stats || {
+        total: raw.pagination?.total || 0,
+        activos: 0,
+        alDia: 0,
+        requierenRevision: 0,
+        tefSinPago: 0,
+        ddjjPendiente: 0,
+        sinDatos: 0,
+      },
     };
   },
 
@@ -37,6 +47,11 @@ export const actoresService = {
 
   async deleteGenerador(id: string): Promise<void> {
     await api.delete(`/actores/generadores/${id}`);
+  },
+
+  async createGeneradorReminders(input: { ids: string[]; fiscalYear: number; motivo: string }): Promise<{ requested: number; delivered: number; skipped: number; campaignId: string }> {
+    const { data } = await api.post('/actores/generadores/recordatorios', input);
+    return data.data;
   },
 
   // Transportistas

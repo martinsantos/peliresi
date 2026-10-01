@@ -164,4 +164,61 @@ describe('InspectionExchangePanel', () => {
     ));
     expect(mocks.presentExchange).not.toHaveBeenCalled();
   });
+
+  it('keeps the linked response and attachment editable after a rejected presentation', async () => {
+    mocks.presentExchange.mockRejectedValueOnce(new Error('La versión del expediente cambió'));
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole('button', { name: 'Responder esta actuación' }));
+    const content = 'Constancia conservada para revisar la versión y volver a presentar.';
+    await user.type(screen.getByRole('textbox', { name: 'Contenido' }), content);
+    const file = new File(['%PDF'], 'constancia-conservada.pdf', { type: 'application/pdf' });
+    await user.upload(screen.getByLabelText(/Adjuntos probatorios/), file);
+    await user.click(screen.getByRole('button', { name: 'Presentar en expediente' }));
+    await waitFor(() => expect(mocks.presentExchange).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Presentar en expediente' })).toBeEnabled());
+    expect(screen.getByRole('textbox', { name: 'Contenido' })).toHaveValue(content);
+    expect(screen.getByText('constancia-conservada.pdf')).toBeInTheDocument();
+    expect(screen.getByText(/Antecedente: presentación #1/)).toBeInTheDocument();
+    expect(mocks.removeDraft).not.toHaveBeenCalled();
+  });
+
+  it.each(['CERRADA_CONFORME', 'DERIVADA_LEGALES'])('does not offer a new response on a %s dossier', async (estado) => {
+    mocks.getExchanges.mockResolvedValue({ ...timeline, inspeccion: { ...timeline.inspeccion, estado } });
+    renderPanel();
+    await screen.findByRole('heading', { name: 'Presentaciones y respuestas' });
+    expect(screen.queryByRole('button', { name: 'Responder esta actuación' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Presentar en expediente' })).not.toBeInTheDocument();
+    expect(mocks.presentExchange).not.toHaveBeenCalled();
+  });
+
+  it('does not offer a sector decision to a head from another sector', async () => {
+    auth.currentUser = { ...auth.currentUser, id: 'wrong-sector-head', rol: 'ADMIN_OPERADOR' };
+    mocks.getExchanges.mockResolvedValue({ ...timeline, parteActual: 'AUTORIDAD' });
+    renderPanel();
+    await screen.findByRole('heading', { name: 'Presentaciones y respuestas' });
+    expect(screen.queryByRole('button', { name: 'Cerrar conforme' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Derivar a Legales' })).not.toBeInTheDocument();
+  });
+
+  it('requires a substantive reason and preserves it after a failed closure', async () => {
+    auth.currentUser = { ...auth.currentUser, id: 'head', rol: 'ADMIN_GENERADOR' };
+    mocks.getExchanges.mockResolvedValue({ ...timeline, parteActual: 'AUTORIDAD' });
+    mocks.decideExchange.mockRejectedValueOnce(new Error('No se pudo registrar'));
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole('button', { name: 'Cerrar conforme' }));
+    const submit = screen.getByRole('button', { name: 'Confirmar cierre conforme' });
+    expect(submit).toBeDisabled();
+    await user.type(screen.getByRole('textbox', { name: 'Fundamento de la decisión' }), 'Corto');
+    expect(submit).toBeDisabled();
+    await user.clear(screen.getByRole('textbox', { name: 'Fundamento de la decisión' }));
+    const reason = 'Se verificó la constancia presentada y se fundamenta el cierre de esta instancia.';
+    await user.type(screen.getByRole('textbox', { name: 'Fundamento de la decisión' }), reason);
+    await user.click(submit);
+    await waitFor(() => expect(mocks.decideExchange).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(submit).toBeEnabled());
+    expect(screen.getByRole('textbox', { name: 'Fundamento de la decisión' })).toHaveValue(reason);
+    expect(mocks.decideExchange).toHaveBeenCalledWith('inspection-1', expect.objectContaining({ decision: 'CERRADA_CONFORME', fundamento: reason }));
+  });
 });

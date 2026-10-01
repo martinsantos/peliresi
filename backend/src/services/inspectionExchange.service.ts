@@ -8,7 +8,7 @@ import {
 
 export type InspectionExchangeAccessTarget = {
   inspectorId: string;
-  tipoActor: TipoActorInspeccion;
+  tipoActor: TipoActorInspeccion | null;
   generadorId?: string | null;
   transportistaId?: string | null;
   operadorId?: string | null;
@@ -27,6 +27,7 @@ export type ExchangeDigestInput = {
   respondeAId?: string | null;
   tipo: TipoIntercambioInspeccion;
   parte: ParteIntercambioInspeccion;
+  destinatario?: ParteIntercambioInspeccion;
   asunto: string;
   cuerpo: string;
   plazoRespuestaAt?: Date | string | null;
@@ -62,7 +63,7 @@ export function exchangePartyForUser(
   if (role === `ADMIN_${inspection.tipoActor}`) return 'AUTORIDAD';
   if (user?.esInspector && String(user?.id) === inspection.inspectorId) return 'AUTORIDAD';
   const expectedRole = inspection.tipoActor;
-  if (role === expectedRole && actorIdForUser(user, inspection.tipoActor) === actorIdForInspection(inspection)) {
+  if (inspection.tipoActor && actorIdForInspection(inspection) && role === expectedRole && actorIdForUser(user, inspection.tipoActor) === actorIdForInspection(inspection)) {
     return 'INSPECCIONADO';
   }
   return null;

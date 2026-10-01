@@ -207,11 +207,25 @@ const EVENTO_LABELS: Record<string, string> = Object.fromEntries(
 );
 
 const ROLES_DESTINATARIOS = [
-  { value: 'ADMIN', label: 'Administradores' },
-  { value: 'GENERADOR', label: 'Generadores' },
-  { value: 'TRANSPORTISTA', label: 'Transportistas' },
-  { value: 'OPERADOR', label: 'Operadores' },
+  { value: 'ADMIN', label: 'Administración central' },
+  { value: 'ADMIN_GENERADOR', label: 'Administración de generadores' },
+  { value: 'ADMIN_TRANSPORTISTA', label: 'Administración de transportistas' },
+  { value: 'ADMIN_OPERADOR', label: 'Administración de operadores' },
+  { value: 'GENERADOR', label: 'Generador involucrado' },
+  { value: 'TRANSPORTISTA', label: 'Transportista involucrado' },
+  { value: 'OPERADOR', label: 'Operador involucrado' },
 ];
+
+const CONDITION_PRESETS: Record<string, Array<{ label: string; value: string }>> = {
+  CAMBIO_ESTADO: [{ label: 'Cualquier cambio de estado', value: '{}' }, { label: 'Sólo rechazo', value: '{"estadoNuevo":"RECHAZADO"}' }, { label: 'Sólo tratamiento finalizado', value: '{"estadoNuevo":"TRATADO"}' }],
+  INCIDENTE: [{ label: 'Cualquier incidente', value: '{}' }],
+  RECHAZO_CARGA: [{ label: 'Cualquier rechazo', value: '{}' }],
+  DIFERENCIA_PESO: [{ label: 'Cualquier diferencia', value: '{}' }, { label: 'Diferencia igual o mayor a 10%', value: '{"deltaPorcentaje":{"gte":10}}' }],
+  TIEMPO_EXCESIVO: [{ label: 'Más de 24 horas', value: '{"horasTransito":{"gte":24}}' }, { label: 'Más de 48 horas', value: '{"horasTransito":{"gte":48}}' }],
+  DESVIO_RUTA: [{ label: 'Más de 50 km fuera del corredor autorizado', value: '{"distanciaKm":{"gt":50}}' }],
+  VENCIMIENTO: [{ label: 'Dentro de 30 días', value: '{"diasRestantes":{"lte":30}}' }, { label: 'Dentro de 7 días', value: '{"diasRestantes":{"lte":7}}' }],
+  ANOMALIA_GPS: [{ label: 'Cualquier anomalía GPS', value: '{}' }, { label: 'Sólo severidad alta', value: '{"severidad":{"in":["ALTA","CRITICA"]}}' }],
+};
 
 const PERIOD_OPTIONS = [
   { value: 'hoy', label: 'Hoy' },
@@ -224,7 +238,7 @@ const defaultReglaForm = {
   nombre: '',
   descripcion: '',
   evento: '',
-  condicion: '',
+  condicion: '{}',
   activa: true,
   destinatarios: [] as string[],
   emails: '',
@@ -446,6 +460,17 @@ export const AlertasPage: React.FC = () => {
   const handleSaveRegla = () => {
     if (!reglaForm.nombre.trim() || !reglaForm.evento || !reglaForm.condicion.trim()) {
       toast.error('Campos requeridos', 'Nombre, evento y condición son obligatorios');
+      return;
+    }
+    try {
+      const condition = JSON.parse(reglaForm.condicion);
+      if (!condition || Array.isArray(condition) || typeof condition !== 'object') throw new Error();
+    } catch {
+      toast.error('Condición inválida', 'Usá una condición sugerida o corregí el JSON avanzado.');
+      return;
+    }
+    if (reglaForm.destinatarios.length === 0 && parseEmails(reglaForm.emails).length === 0) {
+      toast.error('Destinatarios requeridos', 'Elegí al menos un destinatario o agregá un email.');
       return;
     }
     const destinatariosJson = JSON.stringify([
@@ -909,17 +934,23 @@ export const AlertasPage: React.FC = () => {
             placeholder="Seleccionar evento…"
             options={EVENTO_OPTIONS}
             value={reglaForm.evento}
-            onChange={(val) => setReglaForm(prev => ({ ...prev, evento: val }))}
+            onChange={(val) => setReglaForm(prev => ({ ...prev, evento: val, condicion: CONDITION_PRESETS[val]?.[0]?.value || '{}' }))}
           />
           <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">Condición <span className="text-neutral-400 font-normal">(JSON)</span></label>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">Cuándo se activa</label>
+            <select value={CONDITION_PRESETS[reglaForm.evento]?.some((preset) => preset.value === reglaForm.condicion) ? reglaForm.condicion : '__custom__'} onChange={(event) => event.target.value !== '__custom__' && setReglaForm((prev) => ({ ...prev, condicion: event.target.value }))} className="mb-2 h-11 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm focus:border-primary-500 focus:outline-none">
+              {(CONDITION_PRESETS[reglaForm.evento] || [{ label: 'Cualquier evento', value: '{}' }]).map((preset) => <option key={preset.value} value={preset.value}>{preset.label}</option>)}
+              <option value="__custom__">Condición avanzada personalizada</option>
+            </select>
+            <details open={!CONDITION_PRESETS[reglaForm.evento]?.some((preset) => preset.value === reglaForm.condicion)} className="rounded-lg border border-neutral-200 bg-neutral-50 p-3"><summary className="cursor-pointer text-xs font-bold text-neutral-700">JSON avanzado</summary><p className="mt-2 text-xs leading-relaxed text-neutral-500">Operadores admitidos: eq, neq, gt, gte, lt, lte, in y contains. Esta condición se valida y se evalúa en cada evento.</p>
             <textarea
-              className="w-full px-3 py-2 rounded-lg border border-neutral-200 bg-neutral-50 text-sm font-mono focus:border-primary-500 focus:outline-none resize-none"
+              className="mt-2 w-full px-3 py-2 rounded-lg border border-neutral-200 bg-white text-sm font-mono focus:border-primary-500 focus:outline-none resize-none"
               placeholder="{}"
               value={reglaForm.condicion}
               onChange={(e) => setReglaForm(prev => ({ ...prev, condicion: e.target.value }))}
               rows={2}
             />
+            </details>
           </div>
 
           <div>
@@ -927,7 +958,8 @@ export const AlertasPage: React.FC = () => {
               <Users size={13} className="inline mr-1 -mt-0.5 text-neutral-400" />
               Destinatarios
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <p className="mb-2 text-xs leading-relaxed text-neutral-500">Los roles de actor notifican sólo a la parte involucrada en el manifiesto; no a todo el padrón.</p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {ROLES_DESTINATARIOS.map(rol => (
                 <label key={rol.value} className="flex items-center gap-2.5 cursor-pointer p-2.5 rounded-lg border border-neutral-200 hover:bg-neutral-50 transition-colors">
                   <input

@@ -17,12 +17,14 @@ import {
   rechazarSolicitud,
   revisarDocumento,
   upload,
+  getRequisitosSolicitud,
 } from '../controllers/solicitud.controller';
 
 const router = Router();
 
 // ── Public (no auth) ────────────────────────────────────────────────
 router.post('/iniciar', iniciarSolicitud);
+router.get('/requisitos/:tipoActor', getRequisitosSolicitud);
 
 // ── Admin list (MUST be before /:id to avoid route conflict) ────────
 router.get('/', isAuthenticated, hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR'), listarSolicitudes);

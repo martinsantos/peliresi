@@ -77,10 +77,8 @@ const ForgotPasswordPage: React.FC = () => {
           </form>
 
           <p className="mt-4 text-center text-sm text-neutral-500">
-            ¿No tenes acceso al email registrado?{' '}
-            <Link to="/reclamar" className="text-[#1B5E3C] font-semibold hover:underline">
-              Reclama tu cuenta con CUIT y Razon Social
-            </Link>
+            ¿No tenés acceso al correo registrado? Contactá al administrador para verificar tu identidad.
+            Conocer el CUIT no permite reemplazar el correo de la cuenta.
           </p>
         </>
       )}

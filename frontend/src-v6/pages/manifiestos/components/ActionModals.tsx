@@ -2,21 +2,15 @@
  * ManifiestoActions — Action Modals
  * All confirmation/form modals for manifiesto workflow actions.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Loader2,
-  Scale,
-  Beaker,
-  XCircle,
-  RotateCcw,
-  PenTool,
   Flame,
   FlaskConical,
   Leaf,
   Recycle,
   Package,
   Microscope,
-  AlertCircle,
 } from 'lucide-react';
 import { api } from '../../../services/api';
 import { Button } from '../../../components/ui/ButtonV2';
@@ -24,6 +18,7 @@ import { Badge } from '../../../components/ui/BadgeV2';
 import { Input } from '../../../components/ui/Input';
 import { Select } from '../../../components/ui/Select';
 import { SignaturePad } from '../../../components/ui/SignaturePad';
+import { Modal } from '../../../components/ui/Modal';
 import { toast } from '../../../components/ui/Toast';
 import { formatNumber, formatEstado } from '../../../utils/formatters';
 import type { Manifiesto } from '../../../types/models';
@@ -96,15 +91,22 @@ export interface ActionModalsProps {
   onCloseReversion: () => void;
   onCloseFirma: () => void;
   // Action handlers
-  onPesaje: (residuos: { id: string; cantidadRecibida: number }[], observaciones?: string) => void;
-  onTratamiento: (metodo: string, observaciones?: string) => void;
-  onRechazar: (motivo: string, descripcion?: string) => void;
-  onIncidente: (tipo: string, descripcion: string) => void;
-  onCancelar: () => void;
-  onRevertir: (estadoNuevo: string, motivo?: string) => void;
-  onFirmar: () => void;
+  onPesaje: (residuos: { id: string; cantidadRecibida: number }[], observaciones?: string) => Promise<boolean>;
+  onTratamiento: (metodo: string, observaciones?: string) => Promise<boolean>;
+  onRechazar: (motivo: string, descripcion?: string) => Promise<boolean>;
+  onIncidente: (tipo: string, descripcion: string) => Promise<boolean>;
+  onCancelar: () => Promise<boolean>;
+  onRevertir: (estadoNuevo: string, motivo?: string) => Promise<boolean>;
+  onFirmar: (firma: string) => Promise<boolean>;
   isCancelling: boolean;
 }
+
+/** Use the shared portal, focus trap and viewport-bounded scroll surface. */
+const ActionDialog: React.FC<{ title: string; busy: boolean; onClose: () => void; children: React.ReactNode }> = ({ title, busy, onClose, children }) => (
+  <Modal isOpen title={title} onClose={onClose} isBusy={busy} closeOnOverlayClick={false} closeOnEscape={false} showCloseButton={false}>
+    <fieldset disabled={busy} className="min-w-0">{children}</fieldset>
+  </Modal>
+);
 
 export const ActionModals: React.FC<ActionModalsProps> = ({
   manifiesto: m,
@@ -186,6 +188,25 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
 
   // ── Firma local state ──
   const [firmaBase64, setFirmaBase64] = useState('');
+  const firmaInFlight = useRef(false);
+  const [sendingFirma, setSendingFirma] = useState(false);
+  const actionInFlight = useRef(false);
+  const [sendingAction, setSendingAction] = useState(false);
+  const busy = sendingAction || sendingFirma || isCancelling || Object.values(mutations).some(mutation => mutation.isPending);
+
+  const submitAction = async (action: () => Promise<boolean>, onSuccess: () => void) => {
+    if (actionInFlight.current || busy) return;
+    actionInFlight.current = true;
+    setSendingAction(true);
+    try {
+      if (await action()) onSuccess();
+    } catch {
+      toast.error('No se confirmó el cambio', 'Los datos siguen en esta pantalla. Reintentá con conexión.');
+    } finally {
+      actionInFlight.current = false;
+      setSendingAction(false);
+    }
+  };
 
   // ── Handlers ──
   const handlePesaje = () => {
@@ -197,8 +218,9 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
       toast.warning('Datos incompletos', 'Ingresa al menos un peso');
       return;
     }
-    onPesaje(residuosData, pesajeObs || undefined);
-    onClosePesaje();
+    void submitAction(() => onPesaje(residuosData, pesajeObs || undefined), () => {
+      onClosePesaje(); setPesajeData({}); setPesajeObs('');
+    });
   };
 
   const handleTratamiento = () => {
@@ -206,8 +228,9 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
       toast.warning('Datos incompletos', 'Selecciona un metodo de tratamiento');
       return;
     }
-    onTratamiento(tratamientoMetodo, tratamientoObs || undefined);
-    onCloseTratamiento();
+    void submitAction(() => onTratamiento(tratamientoMetodo, tratamientoObs || undefined), () => {
+      onCloseTratamiento(); setTratamientoMetodo(''); setTratamientoObs('');
+    });
   };
 
   const handleRechazar = () => {
@@ -215,10 +238,9 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
       toast.warning('Datos incompletos', 'Selecciona un motivo de rechazo');
       return;
     }
-    onRechazar(rechazarMotivo, rechazarDescripcion || undefined);
-    onCloseRechazar();
-    setRechazarMotivo('');
-    setRechazarDescripcion('');
+    void submitAction(() => onRechazar(rechazarMotivo, rechazarDescripcion || undefined), () => {
+      onCloseRechazar(); setRechazarMotivo(''); setRechazarDescripcion('');
+    });
   };
 
   const handleIncidente = () => {
@@ -230,10 +252,9 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
       toast.warning('Datos incompletos', 'Describe brevemente el incidente');
       return;
     }
-    onIncidente(incidenteTipo, incidenteDescripcion.trim());
-    onCloseIncidente();
-    setIncidenteTipo('');
-    setIncidenteDescripcion('');
+    void submitAction(() => onIncidente(incidenteTipo, incidenteDescripcion.trim()), () => {
+      onCloseIncidente(); setIncidenteTipo(''); setIncidenteDescripcion('');
+    });
   };
 
   const handleRevertir = () => {
@@ -241,32 +262,37 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
       toast.warning('Datos incompletos', 'Selecciona un estado destino');
       return;
     }
-    onRevertir(reversionEstado, reversionMotivo || undefined);
-    onCloseReversion();
-    setReversionEstado('');
-    setReversionMotivo('');
+    void submitAction(() => onRevertir(reversionEstado, reversionMotivo || undefined), () => {
+      onCloseReversion(); setReversionEstado(''); setReversionMotivo('');
+    });
   };
 
-  const handleFirmaConfirm = () => {
-    onFirmar();
-    onCloseFirma();
-    setFirmaBase64('');
+  const handleFirmaConfirm = async () => {
+    if (!firmaBase64 || firmaInFlight.current) return;
+    firmaInFlight.current = true;
+    setSendingFirma(true);
+    try {
+      if (await onFirmar(firmaBase64)) {
+        onCloseFirma();
+        setFirmaBase64('');
+      }
+    } catch {
+      toast.error('No se confirmó la firma', 'La firma sigue disponible en esta pantalla. Reintentá con conexión.');
+    } finally {
+      firmaInFlight.current = false;
+      setSendingFirma(false);
+    }
   };
 
   const handleCancelConfirm = () => {
-    onCancelar();
-    onCloseCancel();
+    void submitAction(onCancelar, onCloseCancel);
   };
 
   return (
     <>
       {/* Pesaje Modal */}
       {showPesajeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-lg w-full mx-2 sm:mx-4">
-            <h3 className="text-lg font-bold text-neutral-900 mb-4 flex items-center gap-2">
-              <Scale size={20} /> Registrar Pesaje
-            </h3>
+        <ActionDialog title="Registrar Pesaje" busy={busy} onClose={onClosePesaje}>
             <div className="space-y-3 max-h-64 overflow-y-auto">
               {(m.residuos || []).map((r: any) => (
                 <div key={r.id} className="flex items-center gap-3 p-3 bg-neutral-50 rounded-lg">
@@ -278,7 +304,7 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
                     <Input
                       type="number"
                       placeholder="Peso real"
-                      value={pesajeData[r.id] || ''}
+                      value={pesajeData[r.id] ?? ''}
                       onChange={(e) => setPesajeData({ ...pesajeData, [r.id]: Number(e.target.value) })}
                     />
                   </div>
@@ -303,17 +329,12 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
                 {mutations.pesaje.isPending ? 'Registrando...' : 'Confirmar Pesaje'}
               </Button>
             </div>
-          </div>
-        </div>
+        </ActionDialog>
       )}
 
       {/* Tratamiento Modal */}
       {showTratamientoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full mx-2 sm:mx-4">
-            <h3 className="text-lg font-bold text-neutral-900 mb-4 flex items-center gap-2">
-              <Beaker size={20} /> Registrar Tratamiento
-            </h3>
+        <ActionDialog title="Registrar Tratamiento" busy={busy} onClose={onCloseTratamiento}>
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-2">Método de Tratamiento *</label>
@@ -403,17 +424,12 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
                 {mutations.registrarTratamiento.isPending ? 'Registrando...' : 'Confirmar Tratamiento'}
               </Button>
             </div>
-          </div>
-        </div>
+        </ActionDialog>
       )}
 
       {/* Rechazar Modal */}
       {showRechazarModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full mx-2 sm:mx-4">
-            <h3 className="text-lg font-bold text-neutral-900 mb-4 flex items-center gap-2">
-              <XCircle size={20} className="text-error-500" /> Rechazar Carga
-            </h3>
+        <ActionDialog title="Rechazar Carga" busy={busy} onClose={onCloseRechazar}>
             <div className="space-y-3">
               <div>
                 <Select
@@ -451,17 +467,12 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
                 {mutations.rechazar.isPending ? 'Rechazando...' : 'Confirmar Rechazo'}
               </Button>
             </div>
-          </div>
-        </div>
+        </ActionDialog>
       )}
 
       {/* Incidente Modal */}
       {showIncidenteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full mx-2 sm:mx-4">
-            <h3 className="text-lg font-bold text-neutral-900 mb-4 flex items-center gap-2">
-              <AlertCircle size={20} className="text-warning-500" /> Registrar Incidente
-            </h3>
+        <ActionDialog title="Registrar Incidente" busy={busy} onClose={onCloseIncidente}>
             <div className="space-y-3">
               <div>
                 <Select
@@ -499,23 +510,13 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
                 {mutations.registrarIncidente.isPending ? 'Registrando...' : 'Registrar Incidente'}
               </Button>
             </div>
-          </div>
-        </div>
+        </ActionDialog>
       )}
 
       {/* Cancel Confirmation Modal */}
       {showCancelModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full mx-2 sm:mx-4">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-error-50 rounded-full flex items-center justify-center">
-                <XCircle size={20} className="text-error-500" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-neutral-900">Cancelar Manifiesto</h3>
-                <p className="text-sm text-neutral-500">Esta accion no se puede deshacer</p>
-              </div>
-            </div>
+        <ActionDialog title="Cancelar Manifiesto" busy={busy} onClose={onCloseCancel}>
+            <p className="text-sm text-neutral-700 mb-4">El manifiesto quedará cancelado y la acción se registrará en su historial.</p>
             <p className="text-neutral-700 mb-6">
               Estas seguro de que deseas cancelar el manifiesto <span className="font-mono font-semibold">{m.numero || manifiestoId}</span>?
             </p>
@@ -527,17 +528,12 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
                 {isCancelling ? 'Cancelando...' : 'Cancelar Manifiesto'}
               </Button>
             </div>
-          </div>
-        </div>
+        </ActionDialog>
       )}
 
       {/* Reversion Modal */}
       {showReversionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full mx-2 sm:mx-4">
-            <h3 className="text-lg font-bold text-neutral-900 mb-4 flex items-center gap-2">
-              <RotateCcw size={20} className="text-amber-500" /> Revertir Estado
-            </h3>
+        <ActionDialog title="Revertir Estado" busy={busy} onClose={onCloseReversion}>
             <p className="text-sm text-neutral-600 mb-4">
               Estado actual: <Badge variant="soft" color={getEstadoBadgeColor(m.estado || EstadoManifiesto.BORRADOR)}>{formatEstado(m.estado || EstadoManifiesto.BORRADOR)}</Badge>
             </p>
@@ -580,17 +576,13 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
                 {mutations.revertir.isPending ? 'Revirtiendo...' : 'Confirmar Reversión'}
               </Button>
             </div>
-          </div>
-        </div>
+        </ActionDialog>
       )}
 
-      {/* Firma Digital Modal */}
+      {/* Captured handwriting is attached to the authenticated approval event. */}
       {showFirmaModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-lg w-full mx-2 sm:mx-4">
-            <h3 className="text-lg font-bold text-neutral-900 mb-4 flex items-center gap-2">
-              <PenTool size={20} className="text-primary-600" /> Firma Digital del Manifiesto
-            </h3>
+        <ActionDialog title="Firma del manifiesto" busy={busy} onClose={onCloseFirma}>
+            <p className="mb-4 text-sm text-neutral-700">La firma manuscrita se adjuntará al registro junto con tu cuenta y la fecha de confirmación.</p>
 
             {/* Resumen */}
             <div className="bg-neutral-50 rounded-xl p-4 mb-4 space-y-1.5">
@@ -627,6 +619,7 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
                   <button
                     type="button"
                     onClick={() => setFirmaBase64('')}
+                    disabled={sendingFirma}
                     className="text-sm text-neutral-500 hover:text-neutral-700 underline"
                   >
                     Volver a firmar
@@ -640,15 +633,14 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
             </div>
 
             <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => { onCloseFirma(); setFirmaBase64(''); }} disabled={mutations.firmar.isPending}>
+              <Button variant="outline" onClick={() => { onCloseFirma(); setFirmaBase64(''); }} disabled={mutations.firmar.isPending || sendingFirma}>
                 Cancelar
               </Button>
-              <Button onClick={handleFirmaConfirm} disabled={mutations.firmar.isPending || !firmaBase64}>
-                {mutations.firmar.isPending ? 'Firmando...' : 'Confirmar y Firmar'}
+              <Button onClick={handleFirmaConfirm} disabled={mutations.firmar.isPending || sendingFirma || !firmaBase64}>
+                {mutations.firmar.isPending || sendingFirma ? 'Confirmando...' : 'Confirmar y Firmar'}
               </Button>
             </div>
-          </div>
-        </div>
+        </ActionDialog>
       )}
     </>
   );

@@ -19,16 +19,19 @@ import {
 } from '../services/inspectionEvidence.service';
 import {
   buildDeclaredInspectionSnapshot,
+  declaredSnapshotSchemaVersion,
   ensureInspectionDeclaredComparisons,
 } from '../services/inspectionDeclaredSnapshot.service';
 import { streamInspectionActPdf } from '../services/inspectionFieldActPdf.service';
-import { streamInspectionTechnicalReportPdf } from '../services/inspectionActPdf.service';
+import { streamInspectionDossierPdf, streamInspectionTechnicalReportPdf } from '../services/inspectionActPdf.service';
 import {
   buildInspectionDocumentFingerprint, hashCanonicalPayload,
   inspectDossierReadiness,
 } from '../services/inspectionDocumentIntegrity.service';
 import { buildInspectionTracePresentation, buildInspectionTraceUrl, verifyInspectionTraceToken } from '../services/inspectionTraceToken.service';
 import { inspectionEvidenceMetadataSchema } from '../domain/inspectionEvidence';
+import { inspectionCreateSchema as createSchema, inspectionScopeForUser, isInspectionStaff, inspectionSeries, inspectionYear, inspectionTypeSchema, inspectionTypeFilter, type InspectionType } from '../domain/inspectionOperations';
+export { inspectionScopeForUser } from '../domain/inspectionOperations';
 
 type ChecklistDefinition = { codigo: string; categoria: string; etiqueta: string; orden: number; obligatorio?: boolean };
 
@@ -104,15 +107,24 @@ const inspectionInclude = {
   },
 } satisfies Prisma.InspeccionInclude;
 
-const createSchema = z.object({
-  tipoActor: z.nativeEnum(TipoActorInspeccion),
-  actorId: z.string().min(1),
-  inspectorId: z.string().min(1).optional(),
-  numeroActa: z.string().trim().max(80).optional().nullable(),
-  ubicacion: z.string().trim().max(300).optional().nullable(),
-  fechaProgramada: z.string().datetime().optional().nullable(),
-  observaciones: z.string().trim().max(10_000).optional().nullable(),
-});
+const FINDING_CHECKLIST: ChecklistDefinition[] = [
+  { codigo: 'HAL-01', categoria: 'Constatación', etiqueta: 'Describir el hecho observado y sus limitaciones', orden: 10 },
+  { codigo: 'HAL-02', categoria: 'Constatación', etiqueta: 'Registrar lugar y referencias disponibles', orden: 20 },
+  { codigo: 'HAL-03', categoria: 'Constatación', etiqueta: 'Registrar evidencia disponible y medidas adoptadas', orden: 30 },
+];
+
+const ENVIRONMENTAL_CHECKLIST: Record<'PETROLEO' | 'AIRE', ChecklistDefinition[]> = {
+  PETROLEO: [
+    { codigo: 'PET-01', categoria: 'Petróleo', etiqueta: 'Registrar instalación, actividad y origen aparente del hecho', orden: 10 },
+    { codigo: 'PET-02', categoria: 'Petróleo', etiqueta: 'Describir derrame, residuos o afectación observada y sus límites', orden: 20 },
+    { codigo: 'PET-03', categoria: 'Petróleo', etiqueta: 'Registrar evidencia, medidas adoptadas y seguimiento necesario', orden: 30 },
+  ],
+  AIRE: [
+    { codigo: 'AIR-01', categoria: 'Aire', etiqueta: 'Registrar fuente aparente, lugar y momento de la emisión', orden: 10 },
+    { codigo: 'AIR-02', categoria: 'Aire', etiqueta: 'Describir humo, polvo u olores y condiciones observadas', orden: 20 },
+    { codigo: 'AIR-03', categoria: 'Aire', etiqueta: 'Registrar evidencia, mediciones disponibles y sus limitaciones', orden: 30 },
+  ],
+};
 
 export const actaDataSchema = z.object({
   codigoPostal: z.string().trim().max(20).optional(),
@@ -259,18 +271,14 @@ function isAuthorizedAdmin(user: any): boolean {
   return ADMIN_ROLES.has(String(user?.rol));
 }
 
-function isInspectionStaff(user: any): boolean {
-  return Boolean(user?.esInspector) || isAuthorizedAdmin(user);
-}
-
-function isSectorReviewer(user: any, tipoActor: TipoActorInspeccion): boolean {
+function isSectorReviewer(user: any, tipoActor?: TipoActorInspeccion | null): boolean {
   if (!isAuthorizedAdmin(user)) return false;
   return user.rol === 'ADMIN' || user.rol === `ADMIN_${tipoActor}`;
 }
 
 type InspectionAccessTarget = {
   inspectorId: string;
-  tipoActor: TipoActorInspeccion;
+  tipoActor: TipoActorInspeccion | null;
 };
 
 /**
@@ -283,15 +291,6 @@ export function canAccessInspection(user: any, inspection: InspectionAccessTarge
   if (role === 'ADMIN') return true;
   if (role.startsWith('ADMIN_')) return role === `ADMIN_${inspection.tipoActor}`;
   return Boolean(user?.esInspector) && user?.id === inspection.inspectorId;
-}
-
-export function inspectionScopeForUser(user: any): Prisma.InspeccionWhereInput {
-  const role = String(user?.rol || '');
-  if (role === 'ADMIN') return {};
-  if (role === 'ADMIN_GENERADOR') return { tipoActor: 'GENERADOR' };
-  if (role === 'ADMIN_TRANSPORTISTA') return { tipoActor: 'TRANSPORTISTA' };
-  if (role === 'ADMIN_OPERADOR') return { tipoActor: 'OPERADOR' };
-  return { inspectorId: user?.id };
 }
 
 function assertInspectionStaff(req: AuthRequest): void {
@@ -342,17 +341,18 @@ function actorForeignKey(tipoActor: TipoActorInspeccion, actorId: string): {
   return { operadorId: actorId };
 }
 
-async function nextInspectionNumber(tx: Prisma.TransactionClient): Promise<string> {
-  const year = new Date().getFullYear();
-  const from = new Date(`${year}-01-01T00:00:00.000Z`);
-  // Serialize only the short number-allocation section across PM2 instances.
-  // This keeps the human-readable sequence unique under concurrent creation.
-  // pg_advisory_xact_lock returns PostgreSQL `void`, which Prisma cannot
-  // deserialize (P2010). Cast it to a supported scalar while preserving the
-  // transaction-scoped lock used by both PM2 workers.
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(836271)::text AS "lock"`;
-  const count = await tx.inspeccion.count({ where: { createdAt: { gte: from } } });
-  return `I-${year}-${String(count + 1).padStart(6, '0')}`;
+async function nextInspectionNumber(tx: Prisma.TransactionClient, tipoActor?: TipoActorInspeccion | null, tipoInspeccion?: InspectionType): Promise<string> {
+  const anio = inspectionYear();
+  const serie = inspectionSeries(tipoActor, tipoInspeccion);
+  // Caller holds the short allocation lock; the durable counter survives cancellations.
+  const counter = await tx.secuenciaInspeccion.findUnique({ where: { serie_anio: { serie, anio } } });
+  if ((counter?.ultimo || 0) >= 99999) throw new AppError('Serie agotada: requiere ampliación autorizada', 409);
+  const next = await tx.secuenciaInspeccion.upsert({
+    where: { serie_anio: { serie, anio } },
+    create: { serie, anio, ultimo: 1 },
+    update: { ultimo: { increment: 1 } },
+  });
+  return `${serie}-${anio}-${String(next.ultimo).padStart(5, '0')}`;
 }
 
 export async function listarInspecciones(req: AuthRequest, res: Response, next: NextFunction) {
@@ -366,7 +366,9 @@ export async function listarInspecciones(req: AuthRequest, res: Response, next: 
       ? req.query.tipoActor as TipoActorInspeccion : undefined;
     const actorId = String(req.query.actorId || '').trim();
     const search = String(req.query.search || '').trim();
+    const tipoInspeccion = req.query.tipoInspeccion ? inspectionTypeSchema.parse(req.query.tipoInspeccion) : undefined;
     const baseWhere: Prisma.InspeccionWhereInput = {
+      ...(tipoInspeccion ? { AND: [inspectionTypeFilter(tipoInspeccion)] } : {}),
       ...(tipoActor ? { tipoActor } : {}),
       ...(actorId && tipoActor === 'GENERADOR' ? { generadorId: actorId } : {}),
       ...(actorId && tipoActor === 'TRANSPORTISTA' ? { transportistaId: actorId } : {}),
@@ -378,6 +380,7 @@ export async function listarInspecciones(req: AuthRequest, res: Response, next: 
         OR: [
           { numero: { contains: search, mode: 'insensitive' } },
           { numeroActa: { contains: search, mode: 'insensitive' } },
+          { ubicacion: { contains: search, mode: 'insensitive' } },
           { generador: { razonSocial: { contains: search, mode: 'insensitive' } } },
           { transportista: { razonSocial: { contains: search, mode: 'insensitive' } } },
           { operador: { razonSocial: { contains: search, mode: 'insensitive' } } },
@@ -432,7 +435,7 @@ export async function obtenerInspeccion(req: AuthRequest, res: Response, next: N
     let inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, include: inspectionInclude });
     if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
     assertCanAccess(req, inspection);
-    if (!inspection.declaradoSnapshot || inspection.comparaciones.length === 0 || inspection.comparaciones.some((row) => row.codigo === 'RES-CORRIENTES' || row.codigo === 'RES-CORRIENTES-RESUMEN')) {
+    if (inspection.tipoActor && (!inspection.declaradoSnapshot || declaredSnapshotSchemaVersion(inspection.declaradoSnapshot) < 3 || inspection.comparaciones.length === 0 || inspection.comparaciones.some((row) => row.codigo === 'RES-CORRIENTES' || row.codigo === 'RES-CORRIENTES-RESUMEN'))) {
       await ensureInspectionDeclaredComparisons(prisma, inspection);
       inspection = await prisma.inspeccion.findUniqueOrThrow({ where: { id: req.params.id }, include: inspectionInclude });
     }
@@ -500,43 +503,69 @@ export async function crearInspeccion(req: AuthRequest, res: Response, next: Nex
   try {
     assertInspectionStaff(req);
     const input = createSchema.parse(req.body);
-    if (String(req.user?.rol).startsWith('ADMIN_') && !isSectorReviewer(req.user, input.tipoActor)) {
+    const inspectionType = input.tipoInspeccion || input.tipoActor || 'ESPONTANEA';
+    const scopeType = ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(inspectionType) ? inspectionType as TipoActorInspeccion : null;
+    if (String(req.user?.rol).startsWith('ADMIN_') && !isSectorReviewer(req.user, scopeType)) {
       throw new AppError('El administrador sectorial solo puede crear inspecciones de su tipo de actor', 403);
     }
-    if (!(await actorExists(input.tipoActor, input.actorId))) throw new AppError('El actor inspeccionado no existe', 404);
+    if (input.tipoActor && input.actorId && !(await actorExists(input.tipoActor, input.actorId))) throw new AppError('El actor inspeccionado no existe', 404);
     const inspectorId = input.inspectorId || req.user.id;
     if (!isAuthorizedAdmin(req.user) && inspectorId !== req.user.id) throw new AppError('Un inspector solo puede asignarse inspecciones a si mismo', 403);
-    const inspector = await prisma.usuario.findUnique({ where: { id: inspectorId }, select: { id: true, activo: true, esInspector: true } });
-    if (!inspector?.activo || (!inspector.esInspector && !isAuthorizedAdmin(req.user))) throw new AppError('El usuario seleccionado no tiene perfil inspector activo', 400);
+    const inspector = await prisma.usuario.findUnique({ where: { id: inspectorId }, select: { id: true, activo: true, esInspector: true, rol: true } });
+    if (!inspector?.activo || !isInspectionStaff(inspector)) throw new AppError('El usuario seleccionado no tiene perfil inspector activo', 400);
+    if (String(inspector.rol).startsWith('ADMIN_') && (!scopeType || !input.tipoActor || !isSectorReviewer(inspector, scopeType))) throw new AppError('El inspector seleccionado pertenece a otro ámbito; un legajo sin responsable requiere inspector o jefatura general', 400);
+    const clienteId = input.clienteId ? `${req.user.id}:${input.clienteId}` : null;
+    const huellaCreacion = hashCanonicalPayload({ ...input, inspectorId });
 
     const created = await prisma.$transaction(async (tx) => {
-      const numero = await nextInspectionNumber(tx);
-      const snapshot = await buildDeclaredInspectionSnapshot(tx, input.tipoActor, input.actorId);
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(836271)::text AS "lock"`;
+      if (clienteId) {
+        const existing = await tx.inspeccion.findUnique({ where: { clienteId } });
+        if (existing) {
+          assertCanAccess(req, existing);
+          if (existing.huellaCreacion !== huellaCreacion) throw new AppError('Esta apertura ya fue recibida con otros datos. Abra el expediente existente.', 409);
+          return existing;
+        }
+      }
+      const numero = await nextInspectionNumber(tx, input.tipoActor, input.tipoInspeccion);
+      const snapshot = input.tipoActor && input.actorId ? await buildDeclaredInspectionSnapshot(tx, input.tipoActor, input.actorId) : null;
       const inspection = await tx.inspeccion.create({
         data: {
           numero,
-          tipoActor: input.tipoActor,
+          clienteId,
+          huellaCreacion,
+          tipoActor: input.tipoActor || null,
           inspectorId,
+          estado: input.fechaProgramada ? 'PLANIFICADA' : 'BORRADOR',
           numeroActa: input.numeroActa || null,
           ubicacion: input.ubicacion || null,
+          latitud: input.latitud ?? null,
+          longitud: input.longitud ?? null,
           fechaProgramada: input.fechaProgramada ? new Date(input.fechaProgramada) : null,
           observaciones: input.observaciones || null,
-          declaradoSnapshot: snapshot as unknown as Prisma.InputJsonValue,
-          ...actorForeignKey(input.tipoActor, input.actorId),
+          declaradoSnapshot: snapshot ? snapshot as unknown as Prisma.InputJsonValue : Prisma.DbNull,
+          ...(input.tipoActor && input.actorId ? actorForeignKey(input.tipoActor, input.actorId) : {}),
           items: {
-            create: CHECKLIST_BY_ACTOR[input.tipoActor].map((item) => ({
+            create: (inspectionType === 'PETROLEO' || inspectionType === 'AIRE' ? ENVIRONMENTAL_CHECKLIST[inspectionType] : inspectionType === 'ESPONTANEA' ? FINDING_CHECKLIST : CHECKLIST_BY_ACTOR[inspectionType]).map((item) => ({
               ...item,
               obligatorio: item.obligatorio ?? true,
             })),
           },
           comparaciones: {
-            create: snapshot.fields.map((row) => ({ ...row })),
+            create: snapshot?.fields.map((row) => ({ ...row })) || [],
           },
         },
       });
       await tx.eventoInspeccion.create({
         data: { inspeccionId: inspection.id, usuarioId: req.user.id, tipo: 'CREADA', titulo: 'Inspeccion creada' },
       });
+      if (inspectorId !== req.user.id || input.fechaProgramada) {
+        await tx.notificacion.create({ data: {
+          usuarioId: inspectorId, tipo: 'INFO_GENERAL', titulo: `Inspección asignada · ${numero}`,
+          mensaje: input.fechaProgramada ? 'Tiene una inspección programada. Revise la fecha y el expediente.' : 'Tiene una nueva inspección asignada.',
+          datos: JSON.stringify({ inspeccionId: inspection.id }),
+        } });
+      }
       return inspection;
     });
     const full = await prisma.inspeccion.findUniqueOrThrow({ where: { id: created.id }, include: inspectionInclude });
@@ -817,11 +846,12 @@ export async function cambiarEstadoInspeccion(req: AuthRequest, res: Response, n
     if (input.estado === 'EN_REVISION' && !isChecklistReadyForReview(inspection.items)) {
       throw new AppError('Complete todos los items obligatorios antes de enviar a revision', 400);
     }
-    if (input.estado === 'EN_REVISION' && !isComparisonReadyForReview(inspection.comparaciones)) {
+    if (input.estado === 'EN_REVISION' && inspection.tipoActor && !isComparisonReadyForReview(inspection.comparaciones)) {
       throw new AppError('Complete el contraste de todos los datos declarados antes de enviar a revision', 400);
     }
     if (input.estado === 'NOTIFICADA' && !input.plazoRespuestaAt) throw new AppError('Defina el plazo de respuesta antes de notificar', 400);
     if (input.estado === 'NOTIFICADA') {
+      if (!inspection.tipoActor) throw new AppError('Puede revisar el hallazgo sin responsable, pero debe identificar al destinatario antes de notificar', 400);
       const readiness = inspectDossierReadiness(inspection);
       if (!readiness.ready) {
         throw new AppError(`Complete el expediente antes de notificar: ${readiness.missing.join(', ')}`, 400);
@@ -1098,6 +1128,16 @@ export async function generarActaInspeccionPdf(req: AuthRequest, res: Response, 
     if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
     assertCanAccess(req, inspection);
     await streamInspectionActPdf(res, inspection, resolveInspectionEvidence);
+  } catch (error) { next(error); }
+}
+
+export async function generarExpedienteInspeccionPdf(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    assertInspectionStaff(req);
+    const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, include: inspectionInclude });
+    if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
+    assertCanAccess(req, inspection);
+    await streamInspectionDossierPdf(res, inspection, resolveInspectionEvidence);
   } catch (error) { next(error); }
 }
 

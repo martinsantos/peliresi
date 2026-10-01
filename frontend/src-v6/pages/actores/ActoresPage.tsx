@@ -292,7 +292,7 @@ export const ActoresPage: React.FC = () => {
   const columns = [
     {
       key: 'actor',
-      width: '28%',
+      // Keep identity flexible so selection cannot absorb unused percentages.
       header: 'Actor',
       sortable: true,
       render: (row: any) => {

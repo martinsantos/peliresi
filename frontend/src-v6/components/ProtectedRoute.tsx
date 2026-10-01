@@ -11,12 +11,15 @@ import { useAuth, type UserRole } from '../contexts/AuthContext';
 interface ProtectedRouteProps {
   /** Optional list of roles allowed to access the route */
   roles?: UserRole[];
+  /** Read-only actor detail routes may also be consulted by designated inspectors. */
+  allowInspector?: boolean;
   /** Where to redirect unauthenticated users (default: /login) */
   redirectTo?: string;
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   roles,
+  allowInspector = false,
   redirectTo = '/login',
 }) => {
   const { currentUser, isLoading, isRestricted } = useAuth();
@@ -46,7 +49,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // Authenticated but role not allowed -> access denied
-  if (roles && roles.length > 0 && !roles.includes(currentUser.rol)) {
+  if (roles && roles.length > 0 && !roles.includes(currentUser.rol) && !(allowInspector && currentUser.esInspector)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-neutral-50">
         <div className="flex flex-col items-center gap-4 text-center max-w-md px-6">

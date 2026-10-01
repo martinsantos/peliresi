@@ -34,7 +34,8 @@ import {
   useRegistrarIncidente,
 } from '../../hooks/useManifiestos';
 import { EstadoManifiesto, type EventoManifiesto, type Manifiesto, type ManifiestoResiduo } from '../../types/models';
-import { formatDateTime, formatWeight } from '../../utils/formatters';
+import { formatDateTime } from '../../utils/formatters';
+import { declaredQuantities, formatDeclaredQuantity } from '../../utils/declaredQuantities';
 import { offlineSafeMutation } from '../../utils/offline-mutation';
 import { useGPSTracking } from '../../hooks/useGPSTracking';
 import { useAuth } from '../../contexts/AuthContext';
@@ -361,7 +362,8 @@ const ViajeEnCursoTransportista: React.FC = () => {
     );
   }
 
-  const totalPeso = Array.isArray(m.residuos) ? m.residuos.reduce((sum: number, residue: ManifiestoResiduo) => sum + (residue.cantidad || 0), 0) : 0;
+  const cantidadesDeclaradas = declaredQuantities(m.residuos || [])
+    .map(({ unidad, cantidad }) => `${formatDeclaredQuantity(cantidad)} ${unidad}`).join(' · ') || 'Sin cantidades informadas';
   const eventos: EventoManifiesto[] = Array.isArray(m.eventos) ? m.eventos : [];
 
   return (
@@ -403,7 +405,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
                 <p className="text-neutral-600 mb-1">Generador: <span className="font-semibold">{m.generador?.razonSocial || '-'}</span></p>
                 <p className="text-sm text-neutral-500">{m.generador?.domicilio || '-'}</p>
                 <div className="mt-4 p-3 bg-neutral-50 rounded-lg">
-                  <p className="text-sm text-neutral-600">Residuos: <span className="font-semibold">{m.residuos?.length || 0} items</span> — {formatWeight(totalPeso)}</p>
+                  <p className="text-sm text-neutral-600">Residuos: <span className="font-semibold">{m.residuos?.length || 0} items</span> — {cantidadesDeclaradas}</p>
                 </div>
               </CardContent>
             </Card>
@@ -446,8 +448,8 @@ const ViajeEnCursoTransportista: React.FC = () => {
                     <p className="text-sm font-bold text-white drop-shadow-sm">{m.operador?.razonSocial || '-'}</p>
                   </div>
                   <div className="text-center border-l border-white/30">
-                    <p className="text-xs text-white/90 mb-1 font-medium tracking-wide">PESO TOTAL</p>
-                    <p className="text-lg font-bold text-white drop-shadow-sm">{formatWeight(totalPeso)}</p>
+                    <p className="text-xs text-white/90 mb-1 font-medium tracking-wide">CANTIDADES DECLARADAS</p>
+                    <p className="text-lg font-bold text-white drop-shadow-sm">{cantidadesDeclaradas}</p>
                   </div>
                 </div>
               </CardContent>

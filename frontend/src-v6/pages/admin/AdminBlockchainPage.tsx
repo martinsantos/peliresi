@@ -117,9 +117,10 @@ export default function AdminBlockchainPage() {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold text-neutral-900">Verificacion de Integridad</h3>
               <span className="text-xs text-neutral-400">
-                {verificarMutation.data.totalVerificados} manifiestos verificados
+                {verificarMutation.data.totalVerificados} manifiestos examinados
               </span>
             </div>
+            <p className="mb-4 text-sm text-neutral-700">Se comparan los sellos disponibles. La cadena histórica de eventos no se reconstruye completa; una coincidencia de sellos no certifica toda la trazabilidad.</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               <div className="bg-emerald-50 rounded-xl p-3 text-center">
                 <p className="text-2xl font-bold text-emerald-700">{verificarMutation.data.integridadCompleta}</p>

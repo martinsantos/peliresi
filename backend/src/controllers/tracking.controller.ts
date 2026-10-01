@@ -252,7 +252,7 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
     // ── Estadísticas ──
     // 4 Prisma queries + 1 raw SQL replaces the previous 12 individual count() calls
     const [
-      totalManifiestos,
+      distributionCounts,
       generadoresActivos,
       operadoresActivos,
       // Single raw SQL GROUP BY replaces 8 per-estado count() queries
@@ -260,7 +260,9 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
       residuosAgg,
       manifiestosPorDia,
     ] = await Promise.all([
-      prisma.manifiesto.count({ where: { createdAt: dateFilter } }),
+      // Historical total and distribution share one cohort and one DB snapshot.
+      // Stage activity below retains its separate event-date contract.
+      prisma.manifiesto.groupBy({ by: ['estado'], where: { createdAt: dateFilter }, _count: { _all: true } }),
       prisma.generador.count({
         where: {
           activo: true,
@@ -324,7 +326,8 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
     const enTransitoActivos = enTransitoCount;
 
     result.estadisticas = {
-      totalManifiestos,
+      totalManifiestos: distributionCounts.reduce((total, row) => total + row._count._all, 0),
+      distribucionPorEstado: Object.fromEntries(distributionCounts.map(row => [row.estado, row._count._all])),
       enTransitoActivos,
       generadoresActivos,
       operadoresActivos,

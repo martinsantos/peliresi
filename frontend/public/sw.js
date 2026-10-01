@@ -1,13 +1,14 @@
 // Service Worker para modo Offline-First (CU-T09)
 // Scope: / (main site)
-const CACHE_NAME = 'trazabilidad-rrpp-v63';
-const RUNTIME_CACHE = 'runtime-cache-v63';
+const CACHE_NAME = 'trazabilidad-rrpp-v78';
+const RUNTIME_CACHE = 'runtime-cache-v78';
 
 // Recursos críticos para cachear en instalación
 const PRECACHE_URLS = [
     '/',
     '/index.html',
-    '/offline.html'
+    '/offline.html',
+    '/favicon.svg'
 ];
 
 function isSpaNavigation(pathname) {
@@ -165,7 +166,7 @@ self.addEventListener('push', (event) => {
         data,
     };
 
-    event.waitUntil(self.registration.showNotification(data.title || 'RP Trazar', options));
+    event.waitUntil(self.registration.showNotification(data.title || 'SITREP', options));
 });
 
 console.log('[SW] Service Worker cargado', CACHE_NAME);

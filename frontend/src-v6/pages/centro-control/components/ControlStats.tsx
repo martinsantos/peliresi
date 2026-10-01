@@ -1,14 +1,15 @@
 /**
  * CentroControl — KPI Cards + Pipeline + Charts + Quick Actions
  */
-import React from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  ClipboardCheck,
   FileText,
   Truck,
   TrendingUp,
   Factory,
-  Package,
+  FlaskConical,
   ChevronRight,
   BarChart3,
   Bell,
@@ -27,7 +28,7 @@ import { ChartTooltip } from '../../../components/charts/ChartTooltip';
 import { CategoryBarChart } from '../../../components/charts/CategoryBarChart';
 import type { CentroControlData } from '../../../hooks/useCentroControl';
 
-const ESTADO_PIPELINE = ['BORRADOR', 'APROBADO', 'EN_TRANSITO', 'ENTREGADO', 'RECIBIDO', 'TRATADO'] as const;
+const ESTADO_PIPELINE = ['BORRADOR', 'APROBADO', 'EN_TRANSITO', 'ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO', 'TRATADO'] as const;
 
 interface AlertItem {
   id: string;
@@ -40,17 +41,28 @@ interface ControlStatsProps {
   cc: CentroControlData | null;
   alertas: AlertItem[];
   datePreset: number;
+  inspectionCount?: number | null;
+  children?: React.ReactNode;
 }
 
 export const ControlStats: React.FC<ControlStatsProps> = ({
   cc,
   alertas,
   datePreset,
+  inspectionCount,
+  children,
 }) => {
   const navigate = useNavigate();
+  const [statisticsOpen, setStatisticsOpen] = useState(false);
+  const pendingScroll = useRef<{ container: HTMLElement; top: number } | null>(null);
+  useLayoutEffect(() => {
+    const saved = pendingScroll.current;
+    pendingScroll.current = null;
+    if (statisticsOpen && saved?.container.isConnected) saved.container.scrollTop = saved.top;
+  }, [statisticsOpen]);
 
   // ── KPIs ──
-  type KpiItem = { label: string; value: number; icon: React.ElementType; gradient: string; href: string; suffix?: string };
+  type KpiItem = { label: string; value: number | null; icon: React.ElementType; gradient: string; href: string; suffix?: string };
   const kpis: KpiItem[] = [
     {
       label: 'Total Manifiestos',
@@ -63,20 +75,20 @@ export const ControlStats: React.FC<ControlStatsProps> = ({
       label: 'En Tránsito',
       value: cc?.estadisticas?.enTransitoActivos || 0,
       icon: Truck,
-      gradient: 'from-amber-500 to-amber-600',
+      gradient: 'from-amber-700 to-amber-800',
       href: '/manifiestos?estado=EN_TRANSITO',
     },
     {
       label: 'Generadores Activos',
       value: cc?.estadisticas?.generadoresActivos || 0,
       icon: Factory,
-      gradient: 'from-green-600 to-green-700',
+      gradient: 'from-purple-700 to-purple-800',
       href: '/admin/actores/generadores',
     },
     {
       label: 'Operadores Activos',
       value: cc?.estadisticas?.operadoresActivos || 0,
-      icon: Package,
+      icon: FlaskConical,
       gradient: 'from-blue-600 to-blue-700',
       href: '/admin/actores/operadores',
     },
@@ -89,6 +101,8 @@ export const ControlStats: React.FC<ControlStatsProps> = ({
       suffix: 't',
     },
   ];
+
+  if (inspectionCount !== undefined) kpis.splice(4, 0, { label: 'Inspecciones activas', value: inspectionCount, icon: ClipboardCheck, gradient: 'from-teal-600 to-teal-700', href: '/inspecciones' });
 
   // ── Pipeline data ──
   const pipelineData = (() => {
@@ -104,7 +118,10 @@ export const ControlStats: React.FC<ControlStatsProps> = ({
   const pipelineTotal = pipelineData.reduce((s, d) => s + d.count, 0) || 1;
 
   // ── Donut data ──
-  const donutData = pipelineData.filter(d => d.count > 0).map(d => ({ name: d.name, value: d.count, fill: d.color }));
+  // Distribution is not the workflow: include terminal and legacy states too.
+  const donutData = Object.entries(cc?.estadisticas?.distribucionPorEstado ?? cc?.estadisticas?.porEstado ?? {})
+    .filter(([, count]) => count > 0)
+    .map(([estado, count]) => ({ name: estado.replace(/_/g, ' '), value: count, fill: ESTADO_CHART_COLORS[estado] || '#6B7280' }));
   const donutTotal = donutData.reduce((s, d) => s + d.value, 0);
 
   // ── Sparkline data ──
@@ -116,7 +133,7 @@ export const ControlStats: React.FC<ControlStatsProps> = ({
   // ── Quick Actions ──
   const quickActions = [
     { icon: FileText, label: 'Nuevo Manifiesto', path: '/manifiestos/nuevo', color: 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100' },
-    { icon: Truck, label: 'Ver Flota', path: '/manifiestos?estado=EN_TRANSITO', color: 'text-blue-600 bg-blue-50 hover:bg-blue-100' },
+    { icon: Truck, label: 'Ver Flota', path: '/manifiestos?estado=EN_TRANSITO', color: 'text-orange-700 bg-orange-50 hover:bg-orange-100' },
     { icon: BarChart3, label: 'Reportes', path: '/reportes', color: 'text-violet-600 bg-violet-50 hover:bg-violet-100' },
     { icon: Bell, label: 'Alertas', path: '/alertas', color: 'text-amber-600 bg-amber-50 hover:bg-amber-100' },
     { icon: Shield, label: 'Auditoría', path: '/auditoria', color: 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100' },
@@ -126,26 +143,35 @@ export const ControlStats: React.FC<ControlStatsProps> = ({
   return (
     <>
       {/* ══════ 5 KPI Cards ══════ */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 stagger-children">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 stagger-children">
         {kpis.map((kpi, i) => {
           const Icon = kpi.icon;
           return (
-            <div key={i} className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${kpi.gradient} p-4 group hover:shadow-lg transition-all duration-300 hover-lift cursor-pointer`} onClick={() => kpi.href && navigate(`${kpi.href}`)}>
+            <button type="button" key={i} aria-label={kpi.label} className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${kpi.gradient} p-4 text-left group hover:shadow-lg transition-shadow duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 active:brightness-90 cursor-pointer`} onClick={() => navigate(kpi.href)}>
               <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-white/10 -translate-y-1/3 translate-x-1/3 group-hover:scale-125 transition-transform duration-500" />
               <div className="relative">
                 <div className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center mb-2">
                   <Icon size={18} className="text-white" />
                 </div>
                 <p className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                  {kpi.value}{kpi.suffix || ''}
+                  {kpi.value ?? '—'}{kpi.suffix || ''}
                 </p>
-                <p className="text-xs text-white/75 font-medium mt-0.5">{kpi.label}</p>
+                <p className="text-xs text-white font-medium mt-0.5">{kpi.label}</p>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
 
+      {children}
+      <details open={statisticsOpen} className="rounded-xl border border-neutral-200 bg-white" style={{ overflowAnchor: 'none' }} onToggle={event => setStatisticsOpen(event.currentTarget.open)}>
+        <summary onClick={event => {
+          event.preventDefault();
+          const container = event.currentTarget.closest('main');
+          pendingScroll.current = container ? { container, top: container.scrollTop } : null;
+          setStatisticsOpen(open => !open);
+        }} className="min-h-14 cursor-pointer px-5 py-4 text-sm font-semibold text-neutral-700 hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">Actividad y estadísticas del período</summary>
+        {statisticsOpen ? <div className="space-y-6 border-t border-neutral-200 p-4">
       {/* ══════ Pipeline ══════ */}
       <Card className="border-0 shadow-sm">
         <CardHeader title="Pipeline de Manifiestos" subtitle="Flujo de trabajo: BORRADOR → TRATADO" />
@@ -154,9 +180,11 @@ export const ControlStats: React.FC<ControlStatsProps> = ({
             {pipelineData.map((stage, i) => {
               const widthPercent = Math.max(8, (stage.count / pipelineTotal) * 100);
               return (
-                <div
+                <button
+                  type="button"
                   key={stage.key}
-                  className="relative flex flex-col items-center justify-center rounded-xl transition-all duration-500 hover:scale-[1.02] group cursor-pointer min-w-0 overflow-hidden"
+                  aria-label={`${stage.name}: ${stage.count}`}
+                  className="relative flex flex-col items-center justify-center rounded-xl transition-colors duration-150 hover:brightness-95 active:brightness-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 focus-visible:-outline-offset-2 group cursor-pointer min-w-0 overflow-hidden"
                   onClick={() => navigate(`/manifiestos?estado=${stage.key}`)}
                   style={{
                     flex: `${widthPercent} 1 0%`,
@@ -170,7 +198,7 @@ export const ControlStats: React.FC<ControlStatsProps> = ({
                   {i < pipelineData.length - 1 && (
                     <ChevronRight size={16} className="absolute -right-2.5 text-neutral-300 z-10 hidden sm:block" />
                   )}
-                </div>
+                </button>
               );
             })}
           </div>
@@ -198,7 +226,7 @@ export const ControlStats: React.FC<ControlStatsProps> = ({
             {/* Sparkline */}
             {sparklineData.length > 0 ? (
               <div className="h-32 mb-3">
-                <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={80}>
+                <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={80} initialDimension={{ width: 100, height: 80 }}>
                   <AreaChart data={sparklineData} margin={{ top: 5, right: 5, bottom: 0, left: 5 }}>
                     <defs>
                       <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
@@ -277,7 +305,7 @@ export const ControlStats: React.FC<ControlStatsProps> = ({
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Donut */}
         <Card className="border-0 shadow-sm">
-          <CardHeader title="Distribución por Estado" subtitle="Proporción actual de manifiestos" />
+          <CardHeader title="Distribución por Estado" subtitle="Manifiestos creados en el período seleccionado" />
           <CardContent>
             <div className="mb-3 text-center">
               <p className="text-3xl font-extrabold text-neutral-900">{donutTotal}</p>
@@ -295,7 +323,7 @@ export const ControlStats: React.FC<ControlStatsProps> = ({
           <CardContent>
             {sparklineData.length > 0 ? (
               <div className="h-[250px] sm:h-[300px]">
-                <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={80}>
+                <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={80} initialDimension={{ width: 100, height: 80 }}>
                   <BarChart data={sparklineData} margin={{ left: 5, right: 20, top: 5, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                     <XAxis dataKey="fecha" tick={{ fontSize: 10 }} stroke="#94a3b8" interval="preserveStartEnd" />
@@ -333,6 +361,8 @@ export const ControlStats: React.FC<ControlStatsProps> = ({
           </div>
         </CardContent>
       </Card>
+        </div> : null}
+      </details>
     </>
   );
 };

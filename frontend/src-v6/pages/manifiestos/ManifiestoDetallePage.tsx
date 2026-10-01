@@ -20,7 +20,6 @@ import {
   Download,
   Copy,
   Check,
-  Award,
   MapPin,
   ExternalLink,
 } from 'lucide-react';
@@ -52,7 +51,8 @@ import {
 } from '../../hooks/useManifiestos';
 import { useAuth } from '../../contexts/AuthContext';
 import { manifiestoService } from '../../services/manifiesto.service';
-import { formatDateTime, formatNumber, formatWeight, formatEstado, formatCuit } from '../../utils/formatters';
+import { formatDateTime, formatEstado, formatCuit } from '../../utils/formatters';
+import { declaredQuantities, formatDeclaredQuantity } from '../../utils/declaredQuantities';
 import type { Manifiesto } from '../../types/models';
 import { EstadoManifiesto } from '../../types/models';
 import ManifiestoTimeline from './components/ManifiestoTimeline';
@@ -109,7 +109,7 @@ const ManifiestoDetailPage: React.FC = () => {
   // Use API data only
   const manifiesto = apiData;
   const m = (manifiesto || {}) as Partial<Manifiesto>;
-  const totalPeso = Array.isArray(m.residuos) ? m.residuos.reduce((sum, r) => sum + (typeof r.cantidad === 'number' ? r.cantidad : 0), 0) : 0;
+  const quantityTotals = declaredQuantities(Array.isArray(m.residuos) ? m.residuos : []);
 
   // --- Tracking route for GPS map ---
   const trackingRoute = useMemo(() => {
@@ -161,20 +161,22 @@ const ManifiestoDetailPage: React.FC = () => {
     action: () => Promise<any>,
     successMsg: string,
   ) => {
-    if (actionInFlightRef.current) return;
+    if (actionInFlightRef.current) return false;
     actionInFlightRef.current = true;
     try {
       await action();
       toast.success(successMsg);
+      return true;
     } catch (err: any) {
       toast.error('Error', err?.response?.data?.message || err?.message || 'Ocurrio un error');
+      return false;
     } finally {
       actionInFlightRef.current = false;
     }
   };
 
-  const handleFirmar = () => handleAction(
-    () => firmar.mutateAsync({ id: id! }),
+  const handleFirmar = (firma: string) => handleAction(
+    () => firmar.mutateAsync({ id: id!, firma }),
     'Manifiesto firmado exitosamente',
   );
 
@@ -199,14 +201,14 @@ const ManifiestoDetailPage: React.FC = () => {
   );
 
   const handlePesaje = (residuos: { id: string; cantidadRecibida: number }[], observaciones?: string) => {
-    handleAction(
+    return handleAction(
       () => pesaje.mutateAsync({ id: id!, residuos, observaciones }),
       'Pesaje registrado exitosamente',
     );
   };
 
   const handleTratamiento = (metodo: string, observaciones?: string) => {
-    handleAction(
+    return handleAction(
       () => registrarTratamiento.mutateAsync({ id: id!, metodo, observaciones }),
       'Tratamiento registrado exitosamente',
     );
@@ -218,34 +220,39 @@ const ManifiestoDetailPage: React.FC = () => {
   );
 
   const handleRechazar = (motivo: string, descripcion?: string) => {
-    handleAction(
+    return handleAction(
       () => rechazar.mutateAsync({ id: id!, motivo, descripcion }),
       'Carga rechazada exitosamente',
     );
   };
 
   const handleIncidente = (tipo: string, descripcion: string) => {
-    handleAction(
+    return handleAction(
       () => registrarIncidente.mutateAsync({ id: id!, tipo, descripcion }),
       'Incidente registrado exitosamente',
     );
   };
 
   const handleCancelar = async () => {
+    if (actionInFlightRef.current) return false;
+    actionInFlightRef.current = true;
     setIsCancelling(true);
     try {
       await cancelar.mutateAsync({ id: id! });
       toast.success('Manifiesto cancelado');
       navigate('/manifiestos');
+      return true;
     } catch (err: any) {
       toast.error('Error al cancelar', err?.response?.data?.message || 'No se pudo cancelar el manifiesto');
+      return false;
     } finally {
+      actionInFlightRef.current = false;
       setIsCancelling(false);
     }
   };
 
   const handleRevertir = (estadoNuevo: string, motivo?: string) => {
-    handleAction(
+    return handleAction(
       () => revertir.mutateAsync({ id: id!, estadoNuevo, motivo }),
       'Estado revertido exitosamente',
     );
@@ -331,7 +338,7 @@ const ManifiestoDetailPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       {/* Header */}
       <div className="space-y-2">
         <Link to="/manifiestos">
@@ -353,14 +360,6 @@ const ManifiestoDetailPage: React.FC = () => {
           Creado el {m.createdAt ? formatDateTime(m.createdAt) : '-'}
         </p>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" leftIcon={<Download size={16} />} onClick={handleDescargarPDF}>
-            Descargar PDF
-          </Button>
-          {m.estado === EstadoManifiesto.TRATADO && (
-            <Button variant="outline" size="sm" leftIcon={<Award size={16} />} onClick={handleDescargarCertificado} className="!border-success-300 !text-success-700 hover:!bg-success-50">
-              Certificado
-            </Button>
-          )}
           {m.estado === EstadoManifiesto.BORRADOR && (isAdmin || userRol === 'GENERADOR') && (
             <Button size="sm" onClick={() => navigate(`/manifiestos/${id}/editar`)}>
               Editar
@@ -368,6 +367,36 @@ const ManifiestoDetailPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* One action surface, before the long field context on every screen size. */}
+      <ManifiestoActions
+        manifiesto={m}
+        manifiestoId={id!}
+        isAdmin={isAdmin}
+        userRol={userRol}
+        isActionPending={isActionPending}
+        isInSitu={!m.transportistaId}
+        mutations={{
+          firmar, confirmarRetiro, confirmarEntrega, confirmarRecepcion,
+          confirmarRecepcionInSitu,
+          pesaje, registrarTratamiento, cerrar, rechazar, registrarIncidente, revertir,
+        }}
+        onFirmar={handleFirmar}
+        onConfirmarRetiro={handleConfirmarRetiro}
+        onConfirmarEntrega={handleConfirmarEntrega}
+        onConfirmarRecepcion={handleConfirmarRecepcion}
+        onConfirmarRecepcionInSitu={handleConfirmarRecepcionInSitu}
+        onPesaje={handlePesaje}
+        onTratamiento={handleTratamiento}
+        onCerrar={handleCerrar}
+        onRechazar={handleRechazar}
+        onIncidente={handleIncidente}
+        onCancelar={handleCancelar}
+        onRevertir={handleRevertir}
+        onDescargarPDF={handleDescargarPDF}
+        onDescargarCertificado={handleDescargarCertificado}
+        isCancelling={isCancelling}
+      />
 
       {/* Content grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -456,19 +485,21 @@ const ManifiestoDetailPage: React.FC = () => {
                       <tr key={residuo.id} className="hover:bg-neutral-50 transition-colors">
                         <td className="px-3 py-2.5 font-mono text-sm">{residuo.tipoResiduo?.codigo || '-'}</td>
                         <td className="px-3 py-2.5 text-neutral-700 truncate" title={residuo.tipoResiduo?.nombre || residuo.descripcion || '-'}>{residuo.tipoResiduo?.nombre || residuo.descripcion || '-'}</td>
-                        <td className="px-3 py-2.5 font-medium">{formatNumber(residuo.cantidad)}</td>
+                        <td className="px-3 py-2.5 font-medium">{formatDeclaredQuantity(residuo.cantidad)}</td>
                         <td className="px-3 py-2.5 text-neutral-600">{residuo.unidad}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
                 </div>
-              <div className="mt-4 p-4 bg-neutral-50 rounded-xl flex items-center justify-between">
+              <div className="mt-4 p-4 bg-neutral-50 rounded-xl flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-neutral-600">
                   <Weight size={18} />
-                  <span className="font-medium">Peso total:</span>
+                  <span className="font-medium">Totales declarados:</span>
                 </div>
-                <span className="text-xl font-bold text-neutral-900">{formatWeight(totalPeso)}</span>
+                <div className="flex flex-wrap gap-x-5 gap-y-2 text-lg font-bold text-neutral-900">
+                  {quantityTotals.length ? quantityTotals.map(total => <span key={total.unidad}>{formatDeclaredQuantity(total.cantidad)} {total.unidad}</span>) : <span>Sin cantidades informadas</span>}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -480,7 +511,7 @@ const ManifiestoDetailPage: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <MapPin size={18} className="text-primary-600" />
                   <h3 className="font-semibold text-neutral-900">
-                    {trackingRoute ? 'Ruta del Viaje' : 'Mapa de Ruta'}
+                    {trackingRoute ? 'Ruta del Viaje' : 'Origen y destino'}
                   </h3>
                   {trackingRoute && (
                     <Badge variant="soft" color="info">{trackingRoute.count} puntos GPS</Badge>
@@ -566,7 +597,7 @@ const ManifiestoDetailPage: React.FC = () => {
                 {generadorPos && operadorPos && (
                   <span className="flex items-center gap-1.5">
                     <span style={{ width: 20, height: 3, background: '#6366f1', display: 'inline-block', borderRadius: 2, borderTop: '1px dashed #6366f1' }} />
-                    Ruta planificada
+                    Referencia entre establecimientos
                   </span>
                 )}
                 {generadorPos && (
@@ -577,7 +608,7 @@ const ManifiestoDetailPage: React.FC = () => {
                 )}
                 {operadorPos && (
                   <span className="flex items-center gap-1.5">
-                    <svg width="12" height="12" viewBox="0 0 14 14"><polygon points="7,1 13,4 13,10 7,13 1,10 1,4" fill={ACTOR_COLORS.operador}/></svg>
+                    <FlaskConical size={14} color={ACTOR_COLORS.operador} />
                     Operador
                   </span>
                 )}
@@ -617,7 +648,7 @@ const ManifiestoDetailPage: React.FC = () => {
             <CardHeader title="QR de Control" icon={<QrCode size={20} />} />
             <CardContent>
               {(() => {
-                const numero = m.numero || id || 'M-2025-089';
+                const numero = m.numero || id!;
                 const qrUrl = `${window.location.origin}/manifiestos/verificar/${encodeURIComponent(numero)}`;
                 return (
                   <div className="flex flex-col items-center gap-4">
@@ -643,10 +674,14 @@ const ManifiestoDetailPage: React.FC = () => {
                         size="sm"
                         fullWidth
                         leftIcon={qrCopied ? <Check size={14} /> : <Copy size={14} />}
-                        onClick={() => {
-                          navigator.clipboard.writeText(qrUrl);
-                          setQrCopied(true);
-                          setTimeout(() => setQrCopied(false), 2000);
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(qrUrl);
+                            setQrCopied(true);
+                            setTimeout(() => setQrCopied(false), 2000);
+                          } catch {
+                            toast.error('No se pudo copiar el enlace', 'El navegador no permitió usar el portapapeles.');
+                          }
                         }}
                       >
                         {qrCopied ? 'Copiado' : 'Copiar enlace'}
@@ -681,66 +716,6 @@ const ManifiestoDetailPage: React.FC = () => {
                   </div>
                 );
               })()}
-            </CardContent>
-          </Card>
-
-          {/* Actions + Modals */}
-          <ManifiestoActions
-            manifiesto={m}
-            manifiestoId={id!}
-            isAdmin={isAdmin}
-            userRol={userRol}
-            isActionPending={isActionPending}
-            isInSitu={!m.transportistaId}
-            mutations={{
-              firmar, confirmarRetiro, confirmarEntrega, confirmarRecepcion,
-              confirmarRecepcionInSitu,
-              pesaje, registrarTratamiento, cerrar, rechazar, registrarIncidente, revertir,
-            }}
-            onFirmar={handleFirmar}
-            onConfirmarRetiro={handleConfirmarRetiro}
-            onConfirmarEntrega={handleConfirmarEntrega}
-            onConfirmarRecepcion={handleConfirmarRecepcion}
-            onConfirmarRecepcionInSitu={handleConfirmarRecepcionInSitu}
-            onPesaje={handlePesaje}
-            onTratamiento={handleTratamiento}
-            onCerrar={handleCerrar}
-            onRechazar={handleRechazar}
-            onIncidente={handleIncidente}
-            onCancelar={handleCancelar}
-            onRevertir={handleRevertir}
-            onDescargarPDF={handleDescargarPDF}
-            onDescargarCertificado={handleDescargarCertificado}
-            isCancelling={isCancelling}
-          />
-
-          <Card>
-            <CardHeader title="Documentos" />
-            <CardContent>
-              <div className="space-y-2 animate-fade-in">
-                <button
-                  onClick={handleDescargarPDF}
-                  className="flex items-center gap-3 p-3 bg-neutral-50 rounded-xl w-full hover:bg-neutral-100 transition-colors text-left"
-                >
-                  <FileText size={20} className="text-primary-500" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm text-neutral-900 truncate">Manifiesto PDF</p>
-                    <p className="text-xs text-neutral-500">Descargar documento oficial</p>
-                  </div>
-                </button>
-                {m.estado === EstadoManifiesto.TRATADO && (
-                  <button
-                    onClick={handleDescargarCertificado}
-                    className="flex items-center gap-3 p-3 bg-success-50 rounded-xl w-full hover:bg-success-100 transition-colors text-left"
-                  >
-                    <Award size={20} className="text-success-600" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm text-success-900 truncate">Certificado de Disposición</p>
-                      <p className="text-xs text-success-600">Certificado de tratamiento final</p>
-                    </div>
-                  </button>
-                )}
-              </div>
             </CardContent>
           </Card>
 

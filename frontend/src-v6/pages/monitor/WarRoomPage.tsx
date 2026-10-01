@@ -5,6 +5,9 @@
  * Modulo autonomo — no importa componentes del app principal
  */
 
+import { useInspectionOperations } from '../../hooks/useInspectionOperations';
+import { useAuth } from '../../contexts/AuthContext';
+import { canUseInspectionOperations } from '../../services/inspectionOperations.service';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -35,6 +38,8 @@ const NUM_TO_SPEED = (n: number): 'fast' | 'normal' | 'slow' =>
 const WarRoomPage: React.FC = () => {
   const navigate = useNavigate();
   const [mode, setModeRaw] = useState<MonitorMode>('LIVE');
+  const { currentUser } = useAuth();
+  const inspections = useInspectionOperations({ limit: 100 }, mode === 'LIVE');
   const [cinemaMode, setCinemaMode] = useState(false);
   const [playbackDate, setPlaybackDate] = useState<string | null>(null);
   const [playbackDias, setPlaybackDias] = useState(1);
@@ -365,6 +370,7 @@ const WarRoomPage: React.FC = () => {
 
       {/* Left Panel — Dashboards */}
       <div className="wr-layout-sidebar wr-enter-left">
+
         <DashboardPanels
           mode={mode}
           liveData={liveData.data || null}
@@ -380,6 +386,10 @@ const WarRoomPage: React.FC = () => {
           onTripClick={(lat, lng) => setForcedFlyTo({ lat, lng })}
           onEventOpen={handleEventOpen}
           onViajeOpen={handleViajeOpen}
+          inspections={mode === 'LIVE' && canUseInspectionOperations(currentUser) ? inspections.data?.items || [] : undefined}
+          inspectionTotal={inspections.data?.total}
+          inspectionError={inspections.isError}
+          inspectionLoading={inspections.isPending}
         />
       </div>
 
@@ -404,6 +414,7 @@ const WarRoomPage: React.FC = () => {
           </div>
         )}
         <WarRoomMap
+          inspections={mode === 'LIVE' ? inspections.data?.items || [] : []}
           cinemaMode={cinemaMode}
           actores={actores || null}
           enTransito={enTransito}

@@ -1,8 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check, ChevronDown } from 'lucide-react';
-import { Button } from '../../components/ui/ButtonV2';
 import { saveInspectionResume } from '../../services/inspectionResume';
+import { Eye, FileSearch } from 'lucide-react';
 
 export interface InspectionWorkspaceStep {
   id: string;
@@ -22,167 +21,107 @@ interface Props {
   guided: boolean;
   defaultStep: string;
   saveAction?: React.ReactNode;
-  onBeforeNavigate: () => void;
+  onBeforeNavigate: () => boolean | void;
   resumeIdentity?: { userId: string | number; inspectionId: string };
 }
 
-/** One section at a time. The hash is the source of truth, including browser back/forward. */
-export function InspectionWorkspace({ steps, reference, guided, defaultStep, saveAction, onBeforeNavigate, resumeIdentity }: Props) {
+const sections = [
+  { label: 'Visita', ids: ['resumen', 'contexto'] },
+  { label: 'Controles', ids: ['checklist', 'declaracion'] },
+  { label: 'Registro', ids: ['acta', 'evidencias'] },
+  { label: 'Expediente', ids: ['revision', 'informe-tecnico', 'intercambios', 'trazabilidad', 'verificacion'] },
+];
+const labels: Record<string, string> = {
+  checklist: 'En campo', declaracion: 'Datos declarados', acta: 'Lo observado',
+  evidencias: 'Fotos y archivos', revision: 'Resumen y cierre', 'informe-tecnico': 'Evaluación técnica',
+  intercambios: 'Comunicaciones', trazabilidad: 'Historial', verificacion: 'Verificación',
+};
+
+/** Direct navigation. Existing deep links, drafts and file selections remain valid. */
+export function InspectionWorkspace({ steps, reference, defaultStep, saveAction, onBeforeNavigate, resumeIdentity }: Props) {
   const location = useLocation();
   const navigate = useNavigate();
-  const [indexOpen, setIndexOpen] = useState(false);
-  const [visibleAnchorKey, setVisibleAnchorKey] = useState<string | null>(null);
   const workspaceRef = useRef<HTMLDivElement>(null);
-  const headingRef = useRef<HTMLHeadingElement>(null);
-  const previousHash = useRef(location.hash);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollPositions = useRef(new Map<string, number>());
   const all = [...steps, ...reference];
   let hash = location.hash.slice(1);
-  try { hash = decodeURIComponent(hash); } catch { /* malformed links fall back to the first step */ }
+  try { hash = decodeURIComponent(hash); } catch { /* Invalid links fall back safely. */ }
   const active = all.find((step) => step.id === hash.split('/')[0])
     || all.find((step) => step.id === defaultStep) || steps[0];
-  const index = steps.findIndex((step) => step.id === active.id);
+  const [visited, setVisited] = useState<Set<string>>(() => new Set([active.id]));
+  if (!visited.has(active.id)) setVisited(new Set([...visited, active.id]));
+  const availableSections = sections.map((section) => ({ ...section, entries: section.ids.flatMap((id) => all.filter((step) => step.id === id)) })).filter((section) => section.entries.length);
+  const selectedSection = availableSections.find((section) => section.ids.includes(active.id));
   const selectedAnchor = active.anchors?.find((anchor) => anchor.id === hash.split('/').slice(1).join('/'));
-  const visibleAnchor = visibleAnchorKey === null ? selectedAnchor : active.anchors?.find((anchor) => `${active.id}/${anchor.id}` === visibleAnchorKey);
-  const anchorIds = active.anchors?.map((anchor) => anchor.id).join('|') || '';
-  const anchorGroups = Array.from(new Set(active.anchors?.map((anchor) => anchor.group).filter((group): group is string => Boolean(group)) || []));
-  const currentGroup = visibleAnchor?.group || selectedAnchor?.group || anchorGroups[0];
+  const resumeLabel = selectedAnchor ? active.label + ' · ' + selectedAnchor.label : active.label;
+  const editableSection = steps.some((step) => step.id === active.id);
   const resumeUserId = resumeIdentity?.userId;
   const resumeInspectionId = resumeIdentity?.inspectionId;
-  const resumeAnchor = visibleAnchor || selectedAnchor;
-  const resumeHash = resumeAnchor ? `#${active.id}/${encodeURIComponent(resumeAnchor.id)}` : `#${active.id}`;
-  const resumeLabel = resumeAnchor ? `${active.label} · ${resumeAnchor.label}` : active.label;
 
   useEffect(() => {
     if (!resumeUserId || !resumeInspectionId) return;
-    saveInspectionResume(resumeUserId, resumeInspectionId, resumeHash, resumeLabel);
-  }, [resumeUserId, resumeInspectionId, resumeHash, resumeLabel]);
+    saveInspectionResume(resumeUserId, resumeInspectionId, location.hash || '#' + active.id, resumeLabel);
+  }, [resumeUserId, resumeInspectionId, location.hash, active.id, resumeLabel]);
 
-  // The application scrolls <main>, not window. Track the control as it enters
-  // the readable area below the pinned guide, without interrupting typing.
-  useEffect(() => {
-    const main = workspaceRef.current?.closest('main');
-    if (!main || !anchorIds) return;
-    let frame = 0;
-    let previousOffset = -1;
-    const update = () => {
-      frame = 0;
-      const guide = workspaceRef.current?.querySelector<HTMLElement>('[data-testid="inspection-navigation"]');
-      const stepHeader = workspaceRef.current?.querySelector<HTMLElement>('[data-testid="inspection-step-header"]');
-      const compact = window.matchMedia('(max-width: 1023px)').matches;
-      const offset = Math.ceil((compact ? guide : stepHeader)?.getBoundingClientRect().height || 0);
-      if (offset !== previousOffset) {
-        workspaceRef.current?.style.setProperty('--inspection-middle-top', `${offset}px`);
-        workspaceRef.current?.style.setProperty('--inspection-anchor-offset', `${offset + 64}px`);
-        previousOffset = offset;
-      }
-      // Follow the field in the inspector's working area, not only the one
-      // touching the pinned group. Otherwise the mobile guide can still name
-      // the previous field while the next form is already being edited.
-      const workingDepth = Math.min(160, Math.max(72, (main.clientHeight - offset) * 0.25));
-      const threshold = main.getBoundingClientRect().top + offset + workingDepth;
-      const markers = Array.from(workspaceRef.current?.querySelectorAll<HTMLElement>('[data-inspection-anchor]') || [])
-        .filter((element) => element.getClientRects().length && element.dataset.inspectionAnchor?.startsWith(`${active.id}/`));
-      let current = '';
-      for (const marker of markers) {
-        if (marker.getBoundingClientRect().top > threshold) break;
-        current = marker.dataset.inspectionAnchor || '';
-      }
-      setVisibleAnchorKey((previous) => previous === current ? previous : current);
-    };
-    const schedule = () => { if (!frame) frame = requestAnimationFrame(update); };
-    const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule);
-    if (workspaceRef.current) resizeObserver?.observe(workspaceRef.current);
-    const guide = workspaceRef.current?.querySelector<HTMLElement>('[data-testid="inspection-navigation"]');
-    const stepHeader = workspaceRef.current?.querySelector<HTMLElement>('[data-testid="inspection-step-header"]');
-    if (guide) resizeObserver?.observe(guide);
-    if (stepHeader) resizeObserver?.observe(stepHeader);
-    main.addEventListener('scroll', schedule, { passive: true });
-    window.addEventListener('resize', schedule);
-    schedule();
-    return () => { resizeObserver?.disconnect(); main.removeEventListener('scroll', schedule); window.removeEventListener('resize', schedule); if (frame) cancelAnimationFrame(frame); };
-  }, [active.id, anchorIds]);
-
-  useEffect(() => {
-    if (previousHash.current === location.hash) return;
-    const previousSection = previousHash.current.split('/')[0];
-    previousHash.current = location.hash;
-    if (previousSection === location.hash.split('/')[0]) return;
-    headingRef.current?.focus({ preventScroll: true });
-    // Align the whole workspace: on mobile the pinned guide sits above the
-    // heading, so scrolling the heading itself would hide the next step.
-    workspaceRef.current?.scrollIntoView?.({ block: 'start', behavior: 'instant' });
-  }, [location.hash]);
-
-  const go = (step: InspectionWorkspaceStep) => {
-    onBeforeNavigate();
-    setIndexOpen(false);
-    if (resumeIdentity) saveInspectionResume(resumeIdentity.userId, resumeIdentity.inspectionId, `#${step.id}`, step.label);
-    navigate({ pathname: location.pathname, search: location.search, hash: `#${step.id}` });
-  };
-  const goToAnchor = (code: string) => {
-    if (!active.anchors?.some((anchor) => anchor.id === code)) return;
-    onBeforeNavigate();
-    setIndexOpen(false);
-    if (resumeIdentity) {
-      const anchor = active.anchors?.find((item) => item.id === code);
-      saveInspectionResume(resumeIdentity.userId, resumeIdentity.inspectionId, `#${active.id}/${encodeURIComponent(code)}`, `${active.label} · ${anchor?.label || code}`);
+  // Each section owns its reading position; the shell and tabs never scroll.
+  useLayoutEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.style.removeProperty('--inspection-scroll-reserve');
+      scrollRef.current.scrollTop = scrollPositions.current.get(active.id) || 0;
     }
-    navigate({ pathname: location.pathname, search: location.search, hash: `#${active.id}/${encodeURIComponent(code)}` }, { replace: true });
-    // Also return to a selected point when its hash is already the current URL.
-    requestAnimationFrame(() => {
-      const target = Array.from(document.querySelectorAll<HTMLElement>('[data-inspection-anchor]'))
-        .find((element) => element.dataset.inspectionAnchor === `${active.id}/${code}`);
-      target?.scrollIntoView({ block: 'start', behavior: 'instant' });
-    });
-  };
-  const stepLink = (step: InspectionWorkspaceStep, order?: number) => {
-    const selected = active.id === step.id;
-    return <a key={step.id} href={`#${step.id}`} aria-current={selected ? 'step' : undefined}
-      onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && event.button === 0) { event.preventDefault(); go(step); } }}
-      className={`flex min-h-12 min-w-0 items-start gap-3 rounded-lg px-3 py-3 !no-underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${selected ? 'bg-primary-50 text-primary-900' : 'text-neutral-700 hover:bg-neutral-100'}`}>
-      {order !== undefined && <span aria-hidden="true" className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${selected ? 'border-primary-700 bg-primary-700 text-white' : step.complete ? 'border-primary-200 bg-primary-50 text-primary-800' : 'border-neutral-300 bg-white text-neutral-600'}`}>{step.complete ? <Check size={15} /> : order + 1}</span>}
-      <span className="min-w-0 pt-0.5"><span className="block text-sm font-semibold leading-snug">{step.label}</span>{step.detail && <span className="mt-1 block text-xs leading-snug text-neutral-600">{step.detail}</span>}</span>
-    </a>;
+  }, [active.id]);
+
+  // Remember the actual visible field, without changing browser history or
+  // adding another navigation bar. This also covers manual long-list scrolling.
+  useEffect(() => {
+    if (!resumeUserId || !resumeInspectionId || !active.anchors?.length) return;
+    let frame = 0;
+    const remember = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const workspace = workspaceRef.current;
+        if (!workspace) return;
+        const edge = scrollRef.current?.getBoundingClientRect().top || 0;
+        const candidates = Array.from(workspace.querySelectorAll<HTMLElement>('[data-inspection-anchor]'))
+          .filter((element) => element.getClientRects().length && element.getBoundingClientRect().bottom > edge);
+        const current = candidates.find((element) => element.getBoundingClientRect().top >= edge - 8) || candidates[0];
+        const point = current?.dataset.inspectionAnchor;
+        const entry = active.anchors?.find((anchor) => point === active.id + '/' + anchor.id);
+        if (point && entry) saveInspectionResume(resumeUserId, resumeInspectionId, '#' + point, active.label + ' · ' + entry.label);
+      });
+    };
+    const region = scrollRef.current;
+    region?.addEventListener('scroll', remember);
+    return () => { region?.removeEventListener('scroll', remember); cancelAnimationFrame(frame); };
+  }, [active.id, active.anchors, active.label, resumeUserId, resumeInspectionId]);
+
+  const go = (event: React.MouseEvent<HTMLAnchorElement>, step: InspectionWorkspaceStep) => {
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0) return;
+    event.preventDefault();
+    if (onBeforeNavigate() === false) return;
+    if (scrollRef.current) scrollPositions.current.set(active.id, scrollRef.current.scrollTop);
+    navigate({ pathname: location.pathname, search: location.search, hash: '#' + step.id });
   };
 
-  return <div ref={workspaceRef} data-testid="inspection-workspace" className="min-w-0 rounded-xl border border-neutral-200 bg-white lg:grid lg:grid-cols-[210px_minmax(0,1fr)] xl:grid-cols-[224px_minmax(0,1fr)]">
-    <aside data-testid="inspection-navigation" className="sticky top-0 z-20 min-w-0 self-start border-b border-neutral-200 bg-white lg:static lg:self-stretch lg:border-b-0 lg:border-r lg:bg-neutral-50/50">
-      <button type="button" aria-label={`Ver todos los pasos · ${active.label}`} aria-expanded={indexOpen} aria-controls="inspection-step-index" onClick={() => setIndexOpen((open) => !open)} className="relative flex min-h-14 w-full items-center justify-between gap-3 px-4 py-2 text-left lg:hidden">
-        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-neutral-900">{guided && index >= 0 ? `Paso ${index + 1} de ${steps.length} · ` : ''}{active.label}</span><span data-testid="inspection-current-point" className="mt-0.5 block truncate text-xs text-neutral-600">{visibleAnchor ? `${visibleAnchor.group ? visibleAnchor.group + ' · ' : ''}${visibleAnchor.id} · ${visibleAnchor.detail || 'Sin revisar'}` : active.detail || 'Abrir índice de pasos'}</span></span><span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-primary-800">Índice<ChevronDown size={17} className={`transition-transform ${indexOpen ? 'rotate-180' : ''}`} /></span>
-        {guided && index >= 0 && <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-0.5 bg-neutral-200"><span className="block h-full bg-primary-600" style={{ width: `${(index + 1) / steps.length * 100}%` }} /></span>}
-      </button>
-      <nav id="inspection-step-index" aria-label={guided ? 'Pasos de la inspección' : 'Secciones del expediente'} className={`${indexOpen ? 'block' : 'hidden'} max-h-[55dvh] overflow-y-auto overscroll-contain px-3 pb-4 lg:sticky lg:top-0 lg:block lg:max-h-[calc(100dvh-7rem)] lg:py-5`}>
-        <p className="hidden px-3 pb-3 text-xs font-semibold text-neutral-500 lg:block">{guided ? 'Completar inspección' : 'Consultar expediente'}</p>
-        {!!active.anchors?.length && <p data-testid="inspection-current-point-desktop" className="mb-3 hidden rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-xs leading-snug text-primary-900 lg:block"><span className="block font-bold">Ahora · {active.label}</span><span className="mt-1 block">{currentGroup ? `${currentGroup} · ` : ''}{visibleAnchor ? `${visibleAnchor.id} · ${visibleAnchor.label}` : 'Inicio de la sección'}</span>{visibleAnchor?.detail && <span className="mt-1 block font-semibold">{visibleAnchor.detail}</span>}</p>}
-        <ol className="space-y-1">{steps.map((step, i) => <li key={step.id}>{stepLink(step, guided ? i : undefined)}{active.id === step.id && anchorGroups.length > 0 && <div aria-label={`Secciones de ${step.label}`} className="mb-2 ml-6 border-l border-neutral-200 pl-2"><p className="px-2 pb-1 pt-1 text-[11px] font-semibold text-neutral-500">Secciones · revisados</p>{anchorGroups.map((group) => {
-          const members = active.anchors?.filter((anchor) => anchor.group === group) || [];
-          const reviewed = members.filter((anchor) => anchor.reviewed).length;
-          return <button key={group} type="button" aria-label={`${group} · ${reviewed} de ${members.length} revisados`} aria-current={currentGroup === group ? 'location' : undefined} onClick={() => goToAnchor(members[0].id)} className={`flex min-h-10 w-full min-w-0 items-center justify-between gap-1 rounded-md px-2 py-1.5 text-left text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${currentGroup === group ? 'bg-primary-50 font-bold text-primary-900' : 'text-neutral-600 hover:bg-neutral-100'}`}><span className="min-w-0 truncate">{group}</span><span className="shrink-0 tabular-nums">{reviewed}/{members.length}</span></button>;
-        })}</div>}</li>)}</ol>
-        {reference.length > 0 && <div className="mt-4 border-t border-neutral-200 pt-3"><p className="px-3 pb-1 text-xs font-semibold text-neutral-500">Seguimiento del expediente</p>{reference.map((step) => stepLink(step))}</div>}
+  return <div ref={workspaceRef} data-testid="inspection-workspace" className="flex h-full min-h-0 min-w-0 flex-col rounded-xl border border-neutral-200 bg-white [--inspection-middle-top:0px] [--inspection-anchor-offset:56px]">
+    <div data-testid="inspection-navigation" className="sticky top-0 z-20 shrink-0 rounded-t-xl bg-white">
+      <nav aria-label="Secciones del expediente" className="flex border-b border-neutral-200 px-2 sm:px-4">
+        {availableSections.map((section) => <a key={section.label} href={'#' + section.entries[0].id} aria-current={selectedSection === section ? 'page' : undefined} onClick={(event) => go(event, section.entries[0])}
+          className={'flex min-h-14 [@media(max-height:500px)]:min-h-11 min-w-0 flex-1 items-center justify-center border-b-2 px-2 text-sm font-semibold !no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:flex-none sm:px-6 ' + (selectedSection === section ? 'border-primary-600 text-primary-800' : 'border-transparent text-neutral-600 hover:text-neutral-900')}>{section.label}</a>)}
       </nav>
-    </aside>
-    <div className="min-w-0">
-      <header data-testid="inspection-step-header" className="max-lg:sr-only border-b border-neutral-200 bg-white px-4 py-3 sm:px-6 lg:sticky lg:top-0 lg:z-20">
-        <div className="flex min-w-0 items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5"><span className="shrink-0 text-xs font-semibold text-neutral-500">{guided && index >= 0 ? `Paso ${index + 1} de ${steps.length}` : 'Expediente'}</span><h2 ref={headingRef} id="inspection-step-heading" tabIndex={-1} className="min-w-0 text-lg font-extrabold leading-snug tracking-tight text-neutral-900 outline-none sm:text-xl">{active.title}</h2></div>
-          {active.detail && <span className="hidden max-w-[38%] shrink-0 truncate text-right text-xs font-medium text-neutral-600 xl:block">{active.detail}</span>}
-        </div>
-        {guided && index >= 0 && <div role="progressbar" aria-label="Paso actual del recorrido" aria-valuemin={1} aria-valuemax={steps.length} aria-valuenow={index + 1} className="mt-2 h-1 overflow-hidden rounded-full bg-neutral-200"><span className="block h-full bg-primary-600 transition-[width]" style={{ width: `${(index + 1) / steps.length * 100}%` }} /></div>}
-      </header>
-      <p className="border-b border-neutral-200 px-4 py-3 text-sm leading-relaxed text-neutral-600 sm:px-6">{active.description}</p>
-      {/* Keep child drafts and selected files alive when navigating. Hidden panels
-          are removed from layout and the accessibility tree, not from React. */}
-      {all.map((step) => <section key={step.id} hidden={step.id !== active.id} aria-label={step.title} id={step.id === 'verificacion' ? undefined : step.id} data-testid={step.id === active.id ? 'inspection-step-content' : undefined} className="min-w-0 space-y-5 p-4 sm:p-6 [&>section]:shadow-none [&>div]:shadow-none">
-        {step.content}
-      </section>)}
-      {index >= 0 && <footer data-testid="inspection-action-bar" className="border-t border-neutral-200 bg-neutral-50/60 p-4 sm:px-6">
-        {saveAction && <div className="mb-3 flex justify-end">{saveAction}</div>}
-        <div className="flex items-center justify-between gap-3">
-          {index > 0 ? <Button variant="outline" leftIcon={<ArrowLeft size={16} />} onClick={() => go(steps[index - 1])}>Anterior</Button> : <span />}
-          {active.nextAction || (index < steps.length - 1 && <Button rightIcon={<ArrowRight size={16} />} onClick={() => go(steps[index + 1])}>Siguiente</Button>)}
-        </div>
-      </footer>}
+      {selectedSection && selectedSection.entries.length > 1 && <nav aria-label={'Apartados de ' + selectedSection.label} className="flex gap-1 overflow-x-auto border-b border-neutral-200 px-3 py-1">
+        {selectedSection.entries.map((step) => <a key={step.id} href={'#' + step.id} aria-current={active.id === step.id ? 'page' : undefined} onClick={(event) => go(event, step)}
+          className={'flex min-h-11 shrink-0 items-center gap-2 rounded-md px-3 text-sm !no-underline focus-visible:ring-2 focus-visible:ring-primary-500 ' + (active.id === step.id ? 'bg-primary-100 font-bold text-primary-900' : 'text-neutral-700 hover:bg-neutral-100')}>{step.id === 'checklist' && <Eye size={18} aria-hidden="true" />}{step.id === 'declaracion' && <FileSearch size={18} aria-hidden="true" />}{labels[step.id] || step.label}</a>)}
+      </nav>}
     </div>
+    <div ref={scrollRef} data-inspection-scroll data-testid="inspection-scroll-region" className="min-h-0 flex-1 scroll-pt-14 scroll-pb-4 overflow-y-auto overscroll-contain rounded-b-xl [overflow-anchor:none] after:block after:h-[var(--inspection-scroll-reserve,0px)] after:content-['']" onScroll={(event) => { scrollPositions.current.set(active.id, event.currentTarget.scrollTop); }}>
+    {active.nextAction && <div data-testid="inspection-start" className="border-b border-primary-200 bg-primary-50 p-4 sm:p-6"><h2 className="mb-1 text-lg font-bold text-primary-900">Comenzar el recorrido</h2><p className="mb-3 text-sm leading-relaxed text-neutral-800">Al iniciar se registra la hora y se abre el trabajo de campo.</p>{active.nextAction}</div>}
+    {/* Hidden sections remain mounted to protect local drafts and selected files. */}
+    {all.map((step) => <section key={step.id} hidden={step.id !== active.id} aria-label={step.title} id={step.id === 'verificacion' ? undefined : step.id} data-testid={step.id === active.id ? 'inspection-step-content' : undefined} className="min-w-0 space-y-6 p-4 sm:p-6 [&>section]:shadow-none [&>div]:shadow-none">
+      {(step.id === active.id || visited.has(step.id)) && step.content}
+    </section>)}
+    </div>
+    {editableSection && saveAction && <footer data-testid="inspection-action-bar" className="shrink-0 rounded-b-xl border-t border-neutral-300 bg-white px-3 py-3 pb-[max(12px,env(safe-area-inset-bottom))] sm:px-6">{saveAction}</footer>}
   </div>;
 }

@@ -79,3 +79,6 @@ __pycache__/
 # Env files with real credentials (never commit)
 backend/.env.production
 backend/.env.production.deploy
+
+# Offline speech model: shared deployment artifact, not duplicated in Git.
+frontend/public/voice/*.tar.gz

@@ -21,19 +21,20 @@ export const ImpersonationBanner: React.FC<ImpersonationBannerProps> = ({ user, 
   const rolLabel = ROL_LABELS[user.rol] || user.rol;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[60] bg-amber-500 text-white px-4 py-2 flex items-center justify-between shadow-lg">
-      <div className="flex items-center gap-2">
-        <Eye size={16} className="shrink-0" />
-        <span className="text-sm font-medium">
-          Acceso Comodín — viendo como: <strong>{user.nombre}</strong>
-          <span className="ml-1 opacity-80">({rolLabel})</span>
+    <div className="fixed inset-x-0 top-0 z-[60] flex min-h-12 items-center justify-between gap-3 border-b border-amber-300 bg-amber-100 px-4 py-1 text-amber-950">
+      <div className="flex min-w-0 items-center gap-2">
+        <Eye size={18} className="shrink-0" aria-hidden="true" />
+        <span className="min-w-0 text-sm font-semibold">
+          Vista temporal · <strong>{user.nombre}</strong>
+          <span className="ml-1 font-normal">({rolLabel})</span>
         </span>
       </div>
       <button
+        type="button"
         onClick={onExit}
-        className="flex items-center gap-1 text-xs bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full font-semibold transition-colors shrink-0"
+        className="flex min-h-11 shrink-0 items-center gap-1 rounded-lg border border-amber-700 bg-white px-3 text-sm font-bold text-amber-950 hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-900"
       >
-        <ArrowLeft size={12} />
+        <ArrowLeft size={16} aria-hidden="true" />
         Volver a mi cuenta
       </button>
     </div>

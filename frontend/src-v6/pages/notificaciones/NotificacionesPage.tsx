@@ -16,13 +16,16 @@ import {
   Info,
   CheckCircle2,
   ArrowLeft,
-  Loader2
+  Loader2,
+  ChevronRight,
 } from 'lucide-react';
 import { Card } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
-import { useNotificaciones, useMarcarLeida, useMarcarTodasLeidas } from '../../hooks/useNotificaciones';
+import { useNotificaciones, useMarcarLeida, useMarcarTodasLeidas, useEliminarNotificacion } from '../../hooks/useNotificaciones';
 import { formatRelativeTime } from '../../utils/formatters';
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
+import { resolveNotificationPath } from '../../utils/notificationNavigation';
 
 const getIconByType = (tipo: string) => {
   switch (tipo) {
@@ -51,12 +54,14 @@ const getBgByType = (tipo: string) => {
 
 const NotificacionesPage: React.FC = () => {
   const navigate = useNavigate();
+  const mp = useMobilePrefix();
   const [filtro, setFiltro] = useState<'todas' | 'no-leidas'>('todas');
 
   // Real API hooks
   const { data: apiData, isLoading } = useNotificaciones({ leida: filtro === 'no-leidas' ? false : undefined });
   const marcarLeidaMutation = useMarcarLeida();
   const marcarTodasMutation = useMarcarTodasLeidas();
+  const eliminarMutation = useEliminarNotificacion();
 
   const notificaciones = useMemo(() => {
     const items = apiData?.items || [];
@@ -68,6 +73,8 @@ const NotificacionesPage: React.FC = () => {
       mensaje: n.mensaje,
       fecha: new Date(n.createdAt),
       leida: n.leida,
+      prioridad: n.prioridad,
+      raw: n,
     }));
   }, [apiData]);
 
@@ -81,8 +88,13 @@ const NotificacionesPage: React.FC = () => {
     marcarTodasMutation.mutate();
   };
 
-  const eliminarNotificacion = (_id: number | string) => {
-    // Deletion handled by API when available
+  const eliminarNotificacion = (id: number | string) => {
+    eliminarMutation.mutate(String(id));
+  };
+
+  const abrirNotificacion = (notif: typeof notificaciones[number]) => {
+    if (!notif.leida) marcarLeida(String(notif.id));
+    navigate(resolveNotificationPath(notif.raw, mp('')));
   };
 
   const noLeidasCount = notificaciones.filter(n => !n.leida).length;
@@ -195,6 +207,11 @@ const NotificacionesPage: React.FC = () => {
                           <span className="ml-2 inline-block w-2 h-2 bg-primary-500 rounded-full" />
                         )}
                       </h4>
+                      {notif.prioridad === 'ALTA' || notif.prioridad === 'URGENTE' ? (
+                        <Badge variant="soft" color="error" className="mt-1">
+                          {notif.prioridad === 'URGENTE' ? 'Urgente' : 'Prioridad alta'}
+                        </Badge>
+                      ) : null}
                       <p className="text-sm text-neutral-600 mt-1">
                         {notif.mensaje}
                       </p>
@@ -207,6 +224,13 @@ const NotificacionesPage: React.FC = () => {
 
                 {/* Actions */}
                 <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => abrirNotificacion(notif)}
+                    className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-primary-700 hover:bg-primary-50"
+                    title="Abrir el caso relacionado"
+                  >
+                    Abrir <ChevronRight size={16} />
+                  </button>
                   {!notif.leida && (
                     <button
                       onClick={() => marcarLeida(notif.id)}

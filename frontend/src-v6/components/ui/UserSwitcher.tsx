@@ -22,6 +22,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import type { UserRole } from '../../contexts/AuthContext';
 import { Button } from './ButtonV2';
 import { Badge } from './BadgeV2';
+import { ROLE_GROUP_LABELS } from '../../utils/roleGroupLabels';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -339,7 +340,7 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
                 )}>
                   <Icon size={18} className={config.color} />
                   <span className={cn('font-semibold', config.color)}>
-                    {config.label}s
+                          {ROLE_GROUP_LABELS[role] || config.label}
                   </span>
                   <Badge variant="soft" color="neutral" size="sm">
                     {roleUsers.length}

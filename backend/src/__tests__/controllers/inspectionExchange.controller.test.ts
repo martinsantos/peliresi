@@ -16,11 +16,12 @@ const mocks = vi.hoisted(() => ({
   updateInspection: vi.fn(),
   createEvent: vi.fn(),
   finalExchange: vi.fn(),
+  markViewed: vi.fn(),
 }));
 
 vi.mock('../../lib/prisma', () => ({ default: {
   inspeccion: { findUnique: mocks.inspection, findMany: mocks.inspections },
-  intercambioInspeccion: { findMany: mocks.exchanges, findFirst: mocks.existingExchange, findUniqueOrThrow: mocks.finalExchange },
+  intercambioInspeccion: { findMany: mocks.exchanges, findFirst: mocks.existingExchange, findUniqueOrThrow: mocks.finalExchange, updateMany: mocks.markViewed },
   $transaction: mocks.transaction,
 } }));
 vi.mock('../../services/inspectionEvidence.service', () => ({
@@ -66,6 +67,7 @@ describe('inspection participant exchange controller', () => {
     vi.clearAllMocks();
     mocks.inspection.mockResolvedValue(actorInspection);
     mocks.exchanges.mockResolvedValue([]);
+    mocks.markViewed.mockResolvedValue({ count: 1 });
     mocks.inspections.mockResolvedValue([{ ...actorInspection, _count: { intercambios: 2 } }]);
     mocks.existingExchange.mockResolvedValue(null);
     mocks.persist.mockResolvedValue({
@@ -103,6 +105,9 @@ describe('inspection participant exchange controller', () => {
     await obtenerIntercambiosInspeccion({ params: { id: 'inspection-1' }, user: actorUser() } as any, res as any, next);
     expect(next).not.toHaveBeenCalled();
     expect(mocks.exchanges).toHaveBeenCalledWith(expect.objectContaining({ where: { inspeccionId: 'inspection-1' } }));
+    expect(mocks.markViewed).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ destinatario: 'INSPECCIONADO', vistaPorDestinatarioAt: null }),
+    }));
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ parteActual: 'INSPECCIONADO', comunicacionExterna: false }),
     }));

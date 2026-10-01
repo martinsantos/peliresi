@@ -4,6 +4,8 @@
  * Shell: filter bar, tab switcher, lazy-loaded tab content
  */
 
+import { useAuth } from '../../contexts/AuthContext';
+import { canUseInspectionOperations } from '../../services/inspectionOperations.service';
 import React, { useState, useMemo, useCallback, lazy, Suspense } from 'react';
 import {
   FileText,
@@ -38,6 +40,7 @@ const GeneradoresTab = lazy(() => import('./tabs/GeneradoresTab'));
 const OperadoresTab = lazy(() => import('./tabs/OperadoresTab'));
 const DepartamentosTab = lazy(() => import('./tabs/DepartamentosTab'));
 const MapaActoresTab = lazy(() => import('./tabs/MapaActoresTab'));
+const InspeccionesTab = lazy(() => import('../inspecciones/InspectionOperationsPanel').then(mod => ({ default: mod.InspectionOperationsPanel })));
 const TratamientosTab = lazy(() => import('./tabs/TratamientosTab'));
 
 // Lazy-load the modal from DepartamentosTab
@@ -45,9 +48,10 @@ const DepartamentoDetalleModalLazy = lazy(() =>
   import('./tabs/DepartamentosTab').then(mod => ({ default: mod.DepartamentoDetalleModal }))
 );
 
-type TabType = 'manifiestos' | 'tratados' | 'transporte' | 'generadores' | 'operadores' | 'tratamientos' | 'departamentos' | 'mapa';
+type TabType = 'manifiestos' | 'tratados' | 'transporte' | 'generadores' | 'operadores' | 'tratamientos' | 'departamentos' | 'mapa' | 'inspecciones';
 
 const tabs: { id: TabType; label: string; icon: React.ElementType }[] = [
+  { id: 'inspecciones', label: 'Inspecciones', icon: FileText },
   { id: 'manifiestos', label: 'Manifiestos', icon: FileText },
   { id: 'tratados', label: 'Residuos Tratados', icon: Package },
   { id: 'transporte', label: 'Transporte', icon: Truck },
@@ -71,6 +75,7 @@ function TabSpinner() {
 }
 
 const ReportesPage: React.FC = () => {
+  const { currentUser } = useAuth();
   // ── Period filter state (default: Ver Todos = days 0) ──
   const [datePreset, setDatePreset] = useState(0);
   const [fechaDesde, setFechaDesde] = useState('');
@@ -114,7 +119,8 @@ const ReportesPage: React.FC = () => {
     ...(incluirTodos ? { incluirTodos: 'true' } : {}),
   }), [fechaDesde, fechaHasta, incluirTodos]);
 
-  const { data: ccData } = useCentroControl(ccParams, 0);
+  const needsCentroControl = ['departamentos', 'mapa', 'generadores', 'operadores'].includes(activeTab);
+  const { data: ccData } = useCentroControl(ccParams, false, needsCentroControl);
 
   const activeQuery = activeTab === 'manifiestos' ? manifiestos
     : activeTab === 'tratados' ? tratados
@@ -298,7 +304,7 @@ const ReportesPage: React.FC = () => {
           {/* Right gradient fade */}
           <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white to-transparent z-10 rounded-br-xl" />
           <div className="flex items-center gap-0.5 px-2 overflow-x-auto scrollbar-hide">
-            {tabs.map(tab => {
+            {tabs.filter(tab => tab.id !== 'inspecciones' || canUseInspectionOperations(currentUser)).map(tab => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               return (
@@ -362,8 +368,9 @@ const ReportesPage: React.FC = () => {
         )
       ) : (
         <>
+          {activeTab === 'inspecciones' && <InspeccionesTab key={`${fechaDesde}:${fechaHasta}`} mode="report" desde={fechaDesde} hasta={fechaHasta} />}
           {activeTab === 'departamentos' && <DepartamentosTab ccData={ccData || null} onSelectDep={handleSelectDep} periodoLabel={periodoLabel} />}
-          {activeTab === 'mapa' && <MapaActoresTab ccData={ccData || null} onSelectDep={handleSelectDep} periodoLabel={periodoLabel} incluirTodos={incluirTodos} onToggleIncluirTodos={setIncluirTodos} />}
+          {activeTab === 'mapa' && <MapaActoresTab ccData={ccData || null} onSelectDep={handleSelectDep} periodoLabel={periodoLabel} desde={fechaDesde} hasta={fechaHasta} incluirTodos={incluirTodos} onToggleIncluirTodos={setIncluirTodos} />}
           {activeTab === 'generadores' && <GeneradoresTab ccData={ccData || null} periodoLabel={periodoLabel} incluirTodos={incluirTodos} />}
           {activeTab === 'operadores' && <OperadoresTab ccData={ccData || null} periodoLabel={periodoLabel} incluirTodos={incluirTodos} />}
           {activeTab === 'tratamientos' && <TratamientosTab periodoLabel={periodoLabel} />}

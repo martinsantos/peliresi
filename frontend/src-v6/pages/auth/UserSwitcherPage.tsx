@@ -8,17 +8,18 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Shield, Factory, Truck, FlaskConical, User, ChevronRight, Loader2 } from 'lucide-react';
+import { ArrowLeft, Shield, Factory, Truck, FlaskConical, User, ChevronRight, Loader2, Search, RefreshCw } from 'lucide-react';
 import { api } from '../../services/api';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { ROLE_GROUP_LABELS } from '../../utils/roleGroupLabels';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 type UserRole = 'ADMIN' | 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR' | 'AUDITOR' | 'ADMIN_TRANSPORTISTA' | 'ADMIN_GENERADOR' | 'ADMIN_OPERADOR';
 
 interface ApiUsuario {
-  id: number;
+  id: string;
   nombre: string;
   apellido?: string;
   email: string;
@@ -61,20 +62,25 @@ function getInitials(u: ApiUsuario): string {
 export const UserSwitcherPage: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
-  const { impersonateUser, impersonationData } = useImpersonation();
-  const [loadingId, setLoadingId] = useState<number | null>(null);
+  const { impersonateUser } = useImpersonation();
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const { data, isLoading, isError } = useQuery<ApiUsuario[]>({
-    queryKey: ['admin-usuarios-switcher'],
+  const { data, isLoading, isError, refetch } = useQuery<ApiUsuario[]>({
+    queryKey: ['admin-usuarios-switcher', currentUser?.id],
     queryFn: () => api.get('/admin/usuarios', { params: { limit: 200 } }).then(r => r.data?.data?.usuarios || []),
     staleTime: 2 * 60_000,
+    enabled: currentUser?.rol === 'ADMIN',
   });
 
   const usuarios: ApiUsuario[] = useMemo(() => {
     const list = data || [];
     // Exclude current user and already-impersonated user
-    return list.filter(u => u.id !== currentUser?.id && u.activo);
-  }, [data, currentUser]);
+    const term = search.trim().toLocaleLowerCase('es-AR');
+    return list.filter(u => String(u.id) !== String(currentUser?.id) && u.activo && (!term ||
+      `${u.nombre} ${u.apellido || ''} ${u.email} ${getSector(u)} ${ROL_CONFIG[u.rol]?.label || u.rol}`.toLocaleLowerCase('es-AR').includes(term)));
+  }, [data, currentUser?.id, search]);
 
   const byRole = useMemo(() => {
     const map: Record<string, ApiUsuario[]> = {};
@@ -86,15 +92,27 @@ export const UserSwitcherPage: React.FC = () => {
   }, [usuarios]);
 
   const handleImpersonate = async (u: ApiUsuario) => {
-    setLoadingId(u.id);
+    setActionError(null);
+    setLoadingId(String(u.id));
     try {
       await impersonateUser(String(u.id));
       // impersonateUser does window.location.href = '/dashboard', so this won't run
     } catch (err) {
       console.error('Impersonation failed:', err);
+      setActionError('No se pudo abrir la vista temporal. Tu sesión no cambió. Intentá nuevamente.');
       setLoadingId(null);
     }
   };
+
+  if (currentUser?.rol !== 'ADMIN') {
+    return (
+      <div className="mx-auto max-w-md px-4 py-8">
+        <h1 className="text-xl font-bold text-neutral-900">Cambio de usuario no disponible</h1>
+        <p className="mt-2 text-base text-neutral-700">Esta función pertenece a una cuenta administradora. Tu sesión actual no cambió.</p>
+        <button type="button" onClick={() => navigate('/dashboard')} className="mt-5 min-h-11 rounded-lg bg-primary-800 px-4 font-semibold text-white">Volver al inicio</button>
+      </div>
+    );
+  }
 
   // Loading overlay
   if (loadingId !== null) {
@@ -109,50 +127,50 @@ export const UserSwitcherPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 py-8 px-4">
-      <div className="max-w-3xl mx-auto space-y-6">
+    <div className="mx-auto max-w-3xl px-1 pb-8 pt-2 sm:px-4" data-testid="user-switcher-page">
+      <div className="space-y-5">
 
         {/* Header */}
-        <div className="flex items-center gap-4">
+        <div>
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-sm font-medium text-neutral-700 transition-colors"
+            className="mb-4 flex min-h-11 items-center gap-2 rounded-lg text-sm font-semibold text-neutral-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
           >
-            <ArrowLeft size={16} />
+            <ArrowLeft size={18} aria-hidden="true" />
             Volver
           </button>
-          <div>
-            <h1 className="text-2xl font-bold text-neutral-900">Cambiar Usuario</h1>
-            <p className="text-neutral-500 text-sm">Selecciona un usuario para impersonarlo</p>
-          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-neutral-950">Ver como otro usuario</h1>
+          <p className="mt-1 text-base text-neutral-700">Vista temporal para comprobar su experiencia. Podés volver a tu cuenta en cualquier momento.</p>
         </div>
 
-        {/* Banner informativo */}
-        <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 rounded-xl p-4 text-white">
-          <p className="font-semibold">Acceso Comodín — Impersonación de Usuarios</p>
-          <p className="text-emerald-100 text-sm mt-1">
-            Tomarás el control total de la sesión del usuario seleccionado. Aparecerá
-            una barra naranja para recordarte que estás en modo impersonación.
-            {impersonationData && (
-              <span className="font-bold"> Ya estás impersonando a {impersonationData.impersonatedUser.nombre}.</span>
-            )}
-          </p>
-        </div>
+        <label className="block">
+          <span className="mb-2 block text-sm font-semibold text-neutral-800">Buscar usuario</span>
+          <span className="flex min-h-12 items-center gap-3 rounded-xl border border-neutral-300 bg-white px-3 focus-within:border-primary-700 focus-within:ring-2 focus-within:ring-primary-100">
+            <Search size={19} className="shrink-0 text-neutral-600" aria-hidden="true" />
+            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Nombre, correo, entidad o rol" className="w-full bg-transparent text-base text-neutral-950 outline-none placeholder:text-neutral-500" />
+          </span>
+        </label>
 
         {/* Estado de carga / error */}
         {isLoading && (
-          <div className="flex items-center justify-center py-16">
+          <div role="status" className="flex items-center justify-center gap-3 py-12 text-neutral-700">
             <Loader2 size={32} className="text-emerald-500 animate-spin" />
+            <span>Cargando usuarios…</span>
           </div>
         )}
 
         {isError && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">
-            Error al cargar usuarios. Verificá que tenés rol ADMIN.
+          <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-900">
+            <p className="font-semibold">No se pudieron cargar los usuarios</p>
+            <p className="mt-1 text-sm">Comprobá la conexión o renová tu sesión. No se cambió de cuenta.</p>
+            <button type="button" onClick={() => void refetch()} className="mt-3 flex min-h-11 items-center gap-2 rounded-lg border border-red-700 bg-white px-3 font-semibold text-red-900"><RefreshCw size={16} aria-hidden="true" /> Reintentar</button>
           </div>
         )}
 
+        {actionError && <p role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 font-medium text-red-900">{actionError}</p>}
+
         {/* Lista por rol */}
+        {!isLoading && !isError && <p className="text-sm font-medium text-neutral-600">{usuarios.length} {usuarios.length === 1 ? 'usuario disponible' : 'usuarios disponibles'}</p>}
         {!isLoading && !isError && ROL_ORDER.map(rol => {
           const group = byRole[rol];
           if (!group || group.length === 0) return null;
@@ -160,11 +178,11 @@ export const UserSwitcherPage: React.FC = () => {
           const Icon = cfg.icon;
 
           return (
-            <div key={rol} className="bg-white rounded-xl border border-neutral-200 overflow-hidden shadow-sm">
+            <section key={rol} className="overflow-hidden rounded-xl border border-neutral-200 bg-white" aria-label={cfg.label}>
               {/* Cabecera del grupo */}
-              <div className={`flex items-center gap-2 px-4 py-3 ${cfg.bg} border-b ${cfg.border}`}>
+              <div className={`flex items-center gap-2 border-b px-4 py-3 ${cfg.bg} ${cfg.border}`}>
                 <Icon size={16} className={cfg.color} />
-                <span className={`font-semibold text-sm ${cfg.color}`}>{cfg.label}s</span>
+                <span className={`font-semibold text-sm ${cfg.color}`}>{ROLE_GROUP_LABELS[rol] || cfg.label}</span>
                 <span className="ml-auto text-xs font-medium text-neutral-500 bg-white/70 px-2 py-0.5 rounded-full">
                   {group.length}
                 </span>
@@ -176,7 +194,7 @@ export const UserSwitcherPage: React.FC = () => {
                   <button
                     key={u.id}
                     onClick={() => handleImpersonate(u)}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-neutral-50 transition-colors text-left"
+                    className="flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
                   >
                     {/* Avatar */}
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0 ${cfg.bg} ${cfg.color}`}>
@@ -188,22 +206,22 @@ export const UserSwitcherPage: React.FC = () => {
                       <p className="font-medium text-neutral-900 truncate">
                         {[u.nombre, u.apellido].filter(Boolean).join(' ') || u.email}
                       </p>
-                      <p className="text-xs text-neutral-500 truncate">{getSector(u)}</p>
+                      <p className="truncate text-sm text-neutral-600">{getSector(u)}</p>
                     </div>
 
                     <ChevronRight size={16} className="text-neutral-400 flex-shrink-0" />
                   </button>
                 ))}
               </div>
-            </div>
+            </section>
           );
         })}
 
         {/* Sin usuarios */}
         {!isLoading && !isError && usuarios.length === 0 && (
-          <div className="text-center py-12 text-neutral-400">
-            <User size={40} className="mx-auto mb-3 opacity-30" />
-            <p className="font-medium">No hay otros usuarios activos</p>
+          <div className="rounded-xl border border-neutral-200 bg-white px-4 py-10 text-center text-neutral-700">
+            <User size={32} className="mx-auto mb-3" aria-hidden="true" />
+            <p className="font-medium">{search ? 'No hay usuarios que coincidan con la búsqueda' : 'No hay otros usuarios activos'}</p>
           </div>
         )}
 

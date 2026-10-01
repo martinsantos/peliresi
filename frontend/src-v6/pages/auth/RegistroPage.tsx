@@ -3,9 +3,10 @@
  */
 import React, { useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import { Leaf, ArrowLeft, User, Mail, Lock, Phone, Building2, AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, User, Mail, Lock, Phone, Building2, AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { authService } from '../../services/auth.service';
 import { Select } from '../../components/ui/Select';
+import { SitrepMark } from '../../components/SitrepMark';
 
 type RolType = 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR' | 'ADMIN_TRANSPORTISTA' | 'ADMIN_GENERADOR' | 'ADMIN_OPERADOR';
 
@@ -97,9 +98,7 @@ const RegistroPage: React.FC = () => {
       </Link>
 
       <div className="text-center mb-6">
-        <div className="w-14 h-14 bg-[#1B5E3C] rounded-2xl flex items-center justify-center mx-auto mb-3">
-          <Leaf size={26} className="text-white" />
-        </div>
+        <SitrepMark size={56} className="mx-auto mb-3" />
         <h2 className="text-2xl font-bold text-neutral-900">Crear cuenta en SITREP</h2>
         <p className="text-sm text-neutral-500 mt-1">Una vez registrado, verificá tu email y aguardá la aprobación</p>
       </div>

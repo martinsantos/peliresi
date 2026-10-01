@@ -1,12 +1,12 @@
 import { Router } from 'express';
-import { isAuthenticated, requireAdminOrTransportista, requireAdminOrGenerador, requireAdminOrOperador, requireFullAccess } from '../middlewares/auth.middleware';
+import { hasRole, isAuthenticated, requireAdminOrTransportista, requireAdminOrGenerador, requireAdminOrOperador, requireFullAccess } from '../middlewares/auth.middleware';
 import {
     getGeneradores, getGeneradorById, createGenerador, updateGenerador, deleteGenerador,
     getTransportistas, getTransportistaById, createTransportista, updateTransportista, deleteTransportista,
     addVehiculo, updateVehiculo, deleteVehiculo,
     addChofer, updateChofer, deleteChofer,
     getOperadores, getOperadorById, createOperador, updateOperador, deleteOperador,
-    getHistorialActor
+    getHistorialActor, crearRecordatoriosGeneradores
 } from '../controllers/actor.controller';
 import { getPagosTEF, createPagoTEF, updatePagoTEF, deletePagoTEF, getDDJJ, createDDJJ, updateDDJJ, deleteDDJJ } from '../controllers/generador-fiscal.controller';
 import { getPagosTEFOperador, createPagoTEFOperador, updatePagoTEFOperador, deletePagoTEFOperador, getDDJJOperador, createDDJJOperador, updateDDJJOperador, deleteDDJJOperador } from '../controllers/operador-fiscal.controller';
@@ -42,6 +42,7 @@ router.use(requireFullAccess);
  *                   numeroInscripcion: { type: string }
  */
 router.get('/generadores', getGeneradores);
+router.post('/generadores/recordatorios', hasRole('ADMIN', 'ADMIN_GENERADOR'), crearRecordatoriosGeneradores);
 
 /**
  * @openapi

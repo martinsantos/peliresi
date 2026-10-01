@@ -1,15 +1,13 @@
 /**
  * SITREP v6 - Usuarios Admin Page
  * ================================
- * Gestion completa de usuarios del sistema - Real API + fallback mock
+ * Gestión de usuarios: confirmaciones y datos provistos por la API.
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
-  Users,
   UserPlus,
   Search,
-  Filter,
   MoreHorizontal,
   Trash2,
   CheckCircle,
@@ -19,34 +17,22 @@ import {
   Truck,
   FlaskConical,
   Building2,
-  Mail,
-  Phone,
-  Calendar,
-  Lock,
   Grid3X3,
   List,
   User,
   Eye,
-  Download,
-  FileDown,
-  ChevronLeft,
-  ChevronRight,
   MapPin,
-  Clock,
-  Loader2,
   UserCheck,
   UserX,
   ShieldCheck,
-  Printer,
 } from 'lucide-react';
-import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
+import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Modal, ConfirmModal } from '../../components/ui/Modal';
 import { toast } from '../../components/ui/Toast';
 import { Table, Pagination } from '../../components/ui/Table';
-import { Tabs, TabList, Tab } from '../../components/ui/Tabs';
 import { Select } from '../../components/ui/Select';
 import { useUsuarios, useCreateUsuario, useDeleteUsuario, useUpdateUsuario, useToggleUsuarioActivo } from '../../hooks/useUsuarios';
 import { downloadCsv } from '../../utils/exportCsv';
@@ -55,6 +41,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
 import api from '../../services/api';
 import type { Rol } from '../../types/models';
+import { useDebounce } from '../../hooks/useDebounce';
+import { getApiErrorMessage } from '../../utils/api-error';
 
 
 type UsuarioLocal = {
@@ -69,7 +57,7 @@ type UsuarioLocal = {
   fechaRegistro: string;
   avatar: string;
   ubicacion: string;
-  manifiestos: number;
+  manifiestos: number | null;
   esInspector: boolean;
 };
 
@@ -111,11 +99,11 @@ function apiUserToLocal(u: any): UsuarioLocal {
     rol: u.rol,
     sector: u.empresa || u.generador?.razonSocial || u.transportista?.razonSocial || u.operador?.razonSocial || '',
     estado: u.activo ? 'activo' : (u.emailVerified ? 'pendiente' : 'inactivo'),
-    ultimoAcceso: u.updatedAt ? timeSince(u.updatedAt) : 'Nunca',
+    ultimoAcceso: u.lastLoginAt ? timeSince(u.lastLoginAt) : 'No informado',
     fechaRegistro: u.createdAt ? new Date(u.createdAt).toISOString().split('T')[0] : '',
     avatar: initials,
     ubicacion: '',
-    manifiestos: 0,
+    manifiestos: typeof u.manifiestosCount === 'number' ? u.manifiestosCount : null,
     esInspector: !!u.esInspector,
   };
 }
@@ -130,9 +118,7 @@ const UsuariosPage: React.FC = () => {
   const [filtroRol, setFiltroRol] = useState('todos');
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [vistaMode, setVistaMode] = useState<'grid' | 'list'>('list');
-  const [activeTab, setActiveTab] = useState('todos');
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<string | undefined>(undefined);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
@@ -140,7 +126,15 @@ const UsuariosPage: React.FC = () => {
   const { impersonateUser } = useImpersonation();
 
   // Real API data
-  const { data: apiData, isLoading: apiLoading, isError: apiError } = useUsuarios({ sortBy, sortOrder });
+  const search = useDebounce(busqueda.trim(), 300);
+  const itemsPerPage = 10;
+  const { data: apiData, isLoading: apiLoading, isError: apiError, refetch } = useUsuarios({
+    page: currentPage, limit: itemsPerPage, sortBy, sortOrder, search: search || undefined,
+    rol: filtroRol !== 'todos' && filtroRol !== 'ADMIN_GRUPO' ? filtroRol as Rol : undefined,
+    roles: filtroRol === 'ADMIN_GRUPO' ? ['ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'] : undefined,
+    activo: filtroEstado === 'todos' ? undefined : filtroEstado === 'activo',
+    emailVerified: filtroEstado === 'pendiente' ? true : filtroEstado === 'inactivo' ? false : undefined,
+  });
   const createMutation = useCreateUsuario();
   const deleteMutation = useDeleteUsuario();
   const updateMutation = useUpdateUsuario();
@@ -181,113 +175,48 @@ const UsuariosPage: React.FC = () => {
   const [editEmpresa, setEditEmpresa] = useState('');
   const [editEsInspector, setEditEsInspector] = useState(false);
 
-  const itemsPerPage = 10;
+  const totalPages = apiData?.totalPages ?? 0;
+  const totalItems = apiData?.total ?? 0;
+  const usuariosPaginados = usuarios;
+  useEffect(() => {
+    if (apiData && currentPage > Math.max(1, apiData.totalPages)) setCurrentPage(Math.max(1, apiData.totalPages));
+  }, [apiData, currentPage]);
 
-  // Filtrar usuarios segun tab, busqueda y filtros
-  const usuariosFiltrados = useMemo(() => {
-    let filtered = usuarios;
-
-    // Filtrar por tab
-    if (activeTab === 'admin') {
-      filtered = filtered.filter(u => u.rol === 'ADMIN');
-    } else if (activeTab === 'admins_grupo') {
-      filtered = filtered.filter(u => ['ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'].includes(u.rol));
-    } else if (activeTab === 'generador') {
-      filtered = filtered.filter(u => u.rol === 'GENERADOR');
-    } else if (activeTab === 'transportista') {
-      filtered = filtered.filter(u => u.rol === 'TRANSPORTISTA');
-    } else if (activeTab === 'operador') {
-      filtered = filtered.filter(u => u.rol === 'OPERADOR');
-    }
-
-    // Filtrar por busqueda
-    if (busqueda) {
-      const searchLower = busqueda.toLowerCase();
-      filtered = filtered.filter(u =>
-        String(u.nombre || '').toLowerCase().includes(searchLower) ||
-        String(u.email || '').toLowerCase().includes(searchLower) ||
-        String(u.sector || '').toLowerCase().includes(searchLower) ||
-        String(u.ubicacion || '').toLowerCase().includes(searchLower)
-      );
-    }
-
-    // Filtrar por rol
-    if (filtroRol !== 'todos') {
-      filtered = filtered.filter(u => u.rol === filtroRol);
-    }
-
-    // Filtrar por estado
-    if (filtroEstado !== 'todos') {
-      filtered = filtered.filter(u => u.estado === filtroEstado);
-    }
-
-    return filtered;
-  }, [usuarios, activeTab, busqueda, filtroRol, filtroEstado]);
-
-  // Paginacion
-  const totalPages = Math.ceil(usuariosFiltrados.length / itemsPerPage);
-  const usuariosPaginados = usuariosFiltrados.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  const ADMIN_GRUPO_ROLES = ['ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'];
-
-  // Stats
-  const stats = {
-    total: usuarios.length,
-    activos: usuarios.filter(u => u.estado === 'activo').length,
-    pendientes: usuarios.filter(u => u.estado === 'pendiente').length,
-    inactivos: usuarios.filter(u => u.estado === 'inactivo').length,
-    admins: usuarios.filter(u => u.rol === 'ADMIN' || ADMIN_GRUPO_ROLES.includes(u.rol)).length,
-    generadores: usuarios.filter(u => u.rol === 'GENERADOR').length,
-    transportistas: usuarios.filter(u => u.rol === 'TRANSPORTISTA').length,
-    operadores: usuarios.filter(u => u.rol === 'OPERADOR').length,
-  };
-
-  // Tab counts
-  const tabCounts = {
-    todos: usuarios.length,
-    admin: usuarios.filter(u => u.rol === 'ADMIN').length,
-    admins_grupo: usuarios.filter(u => ADMIN_GRUPO_ROLES.includes(u.rol)).length,
-    generador: usuarios.filter(u => u.rol === 'GENERADOR').length,
-    transportista: usuarios.filter(u => u.rol === 'TRANSPORTISTA').length,
-    operador: usuarios.filter(u => u.rol === 'OPERADOR').length,
-  };
-
-  const cambiarEstado = (id: string, nuevoEstado: string) => {
+  const cambiarEstado = (id: string, _nuevoEstado: string, onConfirmed?: () => void) => {
+    if (toggleActivoMutation.isPending) return;
     toggleActivoMutation.mutate(id, {
-      onSuccess: () => {
-        toast.success('Estado actualizado', `El usuario ahora esta ${nuevoEstado}`);
+      onSuccess: updated => {
+        toast.success('Estado actualizado', `El usuario ahora está ${updated.activo ? 'activo' : 'inactivo'}.`);
+        onConfirmed?.();
       },
-      onError: () => {
-        toast.success('Estado actualizado', `El usuario ahora esta ${nuevoEstado} (demo)`);
+      onError: error => {
+        toast.error('No se pudo cambiar el estado', getApiErrorMessage(error, 'El cambio no fue confirmado. Revisá la conexión y volvé a intentar.'));
       },
     });
   };
 
   const eliminarUsuario = () => {
-    if (usuarioSeleccionado) {
+    if (usuarioSeleccionado && !deleteMutation.isPending) {
       deleteMutation.mutate(usuarioSeleccionado.id, {
         onSuccess: () => {
           setModalEliminar(false);
           toast.success('Usuario eliminado', 'El usuario fue eliminado correctamente');
         },
-        onError: () => {
-          setModalEliminar(false);
-          toast.success('Usuario eliminado', 'El usuario fue eliminado correctamente (demo)');
+        onError: error => {
+          toast.error('No se pudo eliminar el usuario', getApiErrorMessage(error, 'El servidor no confirmó la eliminación. Podés volver a intentar.'));
         },
       });
     }
   };
 
   const crearUsuario = () => {
+    if (createMutation.isPending) return;
     if (!formEmail || !formNombre || !formRol) {
       toast.error('Error', 'Completa los campos obligatorios: nombre, email y rol');
       return;
     }
-    if (!formPassword || formPassword.length < 6) {
-      toast.error('Error', 'La contraseña es obligatoria y debe tener al menos 6 caracteres');
+    if (!formPassword || formPassword.length < 8) {
+      toast.error('Revisá la contraseña', 'Debe tener al menos 8 caracteres.');
       return;
     }
     createMutation.mutate(
@@ -304,12 +233,10 @@ const UsuariosPage: React.FC = () => {
         onSuccess: () => {
           setModalCrear(false);
           resetForm();
-          toast.success('Usuario creado', 'Se envio email de activacion');
+          toast.success('Usuario creado', 'El servidor confirmó el alta.');
         },
-        onError: () => {
-          setModalCrear(false);
-          resetForm();
-          toast.success('Usuario creado', 'Se envio email de activacion (demo)');
+        onError: error => {
+          toast.error('No se pudo crear el usuario', getApiErrorMessage(error, 'Conservamos los datos del formulario para que puedas volver a intentar.'));
         },
       }
     );
@@ -342,6 +269,7 @@ const UsuariosPage: React.FC = () => {
   };
 
   const guardarEdicion = () => {
+    if (updateMutation.isPending) return;
     if (!usuarioSeleccionado || !editEmail) {
       toast.error('Error', 'El email es obligatorio');
       return;
@@ -364,17 +292,12 @@ const UsuariosPage: React.FC = () => {
   const handleExportPdf = () => {
     exportReportePDF({
       titulo: 'Gestión de Usuarios',
-      subtitulo: 'Usuarios registrados en el sistema SITREP',
-      periodo: `Total: ${stats.total} usuarios`,
-      kpis: [
-        { label: 'Total', value: stats.total },
-        { label: 'Activos', value: stats.activos },
-        { label: 'Generadores', value: stats.generadores },
-        { label: 'Transportistas', value: stats.transportistas },
-      ],
+      subtitulo: 'Usuarios de la página actual',
+      periodo: `Página ${currentPage} · ${usuarios.length} de ${totalItems} resultados`,
+      kpis: [{ label: 'En esta página', value: usuarios.length }],
       tabla: {
         headers: ['Nombre', 'Email', 'Rol', 'Sector', 'Estado', 'Último Acceso'],
-        rows: usuariosFiltrados.map(u => [
+        rows: usuarios.map(u => [
           u.nombre,
           u.email,
           rolConfig[u.rol as keyof typeof rolConfig]?.label || u.rol,
@@ -390,7 +313,7 @@ const UsuariosPage: React.FC = () => {
   const columns = [
     {
       key: 'usuario',
-      width: '22%',
+      width: '34%',
       header: 'Usuario',
       sortable: true,
       render: (row: UsuarioLocal) => {
@@ -418,7 +341,7 @@ const UsuariosPage: React.FC = () => {
     },
     {
       key: 'rol',
-      width: '13%',
+      width: '18%',
       header: 'Rol',
       sortable: true,
       hiddenBelow: 'sm' as const,
@@ -436,12 +359,12 @@ const UsuariosPage: React.FC = () => {
     },
     {
       key: 'sector',
-      width: '15%',
+      width: '18%',
       hiddenBelow: 'lg' as const,
       header: 'Sector/Empresa',
       render: (row: UsuarioLocal) => (
         <div className="min-w-0">
-          <p className="text-sm text-neutral-900 truncate">{row.sector}</p>
+          <p className="text-sm text-neutral-900 truncate">{row.sector || '—'}</p>
           {row.ubicacion && (
             <p className="text-xs text-neutral-500 flex items-center gap-1">
               <MapPin size={10} />
@@ -453,7 +376,7 @@ const UsuariosPage: React.FC = () => {
     },
     {
       key: 'estado',
-      width: '10%',
+      width: '12%',
       header: 'Estado',
       sortable: true,
       render: (row: UsuarioLocal) => (
@@ -469,34 +392,8 @@ const UsuariosPage: React.FC = () => {
       ),
     },
     {
-      key: 'actividad',
-      width: '10%',
-      hiddenBelow: 'xl' as const,
-      header: 'Actividad',
-      align: 'center' as const,
-      render: (row: UsuarioLocal) => (
-        <div className="text-center">
-          <p className="text-sm font-medium text-neutral-900">{row.manifiestos}</p>
-          <p className="text-xs text-neutral-500">manifiestos</p>
-        </div>
-      ),
-    },
-    {
-      key: 'ultimoAcceso',
-      width: '13%',
-      hiddenBelow: 'lg' as const,
-      header: 'Ultimo Acceso',
-      sortable: true,
-      render: (row: UsuarioLocal) => (
-        <div className="flex items-center gap-1 text-sm text-neutral-600">
-          <Clock size={12} />
-          {row.ultimoAcceso}
-        </div>
-      ),
-    },
-    {
       key: 'acciones',
-      width: '17%',
+      width: '18%',
       header: '',
       align: 'right' as const,
       render: (row: UsuarioLocal) => (
@@ -528,6 +425,7 @@ const UsuariosPage: React.FC = () => {
               cambiarEstado(row.id, row.estado === 'activo' ? 'inactivo' : 'activo');
             }}
             title={row.estado === 'activo' ? 'Desactivar usuario' : 'Activar usuario'}
+            disabled={toggleActivoMutation.isPending}
           >
             {row.estado === 'activo' ? <UserX size={16} /> : <UserCheck size={16} />}
           </Button>
@@ -544,6 +442,7 @@ const UsuariosPage: React.FC = () => {
             variant="ghost"
             size="sm"
             className="p-2 text-error-500"
+            aria-label={`Eliminar a ${row.nombre}`}
             onClick={(e: any) => { e.stopPropagation(); setUsuarioSeleccionado(row); setModalEliminar(true); }}
           >
             <Trash2 size={16} />
@@ -555,184 +454,61 @@ const UsuariosPage: React.FC = () => {
 
   return (
     <>
-      {/* Filter bar */}
-      <div className="pt-2 pb-2">
-        <div className="p-3 bg-white rounded-2xl border border-neutral-100 shadow-sm">
-          <Tabs activeTab={activeTab} onChange={(t) => { setActiveTab(t); setCurrentPage(1); }}>
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-3">
-              <TabList>
-                <Tab id="todos">
-                  Todos
-                  <Badge variant="soft" color="neutral" className="ml-2">{tabCounts.todos}</Badge>
-                </Tab>
-                <Tab id="admin">
-                  Super Admin
-                  <Badge variant="soft" color="primary" className="ml-2">{tabCounts.admin}</Badge>
-                </Tab>
-                <Tab id="admins_grupo">
-                  Admins de Grupo
-                  <Badge variant="soft" color="info" className="ml-2">{tabCounts.admins_grupo}</Badge>
-                </Tab>
-                <Tab id="generador">
-                  Generadores
-                  <Badge variant="soft" color="info" className="ml-2">{tabCounts.generador}</Badge>
-                </Tab>
-                <Tab id="transportista">
-                  Transportistas
-                  <Badge variant="soft" color="warning" className="ml-2">{tabCounts.transportista}</Badge>
-                </Tab>
-                <Tab id="operador">
-                  Operadores
-                  <Badge variant="soft" color="success" className="ml-2">{tabCounts.operador}</Badge>
-                </Tab>
-              </TabList>
-
-              {/* Toggle Vista */}
-              <div className="flex items-center gap-2 bg-neutral-100 p-1 rounded-lg">
-                <button
-                  onClick={() => setVistaMode('list')}
-                  className={`p-2 rounded-md transition-colors ${vistaMode === 'list' ? 'bg-white shadow-sm text-primary-600' : 'text-neutral-500'}`}
-                >
-                  <List size={18} />
-                </button>
-                <button
-                  onClick={() => setVistaMode('grid')}
-                  className={`p-2 rounded-md transition-colors ${vistaMode === 'grid' ? 'bg-white shadow-sm text-primary-600' : 'text-neutral-500'}`}
-                >
-                  <Grid3X3 size={18} />
-                </button>
-              </div>
-            </div>
-          </Tabs>
-
-          {/* Filtros */}
-          <div className="flex flex-col md:flex-row gap-3">
-            <div className="flex-1">
-              <Input
-                placeholder="Buscar por nombre, email, sector o ubicacion..."
-                value={busqueda}
-                onChange={(e) => { setBusqueda(e.target.value); setCurrentPage(1); }}
-                leftIcon={<Search size={18} />}
-              />
-            </div>
-            <div className="flex gap-2">
-              <Select
-                value={filtroRol}
-                onChange={(val) => { setFiltroRol(val); setCurrentPage(1); }}
-                options={[
-                  { value: 'todos', label: 'Todos los roles' },
-                  { value: 'ADMIN', label: 'Administradores' },
-                  { value: 'GENERADOR', label: 'Generadores' },
-                  { value: 'TRANSPORTISTA', label: 'Transportistas' },
-                  { value: 'OPERADOR', label: 'Operadores' },
-                ]}
-                size="sm"
-              />
-              <Select
-                value={filtroEstado}
-                onChange={(val) => { setFiltroEstado(val); setCurrentPage(1); }}
-                options={[
-                  { value: 'todos', label: 'Todos los estados' },
-                  { value: 'activo', label: 'Activos' },
-                  { value: 'pendiente', label: 'Pendientes' },
-                  { value: 'inactivo', label: 'Inactivos' },
-                ]}
-                size="sm"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Scrollable page content */}
-      <div className="space-y-6 pt-4 animate-fade-in">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="space-y-5 pt-4">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-neutral-900">Gestion de Usuarios</h2>
-            <p className="text-neutral-600 mt-1">
-              {apiLoading ? (
-                <span className="flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Cargando usuarios...</span>
-              ) : (
-                <>{stats.total} perfiles registrados {'\u2022'} {stats.activos} activos {apiError ? '(error al cargar)' : ''}</>
-              )}
+            <h2 className="text-2xl font-bold text-neutral-900">Usuarios</h2>
+            <p className="mt-1 text-sm text-neutral-600" aria-live="polite">
+              {apiLoading ? 'Cargando usuarios…' : apiError ? 'No se pudo actualizar el listado.' : `${totalItems} ${totalItems === 1 ? 'perfil encontrado' : 'perfiles encontrados'}`}
             </p>
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => window.print()} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={14} />Imprimir</button>
-            <Button variant="outline" leftIcon={<Download size={18} />} onClick={() => downloadCsv(usuarios.map(u => ({ Nombre: u.nombre, Email: u.email, Teléfono: u.telefono, Rol: u.rol, Sector: u.sector, Estado: u.estado, UltimoAcceso: u.ultimoAcceso })), 'usuarios', { titulo: 'Gestion de Usuarios', periodo: 'Todos los periodos', total: usuarios.length })} className="hidden sm:inline-flex">
-              CSV
-            </Button>
-            <button onClick={handleExportPdf} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="Exportar PDF"><FileDown size={14} />PDF</button>
-            <Button leftIcon={<UserPlus size={18} />} onClick={() => setModalCrear(true)}>
-              Nuevo Usuario
-            </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" disabled={apiLoading || apiError || !usuarios.length} onClick={() => downloadCsv(usuarios.map(u => ({ Nombre: u.nombre, Email: u.email, Teléfono: u.telefono, Rol: u.rol, Sector: u.sector, Estado: u.estado })), 'usuarios-pagina', { titulo: 'Usuarios · página actual', periodo: `Página ${currentPage}`, total: usuarios.length })} className="hidden sm:inline-flex">CSV · página</Button>
+            <Button variant="outline" disabled={apiLoading || apiError || !usuarios.length} onClick={handleExportPdf} className="hidden sm:inline-flex">PDF · página</Button>
+            <Button leftIcon={<UserPlus size={18} />} onClick={() => setModalCrear(true)}>Nuevo Usuario</Button>
+          </div>
+        </header>
+
+        <div className="grid min-w-0 grid-cols-2 gap-3 rounded-xl border border-neutral-200 bg-white p-3 lg:grid-cols-[minmax(0,1fr)_minmax(180px,240px)_minmax(150px,190px)_auto] lg:items-end">
+          <Input containerClassName="col-span-2 lg:col-span-1" label="Buscar usuarios" placeholder="Nombre, email o empresa" value={busqueda} onChange={event => { setBusqueda(event.target.value); setCurrentPage(1); }} leftIcon={<Search size={18} />} />
+          <Select label="Rol" value={filtroRol} onChange={value => { setFiltroRol(value); setCurrentPage(1); }} options={[
+            { value: 'todos', label: 'Todos los roles' },
+            { value: 'ADMIN_GRUPO', label: 'Administradores de grupo' },
+            ...Object.entries(rolConfig).map(([value, config]) => ({ value, label: config.label })),
+          ]} />
+          <Select label="Estado" value={filtroEstado} onChange={value => { setFiltroEstado(value); setCurrentPage(1); }} options={[
+            { value: 'todos', label: 'Todos los estados' },
+            { value: 'activo', label: 'Activos' },
+            { value: 'pendiente', label: 'Pendientes de aprobación' },
+            { value: 'inactivo', label: 'Inactivos' },
+          ]} />
+          <div className="col-span-2 flex gap-1 lg:col-span-1" aria-label="Presentación del listado">
+            <Button variant={vistaMode === 'list' ? 'primary' : 'outline'} aria-label="Ver como lista" aria-pressed={vistaMode === 'list'} onClick={() => setVistaMode('list')}><List size={18} /></Button>
+            <Button variant={vistaMode === 'grid' ? 'primary' : 'outline'} aria-label="Ver como tarjetas" aria-pressed={vistaMode === 'grid'} onClick={() => setVistaMode('grid')}><Grid3X3 size={18} /></Button>
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="border-l-4 border-l-primary-500">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-neutral-600 mb-1">Administradores</p>
-                  <p className="text-2xl font-bold text-neutral-900">{stats.admins}</p>
-                </div>
-                <div className="p-2 bg-primary-100 rounded-lg">
-                  <Shield size={20} className="text-primary-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-l-4 border-l-purple-500">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-neutral-600 mb-1">Generadores</p>
-                  <p className="text-2xl font-bold text-neutral-900">{stats.generadores}</p>
-                </div>
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <Factory size={20} className="text-purple-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-l-4 border-l-orange-500">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-neutral-600 mb-1">Transportistas</p>
-                  <p className="text-2xl font-bold text-neutral-900">{stats.transportistas}</p>
-                </div>
-                <div className="p-2 bg-orange-100 rounded-lg">
-                  <Truck size={20} className="text-orange-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-l-4 border-l-blue-500">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-neutral-600 mb-1">Operadores</p>
-                  <p className="text-2xl font-bold text-neutral-900">{stats.operadores}</p>
-                </div>
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <FlaskConical size={20} className="text-blue-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        {apiError ? (
+          <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-error-200 bg-error-50 p-4">
+            <p className="text-error-800">No pudimos cargar los usuarios. Los filtros se conservan.</p>
+            <Button variant="outline" onClick={() => void refetch()}>Reintentar</Button>
+          </div>
+        ) : apiLoading ? (
+          <p role="status" className="py-6 text-neutral-600">Cargando usuarios…</p>
+        ) : !usuarios.length ? (
+          <div className="rounded-xl border border-neutral-200 bg-white p-6">
+            <p className="font-medium text-neutral-900">No hay usuarios con estos filtros.</p>
+            <Button variant="ghost" className="mt-2" onClick={() => { setBusqueda(''); setFiltroRol('todos'); setFiltroEstado('todos'); setCurrentPage(1); }}>Limpiar filtros</Button>
+          </div>
+        ) : null}
 
-        {/* Table or Grid content - filtered by activeTab state, no TabPanel needed */}
-        {vistaMode === 'list' ? (
+        {/* Both presentations use the same server-filtered page. */}
+        {!apiError && !apiLoading && usuarios.length > 0 && (vistaMode === 'list' ? (
           <>
             {/* Mobile cards */}
             <div className="md:hidden space-y-2">
               {usuariosPaginados.map((u) => (
-                <div key={u.id} className="bg-white rounded-xl border border-neutral-100 p-3 cursor-pointer active:scale-[0.98] transition-transform" onClick={() => verUsuario(u)}>
+                <button type="button" key={u.id} className="w-full bg-white rounded-xl border border-neutral-300 p-3 text-left hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700" onClick={() => verUsuario(u)}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-primary-700">
@@ -744,11 +520,12 @@ const UsuariosPage: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-600">{u.rol}</span>
-                      <span className={`w-2 h-2 rounded-full ${u.estado === 'activo' ? 'bg-green-500' : 'bg-neutral-300'}`} />
+                      <span className="max-w-28 text-xs text-neutral-700">{rolConfig[u.rol as keyof typeof rolConfig]?.label || u.rol}</span>
+                      <span className="sr-only">{u.estado}</span>
+                      <span aria-hidden="true" className={`w-2 h-2 rounded-full ${u.estado === 'activo' ? 'bg-green-500' : 'bg-neutral-400'}`} />
                     </div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
             {/* Desktop table */}
@@ -757,9 +534,6 @@ const UsuariosPage: React.FC = () => {
               data={usuariosPaginados}
               columns={columns}
               keyExtractor={(row) => row.id.toString()}
-              selectable
-              selectedKeys={selectedRows}
-              onSelectionChange={setSelectedRows}
               sortable={true}
               onSort={(key, dir) => {
                 setSortBy(USR_COL_MAP[key] ?? key);
@@ -770,13 +544,6 @@ const UsuariosPage: React.FC = () => {
               stickyHeader
             />
             </div>
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalItems={usuariosFiltrados.length}
-              itemsPerPage={itemsPerPage}
-              onPageChange={setCurrentPage}
-            />
           </>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -829,25 +596,23 @@ const UsuariosPage: React.FC = () => {
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between pt-4 border-t border-neutral-100">
-                      <div className="text-center">
-                        <p className="text-lg font-bold text-neutral-900">{usuario.manifiestos}</p>
-                        <p className="text-xs text-neutral-500">Manifiestos</p>
-                      </div>
+                    <div className="flex items-center justify-end pt-4 border-t border-neutral-100">
                       <div className="flex gap-1">
                         <Button
                           variant="ghost" size="sm"
                           className={`p-2 ${usuario.estado === 'activo' ? 'text-amber-500' : 'text-emerald-600'}`}
                           onClick={() => cambiarEstado(usuario.id, usuario.estado === 'activo' ? 'inactivo' : 'activo')}
                           title={usuario.estado === 'activo' ? 'Desactivar' : 'Activar'}
+                          disabled={toggleActivoMutation.isPending}
                         >
                           {usuario.estado === 'activo' ? <UserX size={16} /> : <UserCheck size={16} />}
                         </Button>
-                        <Button variant="ghost" size="sm" className="p-2" onClick={() => verUsuario(usuario)}>
+                        <Button variant="ghost" size="sm" className="p-2" aria-label={`Ver detalle de ${usuario.nombre}`} onClick={() => verUsuario(usuario)}>
                           <Eye size={16} />
                         </Button>
                         <Button
                           variant="ghost" size="sm" className="p-2 text-error-500"
+                          aria-label={`Eliminar a ${usuario.nombre}`}
                           onClick={() => { setUsuarioSeleccionado(usuario); setModalEliminar(true); }}
                         >
                           <Trash2 size={16} />
@@ -859,7 +624,8 @@ const UsuariosPage: React.FC = () => {
               );
             })}
           </div>
-        )}
+        ))}
+        {!apiError && !apiLoading && totalItems > 0 && <Pagination currentPage={currentPage} totalPages={totalPages} totalItems={totalItems} itemsPerPage={itemsPerPage} onPageChange={setCurrentPage} />}
       </div>
 
       {/* Modal Ver Usuario */}
@@ -867,17 +633,18 @@ const UsuariosPage: React.FC = () => {
         isOpen={modalVer}
         onClose={() => setModalVer(false)}
         title="Detalle de Usuario"
+        isBusy={toggleActivoMutation.isPending}
         size="lg"
         footer={
           <>
-            <Button variant="outline" onClick={() => setModalVer(false)}>Cerrar</Button>
+            <Button variant="outline" disabled={toggleActivoMutation.isPending} onClick={() => setModalVer(false)}>Cerrar</Button>
             {usuarioSeleccionado && (
               <Button
                 variant={usuarioSeleccionado.estado === 'activo' ? 'outline' : 'primary'}
+                isLoading={toggleActivoMutation.isPending}
                 leftIcon={usuarioSeleccionado.estado === 'activo' ? <UserX size={16} /> : <UserCheck size={16} />}
                 onClick={() => {
-                  cambiarEstado(usuarioSeleccionado.id, usuarioSeleccionado.estado === 'activo' ? 'inactivo' : 'activo');
-                  setModalVer(false);
+                  cambiarEstado(usuarioSeleccionado.id, usuarioSeleccionado.estado === 'activo' ? 'inactivo' : 'activo', () => setModalVer(false));
                 }}
               >
                 {usuarioSeleccionado.estado === 'activo' ? 'Desactivar' : 'Activar'}
@@ -887,32 +654,33 @@ const UsuariosPage: React.FC = () => {
               <Button
                 variant="outline"
                 leftIcon={<ShieldCheck size={16} />}
+                disabled={toggleActivoMutation.isPending}
                 className={usuarioSeleccionado.rol === 'ADMIN' ? 'text-red-700 border-red-300 hover:bg-red-50' : 'text-amber-700 border-amber-300 hover:bg-amber-50'}
                 onClick={() => { setModalVer(false); setModalPromover(true); setPromoverPassword(''); setPromoverTargetRol(usuarioSeleccionado.rol === 'ADMIN' ? '' : ''); }}
               >
                 {usuarioSeleccionado.rol === 'ADMIN' ? 'Degradar rol' : 'Promover a Super Admin'}
               </Button>
             )}
-            {usuarioSeleccionado && <Button onClick={() => abrirEditar(usuarioSeleccionado)}>Editar</Button>}
+            {usuarioSeleccionado && <Button disabled={toggleActivoMutation.isPending} onClick={() => abrirEditar(usuarioSeleccionado)}>Editar</Button>}
           </>
         }
       >
         {usuarioSeleccionado && (
-          <div className="space-y-6 animate-fade-in">
+          <div className="space-y-5">
             {/* Header del usuario */}
             <div className="flex items-center gap-4">
               {(() => {
                 const config = rolConfig[usuarioSeleccionado.rol as keyof typeof rolConfig];
                 return (
-                  <div className={`w-20 h-20 rounded-2xl flex items-center justify-center text-2xl font-bold ${config?.bgColor || 'bg-neutral-100'} ${config?.textColor || 'text-neutral-700'}`}>
+                  <div aria-hidden="true" className={`h-12 w-12 shrink-0 rounded-xl flex items-center justify-center text-lg font-bold ${config?.bgColor || 'bg-neutral-100'} ${config?.textColor || 'text-neutral-700'}`}>
                     {usuarioSeleccionado.avatar}
                   </div>
                 );
               })()}
-              <div>
+              <div className="min-w-0">
                 <h3 className="text-xl font-bold text-neutral-900">{usuarioSeleccionado.nombre}</h3>
-                <p className="text-neutral-500">{usuarioSeleccionado.email}</p>
-                <div className="flex items-center gap-2 mt-2">
+                <p className="break-words text-sm text-neutral-600">{usuarioSeleccionado.email}</p>
+                <div className="flex flex-wrap items-center gap-2 mt-2">
                   {(() => {
                     const config = rolConfig[usuarioSeleccionado.rol as keyof typeof rolConfig];
                     const Icon = config?.icon || User;
@@ -933,41 +701,20 @@ const UsuariosPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Info Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              <div className="p-4 bg-neutral-50 rounded-xl">
-                <p className="text-sm text-neutral-500 mb-1">Sector/Empresa</p>
-                <p className="font-medium text-neutral-900">{usuarioSeleccionado.sector}</p>
-              </div>
-              <div className="p-4 bg-neutral-50 rounded-xl">
-                <p className="text-sm text-neutral-500 mb-1">Ubicacion</p>
-                <p className="font-medium text-neutral-900">{usuarioSeleccionado.ubicacion || '-'}</p>
-              </div>
-              <div className="p-4 bg-neutral-50 rounded-xl">
-                <p className="text-sm text-neutral-500 mb-1">Telefono</p>
-                <p className="font-medium text-neutral-900">{usuarioSeleccionado.telefono || '-'}</p>
-              </div>
-              <div className="p-4 bg-neutral-50 rounded-xl">
-                <p className="text-sm text-neutral-500 mb-1">Fecha de Registro</p>
-                <p className="font-medium text-neutral-900">{usuarioSeleccionado.fechaRegistro}</p>
-              </div>
-            </div>
+            <dl className="divide-y divide-neutral-200 border-y border-neutral-200 text-sm">
+              {[
+                ['Sector/Empresa', usuarioSeleccionado.sector],
+                ['Ubicación', usuarioSeleccionado.ubicacion],
+                ['Teléfono', usuarioSeleccionado.telefono],
+                ['Fecha de registro', usuarioSeleccionado.fechaRegistro],
+              ].filter(([, value]) => Boolean(value)).map(([label, value]) => (
+                <div key={label} className="grid grid-cols-[minmax(100px,1fr)_2fr] gap-3 py-3">
+                  <dt className="text-neutral-600">{label}</dt>
+                  <dd className="min-w-0 break-words font-medium text-neutral-900">{value}</dd>
+                </div>
+              ))}
+            </dl>
 
-            {/* Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="text-center p-4 bg-primary-50 rounded-xl">
-                <p className="text-2xl font-bold text-primary-600">{usuarioSeleccionado.manifiestos}</p>
-                <p className="text-sm text-primary-700">Manifiestos</p>
-              </div>
-              <div className="text-center p-4 bg-info-50 rounded-xl">
-                <p className="text-2xl font-bold text-info-600">{usuarioSeleccionado.ultimoAcceso}</p>
-                <p className="text-sm text-info-700">Ultimo Acceso</p>
-              </div>
-              <div className="text-center p-4 bg-success-50 rounded-xl">
-                <p className="text-2xl font-bold text-success-600">98%</p>
-                <p className="text-sm text-success-700">Cumplimiento</p>
-              </div>
-            </div>
           </div>
         )}
       </Modal>
@@ -977,10 +724,11 @@ const UsuariosPage: React.FC = () => {
         isOpen={modalEditar}
         onClose={() => setModalEditar(false)}
         title="Editar Usuario"
+        isBusy={updateMutation.isPending}
         size="lg"
         footer={
           <>
-            <Button variant="outline" onClick={() => setModalEditar(false)}>Cancelar</Button>
+            <Button variant="outline" disabled={updateMutation.isPending} onClick={() => setModalEditar(false)}>Cancelar</Button>
             <Button onClick={guardarEdicion} disabled={updateMutation.isPending}>
               {updateMutation.isPending ? 'Guardando...' : 'Guardar cambios'}
             </Button>
@@ -1018,10 +766,11 @@ const UsuariosPage: React.FC = () => {
         isOpen={modalCrear}
         onClose={() => { setModalCrear(false); resetForm(); }}
         title="Nuevo Usuario"
+        isBusy={createMutation.isPending}
         size="lg"
         footer={
           <>
-            <Button variant="outline" onClick={() => { setModalCrear(false); resetForm(); }}>Cancelar</Button>
+            <Button variant="outline" disabled={createMutation.isPending} onClick={() => { setModalCrear(false); resetForm(); }}>Cancelar</Button>
             <Button
               onClick={crearUsuario}
               disabled={createMutation.isPending}
@@ -1037,7 +786,7 @@ const UsuariosPage: React.FC = () => {
             <Input label="Apellido" placeholder="Perez" value={formApellido} onChange={(e) => setFormApellido(e.target.value)} />
           </div>
           <Input label="Email" type="email" placeholder="usuario@empresa.com" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} />
-          <Input label="Contrasena" type="password" placeholder="Contrasena temporal" value={formPassword} onChange={(e) => setFormPassword(e.target.value)} />
+          <Input label="Contraseña" type="password" autoComplete="new-password" helperText="Mínimo 8 caracteres." value={formPassword} onChange={(e) => setFormPassword(e.target.value)} />
           <Input label="Telefono" placeholder="+54 261 123-4567" value={formTelefono} onChange={(e) => setFormTelefono(e.target.value)} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Select
@@ -1056,19 +805,7 @@ const UsuariosPage: React.FC = () => {
                 { value: 'OPERADOR', label: 'Operador' },
               ]}
             />
-            <Select
-              label="Sector/Empresa"
-              value={formSector}
-              onChange={(val) => setFormSector(val)}
-              placeholder="Seleccionar sector"
-              options={[
-                { value: '', label: 'Seleccionar sector' },
-                { value: 'DGFA', label: 'DGFA' },
-                { value: 'Hospital Central', label: 'Hospital Central' },
-                { value: 'Transportes Andes', label: 'Transportes Andes' },
-                { value: 'Planta Las Heras', label: 'Planta Las Heras' },
-              ]}
-            />
+            <Input label="Sector/Empresa" value={formSector} onChange={event => setFormSector(event.target.value)} placeholder="Nombre de la organización" />
           </div>
         </div>
       </Modal>
@@ -1083,6 +820,7 @@ const UsuariosPage: React.FC = () => {
         confirmText="Si, eliminar"
         cancelText="Cancelar"
         variant="danger"
+        isLoading={deleteMutation.isPending}
       />
 
       {/* Modal Cambiar Jerarquia (Promover / Degradar) */}
@@ -1090,10 +828,11 @@ const UsuariosPage: React.FC = () => {
         isOpen={modalPromover}
         onClose={() => { setModalPromover(false); setPromoverPassword(''); setPromoverTargetRol(''); }}
         title={usuarioSeleccionado?.rol === 'ADMIN' ? 'Degradar Super Administrador' : 'Promover a Super Administrador'}
+        isBusy={promoverLoading}
         size="sm"
         footer={
           <>
-            <Button variant="outline" onClick={() => { setModalPromover(false); setPromoverPassword(''); setPromoverTargetRol(''); }}>Cancelar</Button>
+            <Button variant="outline" disabled={promoverLoading} onClick={() => { setModalPromover(false); setPromoverPassword(''); setPromoverTargetRol(''); }}>Cancelar</Button>
             <Button
               variant={usuarioSeleccionado?.rol === 'ADMIN' ? 'outline' : 'primary'}
               className={usuarioSeleccionado?.rol === 'ADMIN' ? 'text-red-700 border-red-300 hover:bg-red-50' : ''}

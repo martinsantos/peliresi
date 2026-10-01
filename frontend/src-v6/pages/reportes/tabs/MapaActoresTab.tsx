@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Layers, Eye, EyeOff, Download, FileDown, Printer,
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { useQuery } from '@tanstack/react-query';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Card } from '../../../components/ui/CardV2';
@@ -14,6 +15,10 @@ import { getDepartamento, DEPARTAMENTOS_MENDOZA } from '../../../utils/mendoza-d
 import { clusterMarkers, downloadCsv } from './shared';
 import { exportReportePDF } from '../../../utils/exportPdf';
 import type { CentroControlData, ActorTransportista } from '../../../hooks/useCentroControl';
+import { useAuth } from '../../../contexts/AuthContext';
+import { InspectionMapLayer } from '../../inspecciones/InspectionMapLayer';
+import { canUseInspectionOperations, hasInspectionCoordinates, inspectionOperationsService, operationSubject } from '../../../services/inspectionOperations.service';
+import { INSPECTION_STATE_LABELS } from '../../inspecciones/inspectionPresentation';
 
 // ActorTransportista may carry additional fields from the backend not declared in the hook type
 type ActorTransportistaExtra = ActorTransportista & {
@@ -68,23 +73,39 @@ export default function MapaActoresTab({
   ccData,
   onSelectDep,
   periodoLabel = '',
+  desde,
+  hasta,
   incluirTodos = true,
   onToggleIncluirTodos,
 }: {
   ccData: CentroControlData | null;
   onSelectDep: (dep: string) => void;
   periodoLabel: string;
+  desde?: string;
+  hasta?: string;
   incluirTodos?: boolean;
   onToggleIncluirTodos?: (value: boolean) => void;
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const inspectionPrefix = location.pathname.startsWith('/mobile') ? '/mobile' : '';
+  const { currentUser } = useAuth();
   const [layers, setLayers] = useState({
     generadores: true,
     transportistas: true,
     operadoresFijos: true,
     operadoresInSitu: true,
+    inspecciones: true,
   });
   const [selectedDep, setSelectedDep] = useState('');
+  const inspectionQuery = useQuery({
+    queryKey: ['inspecciones', 'mapa-reportes', currentUser?.id, desde, hasta, layers.inspecciones],
+    queryFn: () => inspectionOperationsService.list({
+      fecha: 'creacion', activas: false, desde: desde || undefined, hasta: hasta || undefined, limit: 100,
+    }),
+    enabled: layers.inspecciones && canUseInspectionOperations(currentUser),
+    staleTime: 60_000, refetchOnWindowFocus: false, retry: 1,
+  });
 
   const toggleLayer = useCallback((layer: keyof typeof layers) => {
     setLayers(prev => ({ ...prev, [layer]: !prev[layer] }));
@@ -182,6 +203,8 @@ export default function MapaActoresTab({
     if (!selectedDep) return generadoresClustered;
     return clusterMarkers(filteredGen);
   }, [selectedDep, filteredGen, generadoresClustered]);
+  const inspectedPlaces = useMemo(() => (inspectionQuery.data?.items || []).filter(hasInspectionCoordinates)
+    .filter((item) => !selectedDep || getDepartamento(item.latitud!, item.longitud!) === selectedDep), [inspectionQuery.data?.items, selectedDep]);
 
   if (import.meta.env.DEV) {
     console.debug('[MapaActores] Generadores:', totalGen, 'Transportistas:', totalTrans, 'Operadores:', totalOper, 'incluirTodos:', incluirTodos);
@@ -220,6 +243,7 @@ export default function MapaActoresTab({
             { key: 'transportistas' as const, label: 'Transportistas', color: 'bg-orange-500', activeClass: 'bg-orange-50 border-orange-300 text-orange-700 shadow-sm', count: selectedDep ? filteredTrans.length : totalTrans },
             { key: 'operadoresFijos' as const, label: 'Op. Fijos', color: 'bg-blue-500', activeClass: 'bg-blue-50 border-blue-300 text-blue-700 shadow-sm', count: selectedDep ? filteredOpFijos.length : operadoresFijos.length },
             { key: 'operadoresInSitu' as const, label: 'Op. In Situ', color: 'bg-emerald-500', activeClass: 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-sm', count: selectedDep ? filteredOpInSitu.length : operadoresInSitu.length },
+            ...(canUseInspectionOperations(currentUser) ? [{ key: 'inspecciones' as const, label: 'Inspecciones', color: 'bg-teal-500', activeClass: 'bg-teal-50 border-teal-300 text-teal-800 shadow-sm', count: inspectedPlaces.length }] : []),
           ]).map(l => (
             <button
               key={l.key}
@@ -262,11 +286,13 @@ export default function MapaActoresTab({
             <MapContainer
               center={[-32.9287, -68.8535]}
               zoom={10}
+              keyboard={false}
               style={{ height: '100%', width: '100%', zIndex: 0 }}
               className="z-0"
             >
               <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
               <FlyToTarget target={flyTarget} zoom={12} />
+              {layers.inspecciones && canUseInspectionOperations(currentUser) && <InspectionMapLayer items={inspectedPlaces} />}
 
               {/* Generadores */}
               {layers.generadores && filteredGenClustered.map((g: any, idx: number) => (
@@ -429,11 +455,25 @@ export default function MapaActoresTab({
                 <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-orange-500" /> Transportistas</span>
                 <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Op. Fijos</span>
                 <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Op. In Situ</span>
+                {canUseInspectionOperations(currentUser) && <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-teal-500" /> Inspecciones</span>}
               </div>
             </div>
           </div>
         </div>
       </Card>
+      {canUseInspectionOperations(currentUser) && layers.inspecciones && <p role={inspectionQuery.isError ? 'alert' : 'status'} className="text-xs text-neutral-600">
+        {inspectionQuery.isError ? 'No se pudieron actualizar las inspecciones del mapa.' : inspectionQuery.isLoading ? 'Cargando lugares de inspección…' : `${inspectedPlaces.length} lugares de inspección visibles · ${inspectionQuery.data?.summary.sinUbicacion || 0} legajos sin coordenadas en la consulta${(inspectionQuery.data?.total || 0) > 100 ? ' · sólo se muestran los primeros 100; acotá el período' : ''}. Cada punto indica el lugar del hecho, no la posición del inspector.`}
+      </p>}
+      {canUseInspectionOperations(currentUser) && layers.inspecciones && inspectedPlaces.length > 0 && <div className="rounded-xl border border-teal-100 bg-white p-3">
+        <h3 className="text-sm font-semibold text-neutral-900">Legajos en el mapa</h3>
+        <p className="mt-1 text-xs text-neutral-600">Acceso directo sin tener que tocar un marcador.</p>
+        <div className="mt-2 max-h-64 overflow-y-auto divide-y divide-neutral-100">
+          {inspectedPlaces.map((item) => <Link key={item.id} to={`${inspectionPrefix}/inspecciones/${item.id}`} className="flex min-h-11 items-center justify-between gap-3 py-2 text-sm hover:bg-teal-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-700">
+            <span className="min-w-0"><span className="font-semibold text-teal-800">{item.numero}</span><span className="block truncate text-neutral-600">{operationSubject(item)} · {item.ubicacion || 'Sin referencia escrita'}</span></span>
+            <span className="shrink-0 text-xs text-neutral-500">{INSPECTION_STATE_LABELS[item.estado]}</span>
+          </Link>)}
+        </div>
+      </div>}
 
       {/* Lista de actores visibles en el mapa */}
       {(() => {

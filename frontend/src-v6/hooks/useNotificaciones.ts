@@ -49,3 +49,13 @@ export function useMarcarTodasLeidas() {
     },
   });
 }
+
+export function useEliminarNotificacion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => notificacionService.eliminar(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEYS.all });
+    },
+  });
+}

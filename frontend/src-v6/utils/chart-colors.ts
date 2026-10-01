@@ -9,8 +9,10 @@ export const ESTADO_CHART_COLORS: Record<string, string> = {
   EN_TRANSITO: '#F59E0B',
   ENTREGADO: '#14B8A6',
   RECIBIDO: '#3B82F6',
+  EN_TRATAMIENTO: '#8B5CF6',
   TRATADO: '#0D8A4F',
   RECHAZADO: '#EF4444',
+  CANCELADO: '#DC2626',
   ANULADO: '#DC2626',
 };
 

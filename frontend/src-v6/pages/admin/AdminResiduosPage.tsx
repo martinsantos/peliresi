@@ -436,7 +436,6 @@ export const AdminResiduosPage: React.FC = () => {
   const columns = [
     {
       key: 'residuo',
-      width: '24%',
       header: 'Residuo',
       sortable: true,
       render: (row: ResiduoDisplay) => (
@@ -463,7 +462,7 @@ export const AdminResiduosPage: React.FC = () => {
     },
     {
       key: 'corrienteY',
-      width: '8%',
+      width: '7rem',
       header: 'Corriente Y',
       sortable: true,
       hiddenBelow: 'md' as const,
@@ -477,7 +476,7 @@ export const AdminResiduosPage: React.FC = () => {
     },
     {
       key: 'peligrosidad',
-      width: '10%',
+      width: '9rem',
       header: 'Peligrosidad',
       sortable: true,
       render: (row: ResiduoDisplay) => {
@@ -496,10 +495,10 @@ export const AdminResiduosPage: React.FC = () => {
     },
     {
       key: 'generadores',
-      width: '10%',
+      width: '9rem',
       header: 'Generadores',
       sortable: true,
-      hiddenBelow: 'lg' as const,
+      hiddenBelow: '2xl' as const,
       render: (row: ResiduoDisplay) => row.generadoresCount > 0 ? (
         <div className="flex items-center gap-1.5">
           <Factory size={14} className="text-purple-500" />
@@ -511,10 +510,10 @@ export const AdminResiduosPage: React.FC = () => {
     },
     {
       key: 'operadores',
-      width: '10%',
+      width: '8rem',
       header: 'Operadores',
       sortable: true,
-      hiddenBelow: 'lg' as const,
+      hiddenBelow: '2xl' as const,
       render: (row: ResiduoDisplay) => {
         const count = Math.max(row.operadoresCount, row.operadoresDbCount);
         return count > 0 ? (
@@ -529,10 +528,10 @@ export const AdminResiduosPage: React.FC = () => {
     },
     {
       key: 'manifiestos',
-      width: '10%',
+      width: '8rem',
       header: 'Manifiestos',
       sortable: true,
-      hiddenBelow: 'xl' as const,
+      hiddenBelow: '2xl' as const,
       render: (row: ResiduoDisplay) => row.manifestosCount > 0 ? (
         <div className="flex items-center gap-1.5">
           <FileText size={14} className="text-primary-500" />
@@ -544,7 +543,7 @@ export const AdminResiduosPage: React.FC = () => {
     },
     {
       key: 'estado',
-      width: '8%',
+      width: '7rem',
       header: 'Estado',
       sortable: true,
       render: (row: ResiduoDisplay) => (
@@ -555,7 +554,7 @@ export const AdminResiduosPage: React.FC = () => {
     },
     {
       key: 'acciones',
-      width: '8%',
+      width: '7rem',
       header: 'Acciones',
       render: (row: ResiduoDisplay) => (
         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -675,8 +674,8 @@ export const AdminResiduosPage: React.FC = () => {
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
+          <div className="flex flex-wrap gap-4">
+            <div className="min-w-0 flex-[1_1_18rem]">
               <SearchInput
                 value={searchQuery}
                 onChange={(v) => { setSearchQuery(v); setCurrentPage(1); }}
@@ -792,6 +791,8 @@ export const AdminResiduosPage: React.FC = () => {
               onSort={(key, dir) => setSortConfig({ key, direction: dir })}
               onRowClick={openDetalle}
               stickyHeader
+              fixedLayout
+              className="[&_table]:min-w-[40rem]"
             />
             </div>
             <Pagination

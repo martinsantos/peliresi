@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MobileLayout } from '../../layouts/MobileLayout';
@@ -16,6 +16,14 @@ const authState = vi.hoisted(() => ({
     permisos: [],
   },
 }));
+const impersonationState = vi.hoisted(() => ({
+  data: null as null | { impersonatedUser: { nombre: string } },
+  exit: vi.fn(),
+}));
+
+vi.mock('../../contexts/ImpersonationContext', () => ({
+  useImpersonation: () => ({ impersonationData: impersonationState.data, exitImpersonation: impersonationState.exit }),
+}));
 
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({
@@ -23,7 +31,7 @@ vi.mock('../../contexts/AuthContext', () => ({
     users: [authState.currentUser],
     switchUser: vi.fn(),
     logout: vi.fn(),
-    isAdmin: false,
+    isAdmin: authState.currentUser.rol === 'ADMIN',
     isGenerador: false,
     isTransportista: authState.currentUser.rol === 'TRANSPORTISTA',
     isOperador: false,
@@ -37,7 +45,11 @@ vi.mock('../../hooks/useActiveTripRecovery', () => ({
 }));
 
 vi.mock('../../hooks/useOfflineSync', () => ({
-  useOfflineSync: vi.fn(),
+  useOfflineSync: vi.fn(() => ({ processed: 0, pending: 0, retryable: 0, terminal: 0, auth: 0, skipped: 0, syncing: false, retry: vi.fn() })),
+}));
+
+vi.mock('../../hooks/useNotificaciones', () => ({
+  useNotificacionesNoLeidas: vi.fn(() => ({ data: 0 })),
 }));
 
 vi.mock('../../components/NotificationBell', () => ({
@@ -86,6 +98,8 @@ describe('MobileLayout Android shell', () => {
   beforeEach(() => {
     localStorage.clear();
     authState.currentUser = { ...authState.currentUser, rol: 'TRANSPORTISTA' };
+    impersonationState.data = null;
+    impersonationState.exit.mockClear();
   });
 
   it('uses a short transportista bottom navigation label', () => {
@@ -109,5 +123,21 @@ describe('MobileLayout Android shell', () => {
     const outletContainer = screen.getByTestId('trip-content').parentElement;
     expect(outletContainer).toHaveClass('pb-6');
     expect(outletContainer).not.toHaveClass('pb-28');
+  });
+
+  it('does not offer account switching to an operator', () => {
+    authState.currentUser = { ...authState.currentUser, rol: 'OPERADOR' };
+    renderMobileLayout('/dashboard');
+    fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));
+    expect(screen.queryByText('Ver como otro usuario')).not.toBeInTheDocument();
+  });
+
+  it('shows a readable return action during temporary access', () => {
+    authState.currentUser = { ...authState.currentUser, rol: 'OPERADOR' };
+    impersonationState.data = { impersonatedUser: { nombre: 'Operador QA' } };
+    renderMobileLayout('/dashboard');
+    expect(screen.getByTestId('impersonation-banner')).toHaveTextContent('Operador QA');
+    fireEvent.click(screen.getByTestId('exit-impersonation'));
+    expect(impersonationState.exit).toHaveBeenCalledOnce();
   });
 });

@@ -6,6 +6,8 @@ import { saveInspectionResume } from '../../services/inspectionResume';
 import type { Inspection } from '../../types/inspection';
 
 const mocks = vi.hoisted(() => ({ useInspections: vi.fn(), refetch: vi.fn() }));
+vi.mock('../../hooks/useInspectionOperations', () => ({ useInspectionOperations: () => ({ data: undefined, isLoading: false, isError: false }) }));
+vi.mock('../../services/inspectionOperations.service', async (original) => ({ ...await original<typeof import('../../services/inspectionOperations.service')>(), inspectionOperationsService: { inspectors: vi.fn().mockResolvedValue([]) } }));
 
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ currentUser: { id: 'admin-1', rol: 'ADMIN', esInspector: false }, isAdmin: true }),
@@ -46,6 +48,20 @@ describe('InspeccionesPage', () => {
     expect(screen.queryByText('No hay inspecciones para estos filtros')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
     expect(mocks.refetch).toHaveBeenCalledOnce();
+  });
+
+  it('separates inspection classification from the responsible actor and explains the official number', () => {
+    render(<MemoryRouter initialEntries={['/inspecciones']}><InspeccionesPage /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva inspección' }));
+    const type = screen.getByLabelText('Tipo de inspección');
+    expect(screen.getByRole('option', { name: /Petróleo · PRP/ })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Aire · ARP/ })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Espontánea.*IRP/ })).toBeInTheDocument();
+    fireEvent.change(type, { target: { value: 'PETROLEO' } });
+    expect(screen.getByText(/PRP-\d{4}-00001/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Responsable todavía sin identificar')).toBeChecked();
+    expect(screen.queryByLabelText('Actor inspeccionado')).not.toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /D · Reservada/ })).toBeDisabled();
   });
 
   it('distinguishes local copies and resumes at the last inspected control', () => {

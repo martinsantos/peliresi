@@ -8,14 +8,14 @@ import type { Usuario } from '../types/models';
 
 export const usuarioService = {
   async list(filters?: UsuarioFilters): Promise<PaginatedData<Usuario>> {
-    const { data } = await api.get('/admin/usuarios', { params: filters });
+    const { data } = await api.get('/admin/usuarios', { params: { ...filters, roles: filters?.roles?.join(',') } });
     const raw = data.data;
     return {
       items: raw.usuarios || raw.users || [],
       total: raw.pagination?.total || 0,
       page: raw.pagination?.page || 1,
       limit: raw.pagination?.limit || 10,
-      totalPages: raw.pagination?.pages || 1,
+      totalPages: raw.pagination?.pages ?? 1,
     };
   },
 
@@ -40,6 +40,6 @@ export const usuarioService = {
 
   async toggleActivo(id: string): Promise<Usuario> {
     const { data } = await api.patch(`/admin/usuarios/${id}/toggle-activo`);
-    return data.data;
+    return data.data.usuario || data.data;
   },
 };

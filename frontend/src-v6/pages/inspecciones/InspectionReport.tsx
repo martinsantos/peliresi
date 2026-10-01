@@ -13,11 +13,12 @@ export function InspectionReport({ inspection, readiness }: { inspection: Inspec
   const differs = inspection.comparaciones.filter((item) => item.resultado === 'DIFIERE');
   const noComply = inspection.items.filter((item) => item.resultado === 'NO_CUMPLE');
   const checked = inspection.comparaciones.filter((item) => item.resultado !== 'PENDIENTE').length;
+  const hasDeclaredData = inspection.comparaciones.length > 0;
   const complies = inspection.items.filter((item) => item.resultado === 'CUMPLE').length;
   const pending = inspection.items.filter((item) => item.resultado === 'PENDIENTE').length;
   const notApplicable = inspection.items.filter((item) => item.resultado === 'NO_APLICA').length;
   const checklistGroups = useMemo(() => Array.from(new Set(inspection.items.map((item) => item.categoria))), [inspection.items]);
-  const summary = useMemo(() => inspection.observaciones || `Se contrastaron ${checked} de ${inspection.comparaciones.length} datos declarados y se registraron ${differs.length} diferencias. El checklist presenta ${noComply.length} puntos no conformes.`, [checked, differs.length, inspection.comparaciones.length, inspection.observaciones, noComply.length]);
+  const summary = useMemo(() => inspection.observaciones || (inspection.tipoActor ? `Se contrastaron ${checked} de ${inspection.comparaciones.length} datos declarados y se registraron ${differs.length} diferencias. El checklist presenta ${noComply.length} puntos no conformes.` : 'Hallazgo registrado sin responsable identificado. Los hechos y las evidencias deben describirse expresamente antes de atribuirlos a un sujeto.'), [checked, differs.length, inspection.comparaciones.length, inspection.observaciones, inspection.tipoActor, noComply.length]);
   const technicalSections = useMemo(() => {
     const report = inspection.informeTecnico || {};
     return [
@@ -38,9 +39,9 @@ export function InspectionReport({ inspection, readiness }: { inspection: Inspec
           <div className="flex items-start gap-3"><ClipboardCheck className="mt-0.5 shrink-0 text-primary-700" size={20} /><div><p className="font-bold text-[#10213A]">Síntesis de la constatación</p><p className="mt-1 text-sm leading-relaxed text-neutral-700">{summary}</p></div></div>
         </div>
 
-        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-neutral-200 bg-neutral-200 lg:grid-cols-4">
-          <ReportKpi label="Datos verificados" value={`${checked}/${inspection.comparaciones.length}`} tone="text-primary-700" />
-          <ReportKpi label="Diferencias" value={String(differs.length)} tone={differs.length ? 'text-amber-800' : 'text-emerald-700'} />
+        <div className={`grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-neutral-200 bg-neutral-200 ${hasDeclaredData ? 'lg:grid-cols-4' : ''}`}>
+          {hasDeclaredData && <><ReportKpi label="Datos verificados" value={`${checked}/${inspection.comparaciones.length}`} tone="text-primary-700" />
+          <ReportKpi label="Diferencias" value={String(differs.length)} tone={differs.length ? 'text-amber-800' : 'text-emerald-700'} /></>}
           <ReportKpi label="Controles conformes" value={`${complies}/${inspection.items.length}`} tone="text-emerald-700" />
           <ReportKpi label="Pendientes" value={String(pending)} tone={pending ? 'text-amber-800' : 'text-neutral-700'} />
         </div>
@@ -64,9 +65,10 @@ export function InspectionReport({ inspection, readiness }: { inspection: Inspec
         <div>
           <h4 className="mb-3 font-extrabold text-[#10213A]">Hallazgos comparativos</h4>
           <div data-testid="comparison-ledger" className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
-            <div className="hidden grid-cols-[minmax(150px,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_auto] gap-5 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-neutral-500 lg:grid">
+            {hasDeclaredData && <div className="hidden grid-cols-[minmax(150px,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_auto] gap-5 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-neutral-500 lg:grid">
               <span>Concepto</span><span>Declarado</span><span>Verificado</span><span className="text-right">Resultado</span>
-            </div>
+            </div>}
+            {!hasDeclaredData && <p className="px-4 py-4 text-sm leading-relaxed text-neutral-600">{inspection.tipoActor ? 'No hay datos declarados para contrastar. Revisá el registro vinculado antes de considerar completa esta sección.' : 'Todavía no hay un sujeto ni una declaración vinculados. Este vacío no equivale a un resultado conforme.'}</p>}
             {inspection.comparaciones.map((row) => (
               <article key={row.id} className={`grid min-w-0 gap-4 border-b border-neutral-200 px-4 py-4 last:border-b-0 lg:grid-cols-[minmax(150px,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:gap-5 ${row.resultado === 'DIFIERE' ? 'border-l-2 border-l-error-500 bg-error-50/30 pl-[14px]' : ''}`}>
                 <div className="flex min-w-0 items-start justify-between gap-3 lg:block">

@@ -4,8 +4,8 @@
  * Wizard para crear/editar transportistas con todos los campos DPA + vehiculos + choferes
  */
 
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, ArrowRight, Check, Truck, MapPin, Shield,
   Plus, Trash2, Loader2, Car, User,
@@ -13,6 +13,9 @@ import {
 import { Card } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
+import { MobileFormSteps } from '../../components/MobileFormSteps';
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
+import { initialPasswordError, vehicleCapacityError } from '../../utils/actorCreationValidation';
 import { toast } from '../../components/ui/Toast';
 import {
   useTransportista,
@@ -53,7 +56,7 @@ const STEPS = [
 const NuevoTransportistaPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
+  const mp = useMobilePrefix();
   const isEdit = !!id;
 
   const { data: existing } = useTransportista(isEdit ? id! : '');
@@ -61,6 +64,8 @@ const NuevoTransportistaPage: React.FC = () => {
   const updateMutation = useUpdateTransportista();
 
   const [step, setStep] = useState(1);
+  const [attempted, setAttempted] = useState<Set<number>>(new Set());
+  const submitInFlight = useRef(false);
   const [form, setForm] = useState({
     razonSocial: '', cuit: '', domicilio: '', localidad: '',
     telefono: '', email: '', password: '', nombre: '',
@@ -93,7 +98,7 @@ const NuevoTransportistaPage: React.FC = () => {
     if (Array.isArray(t.vehiculos)) {
       setVehiculos(t.vehiculos.map((v: any) => ({
         patente: v.patente || '', marca: v.marca || '', modelo: v.modelo || '',
-        anio: v.anio ? String(v.anio) : '', capacidad: v.capacidad || '',
+        anio: v.anio ? String(v.anio) : '', capacidad: v.capacidad != null ? String(v.capacidad) : '',
         numeroHabilitacion: v.numeroHabilitacion || '',
         vencimiento: v.vencimiento ? new Date(v.vencimiento).toISOString().split('T')[0] : '',
       })));
@@ -110,6 +115,41 @@ const NuevoTransportistaPage: React.FC = () => {
 
   const up = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }));
 
+  const passwordError = initialPasswordError(form.password, form.cuit);
+  const getStepErrors = (s: number) => {
+    const errors: string[] = [];
+    if (s === 1) {
+      if (!form.razonSocial.trim()) errors.push('Razon Social es obligatoria');
+      if (!form.cuit.trim()) errors.push('CUIT es obligatorio');
+      if (!form.email.trim()) errors.push('Email es obligatorio');
+      if (!isEdit && passwordError) errors.push(passwordError);
+    }
+    if (s === 3 && !isEdit) vehiculos.forEach((vehicle, i) => {
+      if (!vehicle.patente.trim()) errors.push(`Vehículo ${i + 1}: la patente es obligatoria`);
+      const error = vehicleCapacityError(vehicle.capacidad);
+      if (error) errors.push(`Vehículo ${i + 1}: ${error}`);
+      if (!vehicle.anio.trim() || !Number.isInteger(Number(vehicle.anio))) errors.push(`Vehículo ${i + 1}: el año debe ser un número entero`);
+      if (!vehicle.vencimiento || !Number.isFinite(Date.parse(vehicle.vencimiento))) errors.push(`Vehículo ${i + 1}: indicá el vencimiento`);
+    });
+    if (s === 4 && !isEdit) choferes.forEach((driver, i) => {
+      if (!driver.nombre.trim()) errors.push(`Chofer ${i + 1}: el nombre es obligatorio`);
+      if (!driver.dni.trim()) errors.push(`Chofer ${i + 1}: el DNI es obligatorio`);
+      if (!driver.vencimiento || !Number.isFinite(Date.parse(driver.vencimiento))) errors.push(`Chofer ${i + 1}: indicá el vencimiento`);
+    });
+    return errors;
+  };
+  const validateStep = (s: number) => {
+    setAttempted(previous => new Set(previous).add(s));
+    const errors = getStepErrors(s);
+    if (!errors.length) return true;
+    setStep(s);
+    return false;
+  };
+  const goStep = (next: number) => {
+    if (submitInFlight.current) return;
+    if (next <= step || validateStep(step)) setStep(next);
+  };
+
   const parseCoords = (coords: string) => {
     const parts = coords?.split(',').map(s => s.trim()).filter(Boolean);
     const lat = parts?.[0] ? Number(parts[0]) : undefined;
@@ -118,11 +158,8 @@ const NuevoTransportistaPage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!form.razonSocial || !form.cuit || !form.email) {
-      toast.error('Campos requeridos', 'Razon social, CUIT y email son obligatorios');
-      setStep(1);
-      return;
-    }
+    if (submitInFlight.current) return;
+    if (![1, 3, 4].every(validateStep)) return;
 
     const payload: any = {
       razonSocial: form.razonSocial, cuit: form.cuit,
@@ -140,50 +177,52 @@ const NuevoTransportistaPage: React.FC = () => {
     };
 
     if (!isEdit) {
-      payload.password = form.password || form.cuit.replace(/\D/g, '');
+      payload.password = form.password;
       payload.nombre = form.nombre || form.razonSocial;
       // Include vehiculos and choferes on create
       if (vehiculos.length > 0) {
-        payload.vehiculos = vehiculos.filter(v => v.patente).map(v => ({
+        payload.vehiculos = vehiculos.map(v => ({
           patente: v.patente, marca: v.marca, modelo: v.modelo,
-          anio: v.anio ? Number(v.anio) : undefined,
-          capacidad: v.capacidad || undefined,
-          numeroHabilitacion: v.numeroHabilitacion || undefined,
-          vencimiento: v.vencimiento || new Date().toISOString(),
+          anio: Number(v.anio),
+          capacidad: Number(v.capacidad),
+          numeroHabilitacion: v.numeroHabilitacion,
+          vencimiento: v.vencimiento,
         }));
       }
       if (choferes.length > 0) {
-        payload.choferes = choferes.filter(c => c.nombre && c.dni).map(c => ({
+        payload.choferes = choferes.map(c => ({
           nombre: c.nombre, apellido: c.apellido || '',
           dni: c.dni, licencia: c.licencia || '',
-          vencimiento: c.vencimiento || new Date().toISOString(),
+          vencimiento: c.vencimiento,
           telefono: c.telefono || '',
         }));
       }
     }
 
+    submitInFlight.current = true;
     try {
       if (isEdit && id) {
         await updateMutation.mutateAsync({ id, data: payload });
         toast.success('Actualizado', `Transportista ${form.razonSocial} actualizado`);
       } else {
         await createMutation.mutateAsync(payload);
-        toast.success('Creado', `Transportista ${form.razonSocial} creado. Password inicial: ${payload.password}`);
+        toast.success('Creado', `Transportista ${form.razonSocial} creado`);
       }
-      const backPath = '/admin/actores/transportistas';
-      navigate(backPath);
+      navigate(mp('/admin/actores/transportistas'));
     } catch (err: any) {
       toast.error('Error', err?.response?.data?.message || 'No se pudo guardar');
+    } finally {
+      submitInFlight.current = false;
     }
   };
 
   const isPending = createMutation.isPending || updateMutation.isPending;
-  const backPath = '/admin/actores/transportistas';
+  const backPath = mp('/admin/actores/transportistas');
 
   return (
     <div className="space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
         <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>
           Volver
         </Button>
@@ -193,29 +232,30 @@ const NuevoTransportistaPage: React.FC = () => {
           </div>
           <div>
             <h2 className="text-xl font-bold text-neutral-900">{isEdit ? 'Editar' : 'Nuevo'} Transportista</h2>
-            <p className="text-xs text-neutral-500">Paso {step} de {STEPS.length}</p>
+            <p className="hidden md:block text-xs text-neutral-500">Paso {step} de {STEPS.length}</p>
           </div>
         </div>
       </div>
 
       {/* Stepper */}
-      <div className="flex items-center justify-between bg-white rounded-2xl border border-neutral-200 p-4">
+      <MobileFormSteps steps={STEPS} currentStep={step} onSelect={goStep} />
+      <div className="hidden md:flex items-center justify-between bg-white rounded-2xl border border-neutral-200 p-4">
         {STEPS.map((s, i) => {
           const Icon = s.icon;
           const isActive = step === s.id;
           const isDone = step > s.id;
           return (
             <React.Fragment key={s.id}>
-              <button onClick={() => setStep(s.id)} className={`flex flex-col items-center gap-1.5 transition-all ${isActive ? 'scale-105' : ''}`}>
+              <button aria-label={`${s.id}. ${s.label}`} aria-current={isActive ? 'step' : undefined} onClick={() => goStep(s.id)} disabled={isPending} className="flex min-h-11 min-w-11 flex-col items-center gap-1.5 rounded-lg transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
                 <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
-                  isActive ? 'bg-orange-500 text-white shadow-lg' :
+                  isActive ? 'bg-orange-700 text-white' :
                   isDone ? 'bg-orange-100 text-orange-600' :
-                  'bg-neutral-100 text-neutral-400'
+                  'bg-neutral-100 text-neutral-600'
                 }`}>
                   {isDone ? <Check size={16} /> : <Icon size={16} />}
                 </div>
                 <span className={`text-[10px] font-medium hidden sm:block ${
-                  isActive ? 'text-orange-600' : isDone ? 'text-orange-600' : 'text-neutral-400'
+                  isActive ? 'text-orange-700' : isDone ? 'text-orange-700' : 'text-neutral-600'
                 }`}>{s.label}</span>
               </button>
               {i < STEPS.length - 1 && (
@@ -232,11 +272,11 @@ const NuevoTransportistaPage: React.FC = () => {
           <div className="space-y-4">
             <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2"><Truck size={20} className="text-orange-600" /> Datos Basicos</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input label="Razon Social *" value={form.razonSocial} onChange={e => up('razonSocial', e.target.value)} placeholder="Transporte S.A." />
-              <Input label="CUIT *" value={form.cuit} onChange={e => up('cuit', e.target.value)} placeholder="30-12345678-9" />
+              <Input label="Razon Social *" value={form.razonSocial} onChange={e => up('razonSocial', e.target.value)} errorMessage={attempted.has(1) && !form.razonSocial.trim() ? 'La razón social es obligatoria' : undefined} placeholder="Transporte S.A." />
+              <Input label="CUIT *" value={form.cuit} onChange={e => up('cuit', e.target.value)} errorMessage={attempted.has(1) && !form.cuit.trim() ? 'El CUIT es obligatorio' : undefined} placeholder="30-12345678-9" />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input label="Email *" type="email" value={form.email} onChange={e => up('email', e.target.value)} placeholder="contacto@empresa.com" />
+              <Input label="Email *" type="email" value={form.email} onChange={e => up('email', e.target.value)} errorMessage={attempted.has(1) && !form.email.trim() ? 'El email es obligatorio' : undefined} placeholder="contacto@empresa.com" />
               <Input label="Telefono" value={form.telefono} onChange={e => up('telefono', e.target.value)} placeholder="+54 261 ..." />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -247,7 +287,7 @@ const NuevoTransportistaPage: React.FC = () => {
             {!isEdit && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input label="Nombre Responsable" value={form.nombre} onChange={e => up('nombre', e.target.value)} placeholder="Juan Perez" />
-                <Input label="Password inicial" type="password" value={form.password} onChange={e => up('password', e.target.value)} placeholder="Default: CUIT" />
+                <Input label="Contraseña inicial *" type="password" autoComplete="new-password" value={form.password} onChange={e => up('password', e.target.value)} errorMessage={attempted.has(1) ? passwordError : undefined} helperText="Al menos 8 caracteres. No uses el CUIT." placeholder="Ingresá una contraseña" />
               </div>
             )}
           </div>
@@ -275,7 +315,17 @@ const NuevoTransportistaPage: React.FC = () => {
           </div>
         )}
 
-        {step === 3 && (
+        {step === 3 && (isEdit ? (
+          <section className="space-y-4" aria-label="Vehículos registrados">
+            <h3 className="text-lg font-bold text-neutral-900">Vehículos registrados</h3>
+            <p className="text-sm text-neutral-700">Esta edición guarda los datos del transportista, no su flota. Los vehículos y choferes se administran desde la pestaña Flota y Conductores de su ficha.</p>
+            <Link className="inline-flex min-h-11 items-center rounded-lg border border-primary-700 px-4 font-semibold text-primary-800 hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700" to={mp('/admin/actores/transportistas/' + id)} target="_blank" rel="noopener noreferrer">Administrar flota (nueva pestaña)</Link>
+            <ul className="divide-y divide-neutral-200 rounded-xl border border-neutral-200">
+              {vehiculos.map((item, i) => <li key={i} className="p-4 text-sm text-neutral-900">{item.patente} — {item.marca} {item.modelo} · {item.capacidad || '—'} kg</li>)}
+            </ul>
+            {vehiculos.length === 0 && <p className="text-sm text-neutral-600">Sin vehículos registrados.</p>}
+          </section>
+        ) : (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2"><Car size={20} className="text-orange-600" /> Vehiculos</h3>
@@ -290,27 +340,37 @@ const NuevoTransportistaPage: React.FC = () => {
               <div key={i} className="border border-neutral-200 rounded-xl p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-neutral-700">Vehiculo {i + 1}</span>
-                  <button onClick={() => setVehiculos(prev => prev.filter((_, j) => j !== i))} className="p-1 text-error-500 hover:bg-error-50 rounded">
+                  <button onClick={() => setVehiculos(prev => prev.filter((_, j) => j !== i))} aria-label={`Quitar vehículo ${i + 1}`} type="button" className="min-h-11 min-w-11 inline-flex items-center justify-center text-error-700 hover:bg-error-50 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-error-700">
                     <Trash2 size={14} />
                   </button>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  <Input label="Patente *" value={v.patente} onChange={e => { const nv = [...vehiculos]; nv[i] = { ...nv[i], patente: e.target.value }; setVehiculos(nv); }} placeholder="AB123CD" />
+                  <Input label="Patente *" value={v.patente} errorMessage={!isEdit && attempted.has(3) && !v.patente.trim() ? 'La patente es obligatoria' : undefined} onChange={e => { const nv = [...vehiculos]; nv[i] = { ...nv[i], patente: e.target.value }; setVehiculos(nv); }} placeholder="AB123CD" />
                   <Input label="Marca" value={v.marca} onChange={e => { const nv = [...vehiculos]; nv[i] = { ...nv[i], marca: e.target.value }; setVehiculos(nv); }} placeholder="Mercedes" />
                   <Input label="Modelo" value={v.modelo} onChange={e => { const nv = [...vehiculos]; nv[i] = { ...nv[i], modelo: e.target.value }; setVehiculos(nv); }} placeholder="Atego 1726" />
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <Input label="Ano" type="number" value={v.anio} onChange={e => { const nv = [...vehiculos]; nv[i] = { ...nv[i], anio: e.target.value }; setVehiculos(nv); }} placeholder="2024" />
-                  <Input label="Capacidad" value={v.capacidad} onChange={e => { const nv = [...vehiculos]; nv[i] = { ...nv[i], capacidad: e.target.value }; setVehiculos(nv); }} placeholder="10 tn" />
+                  <Input label="Ano *" type="number" step="1" value={v.anio} errorMessage={!isEdit && attempted.has(3) && (!v.anio.trim() || !Number.isInteger(Number(v.anio))) ? 'El año debe ser un número entero' : undefined} onChange={e => { const nv = [...vehiculos]; nv[i] = { ...nv[i], anio: e.target.value }; setVehiculos(nv); }} placeholder="2024" />
+                  <Input label="Capacidad (kg) *" type="number" min="0" step="any" inputMode="decimal" value={v.capacidad} errorMessage={!isEdit && attempted.has(3) ? vehicleCapacityError(v.capacidad) : undefined} onChange={e => { const nv = [...vehiculos]; nv[i] = { ...nv[i], capacidad: e.target.value }; setVehiculos(nv); }} placeholder="10000" />
                   <Input label="Habilitacion" value={v.numeroHabilitacion} onChange={e => { const nv = [...vehiculos]; nv[i] = { ...nv[i], numeroHabilitacion: e.target.value }; setVehiculos(nv); }} placeholder="VEH-XXXX" />
-                  <Input label="Vencimiento" type="date" value={v.vencimiento} onChange={e => { const nv = [...vehiculos]; nv[i] = { ...nv[i], vencimiento: e.target.value }; setVehiculos(nv); }} />
+                  <Input label="Vencimiento *" type="date" value={v.vencimiento} errorMessage={!isEdit && attempted.has(3) && (!v.vencimiento || !Number.isFinite(Date.parse(v.vencimiento))) ? 'Indicá el vencimiento' : undefined} onChange={e => { const nv = [...vehiculos]; nv[i] = { ...nv[i], vencimiento: e.target.value }; setVehiculos(nv); }} />
                 </div>
               </div>
             ))}
           </div>
-        )}
+        ))}
 
-        {step === 4 && (
+        {step === 4 && (isEdit ? (
+          <section className="space-y-4" aria-label="Choferes registrados">
+            <h3 className="text-lg font-bold text-neutral-900">Choferes registrados</h3>
+            <p className="text-sm text-neutral-700">Esta edición guarda los datos del transportista, no su flota. Los vehículos y choferes se administran desde la pestaña Flota y Conductores de su ficha.</p>
+            <Link className="inline-flex min-h-11 items-center rounded-lg border border-primary-700 px-4 font-semibold text-primary-800 hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700" to={mp('/admin/actores/transportistas/' + id)} target="_blank" rel="noopener noreferrer">Administrar flota (nueva pestaña)</Link>
+            <ul className="divide-y divide-neutral-200 rounded-xl border border-neutral-200">
+              {choferes.map((item, i) => <li key={i} className="p-4 text-sm text-neutral-900">{item.nombre} {item.apellido} — DNI {item.dni}</li>)}
+            </ul>
+            {choferes.length === 0 && <p className="text-sm text-neutral-600">Sin choferes registrados.</p>}
+          </section>
+        ) : (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2"><User size={20} className="text-orange-600" /> Choferes</h3>
@@ -325,24 +385,24 @@ const NuevoTransportistaPage: React.FC = () => {
               <div key={i} className="border border-neutral-200 rounded-xl p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-neutral-700">Chofer {i + 1}</span>
-                  <button onClick={() => setChoferes(prev => prev.filter((_, j) => j !== i))} className="p-1 text-error-500 hover:bg-error-50 rounded">
+                  <button onClick={() => setChoferes(prev => prev.filter((_, j) => j !== i))} aria-label={`Quitar chofer ${i + 1}`} type="button" className="min-h-11 min-w-11 inline-flex items-center justify-center text-error-700 hover:bg-error-50 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-error-700">
                     <Trash2 size={14} />
                   </button>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  <Input label="Nombre *" value={c.nombre} onChange={e => { const nc = [...choferes]; nc[i] = { ...nc[i], nombre: e.target.value }; setChoferes(nc); }} placeholder="Juan" />
+                  <Input label="Nombre *" value={c.nombre} errorMessage={attempted.has(4) && !c.nombre.trim() ? 'El nombre es obligatorio' : undefined} onChange={e => { const nc = [...choferes]; nc[i] = { ...nc[i], nombre: e.target.value }; setChoferes(nc); }} placeholder="Juan" />
                   <Input label="Apellido" value={c.apellido} onChange={e => { const nc = [...choferes]; nc[i] = { ...nc[i], apellido: e.target.value }; setChoferes(nc); }} placeholder="Perez" />
-                  <Input label="DNI *" value={c.dni} onChange={e => { const nc = [...choferes]; nc[i] = { ...nc[i], dni: e.target.value }; setChoferes(nc); }} placeholder="12345678" />
+                  <Input label="DNI *" value={c.dni} errorMessage={attempted.has(4) && !c.dni.trim() ? 'El DNI es obligatorio' : undefined} onChange={e => { const nc = [...choferes]; nc[i] = { ...nc[i], dni: e.target.value }; setChoferes(nc); }} placeholder="12345678" />
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   <Input label="Licencia" value={c.licencia} onChange={e => { const nc = [...choferes]; nc[i] = { ...nc[i], licencia: e.target.value }; setChoferes(nc); }} placeholder="LIC-XXXX" />
-                  <Input label="Vencimiento" type="date" value={c.vencimiento} onChange={e => { const nc = [...choferes]; nc[i] = { ...nc[i], vencimiento: e.target.value }; setChoferes(nc); }} />
+                  <Input label="Vencimiento *" type="date" value={c.vencimiento} errorMessage={attempted.has(4) && (!c.vencimiento || !Number.isFinite(Date.parse(c.vencimiento))) ? 'Indicá el vencimiento' : undefined} onChange={e => { const nc = [...choferes]; nc[i] = { ...nc[i], vencimiento: e.target.value }; setChoferes(nc); }} />
                   <Input label="Telefono" value={c.telefono} onChange={e => { const nc = [...choferes]; nc[i] = { ...nc[i], telefono: e.target.value }; setChoferes(nc); }} placeholder="261-XXXX" />
                 </div>
               </div>
             ))}
           </div>
-        )}
+        ))}
 
         {step === 5 && (
           <div className="space-y-4">
@@ -391,7 +451,7 @@ const NuevoTransportistaPage: React.FC = () => {
           {step === 1 ? 'Cancelar' : 'Anterior'}
         </Button>
         {step < STEPS.length ? (
-          <Button rightIcon={<ArrowRight size={16} />} onClick={() => setStep(step + 1)}>
+          <Button rightIcon={<ArrowRight size={16} />} disabled={isPending} onClick={() => goStep(step + 1)}>
             Siguiente
           </Button>
         ) : (

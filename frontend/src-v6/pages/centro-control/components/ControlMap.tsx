@@ -13,6 +13,9 @@ import { ACTOR_ICONS, ACTOR_COLORS, createClusterIcon } from '../../../utils/map
 import type { CentroControlData, EnTransitoItem } from '../../../hooks/useCentroControl';
 import type { LayerState } from './ControlFilters';
 
+import { InspectionMapLayer } from '../../inspecciones/InspectionMapLayer';
+import { hasInspectionCoordinates, type InspectionOperation } from '../../../services/inspectionOperations.service';
+
 // ── Cluster helper ──
 function clusterMarkers<T extends { latitud: number; longitud: number }>(
   items: T[],
@@ -53,16 +56,17 @@ function ZoomTracker({ onZoom }: { onZoom: (z: number) => void }) {
   return null;
 }
 
-function FitBounds({ points }: { points: [number, number][] }) {
+function FitBounds({ points, animate = true }: { points: [number, number][]; animate?: boolean }) {
   const map = useMap();
   useEffect(() => {
     if (points.length === 0) return;
     if (points.length === 1) {
-      map.flyTo(points[0], 13, { duration: 0.8 });
+      if (animate) map.flyTo(points[0], 13, { duration: 0.8 });
+      else map.setView(points[0], 13, { animate: false });
     } else {
       map.flyToBounds(L.latLngBounds(points), { padding: [40, 40], duration: 0.8, maxZoom: 14 });
     }
-  }, [points, map]);
+  }, [points, map, animate]);
   return null;
 }
 
@@ -87,7 +91,10 @@ interface ControlMapProps {
   selectedTripId: string | null;
   onSelectTrip: (id: string | null) => void;
   selectedRealizadoId: string | null;
-  tripPanel: 'activos' | 'realizados';
+  tripPanel: 'activos' | 'realizados' | 'inspecciones';
+  inspections: InspectionOperation[];
+  selectedInspectionId: string | null;
+  onSelectInspection: (id: string) => void;
   viajesRealizados: ViajeRealizado[];
   activeTripFlyPoints: [number, number][];
   panelBoundsPoints: [number, number][];
@@ -110,8 +117,15 @@ export const ControlMap: React.FC<ControlMapProps> = ({
   panelBoundsPoints,
   realizadoFlyPoints,
   mapColRef,
+  inspections,
+  selectedInspectionId,
+  onSelectInspection,
 }) => {
   const navigate = useNavigate();
+  const inspectionFlyPoints = useMemo((): [number, number][] => {
+    const selected = layers.inspecciones ? inspections.find((item) => item.id === selectedInspectionId) : undefined;
+    return selected && hasInspectionCoordinates(selected) ? [[selected.latitud!, selected.longitud!]] : [];
+  }, [inspections, selectedInspectionId, layers.inspecciones]);
 
   // Clustered generadores
   const generadoresClustered = useMemo(() => {
@@ -122,7 +136,7 @@ export const ControlMap: React.FC<ControlMapProps> = ({
   return (
     <div ref={mapColRef} className="lg:col-span-2">
       <Card padding="none">
-        <div className="flex items-center justify-between p-5 border-b border-neutral-100">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-b border-neutral-100">
           <div className="flex items-center gap-3">
             <h3 className="font-semibold text-neutral-900">Mapa de Actividad</h3>
             <Badge variant="soft" color="primary">
@@ -130,22 +144,27 @@ export const ControlMap: React.FC<ControlMapProps> = ({
             </Badge>
           </div>
           {/* Map legend */}
-          <div className="hidden sm:flex items-center gap-3 text-xs text-neutral-500">
+          <div className="hidden sm:flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-neutral-500">
             <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded" style={{ background: ACTOR_COLORS.generador }} /> Generadores</span>
             <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: ACTOR_COLORS.transportista, transform: 'rotate(45deg)' }} /> Transportistas</span>
-            <span className="flex items-center gap-1.5"><svg width="14" height="14" viewBox="0 0 14 14"><polygon points="7,1 13,4 13,10 7,13 1,10 1,4" fill={ACTOR_COLORS.operador}/></svg> Operadores</span>
+            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm" style={{ background: ACTOR_COLORS.operador }} /> Operadores</span>
+            {layers.inspecciones !== undefined && <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-teal-700" /> Inspecciones</span>}
             <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full" style={{ background: ACTOR_COLORS.enTransito }} /> En Tránsito</span>
           </div>
         </div>
+
         <div className="p-5">
           <div className="h-[20rem] sm:h-[28rem] lg:h-[32rem] rounded-xl overflow-hidden border border-neutral-200 relative isolate">
             <MapContainer
+              fadeAnimation={false}
               center={[-32.9287, -68.8535]}
               zoom={10}
               style={{ height: '100%', width: '100%', zIndex: 0 }}
               className="z-0"
             >
               <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              {layers.inspecciones && <InspectionMapLayer items={inspections} onSelect={onSelectInspection} />}
+              {inspectionFlyPoints.length > 0 && <FitBounds points={inspectionFlyPoints} animate={false} />}
               <ZoomTracker onZoom={onZoomChange} />
               {/* Fly to selected active trip (all points) */}
               {activeTripFlyPoints.length > 0 && (

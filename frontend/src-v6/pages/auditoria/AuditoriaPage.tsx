@@ -20,9 +20,10 @@ import { useQuery } from '@tanstack/react-query';
 import { reporteService } from '../../services/reporte.service';
 import { downloadCsv } from '../reportes/tabs/shared';
 import { useUsuarios } from '../../hooks/useUsuarios';
+import { Link, useLocation } from 'react-router-dom';
 
 type LogEntry = {
-  id: number;
+  id: string;
   fecha: string;
   usuario: string;
   rol: string;
@@ -30,6 +31,8 @@ type LogEntry = {
   modulo: string;
   detalle: string;
   ip: string;
+  inspeccionId?: string;
+  inspeccionNumero?: string;
 };
 
 const accionConfig: Record<string, { color: string; icon: React.FC<{ size?: number }> }> = {
@@ -69,9 +72,12 @@ const ACCION_OPTIONS = [
 ];
 
 const AuditoriaPage: React.FC = () => {
+  const location = useLocation();
+  const inspectionPath = location.pathname.startsWith('/mobile') ? '/mobile/inspecciones/' : '/inspecciones/';
   // Filters state
   const [busqueda, setBusqueda] = useState('');
   const [filtroAccion, setFiltroAccion] = useState('');
+  const [fuente, setFuente] = useState<'manifiestos' | 'inspecciones'>('manifiestos');
   const [filtroUsuario, setFiltroUsuario] = useState('');
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
@@ -103,7 +109,7 @@ const AuditoriaPage: React.FC = () => {
 
   // Server-side paginated query
   const { data: apiData, isLoading, isError } = useQuery({
-    queryKey: ['reportes', 'auditoria', currentPage, itemsPerPage, filtroAccion, filtroUsuario, fechaDesde, fechaHasta, sortBy, sortOrder],
+    queryKey: ['reportes', 'auditoria', fuente, currentPage, itemsPerPage, filtroAccion, filtroUsuario, fechaDesde, fechaHasta, sortBy, sortOrder],
     queryFn: () => reporteService.auditoria({
       page: currentPage,
       limit: itemsPerPage,
@@ -113,6 +119,7 @@ const AuditoriaPage: React.FC = () => {
       fechaHasta: fechaHasta || undefined,
       sortBy,
       sortOrder,
+      fuente,
     } as any),
   });
 
@@ -121,7 +128,7 @@ const AuditoriaPage: React.FC = () => {
     const raw = apiData?.datos || apiData?.eventos || [];
     if (!Array.isArray(raw)) return [];
     return raw.map((d: any, i: number) => ({
-      id: d.id || i + 1,
+      id: String(d.id || i + 1),
       fecha: d.fecha || d.createdAt || '',
       usuario: d.usuario || d.usuarioNombre || '',
       rol: d.rol || 'SISTEMA',
@@ -129,12 +136,14 @@ const AuditoriaPage: React.FC = () => {
       modulo: d.modulo || d.entidad || d.manifiestoNumero || '',
       detalle: d.detalle || d.descripcion || '',
       ip: d.ip || d.direccionIp || '',
+      inspeccionId: d.inspeccionId,
+      inspeccionNumero: d.inspeccionNumero,
     }));
   }, [apiData]);
 
   const pagination = (apiData as any)?.pagination;
   const totalItems = pagination?.total || logsData.length;
-  const totalPages = pagination?.pages || Math.ceil(totalItems / itemsPerPage);
+  const totalPages = Math.max(1, pagination?.pages ?? Math.ceil(totalItems / itemsPerPage));
 
   // Client-side text search (on already-fetched page)
   const logsFiltrados = busqueda
@@ -158,9 +167,9 @@ const AuditoriaPage: React.FC = () => {
       toast.warning('Sin datos', 'No hay registros para exportar');
       return;
     }
-    const headers = ['Fecha', 'Usuario', 'Rol', 'Accion', 'Modulo', 'Detalle', 'IP'];
-    const rows = logsFiltrados.map(l => [l.fecha, l.usuario, l.rol, l.accion, l.modulo, l.detalle, l.ip]);
-    downloadCsv(`auditoria_${new Date().toISOString().split('T')[0]}.csv`, headers, rows);
+    const headers = ['Fecha', 'Usuario', 'Rol', 'Accion', 'Modulo', 'Legajo', 'Detalle', 'IP'];
+    const rows = logsFiltrados.map(l => [l.fecha, l.usuario, l.rol, l.accion, l.modulo, l.inspeccionNumero || '', l.detalle, l.ip]);
+    downloadCsv(`auditoria_${fuente}_${new Date().toISOString().split('T')[0]}.csv`, headers, rows);
     toast.success('Exportado', 'Registros descargados');
   };
 
@@ -207,11 +216,12 @@ const AuditoriaPage: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" leftIcon={<Download size={16} />} onClick={handleExportar}>
+          <Button variant="outline" size="sm" leftIcon={<Download size={16} />} disabled={isError || !logsFiltrados.length} onClick={handleExportar}>
             CSV
           </Button>
         </div>
       </div>
+      {isError && <p role="alert" className="rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-800">No se pudo actualizar la auditoría de {fuente}. Reintentá antes de exportar o interpretar el listado.</p>}
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
@@ -234,11 +244,14 @@ const AuditoriaPage: React.FC = () => {
       <Card>
         <CardContent className="p-3 sm:p-4 space-y-3">
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+            <div className="w-full sm:w-44">
+              <Select value={fuente} onChange={(value) => { setFuente(value as 'manifiestos' | 'inspecciones'); setFiltroAccion(''); setCurrentPage(1); }} options={[{ value: 'manifiestos', label: 'Manifiestos' }, { value: 'inspecciones', label: 'Inspecciones' }]} size="sm" placeholder="Módulo" />
+            </div>
             <div className="flex-1">
               <Input placeholder="Buscar en resultados..." value={busqueda} onChange={e => setBusqueda(e.target.value)} leftIcon={<Search size={16} />} />
             </div>
             <div className="w-full sm:w-48">
-              <Select value={filtroAccion} onChange={(val) => { setFiltroAccion(val); setCurrentPage(1); }} options={ACCION_OPTIONS} size="sm" placeholder="Acción" />
+              <Select value={filtroAccion} onChange={(val) => { setFiltroAccion(val); setCurrentPage(1); }} options={fuente === 'inspecciones' ? [{ value: '', label: 'Todas las acciones' }, ...Object.keys(stats.porTipo).map((value) => ({ value, label: value.replace(/_/g, ' ') }))] : ACCION_OPTIONS} size="sm" placeholder="Acción" />
             </div>
             <div className="w-full sm:w-56">
               <Select value={filtroUsuario} onChange={(val) => { setFiltroUsuario(val); setCurrentPage(1); }} options={usuarioOptions} size="sm" placeholder="Usuario" searchable />
@@ -284,7 +297,8 @@ const AuditoriaPage: React.FC = () => {
                 </div>
                 <span className="text-[10px] text-neutral-400">{formatFecha(log.fecha)}</span>
               </div>
-              <p className="text-sm text-neutral-900 truncate">{log.detalle || '—'}</p>
+              <p className="text-sm text-neutral-900">{log.inspeccionNumero && <span className="font-semibold">{log.inspeccionNumero} · </span>}{log.detalle || '—'}</p>
+              {log.inspeccionId && <Link className="text-xs font-semibold text-primary-700 underline" to={`${inspectionPath}${log.inspeccionId}`}>Abrir expediente</Link>}
               <div className="flex items-center gap-1.5 mt-1">
                 <User size={10} className="text-neutral-400" />
                 <span className="text-xs text-neutral-600">{log.usuario}</span>
@@ -348,7 +362,7 @@ const AuditoriaPage: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-3 py-2 text-sm text-neutral-600 truncate hidden xl:table-cell">{log.modulo}</td>
-                    <td className="px-3 py-2 text-sm text-neutral-900 truncate" title={log.detalle}>{log.detalle}</td>
+                    <td className="px-3 py-2 text-sm text-neutral-900" title={log.detalle}>{log.inspeccionNumero && <Link className="font-semibold text-primary-700 underline" to={`${inspectionPath}${log.inspeccionId}`}>{log.inspeccionNumero}</Link>}{log.inspeccionNumero ? ' · ' : ''}{log.detalle}</td>
                     <td className="px-3 py-2 text-xs text-neutral-500 font-mono hidden xl:table-cell">{log.ip}</td>
                   </tr>
                 );

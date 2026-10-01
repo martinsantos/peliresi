@@ -338,7 +338,8 @@ export const getLogAuditoria = async (req: AuthRequest, res: Response, next: Nex
             throw new AppError('Acceso no autorizado', 403);
         }
 
-        const { fechaInicio, fechaFin, tipo, manifiestoId, usuarioId, accion, page, limit, sortBy, sortOrder } = req.query;
+        const { fechaInicio, fechaFin, tipo, manifiestoId, usuarioId, accion, page, limit, sortBy, sortOrder, fuente } = req.query;
+        if (fuente && fuente !== 'manifiestos' && fuente !== 'inspecciones') throw new AppError('Fuente de auditoría no reconocida', 400);
         const { skip, take: limitNum, page: pageNum, limit: limitVal } = parsePagination(
             { page: page as string, limit: limit as string },
             { limit: 200, maxLimit: 1000 }
@@ -359,6 +360,34 @@ export const getLogAuditoria = async (req: AuthRequest, res: Response, next: Nex
         let orderBy: any = { createdAt: dir };
         if (sortBy === 'usuario') orderBy = { usuario: { nombre: dir } };
         else if (sortBy === 'tipo' || sortBy === 'accion') orderBy = { tipo: dir };
+
+        if (fuente === 'inspecciones') {
+            if (manifiestoId) throw new AppError('El filtro de manifiesto no aplica a inspecciones', 400);
+            const [events, total, byType] = await Promise.all([
+                prisma.eventoInspeccion.findMany({
+                    where, skip, take: limitNum, orderBy,
+                    include: {
+                        usuario: { select: { nombre: true, apellido: true, rol: true } },
+                        inspeccion: { select: { id: true, numero: true } },
+                    },
+                }),
+                prisma.eventoInspeccion.count({ where }),
+                prisma.eventoInspeccion.groupBy({ by: ['tipo'], _count: true, where }),
+            ]);
+            res.json({ success: true, data: {
+                eventos: events.map((event) => ({
+                    id: event.id, fecha: event.createdAt, tipo: event.tipo,
+                    descripcion: [event.titulo, event.detalle].filter(Boolean).join(' · '),
+                    modulo: 'Inspecciones', inspeccionId: event.inspeccion.id,
+                    inspeccionNumero: event.inspeccion.numero,
+                    usuario: `${event.usuario.nombre} ${event.usuario.apellido || ''}`.trim(),
+                    rol: event.usuario.rol,
+                })),
+                resumen: { total, porTipo: Object.fromEntries(byType.map((entry) => [entry.tipo, entry._count])) },
+                pagination: { page: pageNum, limit: limitVal, total, pages: Math.ceil(total / limitVal) },
+            } });
+            return;
+        }
 
         const [eventos, total] = await Promise.all([
             prisma.eventoManifiesto.findMany({

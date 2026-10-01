@@ -384,7 +384,7 @@ const TransportistasPage: React.FC = () => {
   const columns = [
     {
       key: 'transportista',
-      width: '30%',
+      // Leave remaining space to the actor, not to narrow status/action columns.
       header: 'Transportista',
       sortable: true,
       render: (row: typeof tableData[0]) => (
@@ -401,7 +401,7 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'habilitacion',
-      width: '12%',
+      width: '8rem',
       header: 'Habilitación',
       hiddenBelow: 'xl' as const,
       render: (row: typeof tableData[0]) => {
@@ -424,7 +424,7 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'localidad',
-      width: '10%',
+      width: '7rem',
       header: 'Localidad',
       sortable: true,
       hiddenBelow: 'xl' as const,
@@ -443,7 +443,7 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'flota',
-      width: '7%',
+      width: '7.5rem',
       header: 'Vehículos',
       sortable: true,
       hiddenBelow: 'xl' as const,
@@ -456,7 +456,7 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'choferes',
-      width: '7%',
+      width: '7rem',
       header: 'Choferes',
       sortable: true,
       hiddenBelow: 'xl' as const,
@@ -469,7 +469,7 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'contacto',
-      width: '15%',
+      width: '9rem',
       header: 'Contacto',
       hiddenBelow: '2xl' as const,
       render: (row: typeof tableData[0]) => (
@@ -492,7 +492,7 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'ultimaActividad',
-      width: '9%',
+      width: '7rem',
       header: 'Actividad',
       sortable: true,
       hiddenBelow: '2xl' as const,
@@ -504,7 +504,7 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'estado',
-      width: '8%',
+      width: '6rem',
       header: 'Estado',
       sortable: true,
       render: (row: typeof tableData[0]) => (
@@ -515,7 +515,7 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'acciones',
-      width: '10%',
+      width: '10rem',
       header: '',
       align: 'right' as const,
       render: (row: typeof tableData[0]) => (
@@ -724,6 +724,7 @@ const TransportistasPage: React.FC = () => {
             {/* Desktop table */}
             <div className="hidden md:block">
               <Table
+                className="[&_table]:min-w-[40rem] xl:[&_table]:min-w-[57rem] 2xl:[&_table]:min-w-[73rem]"
                 data={filteredData}
                 columns={columns}
                 keyExtractor={(row) => row.id}

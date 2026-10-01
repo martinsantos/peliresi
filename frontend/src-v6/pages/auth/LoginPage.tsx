@@ -6,10 +6,11 @@
 
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, Leaf, AlertCircle, Factory, Truck, FlaskConical, PlayCircle } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle, Factory, Truck, FlaskConical, PlayCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getApiErrorMessage } from '../../utils/api-error';
 import { MendozaBrand } from '../../components/MendozaBrand';
+import { SitrepMark } from '../../components/SitrepMark';
 import { postLoginDestination } from '../../utils/authRedirect';
 import './institutional.css';
 
@@ -51,9 +52,7 @@ const LoginPage: React.FC = () => {
         <div className="login-brand-lockup">
           <MendozaBrand />
           <div className="sitrep-wordmark">
-            <div className="brand-icon w-9 h-9 rounded-xl flex items-center justify-center">
-              <Leaf size={20} className="text-white" />
-            </div>
+            <SitrepMark size={36} />
             <span style={{ fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" }}>SITREP</span>
           </div>
         </div>
@@ -175,7 +174,7 @@ const LoginPage: React.FC = () => {
       <p className="mt-4 text-center text-sm text-neutral-600">
         ¿Ya tenés cuenta?{' '}
         <Link to="/reclamar" className="brand-link font-semibold hover:underline">
-          Reclamá tu cuenta
+          Recuperá el acceso por correo
         </Link>
       </p>
 

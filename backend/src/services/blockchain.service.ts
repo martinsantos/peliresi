@@ -272,7 +272,7 @@ export async function verificarEnBlockchain(hash: string): Promise<{ exists: boo
 /**
  * Verifica la integridad completa de un manifiesto:
  * 1. Genesis hash recalculado vs blockchain
- * 2. Rolling hash chain replay
+ * 2. Presence of event hashes (historical inputs do not permit a full replay)
  * 3. Closure hash (si TRATADO) vs blockchain
  */
 export async function verificarIntegridad(manifiestoId: string) {
@@ -312,20 +312,18 @@ export async function verificarIntegridad(manifiestoId: string) {
     }
   }
 
-  // 2. Replay rolling hash chain from events
-  let rollingChainIntacta = true;
+  // 2. Counting stored hashes is NOT a verification of the event chain.
+  // Historical events do not retain all hash inputs, so report unknown, never true.
+  const rollingChainIntacta: boolean | null = null;
   const workflowEvents = manifiesto.eventos.filter(e =>
     ['FIRMA', 'RETIRO', 'ENTREGA', 'RECEPCION', 'TRATAMIENTO', 'CIERRE', 'RECHAZO'].includes(e.tipo)
   );
   let rollingChainPasos = 0;
 
-  // We can only verify events that have integrityHash stored
+  // This count is informational only.
   for (const evento of workflowEvents) {
     if (evento.integrityHash) {
       rollingChainPasos++;
-      // The integrityHash on the event should match the manifiesto's rollingHash at that point
-      // We can't fully replay without knowing the exact state at each step,
-      // but we can verify the chain is non-null and consistent
     }
   }
 
@@ -366,7 +364,7 @@ export async function verificarIntegridad(manifiestoId: string) {
 
   const integridad = discrepancias.length > 0
     ? 'FALLIDA'
-    : (cierreVerificado ? 'COMPLETA' : (genesisVerificado ? 'PARCIAL' : 'SIN_SELLOS'));
+    : (cierreVerificado || genesisVerificado ? 'PARCIAL' : 'SIN_SELLOS');
 
   return {
     manifiestoId,
@@ -376,6 +374,7 @@ export async function verificarIntegridad(manifiestoId: string) {
     genesisTxHash: genesisSello?.txHash ?? null,
     rollingChainIntacta,
     rollingChainPasos,
+    limitaciones: ['La cadena de eventos no fue reconstruida: los registros históricos no conservan todos los datos necesarios.'],
     cierreVerificado,
     cierreBlockchain,
     cierreTxHash: cierreSello?.txHash ?? null,
@@ -423,7 +422,8 @@ export async function verificarLote(filtros: {
     },
   });
 
-  let integridadCompleta = 0;
+  // Preserve the response field without manufacturing complete verification.
+  const integridadCompleta = 0;
   let integridadParcial = 0;
   let integridadFallida = 0;
   const detalle: Array<{ id: string; numero: string; integridad: string; nota?: string; discrepancias?: string[] }> = [];
@@ -432,15 +432,14 @@ export async function verificarLote(filtros: {
     const result = await verificarIntegridad(m.id);
     if (!result) continue;
 
-    if (result.integridad === 'COMPLETA') integridadCompleta++;
-    else if (result.integridad === 'PARCIAL') integridadParcial++;
+    if (result.integridad === 'PARCIAL') integridadParcial++;
     else if (result.integridad === 'FALLIDA') integridadFallida++;
 
     detalle.push({
       id: m.id,
       numero: m.numero,
       integridad: result.integridad,
-      ...(result.integridad === 'PARCIAL' && { nota: 'Solo sello genesis' }),
+      ...(result.integridad === 'PARCIAL' && { nota: 'Sellos examinados; cadena de eventos sin reconstrucción completa' }),
       ...(result.discrepancias.length > 0 && { discrepancias: result.discrepancias }),
     });
   }

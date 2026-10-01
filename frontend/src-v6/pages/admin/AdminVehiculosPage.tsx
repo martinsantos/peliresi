@@ -289,7 +289,6 @@ export const AdminVehiculosPage: React.FC = () => {
   const columns = [
     {
       key: 'vehiculo',
-      width: '22%',
       header: 'Vehículo',
       sortable: true,
       render: (row: VehiculoDisplay) => (
@@ -306,8 +305,8 @@ export const AdminVehiculosPage: React.FC = () => {
     },
     {
       key: 'detalles',
-      width: '20%',
-      hiddenBelow: 'lg' as const,
+      width: '8rem',
+      hiddenBelow: 'xl' as const,
       header: 'Detalles',
       render: (row: VehiculoDisplay) => (
         <div className="text-sm min-w-0">
@@ -318,7 +317,7 @@ export const AdminVehiculosPage: React.FC = () => {
     },
     {
       key: 'transportista',
-      width: '20%',
+      width: '10rem',
       sortable: true,
       hiddenBelow: 'lg' as const,
       header: 'Transportista',
@@ -328,7 +327,7 @@ export const AdminVehiculosPage: React.FC = () => {
     },
     {
       key: 'vtv',
-      width: '15%',
+      width: '9rem',
       sortable: true,
       hiddenBelow: 'xl' as const,
       header: 'Vencimiento',
@@ -365,7 +364,7 @@ export const AdminVehiculosPage: React.FC = () => {
     },
     {
       key: 'estado',
-      width: '12%',
+      width: '7rem',
       sortable: true,
       header: 'Estado',
       render: (row: VehiculoDisplay) => {
@@ -381,7 +380,7 @@ export const AdminVehiculosPage: React.FC = () => {
     },
     {
       key: 'acciones',
-      width: '11%',
+      width: '7.5rem',
       header: '',
       align: 'right' as const,
       render: (row: VehiculoDisplay) => (
@@ -428,7 +427,6 @@ export const AdminVehiculosPage: React.FC = () => {
   const choferColumns = [
     {
       key: 'chofer',
-      width: '22%',
       sortable: true,
       header: 'Chofer',
       render: (row: ChoferDisplay) => (
@@ -445,8 +443,8 @@ export const AdminVehiculosPage: React.FC = () => {
     },
     {
       key: 'licencia',
-      width: '15%',
-      hiddenBelow: 'md' as const,
+      width: '7rem',
+      hiddenBelow: 'xl' as const,
       header: 'Licencia',
       render: (row: ChoferDisplay) => (
         <span className="text-sm text-neutral-700">{row.licencia || 'Sin licencia'}</span>
@@ -454,9 +452,9 @@ export const AdminVehiculosPage: React.FC = () => {
     },
     {
       key: 'transportista',
-      width: '25%',
+      width: '10rem',
       sortable: true,
-      hiddenBelow: 'md' as const,
+      hiddenBelow: 'lg' as const,
       header: 'Transportista',
       render: (row: ChoferDisplay) => (
         <span className="text-sm text-neutral-700 truncate block">{row.transportista}</span>
@@ -464,7 +462,8 @@ export const AdminVehiculosPage: React.FC = () => {
     },
     {
       key: 'vencimiento',
-      width: '15%',
+      width: '9rem',
+      hiddenBelow: 'xl' as const,
       header: 'Vencimiento',
       render: (row: ChoferDisplay) => {
         if (!row.vencimiento) {
@@ -499,7 +498,7 @@ export const AdminVehiculosPage: React.FC = () => {
     },
     {
       key: 'estado',
-      width: '12%',
+      width: '7rem',
       sortable: true,
       header: 'Estado',
       render: (row: ChoferDisplay) => (
@@ -510,7 +509,7 @@ export const AdminVehiculosPage: React.FC = () => {
     },
     {
       key: 'acciones',
-      width: '11%',
+      width: '7.5rem',
       header: '',
       align: 'right' as const,
       render: (row: ChoferDisplay) => (
@@ -770,6 +769,7 @@ export const AdminVehiculosPage: React.FC = () => {
               ) : (
                 <>
                   <Table
+                    className="[&_table]:min-w-[38rem]"
                     data={paginatedData}
                     columns={columns}
                     keyExtractor={(row) => row.id}
@@ -891,6 +891,7 @@ export const AdminVehiculosPage: React.FC = () => {
               ) : (
                 <>
                   <Table
+                    className="[&_table]:min-w-[38rem]"
                     data={paginatedChoferes}
                     columns={choferColumns}
                     keyExtractor={(row) => row.id}

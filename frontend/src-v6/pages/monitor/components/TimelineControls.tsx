@@ -103,7 +103,7 @@ export const TimelineControls: React.FC<Props> = ({
   return (
     <div className="wr-panel flex items-center gap-4 px-4 py-3">
       {/* KPI Cards */}
-      <div className="flex items-center gap-3 flex-shrink-0">
+      <div className="wr-summary flex items-center gap-3 flex-shrink-0">
         <KpiCard
           icon={<FileText size={14} />}
           label={isPlayback ? 'Creados' : 'Manifiestos Hoy'}
@@ -132,10 +132,10 @@ export const TimelineControls: React.FC<Props> = ({
       </div>
 
       {/* Separator */}
-      <div className="w-px h-8 bg-neutral-200 flex-shrink-0" />
+      <div className="wr-summary-separator w-px h-8 bg-neutral-200 flex-shrink-0" />
 
       {/* Mode-specific controls */}
-      <div className="flex items-center gap-3 flex-1 min-w-0">
+      <div className="wr-timeline-actions flex items-center gap-3 flex-1 min-w-0">
         {mode === 'LIVE' && (
           <>
             <span className="flex items-center gap-1.5 text-xs font-semibold text-green-600">

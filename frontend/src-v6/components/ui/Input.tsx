@@ -7,7 +7,7 @@
  * Variantes: default, filled, flushed
  */
 
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useId } from 'react';
 import { AlertCircle, Check } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -41,8 +41,8 @@ interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, '
 // STYLES - Tamaños
 // ========================================
 const sizeStyles: Record<InputSize, { input: string; icon: number }> = {
-  sm: { input: 'h-9 px-3 text-sm', icon: 14 },
-  base: { input: 'h-11 px-4 text-sm', icon: 16 },
+  sm: { input: 'h-11 sm:h-9 px-3 text-base sm:text-sm', icon: 14 },
+  base: { input: 'h-11 px-4 text-base sm:text-sm', icon: 16 },
   lg: { input: 'h-14 px-5 text-base', icon: 18 },
 };
 
@@ -64,13 +64,17 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       className,
       containerClassName,
       id,
+      'aria-describedby': describedBy,
+      'aria-invalid': invalid,
       ...props
     },
     ref
   ) => {
-    const inputId = id || `input-${Math.random().toString(36).substr(2, 9)}`;
-    const hasError = state === 'error';
-    const hasSuccess = state === 'success';
+    const generatedId = useId();
+    const inputId = id || generatedId;
+    const hasError = state === 'error' || !!errorMessage;
+    const hasSuccess = state === 'success' && !hasError;
+    const helpIds = [describedBy, (helperText || errorMessage) && `${inputId}-help`].filter(Boolean).join(' ') || undefined;
 
     // Iconos de estado
     const stateIcon = hasError ? (
@@ -108,11 +112,13 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             id={inputId}
             disabled={disabled}
+            aria-invalid={hasError || invalid}
+            aria-describedby={helpIds}
             className={cn(
               // Base styles
-              'w-full rounded-xl border-2 bg-white',
-              'transition-all duration-200 ease-out',
-              'placeholder:text-neutral-400',
+              'w-full min-w-0 rounded-lg border bg-white text-neutral-900',
+              'transition-colors duration-150',
+              'placeholder:text-neutral-500',
               'focus:outline-none',
               
               // Size
@@ -123,9 +129,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               (rightIcon || stateIcon) && 'pr-11',
               
               // States
-              state === 'default' && [
-                'border-neutral-200',
-                'hover:border-neutral-300',
+              !hasError && !hasSuccess && [
+                'border-neutral-400',
+                'hover:border-neutral-500',
                 'focus:border-primary-500 focus:ring-4 focus:ring-primary-500/20',
               ],
               hasError && [
@@ -158,9 +164,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         {/* Helper text / Error message */}
         {(helperText || errorMessage) && (
           <p
+            id={inputId + '-help'}
             className={cn(
               'mt-1.5 text-sm',
-              hasError ? 'text-error-500' : 'text-neutral-500'
+              hasError ? 'text-error-700' : 'text-neutral-600'
             )}
           >
             {errorMessage || helperText}

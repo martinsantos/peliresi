@@ -6,10 +6,10 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   FileText, Search, Filter, Plus, Eye, Edit, Trash2, Loader2, AlertTriangle, ChevronDown, X, ArrowUpDown, ArrowUp, ArrowDown,
-  ShieldCheck, Download, FileDown, Printer, Calendar,
+  ShieldCheck, Download, FileDown, Printer, Calendar, RefreshCw,
 } from 'lucide-react';
 import { Card } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -18,6 +18,7 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { toast } from '../../components/ui/Toast';
 import { useManifiestos } from '../../hooks/useManifiestos';
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { useGeneradores } from '../../hooks/useGeneradores';
 import { useOperadores } from '../../hooks/useOperadores';
 import { manifiestoService } from '../../services/manifiesto.service';
@@ -108,6 +109,7 @@ function mapRow(m: any): MRow {
 
 const ManifiestosPage: React.FC = () => {
   const navigate = useNavigate();
+  const mp = useMobilePrefix();
   const [searchParams] = useSearchParams();
 
   // Filters
@@ -192,10 +194,11 @@ const ManifiestosPage: React.FC = () => {
 
   const totalPages = apiData?.totalPages || 1;
   const hasMore = page < totalPages;
+  const offlineCopy = !!apiData && 'offline' in apiData && apiData.offline === true;
 
   // Accumulate rows
   useEffect(() => {
-    if (!apiData?.items || apiData.items.length === 0) return;
+    if (!apiData?.items || isError) return;
     setTotalCount(apiData.total);
     setAllRows(prev => {
       const mapped = apiData.items.map(mapRow);
@@ -203,7 +206,7 @@ const ManifiestosPage: React.FC = () => {
       const existing = new Set(prev.map(r => r.id));
       return [...prev, ...mapped.filter(r => !existing.has(r.id))];
     });
-  }, [apiData, page]);
+  }, [apiData, page, isError]);
 
   const loadMore = useCallback(() => {
     if (hasMore && !isFetching) setPage(p => p + 1);
@@ -274,6 +277,7 @@ const ManifiestosPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 xl:max-w-7xl xl:mx-auto">
         <h2 className="text-xl font-bold text-neutral-900">Manifiestos</h2>
         <div className="flex items-center gap-2 flex-wrap">
+          <Button size="sm" variant="outline" disabled={isFetching} leftIcon={<RefreshCw size={16} className={isFetching ? 'animate-spin' : ''} />} onClick={() => refetch()}>Actualizar listado</Button>
           <button onClick={() => window.print()} className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-neutral-600 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir">
             <Printer size={13} />
           </button>
@@ -291,22 +295,22 @@ const ManifiestosPage: React.FC = () => {
             }}
             className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-error-600 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="PDF"
           ><FileDown size={13} /> PDF</button>
-          <Button size="sm" leftIcon={<Plus size={16} />} onClick={() => navigate('/manifiestos/nuevo')}>Nuevo Manifiesto</Button>
+          <Button size="sm" leftIcon={<Plus size={16} />} onClick={() => navigate(mp('/manifiestos/nuevo'))}>Nuevo Manifiesto</Button>
         </div>
       </div>
 
       {/* Filters — sticky */}
-      <div ref={filterBarRefCb} className="sticky top-0 z-20 bg-[#FAFAF8] -mx-4 lg:-mx-8 px-4 lg:px-8 pt-2 pb-2">
+      <div ref={filterBarRefCb} className="sticky top-0 z-20 bg-[#FAFAF8] pt-2 pb-2">
         <Card padding="base">
           <div className="flex flex-col md:flex-row gap-3">
             <div className="flex-1">
-              <Input placeholder="Buscar por número o generador..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} leftIcon={<Search size={18} />} />
+              <Input aria-label="Buscar manifiestos" placeholder="Buscar por número o generador..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} leftIcon={<Search size={18} />} />
             </div>
             <div className="flex gap-2 items-center">
               <div className="w-full md:w-48">
                 <Select value={estadoFilter} onChange={(val) => setEstadoFilter(val)} options={[{ value: '', label: 'Todos los estados' }, ...Object.values(EstadoManifiesto).map((e) => ({ value: e, label: ESTADO_LABELS[e] || e }))]} placeholder="Filtrar estado..." size="sm" clearable />
               </div>
-              <button onClick={() => setShowFilters(!showFilters)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border transition-colors ${showFilters || filterCount > 0 ? 'bg-primary-50 text-primary-700 border-primary-200' : 'bg-neutral-50 text-neutral-600 border-neutral-200 hover:border-neutral-300'}`}>
+              <button type="button" aria-label="Filtros" aria-expanded={showFilters} onClick={() => setShowFilters(!showFilters)} className={`flex min-h-11 shrink-0 items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${showFilters || filterCount > 0 ? 'bg-primary-50 text-primary-700 border-primary-200' : 'bg-neutral-50 text-neutral-600 border-neutral-300 hover:border-neutral-400'}`}>
                 <Filter size={15} />
                 <span className="hidden sm:inline">Filtros</span>
                 {filterCount > 0 && <span className="bg-primary-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">{filterCount}</span>}
@@ -321,6 +325,7 @@ const ManifiestosPage: React.FC = () => {
                 <div className="flex gap-2">
                   <div className="flex-1">
                     <Select
+                      placeholder="Ordenar por"
                       value={sortBy}
                       onChange={(val) => handleSort(val as SortCol)}
                       options={[
@@ -366,14 +371,14 @@ const ManifiestosPage: React.FC = () => {
                   size="sm"
                 />
               </div>
-              <div className="flex gap-3">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-neutral-500">Desde</label>
-                  <input type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} className="text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-primary-300" />
+              <div className="grid min-w-0 grid-cols-2 gap-3">
+                <div className="flex min-w-0 flex-col gap-1">
+                  <label htmlFor="manifest-date-from" className="text-sm font-medium text-neutral-600">Desde</label>
+                  <input id="manifest-date-from" type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} className="min-h-11 min-w-0 w-full text-sm border border-neutral-400 rounded-lg px-2 py-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700" />
                 </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-neutral-500">Hasta</label>
-                  <input type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} className="text-sm border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-primary-300" />
+                <div className="flex min-w-0 flex-col gap-1">
+                  <label htmlFor="manifest-date-to" className="text-sm font-medium text-neutral-600">Hasta</label>
+                  <input id="manifest-date-to" type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} className="min-h-11 min-w-0 w-full text-sm border border-neutral-400 rounded-lg px-2 py-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700" />
                 </div>
               </div>
               {(fechaDesde || fechaHasta || generadorFilter || operadorFilter) && (
@@ -403,14 +408,14 @@ const ManifiestosPage: React.FC = () => {
                     </div>
                   </div>
                 )}
-                <Card className="active:scale-[0.98] transition-transform cursor-pointer" onClick={() => navigate(`/manifiestos/${m.id}`)}>
+                <Card padding="none" className="cursor-pointer hover:bg-neutral-50 focus-within:bg-neutral-50" onClick={() => navigate(mp(`/manifiestos/${m.id}`))}>
                   <div className="p-3">
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="font-mono font-semibold text-sm text-neutral-900">{m.numero}</span>
+                        <Link to={mp(`/manifiestos/${m.id}`)} onClick={event => event.stopPropagation()} className="font-mono font-semibold text-sm text-neutral-900 hover:underline">{m.numero}</Link>
                         <BcBadge status={m.blockchainStatus} />
                       </div>
-                      <Badge variant="soft" color={estadoBadgeColor[m.estado] || 'neutral'} className="text-[10px] shrink-0">
+                      <Badge variant="soft" color={estadoBadgeColor[m.estado] || 'neutral'} className="text-xs shrink-0">
                         {ESTADO_LABELS[m.estado as EstadoManifiesto] || m.estado}
                       </Badge>
                     </div>
@@ -418,8 +423,8 @@ const ManifiestosPage: React.FC = () => {
                     <div className="flex items-center justify-between mt-1.5">
                       <span className="text-[11px] text-neutral-400">{formatDateTime(m.actividad)}</span>
                       <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="sm" className="p-1" onClick={() => navigate(`/manifiestos/${m.id}`)}><Eye size={14} /></Button>
-                        <Button variant="ghost" size="sm" className="p-1 text-error-500" onClick={() => setDeleteTarget({ id: m.id, numero: m.numero })}><Trash2 size={14} /></Button>
+                        <Button aria-label={`Ver manifiesto ${m.numero}`} variant="ghost" size="sm" className="h-11 w-11 p-1" onClick={() => navigate(mp(`/manifiestos/${m.id}`))}><Eye size={14} /></Button>
+                        <Button aria-label={`Eliminar manifiesto ${m.numero}`} variant="ghost" size="sm" className="h-11 w-11 p-1 text-error-700" onClick={() => setDeleteTarget({ id: m.id, numero: m.numero })}><Trash2 size={14} /></Button>
                       </div>
                     </div>
                   </div>
@@ -467,10 +472,10 @@ const ManifiestosPage: React.FC = () => {
                   )}
                   <div
                     className="grid grid-cols-[minmax(140px,1.2fr)_1.5fr_100px_100px] lg:grid-cols-[minmax(140px,1.2fr)_1.5fr_100px_160px_70px_100px] xl:grid-cols-[minmax(140px,1.2fr)_1.3fr_1.3fr_100px_160px_70px_100px] items-center px-1 border-b border-neutral-50 hover:bg-neutral-50/60 cursor-pointer transition-colors"
-                    onClick={() => navigate(`/manifiestos/${m.id}`)}
+                    onClick={() => navigate(mp(`/manifiestos/${m.id}`))}
                   >
                     <div className="px-3 py-2 flex items-center gap-2 min-w-0">
-                      <span className="font-mono text-sm font-semibold text-neutral-900 whitespace-nowrap">{m.numero}</span>
+                      <Link to={mp(`/manifiestos/${m.id}`)} onClick={event => event.stopPropagation()} className="font-mono text-sm font-semibold text-neutral-900 whitespace-nowrap hover:underline">{m.numero}</Link>
                       <BcBadge status={m.blockchainStatus} />
                     </div>
                     <div className="px-3 py-2 text-sm text-neutral-700 truncate" title={m.generadorNombre}>{m.generadorNombre}</div>
@@ -481,9 +486,9 @@ const ManifiestosPage: React.FC = () => {
                     <div className="px-3 py-2 text-xs text-neutral-500 whitespace-nowrap hidden lg:block">{formatDateTime(m.actividad)}</div>
                     <div className="px-3 py-2 text-sm text-neutral-700 whitespace-nowrap hidden lg:block">{typeof m.peso === 'number' ? m.peso.toLocaleString('es-AR') : '0'} {m.unidad}</div>
                     <div className="px-3 py-2 flex items-center justify-end gap-0.5">
-                      <button className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-primary-600 transition-colors" onClick={(e) => { e.stopPropagation(); navigate(`/manifiestos/${m.id}`); }}><Eye size={15} /></button>
-                      <button className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-primary-600 transition-colors" onClick={(e) => { e.stopPropagation(); navigate(`/manifiestos/${m.id}/editar`); }}><Edit size={15} /></button>
-                      <button className="p-1.5 rounded-lg hover:bg-error-50 text-neutral-400 hover:text-error-500 transition-colors" onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: m.id, numero: m.numero }); }}><Trash2 size={15} /></button>
+                      <button aria-label={`Ver manifiesto ${m.numero}`} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-primary-600 transition-colors" onClick={(e) => { e.stopPropagation(); navigate(mp(`/manifiestos/${m.id}`)); }}><Eye size={15} /></button>
+                      <button aria-label={`Editar manifiesto ${m.numero}`} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-primary-600 transition-colors" onClick={(e) => { e.stopPropagation(); navigate(mp(`/manifiestos/${m.id}/editar`)); }}><Edit size={15} /></button>
+                      <button aria-label={`Eliminar manifiesto ${m.numero}`} className="p-1.5 rounded-lg hover:bg-error-50 text-neutral-400 hover:text-error-500 transition-colors" onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: m.id, numero: m.numero }); }}><Trash2 size={15} /></button>
                     </div>
                   </div>
                 </React.Fragment>
@@ -501,22 +506,28 @@ const ManifiestosPage: React.FC = () => {
         )}
 
         {/* Empty state */}
-        {allRows.length === 0 && !isLoading && !isFetching && (
+        {allRows.length === 0 && !isLoading && !isFetching && !isError && (
           <Card className="mt-3">
             <div className="text-center py-12">
               <FileText size={48} className="mx-auto text-neutral-300 mb-4" />
-              <p className="text-neutral-500 font-medium">No se encontraron manifiestos</p>
-              <p className="text-sm text-neutral-400 mt-1">Prueba con otros filtros de búsqueda</p>
+              <p className="text-neutral-500 font-medium">{offlineCopy ? 'No hay copias descargadas para estos filtros' : 'No se encontraron manifiestos'}</p>
+              <p className="text-sm text-neutral-400 mt-1">{offlineCopy ? 'Conectate para consultar el registro completo.' : 'Prueba con otros filtros de búsqueda'}</p>
             </div>
           </Card>
         )}
 
+        {offlineCopy && <p role="status" className="mt-3 text-sm text-neutral-800">Sin conexión · copias de este dispositivo. El total corresponde a los manifiestos descargados.</p>}
+        {isError && (
+          <div role="alert" className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-warning-300 bg-warning-50 p-3 text-sm text-warning-900">
+            <span>{allRows.length > 0 ? 'No se pudo actualizar el listado. Se muestran los últimos datos cargados.' : 'No se pudo cargar el listado de manifiestos.'}</span>
+            <Button size="sm" variant="outline" onClick={() => refetch()}>Reintentar</Button>
+          </div>
+        )}
         {/* Status bar */}
         {allRows.length > 0 && (
           <div className="px-3 py-1.5 mt-2 flex items-center gap-2 text-xs text-neutral-400">
             <span>{allRows.length} de {totalCount}</span>
             {isFetching && <Loader2 size={12} className="animate-spin" />}
-            {isError && <span className="text-warning-600">(offline)</span>}
           </div>
         )}
       </div>

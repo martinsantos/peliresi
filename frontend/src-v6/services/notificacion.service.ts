@@ -29,6 +29,10 @@ export const notificacionService = {
     await api.put('/notificaciones/todas-leidas');
   },
 
+  async eliminar(id: string): Promise<void> {
+    await api.delete(`/notificaciones/${id}`);
+  },
+
   async getNoLeidas(): Promise<number> {
     try {
       const { data } = await api.get('/notificaciones');

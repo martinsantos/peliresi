@@ -152,7 +152,7 @@ function App() {
           </Route>
         </Route>
         {/* Transportista detail: ADMIN + ADMIN_TRANSPORTISTA + TRANSPORTISTA (own profile) */}
-        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_TRANSPORTISTA', 'TRANSPORTISTA']} />}>
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_TRANSPORTISTA', 'TRANSPORTISTA']} allowInspector />}>
           <Route element={<MobileLayout />}>
             <Route path="/mobile/admin/actores/transportistas/:id" element={<TransportistaDetallePage />} />
           </Route>
@@ -171,7 +171,7 @@ function App() {
             <Route path="/mobile/admin/actores/generadores/nuevo" element={<NuevoGeneradorPage />} />
             <Route path="/mobile/admin/actores/generadores/:id/editar" element={<NuevoGeneradorPage />} />
             <Route path="/mobile/admin/actores/generadores/:id/renovar" element={<NuevoGeneradorPage />} />
-            <Route path="/mobile/admin/actores/generadores/:id" element={<GeneradorDetallePage />} />
+
             <Route path="/mobile/admin/residuos" element={<AdminResiduosPage />} />
           </Route>
         </Route>
@@ -183,8 +183,36 @@ function App() {
             <Route path="/mobile/admin/actores/operadores/nuevo" element={<NuevoOperadorPage />} />
             <Route path="/mobile/admin/actores/operadores/:id/editar" element={<NuevoOperadorPage />} />
             <Route path="/mobile/admin/actores/operadores/:id/renovar" element={<NuevoOperadorPage />} />
-            <Route path="/mobile/admin/actores/operadores/:id" element={<OperadorDetallePage />} />
+
             <Route path="/mobile/admin/renovaciones" element={<AdminRenovacionesPage />} />
+          </Route>
+        </Route>
+
+        {/* Inspector consultation only; creation/editing remain in admin guards. */}
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR']} allowInspector />}>
+          <Route element={<MainLayout />}>
+            <Route path="/admin/actores/generadores/:id" element={<GeneradorDetallePage />} />
+          </Route>
+        </Route>
+
+        {/* Inspector consultation only; creation/editing remain in admin guards. */}
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_OPERADOR']} allowInspector />}>
+          <Route element={<MainLayout />}>
+            <Route path="/admin/actores/operadores/:id" element={<OperadorDetallePage />} />
+          </Route>
+        </Route>
+
+        {/* Inspector consultation only; creation/editing remain in admin guards. */}
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR']} allowInspector />}>
+          <Route element={<MobileLayout />}>
+            <Route path="/mobile/admin/actores/generadores/:id" element={<GeneradorDetallePage />} />
+          </Route>
+        </Route>
+
+        {/* Inspector consultation only; creation/editing remain in admin guards. */}
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_OPERADOR']} allowInspector />}>
+          <Route element={<MobileLayout />}>
+            <Route path="/mobile/admin/actores/operadores/:id" element={<OperadorDetallePage />} />
           </Route>
         </Route>
 
@@ -271,7 +299,7 @@ function App() {
           </Route>
         </Route>
         {/* Transportista detail: ADMIN + ADMIN_TRANSPORTISTA + TRANSPORTISTA (own profile) */}
-        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_TRANSPORTISTA', 'TRANSPORTISTA']} />}>
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_TRANSPORTISTA', 'TRANSPORTISTA']} allowInspector />}>
           <Route element={<MainLayout />}>
             <Route path="/admin/actores/transportistas/:id" element={<TransportistaDetallePage />} />
           </Route>
@@ -290,7 +318,7 @@ function App() {
             <Route path="/admin/actores/generadores/nuevo" element={<NuevoGeneradorPage />} />
             <Route path="/admin/actores/generadores/:id/editar" element={<NuevoGeneradorPage />} />
             <Route path="/admin/actores/generadores/:id/renovar" element={<NuevoGeneradorPage />} />
-            <Route path="/admin/actores/generadores/:id" element={<GeneradorDetallePage />} />
+
             <Route path="/admin/residuos" element={<AdminResiduosPage />} />
           </Route>
         </Route>
@@ -302,7 +330,7 @@ function App() {
             <Route path="/admin/actores/operadores/nuevo" element={<NuevoOperadorPage />} />
             <Route path="/admin/actores/operadores/:id/editar" element={<NuevoOperadorPage />} />
             <Route path="/admin/actores/operadores/:id/renovar" element={<NuevoOperadorPage />} />
-            <Route path="/admin/actores/operadores/:id" element={<OperadorDetallePage />} />
+
             <Route path="/admin/tratamientos" element={<AdminTratamientosPage />} />
             <Route path="/admin/renovaciones" element={<AdminRenovacionesPage />} />
           </Route>
@@ -316,7 +344,11 @@ function App() {
         <Route path="/v6/manifiestos/verificar/:numero" element={<V6VerificarRedirect />} />
 
         {/* User Switcher */}
-        <Route path="/switch-user" element={<UserSwitcherPage />} />
+        <Route element={<ProtectedRoute />}>
+          <Route element={<MainLayout />}>
+            <Route path="/switch-user" element={<UserSwitcherPage />} />
+          </Route>
+        </Route>
 
         {/* Redirects */}
         <Route path="/" element={<LandingPage />} />

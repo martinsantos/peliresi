@@ -49,24 +49,27 @@ export function useTiposResiduoEnriched() {
   });
 }
 
-export function useCatalogoGeneradores() {
+export function useCatalogoGeneradores(enabled = true) {
   return useQuery({
+    enabled,
     queryKey: ['catalogos', 'generadores'],
     queryFn: () => fetchWithOfflineFallback('generadores', () => catalogoService.generadores()),
     staleTime: STALE_TIME,
   });
 }
 
-export function useCatalogoTransportistas() {
+export function useCatalogoTransportistas(enabled = true) {
   return useQuery({
+    enabled,
     queryKey: ['catalogos', 'transportistas'],
     queryFn: () => fetchWithOfflineFallback('transportistas', () => catalogoService.transportistas()),
     staleTime: STALE_TIME,
   });
 }
 
-export function useCatalogoOperadores() {
+export function useCatalogoOperadores(enabled = true) {
   return useQuery({
+    enabled,
     queryKey: ['catalogos', 'operadores'],
     queryFn: () => fetchWithOfflineFallback('operadores', () => catalogoService.operadores()),
     staleTime: STALE_TIME,

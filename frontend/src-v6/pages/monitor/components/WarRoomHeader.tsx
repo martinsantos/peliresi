@@ -24,7 +24,7 @@ export const WarRoomHeader: React.FC<Props> = ({ mode, cinemaMode, onModeChange,
   }, []);
 
   return (
-    <header className={`flex items-center justify-between px-4 py-2.5 ${cinemaMode ? 'bg-neutral-900/95 border-b border-white/10' : 'bg-[#1B5E3C] text-white'}`}>
+    <header className={`wr-header flex items-center justify-between px-4 py-2.5 ${cinemaMode ? 'bg-neutral-900/95 border-b border-white/10' : 'bg-[#1B5E3C] text-white'}`}>
       {/* Logo */}
       <div className="flex items-center gap-2.5">
         <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
@@ -35,7 +35,7 @@ export const WarRoomHeader: React.FC<Props> = ({ mode, cinemaMode, onModeChange,
       </div>
 
       {/* Mode selector */}
-      <div className="flex items-center gap-1 bg-white/10 rounded-lg p-0.5">
+      <div className="wr-mode-selector flex items-center gap-1 bg-white/10 rounded-lg p-0.5">
         <button
           onClick={() => onModeChange('LIVE')}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
@@ -67,8 +67,8 @@ export const WarRoomHeader: React.FC<Props> = ({ mode, cinemaMode, onModeChange,
       </div>
 
       {/* Right controls */}
-      <div className="flex items-center gap-3">
-        <span className="font-mono text-sm text-white/80 tabular-nums">{clock}</span>
+      <div className="wr-header-tools flex items-center gap-3">
+        <span className="wr-clock font-mono text-sm text-white/80 tabular-nums">{clock}</span>
         <button
           onClick={onCinemaToggle}
           className={`p-1.5 rounded-lg transition-all ${cinemaMode ? 'bg-amber-500/20 text-amber-300' : 'text-white/60 hover:text-white/80 hover:bg-white/10'}`}

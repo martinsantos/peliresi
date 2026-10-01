@@ -32,7 +32,7 @@ export const INSPECTION_ACTOR_LABELS: Record<InspectionActorType, string> = {
 export const isTrainingActNumber = (value?: string | null) => /^ARP-?DEMO(?:[-/]|$)/i.test(value?.trim() || '')
   || /^DEMO(?:[-/]|$)/i.test(value?.trim() || '');
 
-export const inspectionActorRoute = (type: InspectionActorType, actorId: string, mobile = false) => {
+export const inspectionActorRoute = (type: InspectionActorType | null, actorId: string, mobile = false) => {
   const segment = type === 'GENERADOR' ? 'generadores' : type === 'TRANSPORTISTA' ? 'transportistas' : 'operadores';
   return `${mobile ? '/mobile' : ''}/admin/actores/${segment}/${actorId}`;
 };

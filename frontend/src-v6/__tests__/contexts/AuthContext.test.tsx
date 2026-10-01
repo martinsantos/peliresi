@@ -80,6 +80,7 @@ vi.mock('../../components/OnboardingWizard', () => ({
 import { AuthProvider, useAuth } from '../../contexts/AuthContext';
 import { authService } from '../../services/auth.service';
 import { clearTokens, getAccessToken } from '../../services/api';
+import { clearSyncQueue } from '../../services/indexeddb';
 import { OFFLINE_SESSION_KEY, MAX_OFFLINE_SESSION_MS } from '../../services/offlineSession';
 import type { Usuario } from '../../types/models';
 
@@ -222,6 +223,7 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('user').textContent).toBe('null');
     });
     expect(screen.getByTestId('isAdmin').textContent).toBe('false');
+    expect(clearSyncQueue).not.toHaveBeenCalled();
   });
 
   it('useAuth throws when used outside AuthProvider', () => {
