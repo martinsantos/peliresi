@@ -345,6 +345,8 @@ model EventoManifiesto {
   longitud      Float?
   usuarioId     String
   integrityHash String?
+  firmaImagen   String?
+  firmaSha256   String?
   isDemoData    Boolean  @default(false)
   createdAt     DateTime @default(now())
 
@@ -464,7 +466,9 @@ model Inspeccion {
   id                String              @id @default(cuid())
   numero            String              @unique
   numeroActa        String?
-  tipoActor         TipoActorInspeccion
+  tipoActor         TipoActorInspeccion?
+  clienteId         String?             @unique
+  huellaCreacion    String?
   generadorId       String?
   transportistaId   String?
   operadorId        String?
@@ -497,10 +501,20 @@ model Inspeccion {
 
   @@index([estado, createdAt])
   @@index([inspectorId, estado])
+  @@index([fechaProgramada, estado])
   @@index([generadorId])
   @@index([transportistaId])
   @@index([operadorId])
   @@map("inspecciones")
+}
+
+model SecuenciaInspeccion {
+  serie  String
+  anio   Int
+  ultimo Int    @default(0)
+
+  @@id([serie, anio])
+  @@map("secuencias_inspeccion")
 }
 
 model ComparacionInspeccion {
@@ -604,6 +618,7 @@ model IntercambioInspeccion {
   respondeAId        String?
   tipo               TipoIntercambioInspeccion
   parte              ParteIntercambioInspeccion
+  destinatario       ParteIntercambioInspeccion
   asunto             String
   cuerpo             String
   plazoRespuestaAt   DateTime?
@@ -614,6 +629,8 @@ model IntercambioInspeccion {
   hashAnterior       String?
   hashCadena         String
   autorId            String
+  puestaDisposicionAt DateTime                @default(now())
+  vistaPorDestinatarioAt DateTime?
   createdAt          DateTime                 @default(now())
 
   inspeccion Inspeccion              @relation(fields: [inspeccionId], references: [id], onDelete: Cascade)
@@ -627,6 +644,7 @@ model IntercambioInspeccion {
   @@unique([hashCadena])
   @@index([inspeccionId, createdAt])
   @@index([respondeAId])
+  @@index([inspeccionId, destinatario, vistaPorDestinatarioAt], map: "intercambios_inspeccion_destinatario_vista_idx")
   @@map("intercambios_inspeccion")
 }
 
