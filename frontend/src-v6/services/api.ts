@@ -9,6 +9,8 @@ import { toast } from '../components/ui/Toast';
 
 const TOKEN_KEY = 'sitrep_access_token';
 const REFRESH_TOKEN_KEY = 'sitrep_refresh_token';
+const RENEWALS_KEY = 'sitrep_token_renewals';
+const MAX_RENEWALS = 4;
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
@@ -23,12 +25,39 @@ export const api = axios.create({
 export const getAccessToken = () => localStorage.getItem(TOKEN_KEY);
 export const getRefreshToken = () => localStorage.getItem(REFRESH_TOKEN_KEY);
 
-export const setTokens = (accessToken: string, refreshToken: string) => {
-  localStorage.setItem(TOKEN_KEY, accessToken);
+type Renewal = [string, string];
+const readRenewals = (): Renewal[] => {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(RENEWALS_KEY) || '[]');
+    if (!Array.isArray(value) || value.length > MAX_RENEWALS) return [];
+    return value.every(pair => Array.isArray(pair) && pair.length === 2 && pair.every(token => typeof token === 'string' && token.length > 0)) ? value : [];
+  } catch { return []; }
+};
+
+// Only a successful refresh writes this proof. A token change alone proves nothing.
+const isKnownRenewal = (from: string, to: string | null) => {
+  if (!to || from === to) return false;
+  let cursor = from;
+  for (const [previous, next] of readRenewals()) {
+    if (previous === cursor) cursor = next;
+  }
+  return cursor === to;
+};
+
+const writeTokens = (accessToken: string, refreshToken: string) => {
   localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  localStorage.setItem(TOKEN_KEY, accessToken);
+};
+
+export const setTokens = (accessToken: string, refreshToken: string) => {
+  localStorage.removeItem(RENEWALS_KEY);
+  endRefreshSession();
+  writeTokens(accessToken, refreshToken);
 };
 
 export const clearTokens = () => {
+  localStorage.removeItem(RENEWALS_KEY);
+  endRefreshSession();
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
 };
@@ -55,19 +84,25 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 // RESPONSE INTERCEPTOR - Auto refresh
 // ========================================
 
-let isRefreshing = false;
-let failedQueue: Array<{
-  resolve: (token: string) => void;
-  reject: (error: unknown) => void;
-}> = [];
+type RefreshAttempt = {
+  accessToken: string;
+  refreshToken: string | null;
+  queue: Array<{ resolve: (token: string) => void; reject: (error: unknown) => void }>;
+};
+let activeRefresh: RefreshAttempt | null = null;
 
-const processQueue = (error: unknown, token: string | null = null) => {
-  failedQueue.forEach(({ resolve, reject }) => {
+const processQueue = (attempt: RefreshAttempt, error: unknown, token: string | null = null) => {
+  attempt.queue.forEach(({ resolve, reject }) => {
     if (error) reject(error);
     else if (token) resolve(token);
   });
-  failedQueue = [];
+  attempt.queue = [];
 };
+
+function endRefreshSession() {
+  if (activeRefresh) processQueue(activeRefresh, new Error('Session changed'));
+  activeRefresh = null;
+}
 
 api.interceptors.response.use(
   (response) => response,
@@ -84,6 +119,11 @@ api.interceptors.response.use(
     // A request issued by a previous session must never refresh and replay
     // its URL using the user who logged in while that request was in flight.
     if (error.response?.status === 401 && originalRequest?.headers.Authorization !== `Bearer ${getAccessToken()}`) {
+      const authorization = originalRequest?.headers.Authorization;
+      if (!originalRequest?._retry && typeof authorization === 'string' && authorization.startsWith('Bearer ') && isKnownRenewal(authorization.slice(7), getAccessToken())) {
+        originalRequest._retry = true;
+        return api(originalRequest);
+      }
       return Promise.reject(error);
     }
 
@@ -92,9 +132,10 @@ api.interceptors.response.use(
     const hasToken = !!getAccessToken();
 
     if (error.response?.status === 401 && !originalRequest._retry && hasToken) {
-      if (isRefreshing) {
+      originalRequest._retry = true;
+      if (activeRefresh && activeRefresh.accessToken === getAccessToken() && activeRefresh.refreshToken === getRefreshToken()) {
         return new Promise((resolve, reject) => {
-          failedQueue.push({
+          activeRefresh!.queue.push({
             resolve: (token: string) => {
               originalRequest.headers.Authorization = `Bearer ${token}`;
               resolve(api(originalRequest));
@@ -104,9 +145,10 @@ api.interceptors.response.use(
         });
       }
 
-      originalRequest._retry = true;
-      isRefreshing = true;
+      endRefreshSession();
       const refreshToken = getRefreshToken();
+      const attempt: RefreshAttempt = { accessToken: getAccessToken()!, refreshToken, queue: [] };
+      activeRefresh = attempt;
 
       try {
         if (!refreshToken) throw new Error('No refresh token');
@@ -117,23 +159,33 @@ api.interceptors.response.use(
         );
 
         const { accessToken, refreshToken: newRefreshToken } = data.data;
-        if (!getAccessToken() || getRefreshToken() !== refreshToken) {
+        if (activeRefresh !== attempt || getRefreshToken() !== refreshToken) {
+          // Another tab may have completed this same renewal while ours waited.
+          if (isKnownRenewal(attempt.accessToken, getAccessToken())) return api(originalRequest);
           throw new Error('Session changed while refreshing');
         }
-        setTokens(accessToken, newRefreshToken);
-        processQueue(null, accessToken);
+        const history = readRenewals();
+        const chain = history.at(-1)?.[1] === attempt.accessToken ? history : [];
+        localStorage.setItem(RENEWALS_KEY, JSON.stringify([...chain, [attempt.accessToken, accessToken]].slice(-MAX_RENEWALS)));
+        writeTokens(accessToken, newRefreshToken);
+        processQueue(attempt, null, accessToken);
 
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return api(originalRequest);
       } catch (refreshError) {
-        processQueue(refreshError, null);
+        // A competing tab can rotate the refresh token before this request fails.
+        if (isKnownRenewal(attempt.accessToken, getAccessToken())) {
+          processQueue(attempt, null, getAccessToken());
+          return api(originalRequest);
+        }
+        processQueue(attempt, refreshError, null);
         // A late response from the previous session cannot erase a new login.
-        if (getRefreshToken() === refreshToken) clearTokens();
+        if (activeRefresh === attempt && getRefreshToken() === refreshToken) clearTokens();
         // Don't hard-redirect — let React Router handle it
         // The ProtectedRoute will redirect to /login when currentUser is null
         return Promise.reject(refreshError);
       } finally {
-        isRefreshing = false;
+        if (activeRefresh === attempt) activeRefresh = null;
       }
     }
 
@@ -151,20 +203,15 @@ api.interceptors.response.use(
 // This prevents race conditions when multiple tabs try to refresh simultaneously
 if (typeof window !== 'undefined') {
   window.addEventListener('storage', (e) => {
-    if (e.key === TOKEN_KEY && e.newValue) {
-      // Another tab updated the token — unblock queued requests
-      if (isRefreshing) {
-        isRefreshing = false;
-        processQueue(null, e.newValue);
-      }
-    }
-    if (e.key === TOKEN_KEY && !e.newValue) {
-      // Token was cleared in another tab (logout) — reject queued requests
-      if (isRefreshing) {
-        isRefreshing = false;
-        processQueue(new Error('Session ended in another tab'), null);
-      }
-    }
+    if ((e.key !== TOKEN_KEY && e.key !== null) || !activeRefresh) return;
+    if (e.storageArea && e.storageArea !== localStorage) return;
+    const attempt = activeRefresh;
+    const token = getAccessToken();
+    // Storage events may arrive after a later write; inspect the current proof.
+    if (token === attempt.accessToken && getRefreshToken() === attempt.refreshToken) return;
+    activeRefresh = null;
+    if (isKnownRenewal(attempt.accessToken, token)) processQueue(attempt, null, token);
+    else processQueue(attempt, new Error('Session changed in another tab'));
   });
 }
 
