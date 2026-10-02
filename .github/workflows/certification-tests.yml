@@ -151,6 +151,8 @@ jobs:
           cd ../frontend
           NODE_ENV=production npm run build
           NODE_ENV=production npx --no-install vite build --config vite.config.app.ts
+          cd ..
+          node --experimental-strip-types frontend/cloud-qa/build-artifact.ts freeze
       - name: Create temporary loopback PostgreSQL, never a production copy
         id: qa-start
         run: |
@@ -203,6 +205,19 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -memory 2048 -cores 2
           disable-animations: true
           script: node --experimental-strip-types frontend/cloud-qa/android-run.ts
+      - name: Package the exact tested web and app bytes only after every gate passes
+        if: success() && inputs.unit && inputs.android
+        run: node --experimental-strip-types frontend/cloud-qa/build-artifact.ts package
+      - name: Preserve exact tested frontend builds, never dependencies or backend env
+        if: success() && inputs.unit && inputs.android
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sitrep-tested-frontend-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            /tmp/sitrep-night-20260926.cloud/tested-frontend.tar.gz
+            /tmp/sitrep-night-20260926.cloud/tested-build.json
+          retention-days: 3
+          if-no-files-found: error
       - name: Close owned QA processes and PostgreSQL
         if: always()
         run: |
