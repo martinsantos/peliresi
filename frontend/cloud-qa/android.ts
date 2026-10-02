@@ -122,7 +122,7 @@ try{
     await page.getByRole('button',{name:'Iniciar visita',exact:true}).tap();
     expect((await started).status()).toBe(200);
     await page.getByRole('navigation',{name:'Secciones del expediente'}).getByRole('link',{name:'Registro',exact:true}).tap();
-    const saved=page.waitForResponse(r=>r.url().endsWith('/api/inspecciones/'+inspection.id)&&r.request().method()==='PATCH');
+    const saved=page.waitForResponse(r=>r.url().endsWith('/api/inspecciones/'+inspection.id+'/borrador')&&r.request().method()==='PATCH');
     await page.locator('#inspection-observations').fill('QA Android comentario conservado después de cerrar Chrome.');
     expect((await saved).status()).toBe(200);await proof('saved-field-observation');
   });

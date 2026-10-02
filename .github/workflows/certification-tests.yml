@@ -85,9 +85,10 @@ jobs:
           NODE_ENV=production npm run build
           NODE_ENV=production npx --no-install vite build --config vite.config.app.ts
       - name: Create temporary loopback PostgreSQL, never a production copy
+        id: qa-start
         run: |
           /usr/lib/postgresql/16/bin/initdb -D "$RUNNER_TEMP/sitrep-cloud-pg" --username=qa --auth-local=trust --auth-host=trust
-          /usr/lib/postgresql/16/bin/pg_ctl -D "$RUNNER_TEMP/sitrep-cloud-pg" -l "$QA_ARTIFACTS/postgres.log" -o "-h 127.0.0.1 -p 55440 -c shared_buffers=32MB -c max_connections=20" -w start
+          /usr/lib/postgresql/16/bin/pg_ctl -D "$RUNNER_TEMP/sitrep-cloud-pg" -l "$QA_ARTIFACTS/postgres.log" -o "-h 127.0.0.1 -p 55440 -k $RUNNER_TEMP -c shared_buffers=32MB -c max_connections=20" -w start
           /usr/lib/postgresql/16/bin/createdb -h 127.0.0.1 -p 55440 -U qa sitrep_night_qa_20260926
           node --experimental-strip-types frontend/cloud-qa/preflight.ts
           cd backend
@@ -104,12 +105,12 @@ jobs:
           cd frontend
           npx --no-install playwright test --config cloud-qa/playwright.config.ts
       - name: Enable Android hardware acceleration only on the temporary VM
-        if: inputs.android
+        if: always() && inputs.android && steps.qa-start.outcome == 'success'
         run: |
           test -e /dev/kvm
           sudo chmod 666 /dev/kvm
       - name: Android 15 actual OS and Chrome, no local emulator
-        if: inputs.android
+        if: always() && inputs.android && steps.qa-start.outcome == 'success'
         uses: ReactiveCircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808 # v2
         with:
           api-level: 35
