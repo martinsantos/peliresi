@@ -1,69 +1,137 @@
-name: SITREP Certification Tests
-
+name: SITREP Isolated Cloud QA
 on:
   workflow_dispatch:
     inputs:
-      profile:
-        description: Test profile to run
-        required: true
-        default: post-deploy
-        type: choice
-        options:
-          - quick
-          - post-deploy
-          - production-smoke
-          - certification
-      target_url:
-        description: Target base URL
-        required: true
-        default: https://sitrep.ultimamilla.com.ar
-      allow_autofix:
-        description: Allow safe/staging autocorrections
-        required: true
-        default: false
+      android:
+        description: Run Android OS emulator after web and app gates
         type: boolean
-      allow_destructive_staging:
-        description: Allow destructive staging-only phases
         required: true
-        default: false
-        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sitrep-cloud-qa-20261002
+  cancel-in-progress: false
 
 jobs:
-  certification:
-    runs-on: ubuntu-latest
-    timeout-minutes: 180
+  isolated-qa:
+    if: github.ref == 'refs/heads/codex/sitrep-cloud-qa-20261002'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CI: 'true'
+      NODE_ENV: test
+      NODE_APP_INSTANCE: qa
+      ALLOW_SYNTHETIC_QA: '1'
+      DATABASE_URL: postgresql://qa@127.0.0.1:55440/sitrep_night_qa_20260926?schema=public&connection_limit=3
+      PORT: '3037'
+      DISABLE_EMAILS: 'true'
+      BLOCKCHAIN_ENABLED: 'false'
+      ENABLE_ANALYTICS: 'false'
+      SMTP_HOST: ''
+      SMTP_USER: ''
+      SMTP_PASS: ''
+      VAPID_PUBLIC_KEY: ''
+      VAPID_PRIVATE_KEY: ''
+      BLOCKCHAIN_RPC_URL: ''
+      BLOCKCHAIN_CONTRACT_ADDRESS: ''
+      JWT_SECRET: only-cloud-synthetic-qa-20261002-never-production
+      INSPECTION_TRACE_SECRET: only-cloud-inspection-qa-20261002-never-production
+      FRONTEND_URL: http://127.0.0.1:4177
+      CORS_ORIGIN: http://127.0.0.1:4177
+      VITE_API_URL: /api
+      QA_API_URL: http://127.0.0.1:3037/api
+      QA_ARTIFACTS: ${{ runner.temp }}/sitrep-night-20260926.cloud
+      UPLOADS_DIR: ${{ runner.temp }}/sitrep-night-20260926.cloud/uploads
+      QA_WEB_BUILD: ${{ github.workspace }}/frontend/dist
+      QA_APP_BUILD: ${{ github.workspace }}/frontend/dist-app
+      QA_MANUAL_ROOT: ${{ github.workspace }}/docs/manual
+      PGUSER: qa
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          node-version: '20'
-
-      - name: Install Playwright browsers
-        if: ${{ inputs.profile == 'post-deploy' || inputs.profile == 'certification' }}
-        run: cd frontend && npx playwright install --with-deps chromium
-
-      - name: Install Poppler for backend PDF tests
-        if: ${{ inputs.profile == 'quick' || inputs.profile == 'certification' }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Verify isolation before installing or writing data
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends poppler-utils
-
-      - name: Run certification suite
-        env:
-          RUN_PROFILE: ${{ inputs.profile }}
-          TARGET_URL: ${{ inputs.target_url }}
-          ALLOW_AUTOFIX: ${{ inputs.allow_autofix }}
-          ALLOW_DESTRUCTIVE_STAGING: ${{ inputs.allow_destructive_staging }}
-          STAGING_SNAPSHOT_COMMAND: ${{ secrets.CERT_STAGING_SNAPSHOT_COMMAND }}
-          STAGING_RESTORE_COMMAND: ${{ secrets.CERT_STAGING_RESTORE_COMMAND }}
-          REPORT_DIR: reports/test-runs
-        run: bash scripts/certification/run-certification-suite.sh
-
-      - name: Upload certification report
-        if: always()
-        uses: actions/upload-artifact@v4
+          node --experimental-strip-types --test frontend/cloud-qa/safety.test.ts
+          test ! -f backend/.env
+          test ! -f frontend/.env
+          mkdir -p "$QA_ARTIFACTS"
+      - name: Install locked dependencies on the cloud VM
+        run: |
+          npm ci --prefix backend
+          npm ci --prefix frontend
+          cd backend
+          npx --no-install prisma generate
+      - name: Install PDF and browser test tools on the cloud VM
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends poppler-utils postgresql-16
+          cd frontend
+          npx --no-install playwright install --with-deps chromium
+      - name: Backend and frontend unit tests with disconnected DB
+        run: |
+          cd backend
+          npm test -- --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/backend-unit.json"
+          npx --no-install tsc --noEmit
+          npm run build
+          cd ../frontend
+          npm test -- --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/frontend-unit.json"
+          NODE_ENV=production npm run build
+          NODE_ENV=production npx --no-install vite build --config vite.config.app.ts
+      - name: Create temporary loopback PostgreSQL, never a production copy
+        run: |
+          /usr/lib/postgresql/16/bin/initdb -D "$RUNNER_TEMP/sitrep-cloud-pg" --username=qa --auth-local=trust --auth-host=trust
+          /usr/lib/postgresql/16/bin/pg_ctl -D "$RUNNER_TEMP/sitrep-cloud-pg" -l "$QA_ARTIFACTS/postgres.log" -o "-h 127.0.0.1 -p 55440 -c shared_buffers=32MB -c max_connections=20" -w start
+          /usr/lib/postgresql/16/bin/createdb -h 127.0.0.1 -p 55440 -U qa sitrep_night_qa_20260926
+          node --experimental-strip-types frontend/cloud-qa/preflight.ts
+          cd backend
+          npx --no-install prisma db push --skip-generate
+          cd ..
+          node --experimental-strip-types frontend/cloud-qa/prepare.ts
+          node --experimental-strip-types frontend/cloud-qa/start.ts
+      - name: Real HTTP role, workflow, isolation and PDF checks
+        run: |
+          cd backend
+          npx --no-install ts-node tests/integration/night-http.ts > "$QA_ARTIFACTS/http.log" 2>&1
+      - name: Actual web and app E2E, one browser worker, no fake auth
+        run: |
+          cd frontend
+          npx --no-install playwright test --config cloud-qa/playwright.config.ts
+      - name: Enable Android hardware acceleration only on the temporary VM
+        if: inputs.android
+        run: |
+          test -e /dev/kvm
+          sudo chmod 666 /dev/kvm
+      - name: Android 15 actual OS and Chrome, no local emulator
+        if: inputs.android
+        uses: ReactiveCircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808 # v2
         with:
-          name: sitrep-certification-report
-          path: reports/test-runs/
+          api-level: 35
+          target: google_apis_playstore
+          arch: x86_64
+          profile: pixel_7
+          emulator-boot-timeout: 600
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -memory 2048 -cores 2
+          disable-animations: true
+          script: node --experimental-strip-types frontend/cloud-qa/android.ts
+      - name: Close owned QA processes and PostgreSQL
+        if: always()
+        run: |
+          node --experimental-strip-types frontend/cloud-qa/close.ts
+          if test -f "$RUNNER_TEMP/sitrep-cloud-pg/postmaster.pid"; then
+            /usr/lib/postgresql/16/bin/pg_ctl -D "$RUNNER_TEMP/sitrep-cloud-pg" -m fast -w stop
+          fi
+      - name: Save synthetic evidence, not builds or dependency trees
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sitrep-cloud-qa-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/sitrep-night-20260926.cloud
+          retention-days: 3
+          compression-level: 9
