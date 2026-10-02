@@ -2448,7 +2448,7 @@ Los actores registrados (generadores, operadores) deben renovar su inscripcion a
 El Monitor War Room es el centro de mando operacional de SITREP. Ofrece una vista en tiempo real o historica de toda la actividad de residuos peligrosos en la provincia: manifiestos en curso, viajes activos con GPS, eventos recientes y estadisticas dinamicas. Esta disenado para operaciones de seguimiento continuo y auditoria retrospectiva.
 </div>
 
-<p>Acceso: menu lateral <strong>Monitor</strong> (icono Activity). Solo disponible para el rol <strong>ADMIN</strong>.</p>
+<p>Acceso: opción <strong>Monitor</strong> (icono Radio), según el perfil y los permisos de la cuenta. No modifica el estado de los manifiestos ni de las inspecciones.</p>
 
 <h4>3.15.1 Modos de Operacion</h4>
 <p>El Monitor tiene tres modos seleccionables en la barra superior:</p>
@@ -2456,38 +2456,38 @@ El Monitor War Room es el centro de mando operacional de SITREP. Ofrece una vist
 <thead><tr><th>Modo</th><th>Badge</th><th>Descripcion</th></tr></thead>
 <tbody>
 <tr>
-  <td><strong>LIVE</strong></td>
-  <td><code>● EN VIVO</code> (verde pulsante)</td>
-  <td>Datos en tiempo real. Auto-refresco cada 30 segundos. Muestra viajes activos con GPS, manifiestos recientes y contadores por estado. El mapa centra automaticamente en el primer evento nuevo.</td>
+  <td><strong>En vivo</strong></td>
+  <td><code>En vivo</code></td>
+  <td>Consulta automática cada 15 segundos. Muestra viajes con última posición GPS conocida, eventos, estados e inspecciones activas según permisos. La barra indica la última respuesta del servidor; «Sin conexión» o «Sin actualizar» no significa que los viajes estén detenidos. El indicador de actualización se apaga cuando los datos no son recientes.</td>
 </tr>
 <tr>
-  <td><strong>PLAYBACK</strong></td>
-  <td><code>▶ PLAYBACK</code> (azul)</td>
-  <td>Reproduccion historica de un dia seleccionado. El timeline avanza evento por evento. Las estadisticas y contadores reflejan el estado acumulado hasta el momento reproducido. Permite ver como evoluciono la actividad a lo largo del dia.</td>
+  <td><strong>Historial</strong></td>
+  <td><code>Historial</code></td>
+  <td>Reproducción de los eventos registrados en el día seleccionado. Permite pausar, recorrer eventos y cambiar de día activo. Los contadores pertenecen a la reproducción, no a una medición actual de toda la provincia.</td>
 </tr>
 <tr>
-  <td><strong>FORECAST</strong></td>
-  <td><code>◆ FORECAST</code> (amber)</td>
-  <td>Vista predictiva basada en patrones historicos de los ultimos 30 dias. Muestra proyecciones de volumen, tipos de residuo esperados y tendencias por generador u operador.</td>
+  <td><strong>Pendientes</strong></td>
+  <td><code>Pendientes</code></td>
+  <td>Trabajo real pendiente: manifiestos aprobados por retirar, recibidos o en tratamiento por cerrar, y habilitaciones de transporte que vencen en los próximos 7 días. No es una predicción ni proyecta volúmenes futuros.</td>
 </tr>
 </tbody>
 </table>
 
 <h4>3.15.2 Layout y Paneles</h4>
-<p>La pantalla se divide en dos zonas redimensionables con un divisor arrastrable:</p>
+<p>En escritorio la pantalla muestra paneles y mapa; en teléfono se ordena en una columna:</p>
 <ul>
-  <li><strong>Barra lateral izquierda (fija 320px):</strong> Contiene los widgets de estadisticas y el feed de eventos.</li>
-  <li><strong>Area del mapa (resto de la pantalla):</strong> Mapa interactivo con capas de generadores, operadores, transportistas y viajes. El ancho del area se puede ajustar arrastrando el divisor central (entre 25% y 75% del total).</li>
+  <li><strong>Paneles laterales:</strong> Estadísticas, agenda, viajes y eventos. En escritorio el control «Paneles / Eventos» ajusta la altura disponible, no el ancho del mapa.</li>
+  <li><strong>Mapa:</strong> Actores y posiciones conocidas de viajes e inspecciones. En teléfono los detalles se abren sobre la pantalla, con controles para minimizar y cerrar.</li>
 </ul>
 
 <h4>3.15.3 Sistema de Widgets</h4>
-<p>La barra lateral contiene seis widgets configurables. Cada widget puede estar en uno de tres estados:</p>
+<p>Los paneles pueden plegarse desde su encabezado y, cuando ofrecen la acción, ocultarse y restaurarse desde los botones inferiores:</p>
 <table>
 <thead><tr><th>Estado</th><th>Descripcion</th></tr></thead>
 <tbody>
 <tr><td><strong>visible</strong></td><td>Widget expandido y mostrando datos.</td></tr>
 <tr><td><strong>minimized</strong></td><td>Solo el encabezado visible; ocupa minimo espacio.</td></tr>
-<tr><td><strong>closed</strong></td><td>Oculto. Se puede reabrir desde el menu de configuracion de widgets.</td></tr>
+<tr><td><strong>closed</strong></td><td>Oculto. Se puede restaurar desde el botón identificado con su nombre.</td></tr>
 </tbody>
 </table>
 
@@ -2495,29 +2495,31 @@ El Monitor War Room es el centro de mando operacional de SITREP. Ofrece una vist
 <table>
 <thead><tr><th>Widget</th><th>Clave</th><th>Contenido</th></tr></thead>
 <tbody>
-<tr><td>Pipeline de Estados</td><td><code>pipeline</code></td><td>Contadores por estado: BORRADOR, APROBADO, EN_TRANSITO, ENTREGADO, RECIBIDO, EN_TRATAMIENTO, TRATADO. En modo PLAYBACK refleja el estado acumulado hasta el momento reproducido.</td></tr>
+<tr><td>Estados del manifiesto</td><td><code>pipeline</code></td><td>Estados informados por el servidor en En vivo o acumulados por los eventos del Historial. No se mezclan con el modo Pendientes.</td></tr>
+<tr><td>Inspecciones</td><td><code>inspecciones</code></td><td>Agenda activa según permisos. Permite ubicar una visita con coordenadas y abrir su expediente; una visita sin coordenadas conserva el acceso al expediente.</td></tr>
 <tr><td>Manifiestos</td><td><code>manifiestos</code></td><td>Tarjeta del manifiesto mas reciente: numero, estado con badge de color, actores involucrados, residuos con pills de colores.</td></tr>
 <tr><td>Viajes en Transito</td><td><code>viajes</code></td><td>Lista de manifiestos EN_TRANSITO con transportista, origen, destino y ultima posicion GPS. Click en un viaje abre su panel flotante detallado.</td></tr>
-<tr><td>Residuos</td><td><code>residuos</code></td><td>Top 5 tipos de residuo activos con barras de progreso proporcionales. En PLAYBACK: agrega residuos de todos los eventos del dia hasta el momento actual.</td></tr>
+<tr><td>Residuos</td><td><code>residuos</code></td><td>Tipos de residuo presentes en los datos consultados, sin comparar cantidades de unidades diferentes. El enlace a Reportes permite consultar cantidades por unidad. No representa una clasificación por volumen.</td></tr>
 <tr><td>Actores Activos</td><td><code>actores</code></td><td>Top generadores y operadores con conteo de manifiestos en el periodo.</td></tr>
-<tr><td>Tratamiento</td><td><code>tratamiento</code></td><td>Metodos de tratamiento activos y volumenes. Solo visible cuando hay datos de tratamiento disponibles.</td></tr>
+<tr><td>Tratamiento</td><td><code>tratamiento</code></td><td>Métodos de tratamiento y conteos registrados, no volúmenes. Solo visible cuando hay datos de tratamiento disponibles.</td></tr>
 </tbody>
 </table>
 
 <p>Los estados de cada widget se persisten en <code>localStorage</code> (clave <code>wr-widget-states-v2</code>) y se restauran automaticamente en la proxima sesion.</p>
 
-<h4>3.15.4 Controles de Playback</h4>
-<p>En modo PLAYBACK, aparece una barra de controles en la parte inferior de la pantalla:</p>
+<h4>3.15.4 Controles del Historial</h4>
+<p>En modo Historial aparece una barra de controles en la parte inferior de la pantalla:</p>
 <ul>
   <li><strong>Selector de fecha:</strong> Elige el dia a reproducir.</li>
   <li><strong>Play / Pause:</strong> Inicia o detiene la reproduccion automatica.</li>
   <li><strong>← / →:</strong> Salta al evento anterior o siguiente manualmente.</li>
-  <li><strong>Velocidad:</strong> Selector de velocidad de reproduccion: 0.5×, 1×, 2×, 5×, 10×.</li>
+  <li><strong>Velocidad:</strong> Rápido, Normal o Lento regulan la pausa entre eventos, no aceleran una medición física de los viajes.</li>
+  <li><strong>Recorrer historial:</strong> El deslizador busca un evento y pausa la reproducción automática.</li>
   <li><strong>Contador de posicion:</strong> Muestra el evento actual sobre el total (ej. <code>12 / 47</code>).</li>
 </ul>
 
 <h4>3.15.5 Atajos de Teclado</h4>
-<p>El Monitor responde a atajos de teclado cuando el foco no esta en un campo de texto:</p>
+<p>Los atajos no reemplazan el teclado de botones, enlaces, formularios o editores. Fuera de esos controles:</p>
 <table>
 <thead><tr><th>Tecla</th><th>Accion</th><th>Modo</th></tr></thead>
 <tbody>
@@ -2526,16 +2528,18 @@ El Monitor War Room es el centro de mando operacional de SITREP. Ofrece una vist
 <tr><td><kbd>→</kbd></td><td>Evento siguiente</td><td>PLAYBACK</td></tr>
 <tr><td><kbd>+</kbd></td><td>Aumentar velocidad</td><td>PLAYBACK</td></tr>
 <tr><td><kbd>-</kbd></td><td>Reducir velocidad</td><td>PLAYBACK</td></tr>
-<tr><td><kbd>F</kbd></td><td>Activar / desactivar modo cine (pantalla completa del mapa)</td><td>Todos</td></tr>
-<tr><td><kbd>L</kbd></td><td>Cambiar a modo LIVE</td><td>Todos</td></tr>
-<tr><td><kbd>P</kbd></td><td>Cambiar a modo PLAYBACK</td><td>Todos</td></tr>
+<tr><td><kbd>C</kbd></td><td>Activar / desactivar mapa oscuro; los paneles mantienen contraste.</td><td>Todos</td></tr>
+<tr><td><kbd>1</kbd></td><td>En vivo</td><td>Todos</td></tr>
+<tr><td><kbd>2</kbd></td><td>Historial</td><td>Todos</td></tr>
+<tr><td><kbd>3</kbd></td><td>Pendientes</td><td>Todos</td></tr>
+<tr><td><kbd>Esc</kbd></td><td>Volver al Centro de Control</td><td>Fuera de controles</td></tr>
 </tbody>
 </table>
 
 <h4>3.15.6 Paneles Flotantes Arrastrables</h4>
 <p>Al hacer click en un evento del feed lateral o en un viaje de la lista, se abre un <strong>panel flotante</strong> sobre el mapa. Estos paneles:</p>
 <ul>
-  <li>Se pueden <strong>arrastrar</strong> libremente por la pantalla tomando el encabezado.</li>
+  <li>En escritorio se pueden <strong>arrastrar</strong> desde el encabezado; en teléfono se presentan dentro de la pantalla.</li>
   <li>Se pueden <strong>minimizar</strong> (colapsa el contenido, queda solo el encabezado).</li>
   <li>Se pueden <strong>cerrar</strong> con el boton X.</li>
   <li>Al hacer click en un panel ya abierto con el mismo ID, lo trae al frente (sin duplicar).</li>
@@ -2557,9 +2561,9 @@ El Monitor War Room es el centro de mando operacional de SITREP. Ofrece una vist
 <p><strong>Panel de Viaje</strong> — aparece al hacer click en un viaje EN_TRANSITO:</p>
 <ul>
   <li>Numero de manifiesto (borde izquierdo naranja)</li>
-  <li>Transportista, vehiculo (patente), chofer</li>
+  <li>Transportista y datos de su flota declarada (vehículo y chofer); la asignación de esa flota al viaje no está verificada por esta vista.</li>
   <li>Ruta: Origen → Destino</li>
-  <li>Cantidad de puntos GPS registrados y velocidad actual</li>
+  <li>Cantidad de puntos GPS y última velocidad registrada, con la hora de la posición; no garantiza ubicación o velocidad actual.</li>
   <li>Pills de residuos transportados</li>
 </ul>
 

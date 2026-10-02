@@ -127,6 +127,9 @@ test('monitor LIVE, PLAYBACK and FORECAST query real data and expose usable cont
   expect(liveResponse.status()).toBe(200);
   const liveData = (await liveResponse.json()).data;
   expect(Number.isFinite(liveData.estadisticas.total)).toBe(true);
+  await expect(page.getByText('Toneladas',{exact:true})).toHaveCount(0);
+  const gpsCount=liveData.enTransito.filter((trip:{ultimaPosicion:unknown})=>trip.ultimaPosicion!==null).length;
+  await expect(page.getByText('Viajes con GPS',{exact:true}).locator('..')).toContainText(String(gpsCount));
   const header = page.locator('.wr-layout-header');
   await expect(header.getByRole('button', { name: 'En vivo', exact: true })).toBeInViewport({ ratio: 1 });
   await expect(header.getByRole('button', { name: 'Historial', exact: true })).toBeInViewport({ ratio: 1 });
@@ -193,6 +196,8 @@ test('monitor LIVE, PLAYBACK and FORECAST query real data and expose usable cont
 });
 
 test('monitor labels a real offline interruption and recovers without inventing a live signal',async({page,context},info)=>{
+  const runtimeErrors:string[]=[];
+  page.on('pageerror',error=>runtimeErrors.push(error.message));
   await login(page,info);
   const response=page.waitForResponse(r=>r.url().includes('/api/centro-control/monitor-live')&&r.status()===200);
   await page.goto(`${prefix(info)}/monitor`);await response;
@@ -211,6 +216,12 @@ test('monitor labels a real offline interruption and recovers without inventing 
   await expect(header.getByRole('status')).toContainText('Datos actualizados');
   await expect(header.locator('.wr-live-dot')).toHaveCount(1);
   await visibleProof(page,info,'monitor-recovered');
+  await page.goto('/manual/directorio.html#mod-monitor');
+  const manual=page.locator('#mod-monitor');
+  await expect(manual).toContainText('No es una predicción ni proyecta volúmenes futuros');
+  await expect(manual).toContainText('consultar cantidades por unidad');
+  await expect(manual).not.toContainText('Vista predictiva');
+  expect(runtimeErrors).toEqual([]);
 });
 
 test('carrier control center does not expose inspection operations', async ({ page }, info) => {

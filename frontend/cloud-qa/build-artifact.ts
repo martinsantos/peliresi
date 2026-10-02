@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { lstat, readFile, readdir, writeFile } from 'node:fs/promises';
+import { copyFile, lstat, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { assertCloudEnvironment, root } from './safety.ts';
 
@@ -9,6 +9,13 @@ assertCloudEnvironment();
 const output = process.env.QA_ARTIFACTS!;
 const mode = process.argv[2];
 assert.ok(['freeze', 'package'].includes(mode));
+const manualSource = path.join(root, 'docs/manual/directorio.html');
+const manualBuild = path.join(root, 'frontend/dist/manual/directorio.html');
+if (mode === 'freeze') {
+  await mkdir(path.dirname(manualBuild), { recursive: true });
+  await copyFile(manualSource, manualBuild);
+}
+assert.deepEqual(await readFile(manualBuild), await readFile(manualSource), 'Package the same manual served during QA, without replacing its other assets');
 type Item = { file: string; sha256: string };
 async function inventory(directory: string, prefix: string): Promise<Item[]> {
   const items: Item[] = [];

@@ -202,6 +202,7 @@ const ViajeContent: React.FC<{ data: ViajeFPData }> = ({ data }) => {
       {/* Vehiculo + Chofer */}
       {(data.vehiculo || data.chofer) && (
         <div className="space-y-0.5">
+          <p className="text-xs text-neutral-700">Flota declarada · asignación del viaje no verificada</p>
           {data.vehiculo && (
             <p className="text-[10px] text-neutral-500">
               <span className="font-mono font-bold text-neutral-700">{data.vehiculo.patente}</span>

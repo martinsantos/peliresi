@@ -7,7 +7,7 @@ import { WarRoomHeader } from '../../pages/monitor/components/WarRoomHeader';
 import { DashboardPanels } from '../../pages/monitor/components/DashboardPanels';
 import { EventFeed } from '../../pages/monitor/components/EventFeed';
 import { TimelineControls } from '../../pages/monitor/components/TimelineControls';
-import { useFloatingPanels } from '../../pages/monitor/components/FloatingPanelLayer';
+import { FloatingPanelLayer, useFloatingPanels } from '../../pages/monitor/components/FloatingPanelLayer';
 import type { ForecastResponse, MonitorLiveResponse } from '../../pages/monitor/api/monitor-api';
 
 const event={id:'qa-event',tipo:'RETIRO',descripcion:'Carga sintética retirada',timestamp:'2026-10-02T12:00:00Z',manifiestoNumero:'QA-00001'};
@@ -89,5 +89,31 @@ describe('Monitor: controles operativos y datos sin simulación',()=>{
     const divider=screen.getByRole('slider',{name:'Espacio para paneles del Monitor'});
     expect(divider).toHaveValue('55');fireEvent.change(divider,{target:{value:'70'}});
     expect(localStorage.getItem('wr-divider-pct-v1')).toBe('70');
+  });
+  it('al desplegar Actores conserva sus cifras reales y los iconos de cada categoría',()=>{
+    const live={topGeneradores:[{razonSocial:'QA Generador',cantidad:12}],topOperadores:[{razonSocial:'QA Operador',cantidad:7}]} as MonitorLiveResponse;
+    const {container}=render(<MemoryRouter><DashboardPanels mode="LIVE" liveData={live} forecastData={null}/></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button',{name:'Actores',exact:true}));
+    expect(screen.getByText('QA Generador').parentElement).toHaveTextContent('12');
+    expect(screen.getByText('QA Operador').parentElement).toHaveTextContent('7');
+    expect(container.querySelector('svg.lucide-factory')).not.toBeNull();
+    expect(container.querySelector('svg.lucide-flask-conical')).not.toBeNull();
+  });
+  it('no llama toneladas a una suma sin unidad; cuenta viajes con posición registrada',()=>{
+    const live={estadisticas:{toneladas:123456},enTransito:[{ultimaPosicion:{latitud:-32,longitud:-68}},{ultimaPosicion:null}]} as MonitorLiveResponse;
+    render(<TimelineControls mode="LIVE" liveData={live} playbackDate={null} onDateChange={vi.fn()} onSwitchToPlayback={vi.fn()} timelineData={null} isLoading={false} playback={null}/>);
+    expect(screen.queryByText('Toneladas',{exact:true})).not.toBeInTheDocument();
+    expect(screen.getByText('Viajes con GPS',{exact:true}).parentElement).toHaveTextContent('1');
+  });
+  it('no mezcla cantidades sin unidad ni presenta una flota declarada como asignación confirmada',()=>{
+    const live={topResiduos:[{nombre:'QA corriente',total:123456,categoria:null}]} as MonitorLiveResponse;
+    const {container}=render(<MemoryRouter><DashboardPanels mode="LIVE" liveData={live} forecastData={null}/></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button',{name:'Residuos',exact:true}));
+    expect(screen.getByText('QA corriente')).toBeInTheDocument();
+    expect(container.textContent).not.toContain('123.456');
+    expect(screen.getByRole('link',{name:'Cantidades por unidad en Reportes'})).toHaveAttribute('href','/reportes');
+    cleanup();
+    render(<FloatingPanelLayer panels={[{id:'qa-trip',type:'viaje',pos:{x:12,y:12},zIndex:1100,minimized:false,data:{manifiestoId:'qa-id',numero:'QA-0001',transportista:'QA Transporte',origen:{razonSocial:'QA Origen',lat:null,lng:null},destino:{razonSocial:'QA Destino',lat:null,lng:null},fechaRetiro:null,ultimaPosicion:null,ruta:[],vehiculo:{patente:'QA001AA',descripcion:'QA Vehículo'},chofer:{nombre:'QA Conductor'}}}]} onClose={vi.fn()} onBringToFront={vi.fn()} onMove={vi.fn()} onMinimize={vi.fn()}/>);
+    expect(screen.getByText('Flota declarada · asignación del viaje no verificada')).toBeInTheDocument();
   });
 });

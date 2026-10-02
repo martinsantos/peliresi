@@ -64,8 +64,8 @@ const INITIAL_COUNTERS: Counters = {
 
 /** Map numeric speed values to internal PlaybackSpeed */
 function numericToSpeed(n: number): PlaybackSpeed {
-  if (n >= 50) return 'fast';
-  if (n >= 10) return 'normal';
+  if (n >= 100) return 'fast';
+  if (n >= 50) return 'normal';
   return 'slow';
 }
 

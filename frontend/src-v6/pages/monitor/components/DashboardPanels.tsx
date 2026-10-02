@@ -16,7 +16,7 @@ import { hasInspectionCoordinates, operationSubject, type InspectionOperation } 
 import { INSPECTION_STATE_LABELS } from '../../inspecciones/inspectionPresentation';
 import type { MonitorMode } from '../WarRoomPage';
 import type { MonitorLiveResponse, ForecastResponse, TimelineResponse, EnTransitoItem } from '../api/monitor-api';
-import { formatNumber, formatTimeShort } from '../utils/formatters';
+import { formatTimeShort } from '../utils/formatters';
 import { EventFeed } from './EventFeed';
 import { EVENT_COLORS } from '../utils/war-room-icons';
 
@@ -442,7 +442,7 @@ export const DashboardPanels: React.FC<Props> = ({
                     <div className="absolute inset-0 rounded transition-all duration-300" style={{ width: `${(g.cantidad / maxGen) * 100}%`, backgroundColor: '#7c3aed10' }} />
                     <div className="relative flex items-center justify-between px-1 py-0.5">
                       <span className="text-[11px] font-semibold text-neutral-700 truncate">{g.razonSocial}</span>
-                      <span className="text-[11px] font-black text-neutral-900 tabular-nums font-mono ml-1"><AnimatedCounter value={g.cantidad} /></span>
+                      <span className="text-[11px] font-black text-neutral-900 tabular-nums font-mono ml-1">{g.cantidad}</span>
                     </div>
                   </div>
                 </div>
@@ -460,7 +460,7 @@ export const DashboardPanels: React.FC<Props> = ({
                     <div className="absolute inset-0 rounded transition-all duration-300" style={{ width: `${(o.cantidad / maxOper) * 100}%`, backgroundColor: '#2563eb10' }} />
                     <div className="relative flex items-center justify-between px-1 py-0.5">
                       <span className="text-[11px] font-semibold text-neutral-700 truncate">{o.razonSocial}</span>
-                      <span className="text-[11px] font-black text-neutral-900 tabular-nums font-mono ml-1"><AnimatedCounter value={o.cantidad} /></span>
+                      <span className="text-[11px] font-black text-neutral-900 tabular-nums font-mono ml-1">{o.cantidad}</span>
                     </div>
                   </div>
                 </div>
@@ -474,22 +474,17 @@ export const DashboardPanels: React.FC<Props> = ({
           <WidgetShell title="Residuos" icon={Droplets}
             state={ws.residuos} onMin={() => minimize('residuos')} onClose={() => close('residuos')}>
             {(() => {
-              const residuos = topResiduos.slice(0, 3);
+              // The API totals do not carry a unit: never rank or compare them as mass.
+              const residuos = [...new Set(topResiduos.map(r => r.nombre))].sort((a,b) => a.localeCompare(b,'es'));
               if (residuos.length === 0) return <p className="text-[11px] text-neutral-400 italic py-1 text-center">Sin datos</p>;
-              const maxTotal = Math.max(...residuos.map(r => r.total), 1);
-              return residuos.map((r, i) => (
-                <div key={i} className="flex items-center gap-2 mb-1 relative">
+              return <div className="space-y-2">{residuos.map((nombre, i) => (
+                <div key={nombre} className="flex items-start gap-2">
                   <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length] }} />
-                  <div className="flex-1 min-w-0 relative">
-                    <div className="absolute inset-0 rounded transition-all duration-300"
-                      style={{ width: `${(r.total / maxTotal) * 100}%`, backgroundColor: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length] + '18' }} />
-                    <div className="relative flex items-center justify-between px-1 py-0.5">
-                      <span className="text-[11px] text-neutral-700 truncate">{r.nombre}</span>
-                      <span className="text-[11px] font-bold text-neutral-900 tabular-nums font-mono ml-1">{formatNumber(r.total)}</span>
-                    </div>
-                  </div>
+                  <span className="text-xs text-neutral-700 break-words">{nombre}</span>
                 </div>
-              ));
+              ))}<p className="text-xs text-neutral-600">Tipos presentes en los datos consultados · sin comparación de volumen.</p>
+                <Link className="inline-flex min-h-11 items-center text-xs font-semibold text-primary-700 underline underline-offset-2" to="/reportes">Cantidades por unidad en Reportes</Link>
+              </div>;
             })()}
           </WidgetShell>
         )}

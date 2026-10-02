@@ -6,7 +6,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { Play, Pause, Calendar, FileText, Truck, Weight, TrendingUp, RotateCcw, ChevronLeft, ChevronRight, SkipBack, SkipForward, Sun, Sunrise, Sunset, Moon } from 'lucide-react';
+import { Play, Pause, Calendar, FileText, Truck, Weight, MapPin, TrendingUp, RotateCcw, ChevronLeft, ChevronRight, SkipBack, SkipForward, Sun, Sunrise, Sunset, Moon } from 'lucide-react';
 import type { MonitorMode } from '../WarRoomPage';
 import type { ForecastResponse, MonitorLiveResponse, TimelineResponse } from '../api/monitor-api';
 import { formatNumber, formatTimeShort } from '../utils/formatters';
@@ -86,6 +86,8 @@ export const TimelineControls: React.FC<Props> = ({
   const goToPrevDay = () => { if (prevDay) onDateChange(prevDay); };
   const goToNextDay = () => { if (nextDay) onDateChange(nextDay); };
   const stats = liveData?.estadisticas;
+  const tripsWithGps = liveData?.enTransito?.filter(trip => trip.ultimaPosicion != null
+    && Number.isFinite(trip.ultimaPosicion.latitud) && Number.isFinite(trip.ultimaPosicion.longitud)).length ?? 0;
 
   // In PLAYBACK mode, use playback counters for KPIs; in LIVE mode, use liveData
   const isPlayback = mode === 'PLAYBACK' && playback;
@@ -115,26 +117,25 @@ export const TimelineControls: React.FC<Props> = ({
         </> : <>
         <KpiCard
           icon={<FileText size={14} />}
-          label={isPlayback ? 'Creados' : 'Manifiestos Hoy'}
+          label={isPlayback ? 'Creados' : 'Creados hoy'}
           value={hasKpiData?kpiManifiestos:null}
           color="#0D8A4F"
         />
         <KpiCard
           icon={<Truck size={14} />}
-          label="En Transito"
+          label="En tránsito"
           value={hasKpiData?kpiEnTransito:null}
           color="#3b82f6"
         />
         <KpiCard
-          icon={<Weight size={14} />}
-          label={isPlayback ? 'Tratados' : 'Toneladas'}
-          value={hasKpiData?(isPlayback ? kpiTratados : (stats?.toneladas || 0)):null}
+          icon={isPlayback ? <Weight size={14} /> : <MapPin size={14} />}
+          label={isPlayback ? 'Tratados' : 'Viajes con GPS'}
+          value={hasKpiData?(isPlayback ? kpiTratados : tripsWithGps):null}
           color="#8b5cf6"
-          decimals={isPlayback ? 0 : 1}
         />
         <KpiCard
           icon={<TrendingUp size={14} />}
-          label="Total"
+          label={isPlayback ? 'En historial' : 'Manifiestos registrados'}
           value={hasKpiData?(isPlayback ? kpiTotal : (stats?.total || 0)):null}
           color="#f97316"
         />
