@@ -9,10 +9,10 @@ import {
 } from 'recharts';
 import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
 import { Button } from '../../../components/ui/ButtonV2';
-import { ESTADO_CHART_COLORS, CHART_COLORS } from '../../../utils/chart-colors';
+import { ESTADO_CHART_COLORS } from '../../../utils/chart-colors';
 import { ChartTooltip } from '../../../components/charts/ChartTooltip';
 import { KpiCard } from '../../../components/charts/KpiCard';
-import { CategoryBarChart } from '../../../components/charts/CategoryBarChart';
+import { ReportResidueBreakdown } from './ReportResidueBreakdown';
 
 export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: any; periodo: string; onExportPDF: () => void }) {
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
@@ -49,30 +49,13 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
     })),
   [porEstado]);
 
-  const residuoData = useMemo(() =>
-    Object.entries(porTipoResiduo)
-      .map(([name, value], i) => {
-        // Backend returns { cantidad, unidad } objects OR plain numbers
-        const numVal = typeof value === 'object' && value !== null
-          ? Number((value as { cantidad: number }).cantidad) || 0
-          : Number(value) || 0;
-        return {
-          name: name.length > 25 ? name.substring(0, 22) + '...' : name,
-          fullName: name,
-          value: numVal,
-          fill: CHART_COLORS[i % CHART_COLORS.length],
-        };
-      })
-      .filter(d => d.value > 0),
-  [porTipoResiduo]);
-
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <KpiCard icon={FileText} label="Total Manifiestos" value={resumen.totalManifiestos || 0} color="from-emerald-600 to-emerald-700" />
         <KpiCard icon={Package} label="Residuos de esta página" value={formatReportQuantities(manifiestosList)} valueClassName="text-xl sm:text-3xl break-words" color="from-blue-600 to-blue-700" />
         <KpiCard icon={Activity} label="Estados presentes" value={Object.keys(porEstado).length} color="from-indigo-600 to-indigo-700" sub="tipos de estado" />
-        <KpiCard icon={TrendingUp} label="Tipos de Residuo" value={Object.keys(porTipoResiduo).length} color="from-amber-600 to-amber-700" sub="categorías" />
+        <KpiCard icon={TrendingUp} label="Tipos de esta página" value={Object.keys(porTipoResiduo).length} color="from-amber-600 to-amber-700" sub="categorías" />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
@@ -100,10 +83,10 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
         </Card>
 
         <Card className="border-0 shadow-sm">
-          <CardHeader title="Distribución por Tipo de Residuo" subtitle="Proporción de cada categoría" />
+          <CardHeader title="Distribución por Tipo de Residuo" subtitle="Cantidad por unidad · esta página" />
           <CardContent>
             <div className="max-h-[320px] overflow-y-auto pr-2">
-              <CategoryBarChart data={residuoData} maxItems={12} emptyMessage="Sin datos de residuos" />
+              <ReportResidueBreakdown rows={manifiestosList} category="tipo" />
             </div>
           </CardContent>
         </Card>

@@ -10,16 +10,14 @@ import {
 import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
 import { Button } from '../../../components/ui/ButtonV2';
 import { Badge } from '../../../components/ui/BadgeV2';
-import { CHART_COLORS } from '../../../utils/chart-colors';
 import { ChartTooltip } from '../../../components/charts/ChartTooltip';
 import { KpiCard } from '../../../components/charts/KpiCard';
-import { CategoryBarChart } from '../../../components/charts/CategoryBarChart';
+import { ReportResidueBreakdown } from './ReportResidueBreakdown';
 
 export default function TratadosTab({ data, periodo, onExportPDF }: { data: any; periodo: string; onExportPDF: () => void }) {
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const resumen = data.resumen || {};
   const porGenerador = data.porGenerador || {};
-  const totalPorTipo = data.totalPorTipo || {};
   const detalle = data.detalle || [];
 
   const toggleSort = (key: string) => setSortConfig(prev =>
@@ -52,15 +50,6 @@ export default function TratadosTab({ data, periodo, onExportPDF }: { data: any;
       .slice(0, 10),
   [porGenerador]);
 
-  const tipoData = useMemo(() =>
-    Object.entries(totalPorTipo).map(([name, value], i) => ({
-      name: name.length > 25 ? name.substring(0, 22) + '...' : name,
-      fullName: name,
-      value: value as number,
-      fill: CHART_COLORS[i % CHART_COLORS.length],
-    })),
-  [totalPorTipo]);
-
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -71,7 +60,7 @@ export default function TratadosTab({ data, periodo, onExportPDF }: { data: any;
 
       <div className="grid lg:grid-cols-2 gap-6">
         <Card className="border-0 shadow-sm">
-          <CardHeader title="Manifiestos por Generador" subtitle="Top generadores por volumen" />
+          <CardHeader title="Manifiestos por Generador" subtitle="Cantidad de manifiestos · esta página" />
           <CardContent>
             {generadorData.length > 0 ? (
               <ResponsiveContainer width="100%" height={320}>
@@ -90,10 +79,10 @@ export default function TratadosTab({ data, periodo, onExportPDF }: { data: any;
         </Card>
 
         <Card className="border-0 shadow-sm">
-          <CardHeader title="Distribución por Código de Residuo" subtitle="Proporción de cada tipo tratado" />
+          <CardHeader title="Distribución por Código de Residuo" subtitle="Cantidad por unidad · esta página" />
           <CardContent>
             <div className="max-h-[320px] overflow-y-auto pr-2">
-              <CategoryBarChart data={tipoData} maxItems={12} emptyMessage="Sin datos de tipos" />
+              <ReportResidueBreakdown rows={detalle} category="codigo" />
             </div>
           </CardContent>
         </Card>

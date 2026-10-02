@@ -17,7 +17,7 @@ vi.mock('../../hooks/useActores', () => ({
 }));
 // Charts are outside this interaction test; real charts are exercised by browser QA.
 vi.mock('recharts', () => Object.fromEntries(['BarChart', 'Bar', 'XAxis', 'YAxis', 'CartesianGrid', 'Tooltip', 'ResponsiveContainer', 'Cell', 'Legend'].map(name => [name, () => null])));
-vi.mock('../../components/charts/CategoryBarChart', () => ({ CategoryBarChart: () => null }));
+vi.mock('../../components/charts/CategoryBarChart', () => ({ CategoryBarChart: (props: unknown) => <output data-testid="residue-chart">{JSON.stringify(props)}</output> }));
 function Location() { return <output data-testid="location">{useLocation().pathname}</output>; }
 const props = { periodo: 'Todo', onExportPDF: vi.fn() };
 const cases = [
@@ -28,6 +28,28 @@ const cases = [
   { name: 'operadores', render: () => <OperadoresTab periodoLabel="Todo" />, text: 'QA Operador', header: 'Razon Social', path: '/admin/actores/operadores/op' },
 ];
 describe('report table interaction contract', () => {
+  it.each(['manifiestos','tratados'])('%s charts never add incompatible units or use lossy API aggregates',tipo=>{
+    const row={id:'m',numero:'QA-MIX',residuos:[{tipo:'Y1',codigo:'Y1',cantidad:2,unidad:'L'},{tipo:'Y1',codigo:'Y1',cantidad:5,unidad:'kg'}]};
+    const data={porTipoResiduo:{Y1:{cantidad:999,unidad:'kg'}},totalPorTipo:{Y1:999},manifiestos:[row],detalle:[row]};
+    render(<MemoryRouter>{tipo==='manifiestos'?<ManifiestosTab {...props} data={data}/>:<TratadosTab {...props} data={data}/>}</MemoryRouter>);
+    expect(screen.getByText('Cantidad por unidad · esta página')).toBeVisible();
+    const charts=screen.getAllByTestId('residue-chart').map(node=>JSON.parse(node.textContent!));
+    expect(charts).toHaveLength(2);
+    expect(charts.map(chart=>[chart.valueSuffix,chart.data[0].value])).toEqual([['L',2],['kg',5]]);
+    expect(charts.every(chart=>chart.showPercent===false)).toBe(true);
+  });
+  it.each(['manifiestos','tratados'])('%s cannot chart quantities with unknown dimensions',tipo=>{
+    const row={id:'m',numero:'QA-UNKNOWN',residuos:[{tipo:'Y1',codigo:'Y1',cantidad:2,unidad:null}]};
+    render(<MemoryRouter>{tipo==='manifiestos'?<ManifiestosTab {...props} data={{manifiestos:[row]}}/>:<TratadosTab {...props} data={{detalle:[row]}}/>}</MemoryRouter>);
+    expect(screen.getByText('Falta la unidad de un residuo; no se puede comparar su cantidad.')).toBeVisible();
+    expect(screen.queryAllByTestId('residue-chart')).toHaveLength(0);
+  });
+  it.each(['manifiestos','tratados'])('%s cannot chart a partial sum after invalid quantities',tipo=>{
+    const row={id:'m',numero:'QA-INVALID',residuos:[{tipo:'Y1',codigo:'Y1',cantidad:2,unidad:'kg'},{tipo:'Y1',codigo:'Y1',cantidad:'unknown',unidad:'kg'}]};
+    render(<MemoryRouter>{tipo==='manifiestos'?<ManifiestosTab {...props} data={{manifiestos:[row]}}/>:<TratadosTab {...props} data={{detalle:[row]}}/>}</MemoryRouter>);
+    expect(screen.getByText('Hay cantidades inválidas; no se muestra una suma parcial.')).toBeVisible();
+    expect(screen.queryAllByTestId('residue-chart')).toHaveLength(0);
+  });
   it.each(['manifiestos','tratados'])('%s never labels liters as kilograms or a page as the complete quantity',tipo=>{
     const row={id:'m',numero:'QA-MIX',residuos:[{cantidad:2,unidad:'L'},{cantidad:5,unidad:'kg'}]};
     const data={resumen:{totalResiduos:999,totalResiduosTratados:999},manifiestos:[row],detalle:[row]};
