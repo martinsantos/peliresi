@@ -116,6 +116,7 @@ jobs:
       - name: Verify isolation before installing or writing data
         run: |
           node --experimental-strip-types --test frontend/cloud-qa/safety.test.ts
+          node --experimental-strip-types --test frontend/cloud-qa/native-window.test.ts
           test ! -f backend/.env
           test ! -f frontend/.env
           mkdir -p "$QA_ARTIFACTS"
@@ -136,7 +137,6 @@ jobs:
           sudo apt-get install -y --no-install-recommends poppler-utils postgresql-16
           cd frontend
           npx --no-install playwright install --with-deps chromium
-          npx --no-install playwright install android
       - name: Backend and frontend unit tests with disconnected DB
         if: inputs.unit
         run: |

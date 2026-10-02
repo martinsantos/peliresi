@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { assertCloudDatabase } from './safety.ts';
+import { dismissObservedChromePrompts } from './native-window.ts';
 
 await assertCloudDatabase();
 const output=path.join(process.env.QA_ARTIFACTS!,'android');
@@ -24,15 +25,7 @@ let context:BrowserContext;
 let page:Page;
 const errors:string[]=[];
 const results:Array<{name:string;status:string;error?:string}>=[];
-const settleNativeChrome=async()=>{
-  execFileSync('adb',['shell','uiautomator','dump','/data/local/tmp/sitrep-chrome-window.xml'],{timeout:45000});
-  const native=execFileSync('adb',['shell','cat','/data/local/tmp/sitrep-chrome-window.xml'],{encoding:'utf8'});
-  if(native.includes('Chrome notifications make things easier')){
-    await device.tap({text:'No thanks'},{timeout:5000});
-    await device.wait({text:'Chrome notifications make things easier'},{state:'gone',timeout:5000});
-    console.log('Dismissed native Chrome first-run notification prompt on temporary emulator');
-  }
-};
+const settleNativeChrome=()=>dismissObservedChromePrompts(output);
 const observe=(target:Page)=>{
   target.setDefaultTimeout(20000);
   target.on('pageerror',e=>errors.push(e.message));

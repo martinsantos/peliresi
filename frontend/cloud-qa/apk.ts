@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { assertCloudDatabase } from './safety.ts';
+import { dismissObservedChromePrompts, nativeNodes, readNativeWindow } from './native-window.ts';
 
 await assertCloudDatabase();
 const output = path.join(process.env.QA_ARTIFACTS!, 'apk');
@@ -48,7 +49,8 @@ const openOriginal = async () => {
   // Activity launch may briefly retain a closing custom-tab target while the
   // native splash is foreground. Require the actual OS Chrome compositor, then choose a
   // live DOM target that has finished rendering the same login form.
-  await device.wait({ res: 'com.android.chrome:id/compositor_view_holder' }, { timeout: 45000 });
+  await expect.poll(() => nativeNodes(readNativeWindow()).some(node =>
+    node['resource-id'] === 'com.android.chrome:id/compositor_view_holder'), { timeout: 45000 }).toBe(true);
   await expect.poll(async () => {
     const candidates = context!.pages().filter(item => !item.isClosed()
       && item.url().startsWith('https://sitrep.ultimamilla.com.ar/app/')).reverse();
@@ -66,6 +68,7 @@ const openOriginal = async () => {
   assert.equal(new URL(page.url()).origin, 'https://sitrep.ultimamilla.com.ar');
   assert.equal(await page.evaluate(() => isSecureContext), true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+  await dismissObservedChromePrompts(output);
 };
 try {
   await check('original-signature-and-Android-installation', async () => {
@@ -109,8 +112,9 @@ try {
     await device.screenshot({ path: path.join(output, 'original-public-login-device.png') });
     const activities = adb('shell', 'dumpsys', 'activity', 'activities');
     await writeFile(path.join(output, 'launch-activities.txt'), activities);
-    adb('shell', 'uiautomator', 'dump', '/data/local/tmp/sitrep-qa-window.xml');
-    const nativeWindow = adb('shell', 'cat', '/data/local/tmp/sitrep-qa-window.xml');
+    const nativeWindow = readNativeWindow();
+    assert.equal(nativeWindow.includes('com.android.chrome:id/url_bar'), false, 'Original APK must launch as TWA, not a browser URL tab');
+    assert.doesNotMatch(nativeWindow, /resource-id="com.android.chrome:id\/(?:toolbar|custom_tabs_toolbar|location_bar)"/);
     await writeFile(path.join(output, 'launch-window.xml'), nativeWindow);
     await writeFile(path.join(output, 'public-launch.json'), JSON.stringify({
       url: page!.url(), normalTLS: true, loggedIn: false, images,
