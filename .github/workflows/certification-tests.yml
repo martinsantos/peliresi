@@ -2,6 +2,11 @@ name: SITREP Isolated Cloud QA
 on:
   workflow_dispatch:
     inputs:
+      unit:
+        description: Repeat unit suites; false only reuses measured unchanged product-source gates
+        type: boolean
+        required: true
+        default: true
       android:
         description: Run Android OS emulator after web and app gates
         type: boolean
@@ -62,12 +67,17 @@ jobs:
           test ! -f backend/.env
           test ! -f frontend/.env
           mkdir -p "$QA_ARTIFACTS"
+      - name: Reuse unit evidence only when ALL tracked product and unit files are unchanged
+        if: ${{ !inputs.unit }}
+        run: node --experimental-strip-types frontend/cloud-qa/unit-reuse.ts
       - name: Install locked dependencies on the cloud VM
         run: |
           npm ci --prefix backend
           npm ci --prefix frontend
           cd backend
           npx --no-install prisma generate
+          cd ..
+          node --experimental-strip-types --test frontend/cloud-qa/load-seed.test.ts
       - name: Install PDF and browser test tools on the cloud VM
         run: |
           sudo apt-get update -qq
@@ -75,13 +85,18 @@ jobs:
           cd frontend
           npx --no-install playwright install --with-deps chromium
       - name: Backend and frontend unit tests with disconnected DB
+        if: inputs.unit
         run: |
           cd backend
           npm test -- --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/backend-unit.json"
+          cd ../frontend
+          npm test -- --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/frontend-unit.json"
+      - name: Compile unchanged production backend, web and app
+        run: |
+          cd backend
           npx --no-install tsc --noEmit
           npm run build
           cd ../frontend
-          npm test -- --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/frontend-unit.json"
           NODE_ENV=production npm run build
           NODE_ENV=production npx --no-install vite build --config vite.config.app.ts
       - name: Create temporary loopback PostgreSQL, never a production copy

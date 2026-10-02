@@ -1,12 +1,12 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { assertCloudDatabase, backendRequire, root } from './safety.ts';
+import { assertCloudDatabase, backendRequire } from './safety.ts';
+import { loadSeed } from './load-seed.ts';
 
 await assertCloudDatabase();
 const output=process.env.QA_ARTIFACTS!;
 await mkdir(path.join(output,'uploads'),{recursive:true});
-backendRequire('ts-node/register');
-const {seedNightDatabase}=backendRequire(path.join(root,'backend/tests/integration/seed-night.ts'));
+const {seedNightDatabase}=loadSeed();
 const fixture=await seedNightDatabase();
 const {PrismaClient}=backendRequire('@prisma/client');
 const db=new PrismaClient();

@@ -1,0 +1,18 @@
+{
+  "productCommit": "96e7bfd6ec80d6a450a7646749af7fb9b978dd71",
+  "hash": "7da792a4c116ea44038c592dfcfb63fabb968d0546ee0a89686769716dd66b87",
+  "trackedFiles": 795,
+  "scope": "All tracked backend, frontend and scripts except the isolated cloud-qa harness",
+  "measuredUnitRun": 36999929921,
+  "measuredUnitCommit": "2439778bc2d82b03809770406128db640a5ce8a6",
+  "backend": {
+    "passed": 353,
+    "failed": 0,
+    "pending": 0
+  },
+  "frontend": {
+    "passed": 617,
+    "failed": 0,
+    "pending": 0
+  }
+}
