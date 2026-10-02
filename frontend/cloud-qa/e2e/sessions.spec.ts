@@ -9,6 +9,7 @@ async function expectIdentity(response: Awaited<ReturnType<typeof profileRespons
   const { data } = await response.json();
   expect(data.user.rol).toBe(role);
   expect(data.user.email).toBe(email);
+  return data.user;
 }
 
 async function logout(page: Page, info: TestInfo) {
@@ -39,11 +40,11 @@ test('real impersonation survives reload and restores the original administrator
   const operatorProfile = profileResponse(page);
   await target.click();
   expect((await switched).status()).toBe(200);
-  await expectIdentity(await operatorProfile, 'OPERADOR', 'operador@night-qa.invalid');
+  const operator = await expectIdentity(await operatorProfile, 'OPERADOR', 'operador@night-qa.invalid');
   const temporaryBanner = info.project.name === 'app'
     ? page.getByTestId('impersonation-banner') : page.getByText(/Vista temporal ·/);
   await expect(temporaryBanner).toBeVisible();
-  await expect(temporaryBanner).toContainText('QA Operador');
+  await expect(temporaryBanner).toContainText(operator.nombre);
   await expect(page.getByRole('button', { name: 'Volver a mi cuenta', exact: true })).toBeVisible();
   const restoredOperator = profileResponse(page);
   await page.reload();
@@ -66,7 +67,7 @@ test('logout in one real tab removes access in every tab and browser history', a
   const other = await context.newPage();
   try {
     const actualProfile = profileResponse(other);
-    await other.goto(`${prefix(info)}/`);
+    await other.goto(`${prefix(info)}/dashboard`);
     await expectIdentity(await actualProfile, 'ADMIN', 'admin@night-qa.invalid');
     await other.goto(`${prefix(info)}/manifiestos`);
     await expect(other.getByRole('banner')).toBeVisible();

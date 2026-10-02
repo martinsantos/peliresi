@@ -5,12 +5,12 @@ import path from 'node:path';
 import { assertCloudEnvironment } from './safety.ts';
 
 assertCloudEnvironment();
-assert.ok(process.env.QA_GITHUB_TOKEN, 'Read-only job token required for private draft asset');
+assert.ok(process.env.QA_GITHUB_TOKEN, 'Short-lived transfer-job token required for private draft asset');
 assert.ok(process.env.RUNNER_TEMP);
 const headers = { Authorization: `Bearer ${process.env.QA_GITHUB_TOKEN}`,
   Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
 const releaseResponse = await fetch('https://api.github.com/repos/martinsantos/peliresi/releases/401766766', { headers });
-assert.equal(releaseResponse.status, 200, 'Private QA draft must be readable without expanding job permissions');
+assert.equal(releaseResponse.status, 200, 'Private QA draft must be readable from the isolated transfer job');
 const release = await releaseResponse.json();
 assert.equal(release.draft, true, 'Never consume a published product release');
 assert.equal(release.tag_name, 'qa-apk-isolated-20261002');

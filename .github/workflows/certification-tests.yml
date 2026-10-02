@@ -21,8 +21,60 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  stage-original-apk:
+    if: github.ref == 'refs/heads/codex/sitrep-cloud-qa-20261002' && inputs.android
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    # GitHub requires push access to read draft releases. This short job only
+    # performs fixed-ID GETs and uploads a one-day private Actions artifact;
+    # no npm packages, deploy code, repository writes or production secrets.
+    permissions:
+      contents: write
+    env:
+      CI: 'true'
+      NODE_ENV: test
+      NODE_APP_INSTANCE: qa
+      ALLOW_SYNTHETIC_QA: '1'
+      DATABASE_URL: postgresql://qa@127.0.0.1:55440/sitrep_night_qa_20260926?schema=public&connection_limit=3
+      PORT: '3037'
+      DISABLE_EMAILS: 'true'
+      BLOCKCHAIN_ENABLED: 'false'
+      ENABLE_ANALYTICS: 'false'
+      SMTP_HOST: ''
+      SMTP_USER: ''
+      SMTP_PASS: ''
+      VAPID_PUBLIC_KEY: ''
+      VAPID_PRIVATE_KEY: ''
+      BLOCKCHAIN_RPC_URL: ''
+      BLOCKCHAIN_CONTRACT_ADDRESS: ''
+      FRONTEND_URL: http://127.0.0.1:4177
+      CORS_ORIGIN: http://127.0.0.1:4177
+      VITE_API_URL: /api
+      QA_ARTIFACTS: /tmp/sitrep-night-20260926.cloud
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Safety guard before private APK transfer
+        run: node --experimental-strip-types --test frontend/cloud-qa/safety.test.ts
+      - name: Download fixed original APK, never publish its draft
+        env:
+          QA_GITHUB_TOKEN: ${{ github.token }}
+        run: node --experimental-strip-types frontend/cloud-qa/apk-download.ts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sitrep-original-apk-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/sitrep-original-candidate.apk
+            /tmp/sitrep-night-20260926.cloud/apk-candidate-source.json
+          retention-days: 1
+          if-no-files-found: error
   isolated-qa:
-    if: github.ref == 'refs/heads/codex/sitrep-cloud-qa-20261002'
+    needs: stage-original-apk
+    if: always() && github.ref == 'refs/heads/codex/sitrep-cloud-qa-20261002'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
@@ -91,7 +143,7 @@ jobs:
           npm test -- --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/backend-unit.json"
           cd ../frontend
           npm test -- --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/frontend-unit.json"
-      - name: Compile unchanged production backend, web and app
+      - name: Compile isolated candidate backend, web and app
         run: |
           cd backend
           npx --no-install tsc --noEmit
@@ -119,16 +171,26 @@ jobs:
         run: |
           cd frontend
           npx --no-install playwright test --config cloud-qa/playwright.config.ts
+      - name: Preserve web results before starting Android
+        if: always() && steps.qa-start.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sitrep-cloud-web-summary-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            /tmp/sitrep-night-20260926.cloud/e2e.json
+            /tmp/sitrep-night-20260926.cloud/http.log
+          retention-days: 3
       - name: Enable Android hardware acceleration only on the temporary VM
         if: always() && inputs.android && steps.qa-start.outcome == 'success'
         run: |
           test -e /dev/kvm
           sudo chmod 666 /dev/kvm
-      - name: Read original signed APK from the private QA draft without write permissions
-        if: always() && inputs.android && steps.qa-start.outcome == 'success'
-        env:
-          QA_GITHUB_TOKEN: ${{ github.token }}
-        run: node --experimental-strip-types frontend/cloud-qa/apk-download.ts
+      - name: Receive already verified APK with read-only QA job permissions
+        if: always() && inputs.android && steps.qa-start.outcome == 'success' && needs.stage-original-apk.result == 'success'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: sitrep-original-apk-${{ github.run_id }}
+          path: ${{ runner.temp }}/sitrep-apk-transfer
       - name: Android 15 actual OS and Chrome, no local emulator
         if: always() && inputs.android && steps.qa-start.outcome == 'success'
         uses: ReactiveCircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808 # v2

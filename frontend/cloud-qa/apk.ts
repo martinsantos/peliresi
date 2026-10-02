@@ -3,7 +3,7 @@ import { expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { assertCloudDatabase } from './safety.ts';
 
@@ -12,7 +12,18 @@ const output = path.join(process.env.QA_ARTIFACTS!, 'apk');
 await mkdir(output, { recursive: true });
 const pkg = 'ar.com.ultimamilla.sitrep';
 const activity = pkg + '/ar.com.ultimamilla.sitrep.LauncherActivity';
-const candidate = path.join(process.env.RUNNER_TEMP!, 'sitrep-original-candidate.apk');
+const transfer = path.join(process.env.RUNNER_TEMP!, 'sitrep-apk-transfer');
+async function locateOriginal(directory: string): Promise<string[]> {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const results: string[] = [];
+  for (const entry of entries) {
+    assert.equal(entry.isSymbolicLink(), false);
+    const file = path.join(directory, entry.name);
+    if (entry.isDirectory()) results.push(...await locateOriginal(file));
+    else if (entry.name === 'sitrep-original-candidate.apk') results.push(file);
+  }
+  return results;
+}
 const adb = (...args: string[]) => execFileSync('adb', args, { encoding: 'utf8', timeout: 45000 });
 const results: Array<{ name: string; status: string; error?: string }> = [];
 const attemptedWrites: string[] = [];
@@ -48,6 +59,9 @@ const openOriginal = async () => {
 };
 try {
   await check('original-signature-and-Android-installation', async () => {
+    const originals = await locateOriginal(transfer);
+    assert.equal(originals.length, 1, 'Exactly one unchanged signed candidate must be received');
+    const candidate = originals[0];
     const bytes = await readFile(candidate);
     const sha256 = createHash('sha256').update(bytes).digest('hex');
     assert.equal(sha256, '4200e6d857e3a161e15bcfd161c44b54fc76245d8e9f4e3a093f973b06ad4bf5');
@@ -102,6 +116,7 @@ try {
     await device.screenshot({ path: path.join(output, 'original-restarted-device.png') });
   });
   await check('anonymous-read-only-no-page-errors', async () => {
+    assert.ok(page && new URL(page.url()).origin === 'https://sitrep.ultimamilla.com.ar', 'Public launch must actually have happened');
     expect(attemptedWrites).toEqual([]); expect(pageErrors).toEqual([]);
   });
 } finally {

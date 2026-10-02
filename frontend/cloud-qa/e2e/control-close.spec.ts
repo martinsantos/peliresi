@@ -61,6 +61,22 @@ test('control center queries real layers, refreshes and opens the exact active i
   expect(agenda.items.some((r: { id: string }) => r.id === inspection.id)).toBe(true);
   await expect(page.getByText('Total Manifiestos', { exact: true })).toBeVisible();
   await expect(page.getByText('Total Manifiestos', { exact: true }).locator('..')).toContainText(String(stats.estadisticas.totalManifiestos));
+  const legend = page.getByRole('list', { name: 'Tipos de elementos en el mapa', exact: true });
+  await expect(legend).toHaveCount(1); // Only the legend for the current viewport is exposed.
+  for (const [label, glyph] of [
+    ['Generadores', 'factory'], ['Transportistas', 'truck'],
+    ['Operadores', 'flask-conical'], ['Inspecciones', 'clipboard-check'],
+  ]) {
+    const entry = legend.getByRole('listitem').filter({ hasText: label });
+    await expect(entry).toBeVisible();
+    await expect(entry.locator('svg.lucide-' + glyph)).toHaveCount(1);
+    await expect(entry.locator('polygon')).toHaveCount(0);
+  }
+  await legend.scrollIntoViewIfNeeded();
+  const bounds = (await legend.boundingBox())!;
+  expect(bounds.x).toBeGreaterThanOrEqual(0);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual((await page.evaluate(() => innerWidth)) + 1);
+  await visibleProof(page, info, 'map-legend-after');
   const layer = page.getByRole('button', { name: 'Generadores', exact: true });
   await expect(layer).toHaveAttribute('aria-pressed', 'true');
   const changed = page.waitForResponse(r => r.url().includes('/api/centro-control/actividad') && !new URL(r.url()).searchParams.get('capas')?.includes('generadores') && r.status() === 200);

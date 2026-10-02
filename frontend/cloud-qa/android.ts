@@ -24,13 +24,23 @@ let context:BrowserContext;
 let page:Page;
 const errors:string[]=[];
 const results:Array<{name:string;status:string;error?:string}>=[];
+const settleNativeChrome=async()=>{
+  execFileSync('adb',['shell','uiautomator','dump','/data/local/tmp/sitrep-chrome-window.xml'],{timeout:45000});
+  const native=execFileSync('adb',['shell','cat','/data/local/tmp/sitrep-chrome-window.xml'],{encoding:'utf8'});
+  if(native.includes('Chrome notifications make things easier')){
+    await device.tap({text:'No thanks'},{timeout:5000});
+    await device.wait({text:'Chrome notifications make things easier'},{state:'gone',timeout:5000});
+    console.log('Dismissed native Chrome first-run notification prompt on temporary emulator');
+  }
+};
 const observe=(target:Page)=>{
   target.setDefaultTimeout(20000);
   target.on('pageerror',e=>errors.push(e.message));
   target.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
 };
 const launch=async()=>{
-  context=await device.launchBrowser({hasTouch:true,args:['--no-first-run','--no-default-browser-check']});
+  context=await device.launchBrowser({hasTouch:true,permissions:['geolocation'],
+    geolocation:{latitude:-32.89,longitude:-68.84},args:['--no-first-run','--no-default-browser-check']});
   await context.addCookies([{name:'sitrep_qa_client',value:'127.11.20.2',url:'http://127.0.0.1:4177'}]);
   page=await context.newPage();observe(page);
 };
@@ -50,6 +60,12 @@ const login=async(user:string)=>{
   expect(response.status()).toBe(200);
   await expect(page.getByRole('banner')).toBeVisible();
   await expect(page).not.toHaveURL(/\/login$/);
+  await settleNativeChrome();
+  // The user-approved first-login welcome is a real UI step, not an error.
+  const welcome=page.getByRole('button',{name:'Saltar introducción',exact:true});
+  await expect(welcome).toBeVisible({timeout:7000});
+  await welcome.tap();
+  await expect(welcome).toHaveCount(0);
 };
 const logout=async()=>{
   await page.getByRole('button',{name:'Abrir menu',exact:true}).tap();
@@ -61,6 +77,7 @@ const proof=async(name:string)=>{
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
   await page.screenshot({path:path.join(output,name+'.png')});
+  await settleNativeChrome();
   await device.screenshot({path:path.join(output,name+'-device.png')});
 };
 const check=async(name:string,task:()=>Promise<void>)=>{
@@ -80,8 +97,37 @@ try{
     await writeFile(path.join(output,'device.json'),JSON.stringify({
       android:getprop('ro.build.version.release'),sdk:getprop('ro.build.version.sdk'),
       model:device.model(),chrome:chrome.match(/versionName=([^\s]+)/)?.[1],
-      ...deviceInfo,physicalDevice:false,installedReleaseApkTested:false,
+      ...deviceInfo,physicalDevice:false,installedReleaseApkTested:false,geolocationEmulated:true,
     },null,2));await proof('admin-session');
+  });
+  await check('real-impersonation-reload-and-return-to-administrator',async()=>{
+    await page.goto('http://127.0.0.1:4177/app/switch-user');
+    await page.getByLabel('Buscar usuario').fill('operador@night-qa.invalid');
+    const target=page.getByRole('region',{name:'Operador',exact:true})
+      .getByRole('button').filter({hasText:'QA Operador 1'});
+    await expect(target).toHaveCount(1);
+    const [switched,profile]=await Promise.all([
+      page.waitForResponse(r=>r.url().includes('/api/admin/impersonate/')&&r.request().method()==='POST'),
+      page.waitForResponse(r=>r.url().endsWith('/api/auth/profile')&&r.request().method()==='GET'),
+      target.tap(),
+    ]);
+    expect(switched.status()).toBe(200);expect(profile.status()).toBe(200);
+    const operator=(await profile.json()).data.user;
+    expect(operator.email).toBe('operador@night-qa.invalid');expect(operator.rol).toBe('OPERADOR');
+    await expect(page.getByTestId('impersonation-banner')).toContainText(operator.nombre);
+    const [restored]=await Promise.all([
+      page.waitForResponse(r=>r.url().endsWith('/api/auth/profile')&&r.request().method()==='GET'),page.reload(),
+    ]);
+    expect((await restored.json()).data.user.email).toBe('operador@night-qa.invalid');
+    await proof('temporary-operator-session');
+    const [administrator]=await Promise.all([
+      page.waitForResponse(r=>r.url().endsWith('/api/auth/profile')&&r.request().method()==='GET'),
+      page.getByRole('button',{name:'Volver a mi cuenta',exact:true}).tap(),
+    ]);
+    const returned=(await administrator.json()).data.user;
+    expect(returned.email).toBe('admin@night-qa.invalid');expect(returned.rol).toBe('ADMIN');
+    await expect(page.getByTestId('impersonation-banner')).toHaveCount(0);
+    await proof('administrator-restored');
   });
   await check('control-monitor-reports-actual-data',async()=>{
     for(const[route,endpoint]of [
@@ -145,6 +191,7 @@ try{
     await expect(page.getByRole('banner')).toBeVisible();
     await expect(page).not.toHaveURL(/\/login$/);
     await expect(page.locator('#inspection-observations')).toHaveValue('QA Android comentario conservado después de cerrar Chrome.');
+    await expect(page.getByRole('button',{name:'Saltar introducción',exact:true})).toHaveCount(0);
     await proof('restarted-inspector-record');
   });
   await check('logout-removes-access-to-protected-route',async()=>{
@@ -152,7 +199,10 @@ try{
     await page.goto('http://127.0.0.1:4177/app/inspecciones/'+inspection.id);
     await expect(page).toHaveURL(/\/app\/login$/);await proof('logged-out');
   });
-  await check('javascript-health',async()=>expect(errors).toEqual([]));
+  await check('javascript-health',async()=>{
+    assert.ok(results.some(result=>result.name==='real-os-and-admin-session'&&result.status==='PASS'), 'A real authenticated session must have run');
+    expect(errors).toEqual([]);
+  });
 }finally{
   await writeFile(path.join(output,'result.json'),JSON.stringify({
     commit:process.env.GITHUB_SHA,startedOnActualAndroid:true,results,consoleErrors:errors,

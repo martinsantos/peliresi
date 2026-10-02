@@ -3,7 +3,7 @@
  */
 import React, { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Factory, Truck, FlaskConical, ClipboardCheck, Navigation } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -15,6 +15,28 @@ import type { LayerState } from './ControlFilters';
 
 import { InspectionMapLayer } from '../../inspecciones/InspectionMapLayer';
 import { hasInspectionCoordinates, type InspectionOperation } from '../../../services/inspectionOperations.service';
+
+const mapLegendItems = [
+  { key: 'generador', label: 'Generadores', Icon: Factory },
+  { key: 'transportista', label: 'Transportistas', Icon: Truck },
+  { key: 'operador', label: 'Operadores', Icon: FlaskConical },
+  { key: 'inspeccion', label: 'Inspecciones', Icon: ClipboardCheck },
+  { key: 'enTransito', label: 'En tránsito', Icon: Navigation },
+] as const;
+
+function MapLegend({ inspectionsOffered }: { inspectionsOffered: boolean }) {
+  return <div role="list" aria-label="Tipos de elementos en el mapa" className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-neutral-700">
+    {mapLegendItems.filter(item => inspectionsOffered || item.key !== 'inspeccion').map(({ key, label, Icon }) => (
+      <span key={key} role="listitem" className="flex items-center gap-2 whitespace-nowrap">
+        <span aria-hidden="true" className={`inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center text-white ${key === 'enTransito' ? 'rounded-full' : 'rounded'}`}
+          style={{ backgroundColor: ACTOR_COLORS[key], transform: key === 'transportista' ? 'rotate(45deg)' : undefined }}>
+          <Icon size={12} strokeWidth={2.5} style={{ transform: key === 'transportista' ? 'rotate(-45deg)' : undefined }} />
+        </span>
+        {label}
+      </span>
+    ))}
+  </div>;
+}
 
 // ── Cluster helper ──
 function clusterMarkers<T extends { latitud: number; longitud: number }>(
@@ -144,12 +166,8 @@ export const ControlMap: React.FC<ControlMapProps> = ({
             </Badge>
           </div>
           {/* Map legend */}
-          <div className="hidden sm:flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-neutral-500">
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded" style={{ background: ACTOR_COLORS.generador }} /> Generadores</span>
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: ACTOR_COLORS.transportista, transform: 'rotate(45deg)' }} /> Transportistas</span>
-            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm" style={{ background: ACTOR_COLORS.operador }} /> Operadores</span>
-            {layers.inspecciones !== undefined && <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-teal-700" /> Inspecciones</span>}
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full" style={{ background: ACTOR_COLORS.enTransito }} /> En Tránsito</span>
+          <div className="hidden sm:block">
+            <MapLegend inspectionsOffered={layers.inspecciones !== undefined} />
           </div>
         </div>
 
@@ -354,13 +372,8 @@ export const ControlMap: React.FC<ControlMapProps> = ({
             </MapContainer>
 
             {/* Mobile legend */}
-            <div className="sm:hidden absolute bottom-20 left-3 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg z-[400] text-xs">
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded" style={{ background: ACTOR_COLORS.generador }} /> Gen</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: ACTOR_COLORS.transportista, transform: 'rotate(45deg)' }} /> Trans</span>
-                <span className="flex items-center gap-1"><svg width="11" height="11" viewBox="0 0 14 14"><polygon points="7,1 13,4 13,10 7,13 1,10 1,4" fill={ACTOR_COLORS.operador}/></svg> Oper</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full" style={{ background: ACTOR_COLORS.enTransito }} /> Tránsito</span>
-              </div>
+            <div className="sm:hidden absolute bottom-20 left-3 right-3 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg z-[400]">
+              <MapLegend inspectionsOffered={layers.inspecciones !== undefined} />
             </div>
 
             {!cc && (
