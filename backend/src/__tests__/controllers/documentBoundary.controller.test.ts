@@ -90,4 +90,13 @@ describe('actor documents: ownership and sector boundaries before side effects',
     expect((await invoke(downloadDocumento, owner)).error).toMatchObject({ statusCode: 404 });
     expect(mock.exists).not.toHaveBeenCalled();
   });
+  it.each([{ generadorId: null, operadorId: null }, { generadorId: 'gen-1', operadorId: 'op-1' }])
+    ('rejects missing or ambiguous document ownership before reads or moderation: %j', async parents => {
+      mock.find.mockResolvedValue({ ...stored, ...parents });
+      for (const handler of [downloadDocumento, revisarDocumento, deleteDocumento]) {
+        expect((await invoke(handler, { id: 'admin', rol: 'ADMIN' })).error).toMatchObject({ statusCode: 403 });
+      }
+      expect(mock.exists).not.toHaveBeenCalled(); expect(mock.stream).not.toHaveBeenCalled();
+      expect(mock.update).not.toHaveBeenCalled(); expect(mock.remove).not.toHaveBeenCalled(); expect(mock.unlink).not.toHaveBeenCalled();
+    });
 });

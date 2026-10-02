@@ -76,12 +76,16 @@ async function main() {
     operador: ['', '/pagos', '/ddjj', '/documentos', '/historial'],
   };
   const actorPath = (type: string, id: string) => `/actores/${type === 'generador' ? 'generadores' : type === 'operador' ? 'operadores' : 'transportistas'}/${id}`;
+  // Same required query sent by actoresService.getHistorialActor. An omitted
+  // actor type is a 400 input error, not an actor permission regression.
+  const actorReadPath = (type: string, id: string, suffix: string) =>
+    actorPath(type, id) + suffix + (suffix === '/historial' ? '?tipo=' + type.toUpperCase() : '');
   await check('actores / common users read only their own ficha and every protected subresource', async () => {
     for (const [type, suffixes] of Object.entries(actorRoutes)) {
       for (const suffix of suffixes) {
-        assert.equal((await request(type, actorPath(type, fixture.actors[type]) + suffix)).success, true);
-        await request(type + '2', actorPath(type, fixture.actors[type]) + suffix, 'GET', undefined, 403);
-        await request('sin-actor', actorPath(type, fixture.actors[type]) + suffix, 'GET', undefined, 403);
+        assert.equal((await request(type, actorReadPath(type, fixture.actors[type], suffix))).success, true);
+        await request(type + '2', actorReadPath(type, fixture.actors[type], suffix), 'GET', undefined, 403);
+        await request('sin-actor', actorReadPath(type, fixture.actors[type], suffix), 'GET', undefined, 403);
       }
       for (const other of Object.keys(actorRoutes).filter(t => t !== type)) {
         await request(type, actorPath(other, fixture.actors[other]), 'GET', undefined, 403);
@@ -91,7 +95,7 @@ async function main() {
   await check('actores / all admin sectors and inspectors may consult all categories, not mutate foreign sectors', async () => {
     for (const user of ['admin', 'lector-generadores', 'lector-transporte', 'lector-operadores', 'inspector']) {
       for (const [type, suffixes] of Object.entries(actorRoutes)) {
-        for (const suffix of suffixes) assert.equal((await request(user, actorPath(type, fixture.actors[type]) + suffix)).success, true);
+        for (const suffix of suffixes) assert.equal((await request(user, actorReadPath(type, fixture.actors[type], suffix))).success, true);
         const ownSector = user === 'lector-generadores' ? 'generador' : user === 'lector-transporte' ? 'transportista' : user === 'lector-operadores' ? 'operador' : null;
         if (user === 'inspector' || (ownSector && ownSector !== type)) {
           await request(user, actorPath(type, fixture.actors[type]), 'PUT', { razonSocial: 'QA NO DEBE CAMBIAR' }, 403);
