@@ -10,7 +10,7 @@
  * Paso 7: Archivos Adjuntos + Resumen + Confirmar
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, ArrowRight, Save, FlaskConical, MapPin, Lock,
@@ -101,6 +101,10 @@ const NuevoOperadorPage: React.FC = () => {
   const [attempted, setAttempted] = useState<Set<number>>(new Set());
   const [adjuntos, setAdjuntos] = useState<Record<string, File>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [savedActorId, setSavedActorId] = useState<string | null>(null);
+  const [uploadedDocs, setUploadedDocs] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const submissionInFlight = useRef(false);
   const [tefInputs, setTefInputs] = useState<TEFInputs | null>(null);
 
   const { data: existing, isLoading: loadingExisting } = useOperador(id || '');
@@ -225,7 +229,8 @@ const NuevoOperadorPage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    for (const s of [1, 6]) {
+    if (submissionInFlight.current) return;
+    for (const s of savedActorId ? [] : [1, 6]) {
       const errs = getStepErrors(s);
       if (errs.length > 0) {
         setAttempted(prev => new Set(prev).add(s));
@@ -273,11 +278,13 @@ const NuevoOperadorPage: React.FC = () => {
       ...domicilioPayload,
     };
 
+    submissionInFlight.current = true;
+    setSubmitting(true);
     setSubmitError(null);
     try {
-      let operadorId: string | undefined;
+      let operadorId: string | undefined = savedActorId || undefined;
 
-      if (isEdit && id) {
+      if (!operadorId && isEdit && id) {
         await updateMutation.mutateAsync({
           id,
           data: {
@@ -291,7 +298,7 @@ const NuevoOperadorPage: React.FC = () => {
         });
         operadorId = id;
         toast.success('Guardado', `Operador ${form.razonSocial} actualizado`);
-      } else {
+      } else if (!operadorId) {
         const result = await createMutation.mutateAsync({
           email: form.email, password: form.password,
           nombre: form.nombre || form.razonSocial,
@@ -307,14 +314,23 @@ const NuevoOperadorPage: React.FC = () => {
         toast.success('Operador creado', `${form.razonSocial} registrado exitosamente`);
       }
 
+      if (!operadorId) throw new Error('El servidor no devolvió el identificador del operador.');
+      setSavedActorId(operadorId);
       const filesToUpload = Object.entries(adjuntos);
+      const failed: string[] = [];
       if (operadorId && filesToUpload.length > 0) {
         let uploaded = 0;
         for (const [tipo, file] of filesToUpload) {
           try {
             await uploadDocMutation.mutateAsync({ operadorId, file, tipo });
             uploaded++;
+            setUploadedDocs(prev => ({ ...prev, [tipo]: file.name }));
+            setAdjuntos(prev => {
+              if (prev[tipo] !== file) return prev;
+              const remaining = { ...prev }; delete remaining[tipo]; return remaining;
+            });
           } catch (uploadErr: any) {
+            failed.push(file.name);
             console.error('Upload error:', uploadErr);
             toast.error('Error subiendo', `No se pudo subir ${file.name}: ${uploadErr?.response?.data?.message || 'Error'}`);
           }
@@ -323,17 +339,20 @@ const NuevoOperadorPage: React.FC = () => {
           toast.success('Documentos adjuntados', `${uploaded} archivo(s) subido(s)`);
         }
       }
-
+      if (failed.length) {
+        setSubmitError(`Operador guardado. No se subieron: ${failed.join(', ')}. Reintentá los adjuntos pendientes; no se repetirá el alta.`);
+        return;
+      }
       navigate(backPath);
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || 'Error desconocido al guardar';
       console.error('Submit error:', err);
       setSubmitError(msg);
       toast.add({ type: 'error', title: 'Error al guardar', message: msg, duration: 15000 });
-    }
+    } finally { submissionInFlight.current = false; setSubmitting(false); }
   };
 
-  const isPending = createMutation.isPending || updateMutation.isPending || uploadDocMutation.isPending;
+  const isPending = submitting || createMutation.isPending || updateMutation.isPending || uploadDocMutation.isPending;
 
   if (isEdit && loadingExisting) {
     return (
@@ -363,7 +382,7 @@ const NuevoOperadorPage: React.FC = () => {
       </div>
 
       {/* Stepper */}
-      <div className="bg-white rounded-2xl border border-neutral-200 p-4 shadow-sm">
+      <fieldset disabled={isPending || Boolean(savedActorId)} className="min-w-0 bg-white rounded-2xl border border-neutral-200 p-4 shadow-sm">
         <MobileFormSteps steps={STEPS} currentStep={step} onSelect={goStep} />
         <div className="hidden items-center justify-between md:flex">
           {STEPS.map((s, i) => {
@@ -393,10 +412,10 @@ const NuevoOperadorPage: React.FC = () => {
             );
           })}
         </div>
-      </div>
+      </fieldset>
 
       {/* Step Content */}
-      <div className="min-h-[400px]">
+      <fieldset disabled={isPending} className="min-w-0 min-h-[400px]">
 
         {/* ===== PASO 1: Identificacion ===== */}
         {step === 1 && (
@@ -703,7 +722,7 @@ const NuevoOperadorPage: React.FC = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="border border-neutral-200 rounded-xl overflow-hidden">
+                <div className="border border-neutral-200 rounded-xl overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-neutral-50">
                       <tr>
@@ -731,16 +750,19 @@ const NuevoOperadorPage: React.FC = () => {
                             </td>
                             <td className="px-4 py-3 text-center">
                               {file ? (
-                                <div className="inline-flex items-center gap-2 px-2 py-1 bg-success-50 border border-success-200 rounded-lg">
-                                  <Paperclip size={12} className="text-success-600" />
-                                  <span className="text-xs text-success-700 truncate max-w-[100px]">{file.name}</span>
-                                  <button onClick={() => removeFile(doc.tipo)} className="text-neutral-400 hover:text-error-600"><X size={14} /></button>
+                                <div className="inline-flex flex-wrap items-center justify-center gap-2 px-2 py-1 bg-neutral-50 border border-neutral-300 rounded-lg">
+                                  <Paperclip size={12} className="text-neutral-600" />
+                                  <span className="text-xs text-neutral-700 truncate max-w-[100px]">{file.name}</span>
+                                  <span className="text-xs text-neutral-600">Pendiente</span>
+                                  <button type="button" aria-label={`Quitar ${doc.nombre}`} onClick={() => removeFile(doc.tipo)} className="min-h-11 min-w-11 text-neutral-500 hover:text-error-600"><X size={14} /></button>
                                 </div>
+                              ) : uploadedDocs[doc.tipo] ? (
+                                <span className="inline-flex flex-wrap items-center justify-center gap-1 text-xs text-success-700"><Check size={14} /><span className="max-w-[120px] truncate">{uploadedDocs[doc.tipo]}</span><span>Guardado</span></span>
                               ) : (
                                 <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-100 hover:bg-primary-50 border border-neutral-200 hover:border-primary-300 rounded-lg cursor-pointer transition-colors text-xs font-medium text-neutral-700 hover:text-primary-700">
                                   <Upload size={14} />
                                   Subir
-                                  <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png"
+                                  <input type="file" aria-label={`Adjuntar ${doc.nombre}`} className="hidden" accept=".pdf,.jpg,.jpeg,.png"
                                     onChange={e => { const f = e.target.files?.[0]; if (f) attachFile(doc.tipo, f); e.target.value = ''; }}
                                   />
                                 </label>
@@ -776,14 +798,14 @@ const NuevoOperadorPage: React.FC = () => {
             </Card>
           </div>
         )}
-      </div>
+      </fieldset>
 
       {/* Error banner */}
       {submitError && (
-        <div className="bg-error-50 border-2 border-error-300 rounded-xl p-4 flex items-start gap-3">
+        <div role="alert" aria-label={savedActorId ? 'Adjuntos pendientes' : 'Error al guardar'} className="bg-error-50 border-2 border-error-300 rounded-xl p-4 flex items-start gap-3">
           <AlertCircle size={20} className="text-error-600 shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="font-bold text-error-800">No se pudo guardar el operador</p>
+            <p className="font-bold text-error-800">{savedActorId ? 'Operador guardado · adjuntos pendientes' : 'No se pudo guardar el operador'}</p>
             <p className="text-sm text-error-700 mt-1">{submitError}</p>
           </div>
           <button onClick={() => setSubmitError(null)} className="text-error-400 hover:text-error-600"><X size={18} /></button>
@@ -791,9 +813,9 @@ const NuevoOperadorPage: React.FC = () => {
       )}
 
       {/* Navigation */}
-      <div className="flex items-center justify-between pt-2">
-        <Button variant="outline" leftIcon={<ArrowLeft size={16} />} onClick={step === 1 ? () => navigate(backPath) : goPrev}>
-          {step === 1 ? 'Cancelar' : 'Volver'}
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+        <Button variant="outline" disabled={isPending} leftIcon={<ArrowLeft size={16} />} onClick={savedActorId || step === 1 ? () => navigate(backPath) : goPrev}>
+          {savedActorId ? 'Salir sin adjuntos pendientes' : step === 1 ? 'Cancelar' : 'Volver'}
         </Button>
         <div className="flex items-center gap-2">
           <span className="text-sm text-neutral-400">Paso {step} de {TOTAL_STEPS}</span>
@@ -805,7 +827,7 @@ const NuevoOperadorPage: React.FC = () => {
               onClick={handleSubmit}
               disabled={isPending}
             >
-              {isPending ? 'Guardando...' : isEdit ? 'Guardar Cambios' : 'Confirmar Registro'}
+              {isPending ? 'Guardando...' : savedActorId ? 'Reintentar adjuntos' : isEdit ? 'Guardar Cambios' : 'Confirmar Registro'}
             </Button>
           )}
         </div>

@@ -28,20 +28,24 @@ let page:Page;
 const errors:string[]=[];
 const runtimeErrors:string[]=[];
 const failedResponses:Array<{url:string;method:string;status:number;at:string}>=[];
+const browserLifecycle:Array<{at:string;event:string;url?:string;expected:boolean}>=[];
+let explicitlyClosing=false;
+let inspectorUserId='';
 let logoutAttempt=0;
 const results:Array<{name:string;status:string;error?:string}>=[];
 const saveResults=async(completed=false)=>writeFile(path.join(output,'result.json'),JSON.stringify({
-  commit:process.env.GITHUB_SHA,startedOnActualAndroid:true,completed,results,consoleErrors:errors,runtimeErrors,failedResponses,
+  commit:process.env.GITHUB_SHA,startedOnActualAndroid:true,completed,results,consoleErrors:errors,runtimeErrors,failedResponses,browserLifecycle,
   passed:results.filter(r=>r.status==='PASS').length,failed:results.filter(r=>r.status==='FAIL').length,
   limitations:['Android emulator, not a physical phone','Authenticated flow uses Chrome and the isolated QA origin, not the release APK production session','No real microphone, noise, battery or cellular-network certification'],
 },null,2));
 const closeContext=async()=>{
+  explicitlyClosing=true;
   // Kill only this QA Chrome process first. CDP context.close() can hang while
   // an Android window changes size; no profile or session data is deleted.
   execFileSync('adb',['shell','am','force-stop','com.android.chrome'],{timeout:5000});
   let timer:ReturnType<typeof setTimeout>|undefined;
   try{await Promise.race([context?.close().catch(()=>{}),new Promise<void>(resolve=>{timer=setTimeout(resolve,5000);})]);}
-  finally{clearTimeout(timer);}
+  finally{clearTimeout(timer);explicitlyClosing=false;}
 };
 const settleNativeChrome=()=>dismissObservedChromePrompts(output);
 const nativeButtonTap=async(name:string,evidence:string)=>{
@@ -69,6 +73,8 @@ const nativeButtonTap=async(name:string,evidence:string)=>{
 const observe=(target:Page)=>{
   target.setDefaultTimeout(20000);
   target.on('pageerror',e=>runtimeErrors.push(e.message));
+  target.on('close',()=>browserLifecycle.push({at:new Date().toISOString(),event:'page-close',url:target.url(),expected:explicitlyClosing}));
+  target.on('crash',()=>runtimeErrors.push('Android Chrome page crashed: '+target.url()));
   target.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
   target.on('response',response=>{
     if(response.url().includes('/api/')&&response.status()>=400)failedResponses.push({
@@ -85,6 +91,16 @@ const launch=async()=>{
   const restored=context.pages().filter(candidate=>candidate.url().startsWith('http://127.0.0.1:4177/'));
   assert.ok(restored.length<=1,'The isolated single-tab app scenario must not accumulate hidden copies');
   page=restored[0]||await context.newPage();observe(page);
+  // launchBrowser opens a native about:blank tab on every launch. Keep the
+  // authenticated restart tab, close only observed blank tabs, and foreground
+  // the actual QA page before mixing CDP and native OS input.
+  for(const other of context.pages().filter(candidate=>candidate!==page)){
+    assert.equal(other.url(),'about:blank','Never close an unknown or hidden business tab');
+    await other.close();
+  }
+  await page.bringToFront();
+  assert.equal(context.pages().length,1,'Exactly one browser tab in this isolated scenario');
+  context.on('close',()=>browserLifecycle.push({at:new Date().toISOString(),event:'context-close',expected:explicitlyClosing}));
 };
 const login=async(user:string)=>{
   // Presentation preferences only: the real form obtains every session.
@@ -108,6 +124,7 @@ const login=async(user:string)=>{
   await expect(welcome).toBeVisible({timeout:7000});
   await welcome.tap();
   await expect(welcome).toHaveCount(0);
+  return (await response.json()).data.user as {id:string};
 };
 const logout=async()=>{
   const attempt=++logoutAttempt;
@@ -132,12 +149,17 @@ const logout=async()=>{
   expect(await page.evaluate(()=>localStorage.getItem('sitrep_access_token'))).toBeNull();
 };
 const proof=async(name:string)=>{
+  await page.bringToFront();
   await expect(page).toHaveTitle(/SITREP/i);
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
   await page.screenshot({path:path.join(output,name+'.png')});
   await settleNativeChrome();
   await device.screenshot({path:path.join(output,name+'-device.png')});
+  await writeFile(path.join(output,name+'-chrome-exits.txt'),execFileSync('adb',['shell','dumpsys','activity','exit-info','com.android.chrome'],{encoding:'utf8',timeout:5000}));
+  // Native capture may outlive a disconnected CDP target. Do not mark a dead
+  // page PASS merely because its DOM screenshot was taken a few seconds earlier.
+  await expect(page).toHaveTitle(/SITREP/i);
 };
 const check=async(name:string,task:()=>Promise<void>)=>{
   try{await task();results.push({name,status:'PASS'});console.log('PASS Android '+name);}
@@ -221,7 +243,7 @@ try{
   });
   await check('inspector-receives-real-notice-and-opens-dossier',async()=>{
     assert.ok(inspection?.id);
-    await login('inspector');
+    inspectorUserId=(await login('inspector')).id;
     await page.getByRole('banner').getByRole('button',{name:/^Notificaciones/}).tap();
     await page.getByRole('button',{name:'Ver todas las notificaciones',exact:true}).tap();
     await page.getByRole('button',{name:'Abrir aviso: Inspección asignada · '+inspection.numero,exact:true}).tap();
@@ -242,7 +264,12 @@ try{
       page.getByRole('button',{name:'Guardar cambios',exact:true}).tap(),
     ]);
     expect(saved.status()).toBe(200);
+    const confirmed=await saved.json();
     await expect(page.getByText('Cambios confirmados en el servidor',{exact:true})).toBeVisible();
+    const local=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)||'null'),'sitrep_inspection_draft_'+inspectorUserId+'_'+inspection.id);
+    await writeFile(path.join(output,'saved-draft-acknowledgment.json'),JSON.stringify({confirmed:confirmed.data,local},null,2));
+    expect(local?.observaciones).toBe('QA Android comentario conservado después de cerrar Chrome.');
+    expect(local?.version).toBe(confirmed.data.version);
     await proof('saved-field-observation');
   });
   await check('process-restart-keeps-real-session-and-record',async()=>{
@@ -253,6 +280,8 @@ try{
     await expect(page.getByRole('banner')).toBeVisible();
     await expect(page).not.toHaveURL(/\/login$/);
     await expect(page.locator('#inspection-observations')).toHaveValue('QA Android comentario conservado después de cerrar Chrome.');
+    await expect(page.getByText('Hay un borrador anterior sin conciliar',{exact:true})).toHaveCount(0);
+    await expect(page.locator('#inspection-observations')).toBeEnabled();
     await expect(page.getByRole('button',{name:'Saltar introducción',exact:true})).toHaveCount(0);
     await proof('restarted-inspector-record');
   });
@@ -263,6 +292,9 @@ try{
   });
   const gpsResponses:Array<{status:number;latitude:number;longitude:number}>=[];
   await check('carrier-gps-sends-observed-location-to-real-api',async()=>{
+    // A separate person's trip is an independent Chrome lifecycle. Always
+    // restart here, not conditionally to conceal a failed inspector check.
+    await closeContext();await launch();
     await login('transportista');
     page.on('response',response=>{
       if(response.url().endsWith('/manifiestos/'+fixture.deviceManifest.id+'/ubicacion')&&response.request().method()==='POST'){
@@ -301,12 +333,14 @@ try{
     await expect(page).not.toHaveURL(/escaner-qr$/);
   });
   await check('javascript-health',async()=>{
+    await expect(page).toHaveTitle(/SITREP/i);
     assert.ok(results.some(result=>result.name==='real-os-and-admin-session'&&result.status==='PASS'), 'A real authenticated session must have run');
     // Failed transport while deliberately offline is expected; JS exceptions
     // are still rejected. Record all console messages in the artifact.
     expect(errors.filter(error=>!/^Failed to load resource: net::ERR_INTERNET_DISCONNECTED/.test(error))).toEqual([]);
     expect(runtimeErrors).toEqual([]);
     expect(failedResponses).toEqual([]);
+    expect(browserLifecycle.filter(event=>!event.expected)).toEqual([]);
   });
 }finally{
   await saveResults(true);

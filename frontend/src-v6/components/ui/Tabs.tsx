@@ -4,7 +4,7 @@
  * Navegación por pestañas con variantes
  */
 
-import React, { useState, useId, createContext, useContext } from 'react';
+import React, { useState, useId, useRef, useLayoutEffect, createContext, useContext } from 'react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -99,7 +99,28 @@ export function Tabs({
 // TAB LIST
 // ========================================
 export function TabList({ children, className }: TabListProps) {
-  const { variant } = useTabs();
+  const { variant, activeTab } = useTabs();
+  const listRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const reveal = () => {
+      const selected = list.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
+      if (!selected) return;
+      const viewport = list.getBoundingClientRect();
+      const bounds = selected.getBoundingClientRect();
+      // Move only this strip. scrollIntoView would also move the form/page.
+      const delta = bounds.width > viewport.width || bounds.left < viewport.left
+        ? bounds.left - viewport.left
+        : Math.max(0, bounds.right - viewport.right);
+      if (delta) list.scrollLeft += delta;
+    };
+    reveal();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(reveal);
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, [activeTab]);
 
   const variantStyles = {
     default: 'border-b border-neutral-200 gap-1',
@@ -109,7 +130,7 @@ export function TabList({ children, className }: TabListProps) {
   };
 
   return (
-    <div className={cn('flex items-center overflow-x-auto scrollbar-hide max-w-full', variantStyles[variant], className)} role="tablist">
+    <div ref={listRef} className={cn('flex items-center overflow-x-auto scrollbar-hide max-w-full', variantStyles[variant], className)} role="tablist">
       {children}
     </div>
   );

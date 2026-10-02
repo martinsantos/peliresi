@@ -53,7 +53,7 @@ if (mode === 'freeze') {
     assert.ok(unit.numPassedTests > 0);
   }
   const e2e = await readJson('e2e.json');
-  assert.equal(e2e.stats.expected, 63);
+  assert.equal(e2e.stats.expected, 72);
   assert.equal(e2e.stats.unexpected + e2e.stats.flaky + e2e.stats.skipped, 0);
   assert.deepEqual(e2e.errors, []);
   const android = await readJson('android/result.json');
