@@ -29,7 +29,7 @@ const errors:string[]=[];
 const runtimeErrors:string[]=[];
 const failedResponses:Array<{url:string;method:string;status:number;at:string}>=[];
 const browserLifecycle:Array<{at:string;event:string;url?:string;expected:boolean}>=[];
-let explicitlyClosing=false;
+const intentionalClosures=new WeakSet<BrowserContext>();
 let inspectorUserId='';
 let logoutAttempt=0;
 const results:Array<{name:string;status:string;error?:string}>=[];
@@ -39,25 +39,30 @@ const saveResults=async(completed=false)=>writeFile(path.join(output,'result.jso
   limitations:['Android emulator, not a physical phone','Authenticated flow uses Chrome and the isolated QA origin, not the release APK production session','No real microphone, noise, battery or cellular-network certification'],
 },null,2));
 const closeContext=async()=>{
-  explicitlyClosing=true;
+  if(context)intentionalClosures.add(context);
   // Kill only this QA Chrome process first. CDP context.close() can hang while
   // an Android window changes size; no profile or session data is deleted.
   execFileSync('adb',['shell','am','force-stop','com.android.chrome'],{timeout:5000});
   let timer:ReturnType<typeof setTimeout>|undefined;
   try{await Promise.race([context?.close().catch(()=>{}),new Promise<void>(resolve=>{timer=setTimeout(resolve,5000);})]);}
-  finally{clearTimeout(timer);explicitlyClosing=false;}
+  finally{clearTimeout(timer);}
 };
 const settleNativeChrome=()=>dismissObservedChromePrompts(output);
 const nativeButtonTap=async(name:string,evidence:string)=>{
   const button=page.getByRole('button',{name,exact:true});
   await expect(button).toBeVisible();await expect(button).toBeEnabled();
   await button.scrollIntoViewIfNeeded();
+  // Keep the keyboard open. A visible DOM button can still lie behind it.
+  await expect.poll(()=>button.evaluate(el=>{
+    const r=el.getBoundingClientRect(),v=visualViewport;
+    return r.width>0&&r.height>0&&r.top>=(v?.offsetTop||0)
+      &&r.bottom<=(v?(v.offsetTop+v.height):innerHeight);
+  })).toBe(true);
   const xml=readNativeWindow();
   await writeFile(path.join(output,evidence+'-native.xml'),xml);
   await device.screenshot({path:path.join(output,evidence+'-device.png')});
-  const point=chromeButtonPoint(xml,name);
   await writeFile(path.join(output,evidence+'-input.json'),JSON.stringify({
-    name,point,input:'Android adb input tap at fresh native accessibility bounds',
+    name,input:'Android adb input tap at fresh native accessibility bounds',
     dom:await button.evaluate(el=>({rect:el.getBoundingClientRect().toJSON(),
       active:document.activeElement?.tagName,viewport:{width:innerWidth,height:innerHeight,
         visual:visualViewport?{height:visualViewport.height,offsetTop:visualViewport.offsetTop,scale:visualViewport.scale}:null}})),
@@ -65,6 +70,8 @@ const nativeButtonTap=async(name:string,evidence:string)=>{
       elements.map(el=>({tag:el.tagName,label:el.closest('label')?.textContent?.trim(),
         value:(el as HTMLInputElement).value,checked:(el as HTMLInputElement).checked}))),
   },null,2));
+  const point=chromeButtonPoint(xml,name);
+  await writeFile(path.join(output,evidence+'-tap-point.json'),JSON.stringify(point,null,2));
   // run14 had a visible enabled footer but CDP touch produced no creation
   // request. Exercise the actual OS input using freshly observed bounds;
   // never invoke the handler, fabricate coordinates or ignore a failed POST.
@@ -73,7 +80,7 @@ const nativeButtonTap=async(name:string,evidence:string)=>{
 const observe=(target:Page)=>{
   target.setDefaultTimeout(20000);
   target.on('pageerror',e=>runtimeErrors.push(e.message));
-  target.on('close',()=>browserLifecycle.push({at:new Date().toISOString(),event:'page-close',url:target.url(),expected:explicitlyClosing}));
+  target.on('close',()=>browserLifecycle.push({at:new Date().toISOString(),event:'page-close',url:target.url(),expected:intentionalClosures.has(target.context())}));
   target.on('crash',()=>runtimeErrors.push('Android Chrome page crashed: '+target.url()));
   target.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
   target.on('response',response=>{
@@ -100,7 +107,8 @@ const launch=async()=>{
   }
   await page.bringToFront();
   assert.equal(context.pages().length,1,'Exactly one browser tab in this isolated scenario');
-  context.on('close',()=>browserLifecycle.push({at:new Date().toISOString(),event:'context-close',expected:explicitlyClosing}));
+  const launched=context;
+  context.on('close',()=>browserLifecycle.push({at:new Date().toISOString(),event:'context-close',expected:intentionalClosures.has(launched)}));
 };
 const login=async(user:string)=>{
   // Presentation preferences only: the real form obtains every session.
@@ -166,6 +174,16 @@ const check=async(name:string,task:()=>Promise<void>)=>{
   catch(e){const error=e instanceof Error?e.message:String(e);results.push({name,status:'FAIL',error});
     console.error('FAIL Android '+name+': '+error);
     await page?.screenshot({path:path.join(output,name+'-FAIL.png'),timeout:5000}).catch(()=>{});
+    // Retain OS evidence even when CDP has already disconnected. Do not turn
+    // a browser crash into a passing check or reset its recorded failure.
+    for(const [suffix,args]of [
+      ['chrome-exits.txt',['shell','dumpsys','activity','exit-info','com.android.chrome']],
+      ['chrome-memory.txt',['shell','dumpsys','meminfo','com.android.chrome']],
+      ['device.png',['exec-out','screencap','-p']],
+    ]as const){
+      try{await writeFile(path.join(output,name+'-FAIL-'+suffix),execFileSync('adb',[...args],{timeout:5000}));}
+      catch(capture){await writeFile(path.join(output,name+'-FAIL-'+suffix+'.error.txt'),String(capture));}
+    }
   }
   await saveResults();
 };
@@ -295,6 +313,10 @@ try{
     // A separate person's trip is an independent Chrome lifecycle. Always
     // restart here, not conditionally to conceal a failed inspector check.
     await closeContext();await launch();
+    await page.goto('http://127.0.0.1:4177/app/dashboard');
+    const email=page.getByLabel('Correo electrónico o CUIT');
+    await expect.poll(async()=>await email.isVisible()||await page.getByRole('banner').isVisible()).toBe(true);
+    if(!await email.isVisible())await logout();
     await login('transportista');
     page.on('response',response=>{
       if(response.url().endsWith('/manifiestos/'+fixture.deviceManifest.id+'/ubicacion')&&response.request().method()==='POST'){

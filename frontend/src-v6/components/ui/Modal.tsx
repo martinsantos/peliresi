@@ -4,7 +4,7 @@
  * Modal/dialog con animaciones y backdrop
  */
 
-import React, { useEffect, useRef, useId, useContext, createContext } from 'react';
+import React, { useEffect, useLayoutEffect, useState, useRef, useId, useContext, createContext } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
@@ -24,6 +24,7 @@ function cn(...inputs: ClassValue[]) {
 // TYPES
 // ========================================
 type ModalSize = 'sm' | 'base' | 'lg' | 'xl' | 'full';
+type VisibleViewport = { width: number; height: number; top: number; left: number };
 
 interface ModalProps {
   isOpen: boolean;
@@ -70,8 +71,29 @@ export const Modal: React.FC<ModalProps> = ({
   const depth = useContext(ModalDepth);
   const titleId = useId();
   const descriptionId = useId();
+  const [viewport, setViewport] = useState<VisibleViewport | null>(null);
   const settings = useRef({ onClose, closeOnEscape, isBusy });
   useEffect(() => { settings.current = { onClose, closeOnEscape, isBusy }; }, [onClose, closeOnEscape, isBusy]);
+
+  // The Android keyboard shrinks visualViewport, not necessarily CSS dvh.
+  // Keep header/actions within the touchable area; only the form body scrolls.
+  useLayoutEffect(() => {
+    const visible = window.visualViewport;
+    if (!isOpen || !visible) return;
+    const measure = () => {
+      const next = { width: visible.width, height: visible.height, top: visible.offsetTop, left: visible.offsetLeft };
+      if (!Object.values(next).every(Number.isFinite) || next.width <= 0 || next.height <= 0) return;
+      setViewport(previous => previous && Object.keys(next).every(key =>
+        previous[key as keyof VisibleViewport] === next[key as keyof VisibleViewport]) ? previous : next);
+    };
+    measure();
+    visible.addEventListener('resize', measure, { passive: true });
+    visible.addEventListener('scroll', measure, { passive: true });
+    return () => {
+      visible.removeEventListener('resize', measure);
+      visible.removeEventListener('scroll', measure);
+    };
+  }, [isOpen]);
 
   // Focus trap: Tab cycles within the modal
   useEffect(() => {
@@ -128,7 +150,10 @@ export const Modal: React.FC<ModalProps> = ({
   if (!isOpen) return null;
 
   const modalContent = (
-    <div className="fixed inset-0 flex items-center justify-center p-3 sm:p-4" style={{ zIndex: 120 + depth * 10 }}>
+    <div className="fixed inset-0 flex items-center justify-center p-3 sm:p-4" style={{
+      zIndex: 120 + depth * 10,
+      ...(viewport && { top: viewport.top, left: viewport.left, width: viewport.width, height: viewport.height, right: 'auto', bottom: 'auto' }),
+    }}>
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in motion-reduce:animate-none"
@@ -144,6 +169,7 @@ export const Modal: React.FC<ModalProps> = ({
           'animate-scale-in motion-reduce:animate-none',
           sizeStyles[size]
         )}
+        style={viewport ? { maxHeight: `min(94dvh, ${Math.max(0, viewport.height - 32)}px)` } : undefined}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
