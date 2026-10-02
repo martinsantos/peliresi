@@ -8,7 +8,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, AlertTriangle, Info, AlertCircle, CheckCircle2, X, MapPin } from 'lucide-react';
+import { Bell, AlertTriangle, Info, AlertCircle, CheckCircle2, X, MapPin, ClipboardCheck } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { notificacionService } from '../services/notificacion.service';
 import { getAccessToken } from '../services/api';
@@ -43,7 +43,10 @@ function getNotificationType(notif: Notificacion): NotificationType {
   }
 }
 
-function getTypeIcon(type: NotificationType) {
+function getTypeIcon(type: NotificationType, notice: Notificacion) {
+  if (type === 'info' && resolveNotificationPath(notice).includes('/inspecciones/')) {
+    return <ClipboardCheck size={16} className="text-primary-700 shrink-0" />;
+  }
   switch (type) {
     case 'error':
       return <AlertCircle size={16} className="text-error-500 shrink-0" />;
@@ -117,7 +120,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
 
   const items: Notificacion[] = data?.items ?? [];
   // noLeidas viene en data.noLeidas via service; fallback a contar items no leídos
-  const unreadCount = Math.min(data?.noLeidas ?? items.filter(i => !i.leida).length, 99);
+  const unreadCount = data?.noLeidas ?? items.filter(i => !i.leida).length;
 
   // Close on outside click
   useEffect(() => {
@@ -236,7 +239,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
                     >
                       <div className="flex gap-3">
                         <div className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${getTypeBg(type)}`}>
-                          {getTypeIcon(type)}
+                          {getTypeIcon(type, notif)}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
@@ -279,7 +282,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
           <div className="border-t border-neutral-100 p-2">
             <button
               onClick={handleViewAll}
-              className="w-full py-2 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-xl transition-colors"
+              className="min-h-11 w-full py-2 text-sm font-semibold text-primary-800 hover:bg-primary-50 rounded-xl transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
             >
               Ver todas las notificaciones
             </button>

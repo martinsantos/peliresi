@@ -8,16 +8,17 @@ import type { NotificacionFilters, PaginatedData } from '../types/api';
 
 export const notificacionService = {
   async list(filters?: NotificacionFilters): Promise<PaginatedData<Notificacion> & { noLeidas: number }> {
-    const { data } = await api.get('/notificaciones', { params: filters });
+    const { page = 1, limit = 20, ...rest } = filters ?? {};
+    const { data } = await api.get('/notificaciones', { params: { ...rest, limit, offset: (page - 1) * limit } });
     const raw = data.data;
     const noLeidas = raw.noLeidas ?? 0;
     return {
       items: raw.notificaciones || [],
       total: raw.total ?? raw.notificaciones?.length ?? 0,
       noLeidas,
-      page: 1,
-      limit: filters?.limit ?? 100,
-      totalPages: 1,
+      page: raw.pagina ?? page,
+      limit,
+      totalPages: raw.totalPaginas ?? Math.ceil((raw.total ?? raw.notificaciones?.length ?? 0) / limit),
     };
   },
 
@@ -34,11 +35,7 @@ export const notificacionService = {
   },
 
   async getNoLeidas(): Promise<number> {
-    try {
-      const { data } = await api.get('/notificaciones');
-      return data.data?.noLeidas || 0;
-    } catch {
-      return 0;
-    }
+    const { data } = await api.get('/notificaciones', { params: { limit: 1 } });
+    return data.data?.noLeidas ?? 0;
   },
 };

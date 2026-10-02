@@ -1,260 +1,177 @@
 /**
- * SITREP v6 - Notificaciones Page
- * ================================
- * Centro de notificaciones del usuario
+ * SITREP v6 - Centro de notificaciones del usuario.
+ * Una bandeja paginada; los estados y contadores provienen de la API.
  */
-
-import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import {
-  Bell,
-  Check,
-  CheckCheck,
-  Trash2,
-  FileText,
-  AlertTriangle,
-  Info,
-  CheckCircle2,
-  ArrowLeft,
-  Loader2,
-  ChevronRight,
-} from 'lucide-react';
-import { Card } from '../../components/ui/CardV2';
+import React, { useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Bell, Check, CheckCheck, Trash2, FileText, Info, ClipboardCheck, ArrowLeft, ChevronRight, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { useNotificaciones, useMarcarLeida, useMarcarTodasLeidas, useEliminarNotificacion } from '../../hooks/useNotificaciones';
 import { formatRelativeTime } from '../../utils/formatters';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { resolveNotificationPath } from '../../utils/notificationNavigation';
+import type { Notificacion } from '../../types/models';
 
-const getIconByType = (tipo: string) => {
-  switch (tipo) {
-    case 'success':
-      return <CheckCircle2 className="text-success-500" size={20} />;
-    case 'warning':
-      return <AlertTriangle className="text-warning-500" size={20} />;
-    case 'info':
-    default:
-      return <Info className="text-info-500" size={20} />;
-  }
-};
-
-const getBgByType = (tipo: string) => {
-  switch (tipo) {
-    case 'success':
-      return 'bg-success-50';
-    case 'warning':
-      return 'bg-warning-50';
-    case 'info':
-    default:
-      return 'bg-info-50';
-  }
-};
-
+const PAGE_SIZE = 20;
+const focus = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700';
 
 const NotificacionesPage: React.FC = () => {
   const navigate = useNavigate();
   const mp = useMobilePrefix();
-  const [filtro, setFiltro] = useState<'todas' | 'no-leidas'>('todas');
+  const [params, setParams] = useSearchParams();
+  const unreadOnly = params.get('avisos') === 'sin-leer';
+  const rawPage = Number(params.get('pagina') || 1);
+  const page = Number.isSafeInteger(rawPage) && rawPage > 0 ? rawPage : 1;
+  const { data, isPending, isError, isSuccess, refetch } = useNotificaciones({
+    page, limit: PAGE_SIZE, leida: unreadOnly ? false : undefined,
+  });
+  const mark = useMarcarLeida();
+  const markAll = useMarcarTodasLeidas();
+  const remove = useEliminarNotificacion();
+  const items = data?.items ?? [];
+  const mutationPending = mark.isPending || markAll.isPending || remove.isPending;
+  const mutationFailed = mark.isError || markAll.isError || remove.isError;
+  const lastPage = Math.max(1, data?.totalPages ?? 1);
 
-  // Real API hooks
-  const { data: apiData, isLoading } = useNotificaciones({ leida: filtro === 'no-leidas' ? false : undefined });
-  const marcarLeidaMutation = useMarcarLeida();
-  const marcarTodasMutation = useMarcarTodasLeidas();
-  const eliminarMutation = useEliminarNotificacion();
-
-  const notificaciones = useMemo(() => {
-    const items = apiData?.items || [];
-    return items.map((n: any) => ({
-      id: n.id,
-      tipo: n.tipo?.includes('RECHAZ') || n.tipo?.includes('INCIDENTE') ? 'warning' :
-            n.tipo?.includes('TRATADO') || n.tipo?.includes('RECIBIDO') ? 'success' : 'info',
-      titulo: n.titulo,
-      mensaje: n.mensaje,
-      fecha: new Date(n.createdAt),
-      leida: n.leida,
-      prioridad: n.prioridad,
-      raw: n,
-    }));
-  }, [apiData]);
-
-  const notificacionesFiltradas = notificaciones;
-
-  const marcarLeida = (id: number | string) => {
-    marcarLeidaMutation.mutate(String(id));
+  const changePage = (value: number, replace = false) => {
+    setParams(previous => {
+      const next = new URLSearchParams(previous);
+      if (value === 1) next.delete('pagina'); else next.set('pagina', String(value));
+      return next;
+    }, { replace, preventScrollReset: true });
   };
 
-  const marcarTodasLeidas = () => {
-    marcarTodasMutation.mutate();
+  // Reading/deleting the last notice on a filtered page may shrink the result.
+  // Return to its real last page instead of presenting a false empty inbox.
+  useEffect(() => {
+    if (isSuccess && page > lastPage) {
+      setParams(previous => {
+        const next = new URLSearchParams(previous);
+        if (lastPage === 1) next.delete('pagina'); else next.set('pagina', String(lastPage));
+        return next;
+      }, { replace: true, preventScrollReset: true });
+    }
+  }, [isSuccess, page, lastPage, setParams]);
+
+  const changeFilter = (unread: boolean) => {
+    setParams(previous => {
+      const next = new URLSearchParams(previous);
+      next.delete('pagina');
+      if (unread) next.set('avisos', 'sin-leer'); else next.delete('avisos');
+      return next;
+    }, { preventScrollReset: true });
   };
-
-  const eliminarNotificacion = (id: number | string) => {
-    eliminarMutation.mutate(String(id));
+  const resetMutationErrors = () => { mark.reset(); markAll.reset(); remove.reset(); };
+  const open = (notice: Notificacion) => {
+    resetMutationErrors();
+    if (!notice.leida) mark.mutate(notice.id);
+    // Opening the expediente must not depend on a successful acknowledgement.
+    navigate(resolveNotificationPath(notice, mp('')));
   };
-
-  const abrirNotificacion = (notif: typeof notificaciones[number]) => {
-    if (!notif.leida) marcarLeida(String(notif.id));
-    navigate(resolveNotificationPath(notif.raw, mp('')));
-  };
-
-  const noLeidasCount = notificaciones.filter(n => !n.leida).length;
-
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          {isMobile && (
-            <button 
-              onClick={() => navigate(-1)}
-              className="p-2 hover:bg-neutral-100 rounded-lg"
-            >
-              <ArrowLeft size={20} />
-            </button>
-          )}
-          <div>
-            <h2 className="text-2xl font-bold text-neutral-900">Notificaciones</h2>
-            <p className="text-neutral-600 mt-1">
-              Centro de notificaciones del sistema
-            </p>
-          </div>
+    <div className="space-y-4" data-testid="notification-inbox">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-2">
+          <button type="button" aria-label="Volver" onClick={() => navigate(-1)}
+            className={'flex min-h-11 min-w-11 items-center justify-center rounded-lg text-neutral-700 hover:bg-neutral-100 md:hidden ' + focus}>
+            <ArrowLeft size={20} aria-hidden="true" />
+          </button>
+          <h2 className="text-2xl font-bold text-neutral-900">Notificaciones</h2>
         </div>
-        <div className="flex gap-2">
-          {noLeidasCount > 0 && (
-            <Button 
-              variant="outline" 
-              leftIcon={<CheckCheck size={18} />}
-              onClick={marcarTodasLeidas}
-            >
-              Marcar todas leídas
-            </Button>
-          )}
-        </div>
-      </div>
+        {data && data.noLeidas > 0 && (
+          <Button variant="outline" leftIcon={<CheckCheck size={18} />} isLoading={markAll.isPending}
+            disabled={mutationPending} onClick={() => { resetMutationErrors(); markAll.mutate(); }}>
+            Marcar todas leídas
+          </Button>
+        )}
+      </header>
 
-      {/* Filters */}
-      <div className="flex gap-2 border-b border-neutral-200">
-        <button
-          onClick={() => setFiltro('todas')}
-          className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-            filtro === 'todas' 
-              ? 'border-primary-500 text-primary-600' 
-              : 'border-transparent text-neutral-600 hover:text-neutral-900'
-          }`}
-        >
+      <nav aria-label="Filtrar avisos" className="flex gap-2 border-b border-neutral-200">
+        <button type="button" aria-pressed={!unreadOnly} onClick={() => changeFilter(false)}
+          className={'min-h-11 border-b-2 px-3 py-3 text-sm font-semibold transition-colors ' + focus + (!unreadOnly ? ' border-primary-700 text-primary-800' : ' border-transparent text-neutral-700 hover:bg-neutral-50')}>
           Todas
-          <Badge variant="soft" color="neutral" className="ml-2">
-            {notificaciones.length}
-          </Badge>
         </button>
-        <button
-          onClick={() => setFiltro('no-leidas')}
-          className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-            filtro === 'no-leidas' 
-              ? 'border-primary-500 text-primary-600' 
-              : 'border-transparent text-neutral-600 hover:text-neutral-900'
-          }`}
-        >
-          No leídas
-          {noLeidasCount > 0 && (
-            <Badge variant="soft" color="primary" className="ml-2">
-              {noLeidasCount}
-            </Badge>
-          )}
+        <button type="button" aria-pressed={unreadOnly} onClick={() => changeFilter(true)}
+          aria-label={'No leídas' + (data ? ' (' + data.noLeidas + ')' : '')}
+          className={'min-h-11 border-b-2 px-3 py-3 text-sm font-semibold transition-colors ' + focus + (unreadOnly ? ' border-primary-700 text-primary-800' : ' border-transparent text-neutral-700 hover:bg-neutral-50')}>
+          No leídas {data && <span className="ml-2 rounded-full bg-neutral-100 px-2 py-0.5 text-neutral-800">{data.noLeidas}</span>}
         </button>
-      </div>
+      </nav>
 
-      {/* Lista de notificaciones */}
-      <div className="space-y-3">
-        {notificacionesFiltradas.length === 0 ? (
-          <Card className="py-16">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Bell className="text-neutral-400" size={24} />
-              </div>
-              <h3 className="text-lg font-medium text-neutral-900 mb-1">
-                No hay notificaciones
-              </h3>
-              <p className="text-neutral-600">
-                {filtro === 'no-leidas' 
-                  ? 'Todas las notificaciones han sido leídas'
-                  : 'No tienes notificaciones en este momento'
-                }
-              </p>
-            </div>
-          </Card>
-        ) : (
-          notificacionesFiltradas.map((notif) => (
-            <Card 
-              key={notif.id}
-              className={`transition-all ${!notif.leida ? 'border-primary-200 bg-primary-50/30' : ''}`}
-            >
-              <div className="flex items-start gap-4 p-4">
-                {/* Icon */}
-                <div className={`w-10 h-10 ${getBgByType(notif.tipo)} rounded-full flex items-center justify-center flex-shrink-0`}>
-                  {getIconByType(notif.tipo)}
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h4 className={`font-medium ${!notif.leida ? 'text-neutral-900' : 'text-neutral-700'}`}>
-                        {notif.titulo}
-                        {!notif.leida && (
-                          <span className="ml-2 inline-block w-2 h-2 bg-primary-500 rounded-full" />
-                        )}
-                      </h4>
-                      {notif.prioridad === 'ALTA' || notif.prioridad === 'URGENTE' ? (
-                        <Badge variant="soft" color="error" className="mt-1">
-                          {notif.prioridad === 'URGENTE' ? 'Urgente' : 'Prioridad alta'}
-                        </Badge>
-                      ) : null}
-                      <p className="text-sm text-neutral-600 mt-1">
-                        {notif.mensaje}
-                      </p>
-                      <span className="text-xs text-neutral-500 mt-2 block">
-                        {formatRelativeTime(notif.fecha instanceof Date ? notif.fecha.toISOString() : notif.fecha)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => abrirNotificacion(notif)}
-                    className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-primary-700 hover:bg-primary-50"
-                    title="Abrir el caso relacionado"
-                  >
-                    Abrir <ChevronRight size={16} />
-                  </button>
-                  {!notif.leida && (
-                    <button
-                      onClick={() => marcarLeida(notif.id)}
-                      className="p-2 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-                      title="Marcar como leída"
-                    >
-                      <Check size={18} />
+      {isError && (
+        <div role="alert" className="rounded-lg border border-error-200 bg-error-50 p-4 text-sm text-error-800">
+          No se pudieron cargar los avisos.{items.length > 0 && ' Se muestran los últimos disponibles.'}
+          <Button variant="outline" className="mt-3" onClick={() => void refetch()}>Reintentar</Button>
+        </div>
+      )}
+      {mutationFailed && (
+        <p role="alert" className="rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-800">
+          No se pudo guardar el cambio. El aviso sigue disponible; podés reintentar.
+        </p>
+      )}
+      {isPending ? (
+        <p role="status" className="py-8 text-neutral-700">Cargando avisos…</p>
+      ) : isSuccess && items.length === 0 && page <= lastPage ? (
+        <div className="rounded-xl border border-neutral-200 bg-white px-4 py-10 text-center">
+          <Bell size={28} aria-hidden="true" className="mx-auto mb-3 text-neutral-600" />
+          <h3 className="font-semibold text-neutral-900">No hay notificaciones</h3>
+          <p className="mt-1 text-sm text-neutral-700">{unreadOnly ? 'Todas las notificaciones han sido leídas.' : 'Todavía no recibiste avisos.'}</p>
+        </div>
+      ) : items.length > 0 ? (
+        <ul aria-label="Avisos" className="divide-y divide-neutral-200 overflow-hidden rounded-xl border border-neutral-200 bg-white">
+          {items.map(notice => {
+            const path = resolveNotificationPath(notice, mp(''));
+            const warning = /RECHAZ|INCIDENTE|ANOMALIA|VENCIMIENTO|ALERTA/.test(notice.tipo);
+            const success = /TRATADO|RECIBIDO/.test(notice.tipo);
+            const Icon = warning ? AlertTriangle : path.includes('/inspecciones/') ? ClipboardCheck : success ? CheckCircle2 : notice.manifiestoId ? FileText : Info;
+            return (
+              <li key={notice.id} className={notice.leida ? '' : 'bg-primary-50/40'}>
+                <button type="button" aria-label={'Abrir aviso: ' + notice.titulo} onClick={() => open(notice)}
+                  className={'flex w-full items-start gap-3 p-4 text-left text-neutral-900 transition-colors hover:bg-primary-50 active:bg-primary-100 focus-visible:outline-offset-[-2px] ' + focus}>
+                  <Icon size={20} aria-hidden="true" className={'mt-1 shrink-0 ' + (warning ? 'text-warning-800' : 'text-primary-800')} />
+                  <span className="min-w-0 flex-1">
+                    <span className={'block break-words text-base leading-snug ' + (notice.leida ? 'font-medium' : 'font-semibold')}>{notice.titulo}</span>
+                    {!notice.leida && <span className="mt-1 block text-xs font-semibold text-primary-800">Sin leer</span>}
+                    {(notice.prioridad === 'ALTA' || notice.prioridad === 'URGENTE') && (
+                      <Badge variant="soft" color="error" className="mt-1">{notice.prioridad === 'URGENTE' ? 'Urgente' : 'Prioridad alta'}</Badge>
+                    )}
+                    <span className="mt-2 block break-words text-sm leading-relaxed text-neutral-700">{notice.mensaje}</span>
+                    <time dateTime={notice.createdAt} className="mt-2 block text-xs text-neutral-600">{formatRelativeTime(notice.createdAt)}</time>
+                  </span>
+                  <ChevronRight size={18} aria-hidden="true" className="mt-1 shrink-0 text-neutral-600" />
+                </button>
+                <div className="flex flex-wrap justify-end gap-2 px-4 pb-3">
+                  {!notice.leida && (
+                    <button type="button" aria-label={'Marcar como leída: ' + notice.titulo} disabled={mutationPending}
+                      onClick={() => { resetMutationErrors(); mark.mutate(notice.id); }}
+                      className={'inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:opacity-60 ' + focus}>
+                      <Check size={16} aria-hidden="true" />Marcar leída
                     </button>
                   )}
-                  <button
-                    onClick={() => eliminarNotificacion(notif.id)}
-                    className="p-2 text-neutral-400 hover:text-error-500 hover:bg-error-50 rounded-lg transition-colors"
-                    title="Eliminar"
-                  >
-                    <Trash2 size={18} />
+                  <button type="button" aria-label={'Eliminar aviso: ' + notice.titulo} disabled={mutationPending}
+                    onClick={() => { resetMutationErrors(); remove.mutate(notice.id); }}
+                    className={'inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-neutral-700 hover:bg-error-50 hover:text-error-800 disabled:opacity-60 ' + focus}>
+                    <Trash2 size={16} aria-hidden="true" />Eliminar
                   </button>
                 </div>
-              </div>
-            </Card>
-          ))
-        )}
-      </div>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+
+      {data && data.total > 0 && (
+        <nav aria-label="Paginación de avisos" className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-neutral-700">{data.total} avisos{unreadOnly ? ' sin leer' : ''} · Página {page} de {lastPage}</p>
+          <div className="flex gap-2">
+            <Button variant="outline" aria-label="Página anterior" disabled={page <= 1 || isPending} onClick={() => changePage(page - 1)}>Anterior</Button>
+            <Button variant="outline" aria-label="Siguiente página" disabled={page >= lastPage || isPending} onClick={() => changePage(page + 1)}>Siguiente</Button>
+          </div>
+        </nav>
+      )}
     </div>
   );
 };
-
 export default NotificacionesPage;

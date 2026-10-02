@@ -86,17 +86,16 @@ interface NavItemProps {
   label: string;
   badge?: number;
   isActive?: boolean;
-  roleColor?: string;
 }
 
-const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, isActive, roleColor = 'text-primary-600' }) => {
+const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, isActive }) => {
   return (
     <NavLink
       to={to}
       className={({ isActive: active }) => cn(
         'flex flex-1 flex-col items-center justify-center gap-1 border-t-2 py-2 px-1 min-w-0 min-h-14 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700',
         active || isActive
-          ? roleColor + ' border-current bg-neutral-50'
+          ? 'text-primary-800 border-current bg-primary-50'
           : 'border-transparent text-neutral-600 hover:bg-neutral-50'
       )}
     >
@@ -410,7 +409,6 @@ export const MobileLayout: React.FC = () => {
               icon={item.icon} 
               label={item.label}
               badge={item.badge}
-              roleColor={config.color}
             />
           ))}
         </div>

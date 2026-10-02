@@ -248,6 +248,7 @@ function App() {
 
             {/* Alertas */}
             <Route path="/alertas" element={<AlertasPage />} />
+            <Route path="/notificaciones" element={<NotificacionesPage />} />
 
             {/* Configuración */}
             <Route path="/configuracion" element={<ConfiguracionPage />} />

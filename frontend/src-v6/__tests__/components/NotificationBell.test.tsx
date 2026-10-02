@@ -61,4 +61,10 @@ describe('assignment notification delivery', () => {
     await waitFor(() => expect(service.list.mock.calls.length).toBeGreaterThan(calls));
     expect(await screen.findByRole('button', { name: 'Notificaciones', exact: true })).toBeVisible();
   });
+
+  it('keeps the true unread count in its accessible label above 99', async () => {
+    service.list.mockResolvedValue({ items: [notice], noLeidas: 140 });
+    setup();
+    expect(await screen.findByRole('button', { name: 'Notificaciones (140 sin leer)', exact: true })).toBeVisible();
+  });
 });

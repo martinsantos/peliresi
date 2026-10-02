@@ -87,6 +87,7 @@ function renderMobileLayout(initialPath = '/dashboard') {
       <Routes>
         <Route path="/" element={<MobileLayout />}>
           <Route path="dashboard" element={<div data-testid="dashboard-content">Dashboard</div>} />
+          <Route path="notificaciones" element={<div>Bandeja de avisos</div>} />
           <Route path="transporte/viaje/:id" element={<div data-testid="trip-content">Trip</div>} />
           <Route path="admin/actores/generadores/:id" element={<div>Ficha del generador</div>} />
         </Route>
@@ -108,6 +109,15 @@ describe('MobileLayout Android shell', () => {
 
     expect(screen.getByText('Viajes')).toBeInTheDocument();
     expect(screen.queryByText('Mis Viajes')).not.toBeInTheDocument();
+  });
+
+  it.each(['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'])('keeps active navigation green for %s without changing the role', role => {
+    authState.currentUser = { ...authState.currentUser, rol: role };
+    renderMobileLayout('/notificaciones');
+    const noticeLink = screen.getByRole('link', { name: 'Avisos', exact: true });
+    expect(noticeLink).toHaveAttribute('aria-current', 'page');
+    expect(noticeLink).toHaveClass('text-primary-800', 'bg-primary-50', 'border-current');
+    expect(screen.getByRole('banner')).toHaveTextContent(role === 'GENERADOR' ? 'Generador' : role === 'OPERADOR' ? 'Operador' : 'Transportista');
   });
 
   it('keeps menu destinations at least 44px with visible keyboard focus', () => {
