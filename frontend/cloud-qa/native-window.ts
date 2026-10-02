@@ -24,6 +24,21 @@ export function chromeButtonPoint(xml: string, text: string): { x: number; y: nu
   assert.ok(right > left && bottom > top, 'Never tap a zero-area or inverted native node');
   return { x: Math.floor((left + right) / 2), y: Math.floor((top + bottom) / 2) };
 }
+const PIXEL_LAUNCHER_ANR = "Pixel Launcher isn't responding";
+export function pixelLauncherAnrClosePoint(xml: string): { x: number; y: number } | null {
+  const nodes = nativeNodes(xml);
+  const titles = nodes.filter(node => node.package === 'android' && node['resource-id'] === 'android:id/alertTitle');
+  if (!titles.some(node => node.text === PIXEL_LAUNCHER_ANR)) return null;
+  assert.equal(titles.length, 1, 'Never dismiss an ambiguous Android error dialog');
+  const buttons = nodes.filter(node => node.package === 'android' && node['resource-id'] === 'android:id/aerr_close'
+    && node.text === 'Close app' && node.enabled === 'true' && node.clickable === 'true');
+  assert.equal(buttons.length, 1, 'Pixel Launcher recovery requires one observed system Close app button');
+  const bounds = buttons[0].bounds?.match(/^\[(\d+),(\d+)\]\[(\d+),(\d+)\]$/);
+  assert.ok(bounds, 'Native ANR bounds must be present, never guessed');
+  const [left, top, right, bottom] = bounds.slice(1).map(Number);
+  assert.ok(right > left && bottom > top, 'Never tap zero-area or inverted ANR bounds');
+  return { x: Math.floor((left + right) / 2), y: Math.floor((top + bottom) / 2) };
+}
 export function readNativeWindow(): string {
   assertCloudEnvironment();
   const file = '/data/local/tmp/sitrep-cloud-qa-window.xml';
@@ -43,6 +58,16 @@ export async function dismissObservedChromePrompts(output: string): Promise<void
   // teardown. ADB taps use bounds from fresh OS evidence, not guessed coordinates.
   let xml = readNativeWindow();
   await writeFile(path.join(output, 'native-window-latest.xml'), xml);
+  const launcherClose = pixelLauncherAnrClosePoint(xml);
+  if (launcherClose) {
+    await writeFile(path.join(output, 'native-Pixel-Launcher-ANR-before.xml'), xml);
+    execFileSync('adb', ['shell', 'input', 'tap', String(launcherClose.x), String(launcherClose.y)], { timeout: 5000 });
+    xml = readNativeWindow();
+    await writeFile(path.join(output, 'native-Pixel-Launcher-ANR-after.xml'), xml);
+    assert.ok(!nativeNodes(xml).some(node => node.package === 'android' && node.text === PIXEL_LAUNCHER_ANR),
+      'Observed Pixel Launcher ANR must actually disappear after Close app');
+    console.log('Recovered observed emulator Pixel Launcher ANR; application ANRs are never dismissed');
+  }
   for (const [title, button] of [['Chrome notifications make things easier', 'No thanks'], ['Running in Chrome', 'Got it']]) {
     if (!nativeNodes(xml).some(node => node.package === 'com.android.chrome' && node.text === title)) continue;
     await writeFile(path.join(output, 'native-' + button.replaceAll(' ', '-') + '-before.xml'), xml);

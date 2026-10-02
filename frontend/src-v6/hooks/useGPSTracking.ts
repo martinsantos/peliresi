@@ -14,6 +14,9 @@ import { toast } from '../components/ui/Toast';
 import { manifiestoService } from '../services/manifiesto.service';
 import { EstadoManifiesto } from '../types/models';
 
+// Bound the rendered route independently from the persisted upload queue.
+const MAX_LOCAL_TRACK_POINTS = 500;
+
 export type GpsStatus = 'checking' | 'acquiring' | 'active' | 'denied' | 'unavailable' | 'error';
 
 export interface GpsDetails {
@@ -62,9 +65,10 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
 
   const watchIdRef = useRef<number | null>(null);
   const sendIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const acquisitionRetryIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const trackingGenerationRef = useRef(0);
   const pendingUpdatesRef = useRef<PendingGpsPoint[]>([]);
   const lastGpsSearchToastAtRef = useRef(0);
-  const fallbackPositionInFlightRef = useRef(false);
   // Use refs for current position/details inside the interval callback
   // to avoid stale closures
   const currentPositionRef = useRef<[number, number] | null>(null);
@@ -90,6 +94,8 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
 
   // Robust cleanup function — clears watcher + flushes pending to localStorage
   const cleanupGps = useCallback(() => {
+    // getCurrentPosition cannot be cancelled; invalidate its pending callbacks.
+    trackingGenerationRef.current++;
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
@@ -97,6 +103,10 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
     if (sendIntervalRef.current) {
       clearInterval(sendIntervalRef.current);
       sendIntervalRef.current = null;
+    }
+    if (acquisitionRetryIntervalRef.current) {
+      clearInterval(acquisitionRetryIntervalRef.current);
+      acquisitionRetryIntervalRef.current = null;
     }
     // Flush pending to localStorage on cleanup so they survive PWA close
     if (id && pendingUpdatesRef.current.length > 0) {
@@ -171,9 +181,6 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
     };
   }, [id, setPendingUpdates]);
 
-  // Default center (Mendoza, Argentina)
-  const defaultCenter: [number, number] = [-32.9287, -68.8535];
-
   // Start GPS tracking when EN_TRANSITO and ACTIVO
   useEffect(() => {
     if (estado !== EstadoManifiesto.EN_TRANSITO || viajeStatus === 'PAUSADO') return;
@@ -182,28 +189,36 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
       return;
     }
 
+    const generation = ++trackingGenerationRef.current;
+    const isActive = () => trackingGenerationRef.current === generation;
+    let fallbackPositionInFlight = false;
+    let permissionDenied = false;
     setGpsStatus('acquiring');
 
     const applyPosition = (pos: GeolocationPosition) => {
+      if (!isActive() || permissionDenied) return;
       const { latitude, longitude, accuracy, speed, heading, altitude } = pos.coords;
       const point: [number, number] = [latitude, longitude];
       setCurrentPosition(point);
-      setTrackPoints(prev => [...prev, point]);
+      setTrackPoints(prev => [...prev, point].slice(-MAX_LOCAL_TRACK_POINTS));
       setGpsDetails({ accuracy, speed, heading, altitude, lastUpdate: new Date() });
       setGpsStatus('active');
     };
 
     const requestCoarseFallback = () => {
-      if (fallbackPositionInFlightRef.current) return;
-      fallbackPositionInFlightRef.current = true;
+      if (!isActive() || permissionDenied || fallbackPositionInFlight) return;
+      fallbackPositionInFlight = true;
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          fallbackPositionInFlightRef.current = false;
+          if (!isActive()) return;
+          fallbackPositionInFlight = false;
           applyPosition(pos);
         },
-        () => {
-          fallbackPositionInFlightRef.current = false;
-          setGpsStatus('acquiring');
+        (err) => {
+          if (!isActive()) return;
+          fallbackPositionInFlight = false;
+          if (err.code === 1) permissionDenied = true;
+          setGpsStatus(permissionDenied ? 'denied' : 'acquiring');
         },
         { enableHighAccuracy: false, maximumAge: 300000, timeout: 10000 },
       );
@@ -218,9 +233,15 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
     };
 
     watchIdRef.current = navigator.geolocation.watchPosition(
-      applyPosition,
+      (pos) => {
+        if (!isActive()) return;
+        permissionDenied = false;
+        applyPosition(pos);
+      },
       (err) => {
+        if (!isActive()) return;
         if (err.code === 1) {
+          permissionDenied = true;
           setGpsStatus('denied');
           toast.error('Permiso de ubicación denegado. Activa GPS en Ajustes.');
         } else if (err.code === 2) {
@@ -235,18 +256,18 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
           setGpsStatus('error');
           toast.error('Tiempo de espera GPS agotado. Reintentando...');
         }
-        if (err.code !== 2 && err.code !== 3 && !currentPositionRef.current) setCurrentPosition(defaultCenter);
       },
       { enableHighAccuracy: true, maximumAge: 30000, timeout: 60000 }
     );
 
     requestCoarseFallback();
-    const acquisitionRetryInterval = setInterval(() => {
+    acquisitionRetryIntervalRef.current = setInterval(() => {
       if (!currentPositionRef.current) requestCoarseFallback();
     }, 15000);
 
     // GPS send interval: every 30s
     sendIntervalRef.current = setInterval(async () => {
+      if (!isActive() || permissionDenied) return;
       const pos = currentPositionRef.current;
       const details = gpsDetailsRef.current;
       if (!pos || !id) return;
@@ -297,7 +318,6 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
-      clearInterval(acquisitionRetryInterval);
       cleanupGps();
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };

@@ -525,16 +525,16 @@ const InspeccionExpedientePage: React.FC = () => {
       const recorder = new MediaRecorder(stream);
       let interrupted = false;
       chunksRef.current = [];
-      recorder.ondataavailable = (event) => { if (event.data.size) chunksRef.current.push(event.data); };
+      recorder.ondataavailable = (event) => { if (!interrupted && event.data.size) chunksRef.current.push(event.data); };
       recorder.onerror = () => {
         interrupted = true;
         stream?.getTracks().forEach((track) => track.stop());
         recorderRef.current = null;
-        if (interrupted) return;
         setRecording(false);
         toast.error('Grabación interrumpida', 'El audio no se guardó. Volvé a grabar.');
       };
       recorder.onstop = async () => {
+        if (interrupted) return;
         stream?.getTracks().forEach((track) => track.stop());
         recorderRef.current = null;
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' });

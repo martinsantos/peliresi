@@ -372,9 +372,6 @@ export const ControlMap: React.FC<ControlMapProps> = ({
             </MapContainer>
 
             {/* Mobile legend */}
-            <div className="sm:hidden absolute bottom-20 left-3 right-3 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg z-[400]">
-              <MapLegend inspectionsOffered={layers.inspecciones !== undefined} />
-            </div>
 
             {!cc && (
               <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-[400]">
@@ -383,6 +380,9 @@ export const ControlMap: React.FC<ControlMapProps> = ({
                 </div>
               </div>
             )}
+          </div>
+          <div className="sm:hidden border-t border-neutral-200 bg-white px-3 py-3">
+            <MapLegend inspectionsOffered={layers.inspecciones !== undefined} />
           </div>
         </div>
       </Card>

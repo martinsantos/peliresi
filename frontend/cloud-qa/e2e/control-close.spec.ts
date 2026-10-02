@@ -94,6 +94,13 @@ test('control center queries real layers, refreshes and opens the exact active i
   const bounds = (await legend.boundingBox())!;
   expect(bounds.x).toBeGreaterThanOrEqual(0);
   expect(bounds.x + bounds.width).toBeLessThanOrEqual((await page.evaluate(() => innerWidth)) + 1);
+  if (page.viewportSize()!.width < 640) {
+    const mapBounds = (await page.locator('.leaflet-container').boundingBox())!;
+    // The mobile legend must follow the map rather than obscure its markers.
+    expect(bounds.y).toBeGreaterThanOrEqual(mapBounds.y + mapBounds.height - 1);
+    expect(bounds.x).toBeGreaterThanOrEqual(mapBounds.x - 1);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(mapBounds.x + mapBounds.width + 1);
+  }
   await visibleProof(page, info, 'map-legend-after');
   const layer = page.getByRole('button', { name: 'Generadores', exact: true });
   await expect(layer).toHaveAttribute('aria-pressed', 'true');

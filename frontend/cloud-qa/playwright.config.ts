@@ -9,6 +9,8 @@ export default defineConfig({
   outputDir:path.join(process.env.QA_ARTIFACTS!,'e2e'),
   reporter:[['line'],['json',{outputFile:path.join(process.env.QA_ARTIFACTS!,'e2e.json')}]],
   use:{baseURL:'http://127.0.0.1:4177',trace:'retain-on-failure',screenshot:'only-on-failure',
+    launchOptions:{args:['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream',
+      '--use-file-for-fake-video-capture='+path.join(process.env.QA_ARTIFACTS!,'qr-camera.y4m')]},
     geolocation:{latitude:-32.89,longitude:-68.84},permissions:['geolocation']},
   projects:[
     {name:'web-desktop',use:{...devices['Desktop Chrome'],viewport:{width:1440,height:900}}},

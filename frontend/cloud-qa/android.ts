@@ -2,7 +2,7 @@ import { _android as android, type BrowserContext, type Page } from 'playwright'
 import { expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { assertCloudDatabase } from './safety.ts';
 import { chromeButtonPoint, dismissObservedChromePrompts, readNativeWindow } from './native-window.ts';
@@ -10,6 +10,8 @@ import { chromeButtonPoint, dismissObservedChromePrompts, readNativeWindow } fro
 await assertCloudDatabase();
 const output=path.join(process.env.QA_ARTIFACTS!,'android');
 await mkdir(output,{recursive:true});
+const fixture=JSON.parse(await readFile(path.join(process.env.QA_ARTIFACTS!,'fixture.json'),'utf8'));
+assert.equal(fixture.database,'sitrep_night_qa_20260926');
 execFileSync('adb',['reverse','tcp:4177','tcp:4177']);
 execFileSync('adb',['shell','am','set-debug-app','--persistent','com.android.chrome']);
 execFileSync('adb',['shell','svc','power','stayon','true']);
@@ -24,9 +26,10 @@ assert.match(chrome,/versionName=/);
 let context:BrowserContext;
 let page:Page;
 const errors:string[]=[];
+const runtimeErrors:string[]=[];
 const results:Array<{name:string;status:string;error?:string}>=[];
 const saveResults=async(completed=false)=>writeFile(path.join(output,'result.json'),JSON.stringify({
-  commit:process.env.GITHUB_SHA,startedOnActualAndroid:true,completed,results,consoleErrors:errors,
+  commit:process.env.GITHUB_SHA,startedOnActualAndroid:true,completed,results,consoleErrors:errors,runtimeErrors,
   passed:results.filter(r=>r.status==='PASS').length,failed:results.filter(r=>r.status==='FAIL').length,
   limitations:['Android emulator, not a physical phone','Authenticated flow uses Chrome and the isolated QA origin, not the release APK production session','No real microphone, noise, battery or cellular-network certification'],
 },null,2));
@@ -41,7 +44,7 @@ const closeContext=async()=>{
 const settleNativeChrome=()=>dismissObservedChromePrompts(output);
 const observe=(target:Page)=>{
   target.setDefaultTimeout(20000);
-  target.on('pageerror',e=>errors.push(e.message));
+  target.on('pageerror',e=>runtimeErrors.push(e.message));
   target.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
 };
 const launch=async()=>{
@@ -84,6 +87,7 @@ const logout=async()=>{
     return {rect:rect.toJSON(),hit:hit?.outerHTML,viewport:{width:innerWidth,height:innerHeight,
       visual:visualViewport?{height:visualViewport.height,offsetTop:visualViewport.offsetTop,scale:visualViewport.scale}:null}};
   }),null,2));
+  await settleNativeChrome();
   const xml=readNativeWindow();await writeFile(path.join(output,'logout-native-before.xml'),xml);
   const point=chromeButtonPoint(xml,'Cerrar Sesión');
   execFileSync('adb',['shell','input','tap',String(point.x),String(point.y)],{timeout:5000});
@@ -220,9 +224,51 @@ try{
     await page.goto('http://127.0.0.1:4177/app/inspecciones/'+inspection.id);
     await expect(page).toHaveURL(/\/app\/login$/);await proof('logged-out');
   });
+  const gpsResponses:Array<{status:number;latitude:number;longitude:number}>=[];
+  await check('carrier-gps-sends-observed-location-to-real-api',async()=>{
+    await login('transportista');
+    page.on('response',response=>{
+      if(response.url().endsWith('/manifiestos/'+fixture.deviceManifest.id+'/ubicacion')&&response.request().method()==='POST'){
+        const body=response.request().postDataJSON();gpsResponses.push({status:response.status(),latitude:body.latitud,longitude:body.longitud});
+      }
+    });
+    await page.goto('http://127.0.0.1:4177/app/transporte/viaje/'+fixture.deviceManifest.id);
+    await expect(page.getByText('GPS activo',{exact:true}).first()).toBeVisible();
+    await expect.poll(()=>gpsResponses.length,{timeout:45000}).toBeGreaterThan(0);
+    expect(gpsResponses[0]).toEqual({status:200,latitude:-32.89,longitude:-68.84});
+    await proof('carrier-gps-online');
+  });
+  await check('gps-offline-queue-survives-and-synchronizes-after-reconnection',async()=>{
+    const key='gps_pending_'+fixture.deviceManifest.id;
+    try{
+      await context.setOffline(true);
+      await context.setGeolocation({latitude:-32.891,longitude:-68.841});
+      await expect.poll(()=>page.evaluate(k=>JSON.parse(localStorage.getItem(k)||'[]').length,key),{timeout:45000}).toBeGreaterThan(0);
+      await expect(page.getByText('Guardando local',{exact:true}).first()).toBeVisible();
+      await proof('gps-offline-protected');
+    }finally{await context.setOffline(false);}
+    await expect.poll(()=>page.evaluate(k=>localStorage.getItem(k),key),{timeout:45000}).toBeNull();
+    expect(gpsResponses.some(row=>row.status===200&&row.latitude===-32.891&&row.longitude===-68.841)).toBe(true);
+    await writeFile(path.join(output,'gps-requests.json'),JSON.stringify(gpsResponses,null,2));
+    await writeFile(path.join(output,'chrome-memory.txt'),execFileSync('adb',['shell','dumpsys','meminfo','com.android.chrome'],{encoding:'utf8',timeout:10000}));
+    await proof('gps-reconnected');
+  });
+  await check('scanner-no-camera-remains-recoverable-on-Android',async()=>{
+    await context.grantPermissions(['camera','geolocation']);
+    await page.goto('http://127.0.0.1:4177/app/escaner-qr');
+    // This emulator explicitly has camera-back/front none. Decoder success is
+    // tested separately with a synthetic optical stream in browser E2E.
+    await expect(page.getByText('No se detecto ninguna camara en este dispositivo.',{exact:true})).toBeVisible();
+    await proof('scanner-without-hardware');
+    await page.getByRole('button',{name:'Cerrar escaner',exact:true}).tap();
+    await expect(page).not.toHaveURL(/escaner-qr$/);
+  });
   await check('javascript-health',async()=>{
     assert.ok(results.some(result=>result.name==='real-os-and-admin-session'&&result.status==='PASS'), 'A real authenticated session must have run');
-    expect(errors).toEqual([]);
+    // Failed transport while deliberately offline is expected; JS exceptions
+    // are still rejected. Record all console messages in the artifact.
+    expect(errors.filter(error=>!/^Failed to load resource: net::ERR_INTERNET_DISCONNECTED/.test(error))).toEqual([]);
+    expect(runtimeErrors).toEqual([]);
   });
 }finally{
   await saveResults(true);

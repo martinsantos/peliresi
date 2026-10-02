@@ -11,6 +11,26 @@ const fixture=await seedNightDatabase();
 const {PrismaClient}=backendRequire('@prisma/client');
 const db=new PrismaClient();
 try {
+  const deviceManifest = await db.manifiesto.create({data:{
+    numero:'2026-990001', generadorId:fixture.actors.generador,
+    transportistaId:fixture.actors.transportista, operadorId:fixture.actors.operador,
+    creadoPorId:fixture.users.admin, estado:'EN_TRANSITO', isDemoData:true, modalidad:'FIJO',
+    fechaRetiro:new Date(), observaciones:'QA Android GPS y lector QR; datos completamente sintéticos',
+    residuos:{create:[{tipoResiduoId:fixture.wastes[0],cantidad:10,unidad:'kg',estado:'SOLIDO'}]},
+  }});
+  // The PDF emits this JSON shape. Only optical input is synthetic: jsQR,
+  // navigation, real login and the business API remain unmodified during E2E.
+  const payload=JSON.stringify({numero:deviceManifest.numero,id:deviceManifest.id,timestamp:new Date().toISOString()});
+  const matrix=backendRequire('qrcode').create(payload,{errorCorrectionLevel:'M'}).modules;
+  const size=320,scale=Math.floor(size/(matrix.size+8)),offset=Math.floor((size-matrix.size*scale)/2);
+  const frame=Buffer.alloc(size*size*3/2,128);frame.fill(235,0,size*size);
+  for(let y=0;y<matrix.size;y++)for(let x=0;x<matrix.size;x++)if(matrix.get(y,x)){
+    for(let dy=0;dy<scale;dy++)frame.fill(16,(offset+y*scale+dy)*size+offset+x*scale,(offset+y*scale+dy)*size+offset+(x+1)*scale);
+  }
+  await writeFile(path.join(output,'qr-camera.y4m'),Buffer.concat([
+    Buffer.from(`YUV4MPEG2 W${size} H${size} F5:1 Ip A1:1 C420\n`),
+    ...Array.from({length:5},()=>[Buffer.from('FRAME\n'),frame]).flat(),
+  ]));
   // Explicit synthetic page-two/mixed-unit data, not business responses or fake auth.
   for(let i=0;i<155;i++)await db.manifiesto.upsert({
     where:{id:'cloud-qa-report-'+i},
@@ -24,7 +44,7 @@ try {
     update:{},
   });
   await writeFile(path.join(output,'fixture.json'),JSON.stringify({
-    ...fixture,database:'sitrep_night_qa_20260926',source:process.env.GITHUB_SHA,
+    ...fixture,deviceManifest:{id:deviceManifest.id,numero:deviceManifest.numero},database:'sitrep_night_qa_20260926',source:process.env.GITHUB_SHA,
     externalDelivery:false,syntheticReportRecords:155},null,2));
 }finally{await db.$disconnect();}
 console.log('Synthetic cloud fixture ready; no production data or credentials');

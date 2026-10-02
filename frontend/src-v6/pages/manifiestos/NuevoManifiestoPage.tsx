@@ -491,6 +491,10 @@ export const NuevoManifiestoPage: React.FC = () => {
                   onClick={() => {
                     if (!validateForm(2)) return;
                     setValidationErrors(prev => { const n = {...prev}; delete n.residuos; return n; });
+                    // A previously selected transport must still support the updated residues.
+                    if (formData.transportista && !transportistasFiltrados.some((t) => t.id === formData.transportista)) {
+                      setFormData(prev => ({ ...prev, transportista: '' }));
+                    }
                     // Clear operador if no longer valid for the selected residuos
                     if (formData.operador) {
                       const curResiduoIds = formData.residuos.map(r => r.tipo).filter(Boolean);

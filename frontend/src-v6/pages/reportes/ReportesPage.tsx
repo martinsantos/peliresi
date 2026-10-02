@@ -303,8 +303,8 @@ const ReportesPage: React.FC = () => {
             {isReportTab && (
               <>
                 <Button variant="ghost" onClick={() => window.print()} className="hidden sm:flex min-w-11 px-3" aria-label="Imprimir reporte" title="Imprimir"><Printer size={18} /></Button>
-                <Button variant="outline" onClick={handleExportCSV} isLoading={exportarReporte.isPending} className="min-w-11 px-3" aria-label="Exportar CSV" title="Exportar CSV"><Download size={18} /></Button>
-                <Button onClick={handleExportPDF} disabled={!activeQuery?.data} className="min-w-11 px-3" aria-label="Exportar PDF" title="Exportar PDF"><FileDown size={18} /></Button>
+                <Button variant="outline" onClick={handleExportCSV} isLoading={exportarReporte.isPending} className="min-w-11 px-3" aria-label="Exportar CSV" title="Exportar CSV"><Download size={18} /><span>CSV</span></Button>
+                <Button onClick={handleExportPDF} disabled={!activeQuery?.data} className="min-w-11 px-3" aria-label="Exportar PDF" title="Exportar PDF"><FileDown size={18} /><span>PDF</span></Button>
               </>
             )}
           </div>

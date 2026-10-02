@@ -49,8 +49,10 @@ const openOriginal = async () => {
   // Activity launch may briefly retain a closing custom-tab target while the
   // native splash is foreground. Require the actual OS Chrome compositor, then choose a
   // live DOM target that has finished rendering the same login form.
-  await expect.poll(() => nativeNodes(readNativeWindow()).some(node =>
-    node['resource-id'] === 'com.android.chrome:id/compositor_view_holder'), { timeout: 45000 }).toBe(true);
+  await expect.poll(async () => {
+    await dismissObservedChromePrompts(output);
+    return nativeNodes(readNativeWindow()).some(node=>node['resource-id']==='com.android.chrome:id/compositor_view_holder');
+  }, { timeout: 45000 }).toBe(true);
   await expect.poll(async () => {
     const candidates = context!.pages().filter(item => !item.isClosed()
       && item.url().startsWith('https://sitrep.ultimamilla.com.ar/app/')).reverse();

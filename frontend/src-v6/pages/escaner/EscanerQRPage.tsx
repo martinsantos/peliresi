@@ -18,7 +18,8 @@ import { toast } from '../../components/ui/Toast';
 import QRScanner from '../../components/QRScanner';
 import { getCachedManifiestos } from '../../services/offline-sync';
 import { useAuth } from '../../contexts/AuthContext';
-import { parseQrPayload } from './qrParser';
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
+import { isManifiestoNumber, parseQrPayload } from './qrParser';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -30,6 +31,7 @@ import { parseQrPayload } from './qrParser';
 
 const EscanerQRPage: React.FC = () => {
   const navigate = useNavigate();
+  const mp = useMobilePrefix();
 
   // "idle"       -> scanner is open
   // "success"    -> valid manifiesto detected
@@ -77,16 +79,21 @@ const EscanerQRPage: React.FC = () => {
       const cached = await getCachedManifiestos(currentUser.id);
       const found = cached.find(m => m.numero === scanResult.value || m.id === scanResult.value);
       if (!found) {
-        toast.info('Sin conexión — Se verificará cuando haya conexión');
+        toast.info('Sin conexión — Este manifiesto no está descargado. Volvé a intentarlo al recuperar conexión.');
         // Save for later verification
         const pending = JSON.parse(localStorage.getItem('sitrep_pending_qr') || '[]');
         if (!pending.includes(scanResult.value)) pending.push(scanResult.value);
         localStorage.setItem('sitrep_pending_qr', JSON.stringify(pending));
         return;
       }
+      navigate(mp(`/manifiestos/${encodeURIComponent(found.id)}`));
+      return;
     }
 
-    navigate(`/manifiestos/${scanResult.value}`);
+    const value = encodeURIComponent(scanResult.value);
+    navigate(isManifiestoNumber(scanResult.value)
+      ? `/manifiestos/verificar/${value}`
+      : mp(`/manifiestos/${value}`));
   };
 
   // -----------------------------------------------------------
@@ -122,7 +129,7 @@ const EscanerQRPage: React.FC = () => {
               <CheckCircle2 size={40} className="text-white" />
             </div>
             <p className="text-white text-xl font-bold mb-1 break-all">{scanResult.kind === 'inspection' ? 'QR de inspección' : scanResult.value}</p>
-            <p className="text-white/60 text-sm">{scanResult.kind === 'inspection' ? 'Código reconocido. Consultá SITREP para verificarlo.' : 'Manifiesto encontrado'}</p>
+            <p className="text-white/60 text-sm">Código reconocido. Consultá SITREP para verificarlo.</p>
           </div>
         )}
 

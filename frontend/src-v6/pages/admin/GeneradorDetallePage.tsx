@@ -193,6 +193,7 @@ const GeneradorDetallePage: React.FC = () => {
   if (!generador) return null;
 
   const g = generador;
+  const categoriaLabel = generador.categoria?.replaceAll('_', ' ') || 'Sin categoría';
   const enriched = generador.cuit ? (GENERADORES_DATA[generador.cuit] || GENERADORES_DATA[generador.cuit.replace(/^(\d{2})(\d{8})(\d)$/, '$1-$2-$3')]) : null;
   const categorias = g.corrientesControl
     ? parseCorrientes(g.corrientesControl)
@@ -319,7 +320,7 @@ const GeneradorDetallePage: React.FC = () => {
                 {generador.estado === 'activo' ? <CheckCircle size={12} className="mr-1" /> : <AlertTriangle size={12} className="mr-1" />}
                 {generador.estado === 'activo' ? 'Activo' : 'Inactivo'}
               </Badge>
-              <Badge variant="outline" color="neutral" className="shrink-0">{generador.categoria}</Badge>
+              <Badge variant="outline" color="neutral" className="max-w-full whitespace-normal break-words">{categoriaLabel}</Badge>
             </div>
             <p className="text-neutral-600 mt-1 font-mono text-sm">CUIT: {generador.cuit}</p>
           </div>
@@ -328,9 +329,9 @@ const GeneradorDetallePage: React.FC = () => {
 
       {/* KPI Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="p-4">
+        <Card className="min-w-0 p-4" aria-label="Categoría del generador">
           <p className="text-xs text-neutral-500 uppercase tracking-wider">Categoria</p>
-          <p className="text-lg font-bold text-neutral-900 mt-1">{generador.categoria || '-'}</p>
+          <p className="text-base sm:text-lg font-bold text-neutral-900 mt-1 break-words">{categoriaLabel}</p>
         </Card>
         <Card className="p-4">
           <p className="text-xs text-neutral-500 uppercase tracking-wider">Corrientes Y</p>

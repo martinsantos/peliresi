@@ -18,7 +18,11 @@ test('report rows, sorting, filters, exports and real actor destinations remain 
   await expect(page.getByLabel('Hasta',{exact:true})).toBeVisible();
   const toolbar=page.getByRole('navigation',{name:'Tipos de reporte'});
   await expect(toolbar.getByRole('button',{name:'Manifiestos',exact:true})).toHaveAttribute('aria-pressed','true');
-  for(const control of [page.getByLabel('Desde',{exact:true}),page.getByLabel('Hasta',{exact:true}),page.getByRole('button',{name:'Exportar CSV',exact:true})]){
+  const csvButton=page.getByRole('button',{name:'Exportar CSV',exact:true});
+  const pdfButton=page.getByRole('button',{name:'Exportar PDF',exact:true}).first();
+  await expect(csvButton.getByText('CSV',{exact:true})).toBeVisible();
+  await expect(pdfButton.getByText('PDF',{exact:true})).toBeVisible();
+  for(const control of [page.getByLabel('Desde',{exact:true}),page.getByLabel('Hasta',{exact:true}),csvButton,pdfButton]){
     const box=(await control.boundingBox())!;expect(box.height).toBeGreaterThanOrEqual(44);
     expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(page.viewportSize()!.width);
   }

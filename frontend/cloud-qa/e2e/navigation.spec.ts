@@ -72,6 +72,22 @@ for (const category of [
     await page.screenshot({ path: info.outputPath(category.path + '-detail-menu.png'), animations: 'disabled' });
     if (info.project.name === 'app') await page.getByRole('button', { name: 'Cerrar menu', exact: true }).click();
     else if (info.project.name === 'web-responsive') await page.locator('div.fixed.inset-0.bg-black\\/40').click({ position: { x: 348, y: 400 } });
+    if (category.path === 'generadores') {
+      const categoryCard = page.getByLabel('Categoría del generador', { exact: true });
+      const categoryValue = categoryCard.getByText('GRAN GENERADOR', { exact: true });
+      await expect(categoryValue).toBeVisible();
+      await expect(categoryCard).not.toContainText('GRAN_GENERADOR');
+      await expect(page.getByRole('heading', { name: category.actor, exact: true }).locator('..').getByText('GRAN GENERADOR', { exact: true })).toBeVisible();
+      const cardBounds = (await categoryCard.boundingBox())!;
+      const valueBounds = (await categoryValue.boundingBox())!;
+      expect(cardBounds.x).toBeGreaterThanOrEqual(0);
+      expect(cardBounds.x + cardBounds.width).toBeLessThanOrEqual(page.viewportSize()!.width + 1);
+      expect(valueBounds.x).toBeGreaterThanOrEqual(cardBounds.x);
+      expect(valueBounds.x + valueBounds.width).toBeLessThanOrEqual(cardBounds.x + cardBounds.width + 1);
+      expect(valueBounds.y + valueBounds.height).toBeLessThanOrEqual(cardBounds.y + cardBounds.height + 1);
+      expect(await categoryValue.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+      expect(await categoryCard.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+    }
     await page.screenshot({ path: info.outputPath(category.path + '-detail.png'), animations: 'disabled' });
     await info.attach('console-health', { body: JSON.stringify(errors), contentType: 'application/json' });
     expect(errors).toEqual([]);
