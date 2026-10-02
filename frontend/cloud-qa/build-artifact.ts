@@ -35,17 +35,20 @@ async function inventory(directory: string, prefix: string): Promise<Item[]> {
 }
 const files = [...await inventory(path.join(root, 'frontend/dist'), 'dist'),
   ...await inventory(path.join(root, 'frontend/dist-app'), 'dist-app')];
+const backendFiles = await inventory(path.join(root, 'backend/dist'), 'dist');
+assert.ok(backendFiles.some(item => item.file === 'dist/index.js'));
 assert.ok(files.length > 50 && files.length < 5000);
 assert.ok(files.some(item => item.file === 'dist/index.html'));
 assert.ok(files.some(item => item.file === 'dist-app/app.html'));
 const readJson = async (name: string) => JSON.parse(await readFile(path.join(output, name), 'utf8'));
 if (mode === 'freeze') {
-  await writeFile(path.join(output, 'build-frozen.json'), JSON.stringify({ commit: process.env.GITHUB_SHA, files }, null, 2));
-  console.log('Frozen complete web/app inventory before serving any test');
+  await writeFile(path.join(output, 'build-frozen.json'), JSON.stringify({ commit: process.env.GITHUB_SHA, files, backendFiles }, null, 2));
+  console.log('Frozen complete backend/web/app inventories before serving any test');
 } else {
   const frozen = await readJson('build-frozen.json');
   assert.equal(frozen.commit, process.env.GITHUB_SHA);
   assert.deepEqual(files, frozen.files, 'Never package rebuilt or changed bytes after testing');
+  assert.deepEqual(backendFiles, frozen.backendFiles, 'Never package a rebuilt backend after testing');
   const units = [await readJson('backend-unit.json'), await readJson('frontend-unit.json')];
   for (const unit of units) {
     assert.equal(unit.success, true);
@@ -53,6 +56,9 @@ if (mode === 'freeze') {
     assert.ok(unit.numPassedTests > 0);
   }
   const e2e = await readJson('e2e.json');
+  const http = await readJson('http-summary.json');
+  assert.equal(http.passed, 52);
+  assert.equal(http.failed, 0);
   assert.equal(e2e.stats.expected, 72);
   assert.equal(e2e.stats.unexpected + e2e.stats.flaky + e2e.stats.skipped, 0);
   assert.deepEqual(e2e.errors, []);
@@ -71,5 +77,19 @@ if (mode === 'freeze') {
     e2e: e2e.stats, android: { passed: android.passed, failed: android.failed }, apk: { passed: apk.passed, failed: apk.failed },
     builtInCloud: true, rebuiltAfterTesting: false, productionDataWritten: false,
   }, null, 2));
-  console.log('Exact tested web/app archive retained after all gates passed; no dependencies or backend secrets');
+  const backendArchive = path.join(output, 'tested-backend.tar.gz');
+  execFileSync('tar', ['-czf', backendArchive, '-C', path.join(root, 'backend'), 'dist'], { timeout: 30000 });
+  const sourceHashes = await Promise.all(['package.json', 'package-lock.json', 'prisma/schema.prisma'].map(async file => ({
+    file, sha256: createHash('sha256').update(await readFile(path.join(root, 'backend', file))).digest('hex'),
+  })));
+  await writeFile(path.join(output, 'tested-backend.json'), JSON.stringify({
+    commit: process.env.GITHUB_SHA, run: process.env.GITHUB_RUN_ID,
+    archiveSha256: createHash('sha256').update(await readFile(backendArchive)).digest('hex'),
+    files: backendFiles, sourceHashes, http: { passed: http.passed, failed: http.failed },
+    units: units.map(unit => ({ passed: unit.numPassedTests, failed: unit.numFailedTests, pending: unit.numPendingTests })),
+    e2e: e2e.stats, android: { passed: android.passed, failed: android.failed }, apk: { passed: apk.passed, failed: apk.failed },
+    builtInCloud: true, rebuiltAfterTesting: false, productionDataWritten: false,
+    containsDependencies: false, containsEnvironment: false, containsUploads: false,
+  }, null, 2));
+  console.log('Exact tested backend/web/app archives retained after all gates passed; no dependencies, uploads or environment secrets');
 }

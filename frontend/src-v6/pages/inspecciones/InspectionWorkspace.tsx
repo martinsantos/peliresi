@@ -59,6 +59,28 @@ export function InspectionWorkspace({ steps, reference, defaultStep, saveAction,
   const resumeUserId = resumeIdentity?.userId;
   const resumeInspectionId = resumeIdentity?.inspectionId;
 
+  // On Android, the keyboard can pan/shrink visualViewport while h-full/dvh
+  // still describe the larger layout viewport. Keep the ordinary flex footer
+  // inside the visible panel; do not scroll the document or move draft fields.
+  useLayoutEffect(() => {
+    const workspace = workspaceRef.current, viewport = window.visualViewport;
+    if (!workspace || !viewport) return;
+    const measure = () => {
+      const top = workspace.getBoundingClientRect().top;
+      if (!Number.isFinite(top) || !Number.isFinite(viewport.height) || viewport.height <= 0 || !Number.isFinite(viewport.offsetTop)) return;
+      const height = Math.max(0, Math.floor(viewport.offsetTop + viewport.height - top - 12));
+      workspace.style.maxHeight = height + 'px';
+    };
+    measure();
+    viewport.addEventListener('resize', measure, { passive: true });
+    viewport.addEventListener('scroll', measure, { passive: true });
+    return () => {
+      viewport.removeEventListener('resize', measure);
+      viewport.removeEventListener('scroll', measure);
+      workspace.style.removeProperty('max-height');
+    };
+  }, []);
+
   useEffect(() => {
     if (!resumeUserId || !resumeInspectionId) return;
     saveInspectionResume(resumeUserId, resumeInspectionId, location.hash || '#' + active.id, resumeLabel);

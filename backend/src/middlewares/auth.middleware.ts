@@ -4,6 +4,7 @@ import { Rol } from '@prisma/client';
 import { config } from '../config/config';
 import { AppError } from './errorHandler';
 import prisma from '../lib/prisma';
+import { isFullAccess } from '../utils/roleFilter';
 
 /** Shape of req.user set by isAuthenticated middleware. */
 export interface AuthUser {
@@ -112,6 +113,24 @@ export const requireAnyAdmin        = hasRole('ADMIN', 'ADMIN_TRANSPORTISTA', 'A
 export const requireAdminOrTransportista = hasRole('ADMIN', 'ADMIN_TRANSPORTISTA');
 export const requireAdminOrGenerador     = hasRole('ADMIN', 'ADMIN_GENERADOR');
 export const requireAdminOrOperador      = hasRole('ADMIN', 'ADMIN_OPERADOR');
+
+export type ActorRecordType = 'generador' | 'transportista' | 'operador';
+type ActorRecordUser = Pick<AuthUser, 'rol' | 'restricted' | 'esInspector' | 'generador' | 'transportista' | 'operador'>;
+
+// An actor ID is not permission. Cross-sector administration and inspection
+// grant consultation only; mutation routes keep their separate sector guards.
+export function canReadActorRecord(user: ActorRecordUser | undefined, type: ActorRecordType, actorId: string): boolean {
+  if (!user || user.restricted || !actorId) return false;
+  return isFullAccess(user) || (user.rol === type.toUpperCase() && user[type]?.id === actorId);
+}
+
+export const requireActorRead = (type: ActorRecordType) =>
+  (req: AuthRequest, _res: Response, next: NextFunction) => {
+    if (!canReadActorRecord(req.user, type, req.params.id)) {
+      return next(new AppError('No tiene permisos para consultar esta ficha', 403));
+    }
+    next();
+  };
 
 // Allow restricted users (candidates with pending solicitudes)
 export const allowRestricted = (_req: AuthRequest, _res: Response, next: NextFunction) => {

@@ -577,7 +577,7 @@ const GeneradorDetallePage: React.FC = () => {
           <div className="space-y-8">
             {/* DDJJ Table */}
             <Card>
-              <CardHeader title="Declaraciones Juradas" icon={<ClipboardList size={20} />} action={canEdit ? <Button size="sm" leftIcon={<Plus size={14} />} onClick={() => setDdjjModal({ open: true })}>
+              <CardHeader className="flex-col sm:flex-row" title="Declaraciones Juradas" icon={<ClipboardList size={20} />} action={canEdit ? <Button size="sm" className="min-h-11" leftIcon={<Plus size={14} />} onClick={() => setDdjjModal({ open: true })}>
                   Registrar DDJJ
                 </Button> : undefined} />
               <CardContent>

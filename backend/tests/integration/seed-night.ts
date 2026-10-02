@@ -26,6 +26,11 @@ export async function seedNightDatabase() {
       ['transportista2', 'TRANSPORTISTA', false], ['operador', 'OPERADOR', false],
       ['operador2', 'OPERADOR', false], ['jefe-generadores', 'ADMIN_GENERADOR', true],
       ['jefe-transporte', 'ADMIN_TRANSPORTISTA', true], ['jefe-operadores', 'ADMIN_OPERADOR', true],
+      // Separate non-inspector readers prove sector-admin access is not an
+      // accidental consequence of the inspector flag on the reviewer fixture.
+      ['lector-generadores', 'ADMIN_GENERADOR', false],
+      ['lector-transporte', 'ADMIN_TRANSPORTISTA', false],
+      ['lector-operadores', 'ADMIN_OPERADOR', false],
     ];
     const users: Record<string, string> = {};
     for (const [name, rol, esInspector] of definitions) {

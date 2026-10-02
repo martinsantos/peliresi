@@ -72,6 +72,13 @@ for (const actor of [
     await page.getByRole('tab', { name: 'DDJJ y Documentos', exact: true }).click();
     const documentPanel = page.getByRole('tabpanel', { name: 'DDJJ y Documentos', exact: true });
     await expect(documentPanel).toBeVisible();
+    const title = documentPanel.getByRole('heading', { name: 'Declaraciones Juradas', exact: true });
+    const register = documentPanel.getByRole('button', { name: 'Registrar DDJJ', exact: true });
+    await title.scrollIntoViewIfNeeded();
+    const titleRect = (await title.boundingBox())!, registerRect = (await register.boundingBox())!;
+    expect(registerRect.height).toBeGreaterThanOrEqual(44);
+    expect(titleRect.x + titleRect.width <= registerRect.x || titleRect.y + titleRect.height <= registerRect.y).toBe(true);
+    await page.screenshot({ path: info.outputPath('generador-ddjj-header.png'), animations: 'disabled' });
     await expect(documentPanel.getByText('QA-valid.pdf', { exact: true })).toBeVisible();
     await expect(documentPanel.getByText('QA-recovered.pdf', { exact: true })).toBeVisible();
     await expect(documentPanel.getByText('QA-retry.pdf', { exact: true })).toHaveCount(0);
@@ -89,6 +96,7 @@ for (const actor of [
       }
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+    await documentPanel.getByText('QA-valid.pdf', { exact: true }).scrollIntoViewIfNeeded();
     await page.screenshot({ path: info.outputPath('generador-documents-visible.png'), animations: 'disabled' });
     const [download, received] = await Promise.all([
       page.waitForEvent('download'),

@@ -19,6 +19,7 @@ const devices=await android.devices();
 assert.equal(devices.length,1,'Exactly one actual Android OS device is required');
 const device=devices[0];
 android.setDefaultTimeout(25000);
+device.setDefaultTimeout(25000);
 const getprop=(key:string)=>execFileSync('adb',['shell','getprop',key],{encoding:'utf8'}).trim();
 assert.equal(getprop('ro.build.version.sdk'),'35');
 const chrome=execFileSync('adb',['shell','dumpsys','package','com.android.chrome'],{encoding:'utf8'});
@@ -58,18 +59,27 @@ const nativeButtonTap=async(name:string,evidence:string)=>{
     return r.width>0&&r.height>0&&r.top>=(v?.offsetTop||0)
       &&r.bottom<=(v?(v.offsetTop+v.height):innerHeight);
   })).toBe(true);
+  await device.screenshot({path:path.join(output,evidence+'-device.png')});
   const xml=readNativeWindow();
   await writeFile(path.join(output,evidence+'-native.xml'),xml);
-  await device.screenshot({path:path.join(output,evidence+'-device.png')});
+  const dom=await button.evaluate(el=>({rect:el.getBoundingClientRect().toJSON(),
+    active:document.activeElement?.tagName,viewport:{width:innerWidth,height:innerHeight,
+      visual:visualViewport?{height:visualViewport.height,offsetTop:visualViewport.offsetTop,scale:visualViewport.scale}:null},
+    workspace:document.querySelector('[data-testid="inspection-workspace"]')?.getBoundingClientRect().toJSON(),
+    scroll:document.querySelector('[data-inspection-scroll]')?.getBoundingClientRect().toJSON()}));
   await writeFile(path.join(output,evidence+'-input.json'),JSON.stringify({
     name,input:'Android adb input tap at fresh native accessibility bounds',
-    dom:await button.evaluate(el=>({rect:el.getBoundingClientRect().toJSON(),
-      active:document.activeElement?.tagName,viewport:{width:innerWidth,height:innerHeight,
-        visual:visualViewport?{height:visualViewport.height,offsetTop:visualViewport.offsetTop,scale:visualViewport.scale}:null}})),
+    dom,
     form:await page.getByRole('dialog',{name:'Nueva inspección'}).locator('input,select,textarea').evaluateAll(elements=>
       elements.map(el=>({tag:el.tagName,label:el.closest('label')?.textContent?.trim(),
         value:(el as HTMLInputElement).value,checked:(el as HTMLInputElement).checked}))),
   },null,2));
+  // Native snapshots take time. Recheck the current visual viewport, not only
+  // the transient layout seen before the keyboard finished opening/panning.
+  const visible=dom.viewport.visual;
+  assert.ok(dom.rect.width>0&&dom.rect.height>0&&dom.rect.top>=(visible?.offsetTop||0)
+    &&dom.rect.bottom<=(visible?visible.offsetTop+visible.height:dom.viewport.height),
+    'A native tap requires the entire button inside the current visible viewport');
   const point=chromeButtonPoint(xml,name);
   await writeFile(path.join(output,evidence+'-tap-point.json'),JSON.stringify(point,null,2));
   // run14 had a visible enabled footer but CDP touch produced no creation
@@ -283,10 +293,8 @@ try{
     await page.locator('#inspection-observations').fill('QA Android comentario conservado después de cerrar Chrome.');
     const [saved]=await Promise.all([
       page.waitForResponse(r=>r.url().endsWith('/api/inspecciones/'+inspection.id+'/borrador')&&r.request().method()==='PATCH'),
-      // run17's device capture shows Guardar above the still-open keyboard.
-      // CDP tap instead hits the textarea at its layout-viewport coordinate.
-      // Use the same actual OS path as Crear, with fresh accessible bounds and
-      // the existing viewport guard; still require the real PATCH + server ACK.
+      // Keep the keyboard open and require both actual visual-viewport and
+      // native accessibility bounds before the real PATCH + server ACK.
       nativeButtonTap('Guardar cambios','save-field-observation'),
     ]);
     expect(saved.status()).toBe(200);

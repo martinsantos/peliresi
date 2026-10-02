@@ -69,6 +69,90 @@ async function main() {
     const json = await request(null, '/auth/refresh-token', 'POST', { refreshToken: sessions.generador.refreshToken });
     assert.ok(json.data.tokens?.accessToken || json.data.accessToken);
   });
+
+  const actorRoutes: Record<string, string[]> = {
+    generador: ['', '/pagos', '/ddjj', '/documentos', '/historial'],
+    transportista: ['', '/historial'],
+    operador: ['', '/pagos', '/ddjj', '/documentos', '/historial'],
+  };
+  const actorPath = (type: string, id: string) => `/actores/${type === 'generador' ? 'generadores' : type === 'operador' ? 'operadores' : 'transportistas'}/${id}`;
+  await check('actores / common users read only their own ficha and every protected subresource', async () => {
+    for (const [type, suffixes] of Object.entries(actorRoutes)) {
+      for (const suffix of suffixes) {
+        assert.equal((await request(type, actorPath(type, fixture.actors[type]) + suffix)).success, true);
+        await request(type + '2', actorPath(type, fixture.actors[type]) + suffix, 'GET', undefined, 403);
+        await request('sin-actor', actorPath(type, fixture.actors[type]) + suffix, 'GET', undefined, 403);
+      }
+      for (const other of Object.keys(actorRoutes).filter(t => t !== type)) {
+        await request(type, actorPath(other, fixture.actors[other]), 'GET', undefined, 403);
+      }
+    }
+  });
+  await check('actores / all admin sectors and inspectors may consult all categories, not mutate foreign sectors', async () => {
+    for (const user of ['admin', 'lector-generadores', 'lector-transporte', 'lector-operadores', 'inspector']) {
+      for (const [type, suffixes] of Object.entries(actorRoutes)) {
+        for (const suffix of suffixes) assert.equal((await request(user, actorPath(type, fixture.actors[type]) + suffix)).success, true);
+        const ownSector = user === 'lector-generadores' ? 'generador' : user === 'lector-transporte' ? 'transportista' : user === 'lector-operadores' ? 'operador' : null;
+        if (user === 'inspector' || (ownSector && ownSector !== type)) {
+          await request(user, actorPath(type, fixture.actors[type]), 'PUT', { razonSocial: 'QA NO DEBE CAMBIAR' }, 403);
+        }
+      }
+    }
+    assert.equal((await db.generador.findUniqueOrThrow({ where: { id: fixture.actors.generador } })).razonSocial, 'QA Generador 1');
+    assert.equal((await db.operador.findUniqueOrThrow({ where: { id: fixture.actors.operador } })).razonSocial, 'QA Operador 1');
+  });
+  const documentBytes = Buffer.from('%PDF-1.4\nQA SYNTHETIC ACTOR DOCUMENT ' + run);
+  const actorDocuments: Record<string, { id: string; nombre: string }> = {};
+  await check('documentos / own actor and reviewers receive exact bytes, other accounts get 403', async () => {
+    for (const type of ['generador', 'operador']) {
+      const form = new FormData();
+      form.set('tipo', 'MEMORIA_TECNICA');
+      form.set('archivo', new Blob([documentBytes], { type: 'application/pdf' }), `QA-${type}-${run}.pdf`);
+      const upload = await fetch(base + actorPath(type, fixture.actors[type]) + '/documentos', {
+        method: 'POST', headers: { Authorization: `Bearer ${sessions.admin.accessToken}` }, body: form,
+      });
+      assert.equal(upload.status, 201);
+      const json: any = await upload.json(); actorDocuments[type] = json.data.documento;
+      const doc = actorDocuments[type]; assert.ok(doc.id);
+      const ownList = await request(type, actorPath(type, fixture.actors[type]) + '/documentos');
+      assert.ok(ownList.data.documentos.some((row: any) => row.id === doc.id));
+      const route = `/actores/documentos/${doc.id}/download`;
+      await request(null, route, 'GET', undefined, 401);
+      for (const user of [type + '2', 'sin-actor', 'transportista', type === 'generador' ? 'operador' : 'generador']) {
+        const denied = await request(user, route, 'GET', undefined, 403);
+        assert.equal(denied.success, false); assert.equal(denied.data, undefined);
+      }
+      for (const user of [type, 'admin', 'lector-generadores', 'lector-transporte', 'lector-operadores', 'inspector']) {
+        const download = await fetch(base + route, { headers: { Authorization: `Bearer ${sessions[user].accessToken}` } });
+        assert.equal(download.status, 200); assert.match(download.headers.get('content-type') || '', /application\/pdf/);
+        assert.ok(download.headers.get('content-disposition')?.includes(doc.nombre));
+        assert.deepEqual(Buffer.from(await download.arrayBuffer()), documentBytes);
+      }
+    }
+  });
+  await check('documentos / moderation is limited to the document sector, denied writes preserve bytes and metadata', async () => {
+    for (const type of ['generador', 'operador']) {
+      const doc = actorDocuments[type]; assert.ok(doc, 'Document upload must have completed');
+      const ownAdmin = type === 'generador' ? 'lector-generadores' : 'lector-operadores';
+      const foreignAdmin = type === 'generador' ? 'lector-operadores' : 'lector-generadores';
+      for (const user of [foreignAdmin, 'lector-transporte', 'inspector', type]) {
+        await request(user, `/actores/documentos/${doc.id}/revisar`, 'PATCH', { estado: 'RECHAZADO' }, 403);
+        await request(user, `/actores/documentos/${doc.id}`, 'DELETE', undefined, 403);
+      }
+      const unchanged = await db.documento.findUniqueOrThrow({ where: { id: doc.id } });
+      assert.equal(unchanged.estado, 'PENDIENTE'); assert.equal(unchanged.revisadoPor, null);
+      const readable = await fetch(base + `/actores/documentos/${doc.id}/download`, {
+        headers: { Authorization: `Bearer ${sessions[type].accessToken}` },
+      });
+      assert.equal(readable.status, 200); assert.deepEqual(Buffer.from(await readable.arrayBuffer()), documentBytes);
+      const reviewed = await request(ownAdmin, `/actores/documentos/${doc.id}/revisar`, 'PATCH', { estado: 'APROBADO' });
+      assert.equal(reviewed.data.documento.estado, 'APROBADO');
+      assert.equal(reviewed.data.documento.revisadoPor, fixture.users[ownAdmin]);
+      await request(ownAdmin, `/actores/documentos/${doc.id}`, 'DELETE');
+      assert.equal(await db.documento.findUnique({ where: { id: doc.id } }), null);
+      await request(type, `/actores/documentos/${doc.id}/download`, 'GET', undefined, 404);
+    }
+  });
   await check('manifiestos / an account without an actor sees no manifests or dashboard totals', async () => {
     const list = await request('sin-actor', '/manifiestos');
     assert.equal(list.data.pagination.total, 0);
@@ -323,8 +407,13 @@ async function main() {
     '/inspecciones/operaciones', '/reportes/manifiestos', '/reportes/tratados', '/reportes/transporte']) {
     await check(`integraciones / ${path}`, async () => { await request('admin', path); });
   }
-  console.log(JSON.stringify({ run, results, passed: results.filter(row => row.status === 'PASS').length,
-    failed: results.filter(row => row.status === 'FAIL').length }, null, 2));
+  const summary = { run, results, passed: results.filter(row => row.status === 'PASS').length,
+    failed: results.filter(row => row.status === 'FAIL').length };
+  console.log(JSON.stringify(summary, null, 2));
+  if (process.env.GITHUB_ACTIONS === 'true') {
+    assert.equal(process.env.QA_ARTIFACTS, '/tmp/sitrep-night-20260926.cloud');
+    await writeFile(path.join(process.env.QA_ARTIFACTS, 'http-summary.json'), JSON.stringify(summary, null, 2));
+  }
   if (results.some(row => row.status === 'FAIL')) process.exitCode = 1;
 }
 main().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => db.$disconnect());

@@ -29,7 +29,7 @@ vi.mock('../../lib/prisma', () => ({
   },
 }));
 
-import { isAuthenticated, hasRole, requireFullAccess, AuthRequest } from '../../middlewares/auth.middleware';
+import { isAuthenticated, hasRole, requireFullAccess, canReadActorRecord, requireActorRead, AuthRequest, ActorRecordType } from '../../middlewares/auth.middleware';
 
 function createMocks(authHeader?: string) {
   const req = {
@@ -44,6 +44,53 @@ function createMocks(authHeader?: string) {
 }
 
 const TEST_SECRET = 'test-secret-key';
+
+describe('actor record boundary', () => {
+  const actorTypes: ActorRecordType[] = ['generador', 'transportista', 'operador'];
+  const account = (type: ActorRecordType, extra: Record<string, unknown> = {}) => ({
+    id: 'unit-only', rol: type.toUpperCase(), restricted: false, esInspector: false,
+    generador: null, transportista: null, operador: null, [type]: { id: 'own-id' }, ...extra,
+  }) as AuthRequest['user'];
+  it.each(actorTypes)('allows only the own %s ficha and denies other IDs/types', type => {
+    const user = account(type);
+    expect(canReadActorRecord(user, type, 'own-id')).toBe(true);
+    expect(canReadActorRecord(user, type, 'foreign-id')).toBe(false);
+    for (const other of actorTypes.filter(t => t !== type)) {
+      expect(canReadActorRecord(user, other, 'own-id')).toBe(false);
+    }
+  });
+  it.each(['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA'])
+    ('preserves consultation of all categories for %s without changing write guards', rol => {
+      const user = account('generador', { rol });
+      for (const type of actorTypes) expect(canReadActorRecord(user, type, 'foreign-id')).toBe(true);
+      if (rol !== 'ADMIN') {
+        const { req, res, next } = createMocks(); req.user = user;
+        const otherSector = rol === 'ADMIN_GENERADOR' ? 'ADMIN_OPERADOR' : 'ADMIN_GENERADOR';
+        hasRole('ADMIN', otherSector)(req, res, next);
+        expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }));
+      }
+    });
+  it('permits inspector consultation but not actor mutation as a common account', () => {
+    const user = account('generador', { esInspector: true });
+    for (const type of actorTypes) expect(canReadActorRecord(user, type, 'foreign-id')).toBe(true);
+    const { req, res, next } = createMocks(); req.user = user;
+    hasRole('ADMIN', 'ADMIN_GENERADOR')(req, res, next);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }));
+  });
+  it('denies absent, unlinked, restricted and missing target identities', () => {
+    expect(canReadActorRecord(undefined, 'generador', 'own-id')).toBe(false);
+    expect(canReadActorRecord(account('generador', { generador: null }), 'generador', 'own-id')).toBe(false);
+    expect(canReadActorRecord(account('generador', { rol: 'ADMIN', restricted: true }), 'generador', 'own-id')).toBe(false);
+    expect(canReadActorRecord(account('generador', { rol: 'ADMIN' }), 'generador', '')).toBe(false);
+  });
+  it.each(actorTypes)('enforces the actual %s target parameter before the controller', type => {
+    const { req, res, next } = createMocks(); req.user = account(type); req.params = { id: 'foreign-id' };
+    requireActorRead(type)(req, res, next);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }));
+    vi.mocked(next).mockClear(); req.params.id = 'own-id';
+    requireActorRead(type)(req, res, next); expect(next).toHaveBeenCalledWith();
+  });
+});
 
 function createToken(payload: object): string {
   return jwt.sign(payload, TEST_SECRET);

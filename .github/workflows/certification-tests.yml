@@ -209,7 +209,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -memory 2048 -cores 2
           disable-animations: true
           script: node --experimental-strip-types frontend/cloud-qa/android-run.ts
-      - name: Package the exact tested web and app bytes only after every gate passes
+      - name: Package the exact tested backend, web and app bytes only after every gate passes
         if: success() && inputs.unit && inputs.android
         run: node --experimental-strip-types frontend/cloud-qa/build-artifact.ts package
       - name: Preserve exact tested frontend builds, never dependencies or backend env
@@ -220,6 +220,16 @@ jobs:
           path: |
             /tmp/sitrep-night-20260926.cloud/tested-frontend.tar.gz
             /tmp/sitrep-night-20260926.cloud/tested-build.json
+          retention-days: 3
+          if-no-files-found: error
+      - name: Preserve exact tested backend bytes, without env, uploads or dependencies
+        if: success() && inputs.unit && inputs.android
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sitrep-tested-backend-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            /tmp/sitrep-night-20260926.cloud/tested-backend.tar.gz
+            /tmp/sitrep-night-20260926.cloud/tested-backend.json
           retention-days: 3
           if-no-files-found: error
       - name: Close owned QA processes and PostgreSQL

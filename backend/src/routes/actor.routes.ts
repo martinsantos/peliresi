@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { hasRole, isAuthenticated, requireAdminOrTransportista, requireAdminOrGenerador, requireAdminOrOperador, requireFullAccess } from '../middlewares/auth.middleware';
+import { hasRole, isAuthenticated, requireAdminOrTransportista, requireAdminOrGenerador, requireAdminOrOperador, requireFullAccess, requireActorRead } from '../middlewares/auth.middleware';
 import {
     getGeneradores, getGeneradorById, createGenerador, updateGenerador, deleteGenerador,
     getTransportistas, getTransportistaById, createTransportista, updateTransportista, deleteTransportista,
@@ -62,7 +62,7 @@ router.post('/generadores/recordatorios', hasRole('ADMIN', 'ADMIN_GENERADOR'), c
  *       404:
  *         description: Generador no encontrado
  */
-router.get('/generadores/:id', getGeneradorById);
+router.get('/generadores/:id', requireActorRead('generador'), getGeneradorById);
 
 /**
  * @openapi
@@ -145,23 +145,24 @@ router.put('/generadores/:id',   requireAdminOrGenerador, updateGenerador);
 router.delete('/generadores/:id', requireAdminOrGenerador, deleteGenerador);
 
 // ===== GENERADORES — PAGOS TEF =====
-router.get('/generadores/:id/pagos',                          getPagosTEF);
+router.get('/generadores/:id/pagos', requireActorRead('generador'), getPagosTEF);
 router.post('/generadores/:id/pagos',    requireAdminOrGenerador, createPagoTEF);
 router.put('/generadores/:genId/pagos/:pagoId',  requireAdminOrGenerador, updatePagoTEF);
 router.delete('/generadores/:genId/pagos/:pagoId', requireAdminOrGenerador, deletePagoTEF);
 
 // ===== GENERADORES — DDJJ =====
-router.get('/generadores/:id/ddjj',                           getDDJJ);
+router.get('/generadores/:id/ddjj', requireActorRead('generador'), getDDJJ);
 router.post('/generadores/:id/ddjj',     requireAdminOrGenerador, createDDJJ);
 router.put('/generadores/:genId/ddjj/:ddjjId',   requireAdminOrGenerador, updateDDJJ);
 router.delete('/generadores/:genId/ddjj/:ddjjId',  requireAdminOrGenerador, deleteDDJJ);
 
 // ===== GENERADORES — DOCUMENTOS =====
-router.get('/generadores/:id/documentos',                     getDocumentos);
+router.get('/generadores/:id/documentos', requireActorRead('generador'), getDocumentos);
 router.post('/generadores/:id/documentos', requireAdminOrGenerador, upload.single('archivo'), uploadDocumento);
 router.get('/documentos/:docId/download',                     downloadDocumento);
-router.patch('/documentos/:docId/revisar', requireAdminOrGenerador, revisarDocumento);
-router.delete('/documentos/:docId',        requireAdminOrGenerador, deleteDocumento);
+// The document lookup in each controller enforces its actual actor sector.
+router.patch('/documentos/:docId/revisar', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR'), revisarDocumento);
+router.delete('/documentos/:docId', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR'), deleteDocumento);
 
 // ===== TRANSPORTISTAS =====
 
@@ -196,7 +197,7 @@ router.get('/transportistas', getTransportistas);
  *       404:
  *         description: Transportista no encontrado
  */
-router.get('/transportistas/:id', getTransportistaById);
+router.get('/transportistas/:id', requireActorRead('transportista'), getTransportistaById);
 
 /**
  * @openapi
@@ -482,7 +483,7 @@ router.get('/operadores', getOperadores);
  *       404:
  *         description: Operador no encontrado
  */
-router.get('/operadores/:id', getOperadorById);
+router.get('/operadores/:id', requireActorRead('operador'), getOperadorById);
 
 /**
  * @openapi
@@ -561,24 +562,24 @@ router.put('/operadores/:id',    requireAdminOrOperador, updateOperador);
 router.delete('/operadores/:id', requireAdminOrOperador, deleteOperador);
 
 // ===== OPERADORES — PAGOS TEF =====
-router.get('/operadores/:id/pagos',                              getPagosTEFOperador);
+router.get('/operadores/:id/pagos', requireActorRead('operador'), getPagosTEFOperador);
 router.post('/operadores/:id/pagos',        requireAdminOrOperador, createPagoTEFOperador);
 router.put('/operadores/:opId/pagos/:pagoId',  requireAdminOrOperador, updatePagoTEFOperador);
 router.delete('/operadores/:opId/pagos/:pagoId', requireAdminOrOperador, deletePagoTEFOperador);
 
 // ===== OPERADORES — DDJJ =====
-router.get('/operadores/:id/ddjj',                               getDDJJOperador);
+router.get('/operadores/:id/ddjj', requireActorRead('operador'), getDDJJOperador);
 router.post('/operadores/:id/ddjj',         requireAdminOrOperador, createDDJJOperador);
 router.put('/operadores/:opId/ddjj/:ddjjId',   requireAdminOrOperador, updateDDJJOperador);
 router.delete('/operadores/:opId/ddjj/:ddjjId',  requireAdminOrOperador, deleteDDJJOperador);
 
 // ===== OPERADORES — DOCUMENTOS =====
-router.get('/operadores/:id/documentos',                         getDocumentos);
+router.get('/operadores/:id/documentos', requireActorRead('operador'), getDocumentos);
 router.post('/operadores/:id/documentos', requireAdminOrOperador, upload.single('archivo'), uploadDocumento);
 
 // ===== HISTORIAL DE CAMBIOS =====
-router.get('/generadores/:id/historial', getHistorialActor);
-router.get('/operadores/:id/historial', getHistorialActor);
-router.get('/transportistas/:id/historial', getHistorialActor);
+router.get('/generadores/:id/historial', requireActorRead('generador'), getHistorialActor);
+router.get('/operadores/:id/historial', requireActorRead('operador'), getHistorialActor);
+router.get('/transportistas/:id/historial', requireActorRead('transportista'), getHistorialActor);
 
 export default router;
