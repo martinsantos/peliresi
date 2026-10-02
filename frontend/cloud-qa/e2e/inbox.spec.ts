@@ -89,6 +89,11 @@ test('real assignment -> bell -> paginated inbox -> keyboard -> exact dossier ->
     await expect(inspector).not.toHaveURL(/pagina=2/);
     await expect(primary).toBeVisible();
     await primary.focus();
+    // Chromium only enables :focus-visible after keyboard interaction. Move
+    // through the real next control and back, rather than checking mouse focus.
+    await inspector.keyboard.press('Tab');
+    await inspector.keyboard.press('Shift+Tab');
+    await expect(primary).toBeFocused();
     expect(await primary.evaluate(el => parseFloat(getComputedStyle(el).outlineWidth))).toBeGreaterThanOrEqual(2);
     await inspector.keyboard.press('Enter');
     await expect(inspector).toHaveURL(new RegExp(prefix(info) + '/inspecciones/' + inspection.id + '$'));

@@ -124,6 +124,11 @@ jobs:
         run: |
           test -e /dev/kvm
           sudo chmod 666 /dev/kvm
+      - name: Read original signed APK from the private QA draft without write permissions
+        if: always() && inputs.android && steps.qa-start.outcome == 'success'
+        env:
+          QA_GITHUB_TOKEN: ${{ github.token }}
+        run: node --experimental-strip-types frontend/cloud-qa/apk-download.ts
       - name: Android 15 actual OS and Chrome, no local emulator
         if: always() && inputs.android && steps.qa-start.outcome == 'success'
         uses: ReactiveCircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808 # v2
@@ -135,7 +140,7 @@ jobs:
           emulator-boot-timeout: 600
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -memory 2048 -cores 2
           disable-animations: true
-          script: node --experimental-strip-types frontend/cloud-qa/android.ts
+          script: node --experimental-strip-types frontend/cloud-qa/android-run.ts
       - name: Close owned QA processes and PostgreSQL
         if: always()
         run: |

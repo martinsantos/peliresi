@@ -30,7 +30,7 @@ const observe=(target:Page)=>{
   target.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
 };
 const launch=async()=>{
-  context=await device.launchBrowser({args:['--no-first-run','--no-default-browser-check']});
+  context=await device.launchBrowser({hasTouch:true,args:['--no-first-run','--no-default-browser-check']});
   await context.addCookies([{name:'sitrep_qa_client',value:'127.11.20.2',url:'http://127.0.0.1:4177'}]);
   page=await context.newPage();observe(page);
 };
@@ -43,9 +43,11 @@ const login=async(user:string)=>{
   await page.goto('http://127.0.0.1:4177/app/login');
   await page.getByLabel('Correo electrónico o CUIT').fill(user+'@night-qa.invalid');
   await page.getByLabel('Contraseña',{exact:true}).fill('OnlyLocal-NightQA-2026!');
-  const response=page.waitForResponse(r=>r.url().endsWith('/api/auth/login')&&r.request().method()==='POST');
-  await page.getByRole('button',{name:'Ingresar',exact:true}).tap();
-  expect((await response).status()).toBe(200);
+  const [response]=await Promise.all([
+    page.waitForResponse(r=>r.url().endsWith('/api/auth/login')&&r.request().method()==='POST'),
+    page.getByRole('button',{name:'Ingresar',exact:true}).tap(),
+  ]);
+  expect(response.status()).toBe(200);
   await expect(page.getByRole('banner')).toBeVisible();
   await expect(page).not.toHaveURL(/\/login$/);
 };
@@ -86,9 +88,11 @@ try{
       ['centro-control','/api/centro-control/actividad'],['monitor','/api/centro-control/monitor-live'],
       ['reportes','/api/reportes/manifiestos'],
     ]){
-      const received=page.waitForResponse(r=>r.url().includes(endpoint)&&r.status()===200);
-      await page.goto('http://127.0.0.1:4177/app/'+route);
-      const actual=(await(await received).json()).data;
+      const [received]=await Promise.all([
+        page.waitForResponse(r=>r.url().includes(endpoint)&&r.status()===200),
+        page.goto('http://127.0.0.1:4177/app/'+route),
+      ]);
+      const actual=(await received.json()).data;
       expect(actual).toBeTruthy();await expect(page.locator('body')).not.toBeEmpty();
       await proof(route);
     }
@@ -101,9 +105,11 @@ try{
     await inspector.selectOption({label:'QA inspector'});
     await page.getByLabel('Descripción inicial').fill('QA Android: hallazgo sintético, sin envíos externos');
     await page.getByLabel('Ubicación prevista').fill('QA ubicación ficticia');
-    const created=page.waitForResponse(r=>r.url().endsWith('/api/inspecciones')&&r.request().method()==='POST');
-    await page.getByRole('button',{name:'Crear expediente',exact:true}).tap();
-    const saved=await created;expect(saved.status()).toBe(201);inspection=(await saved.json()).data;
+    const [saved]=await Promise.all([
+      page.waitForResponse(r=>r.url().endsWith('/api/inspecciones')&&r.request().method()==='POST'),
+      page.getByRole('button',{name:'Crear expediente',exact:true}).tap(),
+    ]);
+    expect(saved.status()).toBe(201);inspection=(await saved.json()).data;
     expect(inspection.numero).toMatch(/^IRP-\d{4}-\d{5}$/);
     await proof('created-inspection');await logout();
   });
@@ -118,13 +124,17 @@ try{
   });
   await check('start-field-and-save-observation',async()=>{
     assert.ok(inspection?.id);
-    const started=page.waitForResponse(r=>r.url().endsWith('/inspecciones/'+inspection.id+'/estado')&&r.request().method()==='POST');
-    await page.getByRole('button',{name:'Iniciar visita',exact:true}).tap();
-    expect((await started).status()).toBe(200);
+    const [started]=await Promise.all([
+      page.waitForResponse(r=>r.url().endsWith('/inspecciones/'+inspection.id+'/estado')&&r.request().method()==='POST'),
+      page.getByRole('button',{name:'Iniciar visita',exact:true}).tap(),
+    ]);
+    expect(started.status()).toBe(200);
     await page.getByRole('navigation',{name:'Secciones del expediente'}).getByRole('link',{name:'Registro',exact:true}).tap();
-    const saved=page.waitForResponse(r=>r.url().endsWith('/api/inspecciones/'+inspection.id+'/borrador')&&r.request().method()==='PATCH');
-    await page.locator('#inspection-observations').fill('QA Android comentario conservado después de cerrar Chrome.');
-    expect((await saved).status()).toBe(200);await proof('saved-field-observation');
+    const [saved]=await Promise.all([
+      page.waitForResponse(r=>r.url().endsWith('/api/inspecciones/'+inspection.id+'/borrador')&&r.request().method()==='PATCH'),
+      page.locator('#inspection-observations').fill('QA Android comentario conservado después de cerrar Chrome.'),
+    ]);
+    expect(saved.status()).toBe(200);await proof('saved-field-observation');
   });
   await check('process-restart-keeps-real-session-and-record',async()=>{
     assert.ok(inspection?.id);

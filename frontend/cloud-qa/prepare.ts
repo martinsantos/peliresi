@@ -12,7 +12,7 @@ const {PrismaClient}=backendRequire('@prisma/client');
 const db=new PrismaClient();
 try {
   // Explicit synthetic page-two/mixed-unit data, not business responses or fake auth.
-  for(let i=0;i<55;i++)await db.manifiesto.upsert({
+  for(let i=0;i<155;i++)await db.manifiesto.upsert({
     where:{id:'cloud-qa-report-'+i},
     create:{id:'cloud-qa-report-'+i,numero:'QA-CLOUD-'+String(i+1).padStart(5,'0'),
       generadorId:fixture.actors.generador,transportistaId:fixture.actors.transportista,
@@ -25,6 +25,6 @@ try {
   });
   await writeFile(path.join(output,'fixture.json'),JSON.stringify({
     ...fixture,database:'sitrep_night_qa_20260926',source:process.env.GITHUB_SHA,
-    externalDelivery:false,syntheticReportRecords:55},null,2));
+    externalDelivery:false,syntheticReportRecords:155},null,2));
 }finally{await db.$disconnect();}
 console.log('Synthetic cloud fixture ready; no production data or credentials');

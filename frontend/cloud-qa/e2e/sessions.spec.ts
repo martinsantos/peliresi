@@ -40,12 +40,15 @@ test('real impersonation survives reload and restores the original administrator
   await target.click();
   expect((await switched).status()).toBe(200);
   await expectIdentity(await operatorProfile, 'OPERADOR', 'operador@night-qa.invalid');
-  await expect(page.getByText(/Vista temporal ·/)).toBeVisible();
+  const temporaryBanner = info.project.name === 'app'
+    ? page.getByTestId('impersonation-banner') : page.getByText(/Vista temporal ·/);
+  await expect(temporaryBanner).toBeVisible();
+  await expect(temporaryBanner).toContainText('QA Operador');
   await expect(page.getByRole('button', { name: 'Volver a mi cuenta', exact: true })).toBeVisible();
   const restoredOperator = profileResponse(page);
   await page.reload();
   await expectIdentity(await restoredOperator, 'OPERADOR', 'operador@night-qa.invalid');
-  await expect(page.getByText(/Vista temporal ·/)).toBeVisible();
+  await expect(temporaryBanner).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   await page.screenshot({ path: info.outputPath('operator-temporary-session.png'), animations: 'disabled' });
   const administratorProfile = profileResponse(page);
@@ -63,12 +66,14 @@ test('logout in one real tab removes access in every tab and browser history', a
   const other = await context.newPage();
   try {
     const actualProfile = profileResponse(other);
-    await other.goto(`${prefix(info)}/manifiestos`);
+    await other.goto(`${prefix(info)}/`);
     await expectIdentity(await actualProfile, 'ADMIN', 'admin@night-qa.invalid');
+    await other.goto(`${prefix(info)}/manifiestos`);
     await expect(other.getByRole('banner')).toBeVisible();
     await logout(page, info);
     await expect(other).toHaveURL(new RegExp(`${prefix(info)}/login$`));
     await other.goBack();
+    await expect(other).toHaveURL(new RegExp(`${prefix(info)}/login$`));
     await other.goto(`${prefix(info)}/manifiestos`);
     await expect(other).toHaveURL(new RegExp(`${prefix(info)}/login$`));
     await expect(other.getByLabel('Correo electrónico o CUIT')).toBeVisible();
