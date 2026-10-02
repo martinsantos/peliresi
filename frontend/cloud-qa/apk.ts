@@ -45,9 +45,19 @@ const check = async (name: string, task: () => Promise<void>) => {
 const openOriginal = async () => {
   const launched = adb('shell', 'am', 'start', '-W', '-n', activity);
   assert.doesNotMatch(launched, /Error:|Exception/);
-  await expect.poll(() => {
-    page = context!.pages().find(item => item.url().startsWith('https://sitrep.ultimamilla.com.ar/app/'));
-    return Boolean(page);
+  // Activity launch may briefly retain a closing custom-tab target while the
+  // native splash is foreground. Require the actual OS login, then choose a
+  // live DOM target that has finished rendering the same login form.
+  await device.wait({ text: 'Correo electrónico o CUIT' }, { state: 'shown', timeout: 45000 });
+  await expect.poll(async () => {
+    const candidates = context!.pages().filter(item => !item.isClosed()
+      && item.url().startsWith('https://sitrep.ultimamilla.com.ar/app/')).reverse();
+    for (const candidate of candidates) {
+      try {
+        if (await candidate.getByLabel('Correo electrónico o CUIT').isVisible()) { page = candidate; return true; }
+      } catch { /* A closing native custom tab is not the newly opened app. */ }
+    }
+    return false;
   }, { timeout: 40000 }).toBe(true);
   assert.ok(page);
   await expect(page.getByLabel('Correo electrónico o CUIT')).toBeVisible();
