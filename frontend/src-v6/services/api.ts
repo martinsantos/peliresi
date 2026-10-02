@@ -37,6 +37,7 @@ export const clearTokens = () => {
 // REQUEST INTERCEPTOR
 // ========================================
 
+// Bind the credential before a later login can overtake an async interceptor.
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   // La instancia usa JSON por defecto, pero un FormData debe conservar sus bytes.
   // Al quitar este header, el navegador agrega multipart/form-data con su boundary.
@@ -48,7 +49,7 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
-});
+}, undefined, { synchronous: true });
 
 // ========================================
 // RESPONSE INTERCEPTOR - Auto refresh
@@ -77,6 +78,12 @@ api.interceptors.response.use(
     // Never intercept auth endpoints — let errors propagate naturally
     const isAuthEndpoint = requestUrl.includes('/auth/');
     if (isAuthEndpoint) {
+      return Promise.reject(error);
+    }
+
+    // A request issued by a previous session must never refresh and replay
+    // its URL using the user who logged in while that request was in flight.
+    if (error.response?.status === 401 && originalRequest?.headers.Authorization !== `Bearer ${getAccessToken()}`) {
       return Promise.reject(error);
     }
 

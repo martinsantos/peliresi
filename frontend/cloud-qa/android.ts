@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { assertCloudDatabase } from './safety.ts';
-import { chromeButtonPoint, dismissObservedChromePrompts, readNativeWindow } from './native-window.ts';
+import { dismissObservedChromePrompts, readNativeWindow } from './native-window.ts';
 
 await assertCloudDatabase();
 const output=path.join(process.env.QA_ARTIFACTS!,'android');
@@ -27,9 +27,11 @@ let context:BrowserContext;
 let page:Page;
 const errors:string[]=[];
 const runtimeErrors:string[]=[];
+const failedResponses:Array<{url:string;method:string;status:number;at:string}>=[];
+let logoutAttempt=0;
 const results:Array<{name:string;status:string;error?:string}>=[];
 const saveResults=async(completed=false)=>writeFile(path.join(output,'result.json'),JSON.stringify({
-  commit:process.env.GITHUB_SHA,startedOnActualAndroid:true,completed,results,consoleErrors:errors,runtimeErrors,
+  commit:process.env.GITHUB_SHA,startedOnActualAndroid:true,completed,results,consoleErrors:errors,runtimeErrors,failedResponses,
   passed:results.filter(r=>r.status==='PASS').length,failed:results.filter(r=>r.status==='FAIL').length,
   limitations:['Android emulator, not a physical phone','Authenticated flow uses Chrome and the isolated QA origin, not the release APK production session','No real microphone, noise, battery or cellular-network certification'],
 },null,2));
@@ -46,12 +48,21 @@ const observe=(target:Page)=>{
   target.setDefaultTimeout(20000);
   target.on('pageerror',e=>runtimeErrors.push(e.message));
   target.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+  target.on('response',response=>{
+    if(response.url().includes('/api/')&&response.status()>=400)failedResponses.push({
+      url:response.url(),method:response.request().method(),status:response.status(),at:new Date().toISOString(),
+    });
+  });
 };
 const launch=async()=>{
   context=await device.launchBrowser({hasTouch:true,permissions:['geolocation'],
     geolocation:{latitude:-32.89,longitude:-68.84},args:['--no-first-run','--no-default-browser-check']});
   await context.addCookies([{name:'sitrep_qa_client',value:'127.11.20.2',url:'http://127.0.0.1:4177'}]);
-  page=await context.newPage();observe(page);
+  // Restart the existing QA tab, as a user reopening the app would. Creating a
+  // second copy left the old inspection mounted behind the next user session.
+  const restored=context.pages().filter(candidate=>candidate.url().startsWith('http://127.0.0.1:4177/'));
+  assert.ok(restored.length<=1,'The isolated single-tab app scenario must not accumulate hidden copies');
+  page=restored[0]||await context.newPage();observe(page);
 };
 const login=async(user:string)=>{
   // Presentation preferences only: the real form obtains every session.
@@ -77,20 +88,24 @@ const login=async(user:string)=>{
   await expect(welcome).toHaveCount(0);
 };
 const logout=async()=>{
+  const attempt=++logoutAttempt;
+  await settleNativeChrome();
   await page.getByRole('button',{name:'Abrir menu',exact:true}).tap();
   const button=page.getByRole('button',{name:'Cerrar Sesión',exact:true});
   await expect(button).toBeVisible();await expect(button).toBeEnabled();
-  // Use the actual Android accessibility bounds after the keyboard/viewport
-  // transition. This is a real OS touch, not a force-click or a fake logout.
-  await writeFile(path.join(output,'logout-geometry.json'),JSON.stringify(await button.evaluate(el=>{
+  await button.scrollIntoViewIfNeeded();
+  await writeFile(path.join(output,`logout-${attempt}-geometry.json`),JSON.stringify(await button.evaluate(el=>{
     const rect=el.getBoundingClientRect();const hit=document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2);
     return {rect:rect.toJSON(),hit:hit?.outerHTML,viewport:{width:innerWidth,height:innerHeight,
       visual:visualViewport?{height:visualViewport.height,offsetTop:visualViewport.offsetTop,scale:visualViewport.scale}:null}};
   }),null,2));
   await settleNativeChrome();
-  const xml=readNativeWindow();await writeFile(path.join(output,'logout-native-before.xml'),xml);
-  const point=chromeButtonPoint(xml,'Cerrar Sesión');
-  execFileSync('adb',['shell','input','tap',String(point.x),String(point.y)],{timeout:5000});
+  await writeFile(path.join(output,`logout-${attempt}-native-before.xml`),readNativeWindow());
+  await device.screenshot({path:path.join(output,`logout-${attempt}-before-device.png`)});
+  // A web control is touched through the normal browser input path. Android's
+  // accessibility snapshot can temporarily report zero bounds for this button;
+  // do not fabricate native coordinates or invoke the handler directly.
+  await button.tap();
   await expect(page).toHaveURL(/\/app\/login$/);
   expect(await page.evaluate(()=>localStorage.getItem('sitrep_access_token'))).toBeNull();
 };
@@ -269,6 +284,7 @@ try{
     // are still rejected. Record all console messages in the artifact.
     expect(errors.filter(error=>!/^Failed to load resource: net::ERR_INTERNET_DISCONNECTED/.test(error))).toEqual([]);
     expect(runtimeErrors).toEqual([]);
+    expect(failedResponses).toEqual([]);
   });
 }finally{
   await saveResults(true);
