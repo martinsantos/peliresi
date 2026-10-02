@@ -285,7 +285,7 @@ export const MobileLayout: React.FC = () => {
     if (path.includes('/alertas')) return 'Alertas';
     if (path.includes('/configuracion')) return 'Configuración';
     if (path.includes('/mi-perfil')) return 'Mi Perfil';
-    if (path.includes('/notificaciones')) return 'Notificaciones';
+    if (path.includes('/notificaciones')) return 'Avisos';
     if (path.includes('/estadisticas')) return 'Estadísticas';
     if (path.includes('/escaner-qr')) return 'Escanear QR';
     if (path.includes('/ayuda')) return 'Ayuda';

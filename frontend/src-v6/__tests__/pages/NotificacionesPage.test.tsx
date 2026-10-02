@@ -24,6 +24,16 @@ describe('notification inbox states and interaction', () => {
     for (const mutation of [service.marcarLeida, service.marcarTodasLeidas, service.eliminar]) mutation.mockReset().mockResolvedValue({});
   });
 
+  it('does not promise an opening destination for a general notice without a linked record', async () => {
+    service.list.mockResolvedValue({ ...response, items: [{ ...notice, titulo: 'Aviso general', datos: null }] });
+    setup();
+    expect(await screen.findByText('Aviso general')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Abrir aviso: Aviso general', exact: true })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar como leída: Aviso general', exact: true }));
+    await waitFor(() => expect(service.marcarLeida).toHaveBeenCalledWith('notice'));
+    expect(screen.getByTestId('location')).toHaveTextContent('/notificaciones');
+  });
+
   it('distinguishes loading from an empty inbox', async () => {
     let finish!: (value: typeof response) => void;
     service.list.mockImplementation(() => new Promise(resolve => { finish = resolve; }));

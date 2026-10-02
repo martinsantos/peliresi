@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { ReportRow, ReportSortHeader } from './ReportTableControls';
 import {
-  Package, Activity, Users, FileDown, ChevronUp, ChevronDown,
+  Package, Activity, Factory, FileDown,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -15,7 +15,6 @@ import { KpiCard } from '../../../components/charts/KpiCard';
 import { CategoryBarChart } from '../../../components/charts/CategoryBarChart';
 
 export default function TratadosTab({ data, periodo, onExportPDF }: { data: any; periodo: string; onExportPDF: () => void }) {
-  const navigate = useNavigate();
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const resumen = data.resumen || {};
   const porGenerador = data.porGenerador || {};
@@ -25,10 +24,6 @@ export default function TratadosTab({ data, periodo, onExportPDF }: { data: any;
   const toggleSort = (key: string) => setSortConfig(prev =>
     prev?.key === key ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' }
   );
-  const SortIcon = ({ col }: { col: string }) => {
-    if (sortConfig?.key !== col) return <ChevronUp size={12} className="ml-1 opacity-30 inline" />;
-    return sortConfig.direction === 'asc' ? <ChevronUp size={12} className="ml-1 text-primary-600 inline" /> : <ChevronDown size={12} className="ml-1 text-primary-600 inline" />;
-  };
 
   const sortedDetalle = useMemo(() => {
     if (!sortConfig) return detalle;
@@ -70,7 +65,7 @@ export default function TratadosTab({ data, periodo, onExportPDF }: { data: any;
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <KpiCard icon={Package} label="Manifiestos Tratados" value={resumen.totalManifiestosTratados || 0} color="from-emerald-600 to-emerald-700" />
         <KpiCard icon={Activity} label="Residuos Tratados" value={`${(resumen.totalResiduosTratados || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })} kg`} color="from-teal-600 to-teal-700" />
-        <KpiCard icon={Users} label="Generadores" value={Object.keys(porGenerador).length} color="from-blue-600 to-blue-700" sub="involucrados" />
+        <KpiCard icon={Factory} label="Generadores" value={Object.keys(porGenerador).length} color="from-blue-600 to-blue-700" sub="involucrados" />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
@@ -106,6 +101,7 @@ export default function TratadosTab({ data, periodo, onExportPDF }: { data: any;
       {detalle.length > 0 && (
         <Card className="border-0 shadow-sm">
           <CardHeader
+            className="flex-col sm:flex-row"
             title={`Detalle de Tratamientos (${detalle.length})`}
             subtitle="Registros de residuos tratados"
             action={
@@ -119,24 +115,24 @@ export default function TratadosTab({ data, periodo, onExportPDF }: { data: any;
               <table className="w-full text-left">
                 <thead className="bg-neutral-50/80 border-b border-neutral-200">
                   <tr>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('numero')}>Número<SortIcon col="numero" /></th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('generador')}>Generador<SortIcon col="generador" /></th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('metodo')}>Método<SortIcon col="metodo" /></th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('fecha')}>Fecha<SortIcon col="fecha" /></th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('residuos')}>Residuos<SortIcon col="residuos" /></th>
+                    <ReportSortHeader column="numero" label="Número" sort={sortConfig} onSort={toggleSort} />
+                    <ReportSortHeader column="generador" label="Generador" sort={sortConfig} onSort={toggleSort} />
+                    <ReportSortHeader column="metodo" label="Método" sort={sortConfig} onSort={toggleSort} className="hidden md:table-cell" />
+                    <ReportSortHeader column="fecha" label="Fecha" sort={sortConfig} onSort={toggleSort} />
+                    <ReportSortHeader column="residuos" label="Residuos" sort={sortConfig} onSort={toggleSort} />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
-                  {sortedDetalle.slice(0, 50).map((d: any, i: number) => (
-                    <tr key={i} className="hover:bg-primary-50/30 transition-colors cursor-pointer" onClick={() => d.id && navigate(`/manifiestos/${d.id}`)}>
-                      <td className="px-4 py-3 text-sm font-semibold text-primary-600">{d.numero}</td>
+                  {sortedDetalle.map((d: any, i: number) => (
+                    <ReportRow key={i} to={d.id ? `/manifiestos/${d.id}` : undefined}>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm font-semibold text-primary-600">{d.numero}</td>
                       <td className="px-4 py-3 text-sm text-neutral-900 max-w-[200px] truncate" title={d.generador}>{d.generador}</td>
                       <td className="px-4 py-3 text-sm text-neutral-700 hidden md:table-cell">{d.metodoTratamiento || '-'}</td>
                       <td className="px-4 py-3 text-sm text-neutral-500">{d.fechaTratamiento ? new Date(d.fechaTratamiento).toLocaleDateString('es-AR') : '-'}</td>
                       <td className="px-4 py-3">
                         <Badge variant="soft" color="primary">{d.residuos?.length || 0}</Badge>
                       </td>
-                    </tr>
+                    </ReportRow>
                   ))}
                 </tbody>
               </table>

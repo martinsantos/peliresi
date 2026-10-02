@@ -21,6 +21,7 @@ import {
   Map as MapIcon,
   Factory,
   FlaskConical,
+  ClipboardCheck,
 } from 'lucide-react';
 import { Card } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -51,7 +52,7 @@ const DepartamentoDetalleModalLazy = lazy(() =>
 type TabType = 'manifiestos' | 'tratados' | 'transporte' | 'generadores' | 'operadores' | 'tratamientos' | 'departamentos' | 'mapa' | 'inspecciones';
 
 const tabs: { id: TabType; label: string; icon: React.ElementType }[] = [
-  { id: 'inspecciones', label: 'Inspecciones', icon: FileText },
+  { id: 'inspecciones', label: 'Inspecciones', icon: ClipboardCheck },
   { id: 'manifiestos', label: 'Manifiestos', icon: FileText },
   { id: 'tratados', label: 'Residuos Tratados', icon: Package },
   { id: 'transporte', label: 'Transporte', icon: Truck },
@@ -120,7 +121,8 @@ const ReportesPage: React.FC = () => {
   }), [fechaDesde, fechaHasta, incluirTodos]);
 
   const needsCentroControl = ['departamentos', 'mapa', 'generadores', 'operadores'].includes(activeTab);
-  const { data: ccData } = useCentroControl(ccParams, false, needsCentroControl);
+  const activityQuery = useCentroControl(ccParams, false, needsCentroControl);
+  const ccData = activityQuery.data;
 
   const activeQuery = activeTab === 'manifiestos' ? manifiestos
     : activeTab === 'tratados' ? tratados
@@ -242,7 +244,7 @@ const ReportesPage: React.FC = () => {
   return (
     <>
       {/* Filter Bar (2 rows): Row 1 = dates + actions, Row 2 = tabs */}
-      <div className="sticky top-0 z-20 bg-[#FAFAF8] pt-2 pb-1 -mx-4 lg:-mx-8 px-4 lg:px-8">
+      <div className="sm:sticky top-0 z-20 bg-[#FAFAF8] pt-2 pb-1 -mx-4 lg:-mx-8 px-4 lg:px-8">
         {/* Row 1: Date presets + date inputs + period badge + export buttons */}
         <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 bg-white rounded-t-xl border border-neutral-100 shadow-sm">
           <div className="flex items-center gap-1 flex-wrap">
@@ -250,30 +252,35 @@ const ReportesPage: React.FC = () => {
             {DATE_PRESETS.map(p => (
               <button
                 key={p.days}
+                type="button"
+                aria-pressed={datePreset === p.days}
                 onClick={() => handleDatePreset(p.days)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
+                className={`min-h-11 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 ${
                   datePreset === p.days
                     ? 'bg-primary-50 text-primary-700 border border-primary-200'
-                    : 'text-neutral-500 hover:bg-neutral-50 border border-transparent'
+                    : 'text-neutral-700 hover:bg-neutral-50 border border-transparent'
                 }`}
               >
                 {p.label}
               </button>
             ))}
-            <div className="hidden sm:flex items-center gap-1.5 ml-1 text-xs text-neutral-400">
+            <div className="flex w-full sm:w-auto items-end gap-2 text-sm text-neutral-700">
+              <label className="flex min-w-0 flex-1 flex-col gap-1">Desde
               <input
                 type="date"
                 value={fechaDesde}
                 onChange={e => { setFechaDesde(e.target.value); setDatePreset(-1); setIncluirTodos(false); }}
-                className="px-2 py-1 rounded border border-neutral-200 text-neutral-600 text-xs"
+                className="min-h-11 min-w-0 w-full px-2 py-2 rounded border border-neutral-300 text-neutral-900 bg-white text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
               />
-              <span>—</span>
+              </label>
+              <label className="flex min-w-0 flex-1 flex-col gap-1">Hasta
               <input
                 type="date"
                 value={fechaHasta}
                 onChange={e => { setFechaHasta(e.target.value); setDatePreset(-1); setIncluirTodos(false); }}
-                className="px-2 py-1 rounded border border-neutral-200 text-neutral-600 text-xs"
+                className="min-h-11 min-w-0 w-full px-2 py-2 rounded border border-neutral-300 text-neutral-900 bg-white text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
               />
+              </label>
             </div>
           </div>
           <div className="ml-auto flex items-center gap-1.5 w-full sm:w-auto mt-2 sm:mt-0 justify-end">
@@ -287,11 +294,9 @@ const ReportesPage: React.FC = () => {
             </span>
             {isReportTab && (
               <>
-                <button onClick={() => window.print()} className="hidden sm:flex p-1.5 rounded-md text-neutral-500 hover:bg-neutral-100 transition-colors" title="Imprimir"><Printer size={14} /></button>
-                <button onClick={handleExportCSV} disabled={exportarReporte.isPending} className="p-1.5 rounded-md text-neutral-500 hover:bg-neutral-100 transition-colors disabled:opacity-50" title="CSV">
-                  {exportarReporte.isPending ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                </button>
-                <button onClick={handleExportPDF} disabled={!activeQuery?.data} className="p-1.5 rounded-md bg-primary-500 text-white hover:bg-primary-600 transition-colors disabled:opacity-50" title="PDF"><FileDown size={14} /></button>
+                <Button variant="ghost" onClick={() => window.print()} className="hidden sm:flex min-w-11 px-3" aria-label="Imprimir reporte" title="Imprimir"><Printer size={18} /></Button>
+                <Button variant="outline" onClick={handleExportCSV} isLoading={exportarReporte.isPending} className="min-w-11 px-3" aria-label="Exportar CSV" title="Exportar CSV"><Download size={18} /></Button>
+                <Button onClick={handleExportPDF} disabled={!activeQuery?.data} className="min-w-11 px-3" aria-label="Exportar PDF" title="Exportar PDF"><FileDown size={18} /></Button>
               </>
             )}
           </div>
@@ -303,18 +308,20 @@ const ReportesPage: React.FC = () => {
           <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-white to-transparent z-10 rounded-bl-xl" />
           {/* Right gradient fade */}
           <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white to-transparent z-10 rounded-br-xl" />
-          <div className="flex items-center gap-0.5 px-2 overflow-x-auto scrollbar-hide">
+          <nav aria-label="Tipos de reporte" className="flex items-center gap-0.5 px-2 overflow-x-auto scrollbar-hide">
             {tabs.filter(tab => tab.id !== 'inspecciones' || canUseInspectionOperations(currentUser)).map(tab => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
+                  type="button"
+                  aria-pressed={isActive}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2.5 sm:py-2 text-xs font-medium border-b-2 transition-all whitespace-nowrap ${
+                  className={`min-h-11 flex-shrink-0 flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary-700 ${
                     isActive
-                      ? 'border-primary-600 text-primary-600'
-                      : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50'
+                      ? 'border-primary-700 text-primary-800'
+                      : 'border-transparent text-neutral-700 hover:bg-neutral-50'
                   }`}
                 >
                   <Icon size={14} />
@@ -322,15 +329,18 @@ const ReportesPage: React.FC = () => {
                 </button>
               );
             })}
-          </div>
+          </nav>
         </div>
       </div>
 
       {/* ── Tab Content ── */}
       <div className="mt-4 isolate">
+      {exportarReporte.isError && <p role="alert" className="mb-4 rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-800">No se pudo exportar el CSV. Tus filtros se conservan; podés reintentar la exportación.</p>}
       <Suspense fallback={<TabSpinner />}>
       {isReportTab ? (
-        activeQuery?.isLoading ? (
+        activeQuery?.fetchStatus === 'paused' ? (
+          <p role="status" className="rounded-lg border border-warning-200 bg-warning-50 p-4 text-sm text-warning-800">Sin conexión. Tus filtros se conservan; el reporte se actualizará al reconectar.</p>
+        ) : activeQuery?.isLoading ? (
           <div className="flex flex-col items-center justify-center py-24">
             <div className="relative">
               <div className="w-16 h-16 rounded-full border-4 border-primary-100 border-t-primary-500 animate-spin" />
@@ -346,7 +356,8 @@ const ReportesPage: React.FC = () => {
                 <FileText className="text-red-400" size={24} />
               </div>
               <p className="text-error-600 font-medium">Error al generar el reporte</p>
-              <p className="text-sm text-neutral-500 mt-1">Verifica tu conexión e intenta nuevamente</p>
+              <p className="text-sm text-neutral-700 mt-1">No se pudieron cargar los datos. Tus filtros se conservan.</p>
+              <Button variant="outline" className="mt-4" onClick={() => void activeQuery.refetch()}>Reintentar reporte</Button>
             </div>
           </Card>
         ) : activeQuery?.data ? (
@@ -366,6 +377,15 @@ const ReportesPage: React.FC = () => {
             </div>
           </Card>
         )
+      ) : needsCentroControl && activityQuery.fetchStatus === 'paused' ? (
+        <p role="status" className="rounded-lg border border-warning-200 bg-warning-50 p-4 text-sm text-warning-800">Sin conexión. Tus filtros se conservan; la actividad se actualizará al reconectar.</p>
+      ) : needsCentroControl && activityQuery.isPending ? (
+        <p role="status" className="py-12 text-center text-neutral-700">Cargando actividad del período…</p>
+      ) : needsCentroControl && activityQuery.isError ? (
+        <div role="alert" className="rounded-lg border border-error-200 bg-error-50 p-4 text-sm text-error-800">
+          No se pudo cargar la actividad. Tus filtros se conservan.
+          <Button variant="outline" className="mt-3" onClick={() => void activityQuery.refetch()}>Reintentar actividad</Button>
+        </div>
       ) : (
         <>
           {activeTab === 'inspecciones' && <InspeccionesTab key={`${fechaDesde}:${fechaHasta}`} mode="report" desde={fechaDesde} hasta={fechaHasta} />}

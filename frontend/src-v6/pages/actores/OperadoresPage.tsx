@@ -39,9 +39,9 @@ import {
 } from '../../hooks/useActores';
 
 const estadoConfig: Record<string, { label: string; color: any; icon: React.ReactNode }> = {
-  ACTIVO: { label: 'En linea', color: 'success', icon: <CheckCircle2 size={14} /> },
+  ACTIVO: { label: 'Activo', color: 'success', icon: <CheckCircle2 size={14} /> },
   MANTENIMIENTO: { label: 'Mantenimiento', color: 'warning', icon: <AlertCircle size={14} /> },
-  INACTIVO: { label: 'Fuera de servicio', color: 'error', icon: <AlertCircle size={14} /> },
+  INACTIVO: { label: 'Inactivo', color: 'error', icon: <AlertCircle size={14} /> },
 };
 
 const INITIAL_FORM = {

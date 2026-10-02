@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { ReportRow, ReportSortHeader } from './ReportTableControls';
 import {
-  Factory, Package, MapPin, FileText, Calendar, Search, ChevronUp, ChevronDown, Download, FileDown, Printer, Filter,
+  Factory, Package, MapPin, FileText, Calendar, Search, Download, FileDown, Printer, Filter,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -28,7 +28,6 @@ export default function GeneradoresTab({
   periodoLabel: string;
   incluirTodos?: boolean;
 }) {
-  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [categoriaFilter, setCategoriaFilter] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
@@ -36,10 +35,6 @@ export default function GeneradoresTab({
   const toggleSort = (key: string) => setSortConfig(prev =>
     prev?.key === key ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' }
   );
-  const SortIcon = ({ col }: { col: string }) => {
-    if (sortConfig?.key !== col) return <ChevronUp size={12} className="ml-1 opacity-30 inline" />;
-    return sortConfig.direction === 'asc' ? <ChevronUp size={12} className="ml-1 text-primary-600 inline" /> : <ChevronDown size={12} className="ml-1 text-primary-600 inline" />;
-  };
 
   // Fetch ALL generadores (used in "Ver Todos" mode)
   const { data: paginatedData, isLoading } = useGeneradores({ limit: 5000 });
@@ -60,7 +55,7 @@ export default function GeneradoresTab({
   }, [ccData]);
 
   // Choose data source: ccData when date-filtered, full API when "Ver Todos"
-  const isDateFiltered = !incluirTodos && ccGeneradores.length > 0;
+  const isDateFiltered = !incluirTodos;
   const generadores = isDateFiltered ? ccGeneradores : allGeneradores;
 
   const filtered = useMemo(() => {
@@ -222,6 +217,7 @@ export default function GeneradoresTab({
 
       <Card className="border-0 shadow-sm">
         <CardHeader
+          className="flex-col sm:flex-row"
           title={`Listado de Generadores (${filtered.length})`}
           subtitle={isDateFiltered ? `Generadores con actividad en ${periodoLabel}` : 'Generadores registrados en el sistema'}
           action={
@@ -293,18 +289,18 @@ export default function GeneradoresTab({
             <table className="w-full text-left">
               <thead className="bg-neutral-50/80 border-b border-neutral-200 sticky top-0 z-10">
                 <tr>
-                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('razonSocial')}>Razon Social<SortIcon col="razonSocial" /></th>
+                  <ReportSortHeader column="razonSocial" label="Razon Social" sort={sortConfig} onSort={toggleSort} />
                   <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">CUIT</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('categoria')}>Categoria<SortIcon col="categoria" /></th>
+                  <ReportSortHeader column="categoria" label="Categoria" sort={sortConfig} onSort={toggleSort} className="hidden md:table-cell" />
                   {!isDateFiltered && (
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('departamento')}>Departamento<SortIcon col="departamento" /></th>
+                    <ReportSortHeader column="departamento" label="Departamento" sort={sortConfig} onSort={toggleSort} className="hidden md:table-cell" />
                   )}
-                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('manifiestos')}>Manifiestos<SortIcon col="manifiestos" /></th>
+                  <ReportSortHeader column="manifiestos" label="Manifiestos" sort={sortConfig} onSort={toggleSort} />
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
                 {filtered.slice(0, 100).map((g, i) => (
-                  <tr key={`${g.id}-${i}`} className="hover:bg-primary-50/30 transition-colors cursor-pointer" onClick={() => g.id && navigate(`/admin/actores/generadores/${g.id}`)}>
+                  <ReportRow key={`${g.id}-${i}`} to={g.id ? `/admin/actores/generadores/${g.id}` : undefined}>
                     <td className="px-4 py-3 text-sm font-medium text-neutral-900 max-w-[200px] truncate">{g.razonSocial}</td>
                     <td className="px-4 py-3 text-sm text-neutral-600 font-mono text-xs">{g.cuit}</td>
                     <td className="px-4 py-3 text-sm text-neutral-600 hidden md:table-cell max-w-[150px] truncate" title={g.categoria}>{g.categoria || '-'}</td>
@@ -314,7 +310,7 @@ export default function GeneradoresTab({
                     <td className="px-4 py-3 text-center">
                       <Badge variant="soft" color="primary">{g.cantManifiestos}</Badge>
                     </td>
-                  </tr>
+                  </ReportRow>
                 ))}
                 {filtered.length === 0 && (
                   <tr>

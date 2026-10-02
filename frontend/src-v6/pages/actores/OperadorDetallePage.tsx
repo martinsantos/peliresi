@@ -54,9 +54,9 @@ interface OperadorViewModel extends Operador {
 }
 
 const estadoConfig: Record<string, { label: string; color: string }> = {
-  ACTIVO: { label: 'En línea', color: 'success' },
+  ACTIVO: { label: 'Activo', color: 'success' },
   MANTENIMIENTO: { label: 'Mantenimiento', color: 'warning' },
-  INACTIVO: { label: 'Fuera de servicio', color: 'error' },
+  INACTIVO: { label: 'Inactivo', color: 'error' },
 };
 
 /** Parse tecnologia string into structured entries: { metodo, corrientes[] } */

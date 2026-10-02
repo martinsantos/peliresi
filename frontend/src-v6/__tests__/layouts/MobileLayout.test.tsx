@@ -111,6 +111,12 @@ describe('MobileLayout Android shell', () => {
     expect(screen.queryByText('Mis Viajes')).not.toBeInTheDocument();
   });
 
+  it('uses the short Avisos title so the app header retains room for role and bell', () => {
+    renderMobileLayout('/notificaciones');
+    expect(screen.getByRole('banner')).toHaveTextContent('Avisos');
+    expect(screen.getByRole('banner')).not.toHaveTextContent('Notificaciones');
+  });
+
   it.each(['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'])('keeps active navigation green for %s without changing the role', role => {
     authState.currentUser = { ...authState.currentUser, rol: role };
     renderMobileLayout('/notificaciones');

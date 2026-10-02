@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { ReportRow, ReportSortHeader } from './ReportTableControls';
 import {
-  Users, Truck, Activity, TrendingUp, FileDown, ChevronUp, ChevronDown,
+  Truck, Activity, TrendingUp, FileDown,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -12,7 +12,6 @@ import { ChartTooltip } from '../../../components/charts/ChartTooltip';
 import { KpiCard } from '../../../components/charts/KpiCard';
 
 export default function TransporteTab({ data, periodo, onExportPDF }: { data: any; periodo: string; onExportPDF: () => void }) {
-  const navigate = useNavigate();
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const resumen = data.resumen || {};
   const transportistas = data.transportistas || [];
@@ -20,10 +19,6 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
   const toggleSort = (key: string) => setSortConfig(prev =>
     prev?.key === key ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' }
   );
-  const SortIcon = ({ col }: { col: string }) => {
-    if (sortConfig?.key !== col) return <ChevronUp size={12} className="ml-1 opacity-30 inline" />;
-    return sortConfig.direction === 'asc' ? <ChevronUp size={12} className="ml-1 text-primary-600 inline" /> : <ChevronDown size={12} className="ml-1 text-primary-600 inline" />;
-  };
 
   const sortedTransportistas = useMemo(() => {
     if (!sortConfig) return transportistas;
@@ -61,7 +56,7 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        <KpiCard icon={Users} label="Transportistas" value={resumen.totalTransportistas || 0} color="from-violet-600 to-violet-700" />
+        <KpiCard icon={Truck} label="Transportistas" value={resumen.totalTransportistas || 0} color="from-violet-600 to-violet-700" />
         <KpiCard icon={Truck} label="Total Viajes" value={resumen.totalViajes || 0} color="from-blue-600 to-blue-700" />
         <KpiCard icon={Activity} label="En Tránsito" value={resumen.viajesActivos || 0} color="from-amber-600 to-amber-700" sub="viajes activos" />
         <KpiCard icon={TrendingUp} label="Tasa Promedio" value={`${avgTasa.toFixed(1)}%`} color="from-emerald-600 to-emerald-700" sub="completitud" />
@@ -131,6 +126,7 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
       {transportistas.length > 0 && (
         <Card className="border-0 shadow-sm">
           <CardHeader
+            className="flex-col sm:flex-row"
             title={`Detalle de Transportistas (${transportistas.length})`}
             subtitle="Estadísticas de cada transportista"
             action={
@@ -144,24 +140,21 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
               <table className="w-full text-left">
                 <thead className="bg-neutral-50/80 border-b border-neutral-200 sticky top-0 z-10">
                   <tr>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('transportista')}>Transportista<SortIcon col="transportista" /></th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('totalViajes')}>Viajes<SortIcon col="totalViajes" /></th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('completados')}>Completados<SortIcon col="completados" /></th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('enTransito')}>En Tránsito<SortIcon col="enTransito" /></th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('vehiculos')}>Vehículos<SortIcon col="vehiculos" /></th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden lg:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('choferes')}>Choferes<SortIcon col="choferes" /></th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('tasa')}>Tasa<SortIcon col="tasa" /></th>
+                    <ReportSortHeader column="transportista" label="Transportista" sort={sortConfig} onSort={toggleSort} />
+                    <ReportSortHeader column="totalViajes" label="Viajes" sort={sortConfig} onSort={toggleSort} />
+                    <ReportSortHeader column="completados" label="Completados" sort={sortConfig} onSort={toggleSort} />
+                    <ReportSortHeader column="enTransito" label="En Tránsito" sort={sortConfig} onSort={toggleSort} className="hidden md:table-cell" />
+                    <ReportSortHeader column="vehiculos" label="Vehículos" sort={sortConfig} onSort={toggleSort} className="hidden md:table-cell" />
+                    <ReportSortHeader column="choferes" label="Choferes" sort={sortConfig} onSort={toggleSort} className="hidden lg:table-cell" />
+                    <ReportSortHeader column="tasa" label="Tasa" sort={sortConfig} onSort={toggleSort} className="hidden md:table-cell" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
                   {sortedTransportistas.map((t: any, i: number) => {
                     const tasa = parseFloat(t.tasaCompletitud || '0');
                     return (
-                      <tr
-                        key={i}
-                        className="hover:bg-primary-50/30 transition-colors cursor-pointer"
-                        onClick={() => t.transportistaId && navigate(`/admin/actores/transportistas/${t.transportistaId}`)}
-                      >
+                      <ReportRow
+                        key={i} to={t.transportistaId ? `/admin/actores/transportistas/${t.transportistaId}` : undefined}>
                         <td className="px-4 py-3 text-sm font-medium text-neutral-900 max-w-[200px] truncate" title={t.transportista}>{t.transportista}</td>
                         <td className="px-4 py-3 text-sm font-semibold text-neutral-900">{t.totalViajes}</td>
                         <td className="px-4 py-3 text-sm text-emerald-600 font-semibold">{t.completados}</td>
@@ -181,7 +174,7 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
                             </span>
                           </div>
                         </td>
-                      </tr>
+                      </ReportRow>
                     );
                   })}
                 </tbody>

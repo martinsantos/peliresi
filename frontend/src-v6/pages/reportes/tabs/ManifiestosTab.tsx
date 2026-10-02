@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { ReportRow, ReportSortHeader } from './ReportTableControls';
 import {
-  FileText, Package, Activity, TrendingUp, FileDown, ChevronUp, ChevronDown,
+  FileText, Package, Activity, TrendingUp, FileDown,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -14,7 +14,6 @@ import { KpiCard } from '../../../components/charts/KpiCard';
 import { CategoryBarChart } from '../../../components/charts/CategoryBarChart';
 
 export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: any; periodo: string; onExportPDF: () => void }) {
-  const navigate = useNavigate();
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const resumen = data.resumen || {};
   const porEstado = data.porEstado || {};
@@ -24,10 +23,6 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
   const toggleSort = (key: string) => setSortConfig(prev =>
     prev?.key === key ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' }
   );
-  const SortIcon = ({ col }: { col: string }) => {
-    if (sortConfig?.key !== col) return <ChevronUp size={12} className="ml-1 opacity-30 inline" />;
-    return sortConfig.direction === 'asc' ? <ChevronUp size={12} className="ml-1 text-primary-600 inline" /> : <ChevronDown size={12} className="ml-1 text-primary-600 inline" />;
-  };
 
   const sortedManifiestos = useMemo(() => {
     if (!sortConfig) return manifiestosList;
@@ -75,7 +70,7 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <KpiCard icon={FileText} label="Total Manifiestos" value={resumen.totalManifiestos || 0} color="from-emerald-600 to-emerald-700" />
         <KpiCard icon={Package} label="Total Residuos" value={`${(resumen.totalResiduos || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })} kg`} color="from-blue-600 to-blue-700" />
-        <KpiCard icon={Activity} label="Estados Activos" value={Object.keys(porEstado).length} color="from-indigo-600 to-indigo-700" sub="tipos de estado" />
+        <KpiCard icon={Activity} label="Estados presentes" value={Object.keys(porEstado).length} color="from-indigo-600 to-indigo-700" sub="tipos de estado" />
         <KpiCard icon={TrendingUp} label="Tipos de Residuo" value={Object.keys(porTipoResiduo).length} color="from-amber-600 to-amber-700" sub="categorías" />
       </div>
 
@@ -116,6 +111,7 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
       {manifiestosList.length > 0 && (
         <Card className="border-0 shadow-sm">
           <CardHeader
+            className="flex-col sm:flex-row"
             title={`Detalle de Manifiestos (${manifiestosList.length})`}
             subtitle="Registros individuales del período"
             action={
@@ -129,18 +125,18 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
               <table className="w-full text-left">
                 <thead className="bg-neutral-50/80 border-b border-neutral-200 sticky top-0 z-10">
                   <tr>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('numero')}>Número<SortIcon col="numero" /></th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('estado')}>Estado<SortIcon col="estado" /></th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('generador')}>Generador<SortIcon col="generador" /></th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('transportista')}>Transportista<SortIcon col="transportista" /></th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden lg:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('operador')}>Operador<SortIcon col="operador" /></th>
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('fecha')}>Fecha<SortIcon col="fecha" /></th>
+                    <ReportSortHeader column="numero" label="Número" sort={sortConfig} onSort={toggleSort} />
+                    <ReportSortHeader column="estado" label="Estado" sort={sortConfig} onSort={toggleSort} />
+                    <ReportSortHeader column="generador" label="Generador" sort={sortConfig} onSort={toggleSort} />
+                    <ReportSortHeader column="transportista" label="Transportista" sort={sortConfig} onSort={toggleSort} className="hidden md:table-cell" />
+                    <ReportSortHeader column="operador" label="Operador" sort={sortConfig} onSort={toggleSort} className="hidden lg:table-cell" />
+                    <ReportSortHeader column="fecha" label="Fecha" sort={sortConfig} onSort={toggleSort} className="hidden md:table-cell" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
-                  {sortedManifiestos.slice(0, 50).map((m: any, i: number) => (
-                    <tr key={i} className="hover:bg-primary-50/30 transition-colors cursor-pointer" onClick={() => m.id && navigate(`/manifiestos/${m.id}`)}>
-                      <td className="px-4 py-3 text-sm font-semibold text-primary-600">{m.numero}</td>
+                  {sortedManifiestos.map((m: any, i: number) => (
+                    <ReportRow key={i} to={m.id ? `/manifiestos/${m.id}` : undefined}>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm font-semibold text-primary-600">{m.numero}</td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full" style={{
                           backgroundColor: (ESTADO_CHART_COLORS[m.estado] || '#94A3B8') + '18',
@@ -154,7 +150,7 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
                       <td className="px-4 py-3 text-sm text-neutral-700 max-w-[200px] truncate hidden md:table-cell" title={m.transportista || '-'}>{m.transportista || '-'}</td>
                       <td className="px-4 py-3 text-sm text-neutral-700 max-w-[200px] truncate hidden lg:table-cell" title={m.operador || '-'}>{m.operador || '-'}</td>
                       <td className="px-4 py-3 text-sm text-neutral-500 hidden md:table-cell">{m.createdAt ? new Date(m.createdAt).toLocaleDateString('es-AR') : '-'}</td>
-                    </tr>
+                    </ReportRow>
                   ))}
                 </tbody>
               </table>
