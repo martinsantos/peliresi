@@ -27,8 +27,7 @@ import { useGeneradoresEnrichment } from '../../hooks/useEnrichment';
 import { CORRIENTES_Y, parseCorrientes } from '../../data/corrientes-y';
 import DocumentUpload from '../../components/DocumentUpload';
 import CalculadoraTEF from '../../components/CalculadoraTEF';
-import type { PagoTEF, DeclaracionJurada } from '../../services/generador-fiscal.service';
-import api from '../../services/api';
+import { generadorFiscalService, type PagoTEF, type DeclaracionJurada, type Documento } from '../../services/generador-fiscal.service';
 import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
 import { ActorInspectionsPanel } from '../inspecciones/ActorInspectionsPanel';
 
@@ -269,8 +268,12 @@ const GeneradorDetallePage: React.FC = () => {
     }
   };
 
-  const handleDownloadDoc = (doc: any) => {
-    window.open(`${api.defaults.baseURL}/actores/documentos/${doc.id}/download`, '_blank');
+  const handleDownloadDoc = async (doc: Documento) => {
+    try {
+      await generadorFiscalService.downloadDocumento(doc.id, doc.nombre);
+    } catch {
+      toast.error('No se pudo descargar el documento', 'Verificá la conexión e intentá nuevamente.');
+    }
   };
 
   const handleRevisarDoc = async (docId: string, estado: 'APROBADO' | 'RECHAZADO') => {

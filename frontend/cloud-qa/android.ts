@@ -124,6 +124,10 @@ const login=async(user:string)=>{
     page.getByRole('button',{name:'Ingresar',exact:true}).tap(),
   ]);
   expect(response.status()).toBe(200);
+  // Chrome may raise its own notification introduction immediately after the
+  // navigation. Dismiss only that observed OS prompt before reading web roles;
+  // the native dialog hides the page accessibility tree, not the login result.
+  await settleNativeChrome();
   await expect(page.getByRole('banner')).toBeVisible();
   await expect(page).not.toHaveURL(/\/login$/);
   await settleNativeChrome();
@@ -279,7 +283,11 @@ try{
     await page.locator('#inspection-observations').fill('QA Android comentario conservado después de cerrar Chrome.');
     const [saved]=await Promise.all([
       page.waitForResponse(r=>r.url().endsWith('/api/inspecciones/'+inspection.id+'/borrador')&&r.request().method()==='PATCH'),
-      page.getByRole('button',{name:'Guardar cambios',exact:true}).tap(),
+      // run17's device capture shows Guardar above the still-open keyboard.
+      // CDP tap instead hits the textarea at its layout-viewport coordinate.
+      // Use the same actual OS path as Crear, with fresh accessible bounds and
+      // the existing viewport guard; still require the real PATCH + server ACK.
+      nativeButtonTap('Guardar cambios','save-field-observation'),
     ]);
     expect(saved.status()).toBe(200);
     const confirmed=await saved.json();

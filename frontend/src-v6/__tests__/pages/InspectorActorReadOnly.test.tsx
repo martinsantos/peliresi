@@ -1,10 +1,12 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import GeneradorDetallePage from '../../pages/admin/GeneradorDetallePage';
 import ProtectedRoute from '../../components/ProtectedRoute';
 
-const mock = vi.hoisted(() => ({ role: 'GENERADOR', write: vi.fn() }));
+const mock = vi.hoisted(() => ({ role: 'GENERADOR', write: vi.fn(), download: vi.fn(), error: vi.fn() }));
+vi.mock('../../services/generador-fiscal.service', () => ({ generadorFiscalService: { downloadDocumento: mock.download } }));
+vi.mock('../../components/ui/Toast', () => ({ toast: { success: vi.fn(), error: mock.error } }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { rol: mock.role, esInspector: true }, isLoading: false, isRestricted: false }) }));
 vi.mock('../../hooks/useActores', () => ({ useGenerador: () => ({ data: { id: 'g-1', razonSocial: 'Planta de prueba', cuit: '30-12345678-9', activo: true } }) }));
 vi.mock('../../hooks/useEnrichment', () => ({ useGeneradoresEnrichment: () => ({ data: {} }) }));
@@ -28,7 +30,12 @@ function open(allowInspector: boolean) {
   </Routes></MemoryRouter>);
 }
 describe('inspector actor consultation', () => {
-  beforeEach(() => { mock.role = 'GENERADOR'; mock.write.mockClear(); });
+  beforeEach(() => {
+    mock.role = 'GENERADOR'; mock.write.mockClear(); mock.error.mockClear();
+    mock.download.mockReset().mockResolvedValue(undefined);
+    vi.spyOn(window, 'open').mockImplementation(() => null);
+  });
+  afterEach(() => vi.restoreAllMocks());
   it('does not grant administrative routes unless explicitly designated read-only', () => {
     open(false);
     expect(screen.getByText('Acceso denegado')).toBeInTheDocument();
@@ -50,5 +57,23 @@ describe('inspector actor consultation', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'DDJJ y Documentos' }));
     expect(screen.getByRole('button', { name: 'Registrar DDJJ' })).toBeInTheDocument();
     expect(screen.getByText(/Arrastra un archivo/)).toBeInTheDocument();
+  });
+  it('downloads in read-only consultation through the authenticated service, not an unauthenticated popup', async () => {
+    open(true);
+    fireEvent.click(screen.getByRole('tab', { name: 'DDJJ y Documentos' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Descargar Declaración.pdf', exact: true }));
+    await waitFor(() => expect(mock.download).toHaveBeenCalledWith('doc-1', 'Declaración.pdf'));
+    expect(window.open).not.toHaveBeenCalled();
+    expect(mock.write).not.toHaveBeenCalled();
+  });
+  it('reports a failed download and leaves the document available for retry', async () => {
+    mock.download.mockRejectedValue(new Error('offline'));
+    open(true);
+    fireEvent.click(screen.getByRole('tab', { name: 'DDJJ y Documentos' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Descargar Declaración.pdf', exact: true }));
+    await waitFor(() => expect(mock.error).toHaveBeenCalledWith('No se pudo descargar el documento', 'Verificá la conexión e intentá nuevamente.'));
+    expect(screen.getByRole('button', { name: 'Descargar Declaración.pdf', exact: true })).toBeEnabled();
+    expect(window.open).not.toHaveBeenCalled();
+    expect(mock.write).not.toHaveBeenCalled();
   });
 });

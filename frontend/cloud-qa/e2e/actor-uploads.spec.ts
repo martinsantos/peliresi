@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { login, prefix } from './helpers';
 
@@ -74,6 +75,36 @@ for (const actor of [
     await expect(documentPanel.getByText('QA-valid.pdf', { exact: true })).toBeVisible();
     await expect(documentPanel.getByText('QA-recovered.pdf', { exact: true })).toBeVisible();
     await expect(documentPanel.getByText('QA-retry.pdf', { exact: true })).toHaveCount(0);
+    for (const filename of ['QA-valid.pdf', 'QA-recovered.pdf']) {
+      const identity = (await documentPanel.getByText(filename, { exact: true }).boundingBox())!;
+      expect(identity.width).toBeGreaterThanOrEqual(100);
+      for (const action of ['Descargar', 'Aprobar', 'Rechazar', 'Eliminar']) {
+        const button = documentPanel.getByRole('button', { name: `${action} ${filename}`, exact: true });
+        await expect(button).toBeVisible();
+        const rect = (await button.boundingBox())!;
+        expect(rect.width).toBeGreaterThanOrEqual(44);
+        expect(rect.height).toBeGreaterThanOrEqual(44);
+        expect(rect.x).toBeGreaterThanOrEqual(0);
+        expect(rect.x + rect.width).toBeLessThanOrEqual(page.viewportSize()!.width + 1);
+      }
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+    await page.screenshot({ path: info.outputPath('generador-documents-visible.png'), animations: 'disabled' });
+    const [download, received] = await Promise.all([
+      page.waitForEvent('download'),
+      page.waitForResponse(res => /\/api\/actores\/documentos\/[^/]+\/download$/.test(new URL(res.url()).pathname)),
+      documentPanel.getByRole('button', { name: 'Descargar QA-valid.pdf', exact: true }).click(),
+    ]);
+    expect(received.status()).toBe(200);
+    expect(received.request().headers().authorization).toBe(authorization);
+    expect(received.headers()['content-type']).toContain('application/pdf');
+    expect(download.suggestedFilename()).toBe('QA-valid.pdf');
+    const downloadedFile = info.outputPath('QA-valid-downloaded.pdf');
+    await download.saveAs(downloadedFile);
+    expect(await readFile(downloadedFile, 'utf8')).toBe('%PDF-1.4\nQA synthetic upload');
+    expect(created).toHaveLength(1);
+    expect(apiErrors).toEqual([{ path: `/api/actores/${actor.path}/${saved.id}/documentos`, status: 400 }]);
+    expect(errors).toEqual([]);
   }
   await info.attach('real-upload-recovery', { body: JSON.stringify({ actorId: saved.id, registrations: created.length, expectedFailure: apiErrors }), contentType: 'application/json' });
 });

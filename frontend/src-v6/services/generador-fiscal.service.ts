@@ -101,6 +101,22 @@ export const generadorFiscalService = {
   getDownloadUrl(docId: string): string {
     return `/actores/documentos/${docId}/download`;
   },
+  async downloadDocumento(docId: string, filename: string): Promise<void> {
+    // The protected route requires the session interceptor; window.open does
+    // not send a Bearer header and would show a 401 instead of the document.
+    const { data } = await api.get(`/actores/documentos/${encodeURIComponent(docId)}/download`, { responseType: 'blob' });
+    const url = URL.createObjectURL(data);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename || 'documento-regulatorio';
+    try {
+      document.body.appendChild(link);
+      link.click();
+    } finally {
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+  },
   async revisarDocumento(docId: string, estado: 'APROBADO' | 'RECHAZADO', observaciones?: string): Promise<Documento> {
     const { data } = await api.patch(`/actores/documentos/${docId}/revisar`, { estado, observaciones });
     return data.data.documento;

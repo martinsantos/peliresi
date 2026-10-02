@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Upload, FileText, Download, CheckCircle, XCircle, Clock, Trash2, Eye } from 'lucide-react';
-import { Button } from './ui/ButtonV2';
+import { Upload, FileText, Download, CheckCircle, XCircle, Clock, Trash2 } from 'lucide-react';
 import { Badge } from './ui/BadgeV2';
 import type { Documento } from '../services/generador-fiscal.service';
 
@@ -124,24 +123,27 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
               const est = ESTADO_CONFIG[doc.estado as keyof typeof ESTADO_CONFIG] || ESTADO_CONFIG.PENDIENTE;
               const EstIcon = est.icon;
               return (
-                <div key={doc.id} className="flex items-center gap-3 px-4 py-3 bg-white hover:bg-neutral-50 transition-colors">
+                <div key={doc.id} className="grid grid-cols-[18px_minmax(0,1fr)] gap-x-3 gap-y-2 px-4 py-3 bg-white hover:bg-neutral-50 transition-colors sm:flex sm:items-center sm:gap-3">
                   <FileText size={18} className="text-neutral-400 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-neutral-900 truncate">{doc.nombre}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-neutral-400">{TIPO_LABELS[doc.tipo] || doc.tipo}</span>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
+                      <span className="text-xs text-neutral-400 break-words">{TIPO_LABELS[doc.tipo] || doc.tipo}</span>
                       {doc.anio && <span className="text-xs text-neutral-400">· {doc.anio}</span>}
                       <span className="text-xs text-neutral-400">· {formatSize(doc.size)}</span>
                     </div>
                   </div>
+                  <div className="col-span-2 flex flex-wrap items-center justify-between gap-2 sm:contents">
                   <Badge variant="soft" color={est.color}>
                     <EstIcon size={12} className="mr-1" />
                     {est.label}
                   </Badge>
                   <div className="flex items-center gap-1 shrink-0">
                     <button
+                      type="button"
+                      aria-label={`Descargar ${doc.nombre}`}
                       onClick={() => onDownload(doc)}
-                      className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-500"
+                      className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg hover:bg-neutral-100 text-neutral-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                       title="Descargar"
                     >
                       <Download size={15} />
@@ -149,15 +151,19 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                     {!readOnly && isAdmin && doc.estado === 'PENDIENTE' && onRevisar && (
                       <>
                         <button
+                          type="button"
+                          aria-label={`Aprobar ${doc.nombre}`}
                           onClick={() => onRevisar(doc.id, 'APROBADO')}
-                          className="p-1.5 rounded-lg hover:bg-success-50 text-success-600"
+                          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg hover:bg-success-50 text-success-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                           title="Aprobar"
                         >
                           <CheckCircle size={15} />
                         </button>
                         <button
+                          type="button"
+                          aria-label={`Rechazar ${doc.nombre}`}
                           onClick={() => onRevisar(doc.id, 'RECHAZADO')}
-                          className="p-1.5 rounded-lg hover:bg-error-50 text-error-600"
+                          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg hover:bg-error-50 text-error-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                           title="Rechazar"
                         >
                           <XCircle size={15} />
@@ -166,13 +172,16 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                     )}
                     {!readOnly && isAdmin && onDelete && (
                       <button
+                        type="button"
+                        aria-label={`Eliminar ${doc.nombre}`}
                         onClick={() => onDelete(doc.id)}
-                        className="p-1.5 rounded-lg hover:bg-error-50 text-neutral-400 hover:text-error-600"
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg hover:bg-error-50 text-neutral-400 hover:text-error-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                         title="Eliminar"
                       >
                         <Trash2 size={15} />
                       </button>
                     )}
+                  </div>
                   </div>
                 </div>
               );
