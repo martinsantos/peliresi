@@ -247,7 +247,7 @@ const ReportesPage: React.FC = () => {
       <div className="sm:sticky top-0 z-20 bg-[#FAFAF8] pt-2 pb-1 -mx-4 lg:-mx-8 px-4 lg:px-8">
         {/* Row 1: Date presets + date inputs + period badge + export buttons */}
         <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 bg-white rounded-t-xl border border-neutral-100 shadow-sm">
-          <div className="flex items-center gap-1 flex-wrap">
+          <div className="flex w-full min-w-0 sm:w-auto items-center gap-1 flex-wrap">
             <Calendar size={14} className="text-neutral-400" />
             {DATE_PRESETS.map(p => (
               <button
@@ -264,7 +264,7 @@ const ReportesPage: React.FC = () => {
                 {p.label}
               </button>
             ))}
-            <div className="flex w-full sm:w-auto items-end gap-2 text-sm text-neutral-700">
+            <div className="flex w-full min-w-0 sm:w-auto items-end gap-2 text-sm text-neutral-700">
               <label className="flex min-w-0 flex-1 flex-col gap-1">Desde
               <input
                 type="date"
