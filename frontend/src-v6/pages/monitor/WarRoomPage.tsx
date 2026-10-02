@@ -11,7 +11,7 @@ import { canUseInspectionOperations } from '../../services/inspectionOperations.
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Radio, Play, Pause, FastForward, Calendar, Film, X, Leaf, Clock } from 'lucide-react';
+import { Radio, Play, Pause, FastForward, Calendar, Film, X, Leaf, Clock, FileText } from 'lucide-react';
 import { useWarRoomData } from './hooks/useWarRoomData';
 import { useMonitorTimeline } from './hooks/useMonitorTimeline';
 import { useForecast } from './hooks/useForecast';
@@ -19,7 +19,6 @@ import { useTimeline } from './hooks/useTimeline';
 import { WarRoomMap } from './components/WarRoomMap';
 import { WarRoomHeader } from './components/WarRoomHeader';
 import { DashboardPanels } from './components/DashboardPanels';
-import { DepartureBoard } from './components/DepartureBoard';
 import { EventFeed } from './components/EventFeed';
 import { FloatingPanelLayer, useFloatingPanels } from './components/FloatingPanelLayer';
 import { TimelineControls } from './components/TimelineControls';
@@ -426,15 +425,14 @@ const WarRoomPage: React.FC = () => {
           onMove={movePanel}
           onMinimize={minimizePanel}
         />
-        {/* DepartureBoard — sticky overlay top-left of map */}
+        {/* A compact entry to the same detail keeps the map visible. */}
         {mode === 'PLAYBACK' && playback.currentEvent && (
-          <div className="absolute top-3 left-3 z-[1001] w-72 pointer-events-none">
-            <DepartureBoard
-              event={playback.currentEvent}
-              eventIndex={playback.currentEventIndex}
-              totalEvents={playback.totalEventCount}
-            />
-          </div>
+          <button type="button" aria-label="Abrir detalle del evento actual"
+            className="wr-current-event absolute top-3 left-3 z-[1001] max-w-[calc(100%_-_24px)] min-h-11 flex items-center gap-2 px-3 py-2 rounded-lg border border-neutral-300 bg-white text-neutral-800 shadow-sm text-left hover:bg-neutral-50"
+            onClick={() => { if(playback.currentEvent) handleEventOpen({...playback.currentEvent,tipo:playback.currentEvent.eventoTipo || 'EVENTO'}); }}>
+            <FileText size={16} className="shrink-0 text-[#1B5E3C]"/>
+            <span className="min-w-0"><span className="block text-xs text-neutral-600">Evento actual · {formatTimeShort(playback.currentEvent.timestamp)}</span><span className="block text-sm font-semibold font-mono truncate">{playback.currentEvent.manifiestoNumero}</span></span>
+          </button>
         )}
         <WarRoomMap
           inspections={mode === 'LIVE' ? inspections.data?.items || [] : []}

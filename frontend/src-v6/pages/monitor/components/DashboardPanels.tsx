@@ -534,7 +534,7 @@ export const DashboardPanels: React.FC<Props> = ({
               {forecastData.pendienteRetiro.length === 0
                 ? <p className="text-[11px] text-neutral-400 italic text-center py-1">Sin retiros pendientes</p>
                 : forecastData.pendienteRetiro.slice(0, 8).map(m => (
-                  <div key={m.manifiestoId} className="mb-2 p-2 rounded border border-amber-200 bg-amber-50/50">
+                  <Link key={m.manifiestoId} to={'/manifiestos/'+m.manifiestoId} aria-label={'Abrir manifiesto '+m.numero} className="block min-h-11 mb-2 p-2 rounded border border-amber-200 bg-amber-50/50 hover:bg-amber-100">
                     <div className="flex items-center justify-between mb-1">
                       <span className="font-mono font-bold text-xs text-neutral-800">{m.numero}</span>
                       <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">{m.diasEspera}d</span>
@@ -544,8 +544,9 @@ export const DashboardPanels: React.FC<Props> = ({
                       <span className="mx-1 text-neutral-400">→</span>
                       <span className="font-semibold text-blue-600">{m.operador}</span>
                     </div>
-                  </div>
+                  </Link>
                 ))}
+              {forecastData.pendienteRetiro.length>8 && <Link className="inline-flex min-h-11 items-center text-xs font-semibold text-primary-700 underline" to="/manifiestos?estado=APROBADO">Ver todos los retiros pendientes</Link>}
             </div>
             <div className="wr-panel p-3">
               <h3 className="text-xs font-bold text-purple-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -554,7 +555,7 @@ export const DashboardPanels: React.FC<Props> = ({
               {forecastData.pendienteTratamiento.length === 0
                 ? <p className="text-[11px] text-neutral-400 italic text-center py-1">Sin tratamientos pendientes</p>
                 : forecastData.pendienteTratamiento.slice(0, 8).map(m => (
-                  <div key={m.manifiestoId} className="mb-1.5 flex items-center gap-2">
+                  <Link key={m.manifiestoId} to={'/manifiestos/'+m.manifiestoId} aria-label={'Abrir manifiesto '+m.numero} className="min-h-11 mb-1.5 flex items-center gap-2 rounded px-1 hover:bg-purple-50">
                     <div className="w-1.5 h-5 rounded-full shrink-0" style={{ backgroundColor: m.estado === 'EN_TRATAMIENTO' ? '#a855f7' : '#8b5cf6' }} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
@@ -563,8 +564,12 @@ export const DashboardPanels: React.FC<Props> = ({
                       </div>
                       <div className="text-[10px] text-neutral-500 truncate">{m.operador}</div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
+              {forecastData.pendienteTratamiento.length>8 && <div className="flex flex-wrap gap-x-4">
+                <Link className="inline-flex min-h-11 items-center text-xs font-semibold text-primary-700 underline" to="/manifiestos?estado=RECIBIDO">Ver recibidos</Link>
+                <Link className="inline-flex min-h-11 items-center text-xs font-semibold text-primary-700 underline" to="/manifiestos?estado=EN_TRATAMIENTO">Ver en tratamiento</Link>
+              </div>}
             </div>
             {forecastData.vencimientosProximos.length > 0 && (
               <div className="wr-panel p-3">

@@ -99,9 +99,9 @@ api.interceptors.response.use(
 
       originalRequest._retry = true;
       isRefreshing = true;
+      const refreshToken = getRefreshToken();
 
       try {
-        const refreshToken = getRefreshToken();
         if (!refreshToken) throw new Error('No refresh token');
 
         const { data } = await axios.post<{ success: true; data: RefreshTokenResponse }>(
@@ -110,6 +110,9 @@ api.interceptors.response.use(
         );
 
         const { accessToken, refreshToken: newRefreshToken } = data.data;
+        if (!getAccessToken() || getRefreshToken() !== refreshToken) {
+          throw new Error('Session changed while refreshing');
+        }
         setTokens(accessToken, newRefreshToken);
         processQueue(null, accessToken);
 
@@ -117,7 +120,8 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
-        clearTokens();
+        // A late response from the previous session cannot erase a new login.
+        if (getRefreshToken() === refreshToken) clearTokens();
         // Don't hard-redirect — let React Router handle it
         // The ProtectedRoute will redirect to /login when currentUser is null
         return Promise.reject(refreshError);

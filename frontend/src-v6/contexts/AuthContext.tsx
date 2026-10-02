@@ -295,38 +295,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = useCallback(async () => {
     sessionChanging.current = true;
     ++authGeneration.current;
+    const confirmation = authService.logout();
+    clearTokens();
     clearOfflineSession();
     setOfflineExpiresAt(null);
     setCurrentUser(null);
     setIsLoading(false);
+    setIsRestricted(false);
+    setSolicitudId(null);
+    localStorage.removeItem('sitrep_impersonation');
+    localStorage.removeItem('sitrep_active_trip_id');
+    const keysToClean: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('viaje_snapshot_') || key.startsWith('viaje_status_') || key.startsWith('gps_pending_'))) keysToClean.push(key);
+    }
+    keysToClean.forEach(key => localStorage.removeItem(key));
+    // Pending actions stay owner-scoped; only re-downloadable snapshots go.
+    if (currentUser) void clearUserOfflineData(currentUser.id).catch(() => {});
     qc.clear();
+    sessionChanging.current = false;
     try {
-      await authService.logout();
+      await confirmation;
     } catch {
-      // ignore logout errors
-    } finally {
-      clearTokens();
-      setIsRestricted(false);
-      setSolicitudId(null);
-      // Clean up impersonation and trip-related localStorage
-      localStorage.removeItem('sitrep_impersonation');
-      localStorage.removeItem('sitrep_active_trip_id');
-      const keysToClean: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && (key.startsWith('viaje_snapshot_') || key.startsWith('viaje_status_') || key.startsWith('gps_pending_'))) {
-          keysToClean.push(key);
-        }
-      }
-      keysToClean.forEach(k => localStorage.removeItem(k));
-      // Re-downloadable snapshots can go. Pending actions remain scoped to
-      // their owner, so the same user can resume after signing in again.
-      if (currentUser) {
-        clearUserOfflineData(currentUser.id).catch(() => {});
-      }
-      qc.clear();
-      setCurrentUser(null);
-      sessionChanging.current = false;
+      // Already signed out locally. Do not mutate a newer session here.
     }
   }, [currentUser, qc]);
 

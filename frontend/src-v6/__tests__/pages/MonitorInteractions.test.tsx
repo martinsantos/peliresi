@@ -47,6 +47,15 @@ describe('Monitor: controles operativos y datos sin simulación',()=>{
     expect(screen.queryByText('Eventos')).not.toBeInTheDocument();
     expect(screen.queryByText('37')).not.toBeInTheDocument();
   });
+  it('los retiros y tratamientos pendientes permiten abrir su manifiesto exacto',()=>{
+    const data={...forecast,
+      pendienteRetiro:[{manifiestoId:'qa-retiro',numero:'QA-RET',generador:'QA Origen',operador:'QA Destino',diasEspera:2}],
+      pendienteTratamiento:[{manifiestoId:'qa-tratamiento',numero:'QA-TRAT',operador:'QA Destino',estado:'RECIBIDO',diasEnEspera:1}],
+    } as ForecastResponse;
+    render(<MemoryRouter><DashboardPanels mode="FORECAST" liveData={null} forecastData={data}/></MemoryRouter>);
+    expect(screen.getByRole('link',{name:'Abrir manifiesto QA-RET'})).toHaveAttribute('href','/manifiestos/qa-retiro');
+    expect(screen.getByRole('link',{name:'Abrir manifiesto QA-TRAT'})).toHaveAttribute('href','/manifiestos/qa-tratamiento');
+  });
   it('abre un evento con teclado sin depender de un div clickeable',async()=>{
     const onEventClick=vi.fn();const user=userEvent.setup();
     render(<EventFeed eventos={[event]} mode="LIVE" onEventClick={onEventClick}/>);

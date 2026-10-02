@@ -351,4 +351,32 @@ describe('AuthContext', () => {
     expect(screen.getByTestId('user')).toHaveTextContent('null');
     expect(localStorage.getItem(OFFLINE_SESSION_KEY)).toBeNull();
   });
+
+  it('clears local credentials immediately even if logout confirmation has not arrived', async () => {
+    let finish!: () => void;
+    vi.mocked(authService.logout).mockReturnValueOnce(new Promise(resolve=>{finish=resolve;}));
+    localStorage.setItem('sitrep_access_token',tokenFor());
+    vi.mocked(authService.getMe).mockResolvedValueOnce(inspector);
+    renderWithProviders();
+    await waitFor(()=>expect(screen.getByTestId('user')).toHaveTextContent('Inspectora Uno'));
+    try {
+      await userEvent.setup().click(screen.getByTestId('logout-btn'));
+      expect(screen.getByTestId('user')).toHaveTextContent('null');
+      expect(getAccessToken()).toBeNull();
+    } finally { await act(async()=>finish()); }
+  });
+
+  it('an old logout completion cannot erase a subsequently authenticated user', async () => {
+    let finish!: () => void;
+    vi.mocked(authService.logout).mockReturnValueOnce(new Promise(resolve=>{finish=resolve;}));
+    renderWithProviders();
+    await waitFor(()=>expect(screen.getByTestId('isLoading')).toHaveTextContent('false'));
+    await userEvent.setup().click(screen.getByTestId('logout-btn'));
+    await userEvent.setup().click(screen.getByTestId('login-btn'));
+    await waitFor(()=>expect(screen.getByTestId('user')).toHaveTextContent('Admin User'));
+    localStorage.setItem('sitrep_access_token','next-session');
+    await act(async()=>finish());
+    expect(screen.getByTestId('user')).toHaveTextContent('Admin User');
+    expect(getAccessToken()).toBe('next-session');
+  });
 });

@@ -81,3 +81,19 @@ it('does not attempt a refresh or widen permissions after a forbidden response',
   expect(post).not.toHaveBeenCalled();
   expect(localStorage.getItem('sitrep_access_token')).toBe('expired-access');
 });
+
+it.each(['logout', 'new-login'])('an in-flight refresh cannot resurrect or replace the session after %s', async change => {
+  let release!: (value: unknown) => void;
+  const post=vi.spyOn(axios,'post').mockImplementation(()=>new Promise(resolve=>{release=resolve;}));
+  const pending=monitor.fetchMonitorLive().then(()=>({ok:true}),error=>({ok:false,error}));
+  await vi.waitFor(()=>expect(post).toHaveBeenCalledTimes(1));
+  localStorage.removeItem('sitrep_access_token');localStorage.removeItem('sitrep_refresh_token');
+  if(change==='new-login'){
+    localStorage.setItem('sitrep_access_token','next-access');localStorage.setItem('sitrep_refresh_token','next-refresh');
+  }
+  release({data:{success:true,data:{accessToken:'fresh-access',refreshToken:'fresh-refresh'}}});
+  expect((await pending).ok).toBe(false);
+  expect(calls).toHaveLength(1);
+  expect(localStorage.getItem('sitrep_access_token')).toBe(change==='logout'?null:'next-access');
+  expect(localStorage.getItem('sitrep_refresh_token')).toBe(change==='logout'?null:'next-refresh');
+});

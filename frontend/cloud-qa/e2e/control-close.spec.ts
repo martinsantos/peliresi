@@ -127,6 +127,9 @@ test('monitor LIVE, PLAYBACK and FORECAST query real data and expose usable cont
   expect(liveResponse.status()).toBe(200);
   const liveData = (await liveResponse.json()).data;
   expect(Number.isFinite(liveData.estadisticas.total)).toBe(true);
+  const mappedCarriers=liveData.actores.transportistas.filter((actor:{lat:number;lng:number})=>actor.lat&&actor.lng);
+  expect(mappedCarriers.length).toBeGreaterThan(0);
+  await expect(page.locator('.wr-layout-map .leaflet-marker-icon [style*="rotate(45deg)"]')).toHaveCount(mappedCarriers.length);
   await expect(page.getByText('Toneladas',{exact:true})).toHaveCount(0);
   const gpsCount=liveData.enTransito.filter((trip:{ultimaPosicion:unknown})=>trip.ultimaPosicion!==null).length;
   await expect(page.getByText('Viajes con GPS',{exact:true}).locator('..')).toContainText(String(gpsCount));
@@ -135,11 +138,23 @@ test('monitor LIVE, PLAYBACK and FORECAST query real data and expose usable cont
   await expect(header.getByRole('button', { name: 'Historial', exact: true })).toBeInViewport({ ratio: 1 });
   await expect(header.getByRole('button', { name: 'Pendientes', exact: true })).toBeInViewport({ ratio: 1 });
   await expect(header.getByRole('button', { name: 'En vivo', exact: true })).toHaveAttribute('aria-pressed','true');
+  for(const mode of ['En vivo','Historial','Pendientes']){
+    const glyph=header.getByRole('button',{name:mode,exact:true}).locator('svg');
+    expect((await glyph.boundingBox())!.width).toBeGreaterThanOrEqual(15);
+  }
   await expect(header.locator('img')).toHaveAttribute('src',new RegExp('/favicon.svg$'));
   await expect(header.getByRole('status')).toContainText('Datos actualizados');
   await expect(page.locator('.wr-layout-bottom')).toContainText(String(liveData.estadisticas.total));
   await expect(page.getByText('Agenda activa · lugares de visita', { exact: true })).toBeVisible();
   await visibleProof(page, info, 'monitor-live');
+  if(info.project.name!=='web-desktop'){
+    const sidebar=(await page.locator('.wr-layout-sidebar').boundingBox())!;
+    const dashboard=(await page.locator('.wr-dashboard').boundingBox())!;
+    const bottom=(await page.locator('.wr-layout-bottom').boundingBox())!;
+    await expect(page.locator('.wr-layout-sidebar')).toHaveCSS('overflow-y','visible');
+    expect(sidebar.height).toBeGreaterThanOrEqual(dashboard.height-1);
+    expect(sidebar.y).toBeGreaterThanOrEqual(bottom.y+bottom.height-1);
+  }
   const states=page.getByRole('button',{name:'Estados del manifiesto',exact:true});
   await states.focus();await states.press('Space');
   await expect(states).toHaveAttribute('aria-expanded','false');
@@ -158,6 +173,9 @@ test('monitor LIVE, PLAYBACK and FORECAST query real data and expose usable cont
   const timelineData = (await timelineResponse.json()).data;
   expect(timelineData.eventos.length).toBeGreaterThan(0);
   await expect(page.getByText('Creados', { exact: true })).toBeVisible();
+  const currentEvent=page.getByRole('button',{name:'Abrir detalle del evento actual'});
+  await expect(currentEvent).toBeVisible();
+  expect((await currentEvent.boundingBox())!.height).toBeLessThanOrEqual(56);
   const event=page.getByRole('button',{name:/^Abrir evento /}).first();
   await expect(event).toBeVisible();
   await event.focus();await event.press('Space');
@@ -175,6 +193,8 @@ test('monitor LIVE, PLAYBACK and FORECAST query real data and expose usable cont
   await panel.getByRole('button',{name:'Expandir detalle'}).click();
   await expect(panel.locator('.fp-content')).toBeVisible();
   await panel.getByRole('button',{name:'Cerrar detalle'}).click();await expect(panel).toHaveCount(0);
+  await currentEvent.click();await expect(page.locator('.fp-window')).toHaveCount(1);
+  await page.locator('.fp-window').getByRole('button',{name:'Cerrar detalle'}).click();
   const slider=page.getByRole('slider',{name:'Recorrer historial'});
   await slider.focus();await slider.press('Home');
   await expect(slider).toHaveValue(String(Math.round(1000/timelineData.eventos.filter((e:{type:string})=>e.type==='EVENTO').length)));
@@ -194,6 +214,12 @@ test('monitor LIVE, PLAYBACK and FORECAST query real data and expose usable cont
   await expect(page.getByRole('button',{name:'Eventos',exact:true})).toHaveCount(0);
   await expect(page.getByText('Retiros pendientes',{exact:true}).locator('..')).toContainText(String(forecastData.pendienteRetiro.length));
   await visibleProof(page, info, 'monitor-forecast');
+  const firstPending=forecastData.pendienteRetiro[0];
+  expect(firstPending).toBeDefined();
+  await page.getByRole('link',{name:'Abrir manifiesto '+firstPending.numero,exact:true}).click();
+  await expect(page).toHaveURL(new RegExp('/manifiestos/'+firstPending.manifiestoId+'$'));
+  await expect(page.getByRole('button',{name:'Descargar PDF',exact:true})).toBeVisible();
+  await page.goBack();await expect(header).toBeVisible();
   await header.getByTitle('Cerrar (Esc)', { exact: true }).click();
   await expect(page).toHaveURL(new RegExp('/centro-control$'));
   expect(errors).toEqual([]);

@@ -195,11 +195,14 @@ try{
     ]);
     expect(started.status()).toBe(200);
     await page.getByRole('navigation',{name:'Secciones del expediente'}).getByRole('link',{name:'Registro',exact:true}).tap();
+    await page.locator('#inspection-observations').fill('QA Android comentario conservado después de cerrar Chrome.');
     const [saved]=await Promise.all([
       page.waitForResponse(r=>r.url().endsWith('/api/inspecciones/'+inspection.id+'/borrador')&&r.request().method()==='PATCH'),
-      page.locator('#inspection-observations').fill('QA Android comentario conservado después de cerrar Chrome.'),
+      page.getByRole('button',{name:'Guardar cambios',exact:true}).tap(),
     ]);
-    expect(saved.status()).toBe(200);await proof('saved-field-observation');
+    expect(saved.status()).toBe(200);
+    await expect(page.getByText('Cambios confirmados en el servidor',{exact:true})).toBeVisible();
+    await proof('saved-field-observation');
   });
   await check('process-restart-keeps-real-session-and-record',async()=>{
     assert.ok(inspection?.id);

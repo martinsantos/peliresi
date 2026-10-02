@@ -2,7 +2,8 @@
  * SITREP v6 - Auth Service
  */
 
-import api, { setTokens, clearTokens } from './api';
+import axios from 'axios';
+import api, { setTokens, clearTokens, getAccessToken } from './api';
 import type { LoginRequest, LoginResponse, ChangePasswordRequest } from '../types/api';
 import type { Usuario } from '../types/models';
 
@@ -15,11 +16,16 @@ export const authService = {
   },
 
   async logout(): Promise<void> {
-    try {
-      await api.post('/auth/logout');
-    } finally {
-      clearTokens();
-    }
+    const endingToken = getAccessToken();
+    clearTokens();
+    if (!endingToken) return;
+    // Logout must work locally even without a network. Use the captured ending
+    // credential, never an interceptor that could pick up a subsequent login.
+    await axios.post('/auth/logout', undefined, {
+      baseURL: api.defaults.baseURL,
+      timeout: api.defaults.timeout,
+      headers: { Authorization: `Bearer ${endingToken}` },
+    });
   },
 
   async getMe(): Promise<Usuario> {
