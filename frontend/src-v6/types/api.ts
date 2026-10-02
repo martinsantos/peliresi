@@ -464,6 +464,8 @@ export interface AlertaFilters {
 // ========================================
 
 export interface ReporteFilters {
+  page?: number;
+  limit?: number;
   fechaDesde?: string;
   fechaHasta?: string;
   generadorId?: string;

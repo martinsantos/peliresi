@@ -6,7 +6,7 @@
 
 import { useAuth } from '../../contexts/AuthContext';
 import { canUseInspectionOperations } from '../../services/inspectionOperations.service';
-import React, { useState, useMemo, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, lazy, Suspense } from 'react';
 import {
   FileText,
   Truck,
@@ -82,6 +82,7 @@ const ReportesPage: React.FC = () => {
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
   const [activeTab, setActiveTab] = useState<TabType>('manifiestos');
+  const [reportPage, setReportPage] = useState(1);
   const [incluirTodos, setIncluirTodos] = useState(true);
 
   // ── Department detail modal ──
@@ -100,6 +101,7 @@ const ReportesPage: React.FC = () => {
 
   // ── Date preset handler ──
   const handleDatePreset = useCallback((days: number) => {
+    setReportPage(1);
     setDatePreset(days);
     const range = computeDateRange(days);
     setFechaDesde(range.desde);
@@ -108,9 +110,10 @@ const ReportesPage: React.FC = () => {
   }, []);
 
   // ── Queries — reports (only fetch if filters exist, i.e. dates are set) ──
-  const manifiestos = useReporteManifiestos(activeTab === 'manifiestos' ? (appliedFilters || { fechaDesde: '', fechaHasta: '' }) : undefined);
-  const tratados = useReporteTratados(activeTab === 'tratados' ? (appliedFilters || { fechaDesde: '', fechaHasta: '' }) : undefined);
-  const transporte = useReporteTransporte(activeTab === 'transporte' ? (appliedFilters || { fechaDesde: '', fechaHasta: '' }) : undefined);
+  const reportFilters = useMemo(() => ({ ...appliedFilters, page: reportPage }), [appliedFilters, reportPage]);
+  const manifiestos = useReporteManifiestos(activeTab === 'manifiestos' ? reportFilters : undefined);
+  const tratados = useReporteTratados(activeTab === 'tratados' ? reportFilters : undefined);
+  const transporte = useReporteTransporte(activeTab === 'transporte' ? reportFilters : undefined);
 
   // ── Centro Control data (for Departamentos + Mapa tabs) ──
   const ccParams = useMemo(() => ({
@@ -128,13 +131,17 @@ const ReportesPage: React.FC = () => {
     : activeTab === 'tratados' ? tratados
     : activeTab === 'transporte' ? transporte
     : null;
+  const pagination = activeQuery?.data?.pagination;
+  useEffect(() => {
+    if (pagination && reportPage > Math.max(1, pagination.pages)) setReportPage(1);
+  }, [pagination, reportPage]);
 
   const periodoLabel = fechaDesde && fechaHasta
     ? `${fechaDesde} — ${fechaHasta}`
     : 'Todos los períodos';
 
   const handleExportCSV = () => {
-    const tipoMap: Record<string, string> = { manifiestos: 'manifiestos', tratados: 'manifiestos', transporte: 'transportistas' };
+    const tipoMap: Record<string, string> = { manifiestos: 'manifiestos', tratados: 'tratados', transporte: 'transporte' };
     const tipo = tipoMap[activeTab];
     if (tipo) {
       exportarReporte.mutate({ tipo, formato: 'csv', filters: appliedFilters || {} });
@@ -210,7 +217,7 @@ const ReportesPage: React.FC = () => {
 
     exportReportePDF({
       titulo: tabLabels[activeTab] || 'Reporte',
-      subtitulo: `${tabs.find(t => t.id === activeTab)?.label} - Sistema SITREP`,
+      subtitulo: `${tabs.find(t => t.id === activeTab)?.label} - Sistema SITREP${pagination ? ` · Página ${pagination.page} de ${Math.max(1, pagination.pages)} (${rows.length} registros de ${pagination.total})` : ''}`,
       periodo: periodoLabel,
       kpis,
       tabla: { headers, rows },
@@ -269,7 +276,7 @@ const ReportesPage: React.FC = () => {
               <input
                 type="date"
                 value={fechaDesde}
-                onChange={e => { setFechaDesde(e.target.value); setDatePreset(-1); setIncluirTodos(false); }}
+                onChange={e => { setFechaDesde(e.target.value); setDatePreset(-1); setIncluirTodos(false); setReportPage(1); }}
                 className="min-h-11 min-w-0 w-full px-2 py-2 rounded border border-neutral-300 text-neutral-900 bg-white text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
               />
               </label>
@@ -277,7 +284,7 @@ const ReportesPage: React.FC = () => {
               <input
                 type="date"
                 value={fechaHasta}
-                onChange={e => { setFechaHasta(e.target.value); setDatePreset(-1); setIncluirTodos(false); }}
+                onChange={e => { setFechaHasta(e.target.value); setDatePreset(-1); setIncluirTodos(false); setReportPage(1); }}
                 className="min-h-11 min-w-0 w-full px-2 py-2 rounded border border-neutral-300 text-neutral-900 bg-white text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
               />
               </label>
@@ -317,7 +324,7 @@ const ReportesPage: React.FC = () => {
                   key={tab.id}
                   type="button"
                   aria-pressed={isActive}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => { setActiveTab(tab.id); setReportPage(1); }}
                   className={`min-h-11 flex-shrink-0 flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary-700 ${
                     isActive
                       ? 'border-primary-700 text-primary-800'
@@ -335,7 +342,7 @@ const ReportesPage: React.FC = () => {
 
       {/* ── Tab Content ── */}
       <div className="mt-4 isolate">
-      {exportarReporte.isError && <p role="alert" className="mb-4 rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-800">No se pudo exportar el CSV. Tus filtros se conservan; podés reintentar la exportación.</p>}
+      {exportarReporte.isError && <p role="alert" className="mb-4 rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-800">No se pudo exportar el CSV. {exportarReporte.error instanceof Error ? exportarReporte.error.message : 'Tus filtros se conservan; podés reintentar la exportación.'}</p>}
       <Suspense fallback={<TabSpinner />}>
       {isReportTab ? (
         activeQuery?.fetchStatus === 'paused' ? (
@@ -365,6 +372,15 @@ const ReportesPage: React.FC = () => {
             {activeTab === 'manifiestos' && <ManifiestosTab data={activeQuery.data} periodo={periodoLabel} onExportPDF={handleExportPDF} />}
             {activeTab === 'tratados' && <TratadosTab data={activeQuery.data} periodo={periodoLabel} onExportPDF={handleExportPDF} />}
             {activeTab === 'transporte' && <TransporteTab data={activeQuery.data} periodo={periodoLabel} onExportPDF={handleExportPDF} />}
+            {pagination && (
+              <nav aria-label="Páginas del reporte" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white p-3">
+                <p role="status" className="text-sm text-neutral-700">Página {pagination.page} de {Math.max(1, pagination.pages)} · {pagination.total} registros</p>
+                <div className="flex gap-2">
+                  <Button variant="outline" disabled={reportPage <= 1 || activeQuery.isFetching} onClick={() => setReportPage(value => value - 1)}>Página anterior</Button>
+                  <Button variant="outline" disabled={reportPage >= pagination.pages || activeQuery.isFetching} onClick={() => setReportPage(value => value + 1)}>Página siguiente</Button>
+                </div>
+              </nav>
+            )}
           </>
         ) : (
           <Card className="border-0 shadow-sm">
