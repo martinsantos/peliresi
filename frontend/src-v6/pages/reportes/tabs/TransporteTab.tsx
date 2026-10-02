@@ -57,9 +57,9 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
     <div className="space-y-6 animate-fade-in">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <KpiCard icon={Truck} label="Transportistas" value={resumen.totalTransportistas || 0} color="from-violet-600 to-violet-700" />
-        <KpiCard icon={Truck} label="Total Viajes" value={resumen.totalViajes || 0} color="from-blue-600 to-blue-700" />
-        <KpiCard icon={Activity} label="En Tránsito" value={resumen.viajesActivos || 0} color="from-amber-600 to-amber-700" sub="viajes activos" />
-        <KpiCard icon={TrendingUp} label="Tasa Promedio" value={`${avgTasa.toFixed(1)}%`} color="from-emerald-600 to-emerald-700" sub="completitud" />
+        <KpiCard icon={Truck} label="Viajes de esta página" value={resumen.totalViajes || 0} color="from-blue-600 to-blue-700" />
+        <KpiCard icon={Activity} label="En Tránsito" value={resumen.viajesActivos || 0} color="from-amber-600 to-amber-700" sub="Esta página" />
+        <KpiCard icon={TrendingUp} label="Tasa Promedio" value={`${avgTasa.toFixed(1)}%`} color="from-emerald-600 to-emerald-700" sub="Esta página" />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
@@ -85,7 +85,7 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
         </Card>
 
         <Card className="border-0 shadow-sm">
-          <CardHeader title="Tasa de Completitud" subtitle="Promedio de todos los transportistas" />
+          <CardHeader title="Tasa de Completitud" subtitle="Promedio de los transportistas de esta página" />
           <CardContent>
             <div className="h-[320px] flex flex-col items-center justify-center">
               <div className="relative w-48 h-48">

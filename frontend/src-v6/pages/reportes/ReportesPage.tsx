@@ -29,6 +29,7 @@ import { useReporteManifiestos, useReporteTratados, useReporteTransporte, useExp
 import { useCentroControl } from '../../hooks/useCentroControl';
 import type { ActorGenerador, ActorTransportista, ActorOperador } from '../../hooks/useCentroControl';
 import { exportReportePDF } from '../../utils/exportPdf';
+import { formatReportQuantities } from '../../utils/report-quantities';
 import { DATE_PRESETS, computeDateRange } from '../../utils/date-presets';
 import { agruparPorDepartamento } from '../../utils/mendoza-departamentos';
 import type { ReporteFilters } from '../../types/api';
@@ -170,7 +171,7 @@ const ReportesPage: React.FC = () => {
       const list = (d.manifiestos as Record<string, unknown>[]) || [];
       kpis = [
         { label: 'Total Manifiestos', value: (r.totalManifiestos as number) || 0 },
-        { label: 'Total Residuos (kg)', value: Number(r.totalResiduos || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 }) },
+        { label: 'Residuos de esta página', value: formatReportQuantities(list) },
         { label: 'Estados', value: Object.keys((d.porEstado as Record<string, unknown>) || {}).length },
       ];
       headers = ['Número', 'Estado', 'Generador', 'Transportista', 'Operador', 'Fecha'];
@@ -186,8 +187,8 @@ const ReportesPage: React.FC = () => {
       const list = (d.detalle as Record<string, unknown>[]) || [];
       kpis = [
         { label: 'Manifiestos Tratados', value: (r.totalManifiestosTratados as number) || 0 },
-        { label: 'Residuos Tratados (kg)', value: Number(r.totalResiduosTratados || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 }) },
-        { label: 'Generadores', value: Object.keys((d.porGenerador as Record<string, unknown>) || {}).length },
+        { label: 'Residuos de esta página', value: formatReportQuantities(list) },
+        { label: 'Generadores de esta página', value: Object.keys((d.porGenerador as Record<string, unknown>) || {}).length },
       ];
       headers = ['Número', 'Generador', 'Método', 'Fecha', 'Residuos'];
       rows = list.map((item) => [
@@ -201,8 +202,8 @@ const ReportesPage: React.FC = () => {
       const list = (d.transportistas as Record<string, unknown>[]) || [];
       kpis = [
         { label: 'Transportistas', value: (r.totalTransportistas as number) || 0 },
-        { label: 'Total Viajes', value: (r.totalViajes as number) || 0 },
-        { label: 'En Tránsito', value: (r.viajesActivos as number) || 0 },
+        { label: 'Viajes de esta página', value: (r.totalViajes as number) || 0 },
+        { label: 'En Tránsito (página)', value: (r.viajesActivos as number) || 0 },
       ];
       headers = ['Transportista', 'Viajes', 'Completados', 'En Tránsito', 'Vehículos', 'Tasa'];
       rows = list.map((t) => [

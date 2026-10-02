@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ReportRow, ReportSortHeader } from './ReportTableControls';
+import { formatReportQuantities } from '../../../utils/report-quantities';
 import {
   Package, Activity, Factory, FileDown,
 } from 'lucide-react';
@@ -64,8 +65,8 @@ export default function TratadosTab({ data, periodo, onExportPDF }: { data: any;
     <div className="space-y-6 animate-fade-in">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <KpiCard icon={Package} label="Manifiestos Tratados" value={resumen.totalManifiestosTratados || 0} color="from-emerald-600 to-emerald-700" />
-        <KpiCard icon={Activity} label="Residuos Tratados" value={`${(resumen.totalResiduosTratados || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })} kg`} color="from-teal-600 to-teal-700" />
-        <KpiCard icon={Factory} label="Generadores" value={Object.keys(porGenerador).length} color="from-blue-600 to-blue-700" sub="involucrados" />
+        <KpiCard icon={Activity} label="Residuos de esta página" value={formatReportQuantities(detalle)} valueClassName="text-xl sm:text-3xl break-words" color="from-teal-600 to-teal-700" />
+        <KpiCard icon={Factory} label="Generadores de esta página" value={Object.keys(porGenerador).length} color="from-blue-600 to-blue-700" />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">

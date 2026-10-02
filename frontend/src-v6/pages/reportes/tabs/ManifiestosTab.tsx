@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ReportRow, ReportSortHeader } from './ReportTableControls';
+import { formatReportQuantities } from '../../../utils/report-quantities';
 import {
   FileText, Package, Activity, TrendingUp, FileDown,
 } from 'lucide-react';
@@ -69,7 +70,7 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
     <div className="space-y-6 animate-fade-in">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <KpiCard icon={FileText} label="Total Manifiestos" value={resumen.totalManifiestos || 0} color="from-emerald-600 to-emerald-700" />
-        <KpiCard icon={Package} label="Total Residuos" value={`${(resumen.totalResiduos || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })} kg`} color="from-blue-600 to-blue-700" />
+        <KpiCard icon={Package} label="Residuos de esta página" value={formatReportQuantities(manifiestosList)} valueClassName="text-xl sm:text-3xl break-words" color="from-blue-600 to-blue-700" />
         <KpiCard icon={Activity} label="Estados presentes" value={Object.keys(porEstado).length} color="from-indigo-600 to-indigo-700" sub="tipos de estado" />
         <KpiCard icon={TrendingUp} label="Tipos de Residuo" value={Object.keys(porTipoResiduo).length} color="from-amber-600 to-amber-700" sub="categorías" />
       </div>
@@ -155,11 +156,6 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
                 </tbody>
               </table>
             </div>
-            {manifiestosList.length > 50 && (
-              <div className="px-4 py-3 bg-neutral-50/50 border-t border-neutral-100 text-center">
-                <p className="text-sm text-neutral-500">Mostrando 50 de {manifiestosList.length} registros — Exporte para ver todos</p>
-              </div>
-            )}
           </CardContent>
         </Card>
       )}

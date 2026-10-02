@@ -4,8 +4,8 @@
 
 import type React from 'react';
 
-export function KpiCard({ label, value, icon: Icon, color, sub }: {
-  label: string; value: string | number; icon: React.ElementType; color: string; sub?: string;
+export function KpiCard({ label, value, icon: Icon, color, sub, valueClassName }: {
+  label: string; value: string | number; icon: React.ElementType; color: string; sub?: string; valueClassName?: string;
 }) {
   return (
     <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${color} p-5 group hover:shadow-lg transition-all duration-300 hover-lift`}>
@@ -16,7 +16,7 @@ export function KpiCard({ label, value, icon: Icon, color, sub }: {
             <Icon size={20} className="text-white" />
           </div>
         </div>
-        <p className="text-3xl font-extrabold text-white tracking-tight">{value}</p>
+        <p className={`${valueClassName || 'text-3xl'} font-extrabold text-white tracking-tight`}>{value}</p>
         <p className="text-sm text-white/80 font-medium mt-1">{label}</p>
         {sub && <p className="text-xs text-white/60 mt-0.5">{sub}</p>}
       </div>

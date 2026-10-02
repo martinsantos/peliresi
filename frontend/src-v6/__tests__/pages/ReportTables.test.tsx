@@ -28,6 +28,24 @@ const cases = [
   { name: 'operadores', render: () => <OperadoresTab periodoLabel="Todo" />, text: 'QA Operador', header: 'Razon Social', path: '/admin/actores/operadores/op' },
 ];
 describe('report table interaction contract', () => {
+  it.each(['manifiestos','tratados'])('%s never labels liters as kilograms or a page as the complete quantity',tipo=>{
+    const row={id:'m',numero:'QA-MIX',residuos:[{cantidad:2,unidad:'L'},{cantidad:5,unidad:'kg'}]};
+    const data={resumen:{totalResiduos:999,totalResiduosTratados:999},manifiestos:[row],detalle:[row]};
+    render(<MemoryRouter>{tipo==='manifiestos'?<ManifiestosTab {...props} data={data}/>:<TratadosTab {...props} data={data}/>}</MemoryRouter>);
+    const metric=screen.getByText('Residuos de esta página').parentElement!;
+    expect(metric).toHaveTextContent('2 L');expect(metric).toHaveTextContent('5 kg');expect(metric).not.toHaveTextContent('999');
+    expect(metric.querySelector('p.text-xl')).toHaveClass('break-words');
+  });
+  it('identifies transport aggregates that only describe the current page',()=>{
+    render(<MemoryRouter><TransporteTab {...props} data={{resumen:{totalTransportistas:101,totalViajes:2,viajesActivos:1},transportistas:[]}}/></MemoryRouter>);
+    expect(screen.getByText('Viajes de esta página')).toBeVisible();
+    expect(screen.queryByText('Total Viajes',{exact:true})).toBeNull();
+  });
+  it('does not claim 50 visible records when all 100 loaded rows are rendered',()=>{
+    render(<MemoryRouter><ManifiestosTab {...props} data={{manifiestos:Array.from({length:100},(_,i)=>({id:'m'+i,numero:'QA-'+i,estado:'APROBADO',generador:'QA'}))}} /></MemoryRouter>);
+    expect(screen.getByRole('table').querySelectorAll('tbody tr')).toHaveLength(100);
+    expect(screen.queryByText(/Mostrando 50 de/)).toBeNull();
+  });
   for (const item of cases) {
     it(`${item.name}: the whole row supports keyboard navigation within app basename`, () => {
       render(<MemoryRouter basename="/app" initialEntries={['/app/reportes']}>{item.render()}<Location /></MemoryRouter>);
