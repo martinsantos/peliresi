@@ -43,8 +43,8 @@ jobs:
       CORS_ORIGIN: http://127.0.0.1:4177
       VITE_API_URL: /api
       QA_API_URL: http://127.0.0.1:3037/api
-      QA_ARTIFACTS: ${{ runner.temp }}/sitrep-night-20260926.cloud
-      UPLOADS_DIR: ${{ runner.temp }}/sitrep-night-20260926.cloud/uploads
+      QA_ARTIFACTS: /tmp/sitrep-night-20260926.cloud
+      UPLOADS_DIR: /tmp/sitrep-night-20260926.cloud/uploads
       QA_WEB_BUILD: ${{ github.workspace }}/frontend/dist
       QA_APP_BUILD: ${{ github.workspace }}/frontend/dist-app
       QA_MANUAL_ROOT: ${{ github.workspace }}/docs/manual
@@ -132,6 +132,6 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sitrep-cloud-qa-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/sitrep-night-20260926.cloud
+          path: /tmp/sitrep-night-20260926.cloud
           retention-days: 3
           compression-level: 9
