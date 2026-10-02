@@ -28,6 +28,8 @@ interface Counters {
   recibido: number;
   enTratamiento: number;
   tratado: number;
+  cancelado: number;
+  rechazado: number;
   totalCreated: number;
 }
 
@@ -59,6 +61,8 @@ const INITIAL_COUNTERS: Counters = {
   recibido: 0,
   enTratamiento: 0,
   tratado: 0,
+  cancelado: 0,
+  rechazado: 0,
   totalCreated: 0,
 };
 
@@ -85,21 +89,11 @@ const EVENTO_TO_COUNTER: Record<string, keyof Counters | null> = {
   RECEPCION: 'recibido',
   TRATAMIENTO: 'enTratamiento',
   CIERRE: 'tratado',
-  CANCELACION: null,
-  RECHAZO: null,
+  CANCELACION: 'cancelado',
+  RECHAZO: 'rechazado',
   INCIDENTE: null,
   PESAJE: null,
   REVERSION: null,
-};
-
-/** Map eventoTipo → previous counter key to decrement */
-const PREV_STATE: Record<string, keyof Counters | null> = {
-  FIRMA: 'borrador',
-  RETIRO: 'aprobado',
-  ENTREGA: 'enTransito',
-  RECEPCION: 'entregado',
-  TRATAMIENTO: 'recibido',
-  CIERRE: 'enTratamiento',
 };
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
@@ -121,6 +115,8 @@ export function useTimeline(events: TimelineEvent[] | null) {
   const processedEventsRef = useRef<TimelineEvent[]>([]);
   const activeTripsRef = useRef<Map<string, TripState>>(new Map());
   const countersRef = useRef<Counters>({ ...INITIAL_COUNTERS });
+  const manifestStatesRef = useRef(new Map<string, keyof Counters>());
+  const createdIdsRef = useRef(new Set<string>());
   const currentEventObjRef = useRef<TimelineEvent | null>(null);
 
   // Time boundaries for scrubber compatibility
@@ -151,6 +147,8 @@ export function useTimeline(events: TimelineEvent[] | null) {
       // Update truck position silently
       if (ev.latitud != null && ev.longitud != null) {
         const key = ev.manifiestoId;
+        const knownState = manifestStatesRef.current.get(key);
+        if (knownState && knownState !== 'enTransito') return;
         const existing = activeTripsRef.current.get(key);
         const pos: [number, number] = [ev.latitud, ev.longitud];
         if (existing) {
@@ -168,20 +166,21 @@ export function useTimeline(events: TimelineEvent[] | null) {
     } else if (ev.type === 'EVENTO' && ev.eventoTipo) {
       const tipo = ev.eventoTipo;
 
-      // Decrement previous state counter
-      const prevKey = PREV_STATE[tipo];
-      if (prevKey && countersRef.current[prevKey] > 0) {
-        countersRef.current[prevKey]--;
-      }
-
-      // Increment new state counter
+      // Reconstruct each observed manifest independently. A first event today
+      // cannot decrement another manifest, or assume yesterday's state.
       const newKey = EVENTO_TO_COUNTER[tipo];
       if (newKey) {
-        countersRef.current[newKey]++;
+        const prevKey = manifestStatesRef.current.get(ev.manifiestoId);
+        if (prevKey !== newKey) {
+          if (prevKey) countersRef.current[prevKey]--;
+          countersRef.current[newKey]++;
+          manifestStatesRef.current.set(ev.manifiestoId,newKey);
+        }
       }
 
       // Track total created
-      if (tipo === 'CREACION') {
+      if (tipo === 'CREACION' && !createdIdsRef.current.has(ev.manifiestoId)) {
+        createdIdsRef.current.add(ev.manifiestoId);
         countersRef.current.totalCreated++;
       }
 
@@ -217,7 +216,7 @@ export function useTimeline(events: TimelineEvent[] | null) {
         }
       }
 
-      if (tipo === 'RECEPCION' || tipo === 'CIERRE') {
+      if (tipo === 'RECEPCION' || tipo === 'CIERRE' || tipo === 'CANCELACION' || tipo === 'RECHAZO') {
         activeTripsRef.current.delete(ev.manifiestoId);
       }
 
@@ -238,6 +237,8 @@ export function useTimeline(events: TimelineEvent[] | null) {
     processedEventsRef.current = [];
     activeTripsRef.current = new Map();
     countersRef.current = { ...INITIAL_COUNTERS };
+    manifestStatesRef.current.clear();
+    createdIdsRef.current.clear();
     currentEventObjRef.current = null;
 
     if (targetIdx < 0 || eventoList.length === 0) {
@@ -375,6 +376,8 @@ export function useTimeline(events: TimelineEvent[] | null) {
       processedEventsRef.current = [];
       activeTripsRef.current = new Map();
       countersRef.current = { ...INITIAL_COUNTERS };
+      manifestStatesRef.current.clear();
+      createdIdsRef.current.clear();
       currentEventObjRef.current = null;
       startTimeRef.current = 0;
       endTimeRef.current = 0;
@@ -414,6 +417,8 @@ export function useTimeline(events: TimelineEvent[] | null) {
     processedEventsRef.current = [];
     activeTripsRef.current = new Map();
     countersRef.current = { ...INITIAL_COUNTERS };
+    manifestStatesRef.current.clear();
+    createdIdsRef.current.clear();
     currentEventObjRef.current = null;
 
     setState({
@@ -451,6 +456,8 @@ export function useTimeline(events: TimelineEvent[] | null) {
       processedEventsRef.current = [];
       activeTripsRef.current = new Map();
       countersRef.current = { ...INITIAL_COUNTERS };
+      manifestStatesRef.current.clear();
+      createdIdsRef.current.clear();
       currentEventObjRef.current = null;
     }
 
@@ -516,37 +523,11 @@ export function useTimeline(events: TimelineEvent[] | null) {
     const targetIdx = currentEventIndexRef.current + n;
     const clamped = Math.max(-1, Math.min(targetIdx, eventoListRef.current.length - 1));
 
-    if (n > 0 && clamped > currentEventIndexRef.current) {
-      // Forward: step incrementally (more efficient than full reprocess)
-      const allSorted = allSortedRef.current;
-      const eventoList = eventoListRef.current;
-      const prevMs = currentEventIndexRef.current >= 0
-        ? eventoList[currentEventIndexRef.current].unixMs
-        : 0;
-      const targetMs = eventoList[clamped].unixMs;
-
-      // Process GPS between current and target
-      for (let i = 0; i < allSorted.length; i++) {
-        const entry = allSorted[i];
-        if (entry.unixMs <= prevMs) continue;
-        if (entry.unixMs > targetMs) break;
-        if (entry.type === 'GPS') {
-          processSingleEntry(entry);
-        }
-      }
-
-      // Process each evento between current+1 and clamped (inclusive)
-      for (let ei = currentEventIndexRef.current + 1; ei <= clamped; ei++) {
-        processSingleEntry(eventoList[ei]);
-      }
-      currentEventIndexRef.current = clamped;
-    } else {
-      // Backward or same: reprocess from scratch
-      processUpToEvent(clamped);
-    }
+    // Keep GPS and state events in timestamp order for keyboard jumps too.
+    processUpToEvent(clamped);
 
     flushState();
-  }, [clearPlayInterval, processSingleEntry, processUpToEvent, flushState]);
+  }, [clearPlayInterval, processUpToEvent, flushState]);
 
   /**
    * seek(progress) — jump to a position by progress fraction (0-1).
@@ -574,6 +555,8 @@ export function useTimeline(events: TimelineEvent[] | null) {
     processedEventsRef.current = [];
     activeTripsRef.current = new Map();
     countersRef.current = { ...INITIAL_COUNTERS };
+    manifestStatesRef.current.clear();
+    createdIdsRef.current.clear();
     currentEventObjRef.current = null;
 
     setState(prev => ({

@@ -32,11 +32,14 @@ const ESTADO_COLORS: Record<string, { base: string; dark: string }> = {
   RECIBIDO:       { base: '#8b5cf6', dark: '#7c3aed' },
   EN_TRATAMIENTO: { base: '#a855f7', dark: '#9333ea' },
   TRATADO:        { base: '#eab308', dark: '#ca8a04' },
+  CANCELADO:      { base: '#737373', dark: '#525252' },
+  RECHAZADO:      { base: '#ef4444', dark: '#b91c1c' },
 };
 
 const ESTADO_LABELS: Record<string, string> = {
   BORRADOR: 'Borrador', APROBADO: 'Aprobado', EN_TRANSITO: 'En Tránsito',
   ENTREGADO: 'Entregado', RECIBIDO: 'Recibido', EN_TRATAMIENTO: 'En Tratam.', TRATADO: 'Tratado',
+  CANCELADO: 'Cancelado', RECHAZADO: 'Rechazado',
 };
 
 // ─── Widget system ────────────────────────────────────────────────────────────
@@ -274,7 +277,7 @@ export const DashboardPanels: React.FC<Props> = ({
     ? (playbackCounters || {})
     : (liveData?.estadisticas?.porEstado || {});
   const maxEstado = Math.max(...Object.values(porEstado), 1);
-  const stages = ['BORRADOR', 'APROBADO', 'EN_TRANSITO', 'ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO', 'TRATADO'];
+  const stages = ['BORRADOR', 'APROBADO', 'EN_TRANSITO', 'ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO', 'TRATADO', 'CANCELADO', 'RECHAZADO'];
   const eventos = playbackEvents || liveData?.eventosRecientes || [];
 
   // In PLAYBACK: derive Residuos/Tratamiento/Actores from timelineData events
@@ -302,15 +305,20 @@ export const DashboardPanels: React.FC<Props> = ({
 
   const timelineActores = React.useMemo(() => {
     if (mode !== 'PLAYBACK' || !timelineData) return null;
-    const gen: Record<string, number> = {};
-    const ope: Record<string, number> = {};
+    const gen = new Map<string, Set<string>>();
+    const ope = new Map<string, Set<string>>();
+    const add = (actors: Map<string, Set<string>>, name: string | undefined, id: string) => {
+      if (!name || !id) return;
+      if (!actors.has(name)) actors.set(name,new Set());
+      actors.get(name)!.add(id);
+    };
     timelineData.eventos.forEach(ev => {
-      if (ev.generador?.razonSocial) gen[ev.generador.razonSocial] = (gen[ev.generador.razonSocial] || 0) + 1;
-      if (ev.operador?.razonSocial) ope[ev.operador.razonSocial] = (ope[ev.operador.razonSocial] || 0) + 1;
+      add(gen,ev.generador?.razonSocial,ev.manifiestoId);
+      add(ope,ev.operador?.razonSocial,ev.manifiestoId);
     });
     return {
-      generadores: Object.entries(gen).map(([razonSocial, cantidad]) => ({ razonSocial, cantidad })).sort((a, b) => b.cantidad - a.cantidad),
-      operadores: Object.entries(ope).map(([razonSocial, cantidad]) => ({ razonSocial, cantidad })).sort((a, b) => b.cantidad - a.cantidad),
+      generadores: Array.from(gen,([razonSocial, ids]) => ({ razonSocial, cantidad:ids.size })).sort((a, b) => b.cantidad - a.cantidad),
+      operadores: Array.from(ope,([razonSocial, ids]) => ({ razonSocial, cantidad:ids.size })).sort((a, b) => b.cantidad - a.cantidad),
     };
   }, [mode, timelineData]);
 

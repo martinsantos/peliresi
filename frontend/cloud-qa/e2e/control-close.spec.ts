@@ -178,6 +178,10 @@ test('monitor LIVE, PLAYBACK and FORECAST query real data and expose usable cont
   const slider=page.getByRole('slider',{name:'Recorrer historial'});
   await slider.focus();await slider.press('Home');
   await expect(slider).toHaveValue(String(Math.round(1000/timelineData.eventos.filter((e:{type:string})=>e.type==='EVENTO').length)));
+  await slider.press('End');
+  const stateEvents=new Set(['CREACION','FIRMA','RETIRO','ENTREGA','RECEPCION','TRATAMIENTO','CIERRE','CANCELACION','RECHAZO']);
+  const observedManifests=new Set(timelineData.eventos.filter((e:{type:string;eventoTipo:string})=>e.type==='EVENTO'&&stateEvents.has(e.eventoTipo)).map((e:{manifiestoId:string})=>e.manifiestoId));
+  await expect(page.getByText('En historial',{exact:true}).locator('..').locator('p').first()).toHaveText(new Intl.NumberFormat('es-AR').format(observedManifests.size));
   await visibleProof(page, info, 'monitor-playback');
   const forecast = page.waitForResponse(r => r.url().includes('/api/centro-control/forecast'));
   await header.getByRole('button', { name: 'Pendientes', exact: true }).click();

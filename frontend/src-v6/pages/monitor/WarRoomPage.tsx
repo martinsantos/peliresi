@@ -302,6 +302,8 @@ const WarRoomPage: React.FC = () => {
       RECIBIDO: c.recibido,
       EN_TRATAMIENTO: c.enTratamiento,
       TRATADO: c.tratado,
+      CANCELADO: c.cancelado,
+      RECHAZADO: c.rechazado,
     };
   }, [mode, playback.counters]);
 

@@ -8,7 +8,7 @@ import { DashboardPanels } from '../../pages/monitor/components/DashboardPanels'
 import { EventFeed } from '../../pages/monitor/components/EventFeed';
 import { TimelineControls } from '../../pages/monitor/components/TimelineControls';
 import { FloatingPanelLayer, useFloatingPanels } from '../../pages/monitor/components/FloatingPanelLayer';
-import type { ForecastResponse, MonitorLiveResponse } from '../../pages/monitor/api/monitor-api';
+import type { ForecastResponse, MonitorLiveResponse, TimelineResponse } from '../../pages/monitor/api/monitor-api';
 
 const event={id:'qa-event',tipo:'RETIRO',descripcion:'Carga sintética retirada',timestamp:'2026-10-02T12:00:00Z',manifiestoNumero:'QA-00001'};
 const forecast:ForecastResponse={pendienteRetiro:[],pendienteTratamiento:[],vencimientosProximos:[]};
@@ -104,6 +104,16 @@ describe('Monitor: controles operativos y datos sin simulación',()=>{
     render(<TimelineControls mode="LIVE" liveData={live} playbackDate={null} onDateChange={vi.fn()} onSwitchToPlayback={vi.fn()} timelineData={null} isLoading={false} playback={null}/>);
     expect(screen.queryByText('Toneladas',{exact:true})).not.toBeInTheDocument();
     expect(screen.getByText('Viajes con GPS',{exact:true}).parentElement).toHaveTextContent('1');
+  });
+  it('en Historial los actores cuentan manifiestos únicos, no cada evento y punto GPS',()=>{
+    const timeline={eventos:['CREACION','FIRMA','GPS'].map(kind=>({
+      type:kind==='GPS'?'GPS':'EVENTO',eventoTipo:kind,manifiestoId:'QA-unique',
+      generador:{razonSocial:'QA Origen'},operador:{razonSocial:'QA Destino'},
+    }))} as TimelineResponse;
+    render(<MemoryRouter><DashboardPanels mode="PLAYBACK" liveData={null} forecastData={null} timelineData={timeline}/></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button',{name:'Actores',exact:true}));
+    expect(screen.getByText('QA Origen').parentElement?.lastElementChild).toHaveTextContent(/^1$/);
+    expect(screen.getByText('QA Destino').parentElement?.lastElementChild).toHaveTextContent(/^1$/);
   });
   it('no mezcla cantidades sin unidad ni presenta una flota declarada como asignación confirmada',()=>{
     const live={topResiduos:[{nombre:'QA corriente',total:123456,categoria:null}]} as MonitorLiveResponse;
