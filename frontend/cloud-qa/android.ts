@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { assertCloudDatabase } from './safety.ts';
-import { dismissObservedChromePrompts, readNativeWindow } from './native-window.ts';
+import { chromeButtonPoint, dismissObservedChromePrompts, readNativeWindow } from './native-window.ts';
 
 await assertCloudDatabase();
 const output=path.join(process.env.QA_ARTIFACTS!,'android');
@@ -44,6 +44,28 @@ const closeContext=async()=>{
   finally{clearTimeout(timer);}
 };
 const settleNativeChrome=()=>dismissObservedChromePrompts(output);
+const nativeButtonTap=async(name:string,evidence:string)=>{
+  const button=page.getByRole('button',{name,exact:true});
+  await expect(button).toBeVisible();await expect(button).toBeEnabled();
+  await button.scrollIntoViewIfNeeded();
+  const xml=readNativeWindow();
+  await writeFile(path.join(output,evidence+'-native.xml'),xml);
+  await device.screenshot({path:path.join(output,evidence+'-device.png')});
+  const point=chromeButtonPoint(xml,name);
+  await writeFile(path.join(output,evidence+'-input.json'),JSON.stringify({
+    name,point,input:'Android adb input tap at fresh native accessibility bounds',
+    dom:await button.evaluate(el=>({rect:el.getBoundingClientRect().toJSON(),
+      active:document.activeElement?.tagName,viewport:{width:innerWidth,height:innerHeight,
+        visual:visualViewport?{height:visualViewport.height,offsetTop:visualViewport.offsetTop,scale:visualViewport.scale}:null}})),
+    form:await page.getByRole('dialog',{name:'Nueva inspección'}).locator('input,select,textarea').evaluateAll(elements=>
+      elements.map(el=>({tag:el.tagName,label:el.closest('label')?.textContent?.trim(),
+        value:(el as HTMLInputElement).value,checked:(el as HTMLInputElement).checked}))),
+  },null,2));
+  // run14 had a visible enabled footer but CDP touch produced no creation
+  // request. Exercise the actual OS input using freshly observed bounds;
+  // never invoke the handler, fabricate coordinates or ignore a failed POST.
+  execFileSync('adb',['shell','input','tap',String(point.x),String(point.y)],{timeout:5000});
+};
 const observe=(target:Page)=>{
   target.setDefaultTimeout(20000);
   target.on('pageerror',e=>runtimeErrors.push(e.message));
@@ -191,7 +213,7 @@ try{
     await page.getByLabel('Ubicación prevista').fill('QA ubicación ficticia');
     const [saved]=await Promise.all([
       page.waitForResponse(r=>r.url().endsWith('/api/inspecciones')&&r.request().method()==='POST'),
-      page.getByRole('button',{name:'Crear expediente',exact:true}).tap(),
+      nativeButtonTap('Crear expediente','create-inspection'),
     ]);
     expect(saved.status()).toBe(201);inspection=(await saved.json()).data;
     expect(inspection.numero).toMatch(/^IRP-\d{4}-\d{5}$/);
