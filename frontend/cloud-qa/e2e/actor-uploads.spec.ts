@@ -46,7 +46,10 @@ for (const actor of [
   await expect(page.getByRole('button', { name: 'Reintentar adjuntos', exact: true })).toBeEnabled();
   await expect(page).toHaveURL(new RegExp(`/admin/actores/${actor.path}/nuevo$`));
   await expect(page.getByRole('alert', { name: 'Adjuntos pendientes' })).toContainText('guardado');
-  await expect(page.getByText('QA-valid.pdf', { exact: true })).toBeVisible();
+  const uploadedRow = page.getByRole('row').filter({ has: page.getByText('Memoria Tecnica', { exact: true }) });
+  await expect(uploadedRow).toHaveCount(1);
+  await expect(uploadedRow.getByText('QA-valid.pdf', { exact: true })).toBeVisible();
+  await expect(uploadedRow.getByText('Guardado', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
   await page.screenshot({ path: info.outputPath(`${actor.key}-partial.png`), animations: 'disabled' });
   await page.getByRole('button', { name: `Quitar ${actor.second}`, exact: true }).click();
@@ -66,9 +69,11 @@ for (const actor of [
   if (actor.key === 'generador') {
     await page.goto(`${prefix(info)}/admin/actores/${actor.path}/${saved.id}`);
     await page.getByRole('tab', { name: 'DDJJ y Documentos', exact: true }).click();
-    await expect(page.getByText('QA-valid.pdf', { exact: true })).toBeVisible();
-    await expect(page.getByText('QA-recovered.pdf', { exact: true })).toBeVisible();
-    await expect(page.getByText('QA-retry.pdf', { exact: true })).toHaveCount(0);
+    const documentPanel = page.getByRole('tabpanel', { name: 'DDJJ y Documentos', exact: true });
+    await expect(documentPanel).toBeVisible();
+    await expect(documentPanel.getByText('QA-valid.pdf', { exact: true })).toBeVisible();
+    await expect(documentPanel.getByText('QA-recovered.pdf', { exact: true })).toBeVisible();
+    await expect(documentPanel.getByText('QA-retry.pdf', { exact: true })).toHaveCount(0);
   }
   await info.attach('real-upload-recovery', { body: JSON.stringify({ actorId: saved.id, registrations: created.length, expectedFailure: apiErrors }), contentType: 'application/json' });
 });
