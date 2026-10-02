@@ -5,7 +5,7 @@
  * Pure mousedown/mousemove drag — no external libraries.
  */
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   GripVertical, X, Minus, Maximize2,
   ArrowRight, Package, MapPin, Truck, CheckCircle,
@@ -283,6 +283,8 @@ const FloatingPanelWindow: React.FC<{
   onMove: (pos: { x: number; y: number }) => void;
   onMinimize: () => void;
 }> = ({ panel, onClose, onBringToFront, onMove, onMinimize }) => {
+  const dragCleanup=useRef<(()=>void)|null>(null);
+  useEffect(()=>()=>dragCleanup.current?.(),[]);
 
   const onHeaderMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     // Ignore clicks on buttons inside header
@@ -292,16 +294,20 @@ const FloatingPanelWindow: React.FC<{
 
     const startX = e.clientX - panel.pos.x;
     const startY = e.clientY - panel.pos.y;
+    const layer=e.currentTarget.closest('.fp-layer');
 
     const onMouseMove = (ev: MouseEvent) => {
-      const x = Math.max(0, Math.min(window.innerWidth - 280, ev.clientX - startX));
-      const y = Math.max(0, Math.min(window.innerHeight - 40, ev.clientY - startY));
+      const rect=layer?.getBoundingClientRect();
+      const x = Math.max(0, Math.min((rect?.width ?? window.innerWidth) - 280, ev.clientX - startX));
+      const y = Math.max(0, Math.min((rect?.height ?? window.innerHeight) - 52, ev.clientY - startY));
       onMove({ x, y });
     };
     const onMouseUp = () => {
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
+      dragCleanup.current=null;
     };
+    dragCleanup.current?.();dragCleanup.current=onMouseUp;
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
   }, [panel.pos, onBringToFront, onMove]);
@@ -310,7 +316,8 @@ const FloatingPanelWindow: React.FC<{
     <div
       className="fp-window"
       style={{
-        transform: `translate(${panel.pos.x}px, ${panel.pos.y}px)`,
+        left: `${panel.pos.x}px`, top: `${panel.pos.y}px`,
+        maxHeight: `calc(100% - ${panel.pos.y + 8}px)`,
         zIndex: panel.zIndex,
       }}
       onMouseDown={onBringToFront}
@@ -329,10 +336,10 @@ const FloatingPanelWindow: React.FC<{
             {(panel.data as ViajeFPData).numero}
           </span>
         )}
-        <button onClick={onMinimize} className="fp-btn" title={panel.minimized ? 'Expandir' : 'Minimizar'}>
+        <button onClick={onMinimize} className="fp-btn" aria-expanded={!panel.minimized} title={panel.minimized ? 'Expandir detalle' : 'Minimizar detalle'}>
           {panel.minimized ? <Maximize2 size={11} /> : <Minus size={11} />}
         </button>
-        <button onClick={onClose} className="fp-btn fp-btn-close" title="Cerrar">
+        <button onClick={onClose} className="fp-btn fp-btn-close" title="Cerrar detalle">
           <X size={11} />
         </button>
       </div>
@@ -395,7 +402,7 @@ export function useFloatingPanels() {
       topZRef.current++;
       return [...prev, {
         id, type, data,
-        pos: { x: 340 + offset, y: 72 + offset },
+        pos: { x: Math.max(8, Math.min(12 + offset, window.innerWidth - 288)), y: 12 + offset },
         zIndex: topZRef.current,
         minimized: false,
       }];

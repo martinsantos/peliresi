@@ -1,53 +1,10 @@
 /**
- * Monitor API — Instancia axios independiente
- * =============================================
- * Self-contained: no importa de ../../services/ ni ../../contexts/
+ * Monitor API — Endpoints on the shared authenticated SITREP client.
+ * Token parsing, refresh queuing and logout handling must not diverge from
+ * the rest of the application when several monitor queries expire together.
  */
 
-import axios from 'axios';
-
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
-
-const monitorApi = axios.create({
-  baseURL: API_BASE,
-  timeout: 30000,
-});
-
-// Token keys — must match the main app's api.ts
-const TOKEN_KEY = 'sitrep_access_token';
-const REFRESH_TOKEN_KEY = 'sitrep_refresh_token';
-
-// Interceptor: añade token de auth desde localStorage
-monitorApi.interceptors.request.use((config) => {
-  const token = localStorage.getItem(TOKEN_KEY);
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-// Interceptor: refresh token si 401
-monitorApi.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    if (error.response?.status === 401) {
-      const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-      if (refreshToken) {
-        try {
-          const { data } = await axios.post(`${API_BASE}/auth/refresh-token`, { refreshToken });
-          localStorage.setItem(TOKEN_KEY, data.accessToken || data.token);
-          if (data.refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
-          error.config.headers.Authorization = `Bearer ${data.accessToken || data.token}`;
-          return monitorApi(error.config);
-        } catch {
-          // Refresh failed — don't redirect, just let it fail silently
-          // The main app's AuthContext will handle the redirect
-        }
-      }
-    }
-    return Promise.reject(error);
-  }
-);
+import monitorApi from '../../../services/api';
 
 // ─── Endpoints ────────────────────────────────────────────────────────────────
 

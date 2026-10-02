@@ -3,7 +3,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Leaf, Radio, Play, Eye, Film, X } from 'lucide-react';
+import { Radio, History, CalendarClock, Film, X } from 'lucide-react';
+import { SitrepMark } from '../../../components/SitrepMark';
 import type { MonitorMode } from '../WarRoomPage';
 import { formatTime } from '../utils/formatters';
 
@@ -13,9 +14,10 @@ interface Props {
   onModeChange: (mode: MonitorMode) => void;
   onCinemaToggle: () => void;
   onClose: () => void;
+  liveCurrent?: boolean;
 }
 
-export const WarRoomHeader: React.FC<Props> = ({ mode, cinemaMode, onModeChange, onCinemaToggle, onClose }) => {
+export const WarRoomHeader: React.FC<Props> = ({ mode, cinemaMode, onModeChange, onCinemaToggle, onClose, liveCurrent = false }) => {
   const [clock, setClock] = useState(formatTime(new Date()));
 
   useEffect(() => {
@@ -24,45 +26,48 @@ export const WarRoomHeader: React.FC<Props> = ({ mode, cinemaMode, onModeChange,
   }, []);
 
   return (
-    <header className={`wr-header flex items-center justify-between px-4 py-2.5 ${cinemaMode ? 'bg-neutral-900/95 border-b border-white/10' : 'bg-[#1B5E3C] text-white'}`}>
+    <header className="wr-header flex items-center justify-between px-4 py-2 bg-[#1B5E3C] text-white">
       {/* Logo */}
       <div className="flex items-center gap-2.5">
-        <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-          <Leaf size={18} className="text-white" />
+        <div className="w-9 h-9 bg-white rounded-lg flex items-center justify-center">
+          <SitrepMark size={26} />
         </div>
         <span className="text-base font-bold tracking-tight text-white">SITREP</span>
-        <span className="text-xs font-light text-white/60 hidden sm:inline">Monitor</span>
+        <span className="text-sm text-white hidden sm:inline">Monitor</span>
       </div>
 
       {/* Mode selector */}
-      <div className="wr-mode-selector flex items-center gap-1 bg-white/10 rounded-lg p-0.5">
+      <div className="wr-mode-selector flex items-center gap-1 rounded-lg p-1" role="group" aria-label="Modo del Monitor">
         <button
           onClick={() => onModeChange('LIVE')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-            mode === 'LIVE' ? 'bg-white/20 text-white shadow-sm' : 'text-white/60 hover:text-white/80'
+          aria-pressed={mode === 'LIVE'}
+          className={`flex items-center gap-2 px-3 min-h-11 rounded-md text-sm font-semibold transition-colors ${
+            mode === 'LIVE' ? 'bg-white text-[#1B5E3C]' : 'text-white hover:bg-white/15'
           }`}
         >
-          {mode === 'LIVE' && <span className="wr-live-dot" />}
-          <Radio size={13} />
-          LIVE
+          {mode === 'LIVE' && liveCurrent && <span className="wr-live-dot" aria-hidden="true" />}
+          <Radio size={16} />
+          En vivo
         </button>
         <button
           onClick={() => onModeChange('PLAYBACK')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-            mode === 'PLAYBACK' ? 'bg-white/20 text-white shadow-sm' : 'text-white/60 hover:text-white/80'
+          aria-pressed={mode === 'PLAYBACK'}
+          className={`flex items-center gap-2 px-3 min-h-11 rounded-md text-sm font-semibold transition-colors ${
+            mode === 'PLAYBACK' ? 'bg-white text-[#1B5E3C]' : 'text-white hover:bg-white/15'
           }`}
         >
-          <Play size={13} />
-          PLAYBACK
+          <History size={16} />
+          Historial
         </button>
         <button
           onClick={() => onModeChange('FORECAST')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-            mode === 'FORECAST' ? 'bg-white/20 text-white shadow-sm' : 'text-white/60 hover:text-white/80'
+          aria-pressed={mode === 'FORECAST'}
+          className={`flex items-center gap-2 px-3 min-h-11 rounded-md text-sm font-semibold transition-colors ${
+            mode === 'FORECAST' ? 'bg-white text-[#1B5E3C]' : 'text-white hover:bg-white/15'
           }`}
         >
-          <Eye size={13} />
-          FORECAST
+          <CalendarClock size={16} />
+          Pendientes
         </button>
       </div>
 
@@ -71,14 +76,15 @@ export const WarRoomHeader: React.FC<Props> = ({ mode, cinemaMode, onModeChange,
         <span className="wr-clock font-mono text-sm text-white/80 tabular-nums">{clock}</span>
         <button
           onClick={onCinemaToggle}
-          className={`p-1.5 rounded-lg transition-all ${cinemaMode ? 'bg-amber-500/20 text-amber-300' : 'text-white/60 hover:text-white/80 hover:bg-white/10'}`}
-          title="Cinema mode (C)"
+          className={`min-w-11 min-h-11 flex items-center justify-center rounded-lg transition-colors ${cinemaMode ? 'bg-white text-[#1B5E3C]' : 'text-white hover:bg-white/15'}`}
+          aria-pressed={cinemaMode}
+          title="Modo mapa oscuro (C)"
         >
           <Film size={16} />
         </button>
         <button
           onClick={onClose}
-          className="p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-all"
+          className="min-w-11 min-h-11 flex items-center justify-center rounded-lg text-white hover:bg-white/15 transition-colors"
           title="Cerrar (Esc)"
         >
           <X size={16} />

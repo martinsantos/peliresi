@@ -46,11 +46,12 @@ if (mode === 'freeze') {
     assert.ok(unit.numPassedTests > 0);
   }
   const e2e = await readJson('e2e.json');
-  assert.equal(e2e.stats.expected, 57);
+  assert.equal(e2e.stats.expected, 60);
   assert.equal(e2e.stats.unexpected + e2e.stats.flaky + e2e.stats.skipped, 0);
   assert.deepEqual(e2e.errors, []);
   const android = await readJson('android/result.json');
   const apk = await readJson('apk/result.json');
+  assert.equal(android.completed,true,'An interrupted Android suite cannot pass the package gate');
   assert.equal(android.failed + apk.failed, 0);
   assert.equal(android.passed, 9);
   assert.equal(apk.passed, 4);

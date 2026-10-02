@@ -116,6 +116,7 @@ test('control center queries real layers, refreshes and opens the exact active i
 });
 
 test('monitor LIVE, PLAYBACK and FORECAST query real data and expose usable controls', async ({ page }, info) => {
+  test.setTimeout(90000);
   await login(page, info);
   const errors = health(page);
   await page.goto(`${prefix(info)}/centro-control`);
@@ -127,31 +128,89 @@ test('monitor LIVE, PLAYBACK and FORECAST query real data and expose usable cont
   const liveData = (await liveResponse.json()).data;
   expect(Number.isFinite(liveData.estadisticas.total)).toBe(true);
   const header = page.locator('.wr-layout-header');
-  await expect(header.getByRole('button', { name: 'LIVE', exact: true })).toBeInViewport({ ratio: 1 });
-  await expect(header.getByRole('button', { name: 'PLAYBACK', exact: true })).toBeInViewport({ ratio: 1 });
-  await expect(header.getByRole('button', { name: 'FORECAST', exact: true })).toBeInViewport({ ratio: 1 });
+  await expect(header.getByRole('button', { name: 'En vivo', exact: true })).toBeInViewport({ ratio: 1 });
+  await expect(header.getByRole('button', { name: 'Historial', exact: true })).toBeInViewport({ ratio: 1 });
+  await expect(header.getByRole('button', { name: 'Pendientes', exact: true })).toBeInViewport({ ratio: 1 });
+  await expect(header.getByRole('button', { name: 'En vivo', exact: true })).toHaveAttribute('aria-pressed','true');
+  await expect(header.locator('img')).toHaveAttribute('src',new RegExp('/favicon.svg$'));
+  await expect(header.getByRole('status')).toContainText('Datos actualizados');
   await expect(page.locator('.wr-layout-bottom')).toContainText(String(liveData.estadisticas.total));
   await expect(page.getByText('Agenda activa · lugares de visita', { exact: true })).toBeVisible();
   await visibleProof(page, info, 'monitor-live');
+  const states=page.getByRole('button',{name:'Estados del manifiesto',exact:true});
+  await states.focus();await states.press('Space');
+  await expect(states).toHaveAttribute('aria-expanded','false');
+  await states.press('Enter');await expect(states).toHaveAttribute('aria-expanded','true');
+  const refreshed=page.waitForResponse(r=>r.url().includes('/api/centro-control/monitor-live')&&r.status()===200);
+  await header.getByRole('button',{name:'Actualizar datos del Monitor'}).click();await refreshed;
+  await header.getByRole('button',{name:'Modo mapa oscuro (C)'}).click();
+  await expect(page.locator('.wr-layout')).toHaveClass(/wr-cinema/);
+  await expect(page.locator('.wr-layout-sidebar .wr-panel').first()).toHaveCSS('background-color','rgb(255, 255, 255)');
+  await visibleProof(page,info,'monitor-dark-map-readable-panels');
+  await header.getByRole('button',{name:'Modo mapa oscuro (C)'}).click();
   const timeline = page.waitForResponse(r => r.url().includes('/api/centro-control/timeline'));
-  await header.getByRole('button', { name: 'PLAYBACK', exact: true }).click();
+  await header.getByRole('button', { name: 'Historial', exact: true }).click();
   const timelineResponse = await timeline;
   expect(timelineResponse.status()).toBe(200);
   const timelineData = (await timelineResponse.json()).data;
   expect(timelineData.eventos.length).toBeGreaterThan(0);
   await expect(page.getByText('Creados', { exact: true })).toBeVisible();
+  const event=page.getByRole('button',{name:/^Abrir evento /}).first();
+  await expect(event).toBeVisible();
+  await event.focus();await event.press('Space');
+  const panel=page.locator('.fp-window').last();await expect(panel).toBeVisible();
+  const mapBox=(await page.locator('.wr-layout-map').boundingBox())!;
+  const panelBox=(await panel.boundingBox())!;
+  if(info.project.name==='web-desktop'){
+    expect(panelBox.x).toBeGreaterThanOrEqual(mapBox.x);
+    expect(panelBox.x+panelBox.width).toBeLessThanOrEqual(mapBox.x+mapBox.width+1);
+    expect(panelBox.y+panelBox.height).toBeLessThanOrEqual(mapBox.y+mapBox.height+1);
+  }else await expect(panel).toBeInViewport({ratio:1});
+  await visibleProof(page,info,'monitor-event-detail-visible');
+  await panel.getByRole('button',{name:'Minimizar detalle'}).click();
+  await expect(panel.locator('.fp-content')).toHaveCount(0);
+  await panel.getByRole('button',{name:'Expandir detalle'}).click();
+  await expect(panel.locator('.fp-content')).toBeVisible();
+  await panel.getByRole('button',{name:'Cerrar detalle'}).click();await expect(panel).toHaveCount(0);
+  const slider=page.getByRole('slider',{name:'Recorrer historial'});
+  await slider.focus();await slider.press('Home');
+  await expect(slider).toHaveValue(String(Math.round(1000/timelineData.eventos.filter((e:{type:string})=>e.type==='EVENTO').length)));
   await visibleProof(page, info, 'monitor-playback');
   const forecast = page.waitForResponse(r => r.url().includes('/api/centro-control/forecast'));
-  await header.getByRole('button', { name: 'FORECAST', exact: true }).click();
+  await header.getByRole('button', { name: 'Pendientes', exact: true }).click();
   const forecastResponse = await forecast;
   expect(forecastResponse.status()).toBe(200);
   const forecastData = (await forecastResponse.json()).data;
   expect(Array.isArray(forecastData.pendienteRetiro)).toBe(true);
   await expect(page.getByText(`Pendiente Retiro (${forecastData.pendienteRetiro.length})`, { exact: true })).toBeVisible();
+  await expect(page.getByRole('button',{name:'Estados del manifiesto',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Eventos',exact:true})).toHaveCount(0);
+  await expect(page.getByText('Retiros pendientes',{exact:true}).locator('..')).toContainText(String(forecastData.pendienteRetiro.length));
   await visibleProof(page, info, 'monitor-forecast');
   await header.getByTitle('Cerrar (Esc)', { exact: true }).click();
   await expect(page).toHaveURL(new RegExp('/centro-control$'));
   expect(errors).toEqual([]);
+});
+
+test('monitor labels a real offline interruption and recovers without inventing a live signal',async({page,context},info)=>{
+  await login(page,info);
+  const response=page.waitForResponse(r=>r.url().includes('/api/centro-control/monitor-live')&&r.status()===200);
+  await page.goto(`${prefix(info)}/monitor`);await response;
+  const header=page.locator('.wr-layout-header');
+  await expect(header.getByRole('status')).toContainText('Datos actualizados');
+  try{
+    await context.setOffline(true);
+    await expect(header.getByRole('status')).toContainText('Sin conexión');
+    await expect(header.locator('.wr-live-dot')).toHaveCount(0);
+    await expect(header.getByRole('button',{name:'Actualizar datos del Monitor'})).toBeDisabled();
+    await visibleProof(page,info,'monitor-real-offline');
+  }finally{await context.setOffline(false);}
+  await expect(header.getByRole('button',{name:'Actualizar datos del Monitor'})).toBeEnabled();
+  const recovered=page.waitForResponse(r=>r.url().includes('/api/centro-control/monitor-live')&&r.status()===200);
+  await header.getByRole('button',{name:'Actualizar datos del Monitor'}).click();await recovered;
+  await expect(header.getByRole('status')).toContainText('Datos actualizados');
+  await expect(header.locator('.wr-live-dot')).toHaveCount(1);
+  await visibleProof(page,info,'monitor-recovered');
 });
 
 test('carrier control center does not expose inspection operations', async ({ page }, info) => {

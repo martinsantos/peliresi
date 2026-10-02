@@ -8,7 +8,7 @@
 import React, { useMemo } from 'react';
 import { Play, Pause, Calendar, FileText, Truck, Weight, TrendingUp, RotateCcw, ChevronLeft, ChevronRight, SkipBack, SkipForward, Sun, Sunrise, Sunset, Moon } from 'lucide-react';
 import type { MonitorMode } from '../WarRoomPage';
-import type { MonitorLiveResponse, TimelineResponse } from '../api/monitor-api';
+import type { ForecastResponse, MonitorLiveResponse, TimelineResponse } from '../api/monitor-api';
 import { formatNumber, formatTimeShort } from '../utils/formatters';
 
 type PlaybackSpeed = 'fast' | 'normal' | 'slow';
@@ -26,6 +26,7 @@ interface PlaybackControls {
   setSpeed: (s: PlaybackSpeed) => void;
   skipToNext: () => void;
   skipToPrev: () => void;
+  seek: (progress: number) => void;
   currentEventTimestamp?: string | null;
 }
 
@@ -42,6 +43,8 @@ interface Props {
   onAutoContinueToggle?: () => void;
   activeDays?: string[];
   currentHour?: number; // 0–23 — para indicador hora en PLAYBACK
+  forecastData?: ForecastResponse | null;
+  liveCurrent?: boolean;
 }
 
 /** Format "2026-03-16" -> "16 mar 2026" */
@@ -60,7 +63,7 @@ const SPEED_ORDER: PlaybackSpeed[] = ['fast', 'normal', 'slow'];
 
 export const TimelineControls: React.FC<Props> = ({
   mode, liveData, playbackDate, onDateChange, onSwitchToPlayback, timelineData, isLoading, playback,
-  autoContinue, onAutoContinueToggle, activeDays, currentHour,
+  autoContinue, onAutoContinueToggle, activeDays, currentHour, forecastData, liveCurrent = false,
 }) => {
   // Smart date navigation — find prev/next active day relative to current playbackDate
   const sortedDays = useMemo(() => (activeDays || []).slice().sort(), [activeDays]);
@@ -86,6 +89,7 @@ export const TimelineControls: React.FC<Props> = ({
 
   // In PLAYBACK mode, use playback counters for KPIs; in LIVE mode, use liveData
   const isPlayback = mode === 'PLAYBACK' && playback;
+  const hasKpiData=mode==='PLAYBACK'?!!playback:!!stats;
 
   const kpiManifiestos = isPlayback
     ? (playback.counters.totalCreated || 0)
@@ -104,31 +108,37 @@ export const TimelineControls: React.FC<Props> = ({
     <div className="wr-panel flex items-center gap-4 px-4 py-3">
       {/* KPI Cards */}
       <div className="wr-summary flex items-center gap-3 flex-shrink-0">
+        {mode === 'FORECAST' ? <>
+          <KpiCard icon={<Truck size={14}/>} label="Retiros pendientes" value={forecastData?forecastData.pendienteRetiro.length:null} color="#92400e"/>
+          <KpiCard icon={<Weight size={14}/>} label="Tratamientos pendientes" value={forecastData?forecastData.pendienteTratamiento.length:null} color="#6d28d9"/>
+          <KpiCard icon={<Calendar size={14}/>} label="Vencimientos a 7 días" value={forecastData?forecastData.vencimientosProximos.length:null} color="#b91c1c"/>
+        </> : <>
         <KpiCard
           icon={<FileText size={14} />}
           label={isPlayback ? 'Creados' : 'Manifiestos Hoy'}
-          value={kpiManifiestos}
+          value={hasKpiData?kpiManifiestos:null}
           color="#0D8A4F"
         />
         <KpiCard
           icon={<Truck size={14} />}
           label="En Transito"
-          value={kpiEnTransito}
+          value={hasKpiData?kpiEnTransito:null}
           color="#3b82f6"
         />
         <KpiCard
           icon={<Weight size={14} />}
           label={isPlayback ? 'Tratados' : 'Toneladas'}
-          value={isPlayback ? kpiTratados : (stats?.toneladas || 0)}
+          value={hasKpiData?(isPlayback ? kpiTratados : (stats?.toneladas || 0)):null}
           color="#8b5cf6"
           decimals={isPlayback ? 0 : 1}
         />
         <KpiCard
           icon={<TrendingUp size={14} />}
           label="Total"
-          value={isPlayback ? kpiTotal : (stats?.total || 0)}
+          value={hasKpiData?(isPlayback ? kpiTotal : (stats?.total || 0)):null}
           color="#f97316"
         />
+        </>}
       </div>
 
       {/* Separator */}
@@ -138,9 +148,9 @@ export const TimelineControls: React.FC<Props> = ({
       <div className="wr-timeline-actions flex items-center gap-3 flex-1 min-w-0">
         {mode === 'LIVE' && (
           <>
-            <span className="flex items-center gap-1.5 text-xs font-semibold text-green-600">
-              <span className="wr-live-dot" />
-              LIVE
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-green-800">
+              {liveCurrent && <span className="wr-live-dot" aria-hidden="true" />}
+              {liveCurrent ? 'Actualización automática' : 'Datos sin actualizar'}
             </span>
             <button
               onClick={() => onSwitchToPlayback()}
@@ -158,6 +168,7 @@ export const TimelineControls: React.FC<Props> = ({
             <div className="flex items-center gap-1 flex-shrink-0">
               <button
                 onClick={goToPrevDay}
+                aria-label="Día activo anterior"
                 disabled={!prevDay}
                 className="w-7 h-7 rounded flex items-center justify-center text-neutral-500 hover:bg-neutral-100 disabled:opacity-30"
               >
@@ -168,6 +179,7 @@ export const TimelineControls: React.FC<Props> = ({
               </span>
               <button
                 onClick={goToNextDay}
+                aria-label="Día activo siguiente"
                 disabled={!nextDay}
                 className="w-7 h-7 rounded flex items-center justify-center text-neutral-500 hover:bg-neutral-100 disabled:opacity-30"
               >
@@ -264,7 +276,8 @@ export const TimelineControls: React.FC<Props> = ({
                       min={0}
                       max={1000}
                       value={Math.round(playback.progress * 1000)}
-                      readOnly
+                      aria-label="Recorrer historial"
+                      onChange={event=>playback.seek(Number(event.target.value)/1000)}
                       className="wr-scrubber w-full"
                       style={{ '--progress': `${playback.progress * 100}%` } as React.CSSProperties}
                     />
@@ -286,6 +299,7 @@ export const TimelineControls: React.FC<Props> = ({
                         : 'bg-neutral-100 text-neutral-500 border border-neutral-200'
                     }`}
                     title="Continuar automaticamente al dia siguiente"
+                    aria-pressed={autoContinue}
                   >
                     <RotateCcw size={10} />
                     Auto
@@ -299,7 +313,7 @@ export const TimelineControls: React.FC<Props> = ({
         {mode === 'FORECAST' && (
           <span className="text-xs font-semibold text-purple-600 flex items-center gap-1.5">
             <Calendar size={12} />
-            Proximos 7 dias
+            Pendientes actuales · vencimientos a 7 días
           </span>
         )}
       </div>
@@ -311,15 +325,15 @@ export const TimelineControls: React.FC<Props> = ({
 const KpiCard: React.FC<{
   icon: React.ReactNode;
   label: string;
-  value: number;
+  value: number | null;
   color: string;
   decimals?: number;
 }> = ({ icon, label, value, color, decimals = 0 }) => (
   <div className="flex items-center gap-2 px-3 py-1.5 bg-neutral-50 rounded-lg border border-neutral-100 hover:shadow-sm transition-shadow">
     <div className="flex-shrink-0" style={{ color }}>{icon}</div>
     <div>
-      <p className="text-sm font-bold text-neutral-900 tabular-nums leading-none">{formatNumber(value, decimals)}</p>
-      <p className="text-[10px] text-neutral-500 leading-tight">{label}</p>
+      <p className="text-lg font-bold text-neutral-900 tabular-nums leading-none">{value == null ? '—' : formatNumber(value, decimals)}</p>
+      <p className="text-xs text-neutral-700 leading-tight mt-1">{label}</p>
     </div>
   </div>
 );

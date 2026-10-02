@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { assertCloudDatabase } from './safety.ts';
-import { dismissObservedChromePrompts } from './native-window.ts';
+import { chromeButtonPoint, dismissObservedChromePrompts, readNativeWindow } from './native-window.ts';
 
 await assertCloudDatabase();
 const output=path.join(process.env.QA_ARTIFACTS!,'android');
@@ -25,6 +25,19 @@ let context:BrowserContext;
 let page:Page;
 const errors:string[]=[];
 const results:Array<{name:string;status:string;error?:string}>=[];
+const saveResults=async(completed=false)=>writeFile(path.join(output,'result.json'),JSON.stringify({
+  commit:process.env.GITHUB_SHA,startedOnActualAndroid:true,completed,results,consoleErrors:errors,
+  passed:results.filter(r=>r.status==='PASS').length,failed:results.filter(r=>r.status==='FAIL').length,
+  limitations:['Android emulator, not a physical phone','Authenticated flow uses Chrome and the isolated QA origin, not the release APK production session','No real microphone, noise, battery or cellular-network certification'],
+},null,2));
+const closeContext=async()=>{
+  // Kill only this QA Chrome process first. CDP context.close() can hang while
+  // an Android window changes size; no profile or session data is deleted.
+  execFileSync('adb',['shell','am','force-stop','com.android.chrome'],{timeout:5000});
+  let timer:ReturnType<typeof setTimeout>|undefined;
+  try{await Promise.race([context?.close().catch(()=>{}),new Promise<void>(resolve=>{timer=setTimeout(resolve,5000);})]);}
+  finally{clearTimeout(timer);}
+};
 const settleNativeChrome=()=>dismissObservedChromePrompts(output);
 const observe=(target:Page)=>{
   target.setDefaultTimeout(20000);
@@ -62,8 +75,20 @@ const login=async(user:string)=>{
 };
 const logout=async()=>{
   await page.getByRole('button',{name:'Abrir menu',exact:true}).tap();
-  await page.getByRole('button',{name:'Cerrar Sesión',exact:true}).tap();
+  const button=page.getByRole('button',{name:'Cerrar Sesión',exact:true});
+  await expect(button).toBeVisible();await expect(button).toBeEnabled();
+  // Use the actual Android accessibility bounds after the keyboard/viewport
+  // transition. This is a real OS touch, not a force-click or a fake logout.
+  await writeFile(path.join(output,'logout-geometry.json'),JSON.stringify(await button.evaluate(el=>{
+    const rect=el.getBoundingClientRect();const hit=document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2);
+    return {rect:rect.toJSON(),hit:hit?.outerHTML,viewport:{width:innerWidth,height:innerHeight,
+      visual:visualViewport?{height:visualViewport.height,offsetTop:visualViewport.offsetTop,scale:visualViewport.scale}:null}};
+  }),null,2));
+  const xml=readNativeWindow();await writeFile(path.join(output,'logout-native-before.xml'),xml);
+  const point=chromeButtonPoint(xml,'Cerrar Sesión');
+  execFileSync('adb',['shell','input','tap',String(point.x),String(point.y)],{timeout:5000});
   await expect(page).toHaveURL(/\/app\/login$/);
+  expect(await page.evaluate(()=>localStorage.getItem('sitrep_access_token'))).toBeNull();
 };
 const proof=async(name:string)=>{
   await expect(page).toHaveTitle(/SITREP/i);
@@ -77,8 +102,9 @@ const check=async(name:string,task:()=>Promise<void>)=>{
   try{await task();results.push({name,status:'PASS'});console.log('PASS Android '+name);}
   catch(e){const error=e instanceof Error?e.message:String(e);results.push({name,status:'FAIL',error});
     console.error('FAIL Android '+name+': '+error);
-    await page?.screenshot({path:path.join(output,name+'-FAIL.png')}).catch(()=>{});
+    await page?.screenshot({path:path.join(output,name+'-FAIL.png'),timeout:5000}).catch(()=>{});
   }
+  await saveResults();
 };
 let inspection:{id:string;numero:string};
 try{
@@ -177,8 +203,7 @@ try{
   });
   await check('process-restart-keeps-real-session-and-record',async()=>{
     assert.ok(inspection?.id);
-    await context.close();
-    execFileSync('adb',['shell','am','force-stop','com.android.chrome']);
+    await closeContext();
     await launch();
     await page.goto('http://127.0.0.1:4177/app/inspecciones/'+inspection.id+'#acta');
     await expect(page.getByRole('banner')).toBeVisible();
@@ -197,11 +222,7 @@ try{
     expect(errors).toEqual([]);
   });
 }finally{
-  await writeFile(path.join(output,'result.json'),JSON.stringify({
-    commit:process.env.GITHUB_SHA,startedOnActualAndroid:true,results,consoleErrors:errors,
-    passed:results.filter(r=>r.status==='PASS').length,failed:results.filter(r=>r.status==='FAIL').length,
-    limitations:['Android emulator, not a physical phone','Release APK/TWA installation and signature not tested','No real microphone, noise, battery or cellular-network certification'],
-  },null,2));
-  await context?.close().catch(()=>{});await device.close();
+  await saveResults(true);
+  await closeContext();await device.close();
 }
 if(results.some(r=>r.status==='FAIL'))process.exitCode=1;

@@ -49,9 +49,9 @@ export const EventFeed: React.FC<Props> = ({ eventos, mode, onEventClick, curren
   // Auto-scroll to top when new events arrive
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = 0;
+      if (mode === 'PLAYBACK' || scrollRef.current.scrollTop < 8) scrollRef.current.scrollTop = 0;
     }
-  }, [eventos.length]);
+  }, [eventos.length, mode]);
 
   const handleClick = (ev: EventItem) => {
     onEventClick?.(ev);
@@ -59,29 +59,32 @@ export const EventFeed: React.FC<Props> = ({ eventos, mode, onEventClick, curren
 
   if (eventos.length === 0) {
     return (
-      <div className={`wr-panel p-3 flex flex-col min-h-0 ${className ?? ''}`}>
-        <p className="text-xs text-neutral-400 text-center py-4">Sin eventos recientes</p>
+      <div className={`flex flex-col min-h-0 ${className ?? ''}`}>
+        <p className="text-sm text-neutral-600 text-center py-4">Sin eventos recientes</p>
       </div>
     );
   }
 
   return (
-    <div className={`wr-panel p-3 flex flex-col min-h-0 ${className ?? ''}`}>
+    <div className={`flex flex-col min-h-0 ${className ?? ''}`}>
       <div ref={scrollRef} className="overflow-y-auto flex-1 min-h-0 -mr-1 pr-1 space-y-0.5">
         {eventos.map((ev, i) => {
           const color = EVENT_COLORS[ev.tipo as keyof typeof EVENT_COLORS] || '#94a3b8';
           const isActive = currentEventId && ev.id === currentEventId;
           const TipoIcon = TIPO_ICONS[ev.tipo];
           return (
-            <div
+            <button
               key={ev.id}
-              className={`wr-event-item flex items-start gap-2 py-1.5 pr-1 rounded-sm cursor-pointer transition-colors ${
+              type="button"
+              aria-label={`Abrir evento ${ev.manifiestoNumero}: ${ev.descripcion}`}
+              aria-current={isActive ? 'true' : undefined}
+              className={`wr-event-item w-full text-left min-h-11 flex items-start gap-2 py-2 pr-2 rounded cursor-pointer transition-colors ${
                 isActive ? 'bg-emerald-50' : 'hover:bg-neutral-50/80'
               } ${i === 0 ? 'wr-event-arrive' : ''}`}
               style={{
                 animationDelay: `${i * 40}ms`,
-                borderLeft: isActive ? `4px solid ${color}` : `2px solid ${color}50`,
-                paddingLeft: isActive ? '7px' : '8px',
+                borderLeft: `3px solid ${isActive ? color : color + '80'}`,
+                paddingLeft: '8px',
               }}
               onClick={() => handleClick(ev)}
             >
@@ -137,7 +140,7 @@ export const EventFeed: React.FC<Props> = ({ eventos, mode, onEventClick, curren
                   </div>
                 )}
               </div>
-            </div>
+            </button>
           );
         })}
       </div>

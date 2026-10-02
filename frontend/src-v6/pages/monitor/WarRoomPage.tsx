@@ -23,7 +23,7 @@ import { DepartureBoard } from './components/DepartureBoard';
 import { EventFeed } from './components/EventFeed';
 import { FloatingPanelLayer, useFloatingPanels } from './components/FloatingPanelLayer';
 import { TimelineControls } from './components/TimelineControls';
-import { todayISO } from './utils/formatters';
+import { formatTimeShort, todayISO } from './utils/formatters';
 import type { EnTransitoItem } from './api/monitor-api';
 import { fetchActiveDays, fetchTimeline } from './api/monitor-api';
 import './styles/war-room.css';
@@ -50,6 +50,19 @@ const WarRoomPage: React.FC = () => {
   const liveData = useWarRoomData(mode === 'LIVE');
   const timelineData = useMonitorTimeline(playbackDate, playbackDias);
   const forecastData = useForecast(7, mode === 'FORECAST');
+  const [online, setOnline] = useState(navigator.onLine);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    window.addEventListener('online', update);window.addEventListener('offline', update);
+    const timer=setInterval(()=>setNow(Date.now()),15000);
+    return()=>{window.removeEventListener('online',update);window.removeEventListener('offline',update);clearInterval(timer);};
+  }, []);
+  const selectedQuery=mode==='LIVE'?liveData:mode==='PLAYBACK'?timelineData:forecastData;
+  const staleLive=mode==='LIVE' && !!liveData.dataUpdatedAt && now-liveData.dataUpdatedAt>45000;
+  const liveCurrent=mode==='LIVE' && online && !liveData.isError && !!liveData.dataUpdatedAt && !staleLive;
+  const dataStatus=!online?'Sin conexión':selectedQuery.isError || staleLive?'Sin actualizar':selectedQuery.isPending?'Cargando datos':selectedQuery.isFetching?'Actualizando datos':'Datos actualizados';
+  const closeMonitor=useCallback(()=>navigate(window.location.pathname.startsWith('/app/')?'/app/centro-control':'/centro-control'),[navigate]);
 
   // Active days for date navigator
   const activeDaysQuery = useQuery({ queryKey: ['monitor-active-days'], queryFn: fetchActiveDays, staleTime: 5 * 60_000 });
@@ -148,16 +161,17 @@ const WarRoomPage: React.FC = () => {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement) return;
+      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.target instanceof HTMLElement && e.target.closest('input,textarea,select,button,a,[contenteditable="true"],[role="dialog"]')) return;
       switch (e.key) {
-        case 'Escape': navigate(-1); break;
+        case 'Escape': closeMonitor(); break;
         case 'c': case 'C': setCinemaMode(v => !v); break;
         case '1': setMode('LIVE'); break;
         case '2': setMode('PLAYBACK'); break;
         case '3': setMode('FORECAST'); break;
         case ' ':
-          e.preventDefault();
           if (mode === 'PLAYBACK') {
+            e.preventDefault();
             playback.isPlaying ? playback.pause() : playback.play();
           }
           break;
@@ -176,21 +190,20 @@ const WarRoomPage: React.FC = () => {
           }
           break;
         case 'ArrowRight':
-          e.preventDefault();
           if (mode === 'PLAYBACK') {
+            e.preventDefault();
             if (e.shiftKey) playback.skipEvents(10);
             else playback.skipToNextEvent();
           }
           break;
         case 'ArrowLeft':
-          e.preventDefault();
-          if (mode === 'PLAYBACK') playback.skipToPrevEvent();
+          if (mode === 'PLAYBACK') {e.preventDefault();playback.skipToPrevEvent();}
           break;
       }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [navigate, mode, playback.isPlaying, playback.speed,
+  }, [closeMonitor, setMode, mode, playback.isPlaying, playback.speed,
       playback.play, playback.pause, playback.setSpeed,
       playback.skipEvents, playback.skipToNextEvent, playback.skipToPrevEvent]);
 
@@ -209,7 +222,7 @@ const WarRoomPage: React.FC = () => {
   }, [playback]);
 
   // Resolve actors for the map — always show actors even if timeline hasn't loaded yet
-  const actores = timelineData.data?.actores || liveData.data?.actores || null;
+  const actores = mode === 'PLAYBACK' ? timelineData.data?.actores || liveData.data?.actores || null : liveData.data?.actores || null;
 
   // Build enTransito from playback activeTrips for the map
   const enTransitoFromPlayback = useMemo((): EnTransitoItem[] => {
@@ -352,6 +365,7 @@ const WarRoomPage: React.FC = () => {
     setSpeed: (s: 'fast' | 'normal' | 'slow') => playback.setSpeed(SPEED_TO_NUM[s]),
     skipToNext: playback.skipToNextEvent,
     skipToPrev: playback.skipToPrevEvent,
+    seek: playback.seek,
     currentEventTimestamp: playback.currentEvent?.timestamp || null,
   } : null;
 
@@ -364,8 +378,15 @@ const WarRoomPage: React.FC = () => {
           cinemaMode={cinemaMode}
           onModeChange={setMode}
           onCinemaToggle={() => setCinemaMode(v => !v)}
-          onClose={() => navigate(-1)}
+          onClose={closeMonitor}
+          liveCurrent={liveCurrent}
         />
+        <div className="wr-data-status flex items-center justify-between gap-2 px-4 border-b border-neutral-200 bg-white text-neutral-700">
+          <p role="status" className={`text-xs ${dataStatus === 'Sin actualizar' || !online ? 'text-amber-800 font-semibold' : ''}`}>
+            {dataStatus}{selectedQuery.dataUpdatedAt ? ` · última respuesta ${formatTimeShort(new Date(selectedQuery.dataUpdatedAt).toISOString())}` : ''}
+          </p>
+          <button type="button" aria-label="Actualizar datos del Monitor" disabled={!online || selectedQuery.isFetching} onClick={()=>void selectedQuery.refetch()} className="min-h-11 text-xs font-semibold text-[#1B5E3C] px-2 rounded hover:bg-neutral-100 disabled:opacity-50">Actualizar</button>
+        </div>
       </div>
 
       {/* Left Panel — Dashboards */}
@@ -447,6 +468,8 @@ const WarRoomPage: React.FC = () => {
           activeDays={activeDays}
           playback={playbackControls}
           currentHour={mode === 'PLAYBACK' ? playback.currentHour : undefined}
+          forecastData={forecastData.data || null}
+          liveCurrent={liveCurrent}
         />
       </div>
     </div>

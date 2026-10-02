@@ -4,11 +4,11 @@
  * Each widget: collapsible header + closeable. Closed → tray.
  */
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   ClipboardCheck, Factory, FlaskConical, Package, Beaker, Droplets,
   ChevronUp, ChevronDown, X, Truck, GitBranch, Radio,
-  FileText, ArrowRight, Users, GripHorizontal,
+  FileText, ArrowRight, Users,
   MapPin, CheckCircle, Clock,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -19,29 +19,6 @@ import type { MonitorLiveResponse, ForecastResponse, TimelineResponse, EnTransit
 import { formatNumber, formatTimeShort } from '../utils/formatters';
 import { EventFeed } from './EventFeed';
 import { EVENT_COLORS } from '../utils/war-room-icons';
-
-// ─── AnimatedCounter ─────────────────────────────────────────────────────────
-
-function AnimatedCounter({ value }: { value: number }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const prevRef = useRef(value);
-  useEffect(() => {
-    const start = prevRef.current;
-    const end = value;
-    if (start === end || !ref.current) { prevRef.current = end; return; }
-    const duration = 300;
-    const startTime = performance.now();
-    const step = (now: number) => {
-      const t = Math.min((now - startTime) / duration, 1);
-      const eased = 1 - Math.pow(1 - t, 3);
-      if (ref.current) ref.current.textContent = String(Math.round(start + (end - start) * eased));
-      if (t < 1) requestAnimationFrame(step);
-      else prevRef.current = end;
-    };
-    requestAnimationFrame(step);
-  }, [value]);
-  return <span ref={ref}>{value}</span>;
-}
 
 // ─── Palettes & colors ───────────────────────────────────────────────────────
 
@@ -83,7 +60,7 @@ const DEFAULTS: Record<WId, WState> = {
 
 const WIDGET_CONFIGS: { id: WId; label: string; icon: React.ElementType }[] = [
   { id: 'inspecciones', label: 'Inspecciones', icon: ClipboardCheck },
-  { id: 'pipeline',    label: 'Pipeline',    icon: GitBranch },
+  { id: 'pipeline',    label: 'Estados del manifiesto', icon: GitBranch },
   { id: 'viajes',      label: 'Viajes',      icon: Truck },
   { id: 'manifiesto',  label: 'Manifiesto',  icon: FileText },
   { id: 'actores',     label: 'Actores',     icon: Users },
@@ -104,29 +81,29 @@ const WidgetShell: React.FC<{
 }> = ({ title, icon: Icon, state, onMin, onClose, className = '', children }) => (
   <div className={`wr-panel overflow-hidden flex flex-col flex-shrink-0 ${className}`}>
     <div
-      className="flex items-center gap-1.5 px-2.5 py-2 border-b border-black/5 cursor-pointer select-none"
-      onClick={onMin}
+      className="flex items-center gap-1 px-2 border-b border-neutral-200 bg-neutral-50 select-none"
     >
-      <Icon size={13} className="text-[#0D8A4F] shrink-0" />
-      <span className="text-[11px] font-bold text-neutral-700 uppercase tracking-wide flex-1">{title}</span>
       <button
-        className="p-0.5 rounded hover:bg-black/5 text-neutral-400 hover:text-neutral-600 transition-colors"
-        onClick={e => { e.stopPropagation(); onMin(); }}
+        type="button" aria-expanded={state !== 'minimized'}
+        className="flex flex-1 min-w-0 min-h-11 items-center gap-2 text-left rounded hover:bg-neutral-100 text-neutral-800 transition-colors"
+        onClick={onMin}
       >
-        {state === 'minimized' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+        <Icon size={16} className="text-[#1B5E3C] shrink-0" />
+        <span className="text-sm font-semibold flex-1">{title}</span>
+        {state === 'minimized' ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
       </button>
       {onClose && (
         <button
-          className="p-0.5 rounded hover:bg-red-50 text-neutral-400 hover:text-red-400 transition-colors"
-          onClick={e => { e.stopPropagation(); onClose(); }}
-          title="Cerrar"
+          type="button" aria-label={`Ocultar ${title}`}
+          className="min-w-11 min-h-11 flex items-center justify-center rounded hover:bg-red-50 text-neutral-600 hover:text-red-700 transition-colors"
+          onClick={onClose}
         >
           <X size={12} />
         </button>
       )}
     </div>
     {state !== 'minimized' && (
-      <div className="p-2.5">{children}</div>
+      <div className="wr-widget-content p-3 min-h-0">{children}</div>
     )}
   </div>
 );
@@ -287,40 +264,10 @@ export const DashboardPanels: React.FC<Props> = ({
   // ── Drag divider ──
   const containerRef = useRef<HTMLDivElement>(null);
   const [dividerPct, setDividerPct] = useState<number>(() => {
-    try { const s = localStorage.getItem(DIVIDER_KEY); if (s) return parseFloat(s); } catch {}
+    try { const s = Number(localStorage.getItem(DIVIDER_KEY)); if (Number.isFinite(s) && s >= 25 && s <= 75) return s; } catch {}
     return 55; // 55% for stats zone by default
   });
-  const isDragging = useRef(false);
-
-  const onDividerMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isDragging.current = true;
-    document.body.style.cursor = 'row-resize';
-    document.body.style.userSelect = 'none';
-
-    const onMouseMove = (ev: MouseEvent) => {
-      if (!isDragging.current || !containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const pct = ((ev.clientY - rect.top) / rect.height) * 100;
-      const clamped = Math.max(25, Math.min(75, pct));
-      setDividerPct(clamped);
-    };
-
-    const onMouseUp = () => {
-      isDragging.current = false;
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-      setDividerPct(prev => {
-        try { localStorage.setItem(DIVIDER_KEY, String(prev)); } catch {}
-        return prev;
-      });
-    };
-
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-  }, []);
+  useEffect(() => { try { localStorage.setItem(DIVIDER_KEY, String(dividerPct)); } catch {} }, [dividerPct]);
 
   // ── Data ──
   const porEstado = mode === 'PLAYBACK'
@@ -373,16 +320,17 @@ export const DashboardPanels: React.FC<Props> = ({
   const tratamientosActivos = timelineTratamientos || liveData?.tratamientosActivos || [];
 
   return (
-    <div ref={containerRef} className="flex flex-col h-full overflow-hidden p-3 gap-0">
+    <div ref={containerRef} className={`wr-dashboard flex flex-col h-full overflow-hidden p-3 gap-0 ${mode === 'FORECAST' ? 'wr-dashboard-pending' : ''}`}>
 
       {/* ── ZONA STATS — altura controlada por divider ── */}
       <div
         className="flex flex-col gap-2 overflow-y-auto flex-shrink-0 pb-2"
-        style={{ height: `calc(${dividerPct}% - 16px)` }}
+        style={{ height: mode === 'FORECAST' ? '100%' : `calc(${dividerPct}% - 28px)` }}
       >
+        {mode !== 'FORECAST' && <>
         {/* Widget: Pipeline */}
         {ws.pipeline !== 'closed' && (
-          <WidgetShell title="Pipeline" icon={GitBranch}
+          <WidgetShell title="Estados del manifiesto" icon={GitBranch}
             state={ws.pipeline} onMin={() => minimize('pipeline')} onClose={() => close('pipeline')}>
             <div className="flex flex-col gap-1">
               {stages.map(estado => {
@@ -393,7 +341,7 @@ export const DashboardPanels: React.FC<Props> = ({
                 if (count === 0 && !isKeyStage && mode === 'LIVE') return null;
                 return (
                   <div key={estado} className="flex items-center gap-2">
-                    <span className="text-[10px] text-neutral-500 w-[58px] truncate font-medium flex-shrink-0">
+                    <span className="text-xs text-neutral-700 w-[100px] font-medium flex-shrink-0">
                       {ESTADO_LABELS[estado] || estado}
                     </span>
                     <div className="flex-1 h-4 rounded overflow-hidden relative" style={{ backgroundColor: colors.base + '12' }}>
@@ -406,8 +354,8 @@ export const DashboardPanels: React.FC<Props> = ({
                       />
                     </div>
                     <span className="text-xs font-black tabular-nums font-mono w-6 text-right flex-shrink-0"
-                      style={{ color: count > 0 ? colors.dark : '#d1d5db' }}>
-                      <AnimatedCounter value={count} />
+                      style={{ color: count > 0 ? colors.dark : '#525252' }}>
+                      {count}
                     </span>
                   </div>
                 );
@@ -433,12 +381,12 @@ export const DashboardPanels: React.FC<Props> = ({
             ) : (
               <div className="space-y-1">
                 {enTransito.map(v => (
-                  <div key={v.manifiestoId}
-                    className="flex items-start gap-2 py-1.5 px-1 rounded hover:bg-orange-50/60 cursor-pointer transition-colors"
+                  <button key={v.manifiestoId} type="button" aria-label={`Abrir viaje ${v.numero}`}
+                    className="w-full text-left min-h-11 flex items-start gap-2 py-2 px-1 rounded hover:bg-orange-50 cursor-pointer transition-colors"
                     onClick={() => {
                       onViajeOpen?.(v);
                       const pos = v.ultimaPosicion;
-                      if (pos?.latitud && pos?.longitud) onTripClick?.(pos.latitud, pos.longitud);
+                      if (pos?.latitud != null && pos?.longitud != null) onTripClick?.(pos.latitud, pos.longitud);
                     }}>
                     <div className="w-1.5 h-1.5 rounded-full bg-orange-400 mt-1.5 shrink-0" />
                     <div className="min-w-0 flex-1">
@@ -459,7 +407,7 @@ export const DashboardPanels: React.FC<Props> = ({
                         <span className="text-[9px] text-neutral-400 truncate">{v.destino.razonSocial}</span>
                       </div>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -572,7 +520,8 @@ export const DashboardPanels: React.FC<Props> = ({
           </WidgetShell>
         )}
 
-        {/* Forecast panels (FORECAST mode, no widget controls) */}
+        </>}
+        {/* Actual pending work, not a prediction or cached live snapshot. */}
         {mode === 'FORECAST' && forecastData && (
           <>
             <div className="wr-panel p-3">
@@ -631,10 +580,10 @@ export const DashboardPanels: React.FC<Props> = ({
         )}
 
         {/* Tray — closed widgets */}
-        {closedWidgets.length > 0 && (
+        {mode !== 'FORECAST' && closedWidgets.length > 0 && (
           <div className="flex flex-wrap gap-1 px-1 py-1.5 bg-neutral-50/80 rounded-xl border border-black/5 flex-shrink-0">
             {closedWidgets.map(({ id, label, icon: Icon }) => (
-              <button key={id} onClick={() => restore(id)}
+              <button key={id} onClick={() => restore(id)} aria-label={`Restaurar ${label}`}
                 className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-neutral-500
                            hover:text-[#0D8A4F] hover:bg-white rounded-lg border border-transparent
                            hover:border-black/8 transition-all uppercase tracking-wide">
@@ -646,17 +595,12 @@ export const DashboardPanels: React.FC<Props> = ({
       </div>
 
       {/* ── DRAG DIVIDER ── */}
-      <div
-        className="flex items-center justify-center h-4 flex-shrink-0 cursor-row-resize group"
-        onMouseDown={onDividerMouseDown}
-      >
-        <div className="flex items-center gap-1 px-3 py-1 rounded-full bg-neutral-100 group-hover:bg-neutral-200 transition-colors">
-          <GripHorizontal size={12} className="text-neutral-400" />
-        </div>
-      </div>
+      {mode !== 'FORECAST' && <label className="wr-panel-divider flex items-center gap-2 min-h-7 px-1 text-xs text-neutral-600">
+        <span>Paneles</span><input type="range" min={25} max={75} value={dividerPct} aria-label="Espacio para paneles del Monitor" className="flex-1 min-w-0 accent-[#1B5E3C]" onChange={event=>setDividerPct(Number(event.target.value))}/><span>Eventos</span>
+      </label>}
 
       {/* ── ZONA EVENTOS — takes remaining height ── */}
-      <WidgetShell
+      {mode !== 'FORECAST' && <WidgetShell
         title="Eventos"
         icon={Radio}
         state={ws.eventos}
@@ -671,7 +615,7 @@ export const DashboardPanels: React.FC<Props> = ({
             onEventClick={onEventOpen}
           />
         </div>
-      </WidgetShell>
+      </WidgetShell>}
     </div>
   );
 };

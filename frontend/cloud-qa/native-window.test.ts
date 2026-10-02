@@ -21,3 +21,8 @@ test('requires a complete dump and decodes native text without executing it', ()
   assert.throws(() => nativeNodes('<hierarchy><node/>'));
   assert.equal(nativeNodes(window('<node text="A &amp; B &quot;test&quot;"/>'))[0].text, 'A & B "test"');
 });
+test('uses the Spanish web logout button reported by Android and rejects clipped bounds', () => {
+  const logout=node().replace('No thanks','Cerrar Sesión');
+  assert.deepEqual(chromeButtonPoint(window(logout),'Cerrar Sesión'),{x:140,y:140});
+  assert.throws(()=>chromeButtonPoint(window(node('', '[73,2188][1008,1520]').replace('No thanks','Cerrar Sesión')),'Cerrar Sesión'));
+});
