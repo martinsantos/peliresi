@@ -428,19 +428,19 @@ export const MainLayout: React.FC = () => {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-h-0 min-w-0">
         {/* Header */}
-        <header className="h-16 header-polished flex items-center justify-between px-4 lg:px-8 sticky top-0 z-30">
-          <div className="flex items-center gap-4">
+        <header className="h-16 shrink-0 min-w-0 header-polished flex items-center justify-between gap-2 lg:gap-4 px-4 lg:px-8 sticky top-0 z-30">
+          <div className="flex min-w-0 flex-1 items-center gap-2 lg:gap-4">
             <Button
               variant="ghost"
               size="sm"
-              className="lg:hidden"
+              className="shrink-0 lg:hidden"
               aria-label="Abrir menú"
               aria-expanded={sidebarOpen}
               onClick={() => setSidebarOpen(true)}
             >
               <Menu size={20} />
             </Button>
-            <h1 className="text-xl font-semibold text-neutral-900">{currentPage}</h1>
+            <h1 title={currentPage} className="min-w-0 truncate text-base sm:text-xl font-semibold text-neutral-900">{currentPage}</h1>
             
             {/* Badge de rol actual */}
             <Badge 
@@ -452,7 +452,7 @@ export const MainLayout: React.FC = () => {
             </Badge>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-3">
             {/* Global search trigger */}
             <button
               onClick={() => setSearchOpen(true)}
@@ -473,7 +473,7 @@ export const MainLayout: React.FC = () => {
                 resetOnboardingTour();
                 setShowTour(true);
               }}
-              className="p-2 rounded-xl text-neutral-500 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-neutral-500 hover:text-primary-600 hover:bg-primary-50 transition-colors"
               title="Ver tour de ayuda"
               aria-label="Ver tour de ayuda"
             >

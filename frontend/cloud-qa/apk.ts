@@ -46,9 +46,9 @@ const openOriginal = async () => {
   const launched = adb('shell', 'am', 'start', '-W', '-n', activity);
   assert.doesNotMatch(launched, /Error:|Exception/);
   // Activity launch may briefly retain a closing custom-tab target while the
-  // native splash is foreground. Require the actual OS login, then choose a
+  // native splash is foreground. Require the actual OS Chrome compositor, then choose a
   // live DOM target that has finished rendering the same login form.
-  await device.wait({ text: 'Correo electrónico o CUIT' }, { state: 'shown', timeout: 45000 });
+  await device.wait({ res: 'com.android.chrome:id/compositor_view_holder' }, { timeout: 45000 });
   await expect.poll(async () => {
     const candidates = context!.pages().filter(item => !item.isClosed()
       && item.url().startsWith('https://sitrep.ultimamilla.com.ar/app/')).reverse();

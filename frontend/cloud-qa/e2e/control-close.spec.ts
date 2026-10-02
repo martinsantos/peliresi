@@ -61,6 +61,24 @@ test('control center queries real layers, refreshes and opens the exact active i
   expect(agenda.items.some((r: { id: string }) => r.id === inspection.id)).toBe(true);
   await expect(page.getByText('Total Manifiestos', { exact: true })).toBeVisible();
   await expect(page.getByText('Total Manifiestos', { exact: true }).locator('..')).toContainText(String(stats.estadisticas.totalManifiestos));
+  if (info.project.name !== 'app') {
+    const header = page.getByRole('banner');
+    const title = header.getByRole('heading', { name: 'Centro de Control', exact: true });
+    const headerBox = (await header.boundingBox())!;
+    const titleBox = (await title.boundingBox())!;
+    expect(headerBox.height).toBe(64);
+    await expect(title).toHaveCSS('white-space', 'nowrap');
+    expect(titleBox.y).toBeGreaterThanOrEqual(headerBox.y);
+    expect(titleBox.y + titleBox.height).toBeLessThanOrEqual(headerBox.y + headerBox.height);
+    for (const button of await header.getByRole('button').all()) {
+      if (!await button.isVisible()) continue;
+      const box = (await button.boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual((await page.evaluate(() => innerWidth)) + 1);
+      expect(box.y + box.height).toBeLessThanOrEqual(headerBox.y + headerBox.height);
+    }
+    await visibleProof(page, info, 'stable-header-after');
+  }
   const legend = page.getByRole('list', { name: 'Tipos de elementos en el mapa', exact: true });
   await expect(legend).toHaveCount(1); // Only the legend for the current viewport is exposed.
   for (const [label, glyph] of [

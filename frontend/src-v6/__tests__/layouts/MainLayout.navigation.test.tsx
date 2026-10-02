@@ -40,4 +40,20 @@ describe('Sidebar: one visible current destination',()=>{
     expect(link).toHaveClass('min-h-11','transition-colors','focus-visible:outline-2');
     expect(link).not.toHaveClass('transition-all');
   });
+  it.each([
+    ['/centro-control','Centro de Control'],
+    ['/admin/actores/generadores','Admin Generadores'],
+    ['/inspecciones','Inspecciones'],
+  ])('constrains the header without losing its full accessible title on %s',(path,label)=>{
+    show(path);
+    const header=screen.getByRole('banner');
+    const title=within(header).getByRole('heading',{name:label,exact:true});
+    expect(header).toHaveClass('h-16','shrink-0','min-w-0');
+    expect(title).toHaveClass('min-w-0','truncate');
+    expect(title).toHaveAttribute('title',label);
+    expect(title.parentElement).toHaveClass('min-w-0','flex-1');
+    const help=within(header).getByRole('button',{name:'Ver tour de ayuda',exact:true});
+    expect(help).toHaveClass('h-11','w-11','shrink-0');
+    expect(help.parentElement).toHaveClass('shrink-0');
+  });
 });
