@@ -7,6 +7,7 @@ import path from 'node:path';
 import { assertCloudDatabase } from './safety.ts';
 import { chromeButtonPoint, dismissObservedChromePrompts, readNativeWindow } from './native-window.ts';
 import { DeadlineError, withinDeadline } from './deadline.ts';
+import { renewAndroidConnection } from './android-connection.ts';
 
 await assertCloudDatabase();
 const output=path.join(process.env.QA_ARTIFACTS!,'android');
@@ -18,7 +19,7 @@ execFileSync('adb',['shell','am','set-debug-app','--persistent','com.android.chr
 execFileSync('adb',['shell','svc','power','stayon','true']);
 const devices=await android.devices();
 assert.equal(devices.length,1,'Exactly one actual Android OS device is required');
-const device=devices[0];
+let device=devices[0];
 android.setDefaultTimeout(25000);
 device.setDefaultTimeout(25000);
 const getprop=(key:string)=>execFileSync('adb',['shell','getprop',key],{encoding:'utf8'}).trim();
@@ -34,6 +35,7 @@ const browserLifecycle:Array<{at:string;event:string;url?:string;expected:boolea
 const intentionalClosures=new WeakSet<BrowserContext>();
 let inspectorUserId='';
 let logoutAttempt=0;
+let launches=0;
 const results:Array<{name:string;status:string;error?:string}>=[];
 const driverStages:Array<{stage:string;event:string;at:string;error?:string}>=[];
 const driverStep=async<T>(stage:string,operation:()=>Promise<T>,milliseconds=25000):Promise<T>=>{
@@ -114,8 +116,16 @@ const observe=(target:Page)=>{
   });
 };
 const launch=async()=>{
+  // The experimental device object owns CDP sockets and a background ADB poll.
+  // Reusing it after force-stop produced an unresolved launch in run21. Renew
+  // only that connection on each planned restart; do not retry a failed launch,
+  // clear Chrome's data, inject storage or wait for its localStorage disk commit.
+  if(launches>0)await driverStep('renew-device-transport',async()=>{
+    device=await renewAndroidConnection(device,()=>android.devices());
+  });
   context=await driverStep('launch-and-attach-Chrome',()=>device.launchBrowser({hasTouch:true,permissions:['geolocation'],
     geolocation:{latitude:-32.89,longitude:-68.84},args:['--no-first-run','--no-default-browser-check']}));
+  launches++;
   await driverStep('set-QA-network-identity',()=>context.addCookies([{name:'sitrep_qa_client',value:'127.11.20.2',url:'http://127.0.0.1:4177'}]));
   // Restart the existing QA tab, as a user reopening the app would. Creating a
   // second copy left the old inspection mounted behind the next user session.
@@ -207,9 +217,10 @@ const check=async(name:string,task:()=>Promise<void>)=>{
     for(const [suffix,args]of [
       ['chrome-exits.txt',['shell','dumpsys','activity','exit-info','com.android.chrome']],
       ['chrome-memory.txt',['shell','dumpsys','meminfo','com.android.chrome']],
+      ['chrome-system-log.txt',['logcat','-d','-t','400','-v','brief','ActivityManager:I','AndroidRuntime:E','chromium:E','*:S']],
       ['device.png',['exec-out','screencap','-p']],
     ]as const){
-      try{await writeFile(path.join(output,name+'-FAIL-'+suffix),execFileSync('adb',[...args],{timeout:5000}));}
+      try{await writeFile(path.join(output,name+'-FAIL-'+suffix),execFileSync('adb',[...args],{timeout:5000,maxBuffer:4*1024*1024}));}
       catch(capture){await writeFile(path.join(output,name+'-FAIL-'+suffix+'.error.txt'),String(capture));}
     }
   }
