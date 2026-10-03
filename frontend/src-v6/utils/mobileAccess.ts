@@ -1,5 +1,5 @@
 import type { User, UserRole } from '../contexts/AuthContext';
-import { actorDetailFromPath, canReadActorDetail } from './actorReadAccess';
+import { actorDetailFromPath, canReadActorDetail, isActorDetailPath } from './actorReadAccess';
 
 const ALL_ADMIN_ROLES: UserRole[] = [
   'ADMIN',
@@ -35,16 +35,14 @@ export function canAccessMobilePath(user: User, path: string): boolean {
 
   const actor = actorDetailFromPath(path);
   if (actor) return canReadActorDetail(user, actor.type, actor.id);
+  // A malformed detail must not regain access through a legacy role fallback.
+  if (isActorDetailPath(path)) return false;
 
   if (startsWithAny(path, ['/admin/usuarios', '/admin/actores'])) {
     if (path === '/admin/actores') return user.rol === 'ADMIN';
 
     if (path.startsWith('/admin/actores/transportistas')) {
-      const detailMatch = path.match(/^\/admin\/actores\/transportistas\/([^/]+)$/);
-      const isDetail = Boolean(detailMatch && detailMatch[1] !== 'nuevo');
-      return isDetail
-        ? hasRole(user, ['ADMIN', 'ADMIN_TRANSPORTISTA', 'TRANSPORTISTA'])
-        : hasRole(user, ['ADMIN', 'ADMIN_TRANSPORTISTA']);
+      return hasRole(user, ['ADMIN', 'ADMIN_TRANSPORTISTA']);
     }
 
     if (path.startsWith('/admin/actores/generadores')) {

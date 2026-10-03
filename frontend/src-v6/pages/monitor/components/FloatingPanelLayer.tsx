@@ -14,6 +14,7 @@ import {
 import { EVENT_COLORS, RESIDUO_PALETTE } from '../utils/war-room-icons';
 import { formatTimeShort } from '../utils/formatters';
 import type { EnTransitoItem } from '../api/monitor-api';
+import { MonitorActorRow } from './MonitorActorRow';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -46,13 +47,13 @@ export interface FloatingPanel {
 // ─── Workflow dots ────────────────────────────────────────────────────────────
 
 const WORKFLOW = [
-  { key: 'borrador',      label: 'BOR', Icon: FileText },
-  { key: 'aprobado',      label: 'APR', Icon: CheckCircle },
-  { key: 'enTransito',    label: 'TRA', Icon: Truck },
-  { key: 'entregado',     label: 'ENT', Icon: Box },
-  { key: 'recibido',      label: 'REC', Icon: Package },
-  { key: 'enTratamiento', label: 'TRT', Icon: FlaskConical },
-  { key: 'tratado',       label: 'FIN', Icon: Zap },
+  { key: 'borrador',      label: 'BOR', name: 'Borrador', Icon: FileText },
+  { key: 'aprobado',      label: 'APR', name: 'Aprobado', Icon: CheckCircle },
+  { key: 'enTransito',    label: 'TRA', name: 'En tránsito', Icon: Truck },
+  { key: 'entregado',     label: 'ENT', name: 'Entregado', Icon: Box },
+  { key: 'recibido',      label: 'REC', name: 'Recibido', Icon: Package },
+  { key: 'enTratamiento', label: 'TRT', name: 'En tratamiento', Icon: FlaskConical },
+  { key: 'tratado',       label: 'FIN', name: 'Tratado', Icon: Zap },
 ] as const;
 
 const TIPO_TO_PROGRESS: Record<string, number> = {
@@ -75,8 +76,8 @@ const ManifiestoContent: React.FC<{ data: ManifiestoFPData }> = ({ data }) => {
       {/* Type badge + time */}
       <div className="flex items-center justify-between gap-2">
         <span
-          className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wide"
-          style={{ backgroundColor: color + '20', color }}
+          className="text-[10px] text-neutral-800 font-bold px-2 py-0.5 rounded-md uppercase tracking-wide"
+          style={{ backgroundColor: color + '20' }}
         >
           {tipo || 'EVENTO'}
         </span>
@@ -94,26 +95,11 @@ const ManifiestoContent: React.FC<{ data: ManifiestoFPData }> = ({ data }) => {
       </p>
 
       {/* Actors */}
-      <div className="space-y-1">
-        {data.generador && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 shrink-0">GEN</span>
-            <span className="text-[11px] text-neutral-700 truncate font-medium">{data.generador.razonSocial}</span>
-          </div>
-        )}
-        {transNombre && (
-          <div className="flex items-center gap-1.5 pl-1">
-            <ArrowRight size={9} className="text-neutral-400 shrink-0" />
-            <span className="text-[11px] text-orange-600 truncate font-semibold">{transNombre}</span>
-          </div>
-        )}
-        {data.operador && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 shrink-0">OPE</span>
-            <span className="text-[11px] text-neutral-700 truncate font-medium">{data.operador.razonSocial}</span>
-          </div>
-        )}
-      </div>
+      <ul className="space-y-1" aria-label="Actores del evento">
+        {data.generador && <MonitorActorRow category="generador" name={data.generador.razonSocial} />}
+        {transNombre && <MonitorActorRow category="transportista" name={transNombre} />}
+        {data.operador && <MonitorActorRow category="operador" name={data.operador.razonSocial} />}
+      </ul>
 
       {/* Residuos pills */}
       {data.residuos && data.residuos.length > 0 && (
@@ -137,29 +123,30 @@ const ManifiestoContent: React.FC<{ data: ManifiestoFPData }> = ({ data }) => {
       {/* Workflow progress dots */}
       {progressIdx >= 0 && (
         <div className="pt-1 border-t border-black/5">
-          <div className="flex items-center justify-between mb-1.5">
-            {WORKFLOW.map(({ label, Icon }, i) => {
+          <p className="mb-2 text-xs text-neutral-700">Etapa del evento: {WORKFLOW[progressIdx].name}</p>
+          <ul className="flex items-center justify-between mb-1.5" aria-label="Etapas hasta este evento">
+            {WORKFLOW.map(({ label, name, Icon }, i) => {
               const filled = i <= progressIdx;
               const active = i === progressIdx;
               return (
-                <div key={label} className="flex flex-col items-center gap-0.5">
+                <li key={label} title={name} aria-label={name} aria-current={active ? 'step' : undefined} className="flex flex-col items-center gap-0.5">
                   <div
-                    className={`w-5 h-5 rounded-full border flex items-center justify-center ${active ? 'scale-110' : ''} transition-all`}
+                    className="w-5 h-5 rounded-full border flex items-center justify-center"
                     style={{
                       backgroundColor: filled ? color : 'transparent',
                       borderColor: filled ? color : '#e5e7eb',
-                      boxShadow: active ? `0 0 8px ${color}60` : 'none',
+                      boxShadow: active ? '0 0 0 2px #525252' : 'none',
                     }}
                   >
-                    <Icon size={9} color={filled ? '#fff' : '#d1d5db'} />
+                    <Icon size={11} aria-hidden="true" color={filled ? '#262626' : '#525252'} />
                   </div>
-                  <span className={`text-[7px] font-mono ${filled ? 'text-neutral-500' : 'text-neutral-300'}`}>
+                  <span className="text-[10px] font-mono text-neutral-600">
                     {label}
                   </span>
-                </div>
+                </li>
               );
             })}
-          </div>
+          </ul>
           <div className="h-1 bg-neutral-100 rounded-full overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-500"

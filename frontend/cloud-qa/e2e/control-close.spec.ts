@@ -187,6 +187,42 @@ test('monitor LIVE, PLAYBACK and FORECAST query real data and expose usable cont
   await expect(event).toBeVisible();
   await event.focus();await event.press('Space');
   const panel=page.locator('.fp-window').last();await expect(panel).toBeVisible();
+  // Real computed CSS, not a unit assertion against class names. Badge tint,
+  // event position and future-stage labels are data, not disabled controls.
+  const readingTargets = [panel.getByText('CREACION', { exact: true }),
+    ...await panel.getByRole('list', { name: 'Etapas hasta este evento', exact: true }).locator('span').all(),
+    page.locator('.wr-widget-content').getByText(/^1\/\d+$/).first()];
+  const readingEvidence = [];
+  for (const target of readingTargets) {
+    const measurement = await target.evaluate(el => {
+      const parse = (color: string) => {
+        const channels = color.match(/[\d.]+/g)?.map(Number);
+        if (!channels || channels.length < 3 || !color.startsWith('rgb')) throw new Error('Unmeasured color: ' + color);
+        return channels;
+      };
+      const background = [255, 255, 255];
+      const ancestry: Element[] = []; let parent: Element | null = el;
+      while (parent) { ancestry.unshift(parent); parent = parent.parentElement; }
+      for (const node of ancestry) {
+        const rgb = parse(getComputedStyle(node).backgroundColor), alpha = rgb[3] ?? 1;
+        for (let i = 0; i < 3; i++) background[i] = rgb[i] * alpha + background[i] * (1 - alpha);
+      }
+      const style = getComputedStyle(el), foreground = parse(style.color);
+      const lum = (rgb: number[]) => rgb.slice(0, 3).map(channel => {
+        const value = channel / 255; return value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4;
+      }).reduce((total, value, i) => total + value * [.2126, .7152, .0722][i], 0);
+      const a = lum(foreground), b = lum(background);
+      return { text: el.textContent, foreground: style.color, background,
+        contrast: (Math.max(a, b) + .05) / (Math.min(a, b) + .05), fontSize: parseFloat(style.fontSize) };
+    });
+    expect(measurement.contrast).toBeGreaterThanOrEqual(4.5);
+    expect(measurement.fontSize).toBeGreaterThanOrEqual(12);
+    readingEvidence.push(measurement);
+  }
+  await info.attach('monitor-reading-contrast', { body: JSON.stringify(readingEvidence, null, 2), contentType: 'application/json' });
+  const actorList = panel.getByRole('list', { name: 'Actores del evento', exact: true });
+  await expect(actorList.locator('svg.lucide-factory')).toHaveCount(1);
+  await expect(actorList.locator('svg.lucide-flask-conical')).toHaveCount(1);
   const mapBox=(await page.locator('.wr-layout-map').boundingBox())!;
   const panelBox=(await panel.boundingBox())!;
   if(info.project.name==='web-desktop'){

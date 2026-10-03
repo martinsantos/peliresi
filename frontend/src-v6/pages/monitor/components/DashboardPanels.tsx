@@ -18,6 +18,7 @@ import type { MonitorMode } from '../WarRoomPage';
 import type { MonitorLiveResponse, ForecastResponse, TimelineResponse, EnTransitoItem } from '../api/monitor-api';
 import { formatTimeShort } from '../utils/formatters';
 import { EventFeed } from './EventFeed';
+import { MonitorActorRow } from './MonitorActorRow';
 import { EVENT_COLORS } from '../utils/war-room-icons';
 
 // ─── Palettes & colors ───────────────────────────────────────────────────────
@@ -149,14 +150,14 @@ const ManifiestoCard: React.FC<{
       {/* Header row */}
       <div className="flex items-center justify-between">
         <span
-          className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wide"
-          style={{ backgroundColor: color + '20', color }}
+          className="text-[10px] text-neutral-800 font-bold px-2 py-0.5 rounded-md uppercase tracking-wide"
+          style={{ backgroundColor: color + '20' }}
         >
           {tipo || 'EVENTO'}
         </span>
         <div className="flex items-center gap-1.5 text-[10px] text-neutral-400 font-mono tabular-nums">
           <span>{formatTimeShort(event.timestamp)}</span>
-          {totalEvents > 0 && <span className="text-neutral-300">{eventIndex + 1}/{totalEvents}</span>}
+          {totalEvents > 0 && <span className="text-neutral-600">{eventIndex + 1}/{totalEvents}</span>}
         </div>
       </div>
 
@@ -167,26 +168,11 @@ const ManifiestoCard: React.FC<{
       </p>
 
       {/* Actors */}
-      <div className="space-y-1">
-        {event.generador && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-purple-100 text-purple-700 shrink-0">GEN</span>
-            <span className="text-[11px] text-neutral-700 truncate font-medium">{event.generador.razonSocial}</span>
-          </div>
-        )}
-        {transNombre && (
-          <div className="flex items-center gap-1.5">
-            <ArrowRight size={9} className="text-neutral-400 shrink-0 ml-0.5" />
-            <span className="text-[11px] text-orange-600 truncate font-medium">{transNombre}</span>
-          </div>
-        )}
-        {event.operador && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-blue-100 text-blue-700 shrink-0">OPE</span>
-            <span className="text-[11px] text-neutral-700 truncate font-medium">{event.operador.razonSocial}</span>
-          </div>
-        )}
-      </div>
+      <ul className="space-y-1" aria-label="Actores del evento">
+        {event.generador && <MonitorActorRow category="generador" name={event.generador.razonSocial} />}
+        {transNombre && <MonitorActorRow category="transportista" name={transNombre} />}
+        {event.operador && <MonitorActorRow category="operador" name={event.operador.razonSocial} />}
+      </ul>
 
       {/* Residuos pills */}
       {event.residuos && event.residuos.length > 0 && (

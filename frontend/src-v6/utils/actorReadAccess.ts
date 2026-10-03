@@ -7,6 +7,7 @@ const TYPES: Record<string, ActorReadType> = {
   generadores: 'GENERADOR', transportistas: 'TRANSPORTISTA', operadores: 'OPERADOR',
 };
 const unsafePath = (value: string) => [...value].some(character => character === '\\' || character.charCodeAt(0) < 32);
+const DETAIL_PATH = /^\/(?:mobile\/)?(?:(?:admin\/)?actores\/(generadores|transportistas|operadores)|admin\/(generadores|operadores))\/([^/]+)\/?$/;
 
 /** Consultation only. This rule never grants creation, editing or moderation. */
 export function canReadActorDetail(user: Reader, type: ActorReadType, id?: string): boolean {
@@ -17,13 +18,19 @@ export function canReadActorDetail(user: Reader, type: ActorReadType, id?: strin
 
 /** Match only actual detail screens, never a list or administrative action. */
 export function actorDetailFromPath(pathname: string): { type: ActorReadType; id: string } | null {
-  const match = pathname.match(/^\/(?:mobile\/)?(?:(?:admin\/)?actores\/(generadores|transportistas|operadores)|admin\/(generadores|operadores))\/([^/]+)\/?$/);
+  const match = pathname.match(DETAIL_PATH);
   if (!match) return null;
   try {
     const id = decodeURIComponent(match[3]);
     if (!id.trim() || id === 'nuevo' || id.includes('/') || unsafePath(id)) return null;
     return { type: TYPES[match[1] || match[2]], id };
   } catch { return null; }
+}
+
+/** Distinguish a rejected detail ID from an unrelated screen or creation route. */
+export function isActorDetailPath(pathname: string): boolean {
+  const match = pathname.match(DETAIL_PATH);
+  return Boolean(match && match[3] !== 'nuevo');
 }
 
 /** Inspection staff history is narrower than actor consultation. */
