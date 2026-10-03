@@ -1,5 +1,5 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
-import { login, prefix, readableMapLayers } from './helpers';
+import { login, prefix, readableFixedAction, readableMapLayers } from './helpers';
 
 function health(page: Page) {
   const errors: string[] = [];
@@ -19,6 +19,10 @@ async function proof(page: Page, info: TestInfo, filename: string) {
   await expect(page).toHaveTitle(/SITREP/i);
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+  const bottomNavigation = page.locator('nav.bottom-nav-polished');
+  if (await bottomNavigation.count()) {
+    for (const link of await bottomNavigation.getByRole('link').all()) await readableFixedAction(link, bottomNavigation);
+  }
   await page.screenshot({ path: info.outputPath(filename), animations: 'disabled' });
 }
 
@@ -51,6 +55,7 @@ test('proactive context offers explicit locations and one actionable reference p
   await expect(dialog.getByLabel('Ubicación prevista', { exact: true })).toHaveValue('QA Planta 200, Las Heras');
   await dialog.getByLabel('Ubicación prevista', { exact: true }).scrollIntoViewIfNeeded();
   await dialog.getByRole('group', { name: 'Direcciones declaradas' }).scrollIntoViewIfNeeded();
+  for (const name of ['Cancelar', 'Crear expediente']) await readableFixedAction(dialog.getByRole('button', { name, exact: true }), dialog);
   await proof(page, info, '01-inspection-location.png');
   await dialog.getByRole('button', { name: 'Cancelar', exact: true }).click();
 
@@ -161,6 +166,7 @@ test('finding location assistance preserves actual GPS and the registered narrat
   await expect(dialog.getByLabel('Ubicación o referencia', { exact: true })).toHaveValue('QA desagüe observado');
   await dialog.getByRole('button', { name: 'Usar domicilio declarado: QA Registro 100', exact: true }).click();
   await dialog.getByRole('group', { name: 'Direcciones declaradas' }).scrollIntoViewIfNeeded();
+  for (const name of ['Guardar borrador', 'Registrar denuncia']) await readableFixedAction(dialog.getByRole('button', { name, exact: true }), dialog);
   await proof(page, info, '06-finding-location.png');
   const registered = page.waitForResponse(response => response.url().endsWith('/api/inspecciones') && response.request().method() === 'POST');
   await dialog.getByRole('button', { name: 'Registrar denuncia', exact: true }).click();

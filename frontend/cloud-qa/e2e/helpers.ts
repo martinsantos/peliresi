@@ -1,5 +1,37 @@
 import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
 
+/** Page overflow alone misses clipped text in fixed navigation and dialog actions. */
+export async function readableFixedAction(action: Locator, container: Locator) {
+  await expect(action).toBeVisible();
+  const containerBounds = await container.boundingBox();
+  expect(containerBounds).not.toBeNull();
+  const result = await action.evaluate((element, parent) => {
+    const bounds = element.getBoundingClientRect();
+    const viewport = window.visualViewport;
+    const visible = { left: viewport?.offsetLeft ?? 0, top: viewport?.offsetTop ?? 0,
+      right: (viewport?.offsetLeft ?? 0) + (viewport?.width ?? document.documentElement.clientWidth),
+      bottom: (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight) };
+    const inside = (rect: { left: number; right: number; top: number; bottom: number }, area: typeof visible) =>
+      rect.left >= area.left - 1 && rect.right <= area.right + 1 && rect.top >= area.top - 1 && rect.bottom <= area.bottom + 1;
+    const texts: Array<{ left: number; right: number; top: number; bottom: number }> = [];
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    let node = walker.nextNode();
+    while (node) {
+      if (node.textContent?.trim()) {
+        const range = document.createRange(); range.selectNodeContents(node);
+        texts.push(...Array.from(range.getClientRects()).map(rect => ({ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom })));
+      }
+      node = walker.nextNode();
+    }
+    return { name: element.textContent?.trim(), width: bounds.width, height: bounds.height,
+      button: { left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom }, visible,
+      containedByParent: inside(bounds, { left: parent.x, top: parent.y, right: parent.x + parent.width, bottom: parent.y + parent.height }),
+      containedByViewport: inside(bounds, visible), textContained: texts.every(rect => inside(rect, bounds)), texts };
+  }, containerBounds!);
+  expect(result, `Readable fixed action: ${result.name}`).toMatchObject({ containedByParent: true, containedByViewport: true, textContained: true });
+  expect(result.height).toBeGreaterThanOrEqual(44);
+}
+
 /** Real text geometry, not just a page-overflow check: long names/counts must not collide. */
 export async function readableMapLayers(group: Locator) {
   for (const button of await group.getByRole('button').all()) {
