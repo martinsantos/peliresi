@@ -17,6 +17,11 @@ on:
         type: boolean
         required: true
         default: false
+      context_only:
+        description: Capture inspection/map context only; never packages or certifies a complete candidate
+        type: boolean
+        required: true
+        default: false
 
 permissions:
   contents: read
@@ -180,9 +185,15 @@ jobs:
           cd backend
           npx --no-install ts-node tests/integration/night-http.ts > "$QA_ARTIFACTS/http.log" 2>&1
       - name: Actual web and app E2E, one browser worker, no fake auth
+        env:
+          QA_CONTEXT_ONLY: ${{ inputs.context_only }}
         run: |
           cd frontend
-          npx --no-install playwright test --config cloud-qa/playwright.config.ts
+          if test "$QA_CONTEXT_ONLY" = 'true'; then
+            npx --no-install playwright test --config cloud-qa/playwright.config.ts cloud-qa/e2e/proactive-context.spec.ts
+          else
+            npx --no-install playwright test --config cloud-qa/playwright.config.ts
+          fi
       - name: Preserve web results before starting Android
         if: always() && steps.qa-start.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -219,10 +230,10 @@ jobs:
           disable-animations: true
           script: node --experimental-strip-types frontend/cloud-qa/android-run.ts
       - name: Package the exact tested backend, web and app bytes only after every gate passes
-        if: success() && inputs.unit && inputs.android
+        if: success() && inputs.unit && inputs.android && !inputs.context_only
         run: node --experimental-strip-types frontend/cloud-qa/build-artifact.ts package
       - name: Preserve exact tested frontend builds, never dependencies or backend env
-        if: success() && inputs.unit && inputs.android
+        if: success() && inputs.unit && inputs.android && !inputs.context_only
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sitrep-tested-frontend-${{ github.run_id }}-${{ github.run_attempt }}
@@ -232,7 +243,7 @@ jobs:
           retention-days: 3
           if-no-files-found: error
       - name: Preserve exact tested backend bytes, without env, uploads or dependencies
-        if: success() && inputs.unit && inputs.android
+        if: success() && inputs.unit && inputs.android && !inputs.context_only
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sitrep-tested-backend-${{ github.run_id }}-${{ github.run_attempt }}

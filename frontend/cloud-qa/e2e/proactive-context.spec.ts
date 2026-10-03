@@ -11,7 +11,7 @@ test('proactive context audit captures actor location and map layer controls', a
   await page.goto(`${prefix(info)}/inspecciones`);
   await page.getByRole('button', { name: 'Nueva inspección', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Nueva inspección', exact: true });
-  await dialog.getByLabel('Actor inspeccionado', { exact: true }).selectOption({ label: 'QA Generador 1' });
+  await dialog.getByRole('combobox', { name: 'Actor inspeccionado', exact: true }).selectOption({ label: 'QA Generador 1' });
   await dialog.getByLabel('Ubicación prevista', { exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: info.outputPath('01-inspection-location.png'), animations: 'disabled' });
   await dialog.getByRole('button', { name: 'Cancelar', exact: true }).click();
