@@ -68,13 +68,18 @@ if (mode === 'freeze') {
   assert.equal(android.failed + apk.failed, 0);
   assert.equal(android.passed, 12);
   assert.equal(apk.passed, 4);
+  const androidSystemPackages = await readJson('android-system-packages.json');
+  assert.equal(androidSystemPackages.stable, true, 'Require fixed Android dependency versions');
+  assert.equal(androidSystemPackages.updater, 'com.android.vending');
+  assert.equal(androidSystemPackages.state, 'disabled-user');
+  assert.deepEqual(androidSystemPackages.after, androidSystemPackages.dependencies);
   const archive = path.join(output, 'tested-frontend.tar.gz');
   execFileSync('tar', ['-czf', archive, '-C', path.join(root, 'frontend'), 'dist', 'dist-app'], { timeout: 30000 });
   await writeFile(path.join(output, 'tested-build.json'), JSON.stringify({
     commit: process.env.GITHUB_SHA, run: process.env.GITHUB_RUN_ID,
     archiveSha256: createHash('sha256').update(await readFile(archive)).digest('hex'), files,
     units: units.map(unit => ({ passed: unit.numPassedTests, failed: unit.numFailedTests, pending: unit.numPendingTests })),
-    e2e: e2e.stats, android: { passed: android.passed, failed: android.failed }, apk: { passed: apk.passed, failed: apk.failed },
+    e2e: e2e.stats, android: { passed: android.passed, failed: android.failed }, apk: { passed: apk.passed, failed: apk.failed }, androidSystemPackages,
     builtInCloud: true, rebuiltAfterTesting: false, productionDataWritten: false,
   }, null, 2));
   const backendArchive = path.join(output, 'tested-backend.tar.gz');
@@ -87,7 +92,7 @@ if (mode === 'freeze') {
     archiveSha256: createHash('sha256').update(await readFile(backendArchive)).digest('hex'),
     files: backendFiles, sourceHashes, http: { passed: http.passed, failed: http.failed },
     units: units.map(unit => ({ passed: unit.numPassedTests, failed: unit.numFailedTests, pending: unit.numPendingTests })),
-    e2e: e2e.stats, android: { passed: android.passed, failed: android.failed }, apk: { passed: apk.passed, failed: apk.failed },
+    e2e: e2e.stats, android: { passed: android.passed, failed: android.failed }, apk: { passed: apk.passed, failed: apk.failed }, androidSystemPackages,
     builtInCloud: true, rebuiltAfterTesting: false, productionDataWritten: false,
     containsDependencies: false, containsEnvironment: false, containsUploads: false,
   }, null, 2));

@@ -120,6 +120,7 @@ jobs:
           node --experimental-strip-types --test frontend/cloud-qa/deadline.test.ts
           node --experimental-strip-types --test frontend/cloud-qa/android-connection.test.ts
           node --experimental-strip-types --test frontend/cloud-qa/system-log.test.ts
+          node --experimental-strip-types --test frontend/cloud-qa/system-packages.test.ts
           test ! -f backend/.env
           test ! -f frontend/.env
           mkdir -p "$QA_ARTIFACTS"
