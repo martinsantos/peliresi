@@ -34,7 +34,7 @@ describe('Actionable map legend', () => {
     ['En Tránsito', 'navigation', ACTOR_COLORS.enTransito, 'transito'],
   ])('identifies %s with the marker glyph and preserves the exact toggle action', (name, glyph, color, key) => {
     const toggle = map(true);
-    const button = screen.getByRole('button', { name, exact: true });
+    const button = screen.getByRole('button', { name });
     expect(button.querySelector(`svg.lucide-${glyph}`)).not.toBeNull();
     expect(button.querySelector('[data-map-symbol]')).toHaveStyle({ backgroundColor: color });
     expect(button).toHaveAttribute('aria-pressed', String(key !== 'operadores'));
@@ -44,12 +44,12 @@ describe('Actionable map legend', () => {
 
   it('offers no inspection control to accounts without the layer', () => {
     map();
-    expect(screen.queryByRole('button', { name: 'Inspecciones', exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Inspecciones' })).not.toBeInTheDocument();
   });
 
   it('keeps an offered-but-hidden inspection layer available to turn back on', () => {
     map(false);
-    expect(screen.getByRole('button', { name: 'Inspecciones', exact: true })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Inspecciones' })).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('does not repeat the map layers in the global date filter bar', () => {
@@ -57,7 +57,7 @@ describe('Actionable map legend', () => {
       layers: { generadores: true, transportistas: true, operadores: true, transito: true, inspecciones: true },
       onManualRefresh: vi.fn(), onDatePreset: vi.fn(), onFechaDesde: vi.fn(), onFechaHasta: vi.fn(), onToggleLayer: vi.fn() };
     render(<ControlFilters {...props} />);
-    expect(screen.queryByRole('button', { name: 'Generadores', exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Generadores' })).not.toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Capas del mapa' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Actualizar ahora' })).toBeInTheDocument();
   });

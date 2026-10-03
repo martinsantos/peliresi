@@ -31,18 +31,18 @@ describe('Report map single interactive category reference', () => {
       ['Op. Fijos', 'flask-conical', ACTOR_COLORS.operador],
       ['Op. In Situ', 'flask-conical', ACTOR_COLORS.operador],
     ]) {
-      const button = within(group).getByRole('button', { name: label, exact: true });
+      const button = within(group).getByRole('button', { name: label });
       expect(button).toHaveAttribute('aria-pressed', 'true');
       expect(button.querySelector(`svg.lucide-${glyph}`)).not.toBeNull();
       expect(button.querySelector('[data-map-symbol]')).toHaveStyle({ backgroundColor: color });
     }
-    expect(within(group).queryByRole('button', { name: 'Inspecciones', exact: true })).not.toBeInTheDocument();
+    expect(within(group).queryByRole('button', { name: 'Inspecciones' })).not.toBeInTheDocument();
     expect(screen.getAllByText('Generadores', { exact: true })).toHaveLength(1);
   });
 
   it('really removes and restores the selected category markers and list entries', () => {
     reportMap();
-    const button = screen.getByRole('button', { name: 'Generadores', exact: true });
+    const button = screen.getByRole('button', { name: 'Generadores' });
     expect(screen.getAllByTestId('marker')).toHaveLength(1);
     expect(screen.getByRole('button', { name: /^Generador del mapa/ })).toBeInTheDocument();
     fireEvent.click(button);

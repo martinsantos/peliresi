@@ -59,7 +59,8 @@ if (mode === 'freeze') {
   const http = await readJson('http-summary.json');
   assert.equal(http.passed, 52);
   assert.equal(http.failed, 0);
-  assert.equal(e2e.stats.expected, 90);
+  // 30 existing journeys plus three contextual journeys, across all three surfaces.
+  assert.equal(e2e.stats.expected, 99);
   assert.equal(e2e.stats.unexpected + e2e.stats.flaky + e2e.stats.skipped, 0);
   assert.deepEqual(e2e.errors, []);
   const android = await readJson('android/result.json');

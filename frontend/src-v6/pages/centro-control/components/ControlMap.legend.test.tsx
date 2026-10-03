@@ -29,7 +29,7 @@ describe('Control map visual identity across desktop and mobile', () => {
     renderMap(true);
     expect(screen.getAllByRole('group', { name: 'Capas del mapa' })).toHaveLength(1);
     expect(screen.queryByRole('list', { name: 'Tipos de elementos en el mapa' })).not.toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Operadores', exact: true })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Operadores' })).toHaveLength(1);
   });
 
   it.each([true, false])('uses the same labelled glyphs even when the inspection layer is %s', enabled => {
@@ -42,12 +42,12 @@ describe('Control map visual identity across desktop and mobile', () => {
         ['Operadores', 'flask-conical', ACTOR_COLORS.operador],
         ['Inspecciones', 'clipboard-check', ACTOR_COLORS.inspeccion],
       ]) {
-        const item = within(legend).getByRole('button', { name: label, exact: true });
+        const item = within(legend).getByRole('button', { name: label });
         expect(item.querySelector(`svg.lucide-${glyph}`)).not.toBeNull();
         expect(item.querySelector('[data-map-symbol]')).toHaveStyle({ backgroundColor: color });
         expect(item.querySelector('polygon')).toBeNull();
       }
-      expect(within(legend).getByRole('button', { name: 'En Tránsito', exact: true })).toBeInTheDocument();
+      expect(within(legend).getByRole('button', { name: 'En Tránsito' })).toBeInTheDocument();
   });
 
   it('does not advertise inspection operations where that layer is not offered', () => {

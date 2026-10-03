@@ -15,7 +15,7 @@ describe('Map controls and marker identity', () => {
   it('keeps the exact zero count and hidden state without manufacturing an action', () => {
     const toggle = vi.fn();
     render(<MapLayerToggle category="operador" label="Operadores" pressed={false} count={0} onToggle={toggle} />);
-    const button = screen.getByRole('button', { name: 'Operadores', exact: true });
+    const button = screen.getByRole('button', { name: 'Operadores' });
     expect(button).toHaveAttribute('aria-pressed', 'false');
     expect(button).toHaveAccessibleDescription('(0)');
     expect(button.querySelector('svg.lucide-eye-off')).not.toBeNull();
