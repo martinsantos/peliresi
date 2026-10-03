@@ -36,18 +36,18 @@ describe('Report map single interactive category reference', () => {
     const marker = screen.getAllByTestId('marker').find(node => node.textContent?.includes('Transporte Maipú'));
     expect(marker).toHaveAttribute('data-position', JSON.stringify([-32.943, -68.755]));
     expect(marker).toHaveTextContent('Referencia departamental aproximada');
-    fireEvent.click(screen.getByRole('button', { name: 'Todos los deptos.', exact: true }));
-    fireEvent.click(screen.getByRole('option', { name: 'Maipú', exact: true }));
-    expect(screen.getByRole('button', { name: 'Transportistas', exact: true }).querySelector('[data-map-count]')).toHaveTextContent('1');
+    fireEvent.click(screen.getByRole('button', { name: /^Todos los deptos\.$/ }));
+    fireEvent.click(screen.getByRole('option', { name: /^Maipú$/ }));
+    expect(screen.getByRole('button', { name: /^Transportistas$/ }).querySelector('[data-map-count]')).toHaveTextContent('1');
     expect(screen.getAllByTestId('marker')).toHaveLength(1);
     expect(screen.getByRole('button', { name: /^Transporte Maipú sin GPS/ })).toHaveTextContent('Maipú');
   });
   it('counts a departmental reference shown by the active department filter', () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => [] })));
     reportMap([{ id: 'maipu-count', razonSocial: 'Transporte contado', cuit: 'synthetic', domicilio: 'Ruta de prueba, Maipú', latitud: null, longitud: null, vehiculosActivos: 0, enviosEnTransito: 0 }]);
-    fireEvent.click(screen.getByRole('button', { name: 'Todos los deptos.', exact: true }));
-    fireEvent.click(screen.getByRole('option', { name: 'Maipú', exact: true }));
-    expect(screen.getByRole('button', { name: 'Transportistas', exact: true }).querySelector('[data-map-count]')).toHaveTextContent('1');
+    fireEvent.click(screen.getByRole('button', { name: /^Todos los deptos\.$/ }));
+    fireEvent.click(screen.getByRole('option', { name: /^Maipú$/ }));
+    expect(screen.getByRole('button', { name: /^Transportistas$/ }).querySelector('[data-map-count]')).toHaveTextContent('1');
   });
   it('uses the canonical glyph and color, even for the in-situ operator modality', () => {
     reportMap();
