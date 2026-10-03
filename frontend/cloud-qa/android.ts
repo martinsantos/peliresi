@@ -409,6 +409,40 @@ try{
     await expect(page.getByRole('button',{name:'Saltar introducción',exact:true})).toHaveCount(0);
     await proof('restarted-inspector-record');
   });
+  await check('unsent-field-comment-survives-process-stop-without-false-server-ack',async()=>{
+    assert.ok(inspection?.id);
+    const unsent='QA Android: comentario local sin confirmación del servidor.';
+    const key='sitrep_inspection_draft_'+inspectorUserId+'_'+inspection.id;
+    await context.setOffline(true);
+    try{
+      await page.locator('#inspection-observations').fill(unsent);
+      // Await the application's observable local persistence, not an artificial
+      // delay for Chrome to commit its profile to disk. No storage injection.
+      await expect.poll(()=>page.evaluate(k=>JSON.parse(localStorage.getItem(k)||'null')?.observaciones,key)).toBe(unsent);
+      await expect(page.getByText('Cambios confirmados en el servidor',{exact:true})).toHaveCount(0);
+      await proof('unsent-field-comment-local');
+    }finally{await closeContext();}
+    await launch();
+    const [server]=await Promise.all([
+      page.waitForResponse(r=>r.url().endsWith('/api/inspecciones/'+inspection.id)&&r.request().method()==='GET'&&r.status()===200),
+      page.goto('http://127.0.0.1:4177/app/inspecciones/'+inspection.id+'#acta'),
+    ]);
+    const serverCopy=(await server.json()).data;
+    expect(serverCopy.observaciones).toBe('QA Android comentario conservado después de cerrar Chrome.');
+    await expect(page.locator('#inspection-observations')).toHaveValue(unsent);
+    await expect(page.locator('#inspection-observations')).toBeEnabled();
+    await expect(page.getByText('Cambios confirmados en el servidor',{exact:true})).toHaveCount(0);
+    const local=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)||'null'),key);
+    await writeFile(path.join(output,'unsent-field-recovery.json'),JSON.stringify({server:serverCopy.observaciones,local:local?.observaciones},null,2));
+    await proof('unsent-field-comment-recovered');
+    const [saved]=await Promise.all([
+      page.waitForResponse(r=>r.url().endsWith('/api/inspecciones/'+inspection.id+'/borrador')&&r.request().method()==='PATCH'),
+      nativeButtonTap('Guardar cambios','sync-recovered-field-comment'),
+    ]);
+    expect(saved.status()).toBe(200);
+    expect((await saved.json()).data.observaciones).toBe(unsent);
+    await expect(page.getByText('Cambios confirmados en el servidor',{exact:true})).toBeVisible();
+  });
   await check('inspection-indexes-and-current-control-are-closable-on-Android',async()=>{
     await page.goto('http://127.0.0.1:4177/app/inspecciones');
     await page.getByRole('button',{name:'Nueva inspección',exact:true}).tap();
@@ -530,7 +564,7 @@ try{
   });
 }finally{
   try{
-    await saveResults(results.length===14);
+    await saveResults(results.length===15);
     await closeContext();
     await driverStep('close-QA-device',()=>device.close(),10000);
   }finally{await stopSystemLog();}
