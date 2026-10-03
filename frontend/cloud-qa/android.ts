@@ -76,7 +76,7 @@ const nativeButtonTap=async(name:string,evidence:string)=>{
       &&r.bottom<=(v?(v.offsetTop+v.height):innerHeight);
   })).toBe(true);
   await device.screenshot({path:path.join(output,evidence+'-device.png')});
-  const xml=readNativeWindow();
+  const xml=await readNativeWindow();
   await writeFile(path.join(output,evidence+'-native.xml'),xml);
   const dom=await button.evaluate(el=>({rect:el.getBoundingClientRect().toJSON(),
     active:document.activeElement?.tagName,viewport:{width:innerWidth,height:innerHeight,
@@ -185,7 +185,7 @@ const logout=async()=>{
       visual:visualViewport?{height:visualViewport.height,offsetTop:visualViewport.offsetTop,scale:visualViewport.scale}:null}};
   }),null,2));
   await settleNativeChrome();
-  await writeFile(path.join(output,`logout-${attempt}-native-before.xml`),readNativeWindow());
+  await writeFile(path.join(output,`logout-${attempt}-native-before.xml`),await readNativeWindow());
   await device.screenshot({path:path.join(output,`logout-${attempt}-before-device.png`)});
   // A web control is touched through the normal browser input path. Android's
   // accessibility snapshot can temporarily report zero bounds for this button;
@@ -229,6 +229,11 @@ const check=async(name:string,task:()=>Promise<void>)=>{
   // continue acting on a different context or disguise incomplete work as PASS.
   if(results.at(-1)?.status==='FAIL'&&results.at(-1)?.error?.startsWith('Android driver deadline exceeded:'))
     throw new DeadlineError(name,25000);
+  // ADB loss closes the experimental driver even if Chrome remains alive.
+  // Preserve the failing case, then stop: later cases on a dead context have
+  // not run and must not be misreported as independent application failures.
+  if(results.at(-1)?.status==='FAIL'&&page?.isClosed())
+    throw new Error('Android driver connection lost after '+name+'; remaining cases not executed');
 };
 let inspection:{id:string;numero:string};
 try{

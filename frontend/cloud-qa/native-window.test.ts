@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chromeButtonPoint, nativeNodes, pixelLauncherAnrClosePoint } from './native-window.ts';
+import { chromeButtonPoint, collectNativeWindow, nativeNodes, pixelLauncherAnrClosePoint } from './native-window.ts';
 
 const node = (extra = '', bounds = '[40,100][240,180]') => `<node package="com.android.chrome" text="No thanks" enabled="true" clickable="true" bounds="${bounds}" ${extra}/>`;
 const window = (nodes: string) => '<?xml version="1.0"?><hierarchy>' + nodes + '</hierarchy>';
@@ -55,4 +55,35 @@ test('refuses absent, empty or inverted bounds for the system ANR recovery', () 
   for (const bounds of ['', '[70,1174][70,1300]', '[1010,1300][70,1174]']) {
     assert.throws(() => pixelLauncherAnrClosePoint(window(launcherTitle + launcherClose.replace('[70,1174][1010,1300]', bounds))));
   }
+});
+
+test('fresh native dump yields to other driver work and reads only after completion', async () => {
+  const calls: Array<{args: string[]; timeout: number}> = [];
+  let finish!: () => void;
+  const dump = new Promise<void>(resolve => { finish = resolve; });
+  const result = collectNativeWindow(async (args, timeout) => {
+    calls.push({args, timeout});
+    if (args[1] === 'uiautomator') { await dump; return 'UI hierarchy dumped'; }
+    return window(node());
+  });
+  await new Promise<void>(resolve => setImmediate(resolve));
+  assert.equal(calls.length, 1, 'The event loop stays available while the dump is pending');
+  finish();
+  assert.equal(await result, window(node()));
+  assert.deepEqual(calls, [
+    {args: ['shell', 'uiautomator', 'dump', '/data/local/tmp/sitrep-cloud-qa-window.xml'], timeout: 20000},
+    {args: ['shell', 'cat', '/data/local/tmp/sitrep-cloud-qa-window.xml'], timeout: 5000},
+  ]);
+});
+test('failed native dump is never retried or replaced with an older XML file', async () => {
+  let calls = 0;
+  await assert.rejects(collectNativeWindow(async () => { calls++; throw new Error('device offline'); }), /Native UI dump failed: device offline/);
+  assert.equal(calls, 1);
+});
+test('failed or incomplete native XML read is not accepted as an empty passing window', async () => {
+  await assert.rejects(collectNativeWindow(async args => {
+    if (args[1] === 'cat') throw new Error('read disconnected');
+    return 'dumped';
+  }), /read disconnected/);
+  await assert.rejects(collectNativeWindow(async args => args[1] === 'cat' ? '<hierarchy><node/>' : 'dumped'));
 });

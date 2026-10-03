@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
+import { promisify } from 'node:util';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { assertCloudEnvironment } from './safety.ts';
@@ -39,30 +40,37 @@ export function pixelLauncherAnrClosePoint(xml: string): { x: number; y: number 
   assert.ok(right > left && bottom > top, 'Never tap zero-area or inverted ANR bounds');
   return { x: Math.floor((left + right) / 2), y: Math.floor((top + bottom) / 2) };
 }
-export function readNativeWindow(): string {
-  assertCloudEnvironment();
+type NativeCommand = (args: string[], timeout: number) => Promise<string>;
+const execute = promisify(execFile);
+
+/** Collect one fresh dump without blocking CDP and the Android ADB poll. */
+export async function collectNativeWindow(run: NativeCommand): Promise<string> {
   const file = '/data/local/tmp/sitrep-cloud-qa-window.xml';
   try {
-    execFileSync('adb', ['shell', 'uiautomator', 'dump', file], { encoding: 'utf8', timeout: 20000 });
+    await run(['shell', 'uiautomator', 'dump', file], 20000);
   } catch (error) {
     const failure = error as Error & { stdout?: string; stderr?: string };
     throw new Error('Native UI dump failed: ' + failure.message + '\n' + (failure.stdout || '') + (failure.stderr || ''));
   }
-  const xml = execFileSync('adb', ['shell', 'cat', file], { encoding: 'utf8', timeout: 5000 });
+  const xml = await run(['shell', 'cat', file], 5000);
   nativeNodes(xml);
   return xml;
+}
+export async function readNativeWindow(): Promise<string> {
+  assertCloudEnvironment();
+  return collectNativeWindow(async (args, timeout) => (await execute('adb', args, { encoding: 'utf8', timeout })).stdout);
 }
 export async function dismissObservedChromePrompts(output: string): Promise<void> {
   // Do not mix a long-running Playwright UIAutomator instrumentation with the
   // one-shot native dump: run7 reproduced tap timeout, dump failures and hanging
   // teardown. ADB taps use bounds from fresh OS evidence, not guessed coordinates.
-  let xml = readNativeWindow();
+  let xml = await readNativeWindow();
   await writeFile(path.join(output, 'native-window-latest.xml'), xml);
   const launcherClose = pixelLauncherAnrClosePoint(xml);
   if (launcherClose) {
     await writeFile(path.join(output, 'native-Pixel-Launcher-ANR-before.xml'), xml);
     execFileSync('adb', ['shell', 'input', 'tap', String(launcherClose.x), String(launcherClose.y)], { timeout: 5000 });
-    xml = readNativeWindow();
+    xml = await readNativeWindow();
     await writeFile(path.join(output, 'native-Pixel-Launcher-ANR-after.xml'), xml);
     assert.ok(!nativeNodes(xml).some(node => node.package === 'android' && node.text === PIXEL_LAUNCHER_ANR),
       'Observed Pixel Launcher ANR must actually disappear after Close app');
@@ -73,7 +81,7 @@ export async function dismissObservedChromePrompts(output: string): Promise<void
     await writeFile(path.join(output, 'native-' + button.replaceAll(' ', '-') + '-before.xml'), xml);
     const point = chromeButtonPoint(xml, button);
     execFileSync('adb', ['shell', 'input', 'tap', String(point.x), String(point.y)], { timeout: 5000 });
-    xml = readNativeWindow();
+    xml = await readNativeWindow();
     await writeFile(path.join(output, 'native-' + button.replaceAll(' ', '-') + '-after.xml'), xml);
     assert.ok(!nativeNodes(xml).some(node => node.package === 'com.android.chrome' && node.text === title),
       'Observed native prompt must actually close after the tap');
