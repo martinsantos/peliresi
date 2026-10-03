@@ -1,5 +1,5 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
-import { login, prefix } from './helpers';
+import { login, prefix, readableMapLayers } from './helpers';
 
 function health(page: Page) {
   const errors: string[] = [];
@@ -38,6 +38,11 @@ test('proactive context offers explicit locations and one actionable reference p
   await dialog.getByRole('combobox', { name: 'Actor inspeccionado', exact: true }).selectOption({ label: 'QA Generador 2' });
   await expect(dialog.getByLabel('Ubicación prevista', { exact: true })).toHaveValue('QA portón constatado');
   await expect(dialog.getByRole('button', { name: /QA Planta 200/ })).toHaveCount(0);
+  const tooLong = dialog.getByRole('button', { name: `Usar domicilio legal: ${'A'.repeat(301)}`, exact: true });
+  await expect(tooLong).toBeDisabled();
+  await expect(tooLong).toHaveAccessibleDescription(/300 caracteres/);
+  await dialog.getByLabel('Ubicación prevista', { exact: true }).fill('A'.repeat(301));
+  await expect(dialog.getByLabel('Ubicación prevista', { exact: true })).toHaveValue('A'.repeat(300));
   await dialog.getByLabel('Responsable todavía sin identificar', { exact: true }).check();
   await expect(dialog.getByRole('group', { name: 'Direcciones declaradas' })).toHaveCount(0);
   await dialog.getByLabel('Responsable todavía sin identificar', { exact: true }).uncheck();
@@ -54,6 +59,7 @@ test('proactive context offers explicit locations and one actionable reference p
   await page.getByRole('button', { name: 'Generadores', exact: true }).scrollIntoViewIfNeeded();
   await expect(page.getByRole('group', { name: 'Capas del mapa' })).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Generadores', exact: true })).toHaveCount(1);
+  await readableMapLayers(page.getByRole('group', { name: 'Capas del mapa' }));
   await proof(page, info, '02-control-layers.png');
   await page.getByRole('heading', { name: 'Mapa de Actividad', exact: true }).scrollIntoViewIfNeeded();
   await proof(page, info, '03-control-map.png');
@@ -64,6 +70,7 @@ test('proactive context offers explicit locations and one actionable reference p
   const layers = page.getByRole('group', { name: 'Capas del mapa', exact: true });
   await expect(layers).toHaveCount(1);
   await layers.scrollIntoViewIfNeeded();
+  await readableMapLayers(layers);
   await expect(page.getByText('Generadores', { exact: true })).toHaveCount(1);
   for (const [label, glyph, symbol] of [['Generadores', 'factory', 'generador'], ['Transportistas', 'truck', 'transportista'], ['Op. Fijos', 'flask-conical', 'operador'], ['Op. In Situ', 'flask-conical', 'operador'], ['Inspecciones', 'clipboard-check', 'inspeccion']]) {
     const button = layers.getByRole('button', { name: label, exact: true });

@@ -16,7 +16,7 @@ try {
     domicilio: 'QA Registro 100', domicilioRealCalle: 'QA Planta 200', domicilioRealLocalidad: 'Las Heras',
     domicilioLegalCalle: 'QA Oficina 300', domicilioLegalDepto: 'Capital',
   } });
-  await db.generador.update({ where: { id: fixture.actors.generador2 }, data: { domicilio: 'QA Otro 400' } });
+  await db.generador.update({ where: { id: fixture.actors.generador2 }, data: { domicilio: 'QA Otro 400', domicilioLegalCalle: 'A'.repeat(301) } });
   await db.operador.update({ where: { id: fixture.actors.operador }, data: {
     domicilioRealCalle: 'QA Tratamiento 500', domicilioRealDepto: 'Godoy Cruz',
   } });

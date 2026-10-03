@@ -1,5 +1,5 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
-import { login, prefix } from './helpers';
+import { login, prefix, readableMapLayers } from './helpers';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 
@@ -92,6 +92,7 @@ test('control center queries real layers, refreshes and opens the exact active i
     await expect(entry.locator('polygon')).toHaveCount(0);
   }
   await legend.scrollIntoViewIfNeeded();
+  await readableMapLayers(legend);
   for (const button of await legend.getByRole('button').all()) {
     const box = (await button.boundingBox())!;
     expect(box.height).toBeGreaterThanOrEqual(44);

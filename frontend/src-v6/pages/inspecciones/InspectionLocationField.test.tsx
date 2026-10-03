@@ -5,6 +5,25 @@ import { InspectionLocationField } from './InspectionLocationField';
 
 const options = [{ label: 'Domicilio real', value: 'Planta 100' }];
 describe('Explicit declared-location choice', () => {
+  it('keeps an oversized official address intact but does not copy it into the shorter location field', () => {
+    const long = 'A'.repeat(301);
+    const change = vi.fn();
+    render(<InspectionLocationField label="Ubicación" value="Lugar observado" onChange={change} options={[{ label: 'Domicilio legal', value: long }]} />);
+    const option = screen.getByRole('button', { name: `Usar domicilio legal: ${long}` });
+    expect(option).toBeDisabled();
+    expect(screen.getByText(long)).toBeInTheDocument();
+    expect(option).toHaveAccessibleDescription(/300 caracteres/);
+    fireEvent.click(option);
+    expect(change).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Ubicación')).toHaveValue('Lugar observado');
+  });
+
+  it('exposes the actual 300-character location limit without truncating a recovered draft', () => {
+    render(<InspectionLocationField label="Ubicación" value={'A'.repeat(301)} onChange={vi.fn()} options={[]} />);
+    expect(screen.getByLabelText('Ubicación')).toHaveAttribute('maxlength', '300');
+    expect(screen.getByLabelText('Ubicación')).toHaveValue('A'.repeat(301));
+    expect(screen.getByLabelText('Ubicación')).toHaveAttribute('aria-invalid', 'true');
+  });
   it('never calls a change handler just because addresses arrive or change', () => {
     const change = vi.fn();
     const { rerender } = render(<InspectionLocationField label="Lugar" value="Portón observado" onChange={change} options={options} />);

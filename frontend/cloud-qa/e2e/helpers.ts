@@ -1,4 +1,23 @@
-import { expect, type Page, type TestInfo } from '@playwright/test';
+import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
+
+/** Real text geometry, not just a page-overflow check: long names/counts must not collide. */
+export async function readableMapLayers(group: Locator) {
+  for (const button of await group.getByRole('button').all()) {
+    const result = await button.evaluate(element => {
+      const bounds = element.getBoundingClientRect();
+      const pieces = Array.from(element.querySelectorAll('[data-map-label], [data-map-count]')).flatMap(text => {
+        const range = document.createRange(); range.selectNodeContents(text);
+        return Array.from(range.getClientRects()).map(rect => ({ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }));
+      });
+      const state = element.querySelector('[data-map-state]')!.getBoundingClientRect();
+      const collides = pieces.some(rect => Math.min(rect.right, state.right) - Math.max(rect.left, state.left) > 1 && Math.min(rect.bottom, state.bottom) - Math.max(rect.top, state.top) > 1);
+      const contained = pieces.every(rect => rect.left >= bounds.left && rect.right <= bounds.right + 1 && rect.top >= bounds.top && rect.bottom <= bounds.bottom + 1);
+      return { name: element.getAttribute('aria-label'), collides, contained, height: bounds.height };
+    });
+    expect(result, `Readable map control: ${result.name}`).toMatchObject({ collides: false, contained: true });
+    expect(result.height).toBeGreaterThanOrEqual(44);
+  }
+}
 
 export const prefix = (info: TestInfo) => info.project.name === 'app' ? '/app' : '';
 
